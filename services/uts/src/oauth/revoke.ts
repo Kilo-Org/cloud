@@ -1,8 +1,10 @@
 import type { UtsConfig } from '../env';
 import type { GrantsAccess } from '../grants/store';
+import type { FeedEntry } from '../revocation/entries';
+import type { FeedPublish } from '../revocation/publish';
 import { grantIdOfFirstPartyRefreshToken, isRandomCredential, sha256 } from '../token/credentials';
 import { identifyClient } from './clients';
-import { failureResponse, oauthError } from './errors';
+import { failureResponse, oauthError, temporarilyUnavailable } from './errors';
 import { readForm } from './params';
 
 /**
@@ -12,6 +14,11 @@ import { readForm } from './params';
  * section 2.2). An access token answers `unsupported_token_type`: it lives 10 minutes, and its
  * grant is revoked through the refresh credential.
  *
+ * After the statement commits, the feed entries it wrote go to both feed objects, and the call
+ * answers 200 once one confirms. When neither does, the revocation still stands and the backfill
+ * adds the entries within seconds; the call answers 503 so the client retries, and the retry finds
+ * the token already revoked.
+ *
  * A public client identifies by `client_id`. A token issued to another client changes nothing and
  * answers 200 like an unknown token, so the answer does not tell which client holds a token; the
  * statement's denied audit row records the attempt. No DPoP proof is needed, so a device that lost
@@ -19,7 +26,7 @@ import { readForm } from './params';
  * that device out, a denial of service and nothing more (design 5.6).
  */
 
-export type RevokeDeps = { config: UtsConfig; grants: GrantsAccess };
+export type RevokeDeps = { config: UtsConfig; grants: GrantsAccess; publish: FeedPublish };
 
 /** A compact JWS: three base64url parts, the header always starting `eyJ`. */
 const JWT_SHAPE = /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
@@ -45,17 +52,19 @@ export async function handleRevoke(request: Request, deps: RevokeDeps): Promise<
   if (grantIdOfFirstPartyRefreshToken(token.value) === null && !isRandomCredential(token.value)) {
     return revoked;
   }
+  let feedEntries: FeedEntry[];
   try {
     // Every outcome answers 200: revoked, already revoked, unknown, or issued to another client.
-    await deps.grants(async grants =>
+    ({ feedEntries } = await deps.grants(async grants =>
       grants.revoke({
         environment: deps.config.environment,
         tokenHash: await sha256(token.value),
         clientId: clientId.value,
       })
-    );
-    return revoked;
+    ));
   } catch (error) {
     return failureResponse(error, 'revoke');
   }
+  if ((await deps.publish(feedEntries)) === 'unpublished') return temporarilyUnavailable();
+  return revoked;
 }

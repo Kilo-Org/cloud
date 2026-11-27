@@ -13,11 +13,15 @@
   // feed Worker calls for signer keys, runs where the feed Worker runs.
   "placement": { "region": "aws:eu-central-1" },
   // Traces stay off: a trace records Durable Object storage calls and outbound requests, and the
-  // signer objects hold private keys. Every env block inherits this.
+  // signer objects hold private keys. Query strings stay out of the request URLs in logs and
+  // traces: a provider callback carries its authorization code there, and a LinkedIn code (no PKCE,
+  // no ID-token nonce) read from a log could be replayed while it lives. Every env block inherits
+  // this.
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "invocation_logs": true },
     "traces": { "enabled": false },
+    "redact_query_string": true,
   },
   "logpush": true,
   "routes": [
@@ -31,19 +35,62 @@
     "UTS_ENVIRONMENT": "production",
     // Signer objects hold private keys, so production and staging pin them to the EU.
     "DO_JURISDICTION": "eu",
+    // The PAT lookup Hyperdrive config's connection limit: 20 percent of max_connections 160. The
+    // per-isolate PAT lookup cap is min(100, 3 x this) = 96 (src/env.ts, design 3).
+    "PAT_LOOKUP_CONNECTIONS": "32",
+    // Passkeys belong to the app host; the sign-in pages on the issuer origin use them as a
+    // WebAuthn related origin that the app host lists (design 5.14).
+    "WEBAUTHN_RP_ID": "app.kilo.ai",
+    "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
+    // The identity-store login rotation (src/rotation/config.ts) ships off; turning it on here
+    // belongs to the later rotation phase, after STS delivers UTS_HYPERDRIVE_SWITCH_TOKEN, the login
+    // seeds sit in /db-switch/uts and the origins are pinned (README, "Login rotation").
+    "LOGIN_ROTATION": "off",
+    // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
+    // UTS_TURNSTILE_SITE_KEY are added here, after the secrets SIGNIN_EMAIL_HASH_KEY,
+    // UTS_MAILGUN_SENDING_KEY and UTS_TURNSTILE_SECRET_KEY are set. Staging also needs
+    // UTS_MAIL_ALLOWED_RECIPIENTS; production must not set it (README, "Configuration").
   },
   "durable_objects": {
     "bindings": [
       { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+      // The two revocation-feed objects; only this Worker binds them (src/feed/UtsFeedDO.ts).
+      { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+      { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
+      // The login key of the environment's `uts-rotation-<environment>` identity in the secrets
+      // manager; the key set is served at /manager-auth/.well-known/jwks.json (src/dos/UtsManagerAuthDO.ts).
+      { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
+      // The identity-store login rotation and its sealed login passwords (src/dos/UtsLoginRotationDO.ts).
+      { "name": "UTS_LOGIN_ROTATION_DO", "class_name": "UtsLoginRotationDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["UtsManagerAuthDO"] },
+    { "tag": "v6", "new_sqlite_classes": ["UtsLoginRotationDO"] },
   ],
-  // No identity-store Hyperdrive binding yet: the OAuth endpoints and their metadata stay off
-  // until the environment's identity store is provisioned (src/grants/binding.ts).
+  // The audit outbox relay sends each shard's batches to the environment's UTS audit queue, which
+  // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
+  // streams from it (design 8.1).
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
+  // No STS binding yet: STS has no `uts` workload policy, so the rotation job (off) would get no
+  // secrets. The binding `STS` (service `sts`, entrypoint `SecretsBroker`, props.caller `uts`;
+  // `sts-staging` in env.staging) is added with that policy (README, "Login rotation").
+  // Every minute: keep the 8 audit shard relays running, maintain audit partitions, OAuth rows and
+  // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts).
+  "triggers": { "crons": ["* * * * *"] },
+  // The identity store's three Hyperdrive configs (README "Deploys"): the primary (logins
+  // uts_app_a/b), the PAT lookup config (uts_pat_a/b) and the read replica (uts_reader_a/b).
+  // Bindings are not inherited, so the staging block lists its own.
+  "hyperdrive": [
+    { "binding": "IDENTITY_STORE", "id": "314ea5eee7314e09b59728ff5453e9d9" },
+    { "binding": "IDENTITY_STORE_PAT", "id": "f041609cd77043d7b81bdd9265f46cec" },
+    { "binding": "IDENTITY_STORE_REPLICA", "id": "4194e3ece2b442e381ec6d82f9bc0dcf" },
+  ],
   "env": {
     "staging": {
       "name": "uts-staging",
@@ -59,13 +106,31 @@
       "vars": {
         "UTS_ENVIRONMENT": "staging",
         "DO_JURISDICTION": "eu",
+        // The staging PAT lookup config's connection limit; per-isolate cap min(100, 36) = 36.
+        "PAT_LOOKUP_CONNECTIONS": "12",
+        // Staging keeps its own passkeys on the issuer host, so it needs no related-origins list
+        // on the staging app (design 5.14).
+        "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
+        "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
+        "LOGIN_ROTATION": "off",
       },
       "durable_objects": {
         "bindings": [
           { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+          { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+          { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
+          { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
+          { "name": "UTS_LOGIN_ROTATION_DO", "class_name": "UtsLoginRotationDO" },
         ],
       },
+      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
+      "triggers": { "crons": ["* * * * *"] },
+      "hyperdrive": [
+        { "binding": "IDENTITY_STORE", "id": "5dd523ea0fa447ebaf442a0300d8f848" },
+        { "binding": "IDENTITY_STORE_PAT", "id": "48227f1c669742618bb7bc6adf9a416c" },
+        { "binding": "IDENTITY_STORE_REPLICA", "id": "5fa4d303a52e4274a9750b20e2f507f0" },
+      ],
     },
   },
 }

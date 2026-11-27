@@ -3926,15 +3926,33 @@ importers:
 
   services/uts:
     dependencies:
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/sts-contracts':
         specifier: workspace:*
         version: link:../../packages/sts-contracts
       '@kilocode/uts-contracts':
         specifier: workspace:*
         version: link:../../packages/uts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
+      '@peculiar/asn1-schema':
+        specifier: 2.9.4
+        version: 2.9.4
+      '@peculiar/asn1-x509':
+        specifier: 2.9.4
+        version: 2.9.4
+      '@simplewebauthn/server':
+        specifier: 14.0.1
+        version: 14.0.1
+      cbor2:
+        specifier: 2.3.0
+        version: 2.3.0
       jose:
         specifier: 'catalog:'
         version: 6.2.17
@@ -3960,6 +3978,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
+      playwright:
+        specifier: 1.65.0
+        version: 1.65.0
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -3975,9 +3996,15 @@ importers:
 
   services/uts-feed:
     dependencies:
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/uts-contracts':
         specifier: workspace:*
         version: link:../../packages/uts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -3994,6 +4021,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.17
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -162,14 +162,16 @@ export type WaitUntil = { waitUntil(promise: Promise<unknown>): void };
 
 /**
  * Opens one connection for one request, runs `work`, and closes the connection in the
- * background. `connectionString` is a Hyperdrive binding's `connectionString`.
+ * background. `connectionString` is a Hyperdrive binding's `connectionString`. A caller that must
+ * not wait on a hung connect passes `connectionTimeoutMillis`; a timed-out connect is retryable.
  */
 export async function withIdentityStore<Result>(
   connectionString: string,
   context: WaitUntil,
-  work: (store: IdentityStore) => Promise<Result>
+  work: (store: IdentityStore) => Promise<Result>,
+  options: { connectionTimeoutMillis?: number } = {}
 ): Promise<Result> {
-  const client = new pg.Client({ connectionString, types: identityStoreTypes });
+  const client = new pg.Client({ connectionString, types: identityStoreTypes, ...options });
   try {
     await client.connect();
   } catch (error) {

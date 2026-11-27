@@ -26,6 +26,8 @@ type Column = {
 /** Columns whose row schema is narrower than their SQL type, with a value the schema accepts. */
 const SAMPLE_OVERRIDES: Record<string, unknown> = {
   'audit_events.event': auditEvent(),
+  'subject_operations.feed_entries': '[]',
+  'app_account_events.event_type': 'user.created',
 };
 
 const SCALAR_SAMPLES: Record<string, string> = {

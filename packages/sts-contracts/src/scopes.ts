@@ -50,6 +50,27 @@ export const STS_O11Y_ALERTING_READ = { audience: 'o11y', scope: 'o11y:alerting.
 /** The web app's admin alerts router changes O11y's alerting configuration and baselines. */
 export const STS_O11Y_ALERTING_WRITE = { audience: 'o11y', scope: 'o11y:alerting.write' } as const;
 
+/** The web app asks Security Sync to enqueue a manual sync. Only the `web` workload may send it. */
+export const STS_SECURITY_SYNC_MANUAL_SYNC = {
+  audience: 'security-sync',
+  scope: 'security-sync:manual-sync.enqueue',
+} as const;
+
+/** The web app asks Security Sync to enqueue a finding dismissal. Only the `web` workload may send it. */
+export const STS_SECURITY_SYNC_DISMISS_FINDING = {
+  audience: 'security-sync',
+  scope: 'security-sync:dismiss-finding.enqueue',
+} as const;
+
+/**
+ * Security Sync asks the web app to dispatch security notifications. Only the Security Sync
+ * Worker's workload may send it.
+ */
+export const STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH = {
+  audience: 'web',
+  scope: 'web:security-notifications.dispatch',
+} as const;
+
 /**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
  * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
@@ -57,12 +78,20 @@ export const STS_O11Y_ALERTING_WRITE = { audience: 'o11y', scope: 'o11y:alerting
  * app reads the revocation feed and ends or revokes a subject's sessions and credentials;
  * `uts:token-exchange` authenticates kilo-mcp's RFC 8693 exchange. The service-only scopes of
  * phase 4 are the Secure Proxy forward (`STS_SECURE_PROXY_FORWARD`), the usage publish to Usage
- * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), and O11y's
- * API-metrics write and alerting read and write (`STS_O11Y_*`). STS mints each one only where a
- * policy grants it (default deny).
+ * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
+ * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
+ * finding dismissal (`STS_SECURITY_SYNC_*`), and the web app's security notification dispatch
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`). STS mints each one only where a policy grants it
+ * (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
-  web: { scopes: ['web:sts.canary', STS_USAGE_RECORD.scope] },
+  web: {
+    scopes: [
+      'web:sts.canary',
+      STS_USAGE_RECORD.scope,
+      STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH.scope,
+    ],
+  },
   'usage-ingest': { scopes: ['usage-ingest:sts.canary', STS_USAGE_PUBLISH.scope] },
   [STS_DENIED_PROBE.audience]: { scopes: [STS_DENIED_PROBE.scope] },
   'uts-feed': { scopes: ['uts-feed:revocation.read'] },
@@ -81,6 +110,9 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       STS_O11Y_ALERTING_READ.scope,
       STS_O11Y_ALERTING_WRITE.scope,
     ],
+  },
+  'security-sync': {
+    scopes: [STS_SECURITY_SYNC_MANUAL_SYNC.scope, STS_SECURITY_SYNC_DISMISS_FINDING.scope],
   },
 };
 

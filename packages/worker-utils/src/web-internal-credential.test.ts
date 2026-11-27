@@ -152,7 +152,9 @@ describe('webInternalCredential', () => {
       {
         STS: answering({
           status: 'ok',
-          tokens: [{ status: 'denied', audience: 'web', scope: scope.scope, reason: 'unknown_scope' }],
+          tokens: [
+            { status: 'denied', audience: 'web', scope: scope.scope, reason: 'unknown_scope' },
+          ],
         }),
       },
       scope,

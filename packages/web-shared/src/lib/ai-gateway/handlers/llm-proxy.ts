@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { type NextResponse as NextResponseType } from 'next/server';
 import { after, type NextRequest } from 'next/server';
 import { ensureAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/ensure';
@@ -17,6 +16,7 @@ import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -253,7 +253,7 @@ export async function handleLlmProxyRequest(
   // A benchmark case request's usage id is minted by the Worker and signed into the
   // assignment, so `microdollar_usage.id` is known before the call and a replay cannot
   // double-charge. Every other request keeps a fresh server-side id.
-  const usageId = benchmark ? benchmark.assignment.usageId : randomUUID();
+  const usageId = benchmark ? benchmark.assignment.usageId : createUsageId();
 
   const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
     ([caller, account]) =>

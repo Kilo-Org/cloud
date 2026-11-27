@@ -17,6 +17,7 @@ import { SecretNotConfiguredError, readO11ySecret } from './secrets';
  * `o11y` audience). The set is closed: a value outside it refuses every request, never a default.
  * Unset means `legacy-only`, the behaviour before phase 4. Rollback is a redeploy with the value
  * set back to `legacy-only`, independent of `SECRETS_SOURCE` and of the callers' own switches.
+ * `API_METRICS_CREDENTIAL_ACCEPT` takes the same values for `POST /ingest/api-metrics` alone.
  */
 export const ADMIN_CREDENTIAL_ACCEPT_MODES = [
   'disabled',
@@ -48,7 +49,8 @@ export function adminCredentialAcceptance(mode: string | undefined): Acceptance 
 /** The STS audience of this Worker (design 6.5); all three o11y scopes belong to it. */
 export const O11Y_STS_AUDIENCE = STS_O11Y_ALERTING_READ.audience;
 
-export type AdminRoute = 'apiMetricsWrite' | 'alertingRead' | 'alertingWrite';
+const ADMIN_ROUTE_NAMES = ['apiMetricsWrite', 'alertingRead', 'alertingWrite'] as const;
+export type AdminRoute = (typeof ADMIN_ROUTE_NAMES)[number];
 
 /** One admin route family's STS contract: its one scope and the STS workloads that may call it. */
 export type AdminRouteContract = { scope: string; workloads: readonly string[] };
@@ -80,14 +82,34 @@ const RESOURCE_ORIGINS: Readonly<Partial<Record<StsEnvironment, string>>> = {
 export const RESOURCE_METADATA_PATH = '/.well-known/oauth-protected-resource';
 
 /**
- * The deployment settings the admin routes read. `ADMIN_CREDENTIAL_ACCEPT` (default
- * `legacy-only`) and `STS_ENVIRONMENT` (the one `env` claim and issuer STS tokens must carry) are
- * read only from the Worker's own configuration.
+ * The deployment settings the admin routes read, only from the Worker's own configuration:
+ * - `ADMIN_CREDENTIAL_ACCEPT` (default `legacy-only`), the mode of every admin route;
+ * - `API_METRICS_CREDENTIAL_ACCEPT`, the mode of the API-metrics write alone (D59: its senders cut
+ *   over to STS while the alerting routes keep `ADMIN_CREDENTIAL_ACCEPT`). Unset or empty, the
+ *   route follows `ADMIN_CREDENTIAL_ACCEPT`; a value outside the closed set refuses that route;
+ * - `STS_ENVIRONMENT`, the one `env` claim and issuer STS tokens must carry.
  */
 export type AdminCredentialEnv = {
   ADMIN_CREDENTIAL_ACCEPT?: string;
+  API_METRICS_CREDENTIAL_ACCEPT?: string;
   STS_ENVIRONMENT?: string;
 };
+
+/**
+ * The credentials `route` admits under this deployment's configuration, or the configuration
+ * error. An invalid `ADMIN_CREDENTIAL_ACCEPT` refuses every route, the API-metrics write included;
+ * an invalid `API_METRICS_CREDENTIAL_ACCEPT` refuses only that route. Configuration only.
+ */
+function routeAcceptance(
+  env: AdminCredentialEnv,
+  route: AdminRoute
+): Acceptance | { error: string } {
+  const base = adminCredentialAcceptance(env.ADMIN_CREDENTIAL_ACCEPT);
+  if (base === null) return { error: 'accept_mode' };
+  const override = route === 'apiMetricsWrite' ? env.API_METRICS_CREDENTIAL_ACCEPT : undefined;
+  if (override === undefined || override === '') return base;
+  return isAcceptMode(override) ? ACCEPTANCE[override] : { error: 'api_metrics_accept_mode' };
+}
 
 type StsRouteConfig = { environment: StsEnvironment; origin: string };
 
@@ -106,12 +128,16 @@ function stsRouteConfig(env: Env & AdminCredentialEnv): StsRouteConfig | { error
 
 /**
  * `GET /.well-known/oauth-protected-resource` (RFC 9728): the metadata the STS challenge names,
- * only while an STS mode is on and its environment is configured; otherwise null, and the route
- * answers the Worker's ordinary 404. It lists this Worker's origin, its STS issuer and the o11y
- * scopes, all from configuration and code.
+ * only while some route admits STS and its environment is configured; otherwise null, and the
+ * route answers the Worker's ordinary 404. It lists this Worker's origin, its STS issuer and the
+ * scopes of exactly the routes that admit STS, all from configuration and code.
  */
 export function protectedResourceMetadata(env: Env & AdminCredentialEnv): Response | null {
-  if (adminCredentialAcceptance(env.ADMIN_CREDENTIAL_ACCEPT)?.sts !== true) return null;
+  const scopes = ADMIN_ROUTE_NAMES.filter(route => {
+    const acceptance = routeAcceptance(env, route);
+    return !('error' in acceptance) && acceptance.sts;
+  }).map(route => ADMIN_ROUTES[route].scope);
+  if (scopes.length === 0) return null;
   const config = stsRouteConfig(env);
   if ('error' in config) return null;
   return Response.json(
@@ -119,7 +145,7 @@ export function protectedResourceMetadata(env: Env & AdminCredentialEnv): Respon
       resource: config.origin,
       authorization_servers: [STS_ISSUERS[config.environment]],
       bearer_methods_supported: ['header'],
-      scopes_supported: Object.values(ADMIN_ROUTES).map(route => route.scope),
+      scopes_supported: scopes,
     },
     { headers: { 'cache-control': 'public, max-age=300' } }
   );
@@ -162,8 +188,8 @@ export type AdminAuth = {
 
 /**
  * The admin-route guard. Create it at module scope: it holds one STS verifier per environment,
- * built on the first STS request, so its key set serves every later request of the isolate. In
- * `legacy-only` it builds nothing and fetches nothing.
+ * built on the first STS request, so its key set serves every later request of the isolate. A
+ * route in `legacy-only` builds nothing and fetches nothing.
  */
 export function createAdminAuth(): AdminAuth {
   const verifiers = new Map<StsEnvironment, Verifier<false>>();
@@ -242,8 +268,8 @@ export function createAdminAuth(): AdminAuth {
     requireAdmin: route => {
       return async (c, next) => {
         const env: Env & AdminCredentialEnv = c.env;
-        const acceptance = adminCredentialAcceptance(env.ADMIN_CREDENTIAL_ACCEPT);
-        if (acceptance === null) return misconfigured('accept_mode');
+        const acceptance = routeAcceptance(env, route);
+        if ('error' in acceptance) return misconfigured(acceptance.error);
         // The default: exactly the pre-phase-4 path. No verifier, key set or new header read.
         if (acceptance.legacy && !acceptance.sts) {
           return (await legacyCheck(c)) ?? (await next());

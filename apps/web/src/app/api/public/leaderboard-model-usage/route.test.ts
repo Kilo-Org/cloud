@@ -73,6 +73,71 @@ describe('GET /api/public/leaderboard-model-usage', () => {
     expect(redisClient.set).not.toHaveBeenCalled();
   });
 
+  test('sums the hours of each UTC day', async () => {
+    await insertLeaderboardUsage([
+      { hour_start: `${utcDaysAgo(2)}T00:00:00.000Z`, input_tokens: 1, output_tokens: 2 },
+      { hour_start: `${utcDaysAgo(2)}T23:00:00.000Z`, input_tokens: 4, output_tokens: 8 },
+      { hour_start: `${utcDaysAgo(1)}T00:00:00.000Z`, input_tokens: 16, output_tokens: 0 },
+    ]);
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([
+      { usageDate: utcDaysAgo(1), model: 'model', mode: 'code', tokens: 16 },
+      { usageDate: utcDaysAgo(2), model: 'model', mode: 'code', tokens: 15 },
+    ]);
+  });
+
+  test('applies the input filter per day, so an hour without input still counts', async () => {
+    await insertLeaderboardUsage([
+      { hour_start: `${utcDaysAgo(1)}T08:00:00.000Z`, input_tokens: 10, output_tokens: 0 },
+      { hour_start: `${utcDaysAgo(1)}T09:00:00.000Z`, input_tokens: 0, output_tokens: 5 },
+    ]);
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([
+      { usageDate: utcDaysAgo(1), model: 'model', mode: 'code', tokens: 15 },
+    ]);
+  });
+
+  test('reads only the hours of the seven complete UTC days before today', async () => {
+    await insertLeaderboardUsage([
+      { hour_start: `${utcDaysAgo(8)}T23:00:00.000Z`, input_tokens: 1, output_tokens: 0 },
+      { hour_start: `${utcDaysAgo(7)}T00:00:00.000Z`, input_tokens: 2, output_tokens: 0 },
+      { hour_start: `${utcDaysAgo(1)}T23:00:00.000Z`, input_tokens: 4, output_tokens: 0 },
+      { hour_start: `${utcDaysAgo(0)}T00:00:00.000Z`, input_tokens: 8, output_tokens: 0 },
+    ]);
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([
+      { usageDate: utcDaysAgo(1), model: 'model', mode: 'code', tokens: 4 },
+      { usageDate: utcDaysAgo(7), model: 'model', mode: 'code', tokens: 2 },
+    ]);
+  });
+
+  test('leaves out a day with an hour that was not built', async () => {
+    await insertLeaderboardUsage([{ usage_date: utcDaysAgo(1), input_tokens: 10 }], {
+      recordedHours: 23,
+    });
+    await insertLeaderboardUsage([{ usage_date: utcDaysAgo(2), input_tokens: 20 }]);
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([
+      { usageDate: utcDaysAgo(2), model: 'model', mode: 'code', tokens: 2_000_020 },
+    ]);
+  });
+
+  test('answers 502 while no day in the window is complete', async () => {
+    await insertLeaderboardUsage([{ usage_date: utcDaysAgo(1) }], { recordedHours: 23 });
+
+    const response = await GET();
+
+    expect(response.status).toBe(502);
+  });
+
   test('classifies modes without treating the KiloClaw feature as a mode', async () => {
     await insertLeaderboardUsage([
       { mode: 'Code', input_tokens: 700, output_tokens: 0 },

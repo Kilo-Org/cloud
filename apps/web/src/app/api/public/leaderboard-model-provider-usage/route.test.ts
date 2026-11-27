@@ -99,6 +99,57 @@ describe('GET /api/public/leaderboard-model-provider-usage', () => {
     expect(redisClient.set).not.toHaveBeenCalled();
   });
 
+  test('leaves out a day with an hour that was not built', async () => {
+    await insertLeaderboardUsage(
+      [{ usage_date: utcDaysAgo(1), requested_model: 'acme/partial-day' }],
+      { recordedHours: 23 }
+    );
+    await insertLeaderboardUsage([
+      { hour_start: `${utcDaysAgo(2)}T00:00:00.000Z`, requested_model: 'acme/complete-day' },
+      { hour_start: `${utcDaysAgo(2)}T23:00:00.000Z`, requested_model: 'acme/complete-day' },
+    ]);
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([
+      expect.objectContaining({ model: 'complete-day', sumTokens: 24_000_000 }),
+    ]);
+  });
+
+  test('applies the output filter per day, so an hour of only errors still counts', async () => {
+    await insertLeaderboardUsage([
+      { hour_start: `${utcDaysAgo(1)}T08:00:00.000Z`, request_count: 90 },
+      {
+        hour_start: `${utcDaysAgo(1)}T09:00:00.000Z`,
+        input_tokens: 0,
+        output_tokens: 0,
+        request_count: 10,
+        error_count: 10,
+      },
+    ]);
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([
+      expect.objectContaining({ model: 'model', sumTokens: 12_000_000, errorRate: 0.1 }),
+    ]);
+  });
+
+  test('reads only the hours of the seven complete UTC days before today', async () => {
+    await insertLeaderboardUsage([
+      { hour_start: `${utcDaysAgo(8)}T23:00:00.000Z`, requested_model: 'acme/too-old' },
+      { hour_start: `${utcDaysAgo(7)}T00:00:00.000Z`, requested_model: 'acme/first-hour' },
+      { hour_start: `${utcDaysAgo(1)}T23:00:00.000Z`, requested_model: 'acme/last-hour' },
+      { hour_start: `${utcDaysAgo(0)}T00:00:00.000Z`, requested_model: 'acme/today' },
+    ]);
+
+    const response = await GET();
+
+    expect(
+      ((await response.json()) as { model: string }[]).map(usage => usage.model).sort()
+    ).toEqual(['first-hour', 'last-hour']);
+  });
+
   test('keeps Claude Platform on AWS separate from Amazon Bedrock for the same model', async () => {
     await insertLeaderboardUsage([
       { requested_model: 'synthetic/model', inference_provider: 'claudeaws' },

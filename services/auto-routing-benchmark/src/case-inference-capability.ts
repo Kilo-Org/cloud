@@ -62,6 +62,7 @@ export async function verifyCaseInferenceCapability(
     token: authorization.slice('Bearer '.length),
     scope: BENCHMARK_CASE_CAPABILITY_SCOPE,
     resourceParts: benchmarkCaseCapabilityParts(invocation.data),
+    observation: { receiver: 'auto-routing-benchmark', caller: headers.get('x-kilo-caller') },
   });
   return authenticated ? invocation.data : null;
 }

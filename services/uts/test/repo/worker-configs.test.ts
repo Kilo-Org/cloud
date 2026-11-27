@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { STS_ISSUERS } from '@kilocode/sts-contracts';
-import { UTS_MINT_DEPLOYMENTS } from '@kilocode/uts-contracts';
+import { UTS_MINT_DEPLOYMENTS, type UtsEnvironment, utsScopeEntry } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
@@ -23,6 +23,7 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { ciPolicies } from '../../src/ci/policy';
 import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
 /**
@@ -635,6 +636,35 @@ describe('the UTS configs themselves', () => {
       enabled: 'true',
       sts: STS_ISSUERS.development,
     });
+  });
+
+  it('keep the CI token exchange off in production, and every configured CI trust policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.CI_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    const blocks: [unknown, UtsEnvironment][] = [
+      [staging, 'staging'],
+      [
+        experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+        'development',
+      ],
+      [
+        experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+        'development',
+      ],
+    ];
+    for (const [block, environment] of blocks) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = ciPolicies(
+        { CI_TOKEN_POLICIES: z.string().parse(value) },
+        environment,
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
   });
 
   it('leave the login rotation off in every deployed block, and name the configs it switches', () => {

@@ -11,8 +11,14 @@ import {
   type ExportJob,
   type HyperdriveBinding,
   type ReplicaDatabase,
+  type StateDb,
 } from './databases';
 import { SourceReadError, TerminalExportError } from './errors';
+import {
+  STS_WEB_USER_DATA_EXPORT_READY,
+  webInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import {
   createSourceAdapters,
   findPresentWarehouseTables,
@@ -154,7 +160,7 @@ export type ExportEnv = {
   R2_ACCOUNT_ID: string;
   R2_BUCKET_NAME: string;
   USER_DATA_EXPORT_WEB_URL?: string;
-};
+} & WebInternalAuthEnv;
 
 function objectKey(exportId: string): string {
   return `exports/${exportId}/kilo-data-export.jsonl.gz`;
@@ -994,9 +1000,9 @@ export function redirectTargetHost(response: Response, requestUrl: URL): string 
   }
 }
 
-async function dispatchReadyNotifications(
-  env: ExportEnv,
-  state: ReturnType<typeof createStateDb>
+export async function dispatchReadyNotifications(
+  env: Pick<ExportEnv, 'USER_DATA_EXPORT_WEB_URL' | 'INTERNAL_API_SECRET'> & WebInternalAuthEnv,
+  state: Pick<StateDb, 'pendingNotifications'>
 ): Promise<void> {
   if (!env.USER_DATA_EXPORT_WEB_URL) return;
   if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) {
@@ -1006,9 +1012,22 @@ async function dispatchReadyNotifications(
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   const callbackUrl = new URL('/api/internal/user-data-exports/ready', baseUrl);
   for (const item of await state.pendingNotifications()) {
+    // Per item: a held STS token is a memory read, and a long sweep presents a fresh one.
+    const credential = await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, {
+      header: 'x-internal-api-key',
+      secret: async () => env.INTERNAL_API_SECRET,
+    });
+    if (credential.kind === 'unavailable') {
+      // The rest of the sweep would fail the same way; the lease keeps every item for the next.
+      logExportEvent('warn', 'export_notification_callback_failed', {
+        exportId: item.id,
+        reason: 'credential_unavailable',
+      });
+      return;
+    }
     try {
       // redirect: 'manual' is fail-closed — we never follow a redirect and therefore
-      // never re-send x-internal-api-key to the redirect target. We still capture the
+      // never re-send the credential to the redirect target. We still capture the
       // redirect's target host (no path/query, so no secrets) to diagnose an
       // unexpected 3xx on the api.kilo.ai callback path.
       const response = await fetch(callbackUrl, {
@@ -1016,7 +1035,7 @@ async function dispatchReadyNotifications(
         redirect: 'manual',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': env.INTERNAL_API_SECRET,
+          [credential.header]: credential.value,
         },
         body: JSON.stringify({ exportId: item.id }),
         signal: AbortSignal.timeout(10_000),

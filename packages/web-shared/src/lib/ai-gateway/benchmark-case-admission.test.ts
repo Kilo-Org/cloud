@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeAll, beforeEach, jest } from '@jest/globals';
 import {
   BENCHMARK_ADMISSION_HEADER,
   BENCHMARK_ASSIGNMENT_HEADER,
@@ -19,13 +19,26 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 
-import {
-  BENCHMARK_ASSIGNMENT_TTL_MS,
-  benchmarkRefusalResponse,
-  requestBenchmarkAdmission,
-  signedModelViolation,
-  verifyBenchmarkAssignment,
-} from './benchmark-case-admission';
+import type * as BenchmarkCaseAdmission from './benchmark-case-admission';
+
+type Admission = typeof BenchmarkCaseAdmission;
+let BENCHMARK_ASSIGNMENT_TTL_MS!: Admission['BENCHMARK_ASSIGNMENT_TTL_MS'];
+let benchmarkRefusalResponse!: Admission['benchmarkRefusalResponse'];
+let requestBenchmarkAdmission!: Admission['requestBenchmarkAdmission'];
+let signedModelViolation!: Admission['signedModelViolation'];
+let verifyBenchmarkAssignment!: Admission['verifyBenchmarkAssignment'];
+
+// `jest` comes from '@jest/globals', so the mock above is not hoisted above a static import.
+// Loading the module here makes its default Worker URL read the mocked getter.
+beforeAll(async () => {
+  ({
+    BENCHMARK_ASSIGNMENT_TTL_MS,
+    benchmarkRefusalResponse,
+    requestBenchmarkAdmission,
+    signedModelViolation,
+    verifyBenchmarkAssignment,
+  } = await import('./benchmark-case-admission'));
+});
 
 const SECRET = 'test-internal-secret';
 const ROUTER_ID = '6f1c2f3a-1111-4a2b-8c3d-4e5f60718293';
@@ -240,15 +253,53 @@ describe('requestBenchmarkAdmission', () => {
   });
 
   it('treats an unreachable or malformed callback as admission_unavailable', async () => {
+    const options = { secret: SECRET, fetchImpl: mockFetch, workerUrl: mockWorkerUrl };
     mockFetch.mockRejectedValue(new Error('network down'));
-    expect(
-      await requestBenchmarkAdmission(assignment(), { secret: SECRET, fetchImpl: mockFetch })
-    ).toEqual({ reason: 'admission_unavailable', retryable: true });
+    expect(await requestBenchmarkAdmission(assignment(), options)).toEqual({
+      reason: 'admission_unavailable',
+      retryable: true,
+    });
 
     mockFetch.mockResolvedValue(new Response('not json', { status: 500 }));
+    expect(await requestBenchmarkAdmission(assignment(), options)).toEqual({
+      reason: 'admission_unavailable',
+      retryable: true,
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  // '' is what config.server resolves outside production when the URL is unset or production.
+  it.each(['', 'http://benchmark.internal', '/relative'])(
+    'sends no callback when the configured Worker URL is %j',
+    async value => {
+      expect(
+        await requestBenchmarkAdmission(assignment(), {
+          secret: SECRET,
+          fetchImpl: mockFetch,
+          workerUrl: value,
+        })
+      ).toEqual({ reason: 'admission_unavailable', retryable: true });
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  // The production caller (llm-proxy) passes no workerUrl, so the module's configured URL decides.
+  it('posts to the configured Worker URL when no override is given', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ decision: 'admit' }), { status: 200 })
+    );
+    expect(
+      await requestBenchmarkAdmission(assignment(), { secret: SECRET, fetchImpl: mockFetch })
+    ).toBeNull();
+    expect(mockFetch.mock.calls[0]?.[0]).toBe('https://benchmark.internal/internal/case-admit');
+  });
+
+  it('sends no callback when the configured Worker URL is unconfigured', async () => {
+    mockWorkerUrl = '';
     expect(
       await requestBenchmarkAdmission(assignment(), { secret: SECRET, fetchImpl: mockFetch })
     ).toEqual({ reason: 'admission_unavailable', retryable: true });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

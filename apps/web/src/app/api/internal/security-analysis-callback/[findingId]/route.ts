@@ -35,6 +35,7 @@ export async function POST(
         secret: CALLBACK_TOKEN_SECRET,
         scope: 'security-analysis-callback',
         resourceParts: [findingId, attemptToken],
+        observation: { receiver: 'web', caller: req.headers.get('x-kilo-caller') },
       }));
     if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

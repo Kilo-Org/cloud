@@ -1,0 +1,37 @@
+# Callers are listed in README.md next to this file (Callers). Read it before adding another caller.
+name: 'STS bundle'
+description: "Read the job's secret bundle from Kilo STS with the GitHub OIDC token and set each requested secret as a step output"
+inputs:
+  workload:
+    description: 'STS policy name of the job, for example ci-cloud-agent-e2e; the action fails unless STS returns the bundle of this workload'
+    required: true
+  secrets:
+    description: 'Newline-separated bundle keys; each must be in the bundle and declared under outputs, and becomes the output of the same name'
+    required: true
+  sts-url:
+    description: 'STS origin, https://sts.kiloapps.io or https://sts-staging.kiloapps.io; also the audience of the GitHub OIDC token'
+    required: false
+    default: 'https://sts.kiloapps.io'
+# One output per bundle key that a policy read by this repository's workflows grants
+# (services/sts/policy/ci-*.yaml). A composite action passes on only declared outputs, and the
+# script refuses a requested key that is not declared here. A private key or certificate chain that
+# its consumer reads from a file would be declared as `<KEY>_FILE`; the script writes it to a mode
+# 0600 file under RUNNER_TEMP and sets the path.
+outputs:
+  E2E_ACCESS_CLIENT_ID:
+    description: 'Cloudflare Access service token client id of the Cloud Agent e2e Worker (ci-cloud-agent-e2e)'
+    value: ${{ steps.bundle.outputs.E2E_ACCESS_CLIENT_ID }}
+  E2E_ACCESS_CLIENT_SECRET:
+    description: 'Cloudflare Access service token client secret of the Cloud Agent e2e Worker (ci-cloud-agent-e2e)'
+    value: ${{ steps.bundle.outputs.E2E_ACCESS_CLIENT_SECRET }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Read the STS bundle
+      id: bundle
+      shell: bash
+      env:
+        INPUT_WORKLOAD: ${{ inputs.workload }}
+        INPUT_SECRETS: ${{ inputs.secrets }}
+        INPUT_STS_URL: ${{ inputs['sts-url'] }}
+      run: bash "$GITHUB_ACTION_PATH/sts-bundle.sh"

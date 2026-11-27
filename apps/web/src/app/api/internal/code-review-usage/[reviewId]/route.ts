@@ -37,7 +37,7 @@ export async function POST(
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   // Outside the try: its catch echoes the error message, and a failed secret read must not reach it.
-  const unauthorized = await authorizeInternalApiRequest(req);
+  const unauthorized = await authorizeInternalApiRequest(req, 'code_review_usage');
   if (unauthorized) return unauthorized;
 
   try {

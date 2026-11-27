@@ -27,6 +27,7 @@ import {
   sandboxProviderConfigurationSchema,
   type SandboxProviderConfiguration,
 } from '../../src/sandbox-control/provider.js';
+import { workerAccessHeaders } from './worker-access.js';
 
 export type AllocationInspection = {
   logicalSandboxId: string;
@@ -61,6 +62,7 @@ export type SurfaceRequestOptions = {
 
 function surfaceHeaders(options: SurfaceRequestOptions): Record<string, string> {
   return {
+    ...workerAccessHeaders(options.surfaceUrl),
     ...(options.bearerToken === undefined
       ? {}
       : { Authorization: `Bearer ${options.bearerToken}` }),
@@ -193,6 +195,8 @@ export async function fetchAllocation(
 ): Promise<AllocationInspection> {
   const response = await fetch(allocationUrl(options.surfaceUrl, cloudAgentSessionId), {
     headers: surfaceHeaders(options),
+    // An Access login redirect is a refusal, never a page to follow.
+    redirect: 'manual',
     ...(options.signal ? { signal: options.signal } : {}),
   });
   if (!response.ok) {
@@ -245,8 +249,10 @@ export function createHttpSessionSandbox(
  * `POST /__e2e/callbacks`, register the returned URL as the session's
  * callback target, then poll `GET /__e2e/callbacks/:token` for deliveries and
  * release the token with `DELETE`. The Worker's callback delivery sends no
- * credential, so the token ingest route authorizes by its own unguessable path
- * token while mint/read/delete carry the driver bearer.
+ * Worker credential, so the token ingest route authorizes by its own unguessable
+ * path token while mint/read/delete carry the driver bearer. On an
+ * Access-protected hostname the target also carries the Access service-token
+ * headers, which Access consumes before the request reaches the Worker.
  */
 export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObservation {
   const base = options.surfaceUrl.replace(/\/+$/, '');
@@ -255,6 +261,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
     const response = await fetch(`${base}/__e2e/callbacks`, {
       method: 'POST',
       headers: surfaceHeaders(options),
+      redirect: 'manual',
       ...((signal ?? options.signal) ? { signal: signal ?? options.signal } : {}),
     });
     if (!response.ok) {
@@ -271,6 +278,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
     const effective = signal ?? options.signal;
     const response = await fetch(`${base}/__e2e/callbacks/${encodeURIComponent(token)}`, {
       headers: surfaceHeaders(options),
+      redirect: 'manual',
       ...(effective ? { signal: effective } : {}),
     });
     if (!response.ok) {
@@ -288,6 +296,9 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
       const minted = await mint(signal);
       return {
         callbackUrl: minted.callbackUrl,
+        // No callback headers: the e2e Worker's fetch wrapper stamps the
+        // Access token on delivery to its own origin, so it is never stored
+        // with the callback target.
         records: recordsSignal => records(minted.token, recordsSignal ?? signal),
         waitFor: async (predicate, timeoutMs, waitSignal) => {
           const effective = waitSignal ?? signal ?? options.signal;
@@ -309,6 +320,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
             {
               method: 'DELETE',
               headers: surfaceHeaders(options),
+              redirect: 'manual',
               signal: AbortSignal.timeout(CLOSE_TIMEOUT_MS),
             }
           );

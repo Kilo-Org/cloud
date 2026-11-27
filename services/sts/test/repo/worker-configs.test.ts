@@ -84,7 +84,7 @@ describe('repository Worker configs', () => {
     expect(paths).toContain('services/sts/wrangler.jsonc');
     expect(paths).toContain('services/o11y/wrangler.jsonc');
     expect(paths).toContain('services/sts/wrangler.test.jsonc');
-    // cloud-agent-e2e-deploy.yml deploys this one to the account.
+    // cloud-agent-e2e.yml deploys this one to the account.
     expect(paths).toContain('services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc');
     expect(paths.filter(path => path.includes('node_modules/'))).toEqual([]);
   });

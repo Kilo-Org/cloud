@@ -47,6 +47,11 @@
     "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "R2_BUCKET_NAME": "user-data-export",
     "USER_DATA_EXPORT_WEB_URL": "https://api.kilo.ai",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the `/api/internal/user-data-exports/ready`
+    // callback sends `INTERNAL_API_SECRET` as `x-internal-api-key`. `"sts"` sends a
+    // `web:user-data-exports.ready` STS service token over the `STS` binding instead; set it only
+    // once the Worker has that binding, STS grants the scope and the route accepts STS.
+    // Removing it is the rollback.
   },
   "triggers": {
     "crons": ["*/5 * * * *"],

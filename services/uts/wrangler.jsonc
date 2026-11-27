@@ -77,16 +77,9 @@
   // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
   // streams from it (design 8.1).
   "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
-  // The rotation job's two secrets arrive through STS (src/rotation/secrets.ts); no Worker secret
-  // holds them.
-  "services": [
-    {
-      "binding": "STS",
-      "service": "sts",
-      "entrypoint": "SecretsBroker",
-      "props": { "caller": "uts" },
-    },
-  ],
+  // No STS binding yet: STS has no `uts` workload policy, so the rotation job (off) would get no
+  // secrets. The binding `STS` (service `sts`, entrypoint `SecretsBroker`, props.caller `uts`;
+  // `sts-staging` in env.staging) is added with that policy (README, "Login rotation").
   // Every minute: keep the 8 audit shard relays running, maintain audit partitions, OAuth rows and
   // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts).
   "triggers": { "crons": ["* * * * *"] },
@@ -132,14 +125,6 @@
         ],
       },
       "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
-      "services": [
-        {
-          "binding": "STS",
-          "service": "sts-staging",
-          "entrypoint": "SecretsBroker",
-          "props": { "caller": "uts" },
-        },
-      ],
       "triggers": { "crons": ["* * * * *"] },
       "hyperdrive": [
         { "binding": "IDENTITY_STORE", "id": "5dd523ea0fa447ebaf442a0300d8f848" },

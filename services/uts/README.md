@@ -1322,7 +1322,7 @@ are app (`IDENTITY_STORE`, `uts_app_a/b`), pat (`IDENTITY_STORE_PAT`, `uts_pat_a
 - **Failures.** A timeout, 429, 5xx or lost connection waits 1 minute and warns
   (`uts.login_rotation.retry`); a refusal waits 1 hour and logs an error (`uts.login_rotation.refused`).
 
-Secrets, through STS (`services/sts/policy/uts.yaml`, manager folder `/workloads/uts`, binding
+Secrets, through STS (manager folder `/workloads/uts`, policy `services/sts/policy/uts.yaml`, binding
 `STS` with caller `uts`):
 
 | Name | Value | Provisioned by |
@@ -1333,6 +1333,11 @@ Secrets, through STS (`services/sts/policy/uts.yaml`, manager folder `/workloads
 The object adopts a seed only for a login whose password it does not hold, or for a `lost` login.
 The direct socket uses TLS with the platform's trust store; trial check 9 must show that the
 identity store's direct host passes it.
+
+**Open item:** STS has no `uts` workload policy yet (phase 2 adds it), so `wrangler.jsonc` binds no
+`STS` for now and the job, which is off, would report `misconfigured` (`missing STS`). With that
+policy, add the binding to the top level and to `env.staging`: `{ "binding": "STS", "service":
+"sts" (`"sts-staging"` in staging), "entrypoint": "SecretsBroker", "props": { "caller": "uts" } }`.
 
 `pnpm exec tsx scripts/rotation-e2e.ts` runs the full a -> b -> a rotation locally: the mint Worker
 under `wrangler dev`, a stand-in manager and Cloudflare API on loopback (`UTS_E2E_PORT`, default

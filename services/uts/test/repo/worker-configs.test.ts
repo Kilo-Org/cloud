@@ -595,7 +595,6 @@ describe('the UTS configs themselves', () => {
     const BlockSchema = z.object({
       vars: z.object({ LOGIN_ROTATION: z.literal('off') }).loose(),
       hyperdrive: z.array(z.object({ binding: z.string(), id: z.string() })),
-      services: z.array(z.object({ binding: z.string(), service: z.string() }).loose()),
     });
     const top = BlockSchema.parse(raw);
     const staging = BlockSchema.parse(
@@ -613,7 +612,6 @@ describe('the UTS configs themselves', () => {
         IDENTITY_STORE_PAT: configs.pat,
         IDENTITY_STORE_REPLICA: configs.reader,
       });
-      expect(block.services.filter(service => service.binding === 'STS')).toHaveLength(1);
     }
   });
 

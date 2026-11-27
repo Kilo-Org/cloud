@@ -61,16 +61,16 @@
     // events. It can only be an event ID: `after` and `range_start` are
     // mutually exclusive in the Events API.
     "WORKOS_EVENT_CURSOR": "",
-    // Where every runtime secret read goes: `env` (the Secrets Store bindings below) or `sts` (the
-    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
-    // read. The `sts` source never falls back to the Secrets Store. `env.staging` deploys no STS
-    // binding, so it keeps the default.
-    "SECRETS_SOURCE": "env",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store bindings below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    // `env.staging` deploys no STS binding, so it keeps the default.
+    "SECRETS_SOURCE": "secrets-store",
   },
   // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
   // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
   // cloudflare-scim-sync.yaml grants WORKOS_API_KEY, WORKOS_CLIENT_ID and INTERNAL_API_SECRET.
-  // Nothing reads it while SECRETS_SOURCE is `env`.
+  // Nothing reads it while SECRETS_SOURCE is `secrets-store`.
   "services": [
     {
       "binding": "STS",

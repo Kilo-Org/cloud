@@ -37,10 +37,10 @@ function storeSecret(value: string) {
 
 describe('secretsSource', () => {
   it('defaults to the legacy binding source', () => {
-    expect(secretsSource({})).toBe('env');
+    expect(secretsSource({})).toBe('secrets-store');
   });
 
-  it.each(['env', 'sts'] as const)('accepts %s', source => {
+  it.each(['secrets-store', 'sts'] as const)('accepts %s', source => {
     expect(secretsSource({ SECRETS_SOURCE: source })).toBe(source);
   });
 
@@ -65,7 +65,7 @@ describe('readAiAttributionSecret', () => {
     expect(sts.getBundle).toHaveBeenCalledTimes(1);
 
     // Flipping the variable back reads the legacy binding again.
-    expect(await readAiAttributionSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
+    expect(await readAiAttributionSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)).toBe(
       'legacy-value'
     );
     expect(store.get).toHaveBeenCalledTimes(2);

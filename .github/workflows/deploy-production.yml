@@ -41,50 +41,43 @@ jobs:
     with:
       workflow_file: deploy-production.yml
 
-  # One checkout and one install gate both database checks: the startup probe
-  # runs first, so an unreachable database fails here before the migrations try
-  # the same connection.
+  # The database gate holds no database credential: it asks the migration proxy
+  # (services/migration-proxy) to apply what is on main at target_sha and waits
+  # for the run. Its only credential is this job's GitHub OIDC token with the
+  # proxy's audience, which STS attests against the ci-db-migrate policy
+  # (environment production, this workflow on main). The job reads nothing from
+  # the triggering run: no workflow_run payload, no artifact, no input.
   db-gate:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # A run still going at the timeout continues on the proxy; the next deploy
+    # waits for it (busy) and then finds it applied.
     timeout-minutes: 45
     environment: production
-
-    env:
-      DATABASE_CA: ${{ secrets.DATABASE_CA }}
-      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+    # The only job in this workflow that may mint an OIDC token.
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
+      # Only for the script: no LFS objects, no dependencies.
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           ref: ${{ needs.check-changes.outputs.target_sha }}
+          persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
-      # The probe imports @kilocode/db and the migrate step runs drizzle-kit from
-      # that package, so the database workspace and the root project are enough.
-      # Widen this filter when a step in this job imports another workspace.
-      # This job also owns the LFS decision: it builds nothing from apps/web, so
-      # its checkout skips LFS objects. Add `lfs: true` back before a step here
-      # reads a path tracked by Git LFS.
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
-
-      - name: Check production DB startup path
-        run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
-
-      - name: Run Drizzle migrations
-        run: NODE_ENV=production pnpm run drizzle migrate
+      - name: Apply migrations through the migration proxy
+        env:
+          MIGRATION_PROXY_URL: https://migration-proxy.kiloapps.io
+          MIGRATION_PROXY_AUDIENCE: https://migration-proxy.kiloapps.io
+          TARGET_SHA: ${{ needs.check-changes.outputs.target_sha }}
+          # A little under timeout-minutes: the script stops with a message
+          # before the runner kills it.
+          MIGRATION_PROXY_BUDGET_SECONDS: '2580'
+        run: bash scripts/migration-proxy-run.sh
 
   stage-app:
     needs: check-changes

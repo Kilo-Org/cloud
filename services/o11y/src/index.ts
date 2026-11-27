@@ -7,6 +7,7 @@ import { registerAlertingConfigRoutes } from './alerting/config-routes';
 import { SessionMetricsParamsSchema } from './session-metrics-schema';
 import type { SessionMetricsParamsInput } from './session-metrics-schema';
 import { writeSessionMetricsDataPoint } from './session-metrics-analytics';
+import { summarizeInternalAuthCounter } from './internal-auth-counter';
 
 export { AlertConfigDO } from './alerting/AlertConfigDO';
 
@@ -24,6 +25,7 @@ export default class extends WorkerEntrypoint<Env> {
 
   async scheduled(_controller: ScheduledController): Promise<void> {
     await evaluateAlerts(this.env, this.ctx);
+    await summarizeInternalAuthCounter(this.env, this.ctx);
   }
 
   /** RPC method called by session-ingest via service binding. */

@@ -15,6 +15,7 @@ import { cors } from 'hono/cors';
 import {
   INTERNAL_CALLER_HEADER,
   callerLabel,
+  internalAuthAnalyticsSink,
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
 import { useWorkersLogger } from 'workers-tagged-logger';
@@ -123,11 +124,15 @@ async function hasValidInternalSecret(
   }
   const expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
   if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  // No Logpush here, so each counter line also becomes one Analytics Engine data point that o11y
+  // reads back into Axiom (design section 9.4, item 9).
+  const counter = c.env.INTERNAL_AUTH_COUNTER;
   observeInternalAuth(
     'notifications',
     route,
     'legacy_shared_secret',
-    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null),
+    internalAuthAnalyticsSink(counter)
   );
   return true;
 }

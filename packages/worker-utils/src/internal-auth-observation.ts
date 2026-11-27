@@ -36,6 +36,36 @@ export const INTERNAL_CALLER_HEADER = 'x-kilo-caller';
 /** `legacy_shared_secret` compared a shared secret; `sts` verified an STS service token. */
 export type InternalAuthMethod = 'legacy_shared_secret' | 'sts';
 
+/** Receives each line this module would log; see `observeInternalAuth`. */
+export type InternalAuthSink = (line: InternalAuthLine) => void;
+
+/** The AE dataset both Workers without Logpush write, and `o11y` reads back. */
+export const INTERNAL_AUTH_COUNTER_DATASET = 'kilo_internal_auth';
+
+/** The part of a Workers Analytics Engine binding this module uses. */
+export type InternalAuthAnalyticsBinding = {
+  writeDataPoint(point: { blobs?: string[]; doubles?: number[]; indexes?: string[] }): void;
+};
+
+/**
+ * A sink that writes the same line as one Analytics Engine data point, for a Worker with no
+ * Logpush. Column order is fixed and shared with `o11y`'s reader:
+ * `blob1` receiver, `blob2` route, `blob3` auth, `blob4` caller, `double1` count, `index1` minute.
+ * Undefined without the binding, so a local or test run writes no data points.
+ */
+export function internalAuthAnalyticsSink(
+  binding: InternalAuthAnalyticsBinding | undefined
+): InternalAuthSink | undefined {
+  if (binding === undefined) return undefined;
+  return line => {
+    binding.writeDataPoint({
+      blobs: [line.receiver, line.route, line.auth, line.caller],
+      doubles: [line.count],
+      indexes: [String(line.minute)],
+    });
+  };
+}
+
 /** One aggregation bucket's worth of accepted requests, one JSON line. */
 export type InternalAuthLine = {
   event: 'kilo_internal_auth';
@@ -132,6 +162,8 @@ type Bucket = {
   route: string;
   auth: InternalAuthMethod;
   caller: string;
+  /** The last sink of this bucket; a Worker without Logpush ships rows through it. */
+  sink: InternalAuthSink | undefined;
 };
 
 /**
@@ -157,7 +189,7 @@ export function writeInternalAuthLine(line: InternalAuthLine): void {
 function writeBucket(bucket: Bucket, count: number): void {
   if (count <= 0) return;
   bucket.written += count;
-  writeInternalAuthLine({
+  const line: InternalAuthLine = {
     event: INTERNAL_AUTH_OBSERVATION_EVENT,
     v: 1,
     receiver: bucket.receiver,
@@ -166,7 +198,13 @@ function writeBucket(bucket: Bucket, count: number): void {
     caller: bucket.caller,
     count,
     minute: bucket.minute,
-  });
+  };
+  writeInternalAuthLine(line);
+  try {
+    bucket.sink?.(line);
+  } catch {
+    // A failing sink never refuses or delays the request; the log line still went out.
+  }
 }
 
 /** Writes every bucket of an earlier minute and drops it: the minute has turned. */
@@ -185,13 +223,14 @@ function openBucket(
   receiver: string,
   route: string,
   auth: InternalAuthMethod,
-  caller: string
+  caller: string,
+  sink: InternalAuthSink | undefined
 ): void {
   if (buckets.size >= MAX_BUCKETS) {
     for (const bucket of buckets.values()) writeBucket(bucket, bucket.count - bucket.written);
     buckets.clear();
   }
-  const bucket: Bucket = { minute, count: 1, written: 0, receiver, route, auth, caller };
+  const bucket: Bucket = { minute, count: 1, written: 0, receiver, route, auth, caller, sink };
   buckets.set(key, bucket);
   writeBucket(bucket, 1);
 }
@@ -206,7 +245,8 @@ export function observeInternalAuth(
   receiver: string,
   route: string,
   auth: InternalAuthMethod,
-  caller: string = 'unknown'
+  caller: string = 'unknown',
+  sink?: InternalAuthSink
 ): void {
   try {
     if (!isInternalAuthObservationEnabled()) return;
@@ -218,17 +258,18 @@ export function observeInternalAuth(
     }
     const held = buckets.get(key);
     if (held === undefined) {
-      openBucket(key, minute, receiver, route, auth, caller);
+      openBucket(key, minute, receiver, route, auth, caller, sink);
       return;
     }
     if (held.minute !== minute) {
       // Only a backwards clock reaches here: `flushBefore` keeps a later minute's bucket.
       writeBucket(held, held.count - held.written);
       buckets.delete(key);
-      openBucket(key, minute, receiver, route, auth, caller);
+      openBucket(key, minute, receiver, route, auth, caller, sink);
       return;
     }
     held.count++;
+    if (sink !== undefined) held.sink = sink;
   } catch {
     // Dropped; the verdict stands.
   }

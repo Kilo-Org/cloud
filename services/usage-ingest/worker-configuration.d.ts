@@ -17,6 +17,7 @@ interface __BaseEnv_CloudflareEnv {
 	STS_ENVIRONMENT: "staging" | "production";
 	WEB_STS_CANARY_URL: "https://staging-app.kilo.ai/api/internal/sts-canary" | "https://app.kilo.ai/api/internal/sts-canary";
 	STS: Service /* entrypoint SecretsBroker from sts-staging */ | Service /* entrypoint SecretsBroker from sts */;
+	INTERNAL_AUTH_COUNTER?: AnalyticsEngineDataset;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -39,6 +40,7 @@ declare namespace Cloudflare {
 		STS_ENVIRONMENT: "staging";
 		WEB_STS_CANARY_URL: "https://staging-app.kilo.ai/api/internal/sts-canary";
 		STS: Service /* entrypoint SecretsBroker from sts-staging */;
+		INTERNAL_AUTH_COUNTER?: AnalyticsEngineDataset;
 	}
 	interface Env extends __BaseEnv_CloudflareEnv {}
 }
@@ -48,4 +50,9 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 };
 declare namespace NodeJS {
 	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "USAGE_INGEST_PARALLELISM" | "USAGE_WRITER_URL" | "USAGE_INGEST_HEDGE_MODE" | "USAGE_INGEST_HEDGE_DELAY_MS" | "USAGE_INGEST_HEDGE_PERCENT" | "USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED" | "STS_CANARY_ENABLED" | "STS_URL" | "STS_ENVIRONMENT" | "WEB_STS_CANARY_URL">> {}
+}
+// Added by hand: this service generates types with `--include-runtime=false`, which leaves the
+// Analytics Engine binding type undeclared. Only the method the item-9 counter uses is described.
+interface AnalyticsEngineDataset {
+	writeDataPoint(point: { blobs?: string[]; doubles?: number[]; indexes?: string[] }): void;
 }

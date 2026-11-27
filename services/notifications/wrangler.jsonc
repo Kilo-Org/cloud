@@ -11,6 +11,12 @@
   // bindings, and a Worker that binds STS records none
   // (services/sts/test/repo/worker-configs.ts).
   "observability": { "enabled": true, "traces": { "enabled": false } },
+  // Item 9 internal-auth counter (design section 9.4): no Logpush here, so each
+  // `kilo_internal_auth` line also becomes one Analytics Engine data point. `o11y` reads this
+  // dataset once a minute and emits the same line to Axiom. Counter rows only.
+  "analytics_engine_datasets": [
+    { "binding": "INTERNAL_AUTH_COUNTER", "dataset": "kilo_internal_auth" },
+  ],
   // Notification history retention. `NotificationsService.scheduled` prunes rows
   // older than the 90-day history window; see
   // src/lib/notification-history-prune.ts.

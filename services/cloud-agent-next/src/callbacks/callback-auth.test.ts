@@ -63,7 +63,6 @@ describe('callbackRouteOf', () => {
     [REVIEW_URL, 'web:code-review.agent-callback'],
     [WEBHOOK_URL, 'webhook-agent-ingest:execution.callback'],
     [SAA_URL, 'security-auto-analysis:analysis.callback'],
-    [WEB_REMEDIATION_URL, 'web:security-remediation.callback'],
     [SAA_REMEDIATION_URL, 'security-auto-analysis:remediation.callback'],
   ])('maps %s to %s', (url, scope) => {
     expect(callbackRouteOf(url)?.scope).toBe(scope);
@@ -80,6 +79,8 @@ describe('callbackRouteOf', () => {
     'https://hooks.kilosessions.ai/api/callbacks/execution/extra',
     'workspace:session-1',
     'not a url',
+    // The web app has no remediation callback route; phase 4 adds the entry if one lands.
+    WEB_REMEDIATION_URL,
   ])('maps nothing for %s', url => {
     expect(callbackRouteOf(url)).toBeNull();
   });
@@ -236,9 +237,13 @@ describe('deliverCallbackJob under sts', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('maps the remediation callbacks to their own scopes and receiver switches', async () => {
+  it('mints the remediation scope only for the Security Auto Analysis route', async () => {
     const STS = mintBinding();
-    const env = { STS, CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS: 'sts' };
+    const env = {
+      STS,
+      CALLBACK_SENDER_AUTH_WEB: 'sts',
+      CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS: 'sts',
+    };
 
     expect(
       await callbackAuth(env, { url: SAA_REMEDIATION_URL, headers: { 'X-Callback-Token': 'd' } })

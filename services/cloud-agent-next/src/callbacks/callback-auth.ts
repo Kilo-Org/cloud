@@ -44,10 +44,11 @@ type CallbackRoute = {
  * until a scope is in `STS_SCOPE_REGISTRY` and the grant is in
  * `services/sts/policy/cloud-agent-next.yaml`, STS refuses it and nothing is sent under `sts`.
  * Origins are the production targets the callers build: the web app's `APP_URL` (bot, Security
- * Agent analysis and remediation, and code review callbacks), Webhook Agent Ingest's
- * `WEBHOOK_AGENT_URL` and Security Auto Analysis's `SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL`
- * (its analysis and remediation callbacks; `services/security-auto-analysis/src/launch.ts`,
- * `remediation.ts`).
+ * Agent analysis and code review callbacks), Webhook Agent Ingest's `WEBHOOK_AGENT_URL` and
+ * Security Auto Analysis's `SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL` (its analysis and
+ * remediation callbacks; `services/security-auto-analysis/src/launch.ts`, `remediation.ts`). The
+ * web app has no remediation callback route, so a remediation callback in `web` routing mode
+ * matches no entry and keeps its stored headers.
  */
 export const CALLBACK_ROUTES: readonly CallbackRoute[] = [
   {
@@ -63,14 +64,6 @@ export const CALLBACK_ROUTES: readonly CallbackRoute[] = [
     scope: 'web:security-analysis.callback',
     origin: 'https://app.kilo.ai',
     path: /^\/api\/internal\/security-analysis-callback\/[^/]+$/,
-    legacyHeaders: ['x-callback-token'],
-    switch: 'CALLBACK_SENDER_AUTH_WEB',
-  },
-  {
-    audience: 'web',
-    scope: 'web:security-remediation.callback',
-    origin: 'https://app.kilo.ai',
-    path: /^\/api\/internal\/security-remediation-callback\/[^/]+$/,
     legacyHeaders: ['x-callback-token'],
     switch: 'CALLBACK_SENDER_AUTH_WEB',
   },

@@ -237,7 +237,8 @@ export type VercelSelectionReadiness = {
 export async function resolveVercelSelectionReadiness(
   env: Env,
   owner: SelectionOwner,
-  capability?: SandboxAllocationCapability
+  capability?: SandboxAllocationCapability,
+  ctx?: SecretsExecutionContext
 ): Promise<VercelSelectionReadiness> {
   const byocOwner = enrolledByocVercelOwner(env, owner);
   if (byocOwner === undefined) return {};
@@ -245,8 +246,8 @@ export async function resolveVercelSelectionReadiness(
   try {
     enrollment =
       byocOwner.organizationId !== undefined
-        ? await fetchByocVercelEnrollment(env, byocOwner.organizationId)
-        : await fetchByocVercelEnrollmentForUser(env, byocOwner.userId);
+        ? await fetchByocVercelEnrollment(env, byocOwner.organizationId, ctx)
+        : await fetchByocVercelEnrollmentForUser(env, byocOwner.userId, ctx);
   } catch {
     return { vercelUnavailableReason: VERCEL_NOT_READY_REASON };
   }

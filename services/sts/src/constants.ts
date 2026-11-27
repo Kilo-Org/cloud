@@ -296,7 +296,10 @@ export const CLOUDFLARE_DEPLOY_PINS: CloudflareDeployPins = {
   allowedZones: {
     development: [],
     staging: ['9f7103cbcadbe93a052c120f231e8507'], // kiloapps.io
-    production: ['9f7103cbcadbe93a052c120f231e8507'], // kiloapps.io
+    production: [
+      '9f7103cbcadbe93a052c120f231e8507', // kiloapps.io
+      '1417bcc629d528e478b1da6615ea3799', // kiloapps.ai (cloud-agent-next's zone route; Igor, 2026-11-27)
+    ],
   },
 };
 

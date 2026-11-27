@@ -3,7 +3,7 @@
 # repository variable DEPLOY_TOKEN_SOURCE is `sts` (README "Cloudflare deploy tokens"). It deploys no
 # Worker: Containers Write pushes the runtime base image, and R2 Storage Write only asks R2 for
 # temporary credentials on the runtime bucket. workflow_run with workflow_dispatch in production
-# relies on the Q71 carve-out, PENDING IGOR (Q71_CLOUDFLARE_DEPLOY_CARVE_OUT in src/policy/schema.ts).
+# relies on the Q71 carve-out (Q71b, decided by Igor 2026-11-27; Q71_CLOUDFLARE_DEPLOY_CARVE_OUT).
 workload: ci-deploy-cloud-runtime
 environments: [production]
 identity:

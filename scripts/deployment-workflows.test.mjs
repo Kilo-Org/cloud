@@ -2125,13 +2125,11 @@ test('the STS deploy policies intend exactly the Workers deploy-workers.yml can 
   }
 });
 
-/**
- * Zone ids of the zones deploy-workers.yml routes to. A zone whose id is still to be read in
- * setup step 3 (live setup, README "Cloudflare deploy tokens") is listed as pending: its routes
- * cannot deploy on the STS path until the id joins the pins and ci-deploy-cloud.
- */
-const ROUTE_ZONE_IDS = { 'kiloapps.io': '9f7103cbcadbe93a052c120f231e8507' };
-const PENDING_ROUTE_ZONES = ['kiloapps.ai'];
+/** Zone ids of the zones deploy-workers.yml routes to (CLOUDFLARE_DEPLOY_PINS, production). */
+const ROUTE_ZONE_IDS = {
+  'kiloapps.io': '9f7103cbcadbe93a052c120f231e8507',
+  'kiloapps.ai': '1417bcc629d528e478b1da6615ea3799',
+};
 
 test('every zone route a production Worker deploys is in ci-deploy-cloud zones and intended routes', () => {
   const policy = load(
@@ -2149,7 +2147,7 @@ test('every zone route a production Worker deploys is in ci-deploy-cloud zones a
     const zone = typeof route === 'string' ? undefined : route.zone_name;
     assert.ok(zone, `${pattern} names its zone`);
     assert.ok(grant.intendedRoutes.includes(pattern), `${pattern} is an intended route`);
-    if (PENDING_ROUTE_ZONES.includes(zone)) continue;
+    assert.ok(ROUTE_ZONE_IDS[zone], `${zone} (${pattern}) has a known zone id`);
     assert.ok(grant.zones.includes(ROUTE_ZONE_IDS[zone]), `${zone} (${pattern}) is a policy zone`);
   }
 });

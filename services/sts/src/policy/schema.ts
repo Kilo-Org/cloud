@@ -282,7 +282,7 @@ export const CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING = 12;
 export const CLOUDFLARE_DEPLOY_MAX_PER_RUN_CEILING = 64;
 
 /**
- * PENDING IGOR (Q71 carve-out for Cloudflare deploy grants, proposed 2026-11-27, not decided).
+ * Q71 carve-out for Cloudflare deploy grants (Q71b, decided by Igor 2026-11-27).
  * The workflow files whose deploy-only policies may accept `workflow_run` together with
  * `schedule` and `workflow_dispatch`, and grant production. Q71 refuses that elsewhere because
  * STS cannot see the upstream run. Here the deploy job already receives the stored
@@ -290,9 +290,7 @@ export const CLOUDFLARE_DEPLOY_MAX_PER_RUN_CEILING = 64;
  * the commit that `check-deployment-changes.yml` (or the runtime publisher's admission) picked from
  * main, so a 1-hour token is no stronger than the stored token it replaces (Q65). A policy uses
  * the carve-out only when it is a Kilo-Org/cloud policy (ids below), binds a GitHub environment,
- * names only these files and holds nothing but its `cloudflare-deploy` grant. If Igor declines,
- * remove this constant, `usesCloudflareDeployCarveOut` and `workflow_run` from the
- * `ci-deploy-cloud`, `ci-deploy-cloud-staging` and `ci-deploy-cloud-runtime` policies.
+ * names only these files and holds nothing but its `cloudflare-deploy` grant.
  */
 export const Q71_CLOUDFLARE_DEPLOY_CARVE_OUT = {
   repository: 'Kilo-Org/cloud',
@@ -716,7 +714,7 @@ function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
 }
 
 /**
- * True for a policy inside `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (PENDING IGOR): a Kilo-Org/cloud
+ * True for a policy inside `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b): a Kilo-Org/cloud
  * policy, by its ids, bound to a GitHub environment, naming only the carved-out workflow files,
  * accepting nothing beyond `workflow_run`, `schedule` and `workflow_dispatch`, and holding its
  * `cloudflare-deploy` grant and nothing else.
@@ -767,7 +765,7 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   // Q71 carve-out (Igor, 2026-11-27): a trigger-only policy holds nothing a token could read; its
   // job only asks the migration proxy to apply what is on `main`, which the proxy checks itself
   // (design Q64a). So it alone may list workflow_run with other events and grant production.
-  // PENDING IGOR: the deploy-only policies of Q71_CLOUDFLARE_DEPLOY_CARVE_OUT may too.
+  // Q71b (Igor, 2026-11-27): the deploy-only policies of Q71_CLOUDFLARE_DEPLOY_CARVE_OUT may too.
   const carvedOut = holdsMigrationRun(policy) || usesCloudflareDeployCarveOut(policy, identity);
   if (!carvedOut && identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');

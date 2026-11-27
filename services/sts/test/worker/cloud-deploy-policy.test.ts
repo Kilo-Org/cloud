@@ -127,7 +127,7 @@ describe('Kilo-Org/cloud deploy policies', () => {
     ).toEqual(['Workers Scripts Write', 'Queues Write']);
   });
 
-  it('accept workflow_run with the other events and production for the carved-out deploy files (PENDING IGOR)', () => {
+  it('accept workflow_run with the other events and production for the carved-out deploy files (Q71b)', () => {
     expect(load(deployPolicy()).has('ci-deploy-x')).toBe(true);
     expect(
       load(

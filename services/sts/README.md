@@ -1487,7 +1487,7 @@ run and about 5 runs in its busiest hour, which a per-token `maxActive` of 3 and
 12 cannot carry, and GitHub drops a job output that holds a masked value, so jobs cannot share one
 token. Each job still gets, and revokes, its own token, and each token is audited and
 window-checked. The caller's own run attempt never counts against `maxActive` or `maxPerHour`.
-PENDING IGOR: this reads the design's §3 limits per run for these policies.
+Decided by Igor 2026-11-27 (W5): this reads the design's §3 limits per run for these policies.
 
 **Kilo-Org/cloud's own deploys** (repository id `1145038391`, owner id `201822503`, each workflow
 pinned to `@refs/heads/main`; the repository variable `DEPLOY_TOKEN_SOURCE` set to `sts` runs each
@@ -1496,13 +1496,14 @@ the stored-secret jobs as the rollback):
 
 | Workload | STS environment | GitHub environment | Workflow file | Events | Permission groups | Limits |
 |---|---|---|---|---|---|---|
-| `ci-deploy-cloud` | production | `production` | `deploy-workers.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | Workers Scripts, Containers, Routes (`kiloapps.io`), Queues, D1, R2 Storage Write | 1 h, 2 runs, 12 runs/h, 40 per run |
+| `ci-deploy-cloud` | production | `production` | `deploy-workers.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | Workers Scripts, Containers, Routes (`kiloapps.io`, `kiloapps.ai`), Queues, D1, R2 Storage Write | 1 h, 2 runs, 12 runs/h, 40 per run |
 | `ci-deploy-cloud-staging` | staging | `staging` | `deploy-workers.yml` | same | Workers Scripts, Queues Write | 1 h, 2 runs, 12 runs/h, 16 per run |
 | `ci-deploy-cloud-runtime` | production | `cloud-agent-runtime-publication` | `cloud-agent-runtime-publish.yml` | `workflow_run`, `workflow_dispatch` | Containers, R2 Storage Write | 1 h, 1 active, 12/h |
 | `ci-deploy-cloud-mcp-catalog` | production | `production` | `kilo-mcp-catalog.yml` | `push` | Vectorize Write, Workers AI Read | 15 min, 1 active, 12/h |
 
-- **`workflow_run` (PENDING IGOR, Q71 carve-out).** Q71 keeps `workflow_run` out of production and
-  alone in its list, because STS cannot see the upstream run. `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT`
+- **`workflow_run` (Q71 carve-out, Q71b, decided by Igor 2026-11-27).** Q71 keeps `workflow_run`
+  out of production and alone in its list, because STS cannot see the upstream run.
+  `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT`
   (`src/policy/schema.ts`) lets the deploy-only policies of `deploy-workers.yml` and
   `cloud-agent-runtime-publish.yml` list it with `schedule` and `workflow_dispatch` and grant
   production: their jobs receive the stored `CLOUDFLARE_API_TOKEN` on the same trigger today, run
@@ -1523,12 +1524,14 @@ the stored-secret jobs as the rollback):
   the repository variable `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID`. R2 Storage Write reaches
   every bucket for the token's hour, as a Worker binding deployed with Workers Scripts Write already
   does (Q65).
-- **Before `DEPLOY_TOKEN_SOURCE` becomes `sts`:** the `kiloapps.ai` zone id joins `allowedZones`
-  and `ci-deploy-cloud` (cloud-agent-next's zone routes); setup step 3 confirms the five new group
-  ids; a Super Administrator adds the new groups and zone to `sts-minting-<env>` (setup step 2
-  lists only the bouncer groups); the repository variable `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID`
-  is set; and the `cloud-agent-runtime-publication` GitHub environment admits `main` only. A STS
-  deploy rides the sts path too: if a broken STS cannot mint, set the variable to `secret`.
+- **Before `DEPLOY_TOKEN_SOURCE` becomes `sts`:** the repository variable
+  `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID` is set, and the `cloud-agent-runtime-publication`
+  GitHub environment admits `main` only. Done 2026-11-27: the five new group ids match Cloudflare's
+  list; the `kiloapps.ai` zone, `1417bcc629d528e478b1da6615ea3799`, is pinned for production and in
+  `ci-deploy-cloud`; and a Super Administrator added Queues Write to `sts-minting-staging` and the
+  new groups and the zone to `sts-minting-production` (17:40-17:42Z). Setup step 2 lists only the
+  bouncer groups, so a recreated minting token needs these again. A STS deploy rides the sts path
+  too: if a broken STS cannot mint, set the variable to `secret`.
 - **Rollout and its limits.** The first production run on `sts` must deploy a Worker with a
   Custom Domain on `kilosessions.ai` (for example `git-token-service`) and one on
   `kilousercontent.com` (`nteract-pages-outputs`): their zones are in no grant, and Cloudflare

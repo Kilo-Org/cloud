@@ -3,7 +3,7 @@
 # variable DEPLOY_TOKEN_SOURCE is `sts` (README "Cloudflare deploy tokens"). Staging and production
 # share the Cloudflare account, so this token reaches production Workers too; the staging GitHub
 # environment carries production's main-only rule. workflow_run with the other events relies on
-# the Q71 carve-out, PENDING IGOR (Q71_CLOUDFLARE_DEPLOY_CARVE_OUT in src/policy/schema.ts).
+# the Q71 carve-out (Q71b, decided by Igor 2026-11-27; Q71_CLOUDFLARE_DEPLOY_CARVE_OUT).
 workload: ci-deploy-cloud-staging
 environments: [staging]
 identity:

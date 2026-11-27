@@ -2,8 +2,8 @@
 # deploy-production.yml, or dispatched on its own) in GitHub environment production, when the
 # repository variable DEPLOY_TOKEN_SOURCE is `sts` (README "Cloudflare deploy tokens"). One token per
 # deploy job; maxPerRun counts the limits per run, because one run deploys up to 31 Workers in
-# parallel. workflow_run with the other events in production relies on the Q71 carve-out, PENDING
-# IGOR (Q71_CLOUDFLARE_DEPLOY_CARVE_OUT in src/policy/schema.ts).
+# parallel (W5). workflow_run with the other events in production relies on the Q71 carve-out
+# (Q71b, decided by Igor 2026-11-27; Q71_CLOUDFLARE_DEPLOY_CARVE_OUT in src/policy/schema.ts).
 workload: ci-deploy-cloud
 environments: [production]
 identity:
@@ -26,11 +26,9 @@ dynamic:
       - { id: 366f57075ffc42689627bcf8242a1b6d, name: Queues Write, scope: account }
       - { id: 09b2857d1c31407795e75e3fed8617a1, name: D1 Write, scope: account }
       - { id: bf7481a1826f439697cb59a20b22293e, name: Workers R2 Storage Write, scope: account }
-    # kiloapps.io. LIVE SETUP: cloud-agent-next's `*.cloud-agent.kiloapps.ai/*` route needs the
-    # kiloapps.ai zone too; setup step 3 reads its id, which then joins this list and
-    # CLOUDFLARE_DEPLOY_PINS before DEPLOY_TOKEN_SOURCE becomes `sts` (placeholder:
-    # '<kiloapps.ai zone id>'). scripts/deployment-workflows.test.mjs holds every zone route here.
-    zones: ['9f7103cbcadbe93a052c120f231e8507']
+    # kiloapps.io, and kiloapps.ai for cloud-agent-next's `*.cloud-agent.kiloapps.ai/*` route.
+    # scripts/deployment-workflows.test.mjs holds every zone route of a production Worker here.
+    zones: ['9f7103cbcadbe93a052c120f231e8507', '1417bcc629d528e478b1da6615ea3799']
     # Every production Worker deploy-workers.yml can deploy (scripts/deployment-workflows.test.mjs
     # holds this list to the services/*/wrangler.jsonc names it discovers).
     intendedScripts:

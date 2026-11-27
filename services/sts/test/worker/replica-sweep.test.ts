@@ -331,6 +331,14 @@ describe('replica sweep', () => {
     await vi.waitFor(() => expect(revokes).toEqual([leaseId]));
     // The revocation hangs, and both replicas were swept already.
     expect(sweeps.calls.sort()).toEqual([A, B]);
+    // The next alarm is set before the hanging upkeep ends.
+    await vi.waitFor(async () =>
+      expect(
+        await runInDurableObject(getLeaseStub(env, config), (_instance, state) =>
+          state.storage.getAlarm()
+        )
+      ).not.toBeNull()
+    );
     // The revocation holds the alarm for 30 s of the object's clock before it throws.
     vi.setSystemTime(firedBefore + 30_000);
     hang.resolve();

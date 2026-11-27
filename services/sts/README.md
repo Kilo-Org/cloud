@@ -1136,7 +1136,9 @@ passwords, nor read a creation statement in `pg_stat_activity` (`check.sh`).
 part. Where an earlier `setup-ci-migration.sql` (one without `sweep_sessions`) already ran,
 `postgres` no longer owns the schema: a superuser runs `setup-replica-sweeper.sql` instead and then
 `ALTER FUNCTION kilo_lease.sweep_sessions() OWNER TO kilo_lease_owner;` (the superuser then also
-creates the sweeper login, so `postgres` does not administer it).
+creates the sweeper login, so `postgres` does not administer it). Then check that
+`SELECT proowner::regrole FROM pg_proc WHERE oid = 'kilo_lease.sweep_sessions()'::regprocedure`
+returns `kilo_lease_owner`, so a forgotten `ALTER` is caught.
 
 **Infisical setup, per environment (staging first).**
 

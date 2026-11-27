@@ -413,7 +413,8 @@ export class LeaseDO extends DurableObject<Env> {
   /**
    * The replica sweep starts first and runs beside the rest, timed from when the alarm fired, so a
    * slow or failing relay, Infisical call or row write never delays it; neither can a throw in that
-   * upkeep skip the sweep or the next alarm.
+   * upkeep skip the sweep or the next alarm. The next alarm is scheduled as soon as the sweep ends,
+   * so a long upkeep cannot hold it back, and again once the upkeep ends.
    */
   async alarm(): Promise<void> {
     const firedAt = Date.now();
@@ -422,11 +423,23 @@ export class LeaseDO extends DurableObject<Env> {
         reason: errorName(error),
       });
     });
-    let failed = false;
+    const upkeep = this.#upkeep();
+    await sweep;
+    await this.#scheduleSweepAlarm(Date.now());
+    const relayFailed = await upkeep;
+    await this.#scheduleAlarm(Date.now(), relayFailed);
+  }
+
+  /**
+   * The alarm's work beside the sweep: the audit relay, owed revocations, stopping unconfirmed ones
+   * and pruning. Never throws; answers whether the relay failed.
+   */
+  async #upkeep(): Promise<boolean> {
+    let relayFailed = false;
     try {
       await this.#audit.relay(this.#stream);
     } catch (error) {
-      failed = true;
+      relayFailed = true;
       console.warn('sts: lease audit relay failed; rows stay for the next alarm', {
         reason: errorName(error),
       });
@@ -453,8 +466,7 @@ export class LeaseDO extends DurableObject<Env> {
         reason: errorName(error),
       });
     }
-    await sweep;
-    await this.#scheduleAlarm(Date.now(), failed);
+    return relayFailed;
   }
 
   /**
@@ -837,6 +849,21 @@ export class LeaseDO extends DurableObject<Env> {
     if (rowDue !== null) target = Math.min(target, Math.max(now + 1_000, rowDue));
     const sweepDue = this.#nextSweepAt(now);
     if (sweepDue !== null) target = Math.min(target, Math.max(now + 1_000, sweepDue));
+    await this.#moveAlarmTo(target, now);
+  }
+
+  /**
+   * Sets the alarm for the next replica sweep only. The alarm calls it as soon as the sweep ends,
+   * before the upkeep has updated the relay and revocation state that `#scheduleAlarm` reads, so
+   * a stale owed revocation cannot pull the alarm in and skip its 30-second backoff.
+   */
+  async #scheduleSweepAlarm(now: number): Promise<void> {
+    const sweepDue = this.#nextSweepAt(now);
+    if (sweepDue !== null) await this.#moveAlarmTo(Math.max(now + 1_000, sweepDue), now);
+  }
+
+  /** Moves the alarm to `target` when none is set, it is later, or it already passed. */
+  async #moveAlarmTo(target: number, now: number): Promise<void> {
     if (target === Number.POSITIVE_INFINITY) return;
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > target || current < now) {

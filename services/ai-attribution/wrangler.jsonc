@@ -80,6 +80,11 @@
   ],
   "env": {
     "dev": {
+      // Fence: named envs inherit top-level routes; never publish dev to prod hosts.
+      "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
+      "triggers": { "crons": [] },
       "vars": {
         "ENVIRONMENT": "development",
       },
@@ -106,7 +111,7 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

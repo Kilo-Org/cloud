@@ -150,7 +150,8 @@ export function installManager(options: {
 
 /**
  * The default for a test that installs no manager: every outbound request fails fast with 503.
- * Background refresher alarms then never reach the network.
+ * Background refresher alarms still run: each manager read fails, the refresher records a failure
+ * and re-arms with backoff. `setup.ts` disarms it after every test.
  */
 export function stubOfflineNetwork(): void {
   vi.unstubAllGlobals();

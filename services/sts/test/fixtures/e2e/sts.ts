@@ -62,24 +62,6 @@ identity:
   events: [workflow_dispatch]
 secrets: [E2E_RELEASE_KEY, E2E_SHARED_WEBHOOK]
 `,
-    'ci-e2e-migrate.yaml': `
-workload: ci-e2e-migrate
-environments: [development]
-identity:
-  kind: github-oidc
-  repository: kilo-e2e/ci-fixture
-  repositoryId: '1001'
-  repositoryOwnerId: '2002'
-  environment: migrations
-  jobWorkflowRefs: [kilo-e2e/ci-fixture/.github/workflows/deploy.yml@refs/heads/main]
-  events: [push]
-secrets: []
-dynamic:
-  - grant: ci-migration
-    maxTtlSeconds: 3600
-    defaultTtlSeconds: 3600
-    maxActive: 1
-`,
     'ci-e2e-deploy.yaml': `
 workload: ci-e2e-deploy
 environments: [development]

@@ -60,18 +60,12 @@ export async function run() {
       MIN(LENGTH(message_id))::float as message_id_min_len,
       MAX(LENGTH(message_id))::float as message_id_max_len,
       
-      AVG(LENGTH(user_prompt_prefix))::float as user_prompt_prefix_avg_len,
-      MIN(LENGTH(user_prompt_prefix))::float as user_prompt_prefix_min_len,
-      MAX(LENGTH(user_prompt_prefix))::float as user_prompt_prefix_max_len,
-      (COUNT(*) FILTER (WHERE user_prompt_prefix IS NULL) * 100.0 / COUNT(*))::float as user_prompt_prefix_null_pct,
-      
       -- FK null percentages
       (COUNT(*) FILTER (WHERE http_user_agent_id IS NULL) * 100.0 / COUNT(*))::float as http_user_agent_id_null_pct,
       (COUNT(*) FILTER (WHERE http_ip_id IS NULL) * 100.0 / COUNT(*))::float as http_ip_id_null_pct,
       (COUNT(*) FILTER (WHERE vercel_ip_city_id IS NULL) * 100.0 / COUNT(*))::float as vercel_ip_city_id_null_pct,
       (COUNT(*) FILTER (WHERE vercel_ip_country_id IS NULL) * 100.0 / COUNT(*))::float as vercel_ip_country_id_null_pct,
       (COUNT(*) FILTER (WHERE ja4_digest_id IS NULL) * 100.0 / COUNT(*))::float as ja4_digest_id_null_pct,
-      (COUNT(*) FILTER (WHERE system_prompt_prefix_id IS NULL) * 100.0 / COUNT(*))::float as system_prompt_prefix_id_null_pct,
       
       -- Other nullable columns
       (COUNT(*) FILTER (WHERE vercel_ip_latitude IS NULL) * 100.0 / COUNT(*))::float as vercel_ip_latitude_null_pct,
@@ -114,12 +108,7 @@ export async function run() {
       (SELECT COUNT(*)::float FROM ja4_digest) as ja4_digest_count,
       (SELECT AVG(LENGTH(ja4_digest))::float FROM ja4_digest) as ja4_digest_avg_len,
       (SELECT MIN(LENGTH(ja4_digest))::float FROM ja4_digest) as ja4_digest_min_len,
-      (SELECT MAX(LENGTH(ja4_digest))::float FROM ja4_digest) as ja4_digest_max_len,
-      
-      (SELECT COUNT(*)::float FROM system_prompt_prefix) as system_prompt_prefix_count,
-      (SELECT AVG(LENGTH(system_prompt_prefix))::float FROM system_prompt_prefix) as system_prompt_prefix_avg_len,
-      (SELECT MIN(LENGTH(system_prompt_prefix))::float FROM system_prompt_prefix) as system_prompt_prefix_min_len,
-      (SELECT MAX(LENGTH(system_prompt_prefix))::float FROM system_prompt_prefix) as system_prompt_prefix_max_len
+      (SELECT MAX(LENGTH(ja4_digest))::float FROM ja4_digest) as ja4_digest_max_len
   `);
 
   const report = {

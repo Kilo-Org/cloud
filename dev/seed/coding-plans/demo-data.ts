@@ -460,7 +460,7 @@ async function seedScenario(scenario: string, key: Buffer, users: SeedUser[]): P
       const isSecretRetained = fixture.status === 'available' || fixture.status === 'assigned';
       const columns = isSecretRetained
         ? await sealInventoryCredential(id, plaintextCredential(scenario, fixture.slug))
-        : { encrypted_api_key: null, encrypted_api_key_envelope: null };
+        : { encrypted_api_key_envelope: null };
       return { id, slug: fixture.slug, columns };
     })
   );

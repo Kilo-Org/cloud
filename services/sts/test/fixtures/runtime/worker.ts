@@ -223,7 +223,7 @@ async function buildIdentity(issuer: string, issuedAt: number): Promise<void> {
     verifier: new IdentityVerifier({
       policies: loadPolicies({ 'fly-app.yaml': FLY_POLICY }).all(),
       environment: 'development',
-      issuer,
+      audience: issuer,
       fetch: async (input: RequestInfo | URL, init?: RequestInit) =>
         await slowCall(calls.identity, () => local.fetch(input, init)),
     }),

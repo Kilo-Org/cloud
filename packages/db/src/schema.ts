@@ -180,7 +180,6 @@ import type {
   CustomLlmCredentialsEnvelope,
   CodingPlanInventoryCredentialEnvelope,
   OpenAiChatGptConnectionEnvelope,
-  EncryptedData,
   ByocCredentialEnvelope,
   ByocSetupStatus,
   ByocUpgradeStatus,
@@ -8073,13 +8072,6 @@ export const openai_chatgpt_connections = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    /**
-     * OBSOLETE: the static-key copy of the payload from before the KMS migration. Nothing
-     * reads it. Writers store a placeholder that holds no key material, only so a rollback
-     * to the dual-write release keeps reading `encrypted_connection_envelope`; it stays
-     * `NOT NULL` until a migration drops it.
-     */
-    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
     /** The connection payload, encrypted through the BYOK KMS service. */
     encrypted_connection_envelope: jsonb().$type<OpenAiChatGptConnectionEnvelope>(),
     is_enabled: boolean().default(true).notNull(),
@@ -11132,13 +11124,6 @@ export const coding_plan_key_inventory = pgTable(
     provider_id: text().notNull(),
     upstream_plan_id: text().notNull(),
     upstream_usage_id: text(),
-    /**
-     * OBSOLETE: the static-key copy of the credential from before the KMS migration. Nothing
-     * reads it. Writers store a placeholder that holds no key material, only so a rollback
-     * to the dual-write release keeps reading `encrypted_api_key_envelope`, and every clear
-     * path still nulls it. Drop it in a migration.
-     */
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
     /** The credential, encrypted through the BYOK KMS service. Null once it is removed. */
     encrypted_api_key_envelope: jsonb().$type<CodingPlanInventoryCredentialEnvelope>(),
     credential_fingerprint: text().notNull(),

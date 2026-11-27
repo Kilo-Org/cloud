@@ -5,6 +5,7 @@ import {
   UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
   UtsAccessTokenClaimsSchema,
   audienceOfScope,
+  utsScopeEntry,
 } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { getSignerStub } from '../dos/stubs';
@@ -19,8 +20,19 @@ import { signerForGrant } from '../keys/signer-choice';
  */
 
 /**
- * The claim sets of one mint, in the order of `minted.scopes`. `act` and `req` stay absent: a
- * token minted from a grant is not delegated.
+ * The lifetime of an access token for `scope`: 10 minutes (design 5.3), or the scope's shorter
+ * maximum when the scope registry sets one (such as 5 minutes for a one-shot capability).
+ */
+export function accessTokenLifetimeSeconds(scope: string): number {
+  return Math.min(
+    UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+    utsScopeEntry(scope)?.maxLifetimeSeconds ?? UTS_ACCESS_TOKEN_LIFETIME_SECONDS
+  );
+}
+
+/**
+ * The claim sets of one mint, in the order of `minted.scopes`, each living its scope's lifetime.
+ * `act` and `req` stay absent: a token minted from a grant is not delegated.
  */
 export function accessTokenClaims(
   config: UtsConfig,
@@ -32,7 +44,7 @@ export function accessTokenClaims(
   return minted.scopes.map((scope, index) =>
     UtsAccessTokenClaimsSchema.parse({
       iss: config.endpoints.issuer,
-      exp: nowSeconds + UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+      exp: nowSeconds + accessTokenLifetimeSeconds(scope),
       aud: audienceOfScope(scope),
       sub: minted.subjectId,
       client_id: clientId,
@@ -104,7 +116,7 @@ export function tokenResponseBody(
   const issued: IssuedToken[] = claims.map((claimSet, index) => ({
     access_token: tokens[index],
     token_type: 'Bearer',
-    expires_in: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+    expires_in: claimSet.exp - claimSet.iat,
     audience: claimSet.aud,
     scope: claimSet.scope,
   }));
@@ -112,7 +124,7 @@ export function tokenResponseBody(
   return {
     access_token: first.access_token,
     token_type: 'Bearer',
-    expires_in: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+    expires_in: first.expires_in,
     scope: first.scope,
     issued_tokens: issued,
     ...(refresh === null

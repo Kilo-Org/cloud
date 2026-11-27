@@ -1,0 +1,32 @@
+/**
+ * The Workers test pool's config (vitest.config.ts): the object without its container, which the
+ * tests replace with a fake, and a local queue. Never deployed: deploy-workers.yml deploys only
+ * wrangler.jsonc.
+ */
+{
+  "name": "migration-proxy-test",
+  "main": "src/index.ts",
+  // The newest date the pool's workerd supports; the deployed config uses 2026-10-01.
+  "compatibility_date": "2026-06-10",
+  "observability": { "enabled": true, "traces": { "enabled": false } },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "durable_objects": {
+    "bindings": [{ "name": "MIGRATION_RUN_DO", "class_name": "MigrationRunDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MigrationRunDO"] }],
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "migration-proxy-test-audit" }],
+  },
+  "vars": {
+    "MIGRATION_PROXY_ENVIRONMENT": "production",
+    "MIGRATION_DB_TARGET": "db.test.invalid:5432/postgres",
+    "MIGRATION_DB_USER": "kilo_migration_proxy",
+    "MIGRATION_DB_LOGIN_MODE": "member",
+    "MIGRATION_SESSION_KEY": "label",
+    "MIGRATION_SESSION_SAMPLE_MINUTES": "60",
+    "MIGRATION_RUN_DEADLINE_SECONDS": "21600",
+    "MIGRATION_PROXY_GITHUB_APP_ID": "12345",
+    "MIGRATION_PROXY_GITHUB_INSTALLATION_ID": "67890",
+    "MIGRATION_REVIEW_BASELINE_SHA": "0000000000000000000000000000000000000001",
+  },
+}

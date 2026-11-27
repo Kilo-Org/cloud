@@ -101,7 +101,7 @@ async function fixture(environment: 'production' | 'staging'): Promise<Fixture> 
   const verifier = new IdentityVerifier({
     policies: policies.all(),
     environment,
-    issuer: STS_ISSUER,
+    audience: STS_ISSUER,
     fetch: local.fetch,
   });
   return {
@@ -161,6 +161,7 @@ describe('Fly machine identity', () => {
       attestationExp: issuedAt + 900,
       attestationIat: issuedAt,
       run: null,
+      github: null,
     });
   });
 
@@ -210,6 +211,7 @@ describe('GitHub Actions identity', () => {
       attestationExp: issuedAt + 300,
       attestationIat: issuedAt,
       run: { jobWorkflowRef: RELEASE_WORKFLOW, runId: '9001' },
+      github: null,
     });
   });
 

@@ -38,6 +38,9 @@ afterAll(() => db.drop());
 const environment = 'development';
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
 const reference = (value: string) => sha256(value).toString('base64url').slice(0, 8);
+/** The feed entry a revoking statement returns for a revoked grant or family. */
+const feedEntry = (kind: 'grant' | 'third_party_family', id: string) =>
+  expect.objectContaining({ kind, id, revokedBefore: null });
 const token = () => randomBytes(32).toString('base64url');
 /** A verified DPoP proof of the key `jkt`, with a fresh `jti`. */
 const proofOf = (jkt: Buffer): ProofBinding => ({ jkt, jti: randomUUID() });
@@ -104,7 +107,7 @@ async function issueFirstPartyCode(
     amr: ['passkey'],
     ...overrides,
   });
-  expect(outcome).toBe('issued');
+  expect(outcome).toMatchObject({ outcome: 'issued' });
   return { code, verifier, challenge, jkt };
 }
 
@@ -180,7 +183,7 @@ async function thirdPartyFamily(accountId: string) {
       authTime: new Date(),
       amr: ['oauth'],
     })
-  ).toBe('issued');
+  ).toEqual({ outcome: 'issued', orgRole: null });
   const refreshToken = token();
   const familyId = randomUUID();
   const exchange: ExchangeCodeInput = {
@@ -265,13 +268,15 @@ describe('authorization codes', () => {
       authTime: new Date(),
       amr: ['passkey'],
     } satisfies Partial<IssueCodeInput>;
-    expect(await grants.issueCode({ ...base, accountId: blocked, orgId: null })).toBe(
-      'access_denied'
-    );
+    expect(await grants.issueCode({ ...base, accountId: blocked, orgId: null })).toEqual({
+      outcome: 'access_denied',
+    });
 
     const member = await insertAccount(owner);
     const orgId = randomUUID();
-    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toBe('access_denied');
+    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toEqual({
+      outcome: 'access_denied',
+    });
     await owner.query(
       `INSERT INTO uts.org_memberships (org_id, account_id, role, event_version) VALUES ($1, $2, 'member', 1)`,
       [orgId, member]
@@ -280,7 +285,9 @@ describe('authorization codes', () => {
       `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
       [orgId]
     );
-    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toBe('access_denied');
+    expect(await grants.issueCode({ ...base, accountId: member, orgId })).toEqual({
+      outcome: 'access_denied',
+    });
     expect(
       await grants.issueCode({
         ...base,
@@ -289,7 +296,7 @@ describe('authorization codes', () => {
         orgId,
         amr: ['sso'],
       })
-    ).toBe('issued');
+    ).toEqual({ outcome: 'issued', orgRole: 'member' });
   });
 
   it('needs an active consent that covers the scopes for a third-party client', async () => {
@@ -310,9 +317,12 @@ describe('authorization codes', () => {
         authTime: new Date(),
         amr: ['oauth'],
       });
-    expect(await issue(['mcp:tools.write'], consentId)).toBe('consent_required');
-    expect(await issue(['mcp:tools.read'], randomUUID())).toBe('consent_required');
-    expect(await issue(['mcp:tools.read'], consentId)).toBe('issued');
+    expect(await issue(['mcp:tools.write'], consentId)).toEqual({ outcome: 'consent_required' });
+    expect(await issue(['mcp:tools.read'], randomUUID())).toEqual({ outcome: 'consent_required' });
+    expect(await issue(['mcp:tools.read'], consentId)).toEqual({
+      outcome: 'issued',
+      orgRole: null,
+    });
   });
 });
 
@@ -372,7 +382,7 @@ describe('code exchange', () => {
         scopes: result.scopes,
         audiences: ['gateway', 'kilo-chat'],
         refreshRef: reference(input.refreshToken),
-        tokenLifetimeSeconds: 600,
+        tokenLifetimeSeconds: ['600', '600'],
       },
     });
     const text = await eventsText(accountId);
@@ -425,7 +435,10 @@ describe('code exchange', () => {
     const accountId = await insertAccount(owner);
     const fixture = await issueFirstPartyCode(accountId);
     const input = exchangeInput(fixture);
-    expect(await grants.exchangeCode(change(input))).toEqual({ outcome: 'invalid_grant' });
+    expect(await grants.exchangeCode(change(input))).toEqual({
+      outcome: 'invalid_grant',
+      feedEntries: [],
+    });
     expect((await grants.exchangeCode(input)).outcome).toBe('issued');
   });
 
@@ -438,7 +451,10 @@ describe('code exchange', () => {
        WHERE code_hash = $1`,
       [sha256(fixture.code)]
     );
-    expect(await grants.exchangeCode(exchangeInput(fixture))).toEqual({ outcome: 'invalid_grant' });
+    expect(await grants.exchangeCode(exchangeInput(fixture))).toEqual({
+      outcome: 'invalid_grant',
+      feedEntries: [],
+    });
   });
 
   it('selects the requested scopes and refuses a scope or resource outside the code', async () => {
@@ -446,9 +462,10 @@ describe('code exchange', () => {
     const fixture = await issueFirstPartyCode(accountId);
     expect(
       await grants.exchangeCode(exchangeInput(fixture, { scopes: ['gateway:chat.write'] }))
-    ).toEqual({ outcome: 'invalid_scope' });
+    ).toEqual({ outcome: 'invalid_scope', feedEntries: [] });
     expect(await grants.exchangeCode(exchangeInput(fixture, { resources: ['mcp'] }))).toEqual({
       outcome: 'invalid_target',
+      feedEntries: [],
     });
     const result = await grants.exchangeCode(exchangeInput(fixture, { resources: ['kilo-chat'] }));
     expect(result).toMatchObject({ outcome: 'issued', scopes: ['kilo-chat:messages.read'] });
@@ -461,8 +478,9 @@ describe('code exchange', () => {
     // A refused scope still uses the proof up.
     expect(await grants.exchangeCode({ ...input, scopes: ['gateway:chat.write'] })).toEqual({
       outcome: 'invalid_scope',
+      feedEntries: [],
     });
-    expect(await grants.exchangeCode(input)).toEqual({ outcome: 'dpop_replay' });
+    expect(await grants.exchangeCode(input)).toEqual({ outcome: 'dpop_replay', feedEntries: [] });
     const fresh = await grants.exchangeCode({
       ...input,
       binding: { kind: 'first_party', proof: proofOf(fixture.jkt), clientClass: 'desktop', device },
@@ -480,6 +498,7 @@ describe('code exchange', () => {
     const grant = await firstPartyGrant(accountId);
     expect(await grants.exchangeCode({ ...grant, grantId: randomUUID() })).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [feedEntry('grant', grant.grantId)],
     });
     const stored = await owner.query(
       `SELECT grant_row.status, grant_row.revoke_reason, session.status AS session_status
@@ -569,7 +588,7 @@ describe('code exchange', () => {
         binding: { kind: 'first_party', proof: proofOf(first.jkt), clientClass: 'desktop', device },
         refreshTokenHash: sha256(`kilo_rt_${token()}`),
       })
-    ).toEqual({ outcome: 'invalid_grant' });
+    ).toEqual({ outcome: 'invalid_grant', feedEntries: [] });
     const stored = await owner.query(
       'SELECT status, token_hash FROM uts.refresh_grants WHERE id = $1',
       [first.grantId]
@@ -583,6 +602,7 @@ describe('code exchange', () => {
     const first = await firstPartyGrant(accountId);
     expect(await grants.exchangeCode({ ...first, refreshTokenHash: sha256(token()) })).toEqual({
       outcome: 'dpop_replay',
+      feedEntries: [],
     });
     const stored = await owner.query('SELECT status FROM uts.refresh_grants WHERE id = $1', [
       first.grantId,
@@ -619,7 +639,10 @@ describe('code exchange', () => {
       binding: { kind: 'first_party', proof: proofOf(first.jkt), clientClass: 'desktop', device },
       refreshTokenHash: sha256(token()),
     });
-    expect(await grants.exchangeCode(retry)).toEqual({ outcome: 'invalid_grant' });
+    expect(await grants.exchangeCode(retry)).toEqual({
+      outcome: 'invalid_grant',
+      feedEntries: [feedEntry('grant', first.grantId)],
+    });
     const stored = await owner.query(
       'SELECT status, revoke_reason, token_hash FROM uts.refresh_grants WHERE id = $1',
       [first.grantId]
@@ -650,7 +673,10 @@ describe('code exchange', () => {
       },
       refreshTokenHash: sha256(token()),
     };
-    expect(await grants.exchangeCode(retry)).toEqual({ outcome: 'invalid_grant' });
+    expect(await grants.exchangeCode(retry)).toEqual({
+      outcome: 'invalid_grant',
+      feedEntries: [feedEntry('grant', first.grantId)],
+    });
     const stored = await owner.query('SELECT status FROM uts.refresh_grants WHERE id = $1', [
       first.grantId,
     ]);
@@ -664,7 +690,10 @@ describe('code exchange', () => {
     // DPoP key, so the verifier alone does not show the same client instance.
     expect(
       await grants.exchangeCode({ ...family.exchange, refreshTokenHash: sha256(token()) })
-    ).toEqual({ outcome: 'invalid_grant' });
+    ).toEqual({
+      outcome: 'invalid_grant',
+      feedEntries: [feedEntry('third_party_family', family.familyId)],
+    });
     const stored = await owner.query(
       'SELECT status, revoke_reason FROM uts.third_party_grant_families WHERE id = $1',
       [family.familyId]
@@ -683,6 +712,7 @@ describe('code exchange', () => {
     expect(rows.map(row => row.event.data.attributes.rotation)).not.toContain('code_retry');
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
   });
 
@@ -891,7 +921,10 @@ describe('first-party refresh', () => {
     // A code names at most 8 audiences, so the 9 scopes share one.
     const scopes = Array.from({ length: 9 }, (_, index) => `gateway:permission${index}`);
     const fixture = await issueFirstPartyCode(accountId, {}, scopes);
-    expect(await grants.exchangeCode(exchangeInput(fixture))).toEqual({ outcome: 'invalid_scope' });
+    expect(await grants.exchangeCode(exchangeInput(fixture))).toEqual({
+      outcome: 'invalid_scope',
+      feedEntries: [],
+    });
     const result = await grants.exchangeCode(
       exchangeInput(fixture, { scopes: scopes.slice(0, 8) })
     );
@@ -946,6 +979,7 @@ describe('third-party refresh rotation', () => {
     // gets no token: there is no grace.
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'reuse_detected',
+      feedEntries: [feedEntry('third_party_family', family.familyId)],
     });
     const stored = await owner.query(
       `SELECT family.status, family.revoke_reason, token.token_hash
@@ -969,10 +1003,12 @@ describe('third-party refresh rotation', () => {
     // The newest token died with the family, and a second reuse writes nothing more.
     expect(await refreshThirdParty(family.clientId, first.next).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
     const rowsAfter = (await auditRows(accountId)).length;
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
     expect(await auditRows(accountId)).toHaveLength(rowsAfter);
   });
@@ -982,9 +1018,10 @@ describe('third-party refresh rotation', () => {
     const family = await thirdPartyFamily(accountId);
     expect(
       await refreshThirdParty('https://client.example.com/other', family.refreshToken).result
-    ).toEqual({ outcome: 'invalid_grant' });
+    ).toEqual({ outcome: 'invalid_grant', feedEntries: [] });
     expect(await refreshThirdParty(family.clientId, token()).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
   });
 });
@@ -993,21 +1030,33 @@ describe('revocation', () => {
   it('revokes a first-party grant and its device session once, with a feed entry and an audit row', async () => {
     const accountId = await insertAccount(owner);
     const grant = await firstPartyGrant(accountId);
-    const revoke = (clientId = 'kilo-cli') =>
-      grants.revoke({ environment, tokenHash: sha256(grant.refreshToken), clientId });
-    expect(await revoke('kilo-other')).toBe('client_mismatch');
-    expect(await revoke('kilo-other')).toBe('client_mismatch');
+    const revoke = async (clientId = 'kilo-cli') =>
+      await grants.revoke({ environment, tokenHash: sha256(grant.refreshToken), clientId });
+    const noEntries = (outcome: string) => ({ outcome, feedEntries: [] });
+    expect(await revoke('kilo-other')).toEqual(noEntries('client_mismatch'));
+    expect(await revoke('kilo-other')).toEqual(noEntries('client_mismatch'));
     // Caller input that the audit row's credential check would refuse is written as a hash only.
     await owner.query(
       `UPDATE uts.refresh_grants SET denied_audited_at = now() - interval '61 seconds' WHERE id = $1`,
       [grant.grantId]
     );
-    expect(await revoke(`https://evil.example/kilo_rt_${token()}`)).toBe('client_mismatch');
-    expect(await revoke()).toBe('revoked');
-    expect(await revoke()).toBe('already_revoked');
+    expect(await revoke(`https://evil.example/kilo_rt_${token()}`)).toEqual(
+      noEntries('client_mismatch')
+    );
+    expect(await revoke()).toEqual({
+      outcome: 'revoked',
+      feedEntries: [feedEntry('grant', grant.grantId)],
+    });
+    // A retry, as after a 503 that no feed object confirmed, gets the live entry to publish again;
+    // another client still learns nothing.
+    expect(await revoke()).toEqual({
+      outcome: 'already_revoked',
+      feedEntries: [feedEntry('grant', grant.grantId)],
+    });
+    expect(await revoke('kilo-other')).toEqual(noEntries('client_mismatch'));
     expect(
       await grants.revoke({ environment, tokenHash: sha256(token()), clientId: 'kilo-cli' })
-    ).toBe('unknown');
+    ).toEqual(noEntries('unknown'));
     const stored = await owner.query(
       `SELECT grant_row.status, grant_row.revoke_reason, session.status AS session_status
        FROM uts.refresh_grants AS grant_row
@@ -1052,9 +1101,13 @@ describe('revocation', () => {
         tokenHash: sha256(family.refreshToken),
         clientId: family.clientId,
       })
-    ).toBe('revoked');
+    ).toEqual({
+      outcome: 'revoked',
+      feedEntries: [feedEntry('third_party_family', family.familyId)],
+    });
     expect(await refreshThirdParty(family.clientId, first.next).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
   });
 
@@ -1082,7 +1135,7 @@ describe('revocation', () => {
 
     const revoke = (presented: string) =>
       grants.revoke({ environment, tokenHash: sha256(presented), clientId: family.clientId });
-    expect(await revoke(current.next)).toBe('revoked');
+    expect((await revoke(current.next)).outcome).toBe('revoked');
     expect(await versions('third_party_refresh_tokens', 'family_id')).toEqual(tokensBefore);
     expect(await versions('third_party_rotated_tokens', 'family_id')).toEqual(tombstonesBefore);
     expect(await versions('third_party_grant_families', 'id')).not.toEqual(familyBefore);
@@ -1091,6 +1144,7 @@ describe('revocation', () => {
     for (const presented of [family.refreshToken, child.next, current.next]) {
       expect(await refreshThirdParty(family.clientId, presented).result).toEqual({
         outcome: 'invalid_grant',
+        feedEntries: [],
       });
       expect(
         await grants.introspect({
@@ -1099,12 +1153,54 @@ describe('revocation', () => {
           proof: null,
         })
       ).toEqual({ outcome: 'inactive' });
-      expect(await revoke(presented)).toBe('already_revoked');
+      expect(await revoke(presented)).toEqual({
+        outcome: 'already_revoked',
+        feedEntries: [feedEntry('third_party_family', family.familyId)],
+      });
     }
     // A refused token of a revoked family revokes nothing more and writes no row.
     expect(await auditRows(accountId)).toHaveLength(auditCount);
     expect(await versions('third_party_refresh_tokens', 'family_id')).toEqual(tokensBefore);
     expect(await versions('third_party_rotated_tokens', 'family_id')).toEqual(tombstonesBefore);
+  });
+
+  it('returns the feed entry the statement wrote, with the times its row holds, and only that one', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const other = await firstPartyGrant(accountId);
+    await grants.revoke({
+      environment,
+      tokenHash: sha256(other.refreshToken),
+      clientId: 'kilo-cli',
+    });
+    const result = await grants.revoke({
+      environment,
+      tokenHash: sha256(grant.refreshToken),
+      clientId: 'kilo-cli',
+    });
+    const row = await owner.query<{ revoked_at: Date; feed_expires_at: Date }>(
+      `SELECT revoked_at, feed_expires_at FROM uts.revocations
+       WHERE kind = 'grant' AND subject_id = $1`,
+      [grant.grantId]
+    );
+    const stored = row.rows[0];
+    expect(result.feedEntries).toEqual([
+      {
+        kind: 'grant',
+        id: grant.grantId,
+        revokedBefore: null,
+        revokedAt: Math.floor(stored.revoked_at.getTime()),
+        expiresAt: Math.floor(stored.feed_expires_at.getTime()),
+      },
+    ]);
+    expect(result.feedEntries[0].expiresAt - result.feedEntries[0].revokedAt).toBe(20 * 60_000);
+  });
+
+  it('reads no entry outside a revoking statement', async () => {
+    const entries = await app.query<{ entries: unknown }>(
+      'SELECT uts.feed_entries_of_statement() AS entries'
+    );
+    expect(entries.rows).toEqual([{ entries: [] }]);
   });
 });
 
@@ -1205,12 +1301,14 @@ describe('a blocked third-party client', () => {
         authTime: new Date(),
         amr: ['oauth'],
       })
-    ).toBe('issued');
+    ).toEqual({ outcome: 'issued', orgRole: null });
 
-    // The block is the status change alone: no family changes in that statement.
-    await app.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
-      family.clientId,
-    ]);
+    // The block is the status change alone: no family changes in that statement. Only an operator
+    // changes a client's status (migration 0021 takes the app login's DML away).
+    await owner.query(
+      `UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`,
+      [family.clientId]
+    );
     const live = async () =>
       (
         await owner.query<{ live: number }>(
@@ -1231,6 +1329,7 @@ describe('a blocked third-party client', () => {
     ).toEqual({ outcome: 'inactive' });
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
     expect(
       await grants.exchangeCode({
@@ -1240,12 +1339,12 @@ describe('a blocked third-party client', () => {
         grantId: randomUUID(),
         refreshTokenHash: sha256(token()),
       })
-    ).toEqual({ outcome: 'invalid_grant' });
+    ).toEqual({ outcome: 'invalid_grant', feedEntries: [] });
 
     // An unblock is refused, retryably, while any family of the client is still active.
     const OBJECT_IN_USE = '55006';
     const unblock = () =>
-      app.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
+      owner.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
         family.clientId,
       ]);
     expect(await sqlStateOf(unblock)).toBe(OBJECT_IN_USE);
@@ -1278,6 +1377,7 @@ describe('a blocked third-party client', () => {
     await unblock();
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
     expect((await refreshThirdParty(other.clientId, other.refreshToken).result).outcome).toBe(
       'issued'
@@ -1405,9 +1505,11 @@ describe('third-party reuse detection', () => {
 
     expect(await refreshThirdParty(family.clientId, family.refreshToken).result).toEqual({
       outcome: 'reuse_detected',
+      feedEntries: [feedEntry('third_party_family', family.familyId)],
     });
     expect(await refreshThirdParty(family.clientId, thiefNext.next).result).toEqual({
       outcome: 'invalid_grant',
+      feedEntries: [],
     });
     const stored = await owner.query(
       'SELECT status, revoke_reason FROM uts.third_party_grant_families WHERE id = $1',
@@ -1423,7 +1525,7 @@ describe('third-party reuse detection', () => {
     expect((await next.result).outcome).toBe('issued');
     expect(
       await refreshThirdParty('https://client.example.com/other', family.refreshToken).result
-    ).toEqual({ outcome: 'invalid_grant' });
+    ).toEqual({ outcome: 'invalid_grant', feedEntries: [] });
     expect((await refreshThirdParty(family.clientId, next.next).result).outcome).toBe('issued');
   });
 });
@@ -1481,13 +1583,17 @@ describe('OAuth row maintenance', () => {
         tokenHash: sha256(ended.refreshToken),
         clientId: ended.clientId,
       })
-    ).toBe('revoked');
+    ).toMatchObject({ outcome: 'revoked' });
     const staleFeed = randomUUID();
+    // A row written an hour ago: the stamp trigger dates every write now, so the owner turns it
+    // off for this one insert.
+    await owner.query('ALTER TABLE uts.revocations DISABLE TRIGGER revocations_stamp');
     await owner.query(
       `INSERT INTO uts.revocations (kind, subject_id, revoked_at, feed_expires_at)
        VALUES ('grant', $1, now() - interval '1 hour', now() - interval '40 minutes')`,
       [staleFeed]
     );
+    await owner.query('ALTER TABLE uts.revocations ENABLE TRIGGER revocations_stamp');
     const staleJti = randomUUID();
     await owner.query(
       `INSERT INTO uts.dpop_proofs (jkt, jti, expires_at) VALUES ($1, $2, now() - interval '1 second')`,
@@ -1554,6 +1660,7 @@ describe('OAuth row maintenance', () => {
     // The live family's replaced token still revokes it.
     expect(await refreshThirdParty(live.clientId, live.refreshToken).result).toEqual({
       outcome: 'reuse_detected',
+      feedEntries: [feedEntry('third_party_family', live.familyId)],
     });
   });
 });

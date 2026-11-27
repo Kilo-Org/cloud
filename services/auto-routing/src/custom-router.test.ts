@@ -28,8 +28,13 @@ import type * as CustomRouterStoreModule from './custom-router-store';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import type * as ModelClassifierModule from './model-classifier';
 import { clearEmailDomainBlacklistCache } from './caller-auth';
-import { clearCustomRouterTableCache } from './custom-router-decision';
+import {
+  clearCustomRouterTableCache,
+  customRouterTarget,
+  customRouting,
+} from './custom-router-decision';
 import { clearClassificationHotCache } from './decision-cache';
+import type { DecisionTimings } from './decide';
 import { clearOrganizationPolicyCache } from './organization-policy';
 import { app } from './index';
 
@@ -245,6 +250,8 @@ const env = {
 };
 
 const backgroundTasks: Promise<unknown>[] = [];
+// The stub omits bindings a direct `customRouterTarget` call never touches.
+const customRouterEnv = env as unknown as Env;
 const executionCtx = {
   waitUntil: (promise: Promise<unknown>) => {
     backgroundTasks.push(promise);
@@ -349,6 +356,17 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
 async function decisionOf(res: Response) {
   expect(res.status).toBe(200);
   return CustomRouterDecideResponseSchema.parse(await res.json());
+}
+
+function decisionTimings(): DecisionTimings {
+  return {
+    capabilitiesMs: null,
+    tableMs: null,
+    prepMs: 0,
+    cacheReadMs: 0,
+    classifierMs: null,
+    totalMs: 0,
+  };
 }
 
 // A user whose credited balance is fully spent.
@@ -1004,6 +1022,136 @@ describe('public custom router decide', () => {
     });
     await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
     expect(tableFetches()).toBe(2);
+  });
+
+  it('serves a resolved table from cache without another read', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const paths = () => benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
+    // The build reads the fingerprint once and the table once.
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH)).toHaveLength(1);
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_VERSION_PATH)).toHaveLength(1);
+
+    // Same epoch and same readiness fingerprint: the resolved table is served as it stands.
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision.tableVersion).toBe('custom-table-1');
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH)).toHaveLength(1);
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_VERSION_PATH)).toHaveLength(1);
+  });
+
+  it('loads its own table when the request that started the refresh was cancelled', async () => {
+    const firstTableRead = Promise.withResolvers<void>();
+    const endFirstRequest = Promise.withResolvers<void>();
+    let tableReads = 0;
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        tableReads += 1;
+        if (tableReads > 1) return Response.json({ table: rankedTable });
+        firstTableRead.resolve();
+        // The request that started this read is cancelled while it is pending: workerd tears the
+        // I/O down and rejects it. The bound only keeps this test terminating when a later request
+        // is still waiting on that read; how the first request ends is not what is under test.
+        const backstop = setTimeout(endFirstRequest.resolve, 2_000);
+        await endFirstRequest.promise;
+        clearTimeout(backstop);
+        throw new Error('This promise was created by a request that has since ended.');
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+    const cancelled = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    await firstTableRead.promise;
+    // Arrives while the first rebuild is still pending. It must start its own read rather than
+    // wait on the one that dies with the request that started it.
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: false });
+
+    endFirstRequest.resolve();
+    const cancelledRes = await cancelled;
+    expect(cancelledRes.status).toBe(500);
+    expect(await errorCode(cancelledRes)).toBe('internal_error');
+    expect(tableReads).toBe(2);
+  });
+
+  it('hands the table build to waitUntil and caches it after the request stops waiting', async () => {
+    const handed: Promise<unknown>[] = [];
+    const tableRead = Promise.withResolvers<void>();
+    const releaseTable = Promise.withResolvers<void>();
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        tableRead.resolve();
+        await releaseTable.promise;
+        return Response.json({ table: rankedTable });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const tableFetches = () =>
+      benchmarkFetch.mock.calls.filter(
+        ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
+      ).length;
+
+    const routing = customRouting(
+      customRouter(),
+      [{ provider: 'ollama', model: 'qwen3:32b' }],
+      new Set()
+    );
+    // Nobody is waiting for this response any more: the gateway gave up on it. The build the worker
+    // handed to `waitUntil` still finishes and writes the cache for the next request.
+    const loading = customRouterTarget(
+      customRouterEnv,
+      promise => handed.push(promise),
+      routing
+    ).loadRouting(decisionTimings());
+    await tableRead.promise;
+    expect(handed).toHaveLength(1);
+
+    releaseTable.resolve();
+    await expect(handed[0]).resolves.toMatchObject({ table: rankedTable });
+    await loading;
+    expect(tableFetches()).toBe(1);
+
+    const nextHanded: Promise<unknown>[] = [];
+    await customRouterTarget(
+      customRouterEnv,
+      promise => nextHanded.push(promise),
+      routing
+    ).loadRouting(decisionTimings());
+    expect(tableFetches()).toBe(1);
+    expect(nextHanded).toHaveLength(0);
+  });
+
+  it('hands a failed table build to waitUntil as a promise that resolves', async () => {
+    const handed: Promise<unknown>[] = [];
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        throw new Error('This promise was created by a request that has since ended.');
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+    const routing = customRouting(customRouter(), [], new Set());
+    await expect(
+      customRouterTarget(customRouterEnv, promise => handed.push(promise), routing).loadRouting(
+        decisionTimings()
+      )
+    ).rejects.toThrow('Custom router table is temporarily unavailable');
+    // A failed build must not surface as an unhandled rejection held open by the runtime.
+    expect(handed).toHaveLength(1);
+    await expect(handed[0]).resolves.toBeUndefined();
   });
 
   it('never answers a post-settlement request from a build started before it', async () => {

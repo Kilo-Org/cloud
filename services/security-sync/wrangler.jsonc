@@ -120,6 +120,9 @@
   "env": {
     "dev": {
       "name": "cloudflare-security-sync-dev",
+      "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
       "vars": {
         "ENVIRONMENT": "development",
         "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
@@ -169,7 +172,7 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

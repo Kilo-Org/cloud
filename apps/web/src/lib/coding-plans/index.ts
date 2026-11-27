@@ -1070,7 +1070,6 @@ export async function queueAvailableInventoryForRevocation(
   const { rows } = await db.execute<{ id: string; upstream_plan_id: string }>(sql`
     UPDATE coding_plan_key_inventory
     SET status = 'revocation_pending',
-        encrypted_api_key = NULL,
         encrypted_api_key_envelope = NULL,
         revocation_requested_at = now(),
         updated_at = now()

@@ -5,6 +5,7 @@ import {
   LEASE_GRANT_MAX_TTL_SECONDS,
   LEASE_MIN_TTL_SECONDS,
   LeaseGrantSchema,
+  MIGRATION_RUN_GRANT,
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   ScopeSchema,
@@ -95,9 +96,34 @@ export const GithubIdentitySchema = z.strictObject({
   refs: z.array(RefSchema).min(1).max(32).default([GITHUB_PRODUCTION_REF]),
   jobWorkflowRefs: z.array(JobWorkflowRefSchema).min(1).max(32),
   events: z.array(z.enum(GITHUB_EVENTS)).min(1).max(GITHUB_EVENTS.length),
+  /** Accept GitHub's default (name-only) subject too; see `GITHUB_LEGACY_SUBJECT_REPOSITORY`. */
+  legacySubject: z.literal(true).optional(),
 });
 
 export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
+
+/**
+ * The one repository whose policies may set `legacySubject` (decision 2026-11-27): Kilo-Org/kilocode.
+ * Its tokens still carry the default subject `repo:Kilo-Org/kilocode:environment:<env>`, so STS
+ * accepts that form for it; the token's `repository_id` and `repository_owner_id` claims must still
+ * equal these ids, and every other binding still applies, so a renamed or recreated repository with
+ * the same name is refused.
+ *
+ * WHY: npm/cli#9969 (open): npm trusted publishing fails with "package not found" for repositories
+ * using use_immutable_subject, so kilocode cannot turn it on without breaking npm releases; Azure
+ * signing (its federated credential matches `sub`) also needs a new trust entry before the switch.
+ *
+ * HOW TO UPGRADE: when npm fixes #9969 -> add the Azure federated credential for
+ * `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main` -> turn on use_immutable_subject
+ * for kilocode -> prove oidc_check on main and v2 -> delete this exception (this constant, the
+ * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the seven
+ * `ci-kilocode-*` policies).
+ */
+export const GITHUB_LEGACY_SUBJECT_REPOSITORY = {
+  repository: 'Kilo-Org/kilocode',
+  repositoryId: '946087422',
+  repositoryOwnerId: '201822503',
+} as const;
 
 /**
  * The `sub` a token for this identity must carry: GitHub's immutable format, which names the owner
@@ -107,6 +133,14 @@ export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
 export function githubSubject(identity: GithubIdentity, ref: string): string {
   const [owner, name] = identity.repository.split('/');
   const repository = `repo:${owner}@${identity.repositoryOwnerId}/${name}@${identity.repositoryId}`;
+  return identity.environment === undefined
+    ? `${repository}:ref:${ref}`
+    : `${repository}:environment:${identity.environment}`;
+}
+
+/** GitHub's default subject for a `legacySubject` policy: the immutable form without the ids. */
+export function githubLegacySubject(identity: GithubIdentity, ref: string): string {
+  const repository = `repo:${identity.repository}`;
   return identity.environment === undefined
     ? `${repository}:ref:${ref}`
     : `${repository}:environment:${identity.environment}`;
@@ -182,11 +216,10 @@ function hasDuplicates(values: readonly string[]): boolean {
 
 /**
  * The most active leases a policy may allow per grant: `replica-read` covers bouncer-watch's hourly
- * and daily runs, which overlap; a migration re-run may start before a failed run's lease ends.
+ * and daily runs, which overlap.
  */
 export const LEASE_MAX_ACTIVE_CEILING: Readonly<Record<LeaseGrant, number>> = {
   'replica-read': 4,
-  'ci-migration': 2,
 };
 
 /**
@@ -263,15 +296,30 @@ export const CloudflareDeployGrantSchema = z.strictObject({
 
 export type CloudflareDeployGrant = z.infer<typeof CloudflareDeployGrantSchema>;
 
+/**
+ * The grant of a trigger-only policy (design Q64a): its GitHub job may start a migration run
+ * through the migration proxy, which asks `attestGithubRun`, and nothing else. No other field: the
+ * proxy holds the database login, never the job.
+ */
+const MigrationRunGrantSchema = z.strictObject({ grant: z.literal(MIGRATION_RUN_GRANT) });
+
+export type MigrationRunGrant = z.infer<typeof MigrationRunGrantSchema>;
+
 const DynamicGrantSchema = z.discriminatedUnion('grant', [
   LeaseDynamicGrantSchema,
   CloudflareDeployGrantSchema,
+  MigrationRunGrantSchema,
 ]);
 
 export type DynamicGrant = z.infer<typeof DynamicGrantSchema>;
 
 export function isLeaseDynamicGrant(entry: DynamicGrant): entry is LeaseDynamicGrant {
-  return entry.grant !== CLOUDFLARE_DEPLOY_GRANT;
+  return LeaseGrantSchema.safeParse(entry.grant).success;
+}
+
+/** True for a trigger-only policy: one that holds the `migration-run` grant. */
+export function holdsMigrationRun(policy: Policy): boolean {
+  return policy.dynamic.some(entry => entry.grant === MIGRATION_RUN_GRANT);
 }
 
 /** The policy's lease entry for `grant`, or undefined when it lists none. */
@@ -314,7 +362,7 @@ export const PolicySchema = z.strictObject({
    */
   dynamic: z
     .array(DynamicGrantSchema)
-    .max(LeaseGrantSchema.options.length + 1)
+    .max(LeaseGrantSchema.options.length + 2)
     .default([]),
   /** Grants for one STS environment only, each key one of `environments`; absent adds none. */
   environmentGrants: z
@@ -377,10 +425,9 @@ export const PolicySnapshotEntrySchema = z.strictObject({
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
 
 /**
- * Lease grants (design 6.3): at most one entry per grant, lifetimes within the grant's ceiling, and
- * each grant only for the identity it was built for. `replica-read` serves Workers in the account
- * (bouncer-watch); `ci-migration` serves a GitHub job, and only one bound to a protected GitHub
- * environment (production also needs `refs/heads/main`, checked with the other GitHub rules).
+ * Dynamic grants (design 6.3): at most one entry per grant, lease lifetimes within the grant's
+ * ceiling, and each grant only for the identity it was built for. `replica-read` serves Workers in
+ * the account (bouncer-watch); `cloudflare-deploy` and `migration-run` serve GitHub jobs.
  */
 function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
   const problems: string[] = [];
@@ -388,8 +435,12 @@ function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
     problems.push('dynamic lists a grant twice');
   }
   for (const entry of policy.dynamic) {
-    if (!isLeaseDynamicGrant(entry)) {
+    if (entry.grant === CLOUDFLARE_DEPLOY_GRANT) {
       problems.push(...cloudflareDeployProblems(policy, entry, pins));
+      continue;
+    }
+    if (entry.grant === MIGRATION_RUN_GRANT) {
+      problems.push(...migrationRunProblems(policy));
       continue;
     }
     const ceiling = LEASE_GRANT_MAX_TTL_SECONDS[entry.grant];
@@ -404,19 +455,46 @@ function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
         `dynamic ${entry.grant}: maxActive is above ${LEASE_MAX_ACTIVE_CEILING[entry.grant]}`
       );
     }
-    const { identity } = policy;
-    if (entry.grant === 'replica-read' && identity.kind !== 'worker-binding') {
+    if (entry.grant === 'replica-read' && policy.identity.kind !== 'worker-binding') {
       problems.push('dynamic replica-read is only for a worker-binding policy');
     }
-    if (entry.grant === 'ci-migration') {
-      if (identity.kind !== 'github-oidc') {
-        problems.push('dynamic ci-migration is only for a github-oidc policy');
-      } else if (identity.environment === undefined) {
-        problems.push(
-          'a github-oidc policy with dynamic ci-migration must bind identity.environment'
-        );
-      }
+  }
+  return problems;
+}
+
+/**
+ * A trigger-only policy (design Q64a): a GitHub job bound to a protected GitHub environment (a
+ * production one accepts `refs/heads/main` alone, checked with the other GitHub rules) that may
+ * start a migration run and hold nothing else: no secret, token grant, other dynamic grant or
+ * environment grant. A token of its job then opens nothing at STS but `attestGithubRun`.
+ */
+function migrationRunProblems(policy: Policy): string[] {
+  const problems: string[] = [];
+  const { identity } = policy;
+  if (identity.kind !== 'github-oidc') {
+    problems.push(`dynamic ${MIGRATION_RUN_GRANT} is only for a github-oidc policy`);
+  } else {
+    if (identity.environment === undefined) {
+      problems.push(
+        `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} must bind identity.environment`
+      );
     }
+    // In every environment: the job only triggers a run of what is on `main`, so no other ref has
+    // a reason to trigger one.
+    if (identity.refs.length !== 1 || identity.refs[0] !== GITHUB_PRODUCTION_REF) {
+      problems.push(
+        `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} accepts only ${GITHUB_PRODUCTION_REF}`
+      );
+    }
+  }
+  if (
+    policy.secrets.length > 0 ||
+    policy.audiences.length > 0 ||
+    policy.scopes.length > 0 ||
+    policy.dynamic.length > 1 ||
+    Object.keys(policy.environmentGrants).length > 0
+  ) {
+    problems.push(`a policy with dynamic ${MIGRATION_RUN_GRANT} holds nothing else`);
   }
   return problems;
 }
@@ -566,22 +644,40 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
       `a github-oidc workload is named ${GITHUB_WORKLOAD_PREFIX}<job>; its bundle folder is /ci/<workload>`
     );
   }
+  if (
+    identity.legacySubject === true &&
+    (identity.repository !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repository ||
+      identity.repositoryId !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryId ||
+      identity.repositoryOwnerId !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryOwnerId)
+  ) {
+    problems.push(
+      `identity.legacySubject is allowed only for ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repository} (repository id ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryId}, owner id ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryOwnerId})`
+    );
+  }
   if (hasDuplicates(identity.refs)) problems.push('identity.refs contains a duplicate');
   if (hasDuplicates(identity.jobWorkflowRefs)) {
     problems.push('identity.jobWorkflowRefs contains a duplicate');
   }
   if (hasDuplicates(identity.events)) problems.push('identity.events contains a duplicate');
-  if (identity.events.includes('workflow_run') && identity.events.length > 1) {
+  // Q71 carve-out (Igor, 2026-11-27): a trigger-only policy holds nothing a token could read; its
+  // job only asks the migration proxy to apply what is on `main`, which the proxy checks itself
+  // (design Q64a). So it alone may list workflow_run with other events and grant production.
+  const triggerOnly = holdsMigrationRun(policy);
+  if (!triggerOnly && identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }
   // A workflow_run job follows a run a pull request may have started, and its token carries the
   // default branch whatever that run was; only an environment's protection rules stand between it
   // and the policy's values, in any STS environment. STS cannot see the upstream run, so no
-  // production policy accepts it.
+  // production policy accepts it, except a trigger-only one.
   if (identity.events.includes('workflow_run') && identity.environment === undefined) {
     problems.push('a github-oidc policy that accepts workflow_run must bind identity.environment');
   }
-  if (identity.events.includes('workflow_run') && policy.environments.includes('production')) {
+  if (
+    !triggerOnly &&
+    identity.events.includes('workflow_run') &&
+    policy.environments.includes('production')
+  ) {
     problems.push('a github-oidc policy that accepts workflow_run cannot grant production');
   }
   const workflowPrefix = `${identity.repository}/.github/workflows/`;

@@ -50,8 +50,18 @@ export class FakeGithub {
   readonly touching = new Map<string, string>();
   main: string | null = null;
   calls: string[] = [];
-  /** Answers instead of the repository while set: a status code, with headers. */
-  outage: { status: number; headers?: Record<string, string> } | null = null;
+  /** Every Authorization header the proxy sent: the App JWT and the installation token. */
+  authorizations: string[] = [];
+  /**
+   * Answers instead of GitHub while set: a status code, with headers and a JSON body (`{}` by
+   * default). With `tokenMints`, the installation token endpoint still answers as usual.
+   */
+  outage: {
+    status: number;
+    headers?: Record<string, string>;
+    body?: unknown;
+    tokenMints?: boolean;
+  } | null = null;
   /** Answers matching repository paths with a 200 whose body is not GitHub's shape, when set. */
   malformed: RegExp | null = null;
   /** Fails `blob` fetches after this many succeeded, to exercise resumable fetches. */
@@ -130,15 +140,19 @@ export class FakeGithub {
   readonly fetch = async (input: string, init: RequestInit = {}): Promise<Response> => {
     const url = new URL(input);
     this.calls.push(`${init.method ?? 'GET'} ${url.pathname}`);
-    if (this.outage !== null) {
-      return new Response('{}', { status: this.outage.status, headers: this.outage.headers });
+    const authorization = new Headers(init.headers).get('Authorization');
+    if (authorization !== null) this.authorizations.push(authorization);
+    const tokenMint =
+      init.method === 'POST' && /^\/app\/installations\/[0-9]+\/access_tokens$/.test(url.pathname);
+    if (this.outage !== null && !(tokenMint && this.outage.tokenMints === true)) {
+      return new Response(JSON.stringify(this.outage.body ?? {}), {
+        status: this.outage.status,
+        headers: this.outage.headers,
+      });
     }
     const json = (body: unknown, status = 200) => Response.json(body, { status });
     const notFound = () => json({ message: 'Not Found' }, 404);
-    if (
-      init.method === 'POST' &&
-      /^\/app\/installations\/[0-9]+\/access_tokens$/.test(url.pathname)
-    ) {
+    if (tokenMint) {
       return json(
         { token: 'ghs_fake', expires_at: new Date(Date.now() + 3_600_000).toISOString() },
         201

@@ -1,11 +1,14 @@
 import { after } from 'next/server';
 import {
+  O11Y_API_METRICS_SENDER_AUTH,
   O11Y_KILO_GATEWAY_CLIENT_SECRET,
   O11Y_SERVICE_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import { resolveApiMetricsSender } from './api-metrics-sender';
+import type { StsEnvironment } from '@kilocode/sts-contracts';
 
 export type ApiMetricsTokens = {
   inputTokens?: number;
@@ -139,21 +142,61 @@ export function getToolsUsed(request: GatewayRequest): string[] {
   return used;
 }
 
-const apiMetricsUrl = (() => {
+const apiMetricsSender = (() => {
   const baseUrl = parseInternalServiceUrl(O11Y_SERVICE_URL);
-  return baseUrl ? new URL('/ingest/api-metrics', baseUrl) : null;
+  const sender = resolveApiMetricsSender({
+    auth: O11Y_API_METRICS_SENDER_AUTH,
+    url: baseUrl ? new URL('/ingest/api-metrics', baseUrl) : null,
+    secret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+    runtime: process.env,
+  });
+  if (sender.kind === 'misconfigured') {
+    console.error('o11y api metrics: invalid sender configuration; sending nothing', {
+      reason: sender.reason,
+    });
+  }
+  return sender;
 })();
 
-async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
-  if (!apiMetricsUrl) return;
-  const clientSecret = O11Y_KILO_GATEWAY_CLIENT_SECRET;
-  if (!clientSecret) return;
+const sends = apiMetricsSender.kind === 'legacy' || apiMetricsSender.kind === 'sts';
 
-  await fetch(apiMetricsUrl, {
+/**
+ * The `Authorization` header of one STS send, or null when there is no token. The token client
+ * retries within its own attempt timeout and backoff; after that the metric is not sent and the
+ * failure is logged, never retried with the shared secret.
+ */
+async function stsAuthorization(
+  environment: StsEnvironment
+): Promise<{ authorization: string } | null> {
+  try {
+    // Loaded only under `sts`, so a `legacy` deployment never evaluates the token client, the
+    // Vercel OIDC exchange or the STS contracts on this hot path.
+    const { apiMetricsToken } = await import('./api-metrics-sts');
+    return { authorization: `Bearer ${await apiMetricsToken(environment)}` };
+  } catch (error) {
+    // Neither `ServiceTokenError` nor the Vercel identity's error carries a token.
+    console.error('o11y api metrics: no STS token; metric not sent', {
+      errorName: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : undefined,
+    });
+    return null;
+  }
+}
+
+async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
+  const sender = apiMetricsSender;
+  if (sender.kind !== 'legacy' && sender.kind !== 'sts') return;
+  const credential =
+    sender.kind === 'legacy'
+      ? { 'X-O11Y-ADMIN-TOKEN': sender.secret }
+      : await stsAuthorization(sender.environment);
+  if (credential === null) return;
+
+  await fetch(sender.url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'X-O11Y-ADMIN-TOKEN': clientSecret,
+      ...credential,
     },
     body: JSON.stringify(params),
   }).catch(() => {
@@ -162,7 +205,7 @@ async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
 }
 
 export function emitApiMetrics(params: ApiMetricsParams) {
-  if (!apiMetricsUrl) return;
+  if (!sends) return;
 
   after(async () => {
     await sendApiMetrics(params);
@@ -170,7 +213,6 @@ export function emitApiMetrics(params: ApiMetricsParams) {
 }
 
 export function emitGatewayApiMetrics(params: ApiMetricsParams) {
-  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
   emitApiMetrics(params);
 }
 
@@ -179,8 +221,7 @@ export function emitApiMetricsForResponse(
   statsPromise: Promise<Pick<MicrodollarUsageStats, 'inference_provider'> | null>,
   requestStartedAt: number
 ) {
-  if (!apiMetricsUrl) return;
-  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
+  if (!sends) return;
 
   // Accounting reports a usage parse failure; metrics still record the request without a provider.
   after(

@@ -159,10 +159,14 @@ app.onError(createErrorHandler());
 
 export default {
   fetch: app.fetch,
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    ctx?: ExecutionContext
+  ): Promise<void> {
     const errors: unknown[] = [];
     const production =
-      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env) : null;
+      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env, ctx) : null;
     // Paid benchmarks: stage the next bounded slices, activate fully staged requests, settle
     // finished ones, and deliver the durable pin notifications. Never starts a request.
     try {

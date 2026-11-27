@@ -481,7 +481,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
     );
   },
 
-  async queue(batch, env) {
+  async queue(batch, env, ctx) {
     for (const message of batch.messages) {
       const parsed = BillingQueueMessageSchema.safeParse(message.body);
       if (!parsed.success) {
@@ -625,7 +625,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 renewalBoundary: parsed.data.renewalBoundary,
               });
             } else if (parsed.data.kind === 'standalone_instance_destruction') {
-              await runSweep(env, parsed.data, message.attempts);
+              await runSweep(env, parsed.data, message.attempts, ctx);
               log('info', 'Completed standalone instance destruction run', {
                 event: 'run_completed',
                 outcome: 'completed',
@@ -685,7 +685,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 outcome: 'started',
               });
             } else {
-              await runSweep(env, parsed.data, message.attempts);
+              await runSweep(env, parsed.data, message.attempts, ctx);
 
               if (parsed.data.kind === 'lifecycle') {
                 const next = nextSweep(parsed.data.sweep);

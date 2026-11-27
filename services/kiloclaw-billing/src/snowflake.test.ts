@@ -301,4 +301,11 @@ describe('getMissingSnowflakeConfig', () => {
       'SNOWFLAKE_PRIVATE_KEY_PEM',
     ]);
   });
+
+  it('reports an unset secret binding instead of failing the sweep', async () => {
+    const env = createEnv();
+    env.SNOWFLAKE_PRIVATE_KEY_PEM = undefined;
+
+    await expect(getMissingSnowflakeConfig(env)).resolves.toEqual(['SNOWFLAKE_PRIVATE_KEY_PEM']);
+  });
 });

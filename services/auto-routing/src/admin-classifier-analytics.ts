@@ -5,8 +5,9 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import type { Handler } from 'hono';
 import * as z from 'zod';
+import { SecretUnavailableError } from '@kilocode/secrets-client';
 import type { HonoEnv } from './hono-env';
-import { readAutoRoutingSecret } from './secrets';
+import { readAutoRoutingSecret, requestContext } from './secrets';
 
 // The v2 dataset starts at the 2026-06-11 slim-mirror cutover (PR #3975).
 // The original auto_routing_classifier_metrics dataset holds old-schema rows
@@ -204,8 +205,14 @@ function isLocalRequest(url: string): boolean {
 }
 
 function isMissingLocalAnalyticsSecret(error: unknown): boolean {
+  if (error instanceof Error && error.message.includes('Secret "O11Y_CF_AE_API_TOKEN" not found')) {
+    return true;
+  }
+  // Under `SECRETS_SOURCE=sts` the read comes from the bundle client, whose refusal names the
+  // bundle rather than the Secrets Store entry.
   return (
-    error instanceof Error && error.message.includes('Secret "O11Y_CF_AE_API_TOKEN" not found')
+    error instanceof SecretUnavailableError &&
+    (error.reason === 'missing' || error.reason === 'not_granted')
   );
 }
 
@@ -224,7 +231,11 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
   let modelRows: ClassifierModelBreakdownRow[];
 
   try {
-    const apiToken = await readAutoRoutingSecret(c.env, 'O11Y_CF_AE_API_TOKEN');
+    const apiToken = await readAutoRoutingSecret(
+      c.env,
+      'O11Y_CF_AE_API_TOKEN',
+      requestContext(c)
+    );
     [summaryRows, statusRows, taskRows, subtypeRows, modelRows] = await Promise.all([
       queryAnalyticsEngine(c.env, apiToken, buildSummaryQuery(period), SummaryRowSchema),
       queryAnalyticsEngine(

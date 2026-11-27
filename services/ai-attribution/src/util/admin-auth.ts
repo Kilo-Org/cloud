@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { logger } from './logger';
-import { readAiAttributionSecret } from '../secrets';
+import { readAiAttributionSecret, requestContext } from '../secrets';
 import type { HonoContext } from '../ai-attribution.worker';
 
 const ADMIN_SECRET_HEADER = 'X-Admin-Secret';
@@ -23,7 +23,11 @@ export function validateAdminSecret(
 
 export const adminAuthMiddleware = createMiddleware<HonoContext>(async (c, next) => {
   const secretHeader = c.req.header(ADMIN_SECRET_HEADER);
-  const expectedSecret = await readAiAttributionSecret(c.env, 'ADMIN_SECRET');
+  const expectedSecret = await readAiAttributionSecret(
+    c.env,
+    'ADMIN_SECRET',
+    requestContext(c)
+  );
 
   const result = validateAdminSecret(secretHeader ?? null, expectedSecret);
 

@@ -85,6 +85,7 @@ import type {
   TrialInactivityStopCandidateQueueMessage,
 } from './types.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readKiloclawBillingSecret } from './secrets.js';
 import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowflake.js';
 
@@ -5348,7 +5349,8 @@ async function runTrialInactivityStopSweep(
   database: WorkerDb,
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
-  summary: BillingSummary
+  summary: BillingSummary,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (!isEnvFlagEnabled(env.TRIAL_INACTIVITY_STOP_ENABLED)) {
     log('info', 'Trial inactivity stop is disabled', {
@@ -5358,7 +5360,7 @@ async function runTrialInactivityStopSweep(
     return;
   }
 
-  const missingSnowflakeConfig = await getMissingSnowflakeConfig(env);
+  const missingSnowflakeConfig = await getMissingSnowflakeConfig(env, ctx);
   if (missingSnowflakeConfig.length > 0) {
     summary.errors++;
     log('error', 'Skipping trial inactivity stop due to missing Snowflake config', {
@@ -5420,6 +5422,7 @@ async function runTrialInactivityStopSweep(
       } satisfies SweepExecutionContext;
       const activeUserIds = await queryKiloclawActiveUserIds({
         env,
+        ctx,
         userIds: batch.map(candidate => candidate.user_id),
         log: (level, message, fields) => {
           void snowflakeLog(snowflakeContext, level, message, fields);
@@ -5483,6 +5486,7 @@ async function runTrialInactivityStopSweep(
           } satisfies SweepExecutionContext;
           const activeUserIds = await queryKiloclawActiveUserIds({
             env,
+            ctx,
             userIds: [row.user_id],
             log: (level, message, fields) => {
               void snowflakeLog(snowflakeContext, level, message, {
@@ -5625,7 +5629,8 @@ export async function processTrialInactivityStopCandidate(
 export async function runSweep(
   env: BillingWorkerEnv,
   message: { runId: string; sweep: BillingMessageSweep },
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<BillingSummary> {
   const context = createSweepContext(message, attempt);
 
@@ -5705,7 +5710,7 @@ export async function runSweep(
             await runComplementaryInferenceEndedSweep(database, env, context, summary);
             break;
           case 'trial_inactivity_stop':
-            await runTrialInactivityStopSweep(database, env, context, summary);
+            await runTrialInactivityStopSweep(database, env, context, summary, ctx);
             break;
         }
 

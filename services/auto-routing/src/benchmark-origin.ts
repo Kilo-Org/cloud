@@ -18,6 +18,7 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readAutoRoutingSecret } from './secrets';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
@@ -25,9 +26,10 @@ type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 async function fetchBenchmark(
   env: BenchmarkEnv,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const secret = await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET');
+  const secret = await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx);
   return env.BENCHMARK_SERVICE.fetch(`https://auto-routing-benchmark${path}`, {
     ...init,
     headers: {
@@ -176,13 +178,19 @@ export async function fetchCustomRouterTable(
 export async function forwardClientEval(
   env: BenchmarkEnv,
   path: string,
-  body: unknown
+  body: unknown,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const res = await fetchBenchmark(env, path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const res = await fetchBenchmark(
+    env,
+    path,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    ctx
+  );
   return new Response(res.body, {
     status: res.status,
     headers: { 'content-type': res.headers.get('content-type') ?? 'application/json' },

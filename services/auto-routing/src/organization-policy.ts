@@ -4,6 +4,7 @@ import {
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readAutoRoutingSecret } from './secrets';
 
 const POLICY_CACHE_TTL_MS = 60_000;
@@ -41,12 +42,13 @@ class DeniedModelsResponseError extends Error {
 
 async function fetchDeniedModelIds(
   env: GatewayPolicyEnv,
-  request: AutoRoutingDeniedModelsRequest
+  request: AutoRoutingDeniedModelsRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<string[]> {
   const res = await fetch(new URL(AUTO_ROUTING_DENIED_MODELS_PATH, env.KILO_AI_GATEWAY_BASE_URL), {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET')}`,
+      authorization: `Bearer ${await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx)}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify(request),
@@ -66,11 +68,12 @@ function isTransientLookupFailure(error: unknown): boolean {
 
 async function fetchDeniedModelIdsWithRetry(
   env: GatewayPolicyEnv,
-  request: AutoRoutingDeniedModelsRequest
+  request: AutoRoutingDeniedModelsRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<string[] | null> {
   for (let attempt = 1; attempt <= DENIED_MODELS_ATTEMPTS; attempt++) {
     try {
-      return await fetchDeniedModelIds(env, request);
+      return await fetchDeniedModelIds(env, request, ctx);
     } catch (error) {
       console.warn(
         JSON.stringify({
@@ -90,7 +93,8 @@ async function fetchDeniedModelIdsWithRetry(
 // Only answers are cached, so the next request asks again.
 export async function deniedOrganizationModelIds(
   env: GatewayPolicyEnv,
-  request: AutoRoutingDeniedModelsRequest
+  request: AutoRoutingDeniedModelsRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<string[] | null> {
   if (request.modelIds.length === 0) return [];
   const modelIds = [...new Set(request.modelIds)].sort();
@@ -102,7 +106,7 @@ export async function deniedOrganizationModelIds(
   const sequence = lookupSequence;
   // Only a resolved answer is cached: a pending lookup belongs to the request that started it, so
   // a request that joined it would fail when that request was cancelled.
-  const deniedModelIds = await fetchDeniedModelIdsWithRetry(env, { ...request, modelIds });
+  const deniedModelIds = await fetchDeniedModelIdsWithRetry(env, { ...request, modelIds }, ctx);
   if (deniedModelIds === null) return null;
   const existing = deniedModelsCache.get(key);
   // A lookup that started before the cached answer must not replace it, and the TTL runs from the

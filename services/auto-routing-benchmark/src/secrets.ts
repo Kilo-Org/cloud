@@ -51,6 +51,21 @@ export function secretsSource(
 const stsClients = new WeakMap<BundleBinding, Secrets>();
 
 /**
+ * Hono's `executionCtx` getter throws outside a request context, which is how unit tests call the
+ * routes. A missing context only costs the `waitUntil` keep-alive for a bundle revalidation; it
+ * never changes which secret a read returns.
+ */
+export function requestContext(c: {
+  executionCtx: SecretsExecutionContext;
+}): SecretsExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Reads one secret from the selected source and returns it as stored, empty included, so every
  * caller keeps its own empty-value handling. `ctx` belongs to the invocation doing the read (the
  * Worker request, queue batch or container Durable Object): a bundle revalidation it starts runs

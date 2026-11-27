@@ -11,16 +11,6 @@ import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-ga
 import { mockOpenRouterModels } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import type * as StaleAlert from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
-
-jest.mock('@/lib/providers/metadata-cache/metadata-cache-stale-alert', () => ({
-  ...jest.requireActual<typeof StaleAlert>(
-    '@/lib/providers/metadata-cache/metadata-cache-stale-alert'
-  ),
-  alertIfMetadataCacheStale: jest.fn(),
-}));
-
-import { alertIfMetadataCacheStale } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
 import {
   gatewayModelEndpointsSource,
   openRouterGatewayModelsSource,
@@ -39,6 +29,13 @@ const DAY_MS = 24 * HOUR_MS;
 
 let responses: Map<string, () => Response>;
 let fetchSpy: jest.SpiedFunction<typeof fetch>;
+let warnSpy: jest.SpiedFunction<typeof console.warn>;
+
+function staleWarnings() {
+  return warnSpy.mock.calls
+    .map(([message]) => String(message))
+    .filter(message => message.includes('more than a day out of date'));
+}
 
 function respond(url: string, response: () => Response) {
   responses.set(url, response);
@@ -147,7 +144,7 @@ beforeEach(async () => {
     return Response.json({ data: [{ id: 'vendor/model' }] });
   });
   jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.mocked(alertIfMetadataCacheStale).mockClear();
+  warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -175,7 +172,7 @@ describe('refreshMetadataCache', () => {
       failed_count: 0,
       stale_count: 0,
     });
-    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+    expect(staleWarnings()).toEqual([]);
   });
 
   it('stores the refreshed OpenRouter embedding inventory, including additions and removals', async () => {
@@ -247,7 +244,7 @@ describe('refreshMetadataCache', () => {
 
     expect(await readRow(openRouterModelsMetadataSource.url)).toEqual(before);
     expect(summary).toMatchObject({ failed_count: 1, stale_count: 0 });
-    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+    expect(staleWarnings()).toEqual([]);
   });
 
   it('keeps an unchanged body and still bumps updated_at', async () => {
@@ -277,7 +274,7 @@ describe('refreshMetadataCache', () => {
       .from(ai_gateway_metadata_cache);
     expect(rows).toHaveLength(new Set(fetchedUrls()).size - 1);
     expect(fetchedUrls().some(url => url.startsWith(PROVIDER_MODELS_URL_PREFIX))).toBe(false);
-    expect(alertIfMetadataCacheStale).not.toHaveBeenCalled();
+    expect(staleWarnings()).toEqual([]);
   });
 
   it('refreshes the model list of each fetched provider', async () => {
@@ -319,7 +316,7 @@ describe('refreshMetadataCache', () => {
     expect(urls.at(-2)).toBe(openRouterModelsMetadataSource.url);
   });
 
-  it('alerts only for failed sources last stored over a day ago or never stored', async () => {
+  it('warns only about failed sources last stored over a day ago or never stored', async () => {
     const staleUpdatedAt = new Date(Date.now() - 2 * DAY_MS).toISOString();
     await storeRow(openRouterModelsMetadataSource.url, { data: [] }, staleUpdatedAt);
     await storeRow(openRouterGatewayModelsSource.url, { data: [] }, hoursAgo(1));
@@ -334,15 +331,14 @@ describe('refreshMetadataCache', () => {
     const summary = await refreshMetadataCache();
 
     expect(summary).toMatchObject({ failed_count: 3, stale_count: 2 });
-    expect(alertIfMetadataCacheStale).toHaveBeenCalledTimes(1);
-    const [staleEntries] = jest.mocked(alertIfMetadataCacheStale).mock.calls[0] ?? [];
-    expect(staleEntries).toHaveLength(2);
-    expect(staleEntries).toEqual(
-      expect.arrayContaining([
-        { url: openRouterModelsMetadataSource.url, updatedAt: new Date(staleUpdatedAt) },
-        { url: modelsDevCatalogSource.url, updatedAt: null },
-      ])
+    const [warning, ...otherWarnings] = staleWarnings();
+    expect(otherWarnings).toEqual([]);
+    expect(warning).toContain('2 sources failed to refresh');
+    expect(warning).toContain(
+      `${openRouterModelsMetadataSource.url} (last updated ${new Date(staleUpdatedAt).toISOString()})`
     );
+    expect(warning).toContain(`${modelsDevCatalogSource.url} (last updated never)`);
+    expect(warning).not.toContain(openRouterGatewayModelsSource.url);
   });
 
   it('refreshes the endpoints of every model in both stored gateway lists, oldest first', async () => {
@@ -388,10 +384,10 @@ describe('refreshMetadataCache', () => {
       status: 404,
     });
     expect(summary).toMatchObject({ failed_count: 0, stale_count: 0 });
-    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+    expect(staleWarnings()).toEqual([]);
   });
 
-  it('alerts only for failed endpoints sources stored over a day ago, grouped per gateway', async () => {
+  it('warns only about failed endpoints sources stored over a day ago', async () => {
     const staleUrl = openRouterEndpointsUrl('vendor/model-1');
     const neverStoredUrl = openRouterEndpointsUrl('vendor/model-2');
     const staleUpdatedAt = new Date(Date.now() - 2 * DAY_MS).toISOString();
@@ -410,13 +406,11 @@ describe('refreshMetadataCache', () => {
     expect(await readRow(staleUrl)).toEqual(before);
     expect(await readRow(neverStoredUrl)).toBeUndefined();
     expect(summary).toMatchObject({ failed_count: 2, stale_count: 1 });
-    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([
-      {
-        url: staleUrl,
-        updatedAt: new Date(staleUpdatedAt),
-        group: 'https://openrouter.ai/api/v1/models/{id}/endpoints',
-      },
-    ]);
+    const [warning, ...otherWarnings] = staleWarnings();
+    expect(otherWarnings).toEqual([]);
+    expect(warning).toContain('1 source failed to refresh');
+    expect(warning).toContain(staleUrl);
+    expect(warning).not.toContain(neverStoredUrl);
   });
 
   it('refreshes model endpoints from the stored gateway list when the live list fails', async () => {
@@ -449,6 +443,6 @@ describe('refreshMetadataCache', () => {
     const endpointsUrls = fetchedUrls().filter(url => MODEL_ENDPOINTS_URL_PATTERN.test(url));
     expect(endpointsUrls).toHaveLength(1);
     expect(summary).toMatchObject({ failed_count: 199, stale_count: 0 });
-    expect(alertIfMetadataCacheStale).toHaveBeenCalledWith([]);
+    expect(staleWarnings()).toEqual([]);
   });
 });

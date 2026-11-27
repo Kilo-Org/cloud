@@ -1,11 +1,13 @@
 import {
   UTS_GRANT_TYPES,
+  UTS_ID_TOKEN_TYPE_URN,
   UTS_MAX_TOKENS_PER_CALL,
   UTS_TOKEN_PATH,
   type UtsAccessTokenClaims,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import { type AttestationService, attestCodeExchange } from '../attest/gate';
+import { type CiExchangeService, handleCiTokenExchange } from '../ci/exchange';
 import type { UtsConfig } from '../env';
 import { type ExchangeService, handleTokenExchange } from '../exchange/endpoint';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
@@ -36,7 +38,9 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 /**
  * POST /token (design 5.3 and 5.4). Grants: `authorization_code` (DPoP-bound for a first-party
  * client), `refresh_token` (DPoP-bound first-party grant, or third-party rotation with reuse
- * detection) and the RFC 8628 device grant through its hook. `client_credentials` is not offered.
+ * detection) and the RFC 8628 device grant through its hook. The RFC 8693 token exchange goes to
+ * the CI exchange (src/ci/exchange.ts) when its subject is a GitHub OIDC token, and otherwise to
+ * the broker exchange (src/exchange/endpoint.ts). `client_credentials` is not offered.
  *
  * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
  * also records the proof's `jti` under the proof's key, and signs one token per scope (up to 8)
@@ -81,6 +85,11 @@ export type TokenDeps = {
    * wired, and the grant is then not offered.
    */
   exchange: ExchangeService | null;
+  /**
+   * The CI token exchange (src/ci/exchange.ts): a token exchange whose subject is a GitHub OIDC
+   * token. Off unless the environment configures trust policies.
+   */
+  ci: CiExchangeService;
   /**
    * Device attestation of a client that needs it (src/attest/gate.ts): `verified` runs the
    * attestation step before the exchange statement; `unattested_development` skips it, in
@@ -417,12 +426,18 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
       case UTS_GRANT_TYPES.deviceCode:
         if (deps.deviceCodeGrant !== null) return await deps.deviceCodeGrant(request, form.params);
         return oauthError('unsupported_grant_type', 400);
-      case UTS_GRANT_TYPES.tokenExchange:
+      case UTS_GRANT_TYPES.tokenExchange: {
+        // A GitHub OIDC token is the CI exchange's subject; a UTS access token the broker's.
+        const subjectType = form.params.one('subject_token_type');
+        if (subjectType.status === 'present' && subjectType.value === UTS_ID_TOKEN_TYPE_URN) {
+          return await handleCiTokenExchange(form.params, deps);
+        }
         if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
         return await handleTokenExchange(request, form.params, {
           ...deps,
           exchange: deps.exchange,
         });
+      }
       default:
         return oauthError('unsupported_grant_type', 400);
     }

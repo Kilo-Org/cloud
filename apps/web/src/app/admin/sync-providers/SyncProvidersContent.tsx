@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { Bell, RefreshCw } from 'lucide-react';
+import { RefreshCw, TriangleAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,13 +23,30 @@ function formatDuration(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function CompletedAt({ completedAt }: { completedAt: string | null | undefined }) {
+function CompletedAt({
+  completedAt,
+  stale = false,
+}: {
+  completedAt: string | null | undefined;
+  stale?: boolean;
+}) {
   if (!completedAt) {
     return <span className="text-muted-foreground">Not recorded</span>;
   }
   const date = new Date(completedAt);
+  const relative = formatDistanceToNow(date, { addSuffix: true });
+  if (!stale) {
+    return <span title={date.toLocaleString()}>{relative}</span>;
+  }
   return (
-    <span title={date.toLocaleString()}>{formatDistanceToNow(date, { addSuffix: true })}</span>
+    <span
+      className="text-status-warning inline-flex items-center gap-1 font-medium"
+      title={`${date.toLocaleString()}. No run has completed in over an hour, although the cron runs every 5 minutes.`}
+    >
+      <TriangleAlert className="text-status-warning-icon size-3.5 shrink-0" aria-hidden />
+      {relative}
+      <span className="sr-only"> (out of date)</span>
+    </span>
   );
 }
 
@@ -39,17 +56,17 @@ function JobRow({
   status,
   manualResult,
   run,
-  testAlert,
+  stale,
 }: {
   name: string;
   description: string;
   status: ReactNode;
   manualResult: string | null;
   run: { onClick: () => void; pending: boolean; disabled: boolean };
-  testAlert: { onClick: () => void; pending: boolean; disabled: boolean };
+  stale: boolean;
 }) {
   return (
-    <TableRow>
+    <TableRow className={stale ? 'bg-status-warning-surface' : undefined}>
       <TableCell className="whitespace-normal">
         <div className="font-medium">{name}</div>
         <div className="text-muted-foreground text-xs">{description}</div>
@@ -70,16 +87,6 @@ function JobRow({
             <RefreshCw className={run.pending ? 'animate-spin' : undefined} />
             {run.pending ? 'Running...' : 'Run'}
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={testAlert.onClick}
-            disabled={testAlert.disabled}
-            aria-label={`Post test alert for ${name.toLowerCase()}`}
-          >
-            <Bell />
-            {testAlert.pending ? 'Posting...' : 'Test alert'}
-          </Button>
         </div>
       </TableCell>
     </TableRow>
@@ -97,17 +104,6 @@ export function SyncProvidersContent() {
     trpc.admin.syncProviders.getManualSyncEnabled.queryOptions()
   );
   const manualSyncDisabled = manualSyncEnabledQuery.data !== true;
-
-  const testAlertMutation = useMutation(
-    trpc.admin.syncProviders.postTestStaleAlert.mutationOptions({
-      onSuccess: () => {
-        toast.success('Posted a test alert to the Cloud alerts channel');
-      },
-      onError: error => {
-        toast.error(error.message || 'Could not post the test alert');
-      },
-    })
-  );
 
   const metadataCacheRefreshMutation = useMutation(
     trpc.admin.syncProviders.triggerMetadataCacheRefresh.mutationOptions({
@@ -166,14 +162,6 @@ export function SyncProvidersContent() {
   );
 
   const lastSync = lastSyncQuery.data;
-  const pendingTestAlertJob = testAlertMutation.isPending
-    ? testAlertMutation.variables.job
-    : undefined;
-  const testAlert = (job: SyncJob) => ({
-    onClick: () => testAlertMutation.mutate({ job }),
-    pending: pendingTestAlertJob === job,
-    disabled: testAlertMutation.isPending,
-  });
 
   return (
     <Card>
@@ -181,9 +169,8 @@ export function SyncProvidersContent() {
         <CardTitle>Sync jobs</CardTitle>
         <CardDescription>
           Crons run each job every 5 minutes, so manual runs are for local development
-          {manualSyncEnabledQuery.data === false && ' and are disabled here'}. Test alerts post a
-          labeled message to the Cloud alerts channel from any environment; real stale alerts post
-          only from production.
+          {manualSyncEnabledQuery.data === false && ' and are disabled here'}. A job is flagged when
+          it has not completed in over an hour; check Vercel logs for its errors.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -201,7 +188,10 @@ export function SyncProvidersContent() {
               description="Stores the raw upstream catalogs that the syncs and the gateway read."
               status={
                 <>
-                  <CompletedAt completedAt={lastSync?.metadata_cache_newest_updated_at} />
+                  <CompletedAt
+                    completedAt={lastSync?.metadata_cache_newest_updated_at}
+                    stale={lastSync?.metadata_cache_newest_updated_stale}
+                  />
                   {lastSync?.metadata_cache_oldest_updated_at && (
                     <span className="text-muted-foreground">
                       {' '}
@@ -217,14 +207,17 @@ export function SyncProvidersContent() {
                 pending: metadataCacheRefreshMutation.isPending,
                 disabled: manualSyncDisabled,
               }}
-              testAlert={testAlert('metadata_cache')}
+              stale={lastSync?.metadata_cache_newest_updated_stale ?? false}
             />
             <JobRow
               name="Provider and model sync"
               description="Builds the OpenRouter and Vercel AI Gateway provider and model catalog."
               status={
                 <>
-                  <CompletedAt completedAt={lastSync?.completed_at} />
+                  <CompletedAt
+                    completedAt={lastSync?.completed_at}
+                    stale={lastSync?.completed_stale}
+                  />
                   {lastSync?.total_providers != null && (
                     <span className="text-muted-foreground">
                       {' '}
@@ -239,19 +232,24 @@ export function SyncProvidersContent() {
                 pending: syncMutation.isPending,
                 disabled: manualSyncDisabled,
               }}
-              testAlert={testAlert('providers')}
+              stale={lastSync?.completed_stale ?? false}
             />
             <JobRow
               name="Direct BYOK model list sync"
               description="Stores the model list of each direct BYOK provider."
-              status={<CompletedAt completedAt={lastSync?.direct_byok_completed_at} />}
+              status={
+                <CompletedAt
+                  completedAt={lastSync?.direct_byok_completed_at}
+                  stale={lastSync?.direct_byok_completed_stale}
+                />
+              }
               manualResult={manualResults.direct_byok ?? null}
               run={{
                 onClick: () => directByokSyncMutation.mutate(),
                 pending: directByokSyncMutation.isPending,
                 disabled: manualSyncDisabled,
               }}
-              testAlert={testAlert('direct_byok')}
+              stale={lastSync?.direct_byok_completed_stale ?? false}
             />
           </TableBody>
         </Table>

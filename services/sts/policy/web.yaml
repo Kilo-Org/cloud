@@ -34,6 +34,11 @@ scopes:
 # key added below. The web app reads the UTS revocation feed (uts-feed), ends or revokes a
 # subject's sessions and credentials (uts), and signs its kilo-web client assertion with
 # UTS_KILO_WEB_CLIENT_KEY (UTS_KILO_WEB_CLIENT_KEY_NEXT during a rotation).
+# Bouncer (repo Kilo-Org/bouncer) runs in production only and accepts only production STS tokens,
+# so its scopes are a production grant: the shared Bouncer client sends one token per call
+# (bouncer:decide for decide, charge-decide and release; bouncer:usage.write for usage and credit
+# events; bouncer:signup.decide for signup), beside the legacy key while Bouncer runs
+# STS_AUTH=dual. The web app makes no signup-history call, so it holds no bouncer:signup.history.
 environmentGrants:
   development:
     audiences:
@@ -47,3 +52,10 @@ environmentGrants:
     secrets:
       - UTS_KILO_WEB_CLIENT_KEY
       - UTS_KILO_WEB_CLIENT_KEY_NEXT
+  production:
+    audiences:
+      - bouncer
+    scopes:
+      - bouncer:decide
+      - bouncer:usage.write
+      - bouncer:signup.decide

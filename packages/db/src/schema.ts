@@ -2904,10 +2904,8 @@ export const microdollar_usage_daily_repairs = pgTable(
 
 export type MicrodollarUsageDailyRepair = typeof microdollar_usage_daily_repairs.$inferSelect;
 
-// Global per-day usage rollup behind the public leaderboard routes, with no
-// user or organization dimension. Each UTC day is rebuilt whole by the
-// `leaderboard-usage-rollup` cron once it has ended. Leaderboard filters are
-// applied when reading, so the stored dimensions stay unfiltered.
+// Obsolete: replaced by `leaderboard_usage_hourly`. Nothing reads or writes this
+// table any more; drop it in a later migration.
 export const leaderboard_usage_daily = pgTable(
   'leaderboard_usage_daily',
   {
@@ -2934,6 +2932,48 @@ export const leaderboard_usage_daily = pgTable(
 );
 
 export type LeaderboardUsageDaily = typeof leaderboard_usage_daily.$inferSelect;
+
+// Global per-hour usage rollup behind the public leaderboard routes, with no
+// user or organization dimension. Each UTC hour is built whole from recent
+// usage by the `leaderboard-usage-hourly-rollup` cron. Leaderboard filters are
+// applied when reading, so the stored dimensions stay unfiltered.
+export const leaderboard_usage_hourly = pgTable(
+  'leaderboard_usage_hourly',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    provider: text(),
+    requested_model: text(),
+    model: text(),
+    inference_provider: text(),
+    mode: text(),
+    // Usage without a metadata row, or with a NULL flag, counts as not BYOK.
+    is_user_byok: boolean().notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    request_count: bigint({ mode: 'number' }).notNull(),
+    error_count: bigint({ mode: 'number' }).notNull(),
+  },
+  // No unique index over the dimensions: they are unbounded text, and one value
+  // too wide for a B-tree entry would fail the hour's write and drop its day.
+  // The rollup merges each hour in memory and replaces it under a lock instead.
+  table => [index('IDX_leaderboard_usage_hourly_hour_start').on(table.hour_start)]
+);
+
+export type LeaderboardUsageHourly = typeof leaderboard_usage_hourly.$inferSelect;
+
+// One row per UTC hour built into `leaderboard_usage_hourly`, including hours
+// with no usage, so readers can tell a complete day from a partly built one.
+export const leaderboard_usage_hours = pgTable('leaderboard_usage_hours', {
+  hour_start: timestamp({ withTimezone: true, mode: 'string' }).primaryKey(),
+  rows: integer().notNull(),
+  built_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+});
 
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',

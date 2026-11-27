@@ -2,12 +2,13 @@ import { taggedWriterDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import {
+  EXA_USAGE_WRITE_PATH,
   USAGE_CLASS_LIMIT_HEADER,
   ExaUsageRecordSchema,
   ExaUsageWriteResponseSchema,
   type ExaUsageWriteResponse,
 } from '@kilocode/usage-contracts';
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeUsageRecordRequest } from '@/lib/usage-record-auth';
 import { recordExaUsage } from '@/lib/exa-usage';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { taggedWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
@@ -27,8 +28,8 @@ function describeBodyReadError(error: unknown) {
   return { error_name: typeof error };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request);
+export async function POST(request: NextRequest): Promise<Response> {
+  const unauthorized = await authorizeUsageRecordRequest(request, EXA_USAGE_WRITE_PATH);
   if (unauthorized) return unauthorized;
 
   let body: unknown;

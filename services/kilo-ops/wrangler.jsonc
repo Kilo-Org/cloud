@@ -78,6 +78,12 @@
   },
   "env": {
     "dev": {
+      "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
+      "triggers": {
+        "crons": [],
+      },
       "vars": {
         "ENVIRONMENT": "development",
         "CF_ACCESS_TEAM": "engineering-e11",

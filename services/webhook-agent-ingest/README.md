@@ -60,10 +60,12 @@ pnpm typecheck
 ### Development Environment
 
 ```bash
-pnpm deploy:dev
+pnpm dev
 ```
 
-Deploys to: `cloudflare-webhook-agent-ingest-dev`
+The `dev` environment is local-only: `wrangler dev` runs it against the local database, with no
+route, `workers.dev` URL or schedule. Do not run `pnpm deploy:dev`; it cannot safely publish the
+local-only database binding or a hosted dev Worker.
 
 ### Production Environment
 

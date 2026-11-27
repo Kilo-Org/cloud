@@ -1871,6 +1871,7 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
     'test:mobile-sbom',
     'test:kilo-app-release',
     'test:kilo-mcp-release',
+    'test:sentry-init-guard',
   ]) {
     assert.match(rootScripts['test:scripts'], new RegExp(suite), `test-scripts reaches ${suite}`);
   }
@@ -1889,6 +1890,34 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
     );
     assert.doesNotMatch(condition, /test_scripts/, `${webJob}: a script input starts no web job`);
   }
+});
+
+// The Sentry init guard reads every source file under apps/, services/ and
+// packages/, so it cannot sit behind a path filter: a new init in any file must
+// meet it. It runs on every change with Node alone, and the required fan-in
+// waits for it.
+test('the Sentry init guard runs on every change', () => {
+  const job = ciJobs['sentry-init-guard'];
+  assert.ok(job, 'the sentry-init-guard job exists');
+  assert.equal(job.if, undefined, 'no condition skips the guard');
+  assert.equal(job.needs, undefined, 'the guard waits for no change detection');
+  assert.ok(
+    job.steps.some(step => step.run === 'node --test scripts/sentry-init-guard.test.mjs'),
+    'the job runs the guard suite'
+  );
+  assert.ok(
+    !job.steps.some(step => /pnpm install/.test(step.run ?? '')),
+    'the guard needs no install'
+  );
+  assert.ok(ciJobs.test.needs.includes('sentry-init-guard'), 'the required fan-in waits for it');
+  const rootScripts = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+  ).scripts;
+  assert.equal(
+    rootScripts['test:sentry-init-guard'],
+    'node --test scripts/sentry-init-guard.test.mjs',
+    'the job and the root script run the same suite'
+  );
 });
 
 // A Chrome e2e shard installs the workspace, builds one bundle and drives one

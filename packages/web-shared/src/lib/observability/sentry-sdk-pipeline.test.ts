@@ -153,6 +153,7 @@ describe('initServerSentry through the real SDK pipeline', () => {
 
     const [event] = await sentEvents();
 
+    // The SDK query allow list filters every value before beforeSend runs.
     expect(event?.request).toEqual({
       url: 'https://app.kilo.sh/users/sign_in?callbackPath=[Filtered]&plan=[Filtered]',
       query_string: 'callbackPath=[Filtered]&plan=[Filtered]',

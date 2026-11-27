@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import type * as VercelIdentityModule from '../../src/scm-broker/vercel-identity.js';
 import type * as byocCredentials from '../../src/byoc/vercel-credential-resolver.js';
 import type * as VercelJwksModule from '../../src/scm-broker/vercel-jwks.js';
+import { activeReviewPermissions } from '../../src/control-plane/sandbox/scoped-review-permissions.js';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { startAttempt, type RouteContext } from '../../src/control-plane/sandbox/routes.js';
 import * as scopeHandleAdoption from '../../src/control-plane/sandbox/scope-handle-adoption.js';
@@ -2353,6 +2354,40 @@ describe('SandboxControlV2 credentials (B3)', () => {
       }
     }
   );
+
+  it('enables local changes on the prepare frame only after issuing a scoped review grant', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const input = prepareInput(SESSION, {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'code-review',
+      reviewId: 'review-1',
+    });
+    input.spec.permission = { question: 'deny', edit: 'deny' };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.permission).toMatchObject({
+      question: 'deny',
+      edit: { '*': 'allow', '../*': 'deny' },
+      bash: { 'git add *': 'allow', 'git commit *': 'allow', '*': 'deny' },
+    });
+    const stored = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(stored?.spec ?? '{}').permission).toEqual(input.spec.permission);
+    const grant = sessionCredentialGrantSchema.parse(JSON.parse(stored?.grant ?? '{}'));
+    const route = { spec: prepareFrame.spec, grant, credentialSource: input.credentials };
+    expect(activeReviewPermissions(route, 'different-allocation', Date.now())).toBeUndefined();
+    expect(activeReviewPermissions(route, OUTBOUND_CONTAINER_ID, grant.expiresAt)).toBeUndefined();
+    expect(
+      activeReviewPermissions({ ...route, grant: null }, OUTBOUND_CONTAINER_ID, Date.now())
+    ).toBeUndefined();
+    expect(
+      activeReviewPermissions(
+        { ...route, credentialSource: { ...input.credentials, reviewId: 'another-review' } },
+        OUTBOUND_CONTAINER_ID,
+        Date.now()
+      )
+    ).toBeUndefined();
+  });
 
   it('keeps reviews usable when the selected app bot identity is not configured', async () => {
     const provider = createFakeProvider();

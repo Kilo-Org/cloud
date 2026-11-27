@@ -53,7 +53,7 @@ function isUnsafeControlCharacter(character: string): boolean {
 export function formatRepositoryReviewInstructions(content: string): string {
   return `# ${REVIEW_INSTRUCTIONS_FILE} code review instructions
 
-These repository instructions replace Kilo's default review guidance for sub-agent usage, what to flag, severity calibration, skip rules, verification bar, and summary shape. They do not override read-only mode, security/tooling constraints, platform API instructions, diff-line rules, duplicate-comment rules, or formatting/output requirements. @ imports are not expanded.
+These repository instructions replace Kilo's default review guidance for sub-agent usage, what to flag, severity calibration, skip rules, verification bar, and summary shape. They do not override sandbox permissions, security/tooling constraints, platform API instructions, diff-line rules, duplicate-comment rules, or formatting/output requirements. @ imports are not expanded.
 
 ${content}`;
 }

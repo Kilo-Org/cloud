@@ -1,3 +1,4 @@
+import { activeReviewPermissions } from './scoped-review-permissions.js';
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
 import { isContainersLaunchInterrupted } from '../../sandbox-containers/launch-interrupted.js';
@@ -5013,6 +5014,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ),
       ...snapshotFrame,
     };
+    const reviewPermissions = activeReviewPermissions(
+      route,
+      this.outboundContainerIdFor(),
+      Date.now()
+    );
+    if (reviewPermissions) wireSpec.permission = { ...wireSpec.permission, ...reviewPermissions };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
     if (attachment?.runtimeWebSearch !== true) {

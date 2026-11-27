@@ -1,5 +1,5 @@
 # The model-eval-ingest Worker (services/model-eval-ingest/wrangler.jsonc). It reads its runtime
-# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets Store
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets Store
 # binding) until secrets-cutover flips it. INTERNAL_API_SECRET resolves from /shared. The `dev`
 # block deploys no STS binding and reads INTERNAL_API_SECRET_DEV from the store.
 workload: model-eval-ingest

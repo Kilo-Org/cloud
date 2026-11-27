@@ -13,10 +13,10 @@
   "dev": { "port": 8809 },
   "vars": {
     "WORKER_ENV": "production",
-    // Where every runtime secret read goes: `env` (the Secrets Store binding below) or `sts` (the
-    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
-    // read. The `sts` source never falls back to the Secrets Store.
-    "SECRETS_SOURCE": "env",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "routes": [
     {
@@ -49,7 +49,7 @@
 
   // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
   // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
-  // event-service.yaml grants NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `env`.
+  // event-service.yaml grants NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
   "services": [
     {
       "binding": "STS",

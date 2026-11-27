@@ -1,8 +1,8 @@
 # The container-usage-meter Worker (services/container-usage-meter/wrangler.jsonc). It reads its
-# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets
 # Store binding) until secrets-cutover flips it. INTERNAL_API_SECRET resolves from /shared.
 #
-# CONTAINER_BILLING_CLOUD_AGENT_USER_IDS stays a plain Worker secret read from `env`: it is a payer
+# CONTAINER_BILLING_CLOUD_AGENT_USER_IDS stays a plain Worker secret read from `secrets-store`: it is a payer
 # allowlist (configuration), not a credential, and its readers are synchronous.
 workload: container-usage-meter
 environments:

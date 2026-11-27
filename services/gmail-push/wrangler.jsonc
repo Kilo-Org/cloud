@@ -20,10 +20,11 @@
   "vars": {
     // Base URL for OIDC audience construction — the worker appends /push/user/<userId>
     "OIDC_AUDIENCE_BASE": "https://kiloclaw-gmail.kiloapps.io",
-    // Where every runtime secret read goes: `env` (the Worker secret and Secrets Store binding
-    // below) or `sts` (the bundle over the `STS` binding). An absent value means `env`; any other
-    // value refuses every read. The `sts` source never falls back to the legacy binding.
-    "SECRETS_SOURCE": "env",
+    // Where every runtime secret read goes: `secrets-store` (the Worker secret and Secrets Store
+    // binding below) or `sts` (the bundle over the `STS` binding). An absent value means
+    // `secrets-store`; any other value refuses every read. The `sts` source never falls back to
+    // the legacy binding.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "services": [
     {
@@ -33,7 +34,7 @@
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
     // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
     // cloudflare-gmail-push.yaml grants INTERNAL_API_SECRET. Nothing reads it while
-    // SECRETS_SOURCE is `env`.
+    // SECRETS_SOURCE is `secrets-store`.
     {
       "binding": "STS",
       "service": "sts",

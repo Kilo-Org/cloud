@@ -31,7 +31,7 @@ jobs:
       needed: ${{ steps.catalog.outputs.needed }}
     steps:
       # Admission code comes from trusted main, never the triggering PR.
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           ref: refs/heads/main
           persist-credentials: false
@@ -70,18 +70,18 @@ jobs:
       group: cloud-agent-runtime-publisher-${{ needs.admit.outputs.source_sha }}
       cancel-in-progress: false
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           ref: ${{ needs.admit.outputs.source_sha }}
           persist-credentials: false
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
           # The GitHub cache, not the shared sticky disk: this job publishes a
           # production artifact, and deploy workflows keep the same isolation.
           cache: 'pnpm'
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
       # Only the publisher and wrapper dependency graphs; the full workspace install pulls

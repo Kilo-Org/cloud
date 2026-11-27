@@ -510,11 +510,12 @@ async function main() {
   );
   const ticket = z.object({ ticket: z.string(), expires_in: z.number() }).parse(issued.body);
   secrets.push(ticket.ticket);
-  // The development redeemer `uts-ticket-test` may redeem for its listed audiences only.
-  const redeem = async (audience: string) => {
+  // The development redeemer `uts-ticket-test` may redeem for its listed audiences only, and only
+  // the purpose and resource the ticket was minted for.
+  const redeem = async (audience: string, resource = 'session-e2e') => {
     const response = await fetch(new URL('/__dev/tickets/redeem', base), {
       method: 'POST',
-      body: JSON.stringify({ ticket: ticket.ticket, audience }),
+      body: JSON.stringify({ ticket: ticket.ticket, audience, purpose: 'stream', resource }),
       headers: { 'Content-Type': 'application/json' },
     });
     return {
@@ -523,14 +524,17 @@ async function main() {
     };
   };
   const otherAudience = await redeem('session-ingest');
+  const otherResource = await redeem('event-service', 'session-other');
   const firstUse = await redeem('event-service');
   const secondUse = await redeem('event-service');
   check(otherAudience.body.status === 'refused', 'redeemer refused outside its audiences');
+  check(otherResource.body.status === 'invalid_ticket', 'ticket refused for another resource');
   check(firstUse.status === 200 && secondUse.body.status === 'invalid_ticket', 'ticket single use');
   log('5 ticket', {
     issued: issued.status,
     expiresIn: ticket.expires_in,
     audienceNotTheCallers: otherAudience.body,
+    otherResource: otherResource.body,
     firstUse: { status: firstUse.status, body: firstUse.body },
     secondUse: { status: secondUse.status, body: secondUse.body },
   });

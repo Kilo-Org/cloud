@@ -1047,7 +1047,13 @@ describe('revocation', () => {
       outcome: 'revoked',
       feedEntries: [feedEntry('grant', grant.grantId)],
     });
-    expect(await revoke()).toEqual(noEntries('already_revoked'));
+    // A retry, as after a 503 that no feed object confirmed, gets the live entry to publish again;
+    // another client still learns nothing.
+    expect(await revoke()).toEqual({
+      outcome: 'already_revoked',
+      feedEntries: [feedEntry('grant', grant.grantId)],
+    });
+    expect(await revoke('kilo-other')).toEqual(noEntries('client_mismatch'));
     expect(
       await grants.revoke({ environment, tokenHash: sha256(token()), clientId: 'kilo-cli' })
     ).toEqual(noEntries('unknown'));
@@ -1147,7 +1153,10 @@ describe('revocation', () => {
           proof: null,
         })
       ).toEqual({ outcome: 'inactive' });
-      expect((await revoke(presented)).outcome).toBe('already_revoked');
+      expect(await revoke(presented)).toEqual({
+        outcome: 'already_revoked',
+        feedEntries: [feedEntry('third_party_family', family.familyId)],
+      });
     }
     // A refused token of a revoked family revokes nothing more and writes no row.
     expect(await auditRows(accountId)).toHaveLength(auditCount);

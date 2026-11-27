@@ -49,6 +49,11 @@ const FUNCTION_WRITTEN_TABLES = [
   'known_networks',
   'sign_ins',
   'notices',
+  'accounts',
+  'sso_connections',
+  'sso_domains',
+  'org_sso_policies',
+  'org_memberships',
 ];
 
 /** Tables the app login cannot even read: only the sign-in functions reach them. */
@@ -71,6 +76,7 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   known_networks: 'last_seen_at',
   sign_ins: 'new_device',
   notices: 'delivery',
+  org_sso_policies: 'enforcement',
 };
 
 let db: TestDatabase;
@@ -389,14 +395,19 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     'cannot insert, update or delete uts.%s directly, only read it',
     async table => {
       const app = await db.connect(login);
-      await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
-      const column = UPDATE_COLUMN[table] ?? 'status';
-      for (const statement of [
-        `INSERT INTO uts.${table} DEFAULT VALUES`,
-        `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
-        `DELETE FROM uts.${table} WHERE false`,
-      ]) {
-        expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+      // Closed here: this file opens a connection per test, and these cases alone are dozens.
+      try {
+        await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
+        const column = UPDATE_COLUMN[table] ?? 'status';
+        for (const statement of [
+          `INSERT INTO uts.${table} DEFAULT VALUES`,
+          `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
+          `DELETE FROM uts.${table} WHERE false`,
+        ]) {
+          expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+        }
+      } finally {
+        await app.end();
       }
     }
   );
@@ -492,8 +503,7 @@ describe.each(['uts_pat_a', 'uts_pat_b'] as const)('PAT login %s', login => {
 
 describe.each(['uts_reader_a', 'uts_reader_b'] as const)('reader login %s', login => {
   it('reads the account views', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
+    const accountId = await insertAccount(await db.connectAsOwner());
     const reader = await db.connect(login);
     const result = await reader.query('SELECT id, status FROM uts_read.accounts WHERE id = $1', [
       accountId,
@@ -683,6 +693,8 @@ describe('functions', () => {
       { routine: 'keep_bot_key', grantee: 'uts_app' },
       { routine: 'list_bot_keys', grantee: 'uts_app' },
       { routine: 'list_pats', grantee: 'uts_app' },
+      { routine: 'live_feed_entries', grantee: 'uts_app' },
+      { routine: 'live_feed_entries_of_refresh_token', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },

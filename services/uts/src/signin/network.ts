@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ClientAddressSchema, ipv6Hextets } from '../network-address';
 import type { NetworkContext } from './store';
 
 /**
@@ -12,7 +13,6 @@ const CfSchema = z.looseObject({
   country: z.string().optional(),
   city: z.string().optional(),
 });
-const IpSchema = z.union([z.ipv4(), z.ipv6()]);
 
 /** At most the 512 characters a session row keeps. */
 const MAX_USER_AGENT_LENGTH = 512;
@@ -27,7 +27,7 @@ export function requestNetwork(request: Request): NetworkContext {
       userAgent === null || userAgent.length === 0
         ? null
         : userAgent.slice(0, MAX_USER_AGENT_LENGTH),
-    clientIp: IpSchema.safeParse(request.headers.get('CF-Connecting-IP')).data ?? null,
+    clientIp: ClientAddressSchema.safeParse(request.headers.get('CF-Connecting-IP')).data ?? null,
     asn: cf?.asn ?? null,
     country: country !== undefined && /^[A-Z]{2}$/.test(country) ? country : null,
     city: city !== undefined && city.length > 0 && city.length <= 128 ? city : null,
@@ -43,21 +43,8 @@ export function requestNetwork(request: Request): NetworkContext {
 export function anonymousWriter(clientIp: string | null): string | null {
   if (clientIp === null) return null;
   if (!clientIp.includes(':')) return clientIp;
-  // Expand `::` to the hextets it stands for; an IPv4 tail (`::ffff:192.0.2.1`) holds two.
-  const groups = (part: string) =>
-    part === ''
-      ? []
-      : part.split(':').flatMap(group => (group.includes('.') ? ['0', '0'] : [group]));
-  const [head, tail] = clientIp.split('::');
-  const leading = groups(head);
-  const trailing = tail === undefined ? [] : groups(tail);
-  const hextets = [
-    ...leading,
-    ...Array.from({ length: 8 - leading.length - trailing.length }, () => '0'),
-    ...trailing,
-  ];
-  return `${hextets
+  return `${ipv6Hextets(clientIp)
     .slice(0, 3)
-    .map(group => Number.parseInt(group, 16).toString(16))
+    .map(group => group.toString(16))
     .join(':')}::/48`;
 }

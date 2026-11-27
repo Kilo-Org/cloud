@@ -9,12 +9,16 @@ import {
   UtsPublicJwkSchema,
 } from '@kilocode/uts-contracts';
 import { SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  ACCESS_TOKEN_KEYS_FRESH_MS,
+  ACCESS_TOKEN_KEYS_RECHECK_MS,
+  type AccessTokenKeyCopy,
   type AccessTokenKeys,
   checkAccountBearer,
   shardAccessTokenKeys,
 } from '../../src/account/bearer';
+import { readKeySetShard, readThroughIsolateShard } from '../../src/signer-keys';
 import {
   type AccountDeps,
   type CredentialNotice,
@@ -243,6 +247,52 @@ describe('account API authentication', () => {
     expect(response.headers.get('WWW-Authenticate')).toContain(`scope="${UTS_PATS_MANAGE_SCOPE}"`);
   });
 
+  it('reads the key set once per isolate copy, so tokens under an unknown kid cost no Durable Object call each', async () => {
+    const { publicKey } = await generateKeyPair('EdDSA', { extractable: true });
+    const unknownKid = `uts-token-03-${await calculateJwkThumbprint(await exportJWK(publicKey), 'sha256')}`;
+    let reads = 0;
+    const read = async () => {
+      reads += 1;
+      return await readThroughIsolateShard(shard => readKeySetShard(env, config, shard));
+    };
+    const copy: AccessTokenKeyCopy = { copy: null };
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      const keys = shardAccessTokenKeys(env, config, copy, read);
+      for (let request = 0; request < 50; request += 1) {
+        expect(await keys(unknownKid)).toEqual({ status: 'unknown' });
+      }
+      const token = await accessToken();
+      const kid = String(JSON.parse(atob(token.split('.')[0])).kid);
+      expect(await keys(kid)).toMatchObject({ status: 'found' });
+      expect(reads).toBe(1);
+      // An unknown kid reads again once the copy is past the recheck time, since a signer key
+      // can be new; a known kid keeps using the copy until it is past its fresh time.
+      clock.mockReturnValue(now + ACCESS_TOKEN_KEYS_RECHECK_MS);
+      expect(await keys(kid)).toMatchObject({ status: 'found' });
+      expect(reads).toBe(1);
+      expect(await keys(unknownKid)).toEqual({ status: 'unknown' });
+      expect(reads).toBe(2);
+      clock.mockReturnValue(now + ACCESS_TOKEN_KEYS_RECHECK_MS + ACCESS_TOKEN_KEYS_FRESH_MS);
+      expect(await keys(kid)).toMatchObject({ status: 'found' });
+      expect(reads).toBe(3);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('keeps no copy of a failed key-set read', async () => {
+    let reads = 0;
+    const keys = shardAccessTokenKeys(env, config, { copy: null }, async () => {
+      reads += 1;
+      return { status: 'misconfigured' };
+    });
+    expect(await keys('uts-token-03-x')).toEqual({ status: 'unavailable' });
+    expect(await keys('uts-token-03-x')).toEqual({ status: 'unavailable' });
+    expect(reads).toBe(2);
+  });
+
   it('answers 503 when no key-set shard answers', async () => {
     const keys: AccessTokenKeys = async () => ({ status: 'unavailable' });
     const response = await call(
@@ -326,6 +376,45 @@ describe('PAT routes', () => {
     expect(response.headers.get('WWW-Authenticate')).toMatch(
       /^Bearer error="insufficient_user_authentication", .*max_age="600"$/
     );
+  });
+
+  it('answers 429 once the account created 20 PATs in the hour', async () => {
+    const fake = fakeAccount({ createPat: async () => ({ outcome: 'rate_limited' }) });
+    const response = await call(
+      request('/account/pats', {
+        method: 'POST',
+        token: await accessToken(),
+        json: { name: 'ci', scope: 'uts:probe.read' },
+      }),
+      deps(fake.access)
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('3600');
+    expect(await response.json()).toMatchObject({ error: 'too_many_requests' });
+  });
+
+  it('stops reading a body without a length once it passes 4 KB', async () => {
+    let pulls = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new TextEncoder().encode(' '.repeat(1024)));
+      },
+    });
+    const response = await call(
+      new Request(`${config.endpoints.issuer}/account/pats`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${await accessToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: endless,
+      }),
+      deps(fakeAccount({}).access)
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_description: 'the body is too large' });
+    expect(pulls).toBeLessThan(10);
   });
 
   it.each([
@@ -413,7 +502,7 @@ describe('PAT routes', () => {
     const entry = credentialEntry('pat', created.id);
     for (const [outcome, feedEntries, status] of [
       ['revoked', [entry], 204],
-      ['already_revoked', [], 204],
+      ['already_revoked', [entry], 204],
       ['not_found', [], 404],
       ['invalid_session', [], 401],
     ] as const) {
@@ -497,6 +586,20 @@ describe('org bot key routes', () => {
     expect(isWellFormedSecret('bot_key', body.token)).toBe(true);
     expect(body).toMatchObject({ org: ORG, created_by: ACCOUNT });
     expect(fake.calls[0].input).toMatchObject({ orgId: ORG, accountId: ACCOUNT, lifetimeDays: 90 });
+  });
+
+  it('answers 429 once the organization got 20 bot keys in the hour', async () => {
+    const fake = fakeAccount({ createBotKey: async () => ({ outcome: 'rate_limited' }) });
+    const response = await call(
+      request(`/account/orgs/${ORG}/bot-keys`, {
+        method: 'POST',
+        token: await botToken(),
+        json: { name: 'deploy bot', scope: 'uts:probe.read' },
+      }),
+      deps(fake.access)
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('3600');
   });
 
   it('refuses a member who is no admin, and a token bound to another organization', async () => {

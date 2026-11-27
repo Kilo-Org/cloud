@@ -152,7 +152,10 @@ returns them in the same statement (`uts.feed_entries_of_statement()`, migration
 probe, skipped on the issued path). After the commit the Worker writes them to both feed objects
 in parallel (`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2
 seconds. `/revoke` and the account API's revokes answer 503 when neither confirms (the revocation
-stands, the backfill adds it, and the retry finds it revoked); the reuse paths answer as before. A
+stands, and the backfill adds it); the reuse paths answer as before. A retry finds the credential
+revoked and gets its feed entry back while the entry lives (`uts.live_feed_entries`,
+`uts.live_feed_entries_of_refresh_token`, migration 0019), so it answers success only once a feed
+object confirmed the entry. A
 failed publish logs kinds and counts, never ids. `uts.remove_org_member` has no Worker caller in
 this package, so the entries it writes reach the feed objects through the backfill.
 
@@ -163,12 +166,17 @@ only it writes entries. Each one:
 - keeps its entries in memory only (`src/feed/ledger.ts`); the identity store is the record;
 - every 5 seconds (alarm) reads, as the app login, the entries revoked in the last 20 minutes,
   or every live entry after a restart or a gap over 15 minutes (`src/revocation/store.ts`), drops
-  expired entries, and rotates its feed key;
+  expired entries, and rotates its feed key. While the environment binds no identity store the
+  alarm runs hourly and only rotates the key; loading moves such an alarm back to now once the
+  store is bound;
 - signs a head (`typ: kilo-feed-head+jwt`, `{iat, list_hash}`) with its own Ed25519 key, kept in
   its KV storage with the signer's 30-day rotation and published next key (`uts-feed-<n>-<thumbprint>`).
   `iat` is the start of its last good backfill, so every revocation committed before it is in the
-  list; a new head is signed for each new list or backfill, and none once that backfill is 30
-  seconds old or the object holds more than 50,000 entries. A backfill is given up after 10
+  list. It signs one list per `iat`: a verifier that holds a head refuses another list under the
+  same `iat`, so a publish that changes the list after a head of that `iat` went out keeps that
+  head and moves the next backfill to the start of the next second, whose head names the new list.
+  None is signed once that backfill is 30 seconds old or the object holds more than 50,000
+  entries. A backfill is given up after 10
   seconds (5 for the connect); expired entries leave the list at most once a minute;
 - serves its current list, and each list it replaced in the last 30 seconds (at most 16 MB of old
   list text, the oldest dropped first), by hash;
@@ -310,7 +318,9 @@ no audit row; the operator action that blocks or unblocks the client writes it.
 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a
 `sid` (`src/account/bearer.ts`): `EdDSA` under a `uts-token-` key that the isolate's key-set shard
-holds (one Durable Object call per request), `typ` `at+jwt`, the issuer, 60 seconds of skew and
+holds, read through an isolate copy of the key list (one Durable Object call per isolate per 10
+seconds, or per 2 seconds while tokens name a kid the copy lacks, so a flood of forged tokens costs
+no call each), `typ` `at+jwt`, the issuer, 60 seconds of skew and
 the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
 only). A PAT names no session, so it is refused there. Each action is one statement that reads the
 grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
@@ -347,14 +357,14 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|
-| `POST /account/pats` | `uts:pats.manage` | Tier B gate (a sign-in within 10 minutes, or a passkey step-up of the same session); the scope must be registered and PAT-eligible; 90 days unless `expires_in_days` (1 to 365) says otherwise; at most 100 live PATs per account; the PAT appears once in the answer. A gate refusal answers 401 with the RFC 9470 challenge (`insufficient_user_authentication`, `max_age="600"`) | `uts.create_pat` |
+| `POST /account/pats` | `uts:pats.manage` | Tier B gate (a sign-in within 10 minutes, or a passkey step-up of the same session); the scope must be registered and PAT-eligible; 90 days unless `expires_in_days` (1 to 365) says otherwise; at most 100 live PATs per account, and at most 20 created per account in any hour (429 with `Retry-After`); the PAT appears once in the answer. A gate refusal answers 401 with the RFC 9470 challenge (`insufficient_user_authentication`, `max_age="600"`) | `uts.create_pat` |
 | `GET /account/pats` | `uts:pats.manage` | The live PATs, newest first, with the last four characters | `uts.list_pats` |
-| `DELETE /account/pats/<id>` | `uts:pats.manage` | Revokes; writes a 15-minute feed entry; 204 also when already revoked | `uts.revoke_pat` |
-| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization (a key flagged within 7 days counts) | `uts.create_bot_key` |
+| `DELETE /account/pats/<id>` | `uts:pats.manage` | Revokes; writes a 15-minute feed entry; 204 also when already revoked, once a feed object took the entry | `uts.revoke_pat` |
+| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization (a key flagged within 7 days counts), and at most 20 created per organization in any hour (429) | `uts.create_bot_key` |
 | `GET /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | The live keys; a flagged key shows when it stops | `uts.list_bot_keys` |
 | `DELETE /account/orgs/<org>/bot-keys/<id>` | `uts:bot-keys.manage` | Revokes; 15-minute feed entry | `uts.revoke_bot_key` |
 | `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff; tier B gate, since keeping restores long-lived access | `uts.keep_bot_key` |
-| `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per address per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
+| `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per client (an IPv4 address or an IPv6 /64) per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
 
 - A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
   notice and the audit row in one statement. The push and email notice goes through the
@@ -391,8 +401,11 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   verifiers: the lowercase-hex SHA-256 in, `found`, `not_found`, `rate_limited` or `unavailable`
   out (`UtsPatLookupResultSchema`). It answers only callers its environment lists
   (`PAT_LOOKUP_CALLERS`), runs at most min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) lookups at once per
-  isolate (see "Deploys"), and sends one statement through the PAT config. The probe route uses the
-  same cap.
+  isolate (see "Deploys"), and sends one statement through the PAT config. A lookup that has not
+  answered in 5 seconds, connecting included, answers `unavailable` (`pg`'s connect timeout cannot
+  end a hung connect on a Workers socket), and a lookup's slot lapses after 10 seconds even if its
+  promise never settles, as when Workers cancels a request whose client went away. The probe route
+  uses the same cap.
 - The scope registry is `UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`; `test/repo` checks every
   entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff,
   credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
@@ -771,9 +784,12 @@ Both Workers deploy through `.github/workflows/deploy-workers.yml`, which discov
 change, as on the first deploy of an environment, detection takes them out of the parallel matrix:
 the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
-order). A change to only one of them deploys in the matrix. The signer-keys answer carries the feed
-objects' keys in an optional `feeds` field for one release, so either Worker can deploy or roll back
-alone. Every grant statement calls `uts.feed_entries_of_statement()`, so apply migration 0006 to an
+order). A change to only one of them deploys in the matrix. The feed Worker asks for the feed
+objects' keys (`signerKeys({ feeds: true })`), and the mint Worker adds the `feeds` field only
+then: the feed Worker of the release before feed objects asks with no request and parses the answer
+strictly, so it keeps serving signer keys during the deploy window and after a rollback of either
+Worker. The answer schema drops top-level fields it does not name, so a later field needs no such
+step. Every grant statement calls `uts.feed_entries_of_statement()`, so apply migration 0006 to an
 environment's identity store before that environment binds `IDENTITY_STORE`; the code exchange,
 third-party refresh and `/revoke` fail until it is applied.
 
@@ -893,7 +909,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   `uts.org_memberships`; `uts.remove_org_member` (migration 0005) does the former. A removal
   written as one statement, with data-modifying CTEs, keeps the snapshot it took before the wait
   and misses the new credential. An account holds at most 100 live PATs and an organization at
-  most 100 live bot keys, counted behind a lock.
+  most 100 live bot keys, counted behind a lock; behind the same lock an account creates at most 20
+  PATs and an organization gets at most 20 bot keys in any hour (migration 0019), which bounds the
+  feed entries a create-and-revoke loop can add.
 - The app login can still revoke, flag, keep, deny and record use of CI trust policies,
   third-party consents and device codes, through column grants that leave out the holder, the
   hash, the scope, the lifetime and the pass, so an update cannot turn a row into a different
@@ -911,7 +929,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   and tokens, revocations and DPoP proof `jti`s only through the security-definer OAuth functions
   (migration 0004), and PATs, org bot keys and gate passes only through the security-definer
   account functions (migration 0005), which write the credential rows and their audit row
-  together; it keeps SELECT on those tables. It still writes the ungated credential tables directly.
+  together; it keeps SELECT on those tables. Accounts, memberships and the SSO tables it writes not
+  at all since migration 0019: only security-definer functions change them. It still writes the
+  ungated credential tables directly.
   The account-deletion function will be one more such function: in the same statement, before the
   delete, it collects the active bot keys the account created (the keys the delete trigger is about
   to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design

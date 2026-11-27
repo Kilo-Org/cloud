@@ -1,7 +1,8 @@
-// Synthetic proof for the M84 driver (../m84-notifications-run.mjs) and its workflow. A simulated
-// account (scripts, deployments, versions, store, copier, cron ticks) drives every branch. Each
-// tick runs the real core `runTick` against the fake Infisical, so the receipts are the copier's
-// own, and every gate is the real core gate. No provider, credential or real value is involved.
+// Synthetic proof for the runtime copier driver (../runtime-copy-run.mjs) and its matrix
+// workflow, for the checked-in table's Notifications entry. A simulated account (scripts,
+// deployments, versions, store, copier, cron ticks) drives every branch. Each tick runs the real
+// core `runTick` against the fake Infisical, so the receipts are the copier's own, and every gate
+// is the real core gate. No provider, credential or real value is involved.
 
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -11,9 +12,6 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 
 import {
-  BATCH_TARGETS,
-  COPIER,
-  ENVIRONMENT,
   OPERATOR_META,
   OPERATOR_SCHEMA,
   RENDER_CONFIG,
@@ -27,17 +25,21 @@ import {
   exitCode,
   github,
   jsonObjectSplitter,
+  planMatrix,
   planRun,
   receiptsOf,
   rolloutRunsDuring,
   run,
   runChild,
   stopChild,
-} from '../m84-notifications-run.mjs';
-import { NAME_MAP, moduleHashes } from './checks.mjs';
+  targetOf,
+} from '../runtime-copy-run.mjs';
+import { WORKER_SOURCES, moduleHashes } from './checks.mjs';
 import {
+  BATCH,
   CLIENT_ID,
   CLIENT_SECRET,
+  FIXTURE,
   armedCopierBindings,
   copierSettingsResult,
   fakeGateNamespace,
@@ -49,7 +51,10 @@ import {
   unarmedCopierBindings,
 } from './fakes.mjs';
 import { CRON, RECEIPT_SCHEMA, WRITER_SECRET, runTick } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
+
+const NAME_MAP = WORKER_SOURCES.notifications.names;
+const TARGET = targetOf('notifications', FIXTURE);
+const { copier: COPIER, environment: ENVIRONMENT, targets: BATCH_TARGETS } = TARGET;
 
 const T0 = Date.parse('2026-11-27T18:00:00Z');
 const SHA = 'c'.repeat(40);
@@ -103,6 +108,9 @@ function baseEnv(overrides = {}) {
     GITHUB_RUN_ID: '4242',
     GITHUB_RUN_ATTEMPT: '1',
     RUNNER_TEMP: '/tmp/runner-temp',
+    COPY_WORKER: 'notifications',
+    COPY_INDEX: '0',
+    CLOUDFLARE_TOKEN_SOURCE: 'secret',
     GITHUB_TOKEN: 'synthetic-github-token',
     CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
     M65_INFISICAL_CLIENT_ID: CLIENT_ID,
@@ -256,31 +264,6 @@ function makeWorld(o = {}) {
   };
 
   world.gh = {
-    async environment() {
-      calls.push(['gh', 'environment']);
-      if (o.environment === null) return null;
-      return {
-        name: ENVIRONMENT,
-        can_admins_bypass: false,
-        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-        protection_rules: [
-          { id: 1, type: 'branch_policy' },
-          {
-            id: 2,
-            type: 'required_reviewers',
-            prevent_self_review: true,
-            reviewers: [
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-a' } },
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-b' } },
-            ],
-          },
-        ],
-        ...o.environment,
-      };
-    },
-    async branchPolicies() {
-      return { branch_policies: o.branches ?? [{ name: 'main', type: 'branch' }] };
-    },
     async activeRuns(workflow) {
       calls.push(['gh', 'activeRuns', workflow]);
       return o.activeRuns?.(workflow, world) ?? 0;
@@ -301,6 +284,7 @@ function makeWorld(o = {}) {
     );
     world.pins = {
       M65_RUN_ID: flags['--run-id'],
+      M65_BATCH: flags['--batch'],
       M65_NOT_BEFORE: flags['--not-before'],
       M65_NOT_AFTER: flags['--not-after'],
       M65_INFISICAL_CLIENT_ID: flags['--client-id'],
@@ -416,6 +400,7 @@ function ioOf(world, o = {}, env = baseEnv()) {
     log: () => {},
     printTable: world.printTable,
     nameTable: o.nameTable,
+    table: FIXTURE,
     signal: o.signal,
     sleep: async () => {},
   };
@@ -563,12 +548,17 @@ test('window: the earliest minute tick that both the lead and the writer expiry 
 test('context and operator refusals make no provider, GitHub or process call', async t => {
   const cases = [
     [{ GITHUB_REF: 'refs/heads/feature' }, 'ref'],
+    [{ COPY_WORKER: 'not-in-table' }, 'worker'],
+    [{ COPY_WORKER: '__proto__' }, 'worker'],
+    [{ COPY_INDEX: 'x' }, 'matrix_index'],
+    [{ CLOUDFLARE_TOKEN_SOURCE: 'STS' }, 'token_source'],
     [{ GITHUB_REPOSITORY: 'someone/cloud' }, 'repository'],
     [{ GITHUB_EVENT_NAME: 'push' }, 'event'],
     [{ EXPECTED_COMMIT: 'd'.repeat(40) }, 'expected_commit'],
     [{ [WRITER_SECRET]: '' }, 'writer_secret'],
     [{ [OPERATOR_META]: '' }, 'operator_meta'],
     [{ M65_INFISICAL_CLIENT_ID: 'not-a-uuid' }, 'client_id'],
+    [{ GITHUB_TOKEN: '' }, 'github_token'],
     [{ [OPERATOR_META]: JSON.stringify(operatorMeta(), null, 2) }, 'operator_meta_not_compact'],
     [
       { [OPERATOR_META]: JSON.stringify(operatorMeta({ commit: 'e'.repeat(40) })) },
@@ -633,70 +623,6 @@ test('context and operator refusals make no provider, GitHub or process call', a
     assert.deepEqual(world.calls, []);
   });
 });
-test('missing or loosened protected environment stops before any Cloudflare call', async t => {
-  for (const [o, reason] of [
-    [{ environment: null }, 'environment_absent'],
-    [{ environment: { can_admins_bypass: true } }, 'environment_admin_bypass'],
-    [
-      {
-        environment: {
-          deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
-        },
-      },
-      'environment_branch_policy',
-    ],
-    [
-      {
-        branches: [
-          { name: 'main', type: 'branch' },
-          { name: 'release/*', type: 'branch' },
-        ],
-      },
-      'environment_branches',
-    ],
-    [{ branches: [{ name: 'main', type: 'tag' }] }, 'environment_branches'],
-    [{ branches: [{ name: 'main' }] }, 'environment_branches'],
-    [{ environment: { can_admins_bypass: undefined } }, 'environment_admin_bypass'],
-    [{ environment: { protection_rules: undefined } }, 'environment_required_reviewers'],
-    [
-      { environment: { protection_rules: [{ id: 1, type: 'branch_policy' }] } },
-      'environment_required_reviewers',
-    ],
-    [
-      {
-        environment: {
-          protection_rules: [
-            {
-              type: 'required_reviewers',
-              prevent_self_review: false,
-              reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
-            },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-    [
-      {
-        environment: {
-          protection_rules: [
-            { type: 'required_reviewers', prevent_self_review: true, reviewers: [] },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-  ]) {
-    await t.test(reason, async () => {
-      const { world, report } = await drive(o);
-      assert.equal(report.stopReason, 'environment_not_protected');
-      assert.deepEqual(report.environment, [reason]);
-      assert.equal(world.calls.filter(c => c[0] === 'cf' || c[0] === 'wrangler').length, 0);
-      assert.equal(report.cleanup.note, 'not_created');
-    });
-  }
-});
-
 test('an active rollout at start stops before deploy; one before arming deletes the unarmed copier', async () => {
   const atStart = await drive({ activeRuns: w => (w === 'deploy-production.yml' ? 1 : 0) });
   assert.equal(atStart.report.stopReason, 'rollout_active');
@@ -1180,7 +1106,15 @@ test('an aborted cleanup reads once with the short timeout, never retries, and s
     clock: { now: () => T0 },
     sleep: async () => seen.push(['sleep']),
   });
-  const state = { created: true, recorded: new Set([id]), before: {}, since: T0, aborted: true };
+  const state = {
+    created: true,
+    recorded: new Set([id]),
+    before: {},
+    since: T0,
+    aborted: true,
+    copier: COPIER,
+    source: 'notifications',
+  };
   const flaky = await cleanup(
     io({
       async deploymentVersions(_name, opts) {
@@ -1257,6 +1191,8 @@ test('cleanup survives malformed provider data, reports it, and never deletes on
       before: {},
       plan: { notBefore: T0 + 60_000 },
       since: T0,
+      copier: COPIER,
+      source: 'notifications',
     }
   );
   assert.deepEqual(calls, ['read']);
@@ -1292,7 +1228,15 @@ test('a transient cleanup read is read once more; the delete itself is never rep
   };
   const result = await cleanup(
     { cf, gh: {}, clock: { now: () => T0 }, sleep: async () => {} },
-    { created: true, recorded: new Set([id]), before: {}, plan: { notBefore: T0 }, since: T0 }
+    {
+      created: true,
+      recorded: new Set([id]),
+      before: {},
+      plan: { notBefore: T0 },
+      since: T0,
+      copier: COPIER,
+      source: 'notifications',
+    }
   );
   assert.deepEqual(calls, ['delete']);
   assert.equal(result.deleted, true);
@@ -1333,13 +1277,13 @@ test('receipts are filtered by run id and exact schema; exceptions are only coun
     logs: [{ message: [line, 'plain text', JSON.stringify({ ...receipt, extra: 1 })] }],
     exceptions: [{ message: 'synthetic' }],
   };
-  const mine = receiptsOf(event, receipt.runId);
+  const mine = receiptsOf(event, receipt.runId, BATCH);
   assert.equal(mine.receipts.length, 1);
   assert.equal(mine.exceptions, 1);
-  assert.equal(receiptsOf(event, 'm65-another-run-0001').receipts.length, 0);
+  assert.equal(receiptsOf(event, 'm65-another-run-0001', BATCH).receipts.length, 0);
 });
 
-test('child processes inherit no writer secret, operator readback or GitHub token', () => {
+test('child processes inherit no writer secret, operator readback or GitHub token; no Wrangler log', () => {
   const env = baseEnv();
   const plain = childEnv(env);
   const wrangler = childEnv(env, { cloudflare: true });
@@ -1348,6 +1292,7 @@ test('child processes inherit no writer secret, operator readback or GitHub toke
     'HOME',
     'PATH',
     'WRANGLER_SEND_METRICS',
+    'WRANGLER_WRITE_LOGS',
     'XDG_CONFIG_HOME',
   ]);
   assert.deepEqual(Object.keys(wrangler).sort(), [
@@ -1357,10 +1302,14 @@ test('child processes inherit no writer secret, operator readback or GitHub toke
     'HOME',
     'PATH',
     'WRANGLER_SEND_METRICS',
+    'WRANGLER_WRITE_LOGS',
     'XDG_CONFIG_HOME',
   ]);
+  // M124: every Wrangler child (deploy, secret put, tail) runs with log files off.
+  assert.equal(wrangler.WRANGLER_WRITE_LOGS, 'false');
+  assert.equal(plain.WRANGLER_WRITE_LOGS, 'false');
   assert.equal(wrangler.CLOUDFLARE_ACCOUNT_ID, BATCH.accountId);
-  assert.equal(wrangler.HOME, '/tmp/runner-temp/m84-isolated-home');
+  assert.equal(wrangler.HOME, '/tmp/runner-temp/runtime-copy-isolated-home');
   assert.notEqual(wrangler.HOME, env.HOME);
   assert.ok(wrangler.XDG_CONFIG_HOME.startsWith(wrangler.HOME));
 });
@@ -1393,7 +1342,7 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
   const parts = {
     'worker.mjs': ['file', 'export default {};\n// lf only\n'],
     'core.mjs': ['field', 'export const synthetic = "ü";\nexport const two = 2;\n'],
-    'manifest.mjs': ['file', 'export const mixed = 1;\r\n// crlf then lf\n'],
+    'table.mjs': ['file', 'export const mixed = 1;\r\n// crlf then lf\n'],
     metadata: ['field', '{"synthetic":true}'],
   };
   const boundary = 'm84-synthetic-boundary';
@@ -1469,13 +1418,8 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
   });
   assert.deepEqual(await cf.doNamespaces(COPIER), [{ id: 'n2', script: COPIER, class: 'M65Gate' }]);
   const hashes = await cf.moduleHashes(COPIER);
-  assert.deepEqual(Object.keys(hashes).sort(), [
-    'core.mjs',
-    'manifest.mjs',
-    'metadata',
-    'worker.mjs',
-  ]);
-  for (const m of ['worker.mjs', 'core.mjs', 'manifest.mjs']) {
+  assert.deepEqual(Object.keys(hashes).sort(), ['core.mjs', 'metadata', 'table.mjs', 'worker.mjs']);
+  for (const m of ['worker.mjs', 'core.mjs', 'table.mjs']) {
     assert.equal(hashes[m], sha(parts[m][1]), `${m}: digest of the exact uploaded bytes`);
   }
   assert.equal(hashes.metadata, 'unexpected');
@@ -1594,45 +1538,53 @@ test('a child that ignores its stop signal is killed within the bound', async ()
   assert.deepEqual(ok, { code: 0, output: 'echo' });
 });
 
-test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the driver step', () => {
+test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets only in the drivers', () => {
   const { load } = createRequire(import.meta.url)('js-yaml');
   const text = readFileSync(
-    new URL('../../../.github/workflows/notifications-runtime-copy.yml', import.meta.url),
+    new URL('../../../.github/workflows/runtime-copy.yml', import.meta.url),
     'utf8'
   );
   const wf = load(text);
   assert.deepEqual(Object.keys(wf.on), ['workflow_dispatch']);
   assert.deepEqual(Object.keys(wf.on.workflow_dispatch.inputs), ['expected_commit']);
   assert.deepEqual(wf.permissions, {});
-  assert.deepEqual(wf.concurrency, {
-    group: 'notifications-runtime-copy',
-    'cancel-in-progress': false,
-  });
-  assert.deepEqual(Object.keys(wf.jobs), ['environment-guard', 'copy']);
-  const guard = wf.jobs['environment-guard'];
-  assert.equal(guard.environment, undefined);
-  assert.deepEqual(guard.permissions, { contents: 'read', actions: 'read' });
-  assert.ok(!JSON.stringify(guard).includes('secrets.'));
-  assert.equal(
-    guard.steps.at(-1).run,
-    'node scripts/secrets-migration/m84-notifications-run.mjs --environment-guard'
-  );
-  assert.deepEqual(Object.keys(guard.steps.at(-1).env).sort(), ['EXPECTED_COMMIT', 'GITHUB_TOKEN']);
-  assert.equal(guard.if, wf.jobs.copy.if);
+  // M124: Wrangler writes no log file anywhere in the workflow.
+  assert.deepEqual(wf.env, { WRANGLER_WRITE_LOGS: 'false', WRANGLER_SEND_METRICS: 'false' });
+  assert.deepEqual(wf.concurrency, { group: 'runtime-copy', 'cancel-in-progress': false });
+  assert.deepEqual(Object.keys(wf.jobs), ['plan', 'copy']);
+  const guardIf =
+    "github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'";
+
+  const plan = wf.jobs.plan;
+  assert.equal(plan.if, guardIf);
+  assert.equal(plan.environment, undefined);
+  assert.deepEqual(plan.permissions, { contents: 'read' });
+  assert.ok(!JSON.stringify(plan).includes('secrets.'));
+  assert.deepEqual(plan.outputs, { workers: '${{ steps.plan.outputs.workers }}' });
+  const planStep = plan.steps.at(-1);
+  assert.equal(planStep.id, 'plan');
+  assert.equal(planStep.run, 'node scripts/secrets-migration/runtime-copy-run.mjs --plan');
+  assert.deepEqual(Object.keys(planStep.env), ['EXPECTED_COMMIT']);
+
   const job = wf.jobs.copy;
-  assert.equal(job.needs, 'environment-guard');
-  assert.equal(
-    job.if,
-    "github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'"
-  );
-  assert.equal(job.environment, ENVIRONMENT);
+  assert.equal(job.needs, 'plan');
+  assert.equal(job.if, guardIf);
+  assert.deepEqual(job.strategy, {
+    'max-parallel': 1,
+    'fail-fast': true,
+    matrix: { worker: '${{ fromJSON(needs.plan.outputs.workers) }}' },
+  });
+  assert.equal(job.environment, 'runtime-copy-${{ matrix.worker }}');
+  assert.equal(job.environment.replace('${{ matrix.worker }}', 'notifications'), ENVIRONMENT);
   assert.equal(job['runs-on'], 'ubuntu-24.04');
-  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read' });
+  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read', 'id-token': 'write' });
   for (const step of job.steps) {
     if (step.uses) assert.match(step.uses, /^[\w./-]+@[0-9a-f]{40}$/);
     if (step.run) assert.ok(!step.run.includes('${{'), `${step.name} interpolates into run`);
   }
-  assert.equal(job.steps[0].with['persist-credentials'], false);
+  assert.equal(job.steps[0].name, 'Check DEPLOY_TOKEN_SOURCE');
+  const checkout = job.steps.find(s => String(s.uses).startsWith('actions/checkout@'));
+  assert.equal(checkout.with['persist-credentials'], false);
   // The install restores setup-node's pnpm cache first (scripts/typecheck-ci.test.mjs rule).
   const install = job.steps.findIndex(s => /\bpnpm\b.*\binstall\b/.test(s.run ?? ''));
   const warm = job.steps.findIndex(
@@ -1641,24 +1593,348 @@ test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the
   assert.ok(warm >= 0 && warm < install, 'pnpm cache restored before the install');
   assert.equal(
     job.steps[install].run,
-    "pnpm install --frozen-lockfile --ignore-scripts --filter '{.}...' --filter kilocode-monorepo",
+    "pnpm install --frozen-lockfile --ignore-scripts --filter '{.}'",
     'no lifecycle scripts in the protected job'
   );
+
+  // Twins: the stored token only when DEPLOY_TOKEN_SOURCE is not `sts`, the STS token only when
+  // it is; each driver step sees exactly one Cloudflare credential and never the other.
+  const drivers = job.steps.filter(
+    s => s.run === 'node scripts/secrets-migration/runtime-copy-run.mjs'
+  );
+  assert.deepEqual(
+    drivers.map(s => [s.name, s.if, s.env.CLOUDFLARE_TOKEN_SOURCE, s.env.CLOUDFLARE_API_TOKEN]),
+    [
+      [
+        'Run the copier (stored token)',
+        "vars.DEPLOY_TOKEN_SOURCE != 'sts'",
+        'secret',
+        '${{ secrets.CLOUDFLARE_API_TOKEN }}',
+      ],
+      [
+        'Run the copier (STS token)',
+        "vars.DEPLOY_TOKEN_SOURCE == 'sts'",
+        'sts',
+        '${{ steps.sts.outputs.token }}',
+      ],
+    ]
+  );
+  for (const d of drivers) {
+    const sts = d.env.CLOUDFLARE_TOKEN_SOURCE === 'sts';
+    assert.deepEqual(Object.keys(d.env).sort(), [
+      'CLOUDFLARE_API_TOKEN',
+      ...(sts ? ['CLOUDFLARE_TOKEN_EXPIRES_AT'] : []),
+      'CLOUDFLARE_TOKEN_SOURCE',
+      'COPY_INDEX',
+      'COPY_WORKER',
+      'EXPECTED_COMMIT',
+      'GITHUB_TOKEN',
+      'M65_INFISICAL_CLIENT_ID',
+      'M65_INFISICAL_CLIENT_SECRET',
+      'M65_OPERATOR_PREFLIGHT',
+    ]);
+    assert.equal(d.env.COPY_WORKER, '${{ matrix.worker }}');
+    assert.equal(d.env.COPY_INDEX, '${{ strategy.job-index }}');
+    // The STS step carries the token expiry and stops before a 60-minute token is gone; the
+    // stored-token step runs under the job's 80 minutes.
+    assert.deepEqual(
+      [d.env.CLOUDFLARE_TOKEN_EXPIRES_AT, d['timeout-minutes']],
+      sts ? ['${{ steps.sts.outputs.expires_at }}', 58] : [undefined, undefined]
+    );
+  }
+  assert.equal(job['timeout-minutes'], 80);
   const withSecrets = job.steps.filter(s => JSON.stringify(s).includes('secrets.'));
   assert.deepEqual(
     withSecrets.map(s => s.name),
-    ['Run the copier']
+    drivers.map(s => s.name)
   );
-  const driver = withSecrets[0];
-  assert.equal(driver.run, 'node scripts/secrets-migration/m84-notifications-run.mjs');
-  assert.deepEqual(Object.keys(driver.env).sort(), [
-    'CLOUDFLARE_API_TOKEN',
-    'EXPECTED_COMMIT',
-    'GITHUB_TOKEN',
-    'M65_INFISICAL_CLIENT_ID',
-    'M65_INFISICAL_CLIENT_SECRET',
-    'M65_OPERATOR_PREFLIGHT',
-  ]);
+  const mint = job.steps.find(s => s.id === 'sts');
+  assert.deepEqual(
+    [mint.if, mint.env, mint.run],
+    [
+      "vars.DEPLOY_TOKEN_SOURCE == 'sts'",
+      { STS_ENVIRONMENT: 'production' },
+      'bash scripts/ci/sts-deploy-token.sh mint',
+    ]
+  );
+  const revoke = job.steps.at(-1);
+  assert.deepEqual(
+    [revoke.if, revoke.run],
+    [
+      "always() && steps.sts.outputs.token_id != ''",
+      'bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"',
+    ]
+  );
+  assert.ok(job.steps.indexOf(mint) < job.steps.indexOf(drivers[1]));
   assert.ok(!/deploy-workers-|deploy-production/.test(JSON.stringify(wf.concurrency)));
   assert.ok(!text.includes('upload-artifact'));
+});
+
+test('no environment readback: the workflow and the driver never call the environments API', async () => {
+  const text = readFileSync(
+    new URL('../../../.github/workflows/runtime-copy.yml', import.meta.url),
+    'utf8'
+  );
+  const driver = readFileSync(new URL('../runtime-copy-run.mjs', import.meta.url), 'utf8');
+  for (const source of [text, driver]) {
+    assert.ok(!/\/environments\b/.test(source), 'no environments API path');
+    assert.ok(!source.includes('deployment-branch-policies'));
+  }
+  // The plan job holds no token at all; only the copy drivers hold the job token, for the
+  // rollout guard.
+  const { load } = createRequire(import.meta.url)('js-yaml');
+  const wf = load(text);
+  assert.ok(!JSON.stringify(wf.jobs.plan).includes('github.token'));
+  assert.deepEqual(
+    wf.jobs.copy.steps.filter(s => JSON.stringify(s).includes('github.token')).map(s => s.name),
+    ['Run the copier (stored token)', 'Run the copier (STS token)']
+  );
+
+  // The run path, with the real GitHub client on a recording fetch: the plan makes no request at
+  // all, and a whole copy driver run asks GitHub only for rollout workflow runs.
+  const seen = [];
+  const recordingFetch = async url => {
+    seen.push(new URL(url).pathname);
+    return new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), { status: 200 });
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = recordingFetch;
+  try {
+    const plan = planMatrix({ env: baseEnv(), headSha: SHA, table: FIXTURE });
+    assert.equal(plan.ok, true, JSON.stringify(plan.failures));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(seen, [], 'the plan makes no request');
+
+  const gh = github({ token: 'synthetic-github-token', fetchImpl: recordingFetch });
+  assert.deepEqual(Object.keys(gh).sort(), ['activeRuns', 'runsCreated']);
+  const world = makeWorld();
+  const report = await run({ ...ioOf(world), gh, log: () => {} });
+  assert.equal(report.status, 'cloudflare_complete', JSON.stringify(report.gates));
+  assert.deepEqual(
+    await rolloutRunsDuring(gh, T0, T0 + 60_000),
+    ROLLOUT_WORKFLOWS.map(workflow => ({ workflow, total: 0, runs: [] }))
+  );
+  assert.ok(seen.length > 0);
+  for (const path of seen) {
+    assert.ok(!/\/environments\b|deployment-branch-policies/.test(path), path);
+    assert.match(path, /^\/repos\/Kilo-Org\/cloud\/actions\/workflows\/[\w.-]+\.yml\/runs$/);
+  }
+});
+
+test('plan job: the valid table and the dispatch identity, offline, else no matrix', async t => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = () => assert.fail('the plan makes no network call');
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  // The plan job holds no token.
+  const env = baseEnv();
+  delete env.GITHUB_TOKEN;
+  assert.deepEqual(planMatrix({ env, headSha: SHA, table: FIXTURE }), {
+    gate: 'plan',
+    ok: true,
+    failures: [],
+    workers: ['notifications'],
+  });
+  const offline = planMatrix({
+    env: { ...env, GITHUB_REF: 'refs/heads/feature' },
+    headSha: SHA,
+    table: FIXTURE,
+  });
+  assert.deepEqual([offline.ok, offline.failures, offline.workers], [false, ['ref'], []]);
+  const commit = planMatrix({
+    env: { ...env, EXPECTED_COMMIT: 'd'.repeat(40) },
+    headSha: SHA,
+    table: FIXTURE,
+  });
+  assert.deepEqual([commit.ok, commit.failures, commit.workers], [false, ['expected_commit'], []]);
+});
+
+// The operator readback's writer expires at T0 + 41.5 min: not-before T0 + 24, not-after T0 + 39,
+// result deadline T0 + 42.
+const stsEnv = expiresMs => ({
+  CLOUDFLARE_TOKEN_SOURCE: 'sts',
+  CLOUDFLARE_TOKEN_EXPIRES_AT: new Date(expiresMs).toISOString(),
+});
+
+test('STS token: refused at start unless it outlives the result deadline by 8 minutes', async () => {
+  const operator = operatorMeta();
+  const ok = planRun(baseEnv(stsEnv(T0 + 50 * 60_000)), operator, T0);
+  assert.deepEqual(
+    [ok.resultDeadline, ok.tokenAbortAt],
+    [T0 + 42 * 60_000, T0 + 43 * 60_000],
+    'aborts into cleanup 7 minutes before expiry'
+  );
+  assert.deepEqual(planRun(baseEnv(stsEnv(T0 + 50 * 60_000 - 1)), operator, T0), {
+    problem: 'token_expires_too_soon',
+  });
+  // The stored token has no expiry: nothing to refuse, nothing to abort for.
+  assert.equal(planRun(baseEnv(), operator, T0).tokenAbortAt, Infinity);
+  for (const [env, problem] of [
+    [{ CLOUDFLARE_TOKEN_SOURCE: 'sts' }, 'token_expiry'],
+    [{ CLOUDFLARE_TOKEN_SOURCE: 'sts', CLOUDFLARE_TOKEN_EXPIRES_AT: 'soon' }, 'token_expiry'],
+    [stsEnv(T0 + 45 * 60_000), 'token_expires_too_soon'],
+  ]) {
+    const { world, report } = await drive({}, env);
+    assert.deepEqual([report.status, report.problems], ['refused', [problem]]);
+    assert.deepEqual(world.calls, [], 'no Cloudflare, GitHub or process call');
+  }
+});
+
+test('STS token: a run inside the token lifetime completes and reports the abort time', async () => {
+  const { report } = await drive({}, stsEnv(T0 + 60 * 60_000));
+  assert.equal(report.status, 'cloudflare_complete', JSON.stringify(report.gates));
+  assert.deepEqual([report.tokenSource, report.tokenAbortAt], ['sts', iso(T0 + 53 * 60_000)]);
+});
+
+test('STS token: past expiry - 7 min no phase starts; the armed copier is deleted, nothing read', async () => {
+  const { world, report } = await drive(
+    { onPut: w => (w.clock.t = T0 + 53 * 60_000) },
+    stsEnv(T0 + 60 * 60_000)
+  );
+  assert.equal(report.stopReason, 'token_expiry_abort');
+  assert.equal(report.armWrite, 'proved');
+  assert.equal(report.phases.at(-1).name, 'arm_readback');
+  assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
+  assert.equal(report.cleanup.scriptStatus, 404);
+  assert.equal(report.cleanup.gate.ok, true, 'the full cleanup ran while the token was alive');
+  assert.deepEqual([world.readLog.length, world.infisical.calls.length], [0, 0]);
+  assert.equal(exitCode(report), 1);
+});
+
+test('plan: the cleanup deadline is the earlier of the step limit and the token expiry, minus slack', () => {
+  const operator = operatorMeta();
+  const slack = TIMING.cleanupSlackMs;
+  assert.equal(
+    planRun(baseEnv(), operator, T0).cleanupDeadline,
+    T0 + TIMING.stepLimitMs.secret - slack
+  );
+  assert.equal(
+    planRun(baseEnv(stsEnv(T0 + 60 * 60_000)), operator, T0).cleanupDeadline,
+    T0 + TIMING.stepLimitMs.sts - slack,
+    'the 58-minute step ends before a 60-minute token'
+  );
+  assert.equal(
+    planRun(baseEnv(stsEnv(T0 + 50 * 60_000)), operator, T0).cleanupDeadline,
+    T0 + 50 * 60_000 - slack,
+    'a token that ends first bounds cleanup'
+  );
+});
+
+test('cleanup deadline: the snapshot stops reading, drift is not_read_by_deadline, the gate fails', async () => {
+  const id = randomUUID();
+  const names = Array.from({ length: 30 }, (_, i) => `w-${String(i).padStart(2, '0')}`);
+  const world = (startMs, deadlineMs) => {
+    const clock = { t: startMs, now: () => clock.t };
+    const reads = [];
+    let present = true;
+    const cf = {
+      async deploymentVersions(name, opts) {
+        reads.push([name, opts?.timeoutMs]);
+        if (name === COPIER) return present ? [{ version_id: id, percentage: 100 }] : null;
+        clock.t += 10_000;
+        return [{ version_id: randomUUID(), percentage: 100 }];
+      },
+      async deleteScript(_name, opts) {
+        reads.push(['delete', opts?.timeoutMs]);
+        present = false;
+      },
+      async scriptStatus() {
+        return present ? 200 : 404;
+      },
+      async doNamespaces() {
+        return [];
+      },
+      async scriptNames() {
+        return names;
+      },
+    };
+    const state = {
+      created: true,
+      recorded: new Set([id]),
+      before: {},
+      plan: { notBefore: T0 - 1, cleanupDeadline: deadlineMs },
+      since: T0,
+      copier: COPIER,
+      source: 'notifications',
+    };
+    return { io: { cf, gh: {}, clock, sleep: async () => {} }, state, reads };
+  };
+
+  // The deadline falls inside the snapshot: the copier is deleted, the snapshot stops reading.
+  const mid = world(T0, T0 + 60_000);
+  const cut = await cleanup(mid.io, mid.state);
+  assert.deepEqual(
+    [cut.deleted, cut.scriptStatus, cut.drift, cut.deadlineReached, cut.gate.ok],
+    [true, 404, 'not_read_by_deadline', true, false]
+  );
+  assert.deepEqual(cut.errors, ['snapshot:deadline']);
+  const scanned = mid.reads.filter(([n]) => n.startsWith('w-'));
+  assert.ok(scanned.length > 0 && scanned.length < names.length, `${scanned.length} reads`);
+  assert.ok(
+    mid.reads.every(([, t]) => t <= 60_000),
+    'every read capped at the time left'
+  );
+
+  // Already past the deadline: one read and one delete with the short timeout, nothing else.
+  const late = world(T0 + 2 * 60_000, T0 + 60_000);
+  const after = await cleanup(late.io, late.state);
+  const q = TIMING.abortCallTimeoutMs;
+  assert.deepEqual(late.reads, [
+    [COPIER, q],
+    ['delete', q],
+  ]);
+  assert.deepEqual(
+    [after.deleted, after.drift, after.deadlineReached, after.errors, after.gate.ok],
+    [true, 'not_read_by_deadline', true, ['status:deadline', 'snapshot:deadline'], false]
+  );
+});
+
+test('cleanup deadline in a run: the report is still complete and the entry fails as token_expiry_abort', async () => {
+  // The STS step's limit ends cleanup at T0 + 57 min; the cleanup snapshot (the third) starts at
+  // T0 + 58 min, so its reads are cut off.
+  const { world, report } = await drive(
+    {
+      onSnapshot: (w, n) => {
+        if (n === 3) w.clock.t = T0 + 58 * 60_000;
+      },
+    },
+    stsEnv(T0 + 60 * 60_000)
+  );
+  assert.ok(report.finalReceipt, 'the copy itself completed');
+  assert.deepEqual(
+    [report.status, report.stopReason, report.firstStopReason],
+    ['stopped', 'token_expiry_abort', undefined]
+  );
+  assert.deepEqual(
+    [report.cleanup.scriptStatus, report.cleanup.drift, report.cleanup.gate.ok],
+    [404, 'not_read_by_deadline', false]
+  );
+  assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
+  assert.equal(JSON.parse(JSON.stringify(report)).stopReason, 'token_expiry_abort');
+  assert.equal(exitCode(report), 1);
+});
+
+test('the in-run snapshots (before, and the pre-arm drift check) read one transient error again', async () => {
+  // Scan 1 is the before snapshot and 2 the pre-arm one; a failing scan's retry takes the next
+  // number, so either way the run makes four scans (cleanup included).
+  for (const failing of [1, 2]) {
+    const { world, report } = await drive({
+      onSnapshot: (_w, n) => {
+        if (n === failing) throw new StopError('cloudflare_transport');
+      },
+    });
+    assert.equal(report.status, 'cloudflare_complete', `${failing}: ${report.stopReason}`);
+    assert.equal(exitCode(report), 0);
+    assert.equal(world.calls.filter(c => c[1] === 'scriptNames').length, 4, `${failing}`);
+  }
+  // A second failure of the same scan is not retried again.
+  const { report } = await drive({
+    onSnapshot: (_w, n) => {
+      if (n === 1 || n === 2) throw new StopError('cloudflare_transport');
+    },
+  });
+  assert.deepEqual([report.status, report.stopReason], ['stopped', 'cloudflare_transport']);
 });

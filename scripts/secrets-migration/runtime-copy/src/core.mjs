@@ -1,10 +1,13 @@
-// Runtime core of the temporary Notifications copier Worker. One cron tick decides, in order:
+// Runtime core of the temporary runtime copier Worker (one per source Worker). One cron tick
+// decides, in order:
 //   batch, env, pins and cron checks (refused) -> writer secret absent (unarmed receipt) ->
 //   window closed (idle receipt) -> durable one-time gate (Durable Object insert) -> one Universal
 //   Auth login -> per row: one binding read, storable and parity checks, one Create-only POST ->
 //   after the last row or the first stop: one revoke and one denial probe.
-// M108: the batch is exactly one reviewed target (REVIEWED_TARGETS), the Expo token. The writer's
-// access token has two uses: the one create and the denial probe.
+// M122: the batches come from the reviewed row table (table.mjs, `validateTable`): one batch per
+// source Worker, Create-only targets in that Worker's one `/workloads/<folder>`, plus (M142) only
+// the exact `/shared/<KEY>` targets of SHARED_TARGETS, each created by one matrix entry.
+// The writer's access token has rows + 1 uses: one per create and the denial probe.
 // Nothing reads a binding or calls Infisical before the gate admits this run once. Receipts carry
 // names, booleans and fixed flags only: no value, digest, credential, id or provider response.
 
@@ -12,15 +15,14 @@ export const API_BASE = 'https://eu.infisical.com';
 export const PROJECT_ID = '8cf601df-1c5a-4c8f-9e21-7e9af6728b06'; // EU project "kilo"
 export const RECEIPT_SCHEMA = 'm65-copy-receipt/1';
 export const CRON = '* * * * *';
-export const REVIEWED_BATCH_ID = 'm65-notifications-expo-production-1';
-export const ALLOWED_STORE_ID = '342a86d9e3a94da698e82d0c6e2a36f0';
-// The only Infisical targets this copier may create (M108). The other three Notifications values
-// come from 1Password through secrets-cutover and would collide on Create-only.
-export const REVIEWED_TARGETS = Object.freeze([
-  '/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN',
-]);
+// Every source Worker and copier lives in this one Cloudflare account.
+export const ACCOUNT_ID = 'e115e769bcdd4c3d66af59d3332cb394';
+// Reviewed Secrets Store ids a table row may read from.
+export const ALLOWED_STORE_IDS = Object.freeze(['342a86d9e3a94da698e82d0c6e2a36f0']);
+export const MAX_ROWS_PER_WORKER = 16;
 export const RUN_VARS = Object.freeze([
   'M65_RUN_ID',
+  'M65_BATCH',
   'M65_NOT_BEFORE',
   'M65_NOT_AFTER',
   'M65_INFISICAL_CLIENT_ID',
@@ -39,13 +41,27 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 export const PIN_FORMAT = Object.freeze({
   M65_RUN_ID: /^m65-[a-z0-9-]{8,60}$/,
+  M65_BATCH: /^[a-z][a-z0-9-]{0,53}$/,
   M65_NOT_BEFORE: /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/,
   M65_NOT_AFTER: /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/,
   M65_INFISICAL_CLIENT_ID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 });
 export const VERSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const WORKER = PIN_FORMAT.M65_BATCH;
 const BINDING = /^[A-Z][A-Z0-9_]{0,63}$/;
 const KEY = /^[A-Z][A-Z0-9_]{0,127}$/;
+// A Create-only target: a key in one workload folder. /shared never matches.
+const TARGET = /^\/workloads\/[a-z0-9][a-z0-9-]{0,62}\/[A-Z][A-Z0-9_]{0,127}$/;
+// M142: the only /shared targets a copy may create, each exactly (path and key). Any other /shared
+// target is refused. The table creates each once, from the first table Worker that binds it.
+export const SHARED_TARGETS = Object.freeze([
+  '/shared/AUTO_ROUTING_DECISION_SECRET',
+  '/shared/O11Y_CF_AE_API_TOKEN',
+]);
+
+/** The reviewed batch id and copier script name of a source Worker. */
+export const batchId = worker => `m65-${worker}-production-1`;
+export const copierName = worker => `m65-${worker}-copy`;
 
 const own = (o, k) =>
   o !== null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k)
@@ -72,15 +88,25 @@ export function windowOf(pins) {
     : null;
 }
 
-// Structural closure of a batch. Exact equality with the tracked source is checked offline and at
-// live preflight (checks.mjs); this keeps any other batch shape or target out of the deployed module.
+// Structural closure of one Worker's batch. Equality with the reviewed table and the tracked source
+// is checked offline and at live preflight (checks.mjs); this keeps any other batch shape or
+// target out of the deployed module.
 export function validateBatch(batch) {
-  if (own(batch, 'id') !== REVIEWED_BATCH_ID || own(batch, 'environment') !== 'production') {
+  const worker = own(batch, 'sourceScript');
+  if (
+    !WORKER.test(String(worker)) ||
+    own(batch, 'id') !== batchId(worker) ||
+    own(batch, 'environment') !== 'production' ||
+    own(batch, 'accountId') !== ACCOUNT_ID
+  ) {
     return 'batch_not_reviewed';
   }
   const rows = own(batch, 'rows');
-  if (!Array.isArray(rows) || rows.length !== REVIEWED_TARGETS.length) return 'batch_row_count';
-  const targets = new Set();
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_ROWS_PER_WORKER) {
+    return 'batch_row_count';
+  }
+  const seen = new Set();
+  let folder;
   for (const r of rows) {
     if (own(r, 'kind') === 'secret_text') return 'secret_text_not_cross_script';
     if (own(r, 'kind') !== 'secrets_store') return 'row_kind_unsupported';
@@ -88,18 +114,140 @@ export function validateBatch(batch) {
     if (!BINDING.test(binding) || [...FIXED_ENV, WRITER_SECRET].includes(binding)) {
       return 'row_binding_invalid';
     }
-    if (own(r, 'storeId') !== ALLOWED_STORE_ID) return 'row_store_not_allowed';
+    if (!ALLOWED_STORE_IDS.includes(own(r, 'storeId'))) return 'row_store_not_allowed';
     if (!KEY.test(String(own(r, 'secretName'))) || !KEY.test(String(own(r, 'secretKey')))) {
       return 'row_name_invalid';
     }
-    // A target is the STS lookup name: never a store name, never an environment-suffixed name.
-    if (rows.some(x => own(x, 'secretName') === r.secretKey)) return 'row_target_is_store_name';
-    if (/_(PROD|DEV|STAGING)$/.test(r.secretKey)) return 'row_target_environment_suffix';
     const target = `${own(r, 'secretPath')}/${r.secretKey}`;
-    if (!REVIEWED_TARGETS.includes(target) || targets.has(target)) return 'row_target_not_reviewed';
-    targets.add(target);
+    const shared = SHARED_TARGETS.includes(target);
+    if (!shared && !TARGET.test(target)) return 'row_target_not_allowed';
+    if (!shared) {
+      folder ??= own(r, 'secretPath');
+      if (own(r, 'secretPath') !== folder) return 'row_target_folders';
+    }
+    // A target is the STS lookup name: never another row's store name (its own may equal it, as
+    // `WORKOS_API_KEY` -> `WORKOS_API_KEY`), never an environment-suffixed name.
+    if (rows.some(x => x !== r && own(x, 'secretName') === r.secretKey)) {
+      return 'row_target_is_store_name';
+    }
+    if (/_(PROD|DEV|STAGING)$/.test(r.secretKey)) return 'row_target_environment_suffix';
+    for (const k of [`b:${binding}`, `s:${r.secretName}`, `t:${target}`]) {
+      if (seen.has(k)) return 'row_duplicate';
+      seen.add(k);
+    }
   }
   return null;
+}
+
+const TABLE_ROW_KEYS = ['binding', 'secretName', 'storeId', 'target', 'worker'];
+
+/**
+ * The reviewed row table (worker | binding | store/secret | Infisical target), validated as a
+ * whole before anything else uses it: one row per target and no duplicate target anywhere (so a
+ * shared target is created by one row only), only reviewed store ids, no /shared target except the
+ * exact SHARED_TARGETS, at most one workload folder per Worker and no workload folder shared by two
+ * Workers, at most MAX_ROWS_PER_WORKER rows per Worker, and every Worker's batch closed under
+ * `validateBatch`. Returns names-only problem codes; empty when the table is usable.
+ */
+export function validateTable(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return ['table_empty'];
+  const f = [];
+  const targets = new Set();
+  const pairs = new Set();
+  const folders = new Map();
+  rows.forEach((r, i) => {
+    const bad = code => f.push(`row_${i}_${code}`);
+    if (
+      r === null ||
+      typeof r !== 'object' ||
+      Array.isArray(r) ||
+      Object.keys(r).sort().join() !== TABLE_ROW_KEYS.join()
+    ) {
+      bad('shape');
+      return;
+    }
+    const { worker, binding, storeId, secretName, target } = r;
+    if (!WORKER.test(String(worker))) bad('worker_invalid');
+    if (!BINDING.test(String(binding)) || [...FIXED_ENV, WRITER_SECRET].includes(binding)) {
+      bad('binding_invalid');
+    }
+    if (!ALLOWED_STORE_IDS.includes(storeId)) bad('store_not_reviewed');
+    if (!KEY.test(String(secretName))) bad('store_secret_invalid');
+    const shared = SHARED_TARGETS.includes(target);
+    if (!shared && typeof target === 'string' && /^\/shared(\/|$)/.test(target)) {
+      bad('target_shared');
+    } else if (!shared && !TARGET.test(String(target))) bad('target_invalid');
+    if (targets.has(target)) bad('target_duplicate');
+    targets.add(target);
+    if (pairs.has(`${worker}|${binding}`)) bad('binding_duplicate');
+    pairs.add(`${worker}|${binding}`);
+    if (typeof target === 'string' && !shared) {
+      const set = folders.get(worker) ?? new Set();
+      set.add(target.slice(0, target.lastIndexOf('/')));
+      folders.set(worker, set);
+    }
+  });
+  const owner = new Map();
+  for (const [worker, set] of folders) {
+    if (set.size > 1) f.push(`worker_${WORKER.test(String(worker)) ? worker : 'invalid'}_folders`);
+    for (const folder of set) {
+      if (owner.has(folder) && owner.get(folder) !== worker) f.push('table_folder_shared');
+      owner.set(folder, worker);
+    }
+  }
+  if (f.length > 0) return [...new Set(f)];
+  for (const [worker, batch] of Object.entries(batchesOf(rows))) {
+    const problem = validateBatch(batch);
+    if (problem) f.push(`worker_${worker}_${problem}`);
+  }
+  return f;
+}
+
+const freeze = o => {
+  for (const v of Object.values(o)) if (v && typeof v === 'object') freeze(v);
+  return Object.freeze(o);
+};
+
+/**
+ * One batch per source Worker, in table order. Call only on rows `validateTable` passed (its own
+ * last step is the one exception: the shape is already checked there).
+ */
+export function batchesOf(rows) {
+  const out = Object.create(null);
+  for (const r of rows) {
+    const cut = r.target.lastIndexOf('/');
+    out[r.worker] ??= {
+      id: batchId(r.worker),
+      accountId: ACCOUNT_ID,
+      sourceScript: r.worker,
+      environment: 'production',
+      rows: [],
+    };
+    out[r.worker].rows.push({
+      kind: 'secrets_store',
+      binding: r.binding,
+      storeId: r.storeId,
+      secretName: r.secretName,
+      secretPath: r.target.slice(0, cut),
+      secretKey: r.target.slice(cut + 1),
+    });
+  }
+  return freeze(out);
+}
+
+/**
+ * The reviewed table as one frozen value: its rows, its problems, one batch per Worker (none when
+ * any problem exists, so nothing can run) and the Workers in table order (the workflow's matrix).
+ */
+export function tableOf(rows) {
+  const problems = Object.freeze(validateTable(rows));
+  const batches = problems.length === 0 ? batchesOf(rows) : Object.freeze(Object.create(null));
+  return Object.freeze({
+    rows: Object.freeze(Array.isArray(rows) ? [...rows] : []),
+    problems,
+    batches,
+    workers: Object.freeze(Object.keys(batches)),
+  });
 }
 
 // Infisical's v4 create schema stores `val.at(-1) === "\n" ? `${val.trim()}\n` : val.trim()`.
@@ -331,8 +479,9 @@ async function createRow(fetchImpl, accessToken, batch, row, value) {
   return out.echo === 'differs' ? { out, stop: 'stored_echo_mismatch' } : { out, stop: null };
 }
 
-// One revoke, then one probe with the same token. With accessTokenNumUsesLimit = 2 (the one create
-// and this probe), a revoked token answers 401 and an unrevoked create-only token answers 403.
+// One revoke, then one probe with the same token. With accessTokenNumUsesLimit = rows + 1 (one per
+// create plus this probe), a revoked token answers 401 and an unrevoked create-only token answers
+// 403.
 async function revokeAndProve(fetchImpl, accessToken, batch) {
   const r = { revoked: false, denialProved: false };
   try {
@@ -370,7 +519,10 @@ function preGate(env, batch, cron) {
   const keys = Object.keys(env).sort();
   const want = expectedEnvKeys(batch, armed);
   const ready = {
-    pins: RUN_VARS.every(k => PIN_FORMAT[k].test(String(env[k]))) && windowOf(env) !== null,
+    pins:
+      RUN_VARS.every(k => PIN_FORMAT[k].test(String(env[k]))) &&
+      env.M65_BATCH === batch.sourceScript &&
+      windowOf(env) !== null,
     envClosed: keys.length === want.length && keys.every((k, i) => k === want[i]),
     bindings: batch.rows.every(r => typeof env[r.binding]?.get === 'function'),
     gate: typeof env.M65_GATE?.idFromName === 'function',

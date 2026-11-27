@@ -22,7 +22,7 @@
     "test:kilo-mcp-release": "node --test scripts/kilo-mcp-release.test.mjs",
     "test:kilo-extension-release": "node --test 'scripts/kilo-extension-*.test.mjs'",
     "test:validate": "node --test scripts/validate.test.mjs",
-    "test:secrets-migration": "tsx --test 'scripts/secrets-migration/notifications-copy/*.test.mjs'",
+    "test:secrets-migration": "tsx --test 'scripts/secrets-migration/runtime-copy/*.test.mjs'",
     "lint": "scripts/lint-all.sh",
     "lint:workflows": "scripts/zizmor.sh",
     "format": "oxfmt",

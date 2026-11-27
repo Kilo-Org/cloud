@@ -3,16 +3,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  REVIEWED_TARGETS,
   infisicalStoredForm,
   runTick,
   serializationParity,
   utf8Parity,
   validateBatch,
 } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
 import { parseReceipt } from './checks.mjs';
 import {
+  BATCH,
   fakeGateNamespace,
   fakeInfisical,
   iso,
@@ -20,6 +19,10 @@ import {
   makeEnv,
   syntheticValues,
 } from './fakes.mjs';
+
+// The checked-in table's one Notifications target.
+const TARGET = `${BATCH.rows[0].secretPath}/${BATCH.rows[0].secretKey}`;
+const REVIEWED_TARGETS = [TARGET];
 
 const T0 = Date.parse('2026-11-27T16:00:00Z');
 const NOT_BEFORE = iso(T0 - 60_000);
@@ -72,7 +75,7 @@ async function tick(o = {}) {
     'only eu.infisical.com, redirects not followed'
   );
   if (!o.batch) {
-    const parsed = parseReceipt(text);
+    const parsed = parseReceipt(text, BATCH);
     assert.deepEqual(parsed.failures, [], 'the receipt passes the shared parser');
   }
   return { receipt, fake, readLog, gate, values, env };
@@ -232,9 +235,18 @@ test('batch closure: secret_text rows, other targets and other batch shapes are 
   assert.equal(validateBatch(BATCH), null);
   assert.equal(validateBatch(withRow({ kind: 'secret_text' })), 'secret_text_not_cross_script');
   assert.equal(validateBatch(withRow({ storeId: '0'.repeat(32) })), 'row_store_not_allowed');
-  assert.equal(validateBatch(withRow({ secretPath: '/ci' })), 'row_target_not_reviewed');
+  assert.equal(validateBatch(withRow({ secretPath: '/ci' })), 'row_target_not_allowed');
+  assert.equal(validateBatch(withRow({ secretPath: '/shared' })), 'row_target_not_allowed');
+  // A target may equal its own row's store name, never another row's.
+  assert.equal(validateBatch(withRow({ secretKey: 'EXPO_ACCESS_TOKEN' })), null);
   assert.equal(
-    validateBatch(withRow({ secretKey: 'EXPO_ACCESS_TOKEN' })),
+    validateBatch({
+      ...BATCH,
+      rows: [
+        ...BATCH.rows,
+        { ...BATCH.rows[0], binding: 'OTHER', secretName: BATCH.rows[0].secretKey, secretKey: 'K' },
+      ],
+    }),
     'row_target_is_store_name'
   );
   assert.equal(
@@ -251,15 +263,12 @@ test('batch closure: secret_text rows, other targets and other batch shapes are 
   );
 });
 
-test('M108: the three 1Password-sourced targets can never join the copy batch', () => {
-  assert.deepEqual(REVIEWED_TARGETS, ['/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN']);
-  const excluded = [
-    {
-      binding: 'APNS_PRIVATE_KEY',
-      secretName: 'APNS_PRIVATE_KEY_PROD',
-      secretPath: '/workloads/notifications',
-      secretKey: 'NOTIFICATIONS_APNS_PRIVATE_KEY',
-    },
+test('M108: the fixture batch is the Expo target; the /shared names are never targets', () => {
+  assert.deepEqual(
+    BATCH.rows.map(r => `${r.secretPath}/${r.secretKey}`),
+    ['/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN']
+  );
+  const shared = [
     {
       binding: 'NEXTAUTH_SECRET',
       secretName: 'NEXTAUTH_SECRET_PROD',
@@ -273,15 +282,28 @@ test('M108: the three 1Password-sourced targets can never join the copy batch', 
       secretKey: 'INTERNAL_API_SECRET',
     },
   ].map(r => ({ ...BATCH.rows[0], ...r }));
-  for (const row of excluded) {
+  for (const row of shared) {
+    assert.equal(validateBatch({ ...BATCH, rows: [row] }), 'row_target_not_allowed', row.secretKey);
     assert.equal(
-      validateBatch({ ...BATCH, rows: [row] }),
-      'row_target_not_reviewed',
+      validateBatch({ ...BATCH, rows: [...BATCH.rows, row] }),
+      'row_target_not_allowed',
       row.secretKey
     );
-    assert.equal(validateBatch({ ...BATCH, rows: [...BATCH.rows, row] }), 'batch_row_count');
   }
-  assert.equal(validateBatch({ ...BATCH, rows: [BATCH.rows[0], ...excluded] }), 'batch_row_count');
+  // The APNs target sits in the same folder: only the table keeps it out (checks.mjs
+  // `checkSource` refuses any batch that is not the table's).
+  assert.equal(
+    validateBatch({
+      ...BATCH,
+      rows: Array.from({ length: 17 }, (_, i) => ({
+        ...BATCH.rows[0],
+        binding: `B${i}`,
+        secretName: `S${i}`,
+        secretKey: `NOTIFICATIONS_K${i}`,
+      })),
+    }),
+    'batch_row_count'
+  );
 });
 
 test('byte and serialization parity: true and false paths', () => {

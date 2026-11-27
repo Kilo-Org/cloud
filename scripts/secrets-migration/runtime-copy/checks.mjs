@@ -1,39 +1,38 @@
 #!/usr/bin/env node
-// Runner-side gates for the temporary Notifications copier: tracked-source match, rendered config,
-// the receipt parser, and the preflight, post-run and cleanup gates over names-only metadata.
-// Pure functions; no Cloudflare runtime import, no credential, no value.
+// Runner-side gates for the temporary runtime copiers (one per source Worker of the reviewed row
+// table): table and tracked-source match, rendered config, the receipt parser, and the preflight,
+// post-run and cleanup gates over names-only metadata. Pure functions; no Cloudflare runtime
+// import, no credential, no value. Every gate takes the source Worker's batch explicitly.
 //
-//   node scripts/secrets-migration/notifications-copy/checks.mjs <gate>  < input.json
-//   gates: source (no input) | config | receipt | preflight | postrun | cleanup
+//   node scripts/secrets-migration/runtime-copy/checks.mjs source|table      (every table Worker)
+//   node scripts/secrets-migration/runtime-copy/checks.mjs <gate> <worker>  < input.json
+//   gates: config | receipt | preflight | postrun | cleanup (and their -cloudflare/-infisical halves)
 // stdout: one JSON verdict {gate, ok, failures, ...}; exit 0 ok, 1 failed, 2 usage or unreadable.
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ALLOWED_STORE_ID,
+  ACCOUNT_ID,
+  ALLOWED_STORE_IDS,
   CRON,
   OUTCOMES,
   PIN_FORMAT,
   RECEIPT_SCHEMA,
   RUN_VARS,
+  SHARED_TARGETS,
   VERSION_ID,
   WRITER_SECRET,
+  copierName,
   newReceipt,
   validateBatch,
   windowOf,
 } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
-import {
-  COMPATIBILITY_DATE,
-  COPIER_NAME,
-  REPO_ROOT,
-  SRC_DIR,
-  buildConfig,
-} from './render-config.mjs';
+import { TABLE } from './src/table.mjs';
+import { COMPATIBILITY_DATE, REPO_ROOT, SRC_DIR, buildConfig } from './render-config.mjs';
 
-export const MODULES = Object.freeze(['worker.mjs', 'core.mjs', 'manifest.mjs']);
+export const MODULES = Object.freeze(['worker.mjs', 'core.mjs', 'table.mjs']);
 const ACCESS_TOKEN_TTL_S = 300;
 const CLIENT_SECRET_GRACE_MS = 15 * 60_000;
 
@@ -70,10 +69,25 @@ const canon = v =>
       : v;
 const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 
-export const folderFor = secretKey =>
-  secretKey.startsWith('NOTIFICATIONS_') ? '/workloads/notifications' : '/shared';
+// STS resolves a lookup name from the Worker's own `/workloads/<workload>` folder first, then from
+// `/shared` (services/sts/src/bundle/resolve.ts `resolveWorkloadSecrets`). These lookup names are
+// shared by several Workers and live in /shared; every other lookup name of a Worker lives in its
+// own folder. A copy row is a names row in the own folder or an exact core.mjs SHARED_TARGETS entry
+// (M142), so no copy can create one of these names in a workload folder, where it would shadow the
+// /shared value for that Worker.
+export const SHARED_KEYS = Object.freeze([
+  'NEXTAUTH_SECRET',
+  'INTERNAL_API_SECRET',
+  'OPENROUTER_API_KEY',
+  'O11Y_CF_AE_API_TOKEN',
+  'AUTO_ROUTING_DECISION_SECRET',
+]);
 
-// Minimal reader for the policy file's flat shape (scalars, lists of scalars, identity.kind).
+// Minimal reader for the policy file's flat shape: scalars, block lists of scalars, flow lists of
+// plain names (`secrets: [A, B]`, `secrets: []`) and identity.kind. Anything else throws, and so
+// does a scalar under a list key, so a list it cannot read is never taken as empty.
+const FLOW_ITEM = /^[A-Za-z0-9_.-]+$/;
+const LIST_KEYS = new Set(['secrets', 'environments']);
 export function parsePolicy(text) {
   const p = { lists: {} };
   let list = null;
@@ -83,11 +97,19 @@ export function parsePolicy(text) {
     let m;
     if ((m = /^([a-z_]+):\s*(\S.*)?$/.exec(line))) {
       list = block = null;
-      if (m[2] !== undefined) p[m[1]] = m[2].trim();
-      else {
+      const value = m[2]?.trim();
+      if (value === undefined) {
         list = block = m[1];
         p.lists[list] = [];
-      }
+      } else if (value.startsWith('[')) {
+        const flow = /^\[(.*)\]$/.exec(value);
+        if (!flow) throw new Error('policy flow list not recognized');
+        const items = flow[1].trim() === '' ? [] : flow[1].split(',').map(s => s.trim());
+        if (!items.every(s => FLOW_ITEM.test(s)))
+          throw new Error('policy flow list not recognized');
+        p.lists[m[1]] = items;
+      } else if (LIST_KEYS.has(m[1])) throw new Error('policy list not recognized');
+      else p[m[1]] = value;
     } else if ((m = /^\s+-\s+(\S+)\s*$/.exec(line)) && list) p.lists[list].push(m[1]);
     else if ((m = /^\s+([a-z_]+):\s*(\S+)\s*$/.exec(line)) && block) {
       p[`${block}.${m[1]}`] = m[2];
@@ -103,6 +125,15 @@ const storeRows = bindings =>
     .map(b => ({ binding: b.name, storeId: b.store_id, secretName: b.secret_name }));
 const bindingRows = rows =>
   rows.map(r => ({ binding: r.binding, storeId: r.storeId, secretName: r.secretName }));
+const byBinding = rows =>
+  [...rows].sort((a, b) => (a.binding < b.binding ? -1 : a.binding > b.binding ? 1 : 0));
+/** Every Secrets Store binding a Worker's production config holds: its names plus legacy rows. */
+const sourceStoreRows = src => [
+  ...bindingRows(src?.names ?? []),
+  ...bindingRows(src?.legacyStoreBindings ?? []),
+];
+/** Store binding rows (binding, storeId, secretName) equal as sets, in any order. */
+const sameStoreRows = (a, b) => same(byBinding(a), byBinding(b));
 const nameRow = r => ({
   binding: r.binding,
   storeId: r.storeId,
@@ -110,48 +141,325 @@ const nameRow = r => ({
   secretPath: r.secretPath,
   secretKey: r.secretKey,
 });
+const STORE = ALLOWED_STORE_IDS[0];
+const names = rows =>
+  Object.freeze(
+    rows.map(([binding, secretName, secretPath, secretKey]) =>
+      Object.freeze({ binding, storeId: STORE, secretName, secretPath, secretKey })
+    )
+  );
+const legacy = rows =>
+  Object.freeze(
+    rows.map(([binding, secretName]) => Object.freeze({ binding, storeId: STORE, secretName }))
+  );
+const NONE = Object.freeze([]);
+const NO_ALIASES = Object.freeze({});
 
 /**
- * M89b: all four Notifications Secrets Store bindings with their STS lookup name (= Infisical
- * target key) and folder. This is the name proof for every target, including the three that
- * secrets-cutover writes from 1Password (M108); the copy batch (manifest.mjs) is the one row of
- * it this copier creates. It must equal the production Wrangler config, the reader map and the
- * STS policy exactly (`checkSource`).
+ * M89b per source Worker, from its tracked files: `names` is every Secrets Store binding of its
+ * production config that its reader routes, with the STS lookup name (= Infisical target key) and
+ * folder; `legacyStoreBindings` the store bindings its reader does not route (they stay on the
+ * binding); `plainSecrets` the reader keys bound to plain Worker secrets (no copier route, M68); the
+ * reader module, its map and read function; the STS policy; the reviewed aliases (reader key ->
+ * binding where they differ). `checkSource` holds each entry to the tracked files; a copy batch's
+ * rows must be rows of its Worker's `names` in its own folder. A table Worker without an entry here
+ * is refused (`worker_source_unreviewed`). Notifications stays as the reviewed source of the
+ * separate one-shot Expo run and as the test fixture; it has no row in this table.
  */
-export const NAME_MAP = Object.freeze(
-  [
-    [
-      'APNS_PRIVATE_KEY',
-      'APNS_PRIVATE_KEY_PROD',
-      '/workloads/notifications',
-      'NOTIFICATIONS_APNS_PRIVATE_KEY',
-    ],
-    [
-      'EXPO_ACCESS_TOKEN',
-      'EXPO_ACCESS_TOKEN',
-      '/workloads/notifications',
-      'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
-    ],
-    ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
-    ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
-  ].map(([binding, secretName, secretPath, secretKey]) =>
-    Object.freeze({ binding, storeId: ALLOWED_STORE_ID, secretName, secretPath, secretKey })
-  )
-);
-
-// The two intentional design 4.7 aliases: the STS lookup name differs from the legacy binding.
-// NEXTAUTH_SECRET and INTERNAL_API_SECRET keep their binding name as their lookup name.
-export const EXPECTED_ALIASES = Object.freeze({
-  NOTIFICATIONS_APNS_PRIVATE_KEY: 'APNS_PRIVATE_KEY',
-  NOTIFICATIONS_EXPO_ACCESS_TOKEN: 'EXPO_ACCESS_TOKEN',
+export const WORKER_SOURCES = Object.freeze({
+  notifications: Object.freeze({
+    wrangler: 'services/notifications/wrangler.jsonc',
+    reader: 'services/notifications/src/secrets.ts',
+    readerMap: 'SECRETS_STORE_BINDINGS',
+    readerFn: 'readNotificationsSecret',
+    policy: 'services/sts/policy/notifications.yaml',
+    workload: 'notifications',
+    folder: '/workloads/notifications',
+    productionVars: Object.freeze({ WORKER_ENV: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({
+      NOTIFICATIONS_APNS_PRIVATE_KEY: 'APNS_PRIVATE_KEY',
+      NOTIFICATIONS_EXPO_ACCESS_TOKEN: 'EXPO_ACCESS_TOKEN',
+    }),
+    names: names([
+      [
+        'APNS_PRIVATE_KEY',
+        'APNS_PRIVATE_KEY_PROD',
+        '/workloads/notifications',
+        'NOTIFICATIONS_APNS_PRIVATE_KEY',
+      ],
+      [
+        'EXPO_ACCESS_TOKEN',
+        'EXPO_ACCESS_TOKEN',
+        '/workloads/notifications',
+        'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+      ],
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch B (#13047).
+  'session-sync': Object.freeze({
+    wrangler: 'services/session-sync/wrangler.jsonc',
+    reader: 'services/session-sync/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readSessionSyncSecret',
+    policy: 'services/sts/policy/session-sync.yaml',
+    workload: 'session-sync',
+    folder: '/workloads/session-sync',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({ INTERNAL_API_SECRET: 'INTERNAL_API_SECRET_PROD' }),
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'SESSION_SYNC_SECRET',
+        'SESSION_SYNC_SECRET_PROD',
+        '/workloads/session-sync',
+        'SESSION_SYNC_SECRET',
+      ],
+      ['INTERNAL_API_SECRET_PROD', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch D (#13059).
+  'session-ingest': Object.freeze({
+    wrangler: 'services/session-ingest/wrangler.jsonc',
+    reader: 'services/session-ingest/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readSessionIngestSecret',
+    policy: 'services/sts/policy/session-ingest.yaml',
+    workload: 'session-ingest',
+    folder: '/workloads/session-ingest',
+    productionVars: NO_ALIASES,
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({
+      NEXTAUTH_SECRET: 'NEXTAUTH_SECRET_PROD',
+      INTERNAL_API_SECRET: 'INTERNAL_API_SECRET_PROD',
+      SESSION_SHARE_JWT_SECRET: 'SESSION_SHARE_JWT_SECRET_PROD',
+    }),
+    names: names([
+      ['NEXTAUTH_SECRET_PROD', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      ['INTERNAL_API_SECRET_PROD', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+      [
+        'SESSION_SHARE_JWT_SECRET_PROD',
+        'SESSION_SHARE_JWT_SECRET_PROD',
+        '/workloads/session-ingest',
+        'SESSION_SHARE_JWT_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch C (#13061).
+  'kilo-ai-attribution': Object.freeze({
+    wrangler: 'services/ai-attribution/wrangler.jsonc',
+    reader: 'services/ai-attribution/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readAiAttributionSecret',
+    policy: 'services/sts/policy/kilo-ai-attribution.yaml',
+    workload: 'kilo-ai-attribution',
+    folder: '/workloads/kilo-ai-attribution',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: NO_ALIASES,
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'ADMIN_SECRET',
+        'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
+        '/workloads/kilo-ai-attribution',
+        'ADMIN_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch C (#13061). Creates both shared targets (M142): AUTO_ROUTING_DECISION_SECRET and
+  // O11Y_CF_AE_API_TOKEN; it is the first table Worker that binds either.
+  'auto-routing': Object.freeze({
+    wrangler: 'services/auto-routing/wrangler.jsonc',
+    reader: 'services/auto-routing/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readAutoRoutingSecret',
+    policy: 'services/sts/policy/auto-routing.yaml',
+    workload: 'auto-routing',
+    folder: '/workloads/auto-routing',
+    productionVars: NO_ALIASES,
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({ INTERNAL_API_SECRET: 'INTERNAL_API_SECRET_PROD' }),
+    names: names([
+      ['INTERNAL_API_SECRET_PROD', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+      ['OPENROUTER_API_KEY', 'OPENROUTER_API_KEY', '/shared', 'OPENROUTER_API_KEY'],
+      ['O11Y_CF_AE_API_TOKEN', 'O11Y_CF_AE_API_TOKEN', '/shared', 'O11Y_CF_AE_API_TOKEN'],
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'AUTO_ROUTING_DECISION_SECRET',
+        'AUTO_ROUTING_DECISION_SECRET_PROD',
+        '/shared',
+        'AUTO_ROUTING_DECISION_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch C (#13061).
+  'cloudflare-scim-sync': Object.freeze({
+    wrangler: 'services/scim-sync/wrangler.jsonc',
+    reader: 'services/scim-sync/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readScimSyncSecret',
+    policy: 'services/sts/policy/cloudflare-scim-sync.yaml',
+    workload: 'cloudflare-scim-sync',
+    folder: '/workloads/cloudflare-scim-sync',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    // The staging deployment binds its own _STAGING entries, never a production one.
+    stagingStoreBindings: Object.freeze(
+      [
+        ['WORKOS_API_KEY', 'WORKOS_API_KEY_STAGING'],
+        ['WORKOS_CLIENT_ID', 'WORKOS_CLIENT_ID_STAGING'],
+        ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_STAGING'],
+      ].map(([binding, secretName]) =>
+        Object.freeze({ binding, store_id: STORE, secret_name: secretName })
+      )
+    ),
+    aliases: NO_ALIASES,
+    names: names([
+      ['WORKOS_API_KEY', 'WORKOS_API_KEY', '/workloads/cloudflare-scim-sync', 'WORKOS_API_KEY'],
+      ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+      [
+        'WORKOS_CLIENT_ID',
+        'WORKOS_CLIENT_ID',
+        '/workloads/cloudflare-scim-sync',
+        'WORKOS_CLIENT_ID',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch D (#13059). The media pair is the kilo-chat-media bucket's own key, not the Web title.
+  'kilo-chat': Object.freeze({
+    wrangler: 'services/kilo-chat/wrangler.jsonc',
+    reader: 'services/kilo-chat/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readKiloChatSecret',
+    policy: 'services/sts/policy/kilo-chat.yaml',
+    workload: 'kilo-chat',
+    folder: '/workloads/kilo-chat',
+    productionVars: Object.freeze({ WORKER_ENV: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: NO_ALIASES,
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'GATEWAY_TOKEN_SECRET',
+        'GATEWAY_TOKEN_SECRET',
+        '/workloads/kilo-chat',
+        'GATEWAY_TOKEN_SECRET',
+      ],
+      [
+        'R2_ACCESS_KEY_ID',
+        'R2_ACCESS_KEY_ID_KILOCHAT_MEDIA',
+        '/workloads/kilo-chat',
+        'R2_ACCESS_KEY_ID',
+      ],
+      [
+        'R2_SECRET_ACCESS_KEY',
+        'R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA',
+        '/workloads/kilo-chat',
+        'R2_SECRET_ACCESS_KEY',
+      ],
+      ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch D (#13059). Six reader keys are plain Worker secrets (M68, no copier route); the active
+  // OAuth key id stays a direct store binding outside the reader.
+  'git-token-service': Object.freeze({
+    wrangler: 'services/git-token-service/wrangler.jsonc',
+    reader: 'services/git-token-service/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readGitTokenServiceSecret',
+    policy: 'services/sts/policy/git-token-service.yaml',
+    workload: 'git-token-service',
+    folder: '/workloads/git-token-service',
+    productionVars: NO_ALIASES,
+    stagingStoreBindings: NONE,
+    aliases: NO_ALIASES,
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_PROD',
+        '/workloads/git-token-service',
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+      ],
+      [
+        'BITBUCKET_CLIENT_ID',
+        'BITBUCKET_CLIENT_ID_PROD',
+        '/workloads/git-token-service',
+        'BITBUCKET_CLIENT_ID',
+      ],
+      [
+        'BITBUCKET_CLIENT_SECRET',
+        'BITBUCKET_CLIENT_SECRET_PROD',
+        '/workloads/git-token-service',
+        'BITBUCKET_CLIENT_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: legacy([
+      ['BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID', 'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID_PROD'],
+    ]),
+    plainSecrets: Object.freeze([
+      'GITHUB_APP_PRIVATE_KEY',
+      'GITHUB_LITE_APP_PRIVATE_KEY',
+      'GITHUB_APP_CLIENT_SECRET',
+      'GITLAB_CLIENT_SECRET',
+      'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY',
+      'USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY',
+    ]),
+  }),
+  // Batch F (#13068). CF_ANALYTICS_API_KEY reads the shared O11Y_CF_AE_API_TOKEN: auto-routing
+  // creates it, kilo-ops binds the same store entry and only proves parity.
+  'kilo-ops': Object.freeze({
+    wrangler: 'services/kilo-ops/wrangler.jsonc',
+    reader: 'services/kilo-ops/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readKiloOpsSecret',
+    policy: 'services/sts/policy/kilo-ops.yaml',
+    workload: 'kilo-ops',
+    folder: '/workloads/kilo-ops',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({ O11Y_CF_AE_API_TOKEN: 'CF_ANALYTICS_API_KEY' }),
+    names: names([
+      ['CF_ANALYTICS_API_KEY', 'O11Y_CF_AE_API_TOKEN', '/shared', 'O11Y_CF_AE_API_TOKEN'],
+      ['GF_SECRET_KEY', 'GF_SECRET_KEY', '/workloads/kilo-ops', 'GF_SECRET_KEY'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
 });
 
+/** Every reader key of a Worker: its store-bound lookup names and its plain-secret names. */
+export const readerKeysOf = src => [...src.names.map(r => r.secretKey), ...src.plainSecrets];
+
+export const sourceOf = batch =>
+  Object.hasOwn(WORKER_SOURCES, String(batch?.sourceScript))
+    ? WORKER_SOURCES[batch.sourceScript]
+    : null;
+
 /**
- * The `SECRETS_STORE_BINDINGS` map of services/notifications/src/secrets.ts: STS lookup name (the
- * name the code passes to `readNotificationsSecret`) -> legacy Secrets Store binding.
+ * A Worker's reader map in its secrets module: `const <readerMap> = { LOOKUP: 'BINDING', ... } as
+ * const;` -> STS lookup name (the name the code passes to its reader) -> legacy binding.
  */
-export function parseReaderBindings(readerText) {
-  const m = /const SECRETS_STORE_BINDINGS = \{([^}]*)\} as const;/.exec(readerText);
+export function parseReaderBindings(readerText, readerMap = 'SECRETS_STORE_BINDINGS') {
+  if (!/^[A-Z][A-Z0-9_]*$/.test(readerMap)) throw new Error('reader map name not recognized');
+  const m = new RegExp(`const ${readerMap} = \\{([^}]*)\\} as const;`).exec(readerText);
   if (!m) throw new Error('reader map not found');
   const map = {};
   for (const line of m[1].split('\n')) {
@@ -163,27 +471,106 @@ export function parseReaderBindings(readerText) {
   return map;
 }
 
+const sharedBindingOf = (sources, w, key) =>
+  (Object.hasOwn(sources, w) ? sources[w].names : []).find(
+    n => n.secretPath === '/shared' && n.secretKey === key
+  );
+
 /**
- * The name map must equal the tracked production Notifications config (binding -> store name), the
- * Notifications reader (target key = the STS lookup name that indexes that binding) and its STS
- * policy (exactly these keys). A target is never a store name and never carries an environment
- * suffix; the only key/binding differences are the two expected aliases. Every copy batch row must
- * be exactly one name map row.
+ * The other table Workers that bind one of `batch`'s shared targets, each with the binding it reads
+ * it through and the creator's store entry it must equal. The creating entry's preflight reads
+ * each one's serving version (`shared_parity_live_differs_<KEY>`).
  */
-export function checkSource(wranglerText, policyText, readerText, batch = BATCH, names = NAME_MAP) {
-  const f = [];
-  const bv = validateBatch(batch);
-  if (bv) f.push(`batch_${bv}`);
+export function sharedBinders(batch, table = TABLE, sources = WORKER_SOURCES) {
+  const out = [];
   for (const r of Array.isArray(batch?.rows) ? batch.rows : []) {
-    if (names.filter(n => same(nameRow(n), nameRow(r ?? {}))).length !== 1) {
-      f.push(`batch_row_not_in_name_map_${r?.secretKey}`);
+    if (!SHARED_TARGETS.includes(`${r.secretPath}/${r.secretKey}`)) continue;
+    for (const worker of table.workers) {
+      if (worker === batch.sourceScript) continue;
+      const n = sharedBindingOf(sources, worker, r.secretKey);
+      if (n) {
+        out.push({
+          worker,
+          key: r.secretKey,
+          binding: n.binding,
+          storeId: r.storeId,
+          secretName: r.secretName,
+        });
+      }
     }
   }
+  return out;
+}
+
+/**
+ * M142, for one Worker of `table`: a shared target's creating row must belong to the first table
+ * Worker whose reviewed source binds that /shared key, and every table Worker that binds it must
+ * bind the creator's very store entry (parity). Only the creator has a row; the others create
+ * nothing (a second row for the same target is a table duplicate).
+ */
+export function sharedTargetProblems(worker, table = TABLE, sources = WORKER_SOURCES) {
+  const f = [];
+  const bindingOf = (w, key) => sharedBindingOf(sources, w, key);
+  for (const r of table.rows) {
+    if (!SHARED_TARGETS.includes(r.target)) continue;
+    const key = r.target.slice('/shared/'.length);
+    const binders = table.workers.filter(w => bindingOf(w, key));
+    if (r.worker === worker && binders[0] !== worker) {
+      f.push(`shared_target_not_first_binder_${key}`);
+    }
+    const n = bindingOf(worker, key);
+    if (n && (n.storeId !== r.storeId || n.secretName !== r.secretName)) {
+      f.push(`shared_parity_differs_${key}`);
+    }
+  }
+  return f;
+}
+
+/**
+ * One Worker against the reviewed table and its tracked sources. The batch must be exactly the
+ * table's batch for that Worker. Its WORKER_SOURCES entry must equal the production Wrangler config
+ * (every store binding -> store name: `names` plus `legacyStoreBindings`), the reader map (each
+ * names row's target key = the STS lookup name that indexes its binding; the plain-secret keys
+ * index their own binding) and the STS policy (exactly the reader keys). A target lives in /shared
+ * exactly when it is a SHARED_KEYS name, is never another row's store name (its own may equal it)
+ * and never carries an environment suffix; the only key/binding differences are the reviewed
+ * aliases. Every copy batch row must be exactly one names row, in the Worker's own workload folder
+ * or an exact SHARED_TARGETS entry, and the shared rules hold (`sharedTargetProblems`). `table` is
+ * the checked-in table and `sources` the reviewed entries; tests pass fixtures.
+ */
+export function checkSource(
+  wranglerText,
+  policyText,
+  readerText,
+  batch,
+  src = sourceOf(batch),
+  table = TABLE,
+  sources = WORKER_SOURCES
+) {
+  const f = [];
+  if (table.problems.length > 0) f.push('table_invalid');
+  const worker = String(batch?.sourceScript);
+  if (!Object.hasOwn(table.batches, worker) || !same(batch, table.batches[worker])) {
+    f.push('batch_not_in_table');
+  }
+  const bv = validateBatch(batch);
+  if (bv) f.push(`batch_${bv}`);
+  if (!src) return [...f, 'worker_source_unreviewed'];
+  const rows = Array.isArray(batch?.rows) ? batch.rows : [];
+  for (const r of rows) {
+    if (src.names.filter(n => same(nameRow(n), nameRow(r ?? {}))).length !== 1) {
+      f.push(`batch_row_not_in_name_map_${r?.secretKey}`);
+    }
+    const shared = SHARED_TARGETS.includes(`${r?.secretPath}/${r?.secretKey}`);
+    if (r?.secretPath !== src.folder && !shared) f.push(`batch_row_folder_${r?.secretKey}`);
+  }
+  f.push(...sharedTargetProblems(worker, table, sources));
+  if (src.folder !== `/workloads/${src.workload}`) f.push('source_folder');
   const cfg = parseJsonc(wranglerText);
   if (
-    cfg.name !== batch.sourceScript ||
-    cfg.account_id !== batch.accountId ||
-    cfg.vars?.WORKER_ENV !== 'production'
+    cfg.name !== worker ||
+    cfg.account_id !== ACCOUNT_ID ||
+    Object.entries(src.productionVars).some(([k, v]) => cfg.vars?.[k] !== v)
   ) {
     f.push('source_script_identity');
   }
@@ -192,38 +579,55 @@ export function checkSource(wranglerText, policyText, readerText, batch = BATCH,
     storeId: s.store_id,
     secretName: s.secret_name,
   }));
-  if (!same(live, bindingRows(names))) f.push('source_bindings_differ');
-  if (!same(cfg.env?.staging?.secrets_store_secrets, [])) f.push('source_staging_binds_store');
+  if (!sameStoreRows(live, sourceStoreRows(src))) f.push('source_bindings_differ');
+  if (!same(cfg.env?.staging?.secrets_store_secrets ?? [], src.stagingStoreBindings)) {
+    f.push('source_staging_binds_store');
+  }
+  for (const p of src.plainSecrets) {
+    if (live.some(b => b.binding === p)) f.push(`plain_secret_is_store_binding_${p}`);
+  }
+  const keys = readerKeysOf(src);
   let reader = null;
   try {
-    reader = parseReaderBindings(readerText);
+    reader = parseReaderBindings(readerText, src.readerMap);
   } catch {
     f.push('reader_map_unreadable');
   }
   if (reader) {
-    if (!same(Object.keys(reader).sort(), names.map(r => r.secretKey).sort())) {
-      f.push('reader_keys_differ');
-    }
-    for (const r of names) {
+    if (!same(Object.keys(reader).sort(), [...keys].sort())) f.push('reader_keys_differ');
+    for (const r of src.names) {
       if (reader[r.secretKey] !== r.binding) f.push(`reader_lookup_differs_${r.secretKey}`);
     }
+    for (const p of src.plainSecrets) {
+      if (reader[p] !== p) f.push(`reader_lookup_differs_${p}`);
+    }
     const aliases = Object.fromEntries(Object.entries(reader).filter(([k, b]) => k !== b));
-    if (!same(aliases, EXPECTED_ALIASES)) f.push('reader_aliases_differ');
+    if (!same(aliases, src.aliases)) f.push('reader_aliases_differ');
   }
-  const pol = parsePolicy(policyText);
+  let pol;
+  try {
+    pol = parsePolicy(policyText);
+  } catch {
+    return [...f, 'policy_unreadable'];
+  }
   if (
-    pol.workload !== 'notifications' ||
+    pol.workload !== src.workload ||
     !same(pol.lists.environments, ['production']) ||
     pol['identity.kind'] !== 'worker-binding'
   ) {
     f.push('policy_identity');
   }
-  if (!same([...(pol.lists.secrets ?? [])].sort(), names.map(r => r.secretKey).sort())) {
+  if (!same([...(pol.lists.secrets ?? [])].sort(), [...keys].sort())) {
     f.push('policy_targets_differ');
   }
-  for (const r of names) {
-    if (folderFor(r.secretKey) !== r.secretPath) f.push(`target_folder_${r.secretKey}`);
-    if (names.some(x => x.secretName === r.secretKey))
+  const storeNamed = sourceStoreRows(src);
+  for (const r of src.names) {
+    if (r.secretPath !== (SHARED_KEYS.includes(r.secretKey) ? '/shared' : src.folder)) {
+      f.push(`target_folder_${r.secretKey}`);
+    }
+    // Another row's store name as a target is refused; a row whose store name is its own lookup
+    // name (WORKOS_API_KEY -> WORKOS_API_KEY) is allowed: the reader proof binds target = lookup.
+    if (storeNamed.some(x => x.binding !== r.binding && x.secretName === r.secretKey))
       f.push(`target_is_store_name_${r.secretKey}`);
     if (/_(PROD|DEV|STAGING)$/.test(r.secretKey))
       f.push(`target_environment_suffix_${r.secretKey}`);
@@ -231,26 +635,27 @@ export function checkSource(wranglerText, policyText, readerText, batch = BATCH,
   return f;
 }
 
-export function readTrackedSource(root = REPO_ROOT) {
+export function readTrackedSource(src, root = REPO_ROOT) {
   return {
-    wranglerText: readFileSync(join(root, 'services/notifications/wrangler.jsonc'), 'utf8'),
-    policyText: readFileSync(join(root, 'services/sts/policy/notifications.yaml'), 'utf8'),
-    readerText: readFileSync(join(root, 'services/notifications/src/secrets.ts'), 'utf8'),
+    wranglerText: readFileSync(join(root, src.wrangler), 'utf8'),
+    policyText: readFileSync(join(root, src.policy), 'utf8'),
+    readerText: readFileSync(join(root, src.reader), 'utf8'),
   };
 }
 
 /**
- * One row per name map row, each column read from its own tracked source: the old binding and its
- * backing store name from the production Wrangler config, the STS lookup name from the reader map
- * (the key whose binding it is), and the matching policy entry. `checkSource` proves they agree.
+ * One row per names row of a Worker, each column read from its own tracked source: the old binding
+ * and its backing store name from the production Wrangler config, the STS lookup name from the
+ * reader map (the key whose binding it is), and the matching policy entry. `checkSource` proves
+ * they agree.
  */
-export function mappingRows({ wranglerText, policyText, readerText }, names = NAME_MAP) {
+export function mappingRows({ wranglerText, policyText, readerText }, src) {
   const store = Object.fromEntries(
     (parseJsonc(wranglerText).secrets_store_secrets ?? []).map(s => [s.binding, s.secret_name])
   );
-  const reader = parseReaderBindings(readerText);
+  const reader = parseReaderBindings(readerText, src.readerMap);
   const policy = parsePolicy(policyText).lists.secrets ?? [];
-  return names.map(r => {
+  return src.names.map(r => {
     const lookups = Object.keys(reader).filter(k => reader[k] === r.binding);
     const lookup = lookups.length === 1 ? lookups[0] : null;
     return {
@@ -281,22 +686,41 @@ export function mappingTable(rows) {
 }
 
 /**
- * Reads the tracked sources under `root`, validates them (`checkSource`) and returns the names-only
- * table of all four lookup names: {gate:"table", ok, failures, rows:[{binding, storeSecretName,
- * lookup, target, policyEntry}], table}. Callers must refuse to proceed when `ok` is false.
+ * Reads one Worker's tracked sources under `root`, validates them (`checkSource`) and returns the
+ * names-only table of all its lookup names: {gate:"table", worker, ok, failures, rows:[{binding,
+ * storeSecretName, lookup, target, policyEntry}], table}. Callers must refuse when `ok` is false.
+ * A Worker whose reader module is absent or whose policy grants nothing yet (its batch PR is not on
+ * main) is refused with the single failure `source_not_on_main: <worker>`.
  */
-export function validatedNameTable(root = REPO_ROOT, batch = BATCH, names = NAME_MAP) {
-  const sources = readTrackedSource(root);
+export function validatedNameTable(batch, root = REPO_ROOT, table = TABLE) {
+  const src = sourceOf(batch);
+  const worker = typeof batch?.sourceScript === 'string' ? batch.sourceScript : null;
+  const refused = failures => ({ gate: 'table', worker, ok: false, failures, rows: [], table: '' });
+  if (!src) return refused(checkSource('', '', '', batch, null, table));
+  if (![src.wrangler, src.reader, src.policy].every(p => existsSync(join(root, p)))) {
+    return refused([`source_not_on_main: ${worker}`]);
+  }
+  const sources = readTrackedSource(src, root);
+  let granted;
+  try {
+    granted = parsePolicy(sources.policyText).lists.secrets ?? [];
+  } catch {
+    return refused([`policy_unreadable: ${worker}`]);
+  }
+  if (granted.length === 0) {
+    return refused([`source_not_on_main: ${worker}`]);
+  }
   const failures = checkSource(
     sources.wranglerText,
     sources.policyText,
     sources.readerText,
     batch,
-    names
+    src,
+    table
   );
   let rows = [];
   try {
-    rows = mappingRows(sources, names);
+    rows = mappingRows(sources, src);
   } catch {
     failures.push('mapping_rows_unreadable');
   }
@@ -305,23 +729,30 @@ export function validatedNameTable(root = REPO_ROOT, batch = BATCH, names = NAME
   }
   if (
     rows.some(
-      r => r.target !== `${names.find(x => x.binding === r.binding)?.secretPath}/${r.lookup}`
+      r => r.target !== `${src.names.find(x => x.binding === r.binding)?.secretPath}/${r.lookup}`
     )
   ) {
     failures.push('mapping_target_not_lookup');
   }
-  return { gate: 'table', ok: failures.length === 0, failures, rows, table: mappingTable(rows) };
+  return {
+    gate: 'table',
+    worker,
+    ok: failures.length === 0,
+    failures,
+    rows,
+    table: mappingTable(rows),
+  };
 }
 
 /** A rendered config file must equal `buildConfig(pins)` exactly. */
-export function checkRenderedConfig(text, pins, srcDir = SRC_DIR) {
+export function checkRenderedConfig(text, pins, srcDir = SRC_DIR, table = TABLE) {
   let cfg;
   try {
     cfg = JSON.parse(text);
   } catch {
     return ['config_unparsable'];
   }
-  return same(cfg, buildConfig(pins, srcDir)) ? [] : ['config_not_closed'];
+  return same(cfg, buildConfig(pins, srcDir, table)) ? [] : ['config_not_closed'];
 }
 
 export function moduleHashes(srcDir = SRC_DIR) {
@@ -362,7 +793,7 @@ const isCount = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
  * fields with their fixed types and enums; anything else is refused, so nothing extra can pass.
  * Returns {ok, failures, receipt}.
  */
-export function parseReceipt(text, batch = BATCH) {
+export function parseReceipt(text, batch) {
   let r;
   try {
     r = typeof text === 'string' ? JSON.parse(text) : text;
@@ -569,12 +1000,12 @@ const unarmedCopierBindings = (pins, batch) =>
   ].sort(byName);
 
 // Full binding objects: only a self-reference to the copier's own gate namespace is dropped.
-const comparableCopierBindings = (bindings, gateNsId) =>
+const comparableCopierBindings = (bindings, gateNsId, copier) =>
   bindings
     .map(b => {
       const o = { ...b };
       if (o.type === 'durable_object_namespace') {
-        if (o.script_name === COPIER_NAME) delete o.script_name;
+        if (o.script_name === copier) delete o.script_name;
         if (gateNsId !== null && o.namespace_id === gateNsId) delete o.namespace_id;
       }
       return o;
@@ -622,9 +1053,9 @@ const NO_PINS = Object.freeze({
  * storeIds, sourceDeployments}}: names and ids only, never a value or a principal. versionId is the
  * unarmed version; `bindArmedPreflight` moves it to the armed version after the put.
  */
-export function evaluatePreflight(input, batch = BATCH) {
+export function evaluatePreflight(input, batch, sources = WORKER_SOURCES, table = TABLE) {
   try {
-    return preflightOf(input, batch);
+    return preflightOf(input, batch, sources, table);
   } catch {
     return {
       gate: 'preflight',
@@ -635,26 +1066,48 @@ export function evaluatePreflight(input, batch = BATCH) {
   }
 }
 
-function preflightOf(input, batch) {
+function preflightOf(input, batch, sources, table) {
   const meta = isRecord(input?.meta) ? input.meta : {};
   const pins = isRecord(input?.pins) ? input.pins : {};
   const { deployedVersionId, allowedReaders, readinessReceipt } = isRecord(input) ? input : {};
   const nowMs = input?.nowMs === undefined ? Date.now() : input.nowMs;
   const f = [];
+  // The batch comes from the reviewed table (the driver checks equality offline before any call);
+  // here it must still be closed, and its Worker must have reviewed sources.
+  const problem = validateBatch(batch);
+  if (problem) f.push(`batch_${problem}`);
+  const src = Object.hasOwn(sources, String(batch.sourceScript))
+    ? sources[batch.sourceScript]
+    : null;
+  if (!src) f.push('worker_source_unreviewed');
+  const copier = copierName(batch.sourceScript);
   const win = RUN_VARS.every(k => PIN_FORMAT[k].test(String(pins[k]))) ? windowOf(pins) : null;
   if (!win) f.push('pins_invalid');
   else if (!Number.isFinite(nowMs) || !(nowMs < win.notBefore)) {
     f.push('preflight_after_window_open');
   }
+  if (pins.M65_BATCH !== batch.sourceScript) f.push('pins_batch_differs');
 
-  const source = servingVersion(meta.notifications);
+  const source = servingVersion(meta.source);
   if (!source) f.push('source_serving_version_not_single');
-  else if (!same(storeRows(source.bindings), bindingRows(NAME_MAP))) {
+  else if (!sameStoreRows(storeRows(source.bindings), sourceStoreRows(src))) {
     f.push('source_live_bindings_differ');
+  }
+  // M142 live parity: every other table Worker that binds one of this batch's shared targets must
+  // serve exactly one version whose binding reads the creator's very store entry.
+  const binders = isRecord(meta.sharedBinders) ? meta.sharedBinders : {};
+  for (const b of sharedBinders(batch, table, sources)) {
+    const live = servingVersion(Object.hasOwn(binders, b.worker) ? binders[b.worker] : null);
+    const hits = live ? storeRows(live.bindings).filter(x => x.binding === b.binding) : [];
+    if (hits.length !== 1 || hits[0].storeId !== b.storeId || hits[0].secretName !== b.secretName) {
+      f.push(`shared_parity_live_differs_${b.key}`);
+    }
   }
   const store = isRecord(meta.store) ? meta.store : {};
   const storeIds = {};
-  if (store.id !== ALLOWED_STORE_ID) f.push('store_id');
+  if (!ALLOWED_STORE_IDS.includes(store.id) || batch.rows.some(r => r.storeId !== store.id)) {
+    f.push('store_id');
+  }
   for (const r of batch.rows) {
     const hits = list(store.secrets).filter(s => isRecord(s) && s.name === r.secretName);
     const ok =
@@ -670,7 +1123,7 @@ function preflightOf(input, batch) {
 
   const c = isRecord(meta.copier) ? meta.copier : {};
   const gateNs = list(c.doNamespaces).filter(
-    d => isRecord(d) && d.script === COPIER_NAME && d.class === 'M65Gate'
+    d => isRecord(d) && d.script === copier && d.class === 'M65Gate'
   );
   if (gateNs.length !== 1) f.push('copier_gate_namespace_not_single');
   const gateNsId = gateNs.length === 1 && typeof gateNs[0].id === 'string' ? gateNs[0].id : null;
@@ -683,7 +1136,7 @@ function preflightOf(input, batch) {
       : null;
   if (!versionId) f.push('copier_deployment_not_the_unarmed_version');
   const wantCopier = unarmedCopierBindings(pins, batch);
-  const gotCopier = serving ? comparableCopierBindings(serving.bindings, gateNsId) : null;
+  const gotCopier = serving ? comparableCopierBindings(serving.bindings, gateNsId, copier) : null;
   if (gotCopier?.some(b => b.name === WRITER_SECRET)) f.push('copier_already_armed');
   if (!gotCopier || !same(gotCopier, wantCopier)) f.push('copier_bindings_not_closed');
   f.push(...copierSettingsProblems(c.settings));
@@ -758,8 +1211,8 @@ function preflightOf(input, batch) {
   if (readerNotAllowed) f.push('infisical_reader_not_allowed');
 
   // The Worker-only writer exactly as configured at the issuer (names-only readback): one create
-  // permission per batch row (M108: the Expo target only) and an access token with exactly one use
-  // per create plus one for the denial probe (2). Login and revoke do not spend a token use.
+  // permission per batch row (exactly this Worker's table targets) and an access token with one
+  // use per create plus one for the denial probe. Login and revoke do not spend a token use.
   const w = isRecord(meta.writer) ? meta.writer : {};
   const key = p =>
     isRecord(p) ? `${p.action}|${p.environment}|${p.secretPath}|${p.secretName}` : '';
@@ -799,7 +1252,12 @@ function preflightOf(input, batch) {
     },
   };
   if (result.ok) {
-    VERIFIED.set(result, { pins: structuredClone(result.pins), bindings: wantCopier, gateNsId });
+    VERIFIED.set(result, {
+      pins: structuredClone(result.pins),
+      bindings: wantCopier,
+      gateNsId,
+      copier,
+    });
   }
   return result;
 }
@@ -839,7 +1297,7 @@ export function bindArmedPreflight(preflight, armedVersionId, observed) {
   else if (
     !v ||
     !same(
-      comparableCopierBindings(serving.bindings, v.gateNsId),
+      comparableCopierBindings(serving.bindings, v.gateNsId, v.copier),
       [...v.bindings, WRITER_BINDING].sort(byName)
     )
   ) {
@@ -862,10 +1320,10 @@ const verdict = (gate, f) => ({ gate, ok: f.length === 0, failures: f });
 
 /**
  * Post-run, Cloudflare half. input: {pre (the `bindArmedPreflight` verdict),
- * meta{notifications{deployments, version}, store}, receipt}
+ * meta{source{deployments, version}, store}, receipt}
  * The copy-tick receipt is complete for this run and the armed version; the source is unchanged.
  */
-export function evaluatePostRunCloudflare(input, batch = BATCH) {
+export function evaluatePostRunCloudflare(input, batch, sources = WORKER_SOURCES) {
   const { pre, meta } = input ?? {};
   const f = [];
   const { receipt: r, failures } = parseReceipt(input?.receipt ?? null, batch);
@@ -899,11 +1357,11 @@ export function evaluatePostRunCloudflare(input, batch = BATCH) {
   ) {
     f.push('receipt_rows');
   }
-  const source = servingVersion(meta?.notifications);
+  const source = servingVersion(meta?.source);
   if (
     !source ||
-    !same(storeRows(source.bindings), bindingRows(NAME_MAP)) ||
-    !same(meta.notifications.deployments, pre?.pins?.sourceDeployments)
+    !sameStoreRows(storeRows(source.bindings), sourceStoreRows(sources[batch.sourceScript])) ||
+    !same(meta.source.deployments, pre?.pins?.sourceDeployments)
   ) {
     f.push('source_changed_during_run');
   }
@@ -916,7 +1374,7 @@ export function evaluatePostRunCloudflare(input, batch = BATCH) {
 }
 
 /** Post-run, Infisical half. input: {meta{infisical{names}}}. Every target is now present. */
-export function evaluatePostRunInfisical(input, batch = BATCH) {
+export function evaluatePostRunInfisical(input, batch) {
   const names = input?.meta?.infisical?.names;
   const f = batch.rows
     .filter(row => !(names?.[row.secretPath] ?? []).includes(row.secretKey))
@@ -924,10 +1382,10 @@ export function evaluatePostRunInfisical(input, batch = BATCH) {
   return verdict('postrun-infisical', f);
 }
 
-/** Post-run: both halves. input: {pre, meta{notifications, store, infisical{names}}, receipt} */
-export function evaluatePostRun(input, batch = BATCH) {
+/** Post-run: both halves. input: {pre, meta{source, store, infisical{names}}, receipt} */
+export function evaluatePostRun(input, batch, sources = WORKER_SOURCES) {
   return verdict('postrun', [
-    ...evaluatePostRunCloudflare(input, batch).failures,
+    ...evaluatePostRunCloudflare(input, batch, sources).failures,
     ...evaluatePostRunInfisical(input, batch).failures,
   ]);
 }
@@ -935,14 +1393,14 @@ export function evaluatePostRun(input, batch = BATCH) {
 /**
  * Cleanup, Cloudflare half: only the temporary copier is gone; the source script and every
  * existing deployment are unchanged. input: {meta{copier{scriptStatus, gateNamespacePresent},
- * notificationsUnchanged, existingDeploymentsUnchanged}}
+ * sourceUnchanged, existingDeploymentsUnchanged}}
  */
 export function evaluateCleanupCloudflare(input) {
   const meta = input?.meta;
   const f = [];
   if (meta?.copier?.scriptStatus !== 404) f.push('copier_script_present');
   if (meta?.copier?.gateNamespacePresent !== false) f.push('copier_gate_namespace_present');
-  if (meta?.notificationsUnchanged !== true) f.push('source_binding_changed');
+  if (meta?.sourceUnchanged !== true) f.push('source_binding_changed');
   if (meta?.existingDeploymentsUnchanged !== true) f.push('existing_deployments_changed');
   return verdict('cleanup-cloudflare', f);
 }
@@ -999,17 +1457,26 @@ export const GATES = Object.freeze([
   'receipt',
   ...Object.keys(STDIN_GATES),
 ]);
-const NO_STDIN = ['source', 'table'];
+const ALL_WORKER_GATES = ['source', 'table'];
 
-export function runGate(gate, stdinText) {
-  if (gate === 'table') return validatedNameTable();
-  if (gate === 'source') {
-    const { wranglerText, policyText, readerText } = readTrackedSource();
-    const failures = checkSource(wranglerText, policyText, readerText);
-    return { ...verdict(gate, failures), modules: moduleHashes() };
+/**
+ * One gate verdict. `source` and `table` cover the whole table and every Worker; every other gate
+ * judges `worker`'s batch (a Worker of the valid table). Null for usage errors. `table` is the
+ * checked-in table; tests pass a fixture table.
+ */
+export function runGate(gate, stdinText, worker, table = TABLE) {
+  if (ALL_WORKER_GATES.includes(gate)) {
+    const per = table.workers.map(w => {
+      const v = validatedNameTable(table.batches[w], REPO_ROOT, table);
+      return gate === 'table' ? v : { worker: w, ...verdict('source', v.failures) };
+    });
+    const failures = [...table.problems.map(p => `table_${p}`), ...per.flatMap(v => v.failures)];
+    return { gate, ok: failures.length === 0, failures, workers: per, modules: moduleHashes() };
   }
+  const batch = Object.hasOwn(table.batches, String(worker)) ? table.batches[worker] : null;
+  if (!batch) return null;
   if (gate === 'receipt') {
-    const { ok, failures, receipt } = parseReceipt(String(stdinText).trim());
+    const { ok, failures, receipt } = parseReceipt(String(stdinText).trim(), batch);
     return { gate, ok, failures, receipt };
   }
   let input;
@@ -1018,16 +1485,19 @@ export function runGate(gate, stdinText) {
   } catch {
     return null;
   }
-  if (gate === 'config') return verdict(gate, checkRenderedConfig(input?.configText, input?.pins));
-  return STDIN_GATES[gate]?.(input) ?? null;
+  if (gate === 'config') {
+    return verdict(gate, checkRenderedConfig(input?.configText, input?.pins, SRC_DIR, table));
+  }
+  return STDIN_GATES[gate]?.(input, batch) ?? null;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const gate = process.argv[2];
+  const [gate, worker] = process.argv.slice(2);
+  const allWorkers = ALL_WORKER_GATES.includes(gate);
   let result = null;
-  if (GATES.includes(gate) && process.argv.length === 3) {
+  if (GATES.includes(gate) && process.argv.length === (allWorkers ? 3 : 4)) {
     try {
-      result = runGate(gate, NO_STDIN.includes(gate) ? '' : readFileSync(0, 'utf8'));
+      result = runGate(gate, allWorkers ? '' : readFileSync(0, 'utf8'), worker);
     } catch {
       result = null;
     }

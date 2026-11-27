@@ -1,27 +1,27 @@
 #!/usr/bin/env node
-// Renders the temporary copier's Wrangler config from names-only run pins into runner scratch.
-// The config is never tracked: every field except the four run vars is fixed here, and the
-// absolute module paths point at this checkout's src/. No credential is an input or an output.
+// Renders one source Worker's temporary copier Wrangler config from names-only run pins into
+// runner scratch. The config is never tracked: every field except the five run vars is fixed here
+// or by that Worker's reviewed batch (src/table.mjs), and the absolute module paths point at this
+// checkout's src/. No credential is an input or an output.
 //
-//   node scripts/secrets-migration/notifications-copy/render-config.mjs \
-//     --run-id m65-<[a-z0-9-]{8,60}> --not-before <YYYY-MM-DDTHH:MM:SSZ> \
+//   node scripts/secrets-migration/runtime-copy/render-config.mjs \
+//     --run-id m65-<[a-z0-9-]{8,60}> --batch <source Worker> --not-before <YYYY-MM-DDTHH:MM:SSZ> \
 //     --not-after <YYYY-MM-DDTHH:MM:SSZ> --client-id <uuid> --out <path outside the repository>
 //
-// Rules: not-before at least 16 minutes from now (cron changes take up to 15 minutes to
-// propagate), window length 5 to 30 minutes, output written once with mode 0600. Prints one JSON
-// line: {configPath, configSha256, name, cron, notBefore, notAfter}.
+// Rules: the batch is a Worker of the valid table, not-before at least 16 minutes from now (cron
+// changes take up to 15 minutes to propagate), window length 5 to 30 minutes, output written once
+// with mode 0600. Prints one JSON line: {configPath, configSha256, name, cron, notBefore, notAfter}.
 
 import { createHash } from 'node:crypto';
 import { closeSync, openSync, realpathSync, writeSync } from 'node:fs';
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CRON, PIN_FORMAT, RUN_VARS, windowOf } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
+import { CRON, PIN_FORMAT, RUN_VARS, copierName, windowOf } from './src/core.mjs';
+import { TABLE } from './src/table.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const SRC_DIR = join(HERE, 'src');
 export const REPO_ROOT = resolve(HERE, '../../..');
-export const COPIER_NAME = 'm65-notifications-copy';
 export const COMPATIBILITY_DATE = '2026-06-01';
 export const MIN_LEAD_MS = 16 * 60_000;
 export const OBSERVABILITY = Object.freeze({
@@ -31,10 +31,16 @@ export const OBSERVABILITY = Object.freeze({
   traces: { enabled: false },
 });
 
-/** Names-only pin problems; empty when the pins are usable at `nowMs`. */
-export function pinProblems(pins, nowMs) {
+/**
+ * Names-only pin problems; empty when the pins are usable at `nowMs`. `table` is the checked-in
+ * table; tests pass a fixture table.
+ */
+export function pinProblems(pins, nowMs, table = TABLE) {
   const f = [];
   for (const k of RUN_VARS) if (!PIN_FORMAT[k].test(String(pins[k]))) f.push(`pin_${k}`);
+  if (!f.includes('pin_M65_BATCH') && !Object.hasOwn(table.batches, pins.M65_BATCH)) {
+    f.push('batch_not_in_table');
+  }
   if (f.length) return f;
   const win = windowOf(pins);
   if (!win) return ['window_length'];
@@ -42,11 +48,18 @@ export function pinProblems(pins, nowMs) {
   return [];
 }
 
-/** The complete config for `pins`. `srcDir` is absolute so the file can live outside the repo. */
-export function buildConfig(pins, srcDir = SRC_DIR) {
+/**
+ * The complete config for `pins`, or null when `pins.M65_BATCH` is not a Worker of the valid table.
+ * `srcDir` is absolute so the file can live outside the repo.
+ */
+export function buildConfig(pins, srcDir = SRC_DIR, table = TABLE) {
+  const batch = Object.hasOwn(table.batches, pins?.M65_BATCH)
+    ? table.batches[pins.M65_BATCH]
+    : null;
+  if (!batch) return null;
   return {
-    name: COPIER_NAME,
-    account_id: BATCH.accountId,
+    name: copierName(batch.sourceScript),
+    account_id: batch.accountId,
     main: join(srcDir, 'worker.mjs'),
     compatibility_date: COMPATIBILITY_DATE,
     no_bundle: true,
@@ -64,7 +77,7 @@ export function buildConfig(pins, srcDir = SRC_DIR) {
     version_metadata: { binding: 'CF_VERSION_METADATA' },
     durable_objects: { bindings: [{ name: 'M65_GATE', class_name: 'M65Gate' }] },
     migrations: [{ tag: 'v1', new_sqlite_classes: ['M65Gate'] }],
-    secrets_store_secrets: BATCH.rows.map(r => ({
+    secrets_store_secrets: batch.rows.map(r => ({
       binding: r.binding,
       store_id: r.storeId,
       secret_name: r.secretName,
@@ -74,6 +87,7 @@ export function buildConfig(pins, srcDir = SRC_DIR) {
 
 const FLAGS = {
   '--run-id': 'M65_RUN_ID',
+  '--batch': 'M65_BATCH',
   '--not-before': 'M65_NOT_BEFORE',
   '--not-after': 'M65_NOT_AFTER',
   '--client-id': 'M65_INFISICAL_CLIENT_ID',
@@ -136,7 +150,7 @@ function main(argv) {
     `${JSON.stringify({
       configPath: resolve(args.out),
       configSha256: createHash('sha256').update(text).digest('hex'),
-      name: COPIER_NAME,
+      name: copierName(args.M65_BATCH),
       cron: CRON,
       notBefore: args.M65_NOT_BEFORE,
       notAfter: args.M65_NOT_AFTER,

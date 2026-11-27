@@ -1,20 +1,44 @@
 // Synthetic stand-ins for the copier tests: a fake Infisical EU API (single-use client secret,
 // create-only token with rows + 1 uses, Create-only store), a gate with M65Gate's semantics, and
-// synthetic source values. No real value, credential or provider is involved.
+// synthetic source values. No real value, credential or provider is involved. Every helper takes
+// a batch; the default is the fixture table's Notifications batch.
+//
+// The fixture table is the one Notifications Expo row (the reviewed source on main, whose name map
+// checks.mjs `WORKER_SOURCES.notifications` keeps), so every table-bound path (source check,
+// renderer, driver, copier module) runs end to end in CI while the checked-in table's Workers wait
+// for their batch PRs (`source_not_on_main`). Functions take it as their `table` argument; the
+// workerd tests load it as the copier's table module (`FIXTURE_TABLE_MODULE`).
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { COMPATIBILITY_DATE, COPIER_NAME } from './render-config.mjs';
-import { BATCH } from './src/manifest.mjs';
-import { PROJECT_ID, RUN_VARS, WRITER_SECRET } from './src/core.mjs';
+import { COMPATIBILITY_DATE } from './render-config.mjs';
+import { PROJECT_ID, RUN_VARS, WRITER_SECRET, copierName, tableOf } from './src/core.mjs';
 
+export const FIXTURE_ROWS = Object.freeze([
+  Object.freeze({
+    worker: 'notifications',
+    binding: 'EXPO_ACCESS_TOKEN',
+    storeId: '342a86d9e3a94da698e82d0c6e2a36f0',
+    secretName: 'EXPO_ACCESS_TOKEN',
+    target: '/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+  }),
+]);
+export const FIXTURE = tableOf(FIXTURE_ROWS);
+/** The fixture table as the source of a `table.mjs` module next to the real core.mjs. */
+export const FIXTURE_TABLE_MODULE = `import { tableOf } from './core.mjs';\nexport const TABLE = tableOf(${JSON.stringify(FIXTURE_ROWS)});\n`;
+export const BATCH = FIXTURE.batches.notifications;
 export const CLIENT_ID = '11111111-2222-4333-8444-555555555555';
 export const CLIENT_SECRET = `synthetic-client-secret-${randomBytes(12).toString('hex')}`;
 export const VERSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 export const RUN_ID = 'm65-synthetic-run-0001';
 
-// One synthetic value per batch binding, keyed by binding (M108: the Expo token only).
-export function syntheticValues() {
-  return { EXPO_ACCESS_TOKEN: `synthetic-expo-ünïcødé-${randomBytes(24).toString('base64url')}` };
+/** One synthetic value per batch binding, keyed by binding (non-ASCII included). */
+export function syntheticValues(batch = BATCH) {
+  return Object.fromEntries(
+    batch.rows.map(r => [
+      r.binding,
+      `synthetic-${r.binding.toLowerCase()}-ünïcødé-${randomBytes(24).toString('base64url')}`,
+    ])
+  );
 }
 
 // Values plus their trimmed, base64, hex and SHA-256 forms, the client secret, and any extra
@@ -41,6 +65,7 @@ export const leaks = (text, values, extra = []) =>
  * probe 403, a revoked or exhausted one 401.
  */
 export function fakeInfisical(opts = {}) {
+  const batch = opts.batch ?? BATCH;
   const s = {
     calls: [],
     store: new Map(),
@@ -82,7 +107,7 @@ export function fakeInfisical(opts = {}) {
       }
       s.clientSecretUses++;
       const accessToken = `synthetic-access-${randomBytes(24).toString('hex')}`;
-      s.tokens.set(accessToken, { uses: 0, limit: BATCH.rows.length + 1, revoked: false });
+      s.tokens.set(accessToken, { uses: 0, limit: batch.rows.length + 1, revoked: false });
       s.issued.push(accessToken);
       const ttl = opts.ttl ?? 300;
       return json({ accessToken, expiresIn: ttl, accessTokenMaxTTL: ttl, tokenType: 'Bearer' });
@@ -157,9 +182,10 @@ export function makeEnv({
   armed = true,
   extra = {},
   readLog = [],
+  batch = BATCH,
 }) {
   const env = {};
-  for (const r of BATCH.rows) {
+  for (const r of batch.rows) {
     env[r.binding] = {
       get: async () => {
         readLog.push(r.binding);
@@ -173,6 +199,7 @@ export function makeEnv({
     M65_GATE: gate.ns,
     CF_VERSION_METADATA: { id: VERSION_ID, tag: '', timestamp: '2026-11-27T00:00:00.000Z' },
     M65_RUN_ID: RUN_ID,
+    M65_BATCH: batch.sourceScript,
     M65_NOT_BEFORE: notBefore,
     M65_NOT_AFTER: notAfter,
     M65_INFISICAL_CLIENT_ID: CLIENT_ID,
@@ -219,9 +246,9 @@ export function copierSettingsResult() {
  * The unarmed copier version's `resources.bindings` as `GET .../versions/<id>` returns them,
  * including the gate binding's own script_name and namespace_id. The preflight accepts them.
  */
-export function unarmedCopierBindings(pins, namespaceId) {
+export function unarmedCopierBindings(pins, namespaceId, batch = BATCH) {
   return [
-    ...BATCH.rows.map(r => ({
+    ...batch.rows.map(r => ({
       name: r.binding,
       type: 'secrets_store_secret',
       store_id: r.storeId,
@@ -231,7 +258,7 @@ export function unarmedCopierBindings(pins, namespaceId) {
       name: 'M65_GATE',
       type: 'durable_object_namespace',
       class_name: 'M65Gate',
-      script_name: COPIER_NAME,
+      script_name: copierName(batch.sourceScript),
       namespace_id: namespaceId,
     },
     { name: 'CF_VERSION_METADATA', type: 'version_metadata' },
@@ -240,7 +267,7 @@ export function unarmedCopierBindings(pins, namespaceId) {
 }
 
 /** The armed version's bindings: the unarmed ones plus exactly the writer secret (no value). */
-export const armedCopierBindings = (pins, namespaceId) => [
-  ...unarmedCopierBindings(pins, namespaceId),
+export const armedCopierBindings = (pins, namespaceId, batch = BATCH) => [
+  ...unarmedCopierBindings(pins, namespaceId, batch),
   { name: WRITER_SECRET, type: 'secret_text' },
 ];

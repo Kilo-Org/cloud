@@ -1,0 +1,179 @@
+name: Runtime copy (temporary)
+
+# One-shot copy of production Secrets Store values into Create-only Infisical production targets,
+# one source Worker at a time (M122). The rows are the reviewed table in
+# scripts/secrets-migration/runtime-copy/src/table.mjs (worker | binding | store/secret | target);
+# each matrix entry deploys a temporary cron-only copier Worker for one source Worker, copies
+# that Worker's rows and deletes the copier (scripts/secrets-migration/runtime-copy-run.mjs).
+# Removed after the run.
+#
+# It takes no input except the exact commit the dispatcher approved, and runs only from
+# Kilo-Org/cloud main. Each Worker's entry runs in its own protected environment
+# `runtime-copy-<worker>`, which must already exist with main as its only deployment branch, no
+# admin bypass, and required reviewers with self-review prevented. GitHub enforces that protection
+# when each entry starts. The job token cannot read an environment's settings, so no job here reads
+# them: before dispatch the operator reads every environment back with admin rights (the run
+# notes record the result per environment). This workflow never configures an environment, and a
+# dispatch that referenced a missing one would create it unprotected, so that readback is a
+# dispatch precondition. The first job (no secret, no environment, no GitHub API call) validates
+# the table and every Worker's sources offline and outputs the matrix.
+#
+# Serial: max-parallel 1 and fail-fast, so one copier exists at a time, the rollout guard and the
+# zero-drift snapshots hold per entry, and the first failure stops the rest. Concurrency: its own
+# group, so it never replaces or cancels a pending rollout.
+#
+# Credentials, per entry and only in the driver step: the Cloudflare deploy token (the stored
+# CLOUDFLARE_API_TOKEN, or with the repository variable DEPLOY_TOKEN_SOURCE `sts` a short-lived
+# STS deploy token minted for this job and revoked after it; never a fallback between the two),
+# that Worker's one-use writer client secret and the operator's names-only Infisical readback.
+# WRANGLER_WRITE_LOGS is false everywhere (M124): Wrangler would otherwise write its log, which can
+# hold token JSON, to files.
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: 'Exact main commit SHA the run was approved for'
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  WRANGLER_WRITE_LOGS: 'false'
+  WRANGLER_SEND_METRICS: 'false'
+
+concurrency:
+  group: runtime-copy
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      workers: ${{ steps.plan.outputs.workers }}
+    steps:
+      - name: Checkout the dispatched commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Validate the table and the sources
+        id: plan
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: node scripts/secrets-migration/runtime-copy-run.mjs --plan
+
+  copy:
+    needs: plan
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    name: Copy ${{ matrix.worker }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        worker: ${{ fromJSON(needs.plan.outputs.workers) }}
+    environment: runtime-copy-${{ matrix.worker }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      # Exactly unset, `secret` or `sts`: job conditions compare without case, so `STS` stops here.
+      - name: Check DEPLOY_TOKEN_SOURCE
+        env:
+          DEPLOY_TOKEN_SOURCE: ${{ vars.DEPLOY_TOKEN_SOURCE }}
+        run: |
+          case "$DEPLOY_TOKEN_SOURCE" in
+            '' | secret | sts) ;;
+            *)
+              echo "::error::DEPLOY_TOKEN_SOURCE must be unset, secret or sts"
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout the dispatched commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install the pinned Wrangler
+        working-directory: services/notifications
+        # Only this package's own dependencies (the pinned Wrangler; the driver imports nothing
+        # else) and no lifecycle scripts: Wrangler runs from its optional-dependency binaries
+        # alone (checked with this exact install and a closed `wrangler deploy --dry-run`).
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter '{.}'
+
+      - name: Run the copier (stored token)
+        if: vars.DEPLOY_TOKEN_SOURCE != 'sts'
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          GITHUB_TOKEN: ${{ github.token }}
+          COPY_WORKER: ${{ matrix.worker }}
+          COPY_INDEX: ${{ strategy.job-index }}
+          CLOUDFLARE_TOKEN_SOURCE: secret
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          M65_INFISICAL_CLIENT_ID: ${{ vars.M65_INFISICAL_CLIENT_ID }}
+          M65_INFISICAL_CLIENT_SECRET: ${{ secrets.M65_INFISICAL_CLIENT_SECRET }}
+          M65_OPERATOR_PREFLIGHT: ${{ secrets.M65_OPERATOR_PREFLIGHT }}
+        run: node scripts/secrets-migration/runtime-copy-run.mjs
+
+      # STS twin (after #13048): a deploy token minted over GitHub OIDC for this job only, masked
+      # and handed on as a step output; a refusal fails the job and never falls back to the secret.
+      # The mint step must also output `expires_at` (the STS answer's expiresAt); without it the
+      # driver refuses before any Cloudflare call.
+      - name: Get a deploy token from STS
+        id: sts
+        if: vars.DEPLOY_TOKEN_SOURCE == 'sts'
+        env:
+          STS_ENVIRONMENT: production
+        run: bash scripts/ci/sts-deploy-token.sh mint
+
+      # The token lives at most 60 minutes from the mint. The driver refuses unless it outlives the
+      # result deadline by 8 minutes and goes to cleanup 7 minutes before expiry (by minute 53), so
+      # cleanup keeps 5 minutes before this step's 58-minute limit. The job's 80 minutes cover the
+      # stored-token path, where no token expires.
+      - name: Run the copier (STS token)
+        if: vars.DEPLOY_TOKEN_SOURCE == 'sts'
+        timeout-minutes: 58
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          GITHUB_TOKEN: ${{ github.token }}
+          COPY_WORKER: ${{ matrix.worker }}
+          COPY_INDEX: ${{ strategy.job-index }}
+          CLOUDFLARE_TOKEN_SOURCE: sts
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_TOKEN_EXPIRES_AT: ${{ steps.sts.outputs.expires_at }}
+          M65_INFISICAL_CLIENT_ID: ${{ vars.M65_INFISICAL_CLIENT_ID }}
+          M65_INFISICAL_CLIENT_SECRET: ${{ secrets.M65_INFISICAL_CLIENT_SECRET }}
+          M65_OPERATOR_PREFLIGHT: ${{ secrets.M65_OPERATOR_PREFLIGHT }}
+        run: node scripts/secrets-migration/runtime-copy-run.mjs
+
+      - name: Revoke the STS deploy token
+        if: always() && steps.sts.outputs.token_id != ''
+        env:
+          STS_ENVIRONMENT: production
+          TOKEN_ID: ${{ steps.sts.outputs.token_id }}
+        run: bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"

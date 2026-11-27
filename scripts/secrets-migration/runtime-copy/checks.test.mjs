@@ -1,35 +1,18 @@
 // Runner-side gates: tracked-source match, renderer, receipt parser, preflight, post-run, cleanup.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { RUN_VARS, newReceipt } from './src/core.mjs';
-import { BATCH } from './src/manifest.mjs';
+import * as C from './checks.mjs';
+import * as R from './render-config.mjs';
+import { TABLE } from './src/table.mjs';
 import {
-  EXPECTED_ALIASES,
-  NAME_MAP,
-  checkRenderedConfig,
-  checkSource,
-  evaluateCleanup,
-  evaluateCleanupCloudflare,
-  evaluateCleanupInfisical,
-  evaluatePostRun,
-  evaluatePostRunCloudflare,
-  evaluatePostRunInfisical,
-  bindArmedPreflight,
-  evaluatePreflight,
-  moduleHashes,
-  parseJsonc,
-  parseReceipt,
-  pathCovers,
-  readTrackedSource,
-  validatedNameTable,
-} from './checks.mjs';
-import { REPO_ROOT, buildConfig, insideRepo, parseArgs, pinProblems } from './render-config.mjs';
-import {
+  BATCH,
+  FIXTURE,
   CLIENT_ID,
   RUN_ID,
   VERSION_ID,
@@ -39,10 +22,39 @@ import {
   unarmedCopierBindings,
 } from './fakes.mjs';
 
+const { REPO_ROOT, SRC_DIR, insideRepo, parseArgs } = R;
+const {
+  WORKER_SOURCES,
+  bindArmedPreflight,
+  evaluateCleanup,
+  evaluateCleanupCloudflare,
+  evaluateCleanupInfisical,
+  moduleHashes,
+  parseJsonc,
+  pathCovers,
+} = C;
+// The fixture table's Notifications batch, its per-Worker sources, and every gate bound to it.
+const SRC = WORKER_SOURCES.notifications;
+const NAME_MAP = SRC.names;
+const EXPECTED_ALIASES = SRC.aliases;
+const readTrackedSource = () => C.readTrackedSource(SRC);
+const checkSource = (w, p, r, batch = BATCH, src = SRC) =>
+  C.checkSource(w, p, r, batch, src, FIXTURE);
+const validatedNameTable = () => C.validatedNameTable(BATCH, REPO_ROOT, FIXTURE);
+const pinProblems = (pins, nowMs) => R.pinProblems(pins, nowMs, FIXTURE);
+const buildConfig = pins => R.buildConfig(pins, SRC_DIR, FIXTURE);
+const checkRenderedConfig = (text, pins) => C.checkRenderedConfig(text, pins, SRC_DIR, FIXTURE);
+const parseReceipt = (text, batch = BATCH) => C.parseReceipt(text, batch);
+const evaluatePreflight = (input, batch = BATCH) => C.evaluatePreflight(input, batch);
+const evaluatePostRun = input => C.evaluatePostRun(input, BATCH);
+const evaluatePostRunCloudflare = input => C.evaluatePostRunCloudflare(input, BATCH);
+const evaluatePostRunInfisical = input => C.evaluatePostRunInfisical(input, BATCH);
+
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const T0 = Date.parse('2026-11-27T16:00:00Z');
 const PINS = {
   M65_RUN_ID: RUN_ID,
+  M65_BATCH: 'notifications',
   M65_NOT_BEFORE: iso(T0 + 20 * 60_000),
   M65_NOT_AFTER: iso(T0 + 45 * 60_000),
   M65_INFISICAL_CLIENT_ID: CLIENT_ID,
@@ -97,32 +109,41 @@ test('M108: the copy batch is exactly the Expo row of the four-name map', () => 
   ]) {
     expect(checkSource(wranglerText, policyText, readerText, swap(patch)), code);
   }
-  // Another name map row (a 1Password-sourced target) is not a reviewed copy target.
+  // Another name map row (a 1Password-sourced target) is not in the reviewed table.
   for (const n of NAME_MAP.filter(x => x.binding !== 'EXPO_ACCESS_TOKEN')) {
     const failures = checkSource(wranglerText, policyText, readerText, swap(n));
-    assert.deepEqual(failures, ['batch_row_target_not_reviewed'], n.secretKey);
+    expect(failures, 'batch_not_in_table');
   }
 });
 
-test('name map proposals targeting a store name, a *_PROD name or the unprefixed APNs/Expo name refuse', () => {
+test('name map proposals targeting another row’s store name, a *_PROD name or the unprefixed APNs/Expo name refuse', () => {
   const { wranglerText, policyText, readerText } = readTrackedSource();
   const propose = (i, secretKey, secretPath = NAME_MAP[i].secretPath) =>
     NAME_MAP.map((r, j) => (j === i ? { ...r, secretKey, secretPath } : r));
   const cases = [
-    [propose(0, 'APNS_PRIVATE_KEY_PROD', '/shared'), 'target_is_store_name_APNS_PRIVATE_KEY_PROD'],
+    // Another row's store name: the APNs row proposing the Expo store entry's name.
+    [propose(0, 'EXPO_ACCESS_TOKEN'), 'target_is_store_name_EXPO_ACCESS_TOKEN'],
+    [propose(2, 'INTERNAL_API_SECRET_PROD'), 'target_is_store_name_INTERNAL_API_SECRET_PROD'],
+    // Its own store name passes that rule; the suffix, reader and policy checks still refuse.
+    [
+      propose(0, 'APNS_PRIVATE_KEY_PROD', '/shared'),
+      'target_environment_suffix_APNS_PRIVATE_KEY_PROD',
+    ],
     [propose(2, 'NEXTAUTH_SECRET_PROD'), 'target_environment_suffix_NEXTAUTH_SECRET_PROD'],
-    [propose(3, 'INTERNAL_API_SECRET_PROD'), 'target_is_store_name_INTERNAL_API_SECRET_PROD'],
     [propose(0, 'APNS_PRIVATE_KEY', '/shared'), 'reader_lookup_differs_APNS_PRIVATE_KEY'],
-    [propose(1, 'EXPO_ACCESS_TOKEN', '/shared'), 'target_is_store_name_EXPO_ACCESS_TOKEN'],
+    [propose(1, 'EXPO_ACCESS_TOKEN', '/shared'), 'reader_lookup_differs_EXPO_ACCESS_TOKEN'],
   ];
   for (const [names, code] of cases) {
-    const failures = checkSource(wranglerText, policyText, readerText, BATCH, names);
+    const failures = checkSource(wranglerText, policyText, readerText, BATCH, { ...SRC, names });
     expect(failures, code);
     expect(failures, 'policy_targets_differ');
   }
   // Dropping a 1Password-sourced name from the map breaks the source, reader and policy match.
   const three = NAME_MAP.filter(r => r.binding !== 'INTERNAL_API_SECRET');
-  const failures = checkSource(wranglerText, policyText, readerText, BATCH, three);
+  const failures = checkSource(wranglerText, policyText, readerText, BATCH, {
+    ...SRC,
+    names: three,
+  });
   for (const code of ['source_bindings_differ', 'reader_keys_differ', 'policy_targets_differ']) {
     expect(failures, code);
   }
@@ -211,12 +232,16 @@ test('renderer: pins, lead time, window length and a closed config', () => {
 
 test('renderer CLI writes once to scratch with mode 0600 and refuses the repository', () => {
   const dir = mkdtempSync(join(tmpdir(), 'm65-render-'));
+  // The CLI renders from the checked-in table only.
+  const worker = TABLE.workers[0];
   try {
     const now = Date.now();
     const args = out => [
       join(HERE, 'render-config.mjs'),
       '--run-id',
       RUN_ID,
+      '--batch',
+      worker,
       '--not-before',
       iso(now + 17 * 60_000),
       '--not-after',
@@ -240,7 +265,8 @@ test('renderer CLI writes once to scratch with mode 0600 and refuses the reposit
     ]);
     assert.equal(statSync(out).mode & 0o777, 0o600);
     const pins = JSON.parse(readFileSync(out, 'utf8')).vars;
-    assert.deepEqual(checkRenderedConfig(readFileSync(out, 'utf8'), pins), []);
+    assert.equal(pins.M65_BATCH, worker);
+    assert.deepEqual(C.checkRenderedConfig(readFileSync(out, 'utf8'), pins), []);
     assert.equal(
       spawnSync(process.execPath, args(out), { encoding: 'utf8' }).status,
       2,
@@ -348,7 +374,7 @@ function preflightFixture() {
     ready: { pins: true, envClosed: true, bindings: true, gate: true, cron: true },
   };
   const meta = {
-    notifications: {
+    source: {
       deployments: [{ version_id: SOURCE_VERSION, percentage: 100 }],
       version: { id: SOURCE_VERSION, bindings: srcBindings },
     },
@@ -438,7 +464,7 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
   const withCopier = p => ({ copier: { ...meta.copier, ...p } });
   const withBindings = bindings => withCopier({ version: { id: VERSION_ID, bindings } });
   const withInf = p => ({ infisical: { ...meta.infisical, ...p } });
-  const withSource = p => ({ notifications: { ...meta.notifications, ...p } });
+  const withSource = p => ({ source: { ...meta.source, ...p } });
   const receipt = p => ({ readinessReceipt: JSON.stringify({ ...readiness, ...p }) });
 
   // Too late: at or after not-before, or an unusable clock.
@@ -819,7 +845,7 @@ test('preflight fails closed on malformed input and never names a value or princ
   const throwing = evaluatePreflight({
     ...input,
     meta: {
-      get notifications() {
+      get source() {
         throw new Error('synthetic');
       },
     },
@@ -1002,10 +1028,10 @@ test('post-run and cleanup gates', () => {
     );
   }
   // The source serving version must stay the pinned one, read back by its id.
-  for (const notifications of [
+  for (const source of [
     {
       deployments: [{ version_id: OTHER_VERSION, percentage: 100 }],
-      version: { id: OTHER_VERSION, bindings: meta.notifications.version.bindings },
+      version: { id: OTHER_VERSION, bindings: meta.source.version.bindings },
     },
     {
       deployments: [
@@ -1015,20 +1041,20 @@ test('post-run and cleanup gates', () => {
       version: null,
     },
     {
-      ...meta.notifications,
-      version: { id: SOURCE_VERSION, bindings: meta.notifications.version.bindings.slice(1, 3) },
+      ...meta.source,
+      version: { id: SOURCE_VERSION, bindings: meta.source.version.bindings.slice(1, 3) },
     },
-    { deployments: meta.notifications.deployments, bindings: meta.notifications.version.bindings },
+    { deployments: meta.source.deployments, bindings: meta.source.version.bindings },
   ]) {
     expect(
-      evaluatePostRun({ pre, meta: { ...post, notifications }, receipt: JSON.stringify(complete) })
+      evaluatePostRun({ pre, meta: { ...post, source }, receipt: JSON.stringify(complete) })
         .failures,
       'source_changed_during_run'
     );
   }
 
   // Split halves: the Cloudflare half ignores Infisical; the full gate needs both.
-  const cloudOnly = { notifications: meta.notifications, store: meta.store };
+  const cloudOnly = { source: meta.source, store: meta.store };
   assert.deepEqual(
     evaluatePostRunCloudflare({ pre, meta: cloudOnly, receipt: JSON.stringify(complete) }),
     { gate: 'postrun-cloudflare', ok: true, failures: [] }
@@ -1059,7 +1085,7 @@ test('post-run and cleanup gates', () => {
       openApprovalRequestsByWriter: 0,
     },
     writerTokenStatus: 401,
-    notificationsUnchanged: true,
+    sourceUnchanged: true,
     existingDeploymentsUnchanged: true,
   };
   assert.deepEqual(evaluateCleanup({ meta: clean, baseline }), {
@@ -1086,7 +1112,7 @@ test('post-run and cleanup gates', () => {
     'infisical_open_approval_requests'
   );
   expect(
-    evaluateCleanup({ meta: { ...clean, notificationsUnchanged: false }, baseline }).failures,
+    evaluateCleanup({ meta: { ...clean, sourceUnchanged: false }, baseline }).failures,
     'source_binding_changed'
   );
   expect(
@@ -1096,7 +1122,7 @@ test('post-run and cleanup gates', () => {
   expect(evaluateCleanup({ meta: clean, baseline: {} }).failures, 'infisical_counts_differ');
   const cloudClean = {
     copier: clean.copier,
-    notificationsUnchanged: true,
+    sourceUnchanged: true,
     existingDeploymentsUnchanged: true,
   };
   assert.deepEqual(evaluateCleanupCloudflare({ meta: cloudClean }), {
@@ -1115,16 +1141,26 @@ test('post-run and cleanup gates', () => {
 test('checks CLI: verdict JSON on stdout, exit 0/1/2', () => {
   const cli = (args, input) =>
     spawnSync(process.execPath, [join(HERE, 'checks.mjs'), ...args], { input, encoding: 'utf8' });
+  // `source` covers every checked-in Worker; one whose batch PR is not on main yet refuses by name.
   const src = cli(['source'], '');
-  assert.equal(src.status, 0, src.stdout);
-  assert.deepEqual(JSON.parse(src.stdout).failures, []);
+  const verdict = JSON.parse(src.stdout);
+  assert.deepEqual(
+    verdict.workers.map(w => [w.worker, w.failures]),
+    TABLE.workers.map(w => [
+      w,
+      existsSync(join(REPO_ROOT, WORKER_SOURCES[w].reader)) ? [] : [`source_not_on_main: ${w}`],
+    ])
+  );
+  assert.equal(src.status, verdict.failures.length === 0 ? 0 : 1, src.stdout);
+  const worker = TABLE.workers[0];
+  const id = TABLE.batches[worker].id;
   const good = JSON.stringify({
-    ...newReceipt(BATCH.id),
+    ...newReceipt(id),
     outcome: 'refused',
     reason: 'not_ready_cron',
   });
-  assert.equal(cli(['receipt'], `${good}\n`).status, 0);
-  const bad = cli(['receipt'], JSON.stringify({ ...newReceipt(BATCH.id), extra: true }));
+  assert.equal(cli(['receipt', worker], `${good}\n`).status, 0);
+  const bad = cli(['receipt', worker], JSON.stringify({ ...newReceipt(id), extra: true }));
   assert.equal(bad.status, 1);
   assert.deepEqual(JSON.parse(bad.stdout), {
     gate: 'receipt',
@@ -1132,6 +1168,13 @@ test('checks CLI: verdict JSON on stdout, exit 0/1/2', () => {
     failures: ['receipt_keys'],
     receipt: null,
   });
-  assert.equal(cli(['preflight'], '{').status, 2);
+  assert.equal(cli(['receipt'], `${good}\n`).status, 2, 'a per-Worker gate needs the Worker');
+  assert.equal(cli(['receipt', 'other-worker'], `${good}\n`).status, 2, 'only table Workers');
+  assert.equal(
+    cli(['receipt', 'notifications'], `${good}\n`).status,
+    2,
+    'the Expo run is not in this table'
+  );
+  assert.equal(cli(['preflight', worker], '{').status, 2);
   assert.equal(cli(['nope'], '').status, 2);
 });

@@ -713,9 +713,9 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
 });
 
 test('one database gate per deployment runs the migration proxy script and holds no database credential', () => {
-  for (const [name, deployment, environment, proxyUrl, timeout] of [
-    ['production', production, 'production', 'https://migration-proxy.kiloapps.io', 45],
-    ['staging', staging, 'staging', 'https://migration-proxy-staging.kiloapps.io', 15],
+  for (const [name, deployment, environment, proxyUrl, timeout, budget] of [
+    ['production', production, 'production', 'https://migration-proxy.kiloapps.io', 45, '2580'],
+    ['staging', staging, 'staging', 'https://migration-proxy-staging.kiloapps.io', 15, '780'],
   ]) {
     const job = deployment.jobs['db-gate'];
     assert.equal(job.environment, environment);
@@ -745,7 +745,10 @@ test('one database gate per deployment runs the migration proxy script and holds
       MIGRATION_PROXY_URL: proxyUrl,
       MIGRATION_PROXY_AUDIENCE: proxyUrl,
       TARGET_SHA: '${{ needs.check-changes.outputs.target_sha }}',
+      MIGRATION_PROXY_BUDGET_SECONDS: budget,
     });
+    // The script's wait budget ends before the runner's timeout, so it stops with a message.
+    assert.ok(Number(budget) < timeout * 60, `${name} wait budget must end before the timeout`);
 
     // The job installs, probes and migrates nothing itself.
     const text = JSON.stringify(job);
@@ -928,6 +931,7 @@ async function runMigrationScript({ posts, gets = {}, env = {} }) {
         MIGRATION_PROXY_URL: base,
         MIGRATION_PROXY_AUDIENCE: PROXY_AUDIENCE,
         TARGET_SHA: TARGET,
+        MIGRATION_PROXY_BUDGET_SECONDS: '3600',
         ACTIONS_ID_TOKEN_REQUEST_URL: `${base}/oidc?api-version=2.0`,
         ACTIONS_ID_TOKEN_REQUEST_TOKEN: REQUEST_SENTINEL,
         ...env,
@@ -1128,10 +1132,16 @@ test('the db-gate script fails at once on a refusal and prints only its document
     [400, { status: 'invalid_request' }, /HTTP 400 status=invalid_request/],
     [500, { status: 'config_invalid' }, /HTTP 500 status=config_invalid/],
     [502, `<html>${LEAK}</html>`, /HTTP 502 $/m],
+    [
+      429,
+      { status: 'limited', reason: 'too_many_attempts', retryAfterSeconds: 3600 },
+      /HTTP 429 status=limited reason=too_many_attempts\n.*re-run the job: a new attempt gets a fresh cap/,
+    ],
   ]) {
     const run = await runMigrationScript({ posts: [{ status, body }] });
     assert.equal(run.code, 1, run.output);
     assert.equal(run.requests.length, 1, `${status} must not be re-POSTed`);
+    assert.deepEqual(run.sleeps, [], `${status} must not wait`);
     assert.match(run.output, expected);
   }
 
@@ -1139,6 +1149,115 @@ test('the db-gate script fails at once on a refusal and prints only its document
   assert.equal(invalid.code, 1);
   assert.equal(invalid.requests.length, 0);
   assert.match(invalid.output, /TARGET_SHA must be 40 lowercase hex characters/);
+
+  for (const budget of ['0', 'soon', '1e3']) {
+    const refused = await runMigrationScript({
+      posts: [],
+      env: { MIGRATION_PROXY_BUDGET_SECONDS: budget },
+    });
+    assert.equal(refused.code, 1, budget);
+    assert.equal(refused.requests.length, 0);
+    assert.match(refused.output, /MIGRATION_PROXY_BUDGET_SECONDS must be a positive number/);
+  }
+});
+
+test('the db-gate script stops before a wait that would pass the job budget', async () => {
+  // Each wait is checked before it starts; the run, if any, continues on the proxy.
+  for (const [name, budget, posts, gets, posted] of [
+    [
+      'rate_limited',
+      '60',
+      [
+        {
+          status: 429,
+          body: { status: 'limited', reason: 'rate_limited', retryAfterSeconds: 120 },
+        },
+      ],
+      {},
+      1,
+    ],
+    [
+      'unavailable',
+      '10',
+      [
+        {
+          status: 503,
+          body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 15 },
+        },
+      ],
+      {},
+      1,
+    ],
+    [
+      'busy, at its 30 s floor',
+      '25',
+      [{ status: 409, body: { status: 'busy', activeRunId: RUN_C, retryAfterSeconds: 5 } }],
+      {},
+      1,
+    ],
+    ['poll', '10', [accepted(runView(RUN_A, 'pending'))], {}, 1],
+    [
+      '503 while polling',
+      '30',
+      [accepted(runView(RUN_A, 'pending'))],
+      {
+        [RUN_A]: [
+          {
+            status: 503,
+            body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 60 },
+          },
+        ],
+      },
+      1,
+    ],
+  ]) {
+    const run = await runMigrationScript({
+      posts,
+      gets,
+      env: { MIGRATION_PROXY_BUDGET_SECONDS: budget },
+    });
+    assert.equal(run.code, 1, `${name}: ${run.output}`);
+    assert.equal(postCount(run.requests), posted, name);
+    assert.ok(
+      run.sleeps.every(seconds => Number(seconds) <= Number(budget)),
+      `${name} must not start a wait past the budget: ${run.sleeps}`
+    );
+    assert.match(
+      run.output,
+      /::error::the job's wait budget ends before .*; re-run the job at or after \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ, or let the next deploy pick it up/,
+      name
+    );
+  }
+});
+
+test('the db-gate script reads again after a 503 while polling, without another poll interval', async () => {
+  const { code, output, sleeps } = await runMigrationScript({
+    posts: [accepted(runView(RUN_A, 'pending'))],
+    gets: {
+      [RUN_A]: [
+        {
+          status: 503,
+          body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 7 },
+        },
+        { status: 200, body: runView(RUN_A, 'succeeded') },
+      ],
+    },
+  });
+  assert.equal(code, 0, output);
+  assert.deepEqual(sleeps, ['20', '7']);
+});
+
+test('the db-gate script prints the status of a failed read of the active run while busy', async () => {
+  const { code, output, requests } = await runMigrationScript({
+    posts: [
+      { status: 409, body: { status: 'busy', activeRunId: RUN_C, retryAfterSeconds: 30 } },
+      { status: 200, body: { status: 'already_applied', run: runView(RUN_A, 'succeeded') } },
+    ],
+    gets: { [RUN_C]: [{ status: 404, body: { status: 'not_found' } }] },
+  });
+  assert.equal(code, 0, output);
+  assert.equal(postCount(requests), 2);
+  assert.match(output, new RegExp(`could not read run ${RUN_C}: HTTP 404`));
 });
 
 test('every Worker deploy job retries a failed dependency install at most three times', () => {

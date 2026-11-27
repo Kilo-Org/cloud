@@ -195,7 +195,8 @@ export function createSessionWorkspaceArtifactsHandlers() {
             ctx.env,
             await readCloudAgentNextSecret(
               ctx.env,
-              'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY'
+              'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
+              ctx.executionCtx
             ).catch(() => undefined)
           );
           const artifact = await workspaceArtifactsFor(ctx.env, sandboxId, stub =>

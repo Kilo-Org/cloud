@@ -8,6 +8,7 @@ import {
 } from '../utils/attachment-download.js';
 import type { WrapperBootstrapAttachment } from '../shared/wrapper-bootstrap.js';
 import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 type R2AttachmentDownloadEnv = CloudAgentNextSecretsEnv & {
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
@@ -95,12 +96,15 @@ export function assertR2AttachmentDownloadConfigured<T extends R2AttachmentDownl
 
 export async function buildSignedPromptAttachments({
   env,
+  ctx,
   userId,
   sessionId,
   attachments,
   createdOnPlatform,
 }: {
   env: R2AttachmentDownloadEnv;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   sessionId: string;
   attachments?: Attachments;
@@ -111,7 +115,8 @@ export async function buildSignedPromptAttachments({
   // A missing or unreadable secret keeps the existing fail-closed configuration error.
   const secretAccessKey = await readCloudAgentNextSecret(
     env,
-    'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY'
+    'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
+    ctx
   ).catch(() => undefined);
   const config = { ...env, R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: secretAccessKey };
   assertR2AttachmentDownloadConfigured(config);

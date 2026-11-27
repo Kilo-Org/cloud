@@ -17,6 +17,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import type { Env } from '../types.js';
 import { readCloudAgentNextSecret, readCloudAgentNextStoreSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 
 const BYOC_VERCEL_ENVELOPE_SCHEME =
@@ -181,9 +182,9 @@ function ownerMatches(left: ByocVercelOwner, right: ByocVercelOwner): boolean {
   return false;
 }
 
-async function internalSecret(env: Env): Promise<string> {
+async function internalSecret(env: Env, ctx?: SecretsExecutionContext): Promise<string> {
   try {
-    const secret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET');
+    const secret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET', ctx);
     if (secret) return secret;
   } catch {
     // Convert secret-store failures into the same safe resolver error.
@@ -193,7 +194,8 @@ async function internalSecret(env: Env): Promise<string> {
 
 export async function fetchByocVercelCredential(
   env: Env,
-  input: ByocVercelCredentialFetchInput
+  input: ByocVercelCredentialFetchInput,
+  ctx?: SecretsExecutionContext
 ): Promise<ByocVercelCredential> {
   const ownerQuery =
     input.organizationId !== undefined
@@ -205,7 +207,7 @@ export async function fetchByocVercelCredential(
       `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}?${ownerQuery}`,
       {
         method: 'GET',
-        headers: { 'x-internal-api-key': await internalSecret(env) },
+        headers: { 'x-internal-api-key': await internalSecret(env, ctx) },
         cache: 'no-store',
         redirect: 'manual',
       }
@@ -254,7 +256,7 @@ async function fetchByocVercelEnrollmentForOwner(
       `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${path}/${encodeURIComponent(ownerId(owner))}`,
       {
         method: 'GET',
-        headers: { 'x-internal-api-key': await internalSecret(env) },
+        headers: { 'x-internal-api-key': await internalSecret(env, ctx) },
         cache: 'no-store',
         redirect: 'manual',
       }
@@ -287,7 +289,7 @@ export async function projectByocVercelStatus(
         method: 'PATCH',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': await internalSecret(env),
+          'x-internal-api-key': await internalSecret(env, ctx),
         },
         body: JSON.stringify(input),
         cache: 'no-store',
@@ -309,9 +311,10 @@ export async function projectByocVercelStatus(
 
 export async function projectByocVercelSnapshotMissing(
   env: Env,
-  input: ByocVercelRuntimeSnapshot
+  input: ByocVercelRuntimeSnapshot,
+  ctx?: SecretsExecutionContext
 ): Promise<boolean> {
-  const credential = await fetchByocVercelCredential(env, input);
+  const credential = await fetchByocVercelCredential(env, input, ctx);
   if (
     credential.setupStatus !== 'ready' ||
     credential.buildGeneration !== input.buildGeneration ||
@@ -341,14 +344,15 @@ export async function projectByocVercelSnapshotMissing(
 export async function resolveByocVercelRuntimeConfig(
   env: Env,
   input: ByocVercelCredentialFetchInput,
-  onSnapshotResolved?: (snapshot: ByocVercelRuntimeSnapshot) => void
+  onSnapshotResolved?: (snapshot: ByocVercelRuntimeSnapshot) => void,
+  ctx?: SecretsExecutionContext
 ): Promise<VercelSandboxRuntimeConfig> {
-  const credential = await fetchByocVercelCredential(env, input);
+  const credential = await fetchByocVercelCredential(env, input, ctx);
   if (credential.setupStatus !== 'ready' || !credential.runtimeSnapshotId) {
     throw new ByocVercelNotReadyError(credential.setupStatus);
   }
 
-  const config = decryptCredentialRuntimeConfig(env, credential);
+  const config = await decryptCredentialRuntimeConfig(env, credential, ctx);
   onSnapshotResolved?.({
     ...byocVercelOwnerFields(credential),
     credentialId: credential.credentialId,
@@ -360,11 +364,16 @@ export async function resolveByocVercelRuntimeConfig(
 
 export async function resolveByocVercelCredentials(
   env: Env,
-  input: ByocVercelCredentialFetchInput
+  input: ByocVercelCredentialFetchInput,
+  ctx?: SecretsExecutionContext
 ): Promise<VercelSandboxCredentials> {
-  const credential = await fetchByocVercelCredential(env, input);
+  const credential = await fetchByocVercelCredential(env, input, ctx);
+  const privateKey = await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY', ctx).catch(
+    () => undefined
+  );
+  if (!privateKey) throw new ByocCredentialResolverError();
   return {
-    accessToken: decryptCredentialAccessToken(env, credential),
+    accessToken: decryptCredentialAccessToken(credential, privateKey),
     teamId: credential.teamId,
     scope: credential.tokenScope,
   };
@@ -372,21 +381,23 @@ export async function resolveByocVercelCredentials(
 
 export async function resolveByocVercelAccessConfig(
   env: Env,
-  input: ByocVercelCredentialFetchInput
+  input: ByocVercelCredentialFetchInput,
+  ctx?: SecretsExecutionContext
 ): Promise<VercelSandboxRuntimeConfig> {
-  const credential = await fetchByocVercelCredential(env, input);
-  return decryptCredentialRuntimeConfig(env, credential);
+  const credential = await fetchByocVercelCredential(env, input, ctx);
+  return decryptCredentialRuntimeConfig(env, credential, ctx);
 }
 
 async function decryptCredentialRuntimeConfig(
   env: Env,
-  credential: ByocVercelCredential
+  credential: ByocVercelCredential,
+  ctx?: SecretsExecutionContext
 ): Promise<VercelSandboxRuntimeConfig> {
   if (!credential.runtimeBuildId) throw new ByocCredentialResolverError();
 
   const defaults = parseVercelSandboxRuntimeDefaults(env);
   // A missing key stays a resolver error, as before.
-  const privateKey = await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
+  const privateKey = await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY', ctx).catch(
     () => undefined
   );
   if (!defaults || !privateKey) {

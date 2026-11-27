@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Hono } from 'hono';
 import type { HonoContext } from '../hono-context.js';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import { requestContext } from '../request-context.js';
 import { parseSandboxLaunchBearer, verifySandboxLaunchCredential } from './credential.js';
 import { getSandboxControlStub, isSandboxControlId } from './stub.js';
 
@@ -32,7 +33,11 @@ export function registerStartupFailureRoute(app: Hono<HonoContext>): void {
     if (!isSandboxControlId(sandboxId)) return c.text('Invalid sandboxId', 400);
     const token = parseSandboxLaunchBearer(c.req.header('Authorization') ?? null);
     if (token === null) return c.text('Unauthorized', 401);
-    const secret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET').catch(() => null);
+    const secret = await readCloudAgentNextSecret(
+      c.env,
+      'NEXTAUTH_SECRET',
+      requestContext(c)
+    ).catch(() => null);
     if (!secret) return c.text('Authentication unavailable', 503);
     const launch = verifySandboxLaunchCredential(token, secret);
     if (launch === null || launch.sandboxId !== sandboxId) return c.text('Unauthorized', 401);

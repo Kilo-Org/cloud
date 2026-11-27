@@ -342,7 +342,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     const observed = this.load();
     const credential = await fetchByocVercelCredential(
       this.env,
-      ownerCredentialFetchInput(owner, parsed.credentialId)
+      ownerCredentialFetchInput(owner, parsed.credentialId),
+      this.ctx
     );
     if (credential.buildGeneration !== parsed.buildGeneration) return;
 
@@ -429,7 +430,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         const config = await this.external(handover, () =>
           resolveByocVercelAccessConfig(
             this.env,
-            ownerCredentialFetchInput(owner, parsed.credentialId)
+            ownerCredentialFetchInput(owner, parsed.credentialId),
+            this.ctx
           )
         );
         await this.removeBuildResources(handover, this.createClient(config), previousResources);
@@ -462,7 +464,11 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
 
     try {
       const credential = await this.cleanupExternal(ownership, () =>
-        fetchByocVercelCredential(this.env, ownerCredentialFetchInput(owner, parsed.credentialId))
+        fetchByocVercelCredential(
+          this.env,
+          ownerCredentialFetchInput(owner, parsed.credentialId),
+          this.ctx
+        )
       );
       if (credential.buildGeneration !== parsed.buildGeneration) return;
 
@@ -475,7 +481,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       const config = await this.cleanupExternal(ownership, () =>
         resolveByocVercelAccessConfig(
           this.env,
-          ownerCredentialFetchInput(owner, parsed.credentialId)
+          ownerCredentialFetchInput(owner, parsed.credentialId),
+          this.ctx
         )
       );
       const client = this.createClient(config);
@@ -522,7 +529,11 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     let credential: ByocVercelCredential;
     try {
       credential = await this.external(ownership, () =>
-        fetchByocVercelCredential(this.env, ownerCredentialFetchInput(owner, state.credential_id))
+        fetchByocVercelCredential(
+          this.env,
+          ownerCredentialFetchInput(owner, state.credential_id),
+          this.ctx
+        )
       );
     } catch (error) {
       if (error instanceof SnapshotBuildOwnershipLostError) return;
@@ -555,7 +566,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       const config = await this.external(ownership, () =>
         resolveByocVercelAccessConfig(
           this.env,
-          ownerCredentialFetchInput(owner, state.credential_id)
+          ownerCredentialFetchInput(owner, state.credential_id),
+          this.ctx
         )
       );
       const client = this.createClient(config);
@@ -764,7 +776,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         const credentialHash = await this.external(state, () => hashSandboxCredential(credential));
         const allocationId = state.build_generation;
         const signingSecret = await this.external(state, () =>
-          readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null)
+          readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(() => null)
         );
         if (!signingSecret) throw new Error('provider_configuration_failed');
         const launchCredential = mintSandboxLaunchCredential(
@@ -811,6 +823,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           try {
             return await downloadedStartup({
               env: this.env,
+              ctx: this.ctx,
               descriptor: selection.descriptor,
               sandboxId: validatorControlId,
               allocationId,
@@ -1195,7 +1208,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         credential = await this.external(cleanup, () =>
           fetchByocVercelCredential(
             this.env,
-            ownerCredentialFetchInput(ownerFromRow(cleanup), cleanup.credential_id)
+            ownerCredentialFetchInput(ownerFromRow(cleanup), cleanup.credential_id),
+            this.ctx
           )
         );
       } catch (error) {
@@ -1210,7 +1224,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         const config = await this.external(cleanup, () =>
           resolveByocVercelAccessConfig(
             this.env,
-            ownerCredentialFetchInput(ownerFromRow(cleanup), cleanup.credential_id)
+            ownerCredentialFetchInput(ownerFromRow(cleanup), cleanup.credential_id),
+            this.ctx
           )
         );
         client = this.createClient(config);
@@ -1424,7 +1439,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     try {
       await fetchByocVercelCredential(
         this.env,
-        ownerCredentialFetchInput(ownerFromRow(owner), owner.credential_id)
+        ownerCredentialFetchInput(ownerFromRow(owner), owner.credential_id),
+        this.ctx
       );
     } catch (error) {
       if (error instanceof ByocCredentialMissingError) return;
@@ -1494,7 +1510,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     try {
       await fetchByocVercelCredential(
         this.env,
-        ownerCredentialFetchInput(ownerFromRow(owner), owner.credential_id)
+        ownerCredentialFetchInput(ownerFromRow(owner), owner.credential_id),
+        this.ctx
       );
     } catch (error) {
       if (error instanceof ByocCredentialMissingError) return;

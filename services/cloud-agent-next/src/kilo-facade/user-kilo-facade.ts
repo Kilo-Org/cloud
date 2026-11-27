@@ -20,6 +20,7 @@ import type {
 } from '../execution/types.js';
 import { getPgDb } from '../db/pg.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { answerWithAdmission, type AnswerAdmissionOutcome } from '../session/answer-admission.js';
@@ -152,6 +153,7 @@ export type KiloFacadeRequestDeps = {
   }) => Promise<{ cloudAgentSessionId: string } | null>;
   admitPrompt?: (params: {
     env: Env;
+    ctx?: SecretsExecutionContext;
     userId: string;
     cloudAgentSessionId: string;
     request: SubmittedSessionMessageRequest;
@@ -576,6 +578,8 @@ async function readRequestJson(request: Request): Promise<ReadRequestJsonResult>
 
 async function defaultAdmitPrompt(params: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   cloudAgentSessionId: string;
   request: SubmittedSessionMessageRequest;
@@ -587,6 +591,7 @@ async function defaultAdmitPrompt(params: {
   try {
     payload = await buildControlPlaneMessagePayload({
       env: params.env,
+      ctx: params.ctx,
       userId: params.userId,
       sessionId,
       metadata,
@@ -625,6 +630,8 @@ async function defaultAdmitPrompt(params: {
 async function admitBasicPrompt(params: {
   request: Request;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
@@ -654,6 +661,7 @@ async function admitBasicPrompt(params: {
   }
   const balance = await (params.deps?.validatePromptBalance ?? defaultValidatePromptBalance)({
     env: params.env,
+    ctx: params.ctx,
     authToken: params.authToken,
     userId: params.userId,
     cloudAgentSessionId: params.cloudAgentSessionId,
@@ -682,6 +690,7 @@ async function admitBasicPrompt(params: {
       () =>
         admitPrompt({
           env: params.env,
+          ctx: params.ctx,
           userId: params.userId,
           cloudAgentSessionId: params.cloudAgentSessionId,
           request,
@@ -695,6 +704,8 @@ async function admitBasicPrompt(params: {
 async function handlePromptAsyncMutation(params: {
   request: Request;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
@@ -1203,11 +1214,13 @@ async function readOwnedKiloSession(params: {
 export async function handleKiloFacadeRequest(params: {
   request: Request;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   deps?: KiloFacadeRequestDeps;
 }): Promise<Response> {
-  const { request, env, userId, authToken, deps } = params;
+  const { request, env, ctx, userId, authToken, deps } = params;
   const url = new URL(request.url);
   const kiloPath = kiloRelativePath(url.pathname);
 
@@ -1243,6 +1256,7 @@ export async function handleKiloFacadeRequest(params: {
     return answerOwnedNativeInteraction({
       request,
       env,
+      ctx,
       userId,
       authToken,
       cloudAgentSessionId: session.cloudAgentSessionId,
@@ -1254,6 +1268,7 @@ export async function handleKiloFacadeRequest(params: {
     return handleCollectionNativeRoute({
       request,
       env,
+      ctx,
       userId,
       deps,
       url,
@@ -1289,6 +1304,7 @@ export async function handleKiloFacadeRequest(params: {
     return answerOwnedNativeInteraction({
       request,
       env,
+      ctx,
       userId,
       authToken,
       cloudAgentSessionId: root.cloudAgentSessionId,
@@ -1301,6 +1317,7 @@ export async function handleKiloFacadeRequest(params: {
     return handleSessionNativeRoute({
       request,
       env,
+      ctx,
       userId,
       authToken,
       deps,
@@ -1335,6 +1352,7 @@ export async function handleKiloFacadeRequest(params: {
     return handlePromptAsyncMutation({
       request,
       env,
+      ctx,
       userId,
       authToken,
       cloudAgentSessionId: root.cloudAgentSessionId,
@@ -1441,6 +1459,8 @@ async function resolveNativeRouteSession(params: {
 async function handleCollectionNativeRoute(params: {
   request: Request;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   deps?: KiloFacadeRequestDeps;
   url: URL;
@@ -1471,6 +1491,8 @@ async function handleCollectionNativeRoute(params: {
 async function handleSessionNativeRoute(params: {
   request: Request;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   deps?: KiloFacadeRequestDeps;
@@ -1479,7 +1501,8 @@ async function handleSessionNativeRoute(params: {
   cloudAgentSessionId: string;
   route: NativeSessionRoute;
 }): Promise<Response> {
-  const { request, env, userId, deps, url, kiloSessionId, cloudAgentSessionId, route } = params;
+  const { request, env, ctx, userId, deps, url, kiloSessionId, cloudAgentSessionId, route } =
+    params;
   const selectorResponse = validateIdScopedSelectors(url, kiloSessionId, new Set());
   if (selectorResponse) return selectorResponse;
 
@@ -1505,6 +1528,7 @@ async function handleSessionNativeRoute(params: {
   if (!body.ok) return facadeError(body.status, body.code, body.message);
   return admitHostedCommand({
     env,
+    ctx,
     userId,
     authToken: params.authToken,
     cloudAgentSessionId,
@@ -1516,6 +1540,8 @@ async function handleSessionNativeRoute(params: {
 async function answerOwnedNativeInteraction(params: {
   request: Request;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
@@ -1526,6 +1552,7 @@ async function answerOwnedNativeInteraction(params: {
   if (!body.ok) return facadeError(body.status, body.code, body.message);
   return answerHostedNativeInteraction({
     env: params.env,
+    ctx: params.ctx,
     userId: params.userId,
     ...(params.authToken === undefined ? {} : { authToken: params.authToken }),
     cloudAgentSessionId: params.cloudAgentSessionId,
@@ -1543,6 +1570,8 @@ async function answerOwnedNativeInteraction(params: {
  */
 async function answerHostedNativeInteraction(params: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
@@ -1563,6 +1592,7 @@ async function answerHostedNativeInteraction(params: {
   try {
     outcome = await answerWithAdmission({
       env: params.env,
+      ctx: params.ctx,
       userId: params.userId,
       ...(params.authToken === undefined ? {} : { authToken: params.authToken }),
       cloudAgentSessionId: params.cloudAgentSessionId,
@@ -1622,6 +1652,8 @@ async function answerHostedNativeInteraction(params: {
  */
 async function admitHostedCommand(params: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
@@ -1633,6 +1665,7 @@ async function admitHostedCommand(params: {
   }
   const balance = await (params.deps?.validatePromptBalance ?? defaultValidatePromptBalance)({
     env: params.env,
+    ctx: params.ctx,
     authToken: params.authToken,
     userId: params.userId,
     cloudAgentSessionId: params.cloudAgentSessionId,
@@ -1668,6 +1701,7 @@ async function admitHostedCommand(params: {
       () =>
         admitPrompt({
           env: params.env,
+          ctx: params.ctx,
           userId: params.userId,
           cloudAgentSessionId: params.cloudAgentSessionId,
           request,
@@ -1700,6 +1734,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     return handleKiloFacadeRequest({
       request,
       env: this.env,
+      ctx: this.ctx,
       userId,
       authToken,
       deps: { globalEvents: this },

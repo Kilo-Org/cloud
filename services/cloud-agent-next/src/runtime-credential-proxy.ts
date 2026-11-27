@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   resolveRuntimeCredentialProxyRoute,
   type RuntimeCredentialProxyRoute,
@@ -136,10 +137,11 @@ export function sameRuntimeProxyControlBinding(
 export async function issueRuntimeCredentialProxyHandle(
   env: CloudAgentNextSecretsEnv,
   input: RuntimeProxyGrant,
-  issuedAt = Date.now()
+  issuedAt = Date.now(),
+  ctx?: SecretsExecutionContext
 ): Promise<string> {
   const grant = runtimeProxyGrantSchema.parse(input);
-  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) throw new Error('Authentication unavailable');
   const iat = Math.floor(issuedAt / 1000);
   const exp = Math.floor(grant.leaseExpiresAt / 1000);
@@ -163,10 +165,11 @@ export async function issueRuntimeCredentialProxyHandle(
 
 export async function verifyRuntimeCredentialProxyHandle(
   env: CloudAgentNextSecretsEnv,
-  value: string
+  value: string,
+  ctx?: SecretsExecutionContext
 ): Promise<RuntimeProxyHandleClaims | null> {
   return verifyRuntimeCredentialProxyHandleWithSecret(
-    await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null),
+    await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null),
     value
   );
 }
@@ -193,9 +196,10 @@ export function verifyRuntimeCredentialProxyHandleWithSecret(
  */
 export async function verifyRuntimeCredentialProxyHandleExpiresAt(
   env: CloudAgentNextSecretsEnv,
-  value: string
+  value: string,
+  ctx?: SecretsExecutionContext
 ): Promise<number | null> {
-  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret || value.length > 4096) return null;
   try {
     const verified = jwt.verify(value, secret, { algorithms: ['HS256'], ignoreExpiration: true });

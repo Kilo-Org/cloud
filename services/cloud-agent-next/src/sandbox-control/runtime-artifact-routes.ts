@@ -1,15 +1,18 @@
 import type { Hono } from 'hono';
 import type { HonoContext } from '../hono-context.js';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import { requestContext } from '../request-context.js';
 import { RUNTIME_ARTIFACT_HTTP_PREFIX, SHA256_PATTERN } from './runtime-release.js';
 import { runtimeArtifactObjectKey } from './runtime-artifact-keys.js';
 import { validateRuntimeArtifactGrant } from './runtime-artifact-grant.js';
 
 export function registerRuntimeArtifactRoutes(app: Hono<HonoContext>): void {
   app.get(`${RUNTIME_ARTIFACT_HTTP_PREFIX}:sha256`, async c => {
-    const signingSecret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET').catch(
-      () => null
-    );
+    const signingSecret = await readCloudAgentNextSecret(
+      c.env,
+      'NEXTAUTH_SECRET',
+      requestContext(c)
+    ).catch(() => null);
     // The bootstrap retries 5xx responses; 401 is a permanent startup failure.
     if (!signingSecret) return c.text('Authentication unavailable', 503);
     const grant = validateRuntimeArtifactGrant(

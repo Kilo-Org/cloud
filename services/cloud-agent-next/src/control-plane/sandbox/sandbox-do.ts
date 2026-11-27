@@ -2545,7 +2545,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 ? { ok: true, isCurrent: () => true }
                 : { ok: false, status: 403, code: 'invalid_identity' },
           },
-          await readCloudAgentNextSecret(this.env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
+          await readCloudAgentNextSecret(this.env, 'AGENT_ENV_VARS_PRIVATE_KEY', this.ctx).catch(
             () => undefined
           ),
           [...(this.env.WORKER_URL ? [this.env.WORKER_URL] : []), CLOUD_AGENT_SESSION_SYNC_ORIGIN],
@@ -2595,6 +2595,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return admitVercelScmForward(input, {
       ...this.scmAdmissionDependencies(),
       env: this.env,
+      ctx: this.ctx,
       contract: verifiedVercelSandboxIdentityContract,
       readContext: () => this.readScmAdmissionContext(),
     });
@@ -2605,6 +2606,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     return admitVercelEgressForward(input, {
       env: this.env,
+      ctx: this.ctx,
       contract: verifiedVercelSandboxIdentityContract,
       pin: this.providerPin,
       identities: this.egressIdentities,
@@ -2751,7 +2753,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         throw new Error('Session has no matching runtime proxy credential grant');
       }
-      const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle, this.ctx);
       if (
         !claims ||
         !('sessionId' in claims) ||
@@ -2809,7 +2811,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     ) {
       return { type: 'denied' };
     }
-    const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle, this.ctx);
     if (!claims) return { type: 'denied' };
     const owner = await this.requireOwner();
     if (owner === null || owner !== claims.userId) return { type: 'denied' };
@@ -3013,7 +3015,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const token = parseSandboxLaunchBearer(request.headers.get('Authorization'));
     if (token === null)
       return new Response('Invalid or missing Authorization header', { status: 401 });
-    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+      () => null
+    );
     if (!secret) return new Response('Authentication unavailable', { status: 503 });
     const launch = verifySandboxLaunchCredential(token, secret);
     return this.enqueue(async () => {
@@ -4420,7 +4424,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
       return { grant, adopted: true };
     }
-    const mintedClaims = await verifyRuntimeCredentialProxyHandle(this.env, minted.handle);
+    const mintedClaims = await verifyRuntimeCredentialProxyHandle(
+      this.env,
+      minted.handle,
+      this.ctx
+    );
     if (mintedClaims === null || mintedClaims.userId !== ownerId) {
       this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
       return { grant, adopted: true };
@@ -4571,7 +4579,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<boolean> {
     const handle = memberHandleForSession(grant, sessionId);
     if (handle === null) return false;
-    const expiresAt = await verifyRuntimeCredentialProxyHandleExpiresAt(this.env, handle);
+    const expiresAt = await verifyRuntimeCredentialProxyHandleExpiresAt(this.env, handle, this.ctx);
     return expiresAt !== null && expiresAt <= Date.now();
   }
 
@@ -5315,9 +5323,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
     }
     const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(latest);
-    const privateKey = await readCloudAgentNextSecret(this.env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
-      () => undefined
-    );
+    const privateKey = await readCloudAgentNextSecret(
+      this.env,
+      'AGENT_ENV_VARS_PRIVATE_KEY',
+      this.ctx
+    ).catch(() => undefined);
     let frame: MaterializedPrepareFrame;
     try {
       frame = this.materializePrepareFrame(latest, socket, privateKey);
@@ -5452,7 +5462,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (accepted) return { kind: 'handle', handle: finalHandle };
       }
 
-      const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle, this.ctx);
       if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };
       const issuerIsMember = grant.members.some(member => member.sessionId === claims.sessionId);
       if (claims.sessionId !== input.sessionId && !issuerIsMember) {
@@ -5529,7 +5539,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const entry of entries) {
       const handle = handlesByDigest.get(entry.handleDigest);
       if (handle === undefined) continue;
-      const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle, this.ctx);
       if (claims === null) continue;
       const requestorHolds =
         requestorSessionId !== null &&
@@ -5550,7 +5560,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async runtimeProxyHandleClaims(
     handle: string
   ): Promise<{ exp: number; sessionId: string } | null> {
-    const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle, this.ctx);
     return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
   }
 
@@ -5847,6 +5857,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           withTimeout(
             downloadedStartup({
               env: this.env,
+              ctx: this.ctx,
               descriptor: selection.descriptor,
               harness,
               sandboxId: this.sandboxId,
@@ -7692,7 +7703,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         return;
       case 'transfer.grant':
         if (current && attachment.transferGrants === true)
-          void readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').then(
+          void readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).then(
             signingSecret =>
               serveTransferGrant({
                 frame,
@@ -7822,7 +7833,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     provider: AgentSandboxProvider
   ): Promise<Record<string, string>> {
     const signingSecret = await withTimeout(
-      readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET'),
+      readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx),
       1_000,
       'Wrapper launch signing secret lookup timed out'
     ).catch(() => null);
@@ -7912,6 +7923,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
     return createProviderAdapter(pin, {
       env: this.env,
+      ctx: this.ctx,
       sandboxId: this.sandboxId,
       operationStorage: this.ctx.storage,
       persistRuntimeLocator: (allocationName, locator) =>

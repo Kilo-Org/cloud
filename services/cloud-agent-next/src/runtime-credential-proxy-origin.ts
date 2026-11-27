@@ -4,6 +4,7 @@ import {
   RUNTIME_PROXY_ORIGIN_HEADER,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { logger } from './logger.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 
@@ -38,9 +39,10 @@ type OriginEnv = CloudAgentNextSecretsEnv;
  */
 export async function runtimeProxyOriginProof(
   env: OriginEnv,
-  outboundId: string
+  outboundId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<string | null> {
-  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) {
     // Egress then sends no proof; make that visible before readers require it.
     logger
@@ -79,7 +81,8 @@ function isFacadeRequest(url: URL, facade: string | null): boolean {
 export async function withRuntimeProxyOrigin(
   request: Request,
   env: OriginEnv & { WORKER_URL?: string },
-  outboundId: string
+  outboundId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<Request> {
   const facade = env.WORKER_URL ? runtimeCredentialProxyFacadeBaseUrl(env.WORKER_URL) : null;
   const url = new URL(request.url);
@@ -89,7 +92,7 @@ export async function withRuntimeProxyOrigin(
   if (!needsProof && !request.headers.has(RUNTIME_PROXY_ORIGIN_HEADER)) return request;
   const headers = new Headers(request.headers);
   headers.delete(RUNTIME_PROXY_ORIGIN_HEADER);
-  const proof = needsProof ? await runtimeProxyOriginProof(env, outboundId) : null;
+  const proof = needsProof ? await runtimeProxyOriginProof(env, outboundId, ctx) : null;
   if (proof !== null) headers.set(RUNTIME_PROXY_ORIGIN_HEADER, proof);
   return new Request(request, { headers });
 }

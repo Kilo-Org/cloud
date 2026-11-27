@@ -15,6 +15,7 @@ import type { CredentialAdmissionContext } from '../sandbox-control/credential-a
 import { encodeCloudflareProviderRef } from '../sandbox-control/provider-ref.js';
 import type { Env } from '../types.js';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type { NetworkSecretResolution } from '../network-secrets/contract.js';
 import type { EnvironmentBuildTarget } from './target.js';
 import { parseBuildInput, type BuildRow, type BuildStore } from './store.js';
@@ -134,6 +135,8 @@ function readAdmissionContext(input: {
 
 export async function resolveBuilderNetworkSecret(input: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   store: Pick<BuildStore, 'environment' | 'activeBuild'>;
   environmentId: string;
   physicalSandboxId: string;
@@ -142,9 +145,11 @@ export async function resolveBuilderNetworkSecret(input: {
 }): Promise<NetworkSecretResolution | null> {
   const containerId = input.env.SANDBOX_CONTAINERS.idFromName(input.physicalSandboxId).toString();
   // A missing key stays optional: a build with no encrypted secrets needs none.
-  const privateKey = await readCloudAgentNextSecret(input.env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
-    () => undefined
-  );
+  const privateKey = await readCloudAgentNextSecret(
+    input.env,
+    'AGENT_ENV_VARS_PRIVATE_KEY',
+    input.ctx
+  ).catch(() => undefined);
   return admitNetworkSecretCredential(
     input.request.credential,
     {

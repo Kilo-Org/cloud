@@ -30,7 +30,12 @@ export const getAnalysisCreditAdmission = protectedProcedure
   .input(z.object({ organizationId: z.string().uuid().optional() }).strict())
   .output(analysisCreditAdmissionResultSchema)
   .query(async ({ input, ctx }) => {
-    const balance = await validateBalanceOnly(ctx.authToken, input.organizationId, ctx.env);
+    const balance = await validateBalanceOnly(
+      ctx.authToken,
+      input.organizationId,
+      ctx.env,
+      ctx.executionCtx
+    );
     if (balance.success) return { outcome: 'admitted' as const };
     return balance.status === 402
       ? { outcome: 'insufficient_credits' as const, message: balance.message }

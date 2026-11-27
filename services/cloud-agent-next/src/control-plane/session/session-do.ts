@@ -1367,7 +1367,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // actually carries encrypted secrets.
     const agentEnvVarsPrivateKey = await readCloudAgentNextSecret(
       this.env,
-      'AGENT_ENV_VARS_PRIVATE_KEY'
+      'AGENT_ENV_VARS_PRIVATE_KEY',
+      this.ctx
     ).catch(() => undefined);
     let registration: ControlPlaneSessionRegistration;
     try {
@@ -1436,7 +1437,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // actually carries encrypted secrets.
     const agentEnvVarsPrivateKey = await readCloudAgentNextSecret(
       this.env,
-      'AGENT_ENV_VARS_PRIVATE_KEY'
+      'AGENT_ENV_VARS_PRIVATE_KEY',
+      this.ctx
     ).catch(() => undefined);
     let registration: ControlPlaneSessionRegistration;
     try {
@@ -1551,6 +1553,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
+      ctx: this.ctx,
       storage: this.ctx.storage,
       metadata,
       authorization: authorization.success ? authorization.data : null,
@@ -1587,6 +1590,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     try {
       local = await resolvePersistedRuntimeProxyCredential({
         env: this.env,
+        ctx: this.ctx,
         storage: this.ctx.storage,
         handle,
         metadata: () => this.getMetadata(),
@@ -1729,7 +1733,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   async getRuntimeToken(destination?: RuntimeTokenDestination): Promise<string | null> {
     const target = RuntimeTokenDestinationSchema.optional().parse(destination);
-    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+      () => null
+    );
     if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
     return this.getStoredRuntimeToken(secret, target);
   }
@@ -1939,7 +1945,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         failure: createFailure('BAD_REQUEST', 'Runtime authorization already installed'),
       };
     }
-    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+      () => null
+    );
     if (!secret) {
       return { type: 'failure', failure: createFailure('INTERNAL', 'Authentication unavailable') };
     }
@@ -3165,7 +3173,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       hydration = (async () => {
         const internalSecret = await readCloudAgentNextStoreSecret(
           this.env,
-          'INTERNAL_API_SECRET'
+          'INTERNAL_API_SECRET',
+          this.ctx
         ).catch(() => null);
         if (this.registration !== registration) return;
         await hydrateSessionHistory({
@@ -3357,7 +3366,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (metadata === null || metadata.identity.userId !== input.ownerId) {
         return { status: 'denied' as const };
       }
-      const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
+      const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+        () => null
+      );
       if (!secret) return { status: 'denied' as const };
       let fresh: RuntimeAuthorization;
       try {

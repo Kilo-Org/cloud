@@ -5,6 +5,7 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import { logger } from '../logger.js';
 import type { Env } from '../types.js';
@@ -42,11 +43,13 @@ function isUserAdmission(token: string): boolean {
  */
 export async function renewWorkspaceAuthorityForUserSend(input: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken: string | undefined;
   workspaceSessionId: string | undefined;
 }): Promise<void> {
-  const { env, userId, authToken, workspaceSessionId } = input;
+  const { env, ctx, userId, authToken, workspaceSessionId } = input;
   if (authToken === undefined || workspaceSessionId === undefined) return;
   if (!isUserAdmission(authToken)) return;
   const stub = () => getWorkspaceStub(env, userId, workspaceSessionId);
@@ -54,7 +57,7 @@ export async function renewWorkspaceAuthorityForUserSend(input: {
     const status = await withDORetry(stub, workspace => workspace.describe(), 'describe');
     if (status.state !== 'expired' || status.authorizationId === null) return;
     const expectedAuthorizationId = status.authorizationId;
-    const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+    const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
     if (!secret) return;
     const created = await createRuntimeAuthorization({
       token: authToken,

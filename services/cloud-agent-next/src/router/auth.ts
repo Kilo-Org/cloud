@@ -97,9 +97,11 @@ export const cloudAgentAuthorityProcedure = t.procedure.use(
 export const internalApiProtectedProcedure = t.procedure.use(
   async ({ ctx, next, path, getRawInput }) => {
     const internalApiKey = ctx.request.headers.get('x-internal-api-key');
-    const expected = await readCloudAgentNextSecret(ctx.env, 'INTERNAL_API_SECRET').catch(
-      () => undefined
-    );
+    const expected = await readCloudAgentNextSecret(
+      ctx.env,
+      'INTERNAL_API_SECRET',
+      ctx.executionCtx
+    ).catch(() => undefined);
     if (!expected) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

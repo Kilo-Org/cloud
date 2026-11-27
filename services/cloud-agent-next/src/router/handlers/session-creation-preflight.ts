@@ -699,7 +699,8 @@ export async function preflightSessionCreation(
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
     const expectedInternalApiSecret = await readCloudAgentNextSecret(
       ctx.env,
-      'INTERNAL_API_SECRET'
+      'INTERNAL_API_SECRET',
+      ctx.executionCtx
     ).catch(() => undefined);
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
@@ -711,7 +712,8 @@ export async function preflightSessionCreation(
       const balance = await validateBalanceOnly(
         token,
         authority.organizationId ?? undefined,
-        ctx.env
+        ctx.env,
+        ctx.executionCtx
       );
       if (!balance.success)
         throw new TRPCError({
@@ -821,6 +823,7 @@ export async function preflightSessionCreation(
   if (resolvedRequest.initialTurn?.type === 'prompt' && !isPolicyBearingAuthToken(ctx.authToken)) {
     await assertKiloModelAvailable({
       env: ctx.env,
+      ctx: ctx.executionCtx,
       submittedModel: resolvedRequest.agent.model,
       originalToken: ctx.authToken,
       originalOrganizationId: resolvedRequest.options?.kilocodeOrganizationId,

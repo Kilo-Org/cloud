@@ -8,6 +8,7 @@ import {
   type PreviewEntryClaims,
 } from '../auth.js';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   withPreviewTransport,
   type PreviewProviderCoordinates,
@@ -246,7 +247,11 @@ function claimsMatchTarget(
  * only verifies the ticket and passes `path` on; the entry on the preview host
  * runs the access check and validates `path` where it redirects.
  */
-export async function handlePreviewOpen(request: Request, env: Env): Promise<Response> {
+export async function handlePreviewOpen(
+  request: Request,
+  env: Env,
+  ctx?: SecretsExecutionContext
+): Promise<Response> {
   const method = request.method.toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') {
     return entryResponse(405, 'Method not allowed');
@@ -259,7 +264,7 @@ export async function handlePreviewOpen(request: Request, env: Env): Promise<Res
   const ticket = url.searchParams.get('ticket');
   const validated = validatePreviewEntryTicket(
     ticket,
-    await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null)
+    await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null)
   );
   let label: string | null = null;
   if (validated.success) {
@@ -289,14 +294,15 @@ async function handleEntry(
   request: Request,
   env: Env,
   match: PreviewHostMatch,
-  deps: PreviewRouteDeps
+  deps: PreviewRouteDeps,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
   const method = request.method.toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') {
     return entryResponse(405, 'Method not allowed');
   }
   const url = new URL(request.url);
-  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   const ticket = validatePreviewEntryTicket(url.searchParams.get('ticket'), secret);
   if (!ticket.success || secret === null || !claimsMatchHost(ticket.claims, match)) {
     return entryResponse(401, 'Preview ticket is missing or invalid');
@@ -452,7 +458,8 @@ async function handleProxy(
   request: Request,
   env: Env,
   match: PreviewHostMatch,
-  deps: PreviewRouteDeps
+  deps: PreviewRouteDeps,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
   const method = request.method.toUpperCase();
   if (method === 'TRACE' || method === 'CONNECT') {
@@ -477,7 +484,7 @@ async function handleProxy(
   }
 
   const secure = url.protocol === 'https:';
-  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   const session = validatePreviewSessionToken(
     readPreviewCookie(request.headers.get('Cookie'), secure),
     secret
@@ -530,13 +537,14 @@ async function handleProxy(
 export async function handlePreviewRequest(
   request: Request,
   env: Env,
-  deps: PreviewRouteDeps = defaultPreviewRouteDeps
+  deps: PreviewRouteDeps = defaultPreviewRouteDeps,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
   const url = new URL(request.url);
   const match = matchPreviewHost(url.hostname, env.PREVIEW_HOST_SUFFIX);
   if (match === null) return fixed(404, 'Not found');
   if (url.pathname === PREVIEW_ENTER_PATH) {
-    return handleEntry(request, env, match, deps);
+    return handleEntry(request, env, match, deps, ctx);
   }
-  return handleProxy(request, env, match, deps);
+  return handleProxy(request, env, match, deps, ctx);
 }

@@ -9,6 +9,7 @@ import { leaseAtLeastMs } from '../sandbox-control/deadlines.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
 import { SHA256_PATTERN } from '../sandbox-control/runtime-release.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type {
   NativeCaptureResult,
   SandboxContainers,
@@ -136,6 +137,8 @@ type BuilderProviderEnv = BuilderRuntimeEnv & Parameters<typeof openVercelBuilde
 export function createBuilderProvider(deps: {
   containers: DurableObjectNamespace<SandboxContainers>;
   env: BuilderProviderEnv;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   now?: () => number;
   fetch?: typeof fetch;
 }): BuilderProvider {
@@ -158,9 +161,10 @@ export function createBuilderProvider(deps: {
       if (allocation.provider === 'vercel') {
         const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
         if (!descriptor) throw new ProviderCreationError('invalid_configuration');
-        const opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
+        const opened = await openVercelBuilder(deps.env, allocation, deps.fetch, deps.ctx);
         const command = await downloadedStartup({
           env: deps.env,
+          ctx: deps.ctx,
           descriptor,
           sandboxId: allocation.sandboxId,
           allocationId: allocation.allocationId,
@@ -185,6 +189,7 @@ export function createBuilderProvider(deps: {
       }
       const command = await downloadedStartup({
         env: deps.env,
+        ctx: deps.ctx,
         descriptor,
         sandboxId: allocation.sandboxId,
         allocationId: allocation.allocationId,

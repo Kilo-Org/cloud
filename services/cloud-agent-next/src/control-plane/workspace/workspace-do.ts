@@ -623,7 +623,9 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
   }
 
   private async secret(): Promise<string> {
-    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+      () => null
+    );
     if (!secret) throw new Error('Authentication unavailable');
     return secret;
   }

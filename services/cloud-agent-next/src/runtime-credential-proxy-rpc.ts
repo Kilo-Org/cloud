@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -82,6 +83,7 @@ function upgradeLegacyGrantToV3(
  */
 export async function issuePersistedRuntimeProxyGrant(input: {
   env: CloudAgentNextSecretsEnv;
+  ctx?: SecretsExecutionContext;
   storage: Storage;
   metadata: SessionMetadata | null;
   authorization: RuntimeAuthorization | null;
@@ -131,7 +133,7 @@ export async function issuePersistedRuntimeProxyGrant(input: {
         ? { ...upgraded, connectionId: current.fence.connectionId }
         : upgraded;
     if (refreshed !== stored) await input.storage.put(RUNTIME_PROXY_GRANT_KEY, refreshed);
-    return issueRuntimeCredentialProxyHandle(input.env, refreshed, stored.issuedAt);
+    return issueRuntimeCredentialProxyHandle(input.env, refreshed, stored.issuedAt, input.ctx);
   }
   const issuedAt = now;
   const { fence, ...identity } = current;
@@ -145,11 +147,12 @@ export async function issuePersistedRuntimeProxyGrant(input: {
     issuedAt,
   });
   await input.storage.put(RUNTIME_PROXY_GRANT_KEY, grant);
-  return issueRuntimeCredentialProxyHandle(input.env, grant, issuedAt);
+  return issueRuntimeCredentialProxyHandle(input.env, grant, issuedAt, input.ctx);
 }
 
 export async function resolvePersistedRuntimeProxyCredential(input: {
   env: CloudAgentNextSecretsEnv;
+  ctx?: SecretsExecutionContext;
   storage: Storage;
   handle: string;
   metadata: () => Promise<SessionMetadata | null>;
@@ -164,7 +167,9 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
 } | null> {
   const now = input.now ?? Date.now();
   // Resolve the signing secret before the fence: Secrets Store can yield to external I/O.
-  const secret = await readCloudAgentNextSecret(input.env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(input.env, 'NEXTAUTH_SECRET', input.ctx).catch(
+    () => null
+  );
   const claims = verifyRuntimeCredentialProxyHandleWithSecret(secret, input.handle);
   if (!secret || !claims || !('sessionId' in claims)) {
     logRuntimeProxyRequestFailed({ upstreamAttempted: false, rejectionStage: 'handle' });

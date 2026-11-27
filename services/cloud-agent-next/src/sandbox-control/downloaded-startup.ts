@@ -1,4 +1,5 @@
 import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import type { Env } from '../types.js';
 import { ProviderCreationError, type ProviderStartupCommand } from './provider.js';
@@ -14,6 +15,8 @@ import {
 
 export async function downloadedStartup(input: {
   env: Pick<Env, 'WORKER_URL' | 'NEXTAUTH_SECRET' | 'RUNTIME_RELEASE_BUCKET'>;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   descriptor: string;
   sandboxId: string;
   allocationId: string;
@@ -25,7 +28,9 @@ export async function downloadedStartup(input: {
   const release = await loadRuntimeRelease(input.descriptor, input.env.RUNTIME_RELEASE_BUCKET);
   if (runtimeReleaseHarness(release) !== (input.harness ?? 'kilo'))
     throw new ProviderCreationError('invalid_configuration');
-  const secret = await readCloudAgentNextSecret(input.env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(input.env, 'NEXTAUTH_SECRET', input.ctx).catch(
+    () => null
+  );
   if (!secret) throw new Error('Runtime signing unavailable');
   const grant = mintRuntimeArtifactGrant(
     [

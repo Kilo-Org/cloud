@@ -108,7 +108,9 @@ export class EnvironmentBuild extends DurableObject<Env> {
     const env = this.env;
     const storage = this.ctx.storage;
     const signingSecret = async (): Promise<string> => {
-      const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+      const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', this.ctx).catch(
+        () => null
+      );
       if (!secret) throw new Error('Environment build signing secret is unavailable');
       return secret;
     };
@@ -138,6 +140,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
         buildTarget: input =>
           resolveEnvironmentBuildTarget({
             env,
+            ctx: this.ctx,
             db: getPgDb(env),
             reference: input.reference,
             repoFullName: input.repoFullName,
@@ -149,6 +152,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
       provider: createBuilderProvider({
         containers: env.SANDBOX_CONTAINERS,
         env,
+        ctx: this.ctx,
       }),
       runnerUrl: (environmentId, buildId) => {
         const base = env.WORKER_URL?.replace(/\/$/, '');
@@ -169,7 +173,9 @@ export class EnvironmentBuild extends DurableObject<Env> {
         mergeEnvVarsWithSecrets(
           {},
           encrypted as EncryptedSecrets,
-          await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(() => undefined)
+          await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY', this.ctx).catch(
+            () => undefined
+          )
         ),
       billingInput: ({ owner, actorUserId, sandboxId: billingSandboxId, buildId }) => {
         return {
@@ -266,6 +272,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
     try {
       return await resolveBuilderNetworkSecret({
         env: this.env,
+        ctx: this.ctx,
         store: this.store,
         environmentId,
         physicalSandboxId: await builderSandboxId(environmentId),

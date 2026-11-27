@@ -22,6 +22,7 @@ import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import { ByocAwsProviderError, fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -239,6 +240,8 @@ function unsupportedEgressMessage(
 export type SessionRegistrationContext = {
   cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  executionCtx?: SecretsExecutionContext;
   userId: string;
   authToken: string;
   botId?: string;
@@ -952,6 +955,7 @@ async function issueSessionRuntimeAuthorization(
     });
     await assertKiloModelAvailable({
       env: ctx.env,
+      ctx: ctx.executionCtx,
       submittedModel: input.agent.model,
       originalToken: issuedRuntimeToken(
         runtimeAuthorization,
@@ -965,9 +969,11 @@ async function issueSessionRuntimeAuthorization(
   }
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
-    const nextAuthSecret = await readCloudAgentNextSecret(ctx.env, 'NEXTAUTH_SECRET').catch(
-      () => null
-    );
+    const nextAuthSecret = await readCloudAgentNextSecret(
+      ctx.env,
+      'NEXTAUTH_SECRET',
+      ctx.executionCtx
+    ).catch(() => null);
     if (!nextAuthSecret)
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
     const created = await createRuntimeAuthorization({
@@ -1002,6 +1008,7 @@ async function issueSessionRuntimeAuthorization(
     if (initialTurn?.type === 'prompt') {
       await assertKiloModelAvailable({
         env: ctx.env,
+        ctx: ctx.executionCtx,
         submittedModel: input.agent.model,
         originalToken: issuedRuntimeToken(
           runtimeAuthorization,
@@ -1040,6 +1047,7 @@ async function filterUnavailableBuiltinAgentModels(
       if (!validation) {
         validation = assertKiloModelAvailable({
           env: ctx.env,
+          ctx: ctx.executionCtx,
           submittedModel: model,
           originalToken: runtimeAuthorization
             ? issuedRuntimeToken(
@@ -1124,7 +1132,8 @@ async function allocateNewSession(
       { userId: ctx.userId, orgId },
       requestedAllocation,
       input.repository.type,
-      capability
+      capability,
+      ctx.executionCtx
     );
   }
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
@@ -1252,7 +1261,9 @@ async function allocateNewSession(
       try {
         connection = await fetchAwsByocConnection(
           ctx.env,
-          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId }
+          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId },
+          undefined,
+          ctx.executionCtx
         );
       } catch (error) {
         if (error instanceof ByocAwsProviderError && error.reason === 'byoc_credential_missing') {
@@ -1808,6 +1819,7 @@ async function admitInitialTurn(
       initialTurn.type === 'prompt'
         ? await buildSignedPromptAttachments({
             env: ctx.env,
+            ctx: ctx.executionCtx,
             userId: command.identity.userId,
             sessionId: allocation.cloudAgentSessionId,
             attachments: initialTurn.attachments,
@@ -2073,6 +2085,7 @@ function savedAllocationArgs(
   return {
     db: getPgDb(ctx.env),
     env: ctx.env,
+    ctx: ctx.executionCtx,
     userId: ctx.userId,
     ...(options?.billingOrigin ? { billingOrigin: options.billingOrigin } : {}),
   };
@@ -2411,6 +2424,7 @@ export async function createSessionWithLedger(
       await getSandboxSelectionCapabilities(ctx.env, owner, {
         repositoryType: input.repository.type,
         ...(capability ? { capability } : {}),
+        ...(ctx.executionCtx === undefined ? {} : { ctx: ctx.executionCtx }),
       }),
       allocation
     );
@@ -2432,7 +2446,8 @@ export async function createSessionWithLedger(
           owner,
           allocation,
           input.repository.type,
-          capability
+          capability,
+          ctx.executionCtx
         );
       } else {
         assertSessionOperationIdentity(existing, {

@@ -9,6 +9,7 @@ import { TRPCError } from '@trpc/server';
 import { logger } from '../logger.js';
 import { requireCurrentSessionAccess } from '../session-access.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { validateBalanceOnly, type BalanceOnlyResult } from '../balance-validation.js';
 
 /**
@@ -21,6 +22,8 @@ export type ResolvedPayer = { organizationId: string | null };
 /** The payer balance preflight request shared by every admission boundary. */
 export type PromptBalanceParams = {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   authToken: string;
   userId: string;
   cloudAgentSessionId: string;
@@ -112,7 +115,8 @@ export async function defaultValidatePromptBalance(
     return validateBalanceOnly(
       params.authToken,
       params.resolvedPayer.organizationId ?? undefined,
-      params.env
+      params.env,
+      params.ctx
     );
   }
   let organizationId: string | null;
@@ -132,5 +136,5 @@ export async function defaultValidatePromptBalance(
     }
     return promptPayerScopeFailure(error);
   }
-  return validateBalanceOnly(params.authToken, organizationId ?? undefined, params.env);
+  return validateBalanceOnly(params.authToken, organizationId ?? undefined, params.env, params.ctx);
 }

@@ -1,4 +1,5 @@
 import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type { Env } from '../types.js';
 import { parseSandboxLaunchBearer, verifySandboxLaunchCredential } from './credential.js';
 import { getSandboxControlStub, isSandboxControlId } from './stub.js';
@@ -25,7 +26,8 @@ export type WrapperLaunchVerdict =
 export async function verifyWrapperLaunch(
   request: Request,
   env: CloudAgentNextSecretsEnv,
-  sandboxId: string
+  sandboxId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<WrapperLaunchVerdict> {
   if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
     return { ok: false, refusal: new Response('Expected WebSocket upgrade', { status: 426 }) };
@@ -38,7 +40,7 @@ export async function verifyWrapperLaunch(
     const refusal = new Response('Invalid or missing Authorization header', { status: 401 });
     return { ok: false, refusal };
   }
-  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) {
     return { ok: false, refusal: new Response('Authentication unavailable', { status: 503 }) };
   }
@@ -50,9 +52,10 @@ export async function verifyWrapperLaunch(
 export async function admitSandboxWrapperUpgrade(
   request: Request,
   env: Pick<Env, 'NEXTAUTH_SECRET' | 'SANDBOX_CONTROL'>,
-  sandboxId: string
+  sandboxId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const verdict = await verifyWrapperLaunch(request, env, sandboxId);
+  const verdict = await verifyWrapperLaunch(request, env, sandboxId, ctx);
   if (!verdict.ok) {
     return verdict.refusal === 'rejected' ? rejectSandboxWrapperUpgrade() : verdict.refusal;
   }

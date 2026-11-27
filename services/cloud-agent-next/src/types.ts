@@ -28,7 +28,7 @@ import type {
   ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
-import type { BundleBinding } from '@kilocode/secrets-client';
+import type { BundleBinding, SecretsExecutionContext } from '@kilocode/secrets-client';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
@@ -671,6 +671,11 @@ export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
 export type TRPCContext = {
   cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
+  /**
+   * The invocation's context, so a secret read can hand a bundle revalidation to `waitUntil`
+   * (see secrets.ts). Absent only where a test calls the router outside a Worker invocation.
+   */
+  executionCtx?: SecretsExecutionContext;
   userId: string;
   request: Request;
   authToken: string;

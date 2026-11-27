@@ -16,6 +16,7 @@ import {
 } from '../balance-validation.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
 import { readCloudAgentNextSecret } from '../secrets.js';
+import { requestContext } from '../request-context.js';
 import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 import {
@@ -48,9 +49,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function hasValidInternalApiKey(c: Context<HonoContext>): Promise<boolean> {
   const provided = c.req.header(INTERNAL_API_KEY_HEADER);
-  const expected = await readCloudAgentNextSecret(c.env, 'INTERNAL_API_SECRET').catch(
-    () => undefined
-  );
+  const expected = await readCloudAgentNextSecret(
+    c.env,
+    'INTERNAL_API_SECRET',
+    requestContext(c)
+  ).catch(() => undefined);
   return Boolean(provided && expected && timingSafeEqual(provided, expected));
 }
 
@@ -137,7 +140,7 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
       const key = `${tokenScope}:${orgId ?? ''}`;
       const cached = validationCache.get(key);
       if (cached) return cached;
-      const pending = validateBalanceOnly(token, orgId, c.env);
+      const pending = validateBalanceOnly(token, orgId, c.env, requestContext(c));
       validationCache.set(key, pending);
       return pending;
     };

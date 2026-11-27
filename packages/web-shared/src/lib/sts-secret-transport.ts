@@ -3,12 +3,14 @@ import { createHttpSecrets, type Secrets } from '@kilocode/secrets-client';
 import { vercelIdentity } from '@kilocode/service-token-client/vercel';
 import { STS_ISSUERS, type StsEnvironment } from '@kilocode/sts-contracts';
 import { STS_URL } from '@kilocode/web-shared/lib/config.server';
+import { StsSecretReadConfigError } from '@kilocode/web-shared/lib/sts-secret-read-failure';
 import { getCache, waitUntil } from '@vercel/functions';
 
 /**
- * The STS transport of the web app's internal API secret read. `sts-secret-reader.ts` imports this
- * module only on the first read under `SECRETS_SOURCE=sts`, so a deployment on `env` never loads
- * the secrets client, the Vercel OIDC exchange or the Runtime Cache.
+ * The STS transport of the internal API secret read of `apps/web` and `apps/ai-gateway`.
+ * `sts-secret-reader.ts` imports this module only on the first read under `SECRETS_SOURCE=sts`, so
+ * a deployment on `env` never loads the secrets client, the Vercel OIDC exchange or the Runtime
+ * Cache.
  */
 
 /** Reads one secret from the deployment's STS bundle and returns it as stored. */
@@ -22,9 +24,10 @@ type VercelRuntime = Readonly<Record<string, string | undefined>> & {
 
 /**
  * The STS environment whose bundle this deployment may read, from the deployment's own runtime
- * variables (design 6.2, `services/sts/policy/web.yaml`): Vercel production reads production, the
- * `staging` custom environment reads staging, a preview reads development, and a process outside
- * Vercel (local development) reads development. Any other pair has no STS environment.
+ * variables (design 6.2, `services/sts/policy/web.yaml` and `ai-gateway.yaml`): Vercel production
+ * reads production, the `staging` custom environment reads staging, a preview reads development,
+ * and a process outside Vercel (local development) reads development. Any other pair has no STS
+ * environment.
  */
 export function stsEnvironmentOfDeployment(runtime: VercelRuntime): StsEnvironment {
   const { VERCEL_ENV: environment, VERCEL_TARGET_ENV: target } = runtime;
@@ -32,7 +35,9 @@ export function stsEnvironmentOfDeployment(runtime: VercelRuntime): StsEnvironme
   if (environment === 'preview' && target === 'staging') return 'staging';
   if (environment === 'preview' && target === 'preview') return 'development';
   if (environment === undefined && target === undefined) return 'development';
-  throw new Error('This deployment environment has no STS environment to read secrets from');
+  throw new StsSecretReadConfigError(
+    'This deployment environment has no STS environment to read secrets from'
+  );
 }
 
 /**
@@ -52,7 +57,9 @@ export function createStsSecretReader(options: {
     if (secrets === null) {
       const issuer = STS_ISSUERS[stsEnvironmentOfDeployment(options.runtime)];
       if (options.stsUrl !== issuer) {
-        throw new Error('STS_URL is not the STS issuer of this deployment environment');
+        throw new StsSecretReadConfigError(
+          'STS_URL is not the STS issuer of this deployment environment'
+        );
       }
       secrets = options.createSecrets(issuer);
     }
@@ -62,11 +69,12 @@ export function createStsSecretReader(options: {
 
 /**
  * The shipped reader: the bundle request presents the function's Vercel identity exchanged for the
- * STS audience and shares the exchanged token through the Runtime Cache, as the STS canary route
- * does. `waitUntil` keeps a background revalidation alive past the response, and is a no-op outside
- * a Vercel request.
+ * STS audience, so STS selects the workload of the calling project (`web` or `ai-gateway`), and
+ * shares the exchanged token through the project's Runtime Cache, as the STS canary route does.
+ * `waitUntil` keeps a background revalidation alive past the response, and is a no-op outside a
+ * Vercel request.
  */
-export function createWebStsSecretReader(): StsSecretReader {
+export function createVercelStsSecretReader(): StsSecretReader {
   return createStsSecretReader({
     runtime: process.env,
     stsUrl: STS_URL,

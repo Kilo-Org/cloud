@@ -9,10 +9,10 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({ APP_URL: 'https://app.k
 // reads the mocked `APP_URL`, is required here.
 const { GET } = jest.requireActual<typeof RouteModule>('@/app/.well-known/webauthn/route');
 
-// The UTS relying-party configuration (`services/uts/wrangler.jsonc`): each environment's
-// `WEBAUTHN_RP_ID` is the app host, and its `WEBAUTHN_ORIGINS` is the issuer origin.
+// The production UTS relying-party configuration (`services/uts/wrangler.jsonc`): its
+// `WEBAUTHN_RP_ID` is the app host, and its `WEBAUTHN_ORIGINS` is the issuer origin. Staging UTS
+// uses its own relying party, so the staging app serves no list.
 const UTS_PRODUCTION = { rpId: 'app.kilo.ai', origin: 'https://uts.kiloapps.io' };
-const UTS_STAGING = { rpId: 'staging-app.kilo.ai', origin: 'https://uts-staging.kiloapps.io' };
 
 const production: RelatedOriginsInput = {
   appUrl: 'https://app.kilo.ai',
@@ -29,21 +29,13 @@ const staging: RelatedOriginsInput = {
 };
 
 describe('webAuthnRelatedOrigins', () => {
-  test.each([
-    ['production', production, UTS_PRODUCTION],
-    ['staging', staging, UTS_STAGING],
-  ])('%s lists exactly its own UTS origin', (_name, input, uts) => {
-    const document = webAuthnRelatedOrigins(input);
-
-    expect(document).toEqual({ origins: [uts.origin] });
-    expect(input.requestHost).toBe(uts.rpId);
+  test('production lists exactly its own UTS origin', () => {
+    expect(webAuthnRelatedOrigins(production)).toEqual({ origins: [UTS_PRODUCTION.origin] });
+    expect(production.requestHost).toBe(UTS_PRODUCTION.rpId);
   });
 
-  test.each([
-    ['production', production],
-    ['staging', staging],
-  ])('the %s document is a well-formed related-origins list', (_name, input) => {
-    const document = webAuthnRelatedOrigins(input);
+  test('the production document is a well-formed related-origins list', () => {
+    const document = webAuthnRelatedOrigins(production);
     if (!document) throw new Error('expected a document');
 
     expect(Object.keys(document)).toEqual(['origins']);
@@ -52,7 +44,7 @@ describe('webAuthnRelatedOrigins', () => {
       const url = new URL(origin);
       expect(url.protocol).toBe('https:');
       expect(url.origin).toBe(origin);
-      expect(url.host).not.toBe(input.requestHost);
+      expect(url.host).not.toBe(production.requestHost);
     }
     expect(JSON.parse(JSON.stringify(document))).toEqual(document);
   });
@@ -77,6 +69,7 @@ describe('webAuthnRelatedOrigins', () => {
   });
 
   test.each<[string, Partial<RelatedOriginsInput>]>([
+    ['its own deployment', {}],
     [
       'production on the staging app origin',
       { vercelEnv: 'production', vercelTargetEnv: 'production' },
@@ -85,6 +78,10 @@ describe('webAuthnRelatedOrigins', () => {
     ['a preview', { vercelTargetEnv: 'preview' }],
     ['a development server', { vercelEnv: undefined, vercelTargetEnv: undefined }],
     ['the production app origin', { appUrl: 'https://app.kilo.ai' }],
+    [
+      'the production app origin and host',
+      { appUrl: 'https://app.kilo.ai', requestHost: 'app.kilo.ai' },
+    ],
   ])('staging refuses %s', (_name, override) => {
     expect(webAuthnRelatedOrigins({ ...staging, ...override })).toBeNull();
   });
@@ -152,13 +149,18 @@ describe('GET /.well-known/webauthn', () => {
     expect(await response.text()).toBe('');
   });
 
-  test('answers 404 outside a production deployment', async () => {
-    process.env.VERCEL_ENV = 'preview';
-    process.env.VERCEL_TARGET_ENV = 'preview';
+  test.each([
+    ['a preview deployment', 'preview', 'preview', 'app.kilo.ai'],
+    ['a staging deployment', 'preview', 'staging', 'app.kilo.ai'],
+    ['a staging deployment on the staging host', 'preview', 'staging', 'staging-app.kilo.ai'],
+  ])('answers 404 with no body and no caching on %s', async (_name, env, target, host) => {
+    process.env.VERCEL_ENV = env;
+    process.env.VERCEL_TARGET_ENV = target;
 
-    const response = GET(wellKnownRequest('app.kilo.ai'));
+    const response = GET(wellKnownRequest(host));
 
     expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.text()).toBe('');
   });
 });

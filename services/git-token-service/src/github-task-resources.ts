@@ -9,6 +9,7 @@ import {
   type GitHubTaskScope,
 } from '@kilocode/worker-utils/github-task-grant';
 import { readGitTokenServiceSecret, type GitTokenServiceSecretsEnv } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 const MAX_TASK_RESOURCE_LOOKUPS = 16;
 
@@ -44,7 +45,8 @@ export class GitHubTaskResources {
   private readonly root: string;
   constructor(
     private readonly token: string,
-    private readonly env: ResourceEnv
+    private readonly env: ResourceEnv,
+    private readonly ctx?: SecretsExecutionContext
   ) {
     this.root = (env.GITHUB_API_BASE_URL?.trim() || 'https://api.github.com').replace(/\/+$/, '');
   }
@@ -218,7 +220,11 @@ export class GitHubTaskResources {
   /** GitHub limits the token to one owner, even when the parent identity spans multiple installations. */
   async scopeUserToken(scope: GitHubRepositoryScope): Promise<string> {
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
+    const clientSecret = await readGitTokenServiceSecret(
+      this.env,
+      'GITHUB_APP_CLIENT_SECRET',
+      this.ctx
+    );
     if (!clientId || !clientSecret) throw new GitHubTaskResourceError('source_unavailable');
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const value = await this.request(

@@ -32,6 +32,7 @@ import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-l
 import contentDisposition from 'content-disposition';
 import { mintGetUrl, mintPutUrl } from '../util/presigner';
 import { readKiloChatSecret } from '../secrets';
+import { requestContext } from '../util/request-context';
 import type {
   CreateMessageResponse,
   EditMessageResponse,
@@ -642,8 +643,9 @@ export async function handleAttachmentInit(c: HonoCtx) {
     return c.json({ error: init.error }, 400);
   }
 
-  const accessKeyId = await readKiloChatSecret(c.env, 'R2_ACCESS_KEY_ID');
-  const secretAccessKey = await readKiloChatSecret(c.env, 'R2_SECRET_ACCESS_KEY');
+  const ctx = requestContext(c);
+  const accessKeyId = await readKiloChatSecret(c.env, 'R2_ACCESS_KEY_ID', ctx);
+  const secretAccessKey = await readKiloChatSecret(c.env, 'R2_SECRET_ACCESS_KEY', ctx);
   if (!accessKeyId || !secretAccessKey) {
     return c.json({ error: 'R2 credentials unavailable' }, 503);
   }
@@ -705,8 +707,9 @@ export async function handleAttachmentGetUrl(c: HonoCtx) {
     return c.json({ error: 'Attachment not found' }, 404);
   }
 
-  const accessKeyId = await readKiloChatSecret(c.env, 'R2_ACCESS_KEY_ID');
-  const secretAccessKey = await readKiloChatSecret(c.env, 'R2_SECRET_ACCESS_KEY');
+  const ctx = requestContext(c);
+  const accessKeyId = await readKiloChatSecret(c.env, 'R2_ACCESS_KEY_ID', ctx);
+  const secretAccessKey = await readKiloChatSecret(c.env, 'R2_SECRET_ACCESS_KEY', ctx);
   if (!accessKeyId || !secretAccessKey) {
     return c.json({ error: 'R2 credentials unavailable' }, 503);
   }

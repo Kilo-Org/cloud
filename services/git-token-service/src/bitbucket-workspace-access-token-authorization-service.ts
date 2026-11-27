@@ -24,6 +24,7 @@ import { and, eq, exists, isNull, lt, or, sql } from 'drizzle-orm';
 import { availableAccountCondition } from './account-availability.js';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
 import { readGitTokenServiceSecret } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 export type BitbucketWorkspaceAccessTokenAuthorizationCandidate = {
   integrationId: string;
@@ -392,7 +393,8 @@ function temporarilyUnavailable(reason: string): { status: 'temporarily_unavaila
 export class BitbucketWorkspaceAccessTokenAuthorizationService {
   constructor(
     private env: AuthorizationEnv,
-    private dependencies: AuthorizationDependencies = {}
+    private dependencies: AuthorizationDependencies = {},
+    private readonly ctx?: SecretsExecutionContext
   ) {}
 
   async getAuthorization(input: {
@@ -506,7 +508,11 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
       [keyId, encodedPublicKey, encodedPrivateKey] = await Promise.all([
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID),
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY),
-        readGitTokenServiceSecret(this.env, 'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY'),
+        readGitTokenServiceSecret(
+          this.env,
+          'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY',
+          this.ctx
+        ),
       ]);
     } catch {
       return temporarilyUnavailable('secret_resolution_failed');

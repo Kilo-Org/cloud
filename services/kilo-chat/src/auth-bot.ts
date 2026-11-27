@@ -4,6 +4,7 @@ import { logger } from './util/logger';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { deriveGatewayToken } from './lib/gateway-token';
 import { readKiloChatSecret } from './secrets';
+import { requestContext } from './util/request-context';
 import type { AuthContext } from './auth';
 import { sandboxIdSchema } from '@kilocode/kilo-chat';
 
@@ -31,7 +32,7 @@ export const botAuthMiddleware = createMiddleware<{
   let secret: string;
   try {
     secret = await getCachedSecret(
-      { get: () => readKiloChatSecret(c.env, 'GATEWAY_TOKEN_SECRET') },
+      { get: () => readKiloChatSecret(c.env, 'GATEWAY_TOKEN_SECRET', requestContext(c)) },
       'GATEWAY_TOKEN_SECRET'
     );
   } catch {

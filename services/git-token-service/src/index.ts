@@ -55,6 +55,7 @@ import {
 import { DEFAULT_GITLAB_INSTANCE_URL } from '@kilocode/worker-utils/gitlab-url';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
 import { readGitTokenServiceSecret } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { isGitHubDisconnectAssertion } from './github-disconnect-assertion.js';
 import {
   GitLabSessionCapabilityCodec,
@@ -520,18 +521,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private gitlabLookupService: GitLabLookupService;
   private gitlabCredentialResolver: GitLabCredentialBroker;
   private githubUserAuthorizationService: GitHubUserAuthorizationService;
+  /** The invocation context every secret read from this entrypoint runs under. */
+  private readonly secretsCtx: SecretsExecutionContext;
 
   constructor(ctx: ExecutionContext, env: CloudflareEnv) {
     super(ctx, env);
-    this.githubService = new GitHubTokenService(env);
+    this.secretsCtx = ctx;
+    this.githubService = new GitHubTokenService(env, ctx);
     this.installationLookupService = new InstallationLookupService(env);
     this.hostedWorkspaceGitHubRepositories = new HostedWorkspaceGitHubRepositories(
       params => this.findHostedWorkspaceInstallationWithLoginRepair(params),
       this.githubService
     );
     this.gitlabLookupService = new GitLabLookupService(env);
-    this.gitlabCredentialResolver = createGitLabCredentialBroker(env);
-    this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
+    this.gitlabCredentialResolver = createGitLabCredentialBroker(env, ctx);
+    this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env, ctx);
   }
 
   private async refreshGitHubInstallationLogins(
@@ -842,7 +846,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     let taskGrant: GitHubTaskGrant | undefined;
     if (params.taskScope) {
       try {
-        taskGrant = await new GitHubTaskResources(auth.githubToken, this.env).issue(
+        taskGrant = await new GitHubTaskResources(
+          auth.githubToken,
+          this.env,
+          this.secretsCtx
+        ).issue(
           repository.owner,
           repository.repo,
           params.taskScope
@@ -858,7 +866,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     try {
       const encryptionKey = await readGitTokenServiceSecret(
         this.env,
-        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
       );
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
@@ -899,7 +908,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     try {
       const encryptionKey = await readGitTokenServiceSecret(
         this.env,
-        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
       );
       claims = new GitHubSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
@@ -981,7 +991,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         auth,
         claims.taskGrant,
         taskDecision,
-        params.requestUrl
+        params.requestUrl,
+        this.secretsCtx
       );
       if (authorization !== null) {
         authorization = this.formatUpstreamAuthorization(params.requestUrl, authorization);
@@ -1133,7 +1144,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
   async getBitbucketToken(params: GetBitbucketTokenParams): Promise<GetBitbucketTokenResult> {
     if (!params.orgId) return { success: false, reason: 'invalid_request' };
-    const result = await resolveBitbucketToken(this.env, params);
+    const result = await resolveBitbucketToken(this.env, params, undefined, this.secretsCtx);
     return result.success ? { success: true, token: result.token } : result;
   }
 
@@ -1149,13 +1160,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       workspaceUuid: params.workspaceUuid,
       repositoryUuid: params.repositoryUuid,
       repositoryUrl: params.repositoryUrl,
-    });
+    }, undefined, this.secretsCtx);
     if (!resolved.success) return resolved;
     const { subject } = resolved;
     try {
       const encryptionKey = await readGitTokenServiceSecret(
         this.env,
-        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
       );
       const capability = new BitbucketSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
@@ -1186,7 +1198,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     try {
       const encryptionKey = await readGitTokenServiceSecret(
         this.env,
-        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
       );
       claims = new BitbucketSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
@@ -1212,7 +1225,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       workspaceUuid: claims.workspaceUuid,
       repositoryUuid: claims.repositoryUuid,
       repositoryUrl: `https://bitbucket.org/${claims.repositoryFullName}.git`,
-    });
+    }, undefined, this.secretsCtx);
     if (!resolved.success) return { success: false, reason: 'source_unavailable' };
     const { subject } = resolved;
     if (
@@ -1280,7 +1293,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     try {
       const encryptionKey = await readGitTokenServiceSecret(
         this.env,
-        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
       );
       capability = new GitLabSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
@@ -1317,7 +1331,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     try {
       const encryptionKey = await readGitTokenServiceSecret(
         this.env,
-        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
       );
       claims = new GitLabSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
@@ -1414,7 +1429,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 }
 
 export default {
-  async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
+  async fetch(request: Request, env: ServiceHttpEnv, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
     // Credential-bearing endpoints must never be cached, including on their
@@ -1452,7 +1467,7 @@ export default {
 
     let secret: string;
     try {
-      secret = await readGitTokenServiceSecret(env, 'NEXTAUTH_SECRET');
+      secret = await readGitTokenServiceSecret(env, 'NEXTAUTH_SECRET', ctx);
     } catch {
       return Response.json(
         { error: 'authentication_unavailable' },
@@ -1506,10 +1521,15 @@ export default {
         return Response.json({ error: 'organization_required' }, { status: 403 });
       }
       try {
-        const result: BitbucketRepositoryListResult = await listBitbucketRepositories(env, {
-          userId: authorization.kiloUserId,
-          orgId: authorization.organizationId,
-        });
+        const result: BitbucketRepositoryListResult = await listBitbucketRepositories(
+          env,
+          {
+            userId: authorization.kiloUserId,
+            orgId: authorization.organizationId,
+          },
+          undefined,
+          ctx
+        );
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
@@ -1546,7 +1566,11 @@ export default {
       // matches the integration the token belongs to.
       const requested = parsed.data;
       try {
-        const authorizationService = new BitbucketWorkspaceAccessTokenAuthorizationService(env);
+        const authorizationService = new BitbucketWorkspaceAccessTokenAuthorizationService(
+          env,
+          {},
+          ctx
+        );
         const workspaceAuthorization: BitbucketWorkspaceAccessTokenAuthorizationResult =
           await authorizationService.getAuthorization({
             userId: authorization.kiloUserId,
@@ -1611,7 +1635,8 @@ export default {
             userId: authorization.kiloUserId,
             ...(authorization.organizationId ? { orgId: authorization.organizationId } : {}),
           },
-          parsed.data
+          parsed.data,
+          ctx
         );
         return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
       } catch {
@@ -1636,7 +1661,7 @@ export default {
         userId: authorization.kiloUserId,
         orgId: authorization.organizationId,
       };
-      const service = new BitbucketCodeReviewService(env);
+      const service = new BitbucketCodeReviewService(env, {}, ctx);
 
       try {
         switch (url.pathname) {
@@ -1687,7 +1712,7 @@ export default {
         );
       }
       try {
-        const service = new GitHubUserAuthorizationService(env);
+        const service = new GitHubUserAuthorizationService(env, ctx);
         const result = await service.getUserAccessToken(authorization.kiloUserId, parsed.data);
         if (
           result.connected &&
@@ -1721,7 +1746,7 @@ export default {
     const expected = GitHubIdentityPreconditionSchema.safeParse(disconnectBody);
     if (!expected.success) return Response.json({ error: 'invalid_request' }, { status: 400 });
     try {
-      const service = new GitHubUserAuthorizationService(env);
+      const service = new GitHubUserAuthorizationService(env, ctx);
       await service.disconnectUserAuthorization(authorization.kiloUserId, expected.data);
       return Response.json({ disconnected: true });
     } catch (error) {

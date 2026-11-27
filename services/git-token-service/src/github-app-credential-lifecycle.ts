@@ -10,6 +10,7 @@ import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { readGitTokenServiceSecret } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   claimRefreshLease,
   newRefreshLeaseAttemptId,
@@ -68,7 +69,10 @@ export class CredentialSelectionError extends Error {
 }
 
 export class GitHubAppCredentialLifecycle {
-  constructor(protected env: GitHubUserAuthorizationEnv) {}
+  constructor(
+    protected env: GitHubUserAuthorizationEnv,
+    protected readonly ctx?: SecretsExecutionContext
+  ) {}
 
   protected getDatabase(): WorkerDb {
     if (!this.env.HYPERDRIVE) {
@@ -123,7 +127,8 @@ export class GitHubAppCredentialLifecycle {
     const activeKeyId = this.env.USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID;
     const activePrivateKeyEncoded = await readGitTokenServiceSecret(
       this.env,
-      'USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY'
+      'USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY',
+      this.ctx
     );
     if (!activeKeyId || !activePrivateKeyEncoded) {
       throw new EncryptionConfigurationError(
@@ -214,7 +219,11 @@ export class GitHubAppCredentialLifecycle {
     if (typeof initial !== 'object') return initial;
 
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
+    const clientSecret = await readGitTokenServiceSecret(
+      this.env,
+      'GITHUB_APP_CLIENT_SECRET',
+      this.ctx
+    );
     if (!clientId || !clientSecret) return 'transient_failure';
     // Only the attempt that holds the exchange lease may use the refresh token:
     // a second concurrent exchange would make one of the two attempts look like
@@ -385,7 +394,11 @@ export class GitHubAppCredentialLifecycle {
 
   protected async revokeAuthorizationOnGitHub(accessToken: string): Promise<RevokeResult> {
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
+    const clientSecret = await readGitTokenServiceSecret(
+      this.env,
+      'GITHUB_APP_CLIENT_SECRET',
+      this.ctx
+    );
     if (!clientId || !clientSecret) {
       throw new EncryptionConfigurationError(
         'GitHub App revocation credentials are not configured'
@@ -416,7 +429,11 @@ export class GitHubAppCredentialLifecycle {
     authorization: AuthorizationRow
   ): Promise<DisconnectRefreshResult> {
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
+    const clientSecret = await readGitTokenServiceSecret(
+      this.env,
+      'GITHUB_APP_CLIENT_SECRET',
+      this.ctx
+    );
     if (!clientId || !clientSecret) return null;
     if (new Date(authorization.refresh_token_expires_at ?? 0).getTime() <= Date.now()) {
       return 'terminal_refresh_token';

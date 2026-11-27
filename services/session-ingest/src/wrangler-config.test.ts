@@ -99,7 +99,7 @@ describe('session-ingest wrangler.jsonc', () => {
       traces: { enabled: false },
     });
     expect(production.placement).toEqual({ mode: 'smart' });
-    expect(production.vars).toEqual({ ...VARS, SECRETS_SOURCE: 'env' });
+    expect(production.vars).toEqual({ ...VARS, SECRETS_SOURCE: 'secrets-store' });
     expect(boundKinds(production)).toEqual([
       'durable_objects',
       'hyperdrive',

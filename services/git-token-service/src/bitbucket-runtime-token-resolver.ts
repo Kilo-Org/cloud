@@ -23,6 +23,7 @@ import {
   type BitbucketWorkspaceAccessTokenAuthorizationResult,
 } from './bitbucket-workspace-access-token-authorization-service.js';
 import { normalizeBitbucketUuid, parseBitbucketCloneUrl } from './bitbucket-url.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 export type BitbucketRepositoryListResult =
   | { status: 'available'; repositories: BitbucketRepository[] }
@@ -197,12 +198,13 @@ async function findCachedBitbucketRepository(
 
 function dependencies(
   env: CloudflareEnv,
-  overrides?: BitbucketRuntimeTokenResolverDependencies
+  overrides?: BitbucketRuntimeTokenResolverDependencies,
+  ctx?: SecretsExecutionContext
 ): BitbucketRuntimeTokenResolverDependencies {
   if (overrides) return overrides;
   return {
-    authorizationService: new BitbucketWorkspaceAccessTokenAuthorizationService(env),
-    oauthAuthorizationService: new BitbucketAuthorizationService(env),
+    authorizationService: new BitbucketWorkspaceAccessTokenAuthorizationService(env, {}, ctx),
+    oauthAuthorizationService: new BitbucketAuthorizationService(env, ctx),
     listRepositories: listBitbucketWorkspaceRepositories,
     findCachedRepository: input => findCachedBitbucketRepository(env, input),
   };
@@ -308,10 +310,11 @@ async function getRuntimeAuthorization(
 export async function listBitbucketRepositories(
   env: CloudflareEnv,
   owner: { userId: string; orgId?: string },
-  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies,
+  ctx?: SecretsExecutionContext
 ): Promise<BitbucketRepositoryListResult> {
   if (!owner.orgId) return { status: 'invalid_request' };
-  const runtimeDependencies = dependencies(env, dependencyOverrides);
+  const runtimeDependencies = dependencies(env, dependencyOverrides, ctx);
   const authorizationResult = await getRuntimeAuthorization(owner, runtimeDependencies);
   if (authorizationResult.status !== 'available') return authorizationResult;
   const authorization = authorizationResult.authorization;
@@ -342,7 +345,8 @@ type BitbucketTokenFailure = Extract<GetBitbucketTokenResult, { success: false }
 async function resolveBitbucketAuthorizedRepository(
   env: CloudflareEnv,
   params: GetBitbucketTokenParams,
-  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies,
+  ctx?: SecretsExecutionContext
 ): Promise<
   | { success: true; authorization: RuntimeAuthorization; repository: BitbucketRepository }
   | BitbucketTokenFailure
@@ -355,7 +359,7 @@ async function resolveBitbucketAuthorizedRepository(
     return { success: false, reason: 'invalid_request' };
   }
 
-  const runtimeDependencies = dependencies(env, dependencyOverrides);
+  const runtimeDependencies = dependencies(env, dependencyOverrides, ctx);
   const authorizationResult = await getRuntimeAuthorization(
     { userId: params.userId, orgId: params.orgId },
     runtimeDependencies,
@@ -401,9 +405,10 @@ async function resolveBitbucketAuthorizedRepository(
 export async function resolveBitbucketToken(
   env: CloudflareEnv,
   params: GetBitbucketTokenParams,
-  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies,
+  ctx?: SecretsExecutionContext
 ): Promise<GetBitbucketTokenResult> {
-  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
+  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides, ctx);
   if (!resolved.success) return resolved;
   return { success: true, token: resolved.authorization.token };
 }
@@ -421,9 +426,10 @@ export type BitbucketCapabilitySubject = {
 export async function resolveBitbucketCapabilitySubject(
   env: CloudflareEnv,
   params: GetBitbucketTokenParams,
-  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies
+  dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies,
+  ctx?: SecretsExecutionContext
 ): Promise<{ success: true; subject: BitbucketCapabilitySubject } | BitbucketTokenFailure> {
-  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides);
+  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides, ctx);
   if (!resolved.success) return resolved;
   const { authorization, repository } = resolved;
   return {

@@ -4,6 +4,7 @@ import { extractBearerToken } from '@kilocode/worker-utils';
 import { KILO_CHAT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { logger } from './util/logger';
 import { readKiloChatSecret } from './secrets';
+import { requestContext } from './util/request-context';
 
 export type AuthContext = {
   callerId: string;
@@ -28,9 +29,10 @@ export const authMiddleware = createMiddleware<{
   }
 
   try {
+    const ctx = requestContext(c);
     const auth = await verifyKiloBearerAgainstCurrentPepper({
       token,
-      nextAuthSecret: { get: () => readKiloChatSecret(c.env, 'NEXTAUTH_SECRET') },
+      nextAuthSecret: { get: () => readKiloChatSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
       workerEnv: c.env.WORKER_ENV,
       connectionString: c.env.HYPERDRIVE.connectionString,
       resourceAudience: { audience: KILO_CHAT_AUDIENCE, mode: 'allow-legacy' },

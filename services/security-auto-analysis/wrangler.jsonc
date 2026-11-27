@@ -49,10 +49,10 @@
     "SECURITY_AGENT_COMMAND_RUNNING_TIMEOUT_MS": "1800000",
     "SECURITY_AGENT_COMMAND_RETENTION_DAYS": "30",
     "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
-    // Where every runtime secret read goes: `env` (the Secrets Store binding below) or `sts` (the
-    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
-    // read. The `sts` source never falls back to the Secrets Store.
-    "SECRETS_SOURCE": "env",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "triggers": {
     "crons": ["* * * * *"],
@@ -149,7 +149,7 @@
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
     // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
     // security-auto-analysis.yaml grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
-    // NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `env`.
+    // NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
     {
       "binding": "STS",
       "service": "sts",

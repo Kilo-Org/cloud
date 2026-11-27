@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod';
 import type { GitHubBrokerRejectionProvenance } from '@kilocode/worker-utils/github-authorization';
 import { readGitTokenServiceSecret } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 type Token = z.infer<typeof Token>;
 const Token = z.object({
@@ -98,7 +99,10 @@ export class GitHubRepositoryPermissionsUnavailableError extends Error {
 }
 
 export class GitHubTokenService {
-  constructor(private env: CloudflareEnv) {}
+  constructor(
+    private env: CloudflareEnv,
+    private readonly ctx?: SecretsExecutionContext
+  ) {}
 
   /**
    * Get a token scoped to a specific repository.
@@ -291,7 +295,8 @@ export class GitHubTokenService {
       const appId = this.env.GITHUB_LITE_APP_ID;
       const privateKeyRaw = await readGitTokenServiceSecret(
         this.env,
-        'GITHUB_LITE_APP_PRIVATE_KEY'
+        'GITHUB_LITE_APP_PRIVATE_KEY',
+        this.ctx
       );
       if (!appId || !privateKeyRaw) {
         throw new Error('GitHub Lite App credentials not configured');
@@ -303,7 +308,11 @@ export class GitHubTokenService {
     }
 
     const appId = this.env.GITHUB_APP_ID;
-    const privateKeyRaw = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_PRIVATE_KEY');
+    const privateKeyRaw = await readGitTokenServiceSecret(
+      this.env,
+      'GITHUB_APP_PRIVATE_KEY',
+      this.ctx
+    );
     if (!appId || !privateKeyRaw) {
       throw new Error('GitHub App credentials not configured');
     }

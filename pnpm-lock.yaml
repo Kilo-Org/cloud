@@ -2919,6 +2919,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts
@@ -3002,6 +3005,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3610,6 +3616,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3693,6 +3702,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts

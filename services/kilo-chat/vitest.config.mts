@@ -24,7 +24,7 @@ export default defineConfig({
           KILO_CHAT_SELF: kCurrentWorker,
           // Worker unit tests resolve the STS binding to the stub below instead of the deployed
           // broker. The binding names the `SecretsBroker` entrypoint, so the stub exports it.
-          // Nothing reaches it while SECRETS_SOURCE is `env`.
+          // Nothing reaches it while SECRETS_SOURCE is `secrets-store`.
           STS: 'sts-stub',
         },
         workers: [

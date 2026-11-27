@@ -18,6 +18,7 @@ import {
 import { and, eq, exists, isNull, sql } from 'drizzle-orm';
 import { availableAccountCondition } from './account-availability.js';
 import { readGitTokenServiceSecret } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 import {
   claimRefreshLease,
@@ -256,7 +257,10 @@ function credentialAad(
 }
 
 export class BitbucketAuthorizationService {
-  constructor(private env: BitbucketAuthorizationEnv) {}
+  constructor(
+    private env: BitbucketAuthorizationEnv,
+    private readonly ctx?: SecretsExecutionContext
+  ) {}
 
   async getAuthorization(
     owner: BitbucketAuthorizationOwner,
@@ -410,8 +414,8 @@ export class BitbucketAuthorizationService {
     }
 
     const [clientId, clientSecret, refreshToken] = await Promise.all([
-      readGitTokenServiceSecret(this.env, 'BITBUCKET_CLIENT_ID'),
-      readGitTokenServiceSecret(this.env, 'BITBUCKET_CLIENT_SECRET'),
+      readGitTokenServiceSecret(this.env, 'BITBUCKET_CLIENT_ID', this.ctx),
+      readGitTokenServiceSecret(this.env, 'BITBUCKET_CLIENT_SECRET', this.ctx),
       this.decryptCredential(current.authorization, 'refresh'),
     ]);
     if (!clientId || !clientSecret || !refreshToken) {
@@ -577,7 +581,8 @@ export class BitbucketAuthorizationService {
       const keyId = await resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID);
       const encodedPrivateKey = await readGitTokenServiceSecret(
         this.env,
-        'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY'
+        'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY',
+        this.ctx
       );
       if (!keyId || !encodedPrivateKey) return null;
       const privateKeyPem = Buffer.from(encodedPrivateKey, 'base64').toString('utf8');

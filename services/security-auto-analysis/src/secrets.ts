@@ -24,25 +24,25 @@ type BindingName = (typeof BINDINGS)[SecurityAutoAnalysisSecretName];
 type LegacySecretValue = string | { get(): Promise<string> };
 
 /**
- * `SECRETS_SOURCE` selects where every read goes: `env` reads the binding the deployment holds
- * today, `sts` reads the bundle over the `STS` service binding. An absent value means `env`, so
- * merging this path changes nothing until secrets-cutover flips the variable. The `sts` source
- * never falls back to the legacy binding: a failed bundle read fails the read.
+ * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the binding the deployment
+ * holds today, `sts` reads the bundle over the `STS` service binding. An absent value means
+ * `secrets-store`, so merging this path changes nothing until secrets-cutover flips the variable.
+ * The `sts` source never falls back to the legacy binding: a failed bundle read fails the read.
  */
 export type SecurityAutoAnalysisSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {
   SECRETS_SOURCE?: string;
   STS?: BundleBinding;
 };
 
-export type SecretsSource = 'env' | 'sts';
+export type SecretsSource = 'secrets-store' | 'sts';
 
 /** Fails closed: an unrecognised value refuses every read instead of guessing a source. */
 export function secretsSource(
   env: Pick<SecurityAutoAnalysisSecretsEnv, 'SECRETS_SOURCE'>
 ): SecretsSource {
-  const source = env.SECRETS_SOURCE ?? 'env';
-  if (source !== 'env' && source !== 'sts') {
-    throw new Error('SECRETS_SOURCE must be either "env" or "sts"');
+  const source = env.SECRETS_SOURCE ?? 'secrets-store';
+  if (source !== 'secrets-store' && source !== 'sts') {
+    throw new Error('SECRETS_SOURCE must be either "secrets-store" or "sts"');
   }
   return source;
 }

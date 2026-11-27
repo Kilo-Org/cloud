@@ -56,10 +56,10 @@ function legacyEnv(
 
 describe('secretsSource', () => {
   it('defaults to the legacy binding source', () => {
-    expect(secretsSource({})).toBe('env');
+    expect(secretsSource({})).toBe('secrets-store');
   });
 
-  it.each(['env', 'sts'] as const)('accepts %s', source => {
+  it.each(['secrets-store', 'sts'] as const)('accepts %s', source => {
     expect(secretsSource({ SECRETS_SOURCE: source })).toBe(source);
   });
 
@@ -86,7 +86,7 @@ describe('readSessionIngestSecret', () => {
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
       // Flipping the variable back reads the legacy binding again.
-      expect(await readSessionIngestSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
+      expect(await readSessionIngestSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)).toBe(
         'legacy-value'
       );
       expect(store.get).toHaveBeenCalledTimes(2);

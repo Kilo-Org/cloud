@@ -14,6 +14,7 @@ import { decodeJwt } from 'jose';
 
 import type { Env } from '../env';
 import { readSessionIngestSecret } from '../secrets';
+import { requestContext } from '../request-context';
 import { resolveConnectionTicket } from '../dos/connection-ticket';
 
 export type KiloJwtAuthVariables = {
@@ -81,12 +82,14 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }
 
+  const ctx = requestContext(c);
+
   let auth;
   let deletionAudience = false;
   try {
     const deletionAuth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
       token,
-      nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET') },
+      nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
       connectionString: c.env.HYPERDRIVE.connectionString,
       audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
       allowBlocked: true,
@@ -103,7 +106,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     } else {
       auth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
         token,
-        nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET') },
+        nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
         connectionString: c.env.HYPERDRIVE.connectionString,
         resourceAudience: { audience: SESSION_INGEST_AUDIENCE, mode: 'allow-legacy' },
       });
@@ -131,7 +134,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     let attested: boolean;
     try {
       const secret = await getCachedSecret(
-        { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET') },
+        { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
         'NEXTAUTH_SECRET'
       );
       attested = await verifyRuntimeProxyAttestation({

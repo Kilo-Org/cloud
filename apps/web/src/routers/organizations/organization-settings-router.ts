@@ -569,7 +569,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         let previousSettings: OrganizationSettings = {};
         const settings = await mutateOrganizationSettings(
           organizationId,
-          async organization => {
+          organization => {
             if (organization.plan !== 'enterprise') {
               throw new TRPCError({
                 code: 'FORBIDDEN',
@@ -577,12 +577,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
               });
             }
             previousSettings = organization.settings;
-            const nextSettings = { ...organization.settings, disable_new_models };
-            // The policy counts as an active model policy, which rules out auto tiers.
-            if (disable_new_models && !organization.settings.disable_new_models) {
-              await assertActiveOrganizationAutoTargetsAllowed(organization, nextSettings, tx);
-            }
-            return nextSettings;
+            return { ...organization.settings, disable_new_models };
           },
           tx
         );

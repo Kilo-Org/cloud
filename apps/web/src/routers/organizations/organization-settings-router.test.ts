@@ -1898,34 +1898,34 @@ describe('organizations settings trpc router', () => {
           expect(await baselineSnapshotId()).toBe(firstId);
         });
 
-        it('rejects enabling the policy while Organization Auto routes to an auto tier', async () => {
-          await insertSnapshot();
+        it('enables the policy while Organization Auto routes to auto tiers', async () => {
+          const snapshotId = await insertSnapshot();
           await mutateOrganizationSettings(testOrganization.id, () => ({
             default_model: 'kilo-auto/org',
-            org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+            org_auto_model: {
+              routes: { code: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
           }));
           const caller = await createCallerForUser(owner.id);
 
-          await expect(
-            caller.organizations.settings.updateNewModelsPolicy({
-              organizationId: testOrganization.id,
-              disable_new_models: true,
-            })
-          ).rejects.toMatchObject({
-            code: 'BAD_REQUEST',
-            message: expect.stringContaining(
-              'Cannot update model policy because active Organization Auto fallback is invalid'
-            ),
+          const result = await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
           });
 
-          expect(
-            (await getOrganizationById(testOrganization.id))?.settings.disable_new_models
-          ).toBeUndefined();
-          expect(await baselineSnapshotId()).toBeNull();
-          expect(await auditMessages(testOrganization.id)).toEqual([]);
+          expect(result.settings).toMatchObject({
+            disable_new_models: true,
+            default_model: 'kilo-auto/org',
+            org_auto_model: {
+              routes: { code: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          });
+          expect(await baselineSnapshotId()).toBe(snapshotId);
         });
 
-        it('disables the policy even when Organization Auto still routes to an auto tier', async () => {
+        it('disables the policy while Organization Auto routes to an auto tier', async () => {
           const snapshotId = await insertSnapshot();
           await mutateOrganizationSettings(testOrganization.id, () => ({
             disable_new_models: true,
@@ -1945,50 +1945,6 @@ describe('organizations settings trpc router', () => {
 
           expect(result.settings.disable_new_models).toBe(false);
           expect(result.settings.org_auto_model?.fallback_model).toBe('kilo-auto/balanced');
-          expect(await baselineSnapshotId()).toBeNull();
-        });
-
-        it('does not check Organization Auto targets when the policy is already enabled', async () => {
-          const snapshotId = await insertSnapshot();
-          await mutateOrganizationSettings(testOrganization.id, () => ({
-            disable_new_models: true,
-            default_model: 'kilo-auto/org',
-            org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
-          }));
-          await db.insert(organization_new_models_baselines).values({
-            organization_id: testOrganization.id,
-            snapshot_id: snapshotId,
-          });
-          const caller = await createCallerForUser(owner.id);
-
-          const result = await caller.organizations.settings.updateNewModelsPolicy({
-            organizationId: testOrganization.id,
-            disable_new_models: true,
-          });
-
-          expect(result.settings.disable_new_models).toBe(true);
-          expect(await baselineSnapshotId()).toBe(snapshotId);
-        });
-
-        it('rejects enabling the policy while an Organization Auto route is an auto tier', async () => {
-          await mutateOrganizationSettings(testOrganization.id, () => ({
-            default_model: 'kilo-auto/org',
-            org_auto_model: {
-              routes: { code: 'kilo-auto/frontier' },
-              fallback_model: 'openai/gpt-4o',
-            },
-          }));
-          const caller = await createCallerForUser(owner.id);
-
-          await expect(
-            caller.organizations.settings.updateNewModelsPolicy({
-              organizationId: testOrganization.id,
-              disable_new_models: true,
-            })
-          ).rejects.toMatchObject({
-            code: 'BAD_REQUEST',
-            message: expect.stringContaining('active Organization Auto route "code" is invalid'),
-          });
           expect(await baselineSnapshotId()).toBeNull();
         });
 

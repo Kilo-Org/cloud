@@ -45,9 +45,10 @@ export function isOrganizationCustomRouterTarget(modelId: string): boolean {
 export function hasActiveOrganizationModelPolicy(
   settings: OrganizationSettings | undefined
 ): boolean {
+  // The `disable_new_models` policy fills the deny list on its own, so under it a deny list
+  // does not rule out auto tiers; see `validateOrganizationAutoTarget`.
   return (
     settings?.provider_allow_list !== undefined ||
-    (settings?.model_deny_list?.length ?? 0) > 0 ||
-    settings?.disable_new_models === true
+    ((settings?.model_deny_list?.length ?? 0) > 0 && settings?.disable_new_models !== true)
   );
 }

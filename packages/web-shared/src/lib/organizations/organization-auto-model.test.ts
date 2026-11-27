@@ -171,10 +171,38 @@ describe('validateOrganizationAutoTarget with auto tier targets', () => {
     ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
   });
 
-  test('rejects an auto tier for an enterprise organization that disables new models', async () => {
+  test('accepts an auto tier for an enterprise organization that disables new models', async () => {
     await expect(
       validateOrganizationAutoTarget(
         organization({ disable_new_models: true }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
+  });
+
+  test('accepts an auto tier under the policy once it filled the deny list', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ disable_new_models: true, model_deny_list: ['z-ai/glm-5.1'] }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
+  });
+
+  test('rejects an auto tier under the policy when there is a provider allow list', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ disable_new_models: true, provider_allow_list: ['openai'] }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual(autoTierRejection);
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({
+          disable_new_models: true,
+          provider_allow_list: ['openai'],
+          model_deny_list: ['z-ai/glm-5.1'],
+        }),
         'kilo-auto/balanced'
       )
     ).resolves.toEqual(autoTierRejection);

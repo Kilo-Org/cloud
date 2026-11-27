@@ -333,13 +333,14 @@ at the start of each entry.
 | `DO_JURISDICTION` | `eu` in production and staging, `none` locally. |
 | `TOKEN_SIGNING_KIDS_REVOKED` | Comma list of service-token signing kids taken out of service; empty by default (runbook above). |
 | `LEASE_CI_MIGRATION_TARGET` | `<host>:<port>/<database>` of the primary's direct endpoint, returned with a `ci-migration` lease; empty returns no target. Plain values, never a credential. |
+| `LEASE_REPLICA_SWEEP_BINDINGS` | Comma list of the Hyperdrive bindings (`LEASE_SWEEP_<NAME>`) of the read replicas the lease object sweeps once a minute ([Replica sessions](#database-leases)); empty sweeps none. Each name must be a `hyperdrive` binding of the same block (repo check); the binding holds the sweeper login, at Cloudflare, not here. |
 | `CF_DEPLOY_ACCOUNT_ID` | The Cloudflare account STS mints CI deploy tokens in (32 hexadecimal characters). Empty: this environment mints none, and every deploy-token request answers `unavailable` ([Cloudflare deploy tokens](#cloudflare-deploy-tokens)). Not a credential. |
 
 Wrangler inherits no vars into an env block, so every block sets each var, and
 `test/repo/worker-configs.test.ts` checks that each STS block passes the same schema `readConfig`
 uses and that its `STS_ISSUER` equals `STS_ISSUERS` in `@kilocode/sts-contracts`.
 
-Bindings: `AUDIT_QUEUE` (queue producer), `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
+Bindings: `AUDIT_QUEUE` (queue producer), the Hyperdrive bindings `LEASE_REPLICA_SWEEP_BINDINGS` names, `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
 `STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`), `STS_LEASE_DO` (migration `v4`),
 `STS_DEPLOY_TOKEN_DO` (migration `v5`). Trigger: cron `*/5 * * * *` in production and staging, `[]`
 in the local block.
@@ -895,8 +896,13 @@ recorded failure; the last two with
 outcome `failure`). Refusals of an identified caller become
 `ai.kilo.sts.lease.denied` through the denial object, merged per minute: the answer's reason, or
 for a revoke the caller heard as `not_found`, `not_owner` (another workload's lease), `other_run`
-(another GitHub run's lease) or `unknown_lease`. No row carries a username or a password.
-Infisical's own audit log records each lease and revocation, the expiry revocation included.
+(another GitHub run's lease) or `unknown_lease`. `ai.kilo.sts.lease.replica_swept` records one sweep
+of one replica that changed something (Replica sessions below): `replica` (the Hyperdrive binding
+name) and `result` `ended` with `sessions` and `afterFailures` (a sweep that ended sessions, or the
+first to succeed after failures), or `failed` with `consecutiveFailures` and `detail` (the error's
+name and code) and outcome `failure` (the first failure of a streak, and the 15th). No row carries
+a username, a password or a host. Infisical's own audit log records each lease and revocation, the
+expiry revocation included.
 
 **Replica sessions (design decision Q63).** Infisical creates and drops the role on the primary,
 through its direct endpoint; no dynamic engine can write to a standby. The role reaches the replica
@@ -905,16 +911,55 @@ for the replication delay. The same login also works on the primary: Supabase gi
 host rule (no `pg_hba.conf` access), so nothing stops a `replica-read` holder from connecting to
 the primary instead. On the primary, the revocation (and the expiry revocation) ends the role's
 sessions, and every later revocation of the same template also ends the sessions of lease roles
-whose `VALID UNTIL` has passed. On the replica nothing ends a session: what bounds it is the
-consumer's own run deadline (bouncer-watch: 55 and 130 minutes, under the 60 and 150-minute
-leases); `VALID UNTIL` and the dropped role refuse a new login on both nodes. The role settings
-`statement_timeout` (60 s), `idle_in_transaction_session_timeout` (60 s) and
+whose `VALID UNTIL` has passed. Neither reaches a replica: a session open there stays connected
+after its role is dropped (its next statement fails with `invalid role OID`, an idle one lingers),
+and the role settings `statement_timeout` (60 s), `idle_in_transaction_session_timeout` (60 s) and
 `idle_session_timeout` (15 min) protect an honest consumer only: a session can change any of them
-with `SET`, and a database-level setting is a default too. Only a pooler or a kill job outside the
-session enforces a time limit, and on the replica STS has neither. `check.sh` shows on one node
-that `VALID UNTIL` refuses new logins and leaves an open session alone until a revocation. So
-`replica-read` is staging-only until a replica-side session sweeper ships (a phase 2 follow-up PR
-that runs the session-ending function on each replica): no production policy grants it before.
+with `SET`.
+
+The lease object's sweep ends them. Once a minute its alarm connects to each replica that
+`LEASE_REPLICA_SWEEP_BINDINGS` names, through that replica's Hyperdrive binding, as
+`kilo_lease_sweeper`, and runs `SELECT kilo_lease.sweep_sessions()` (`setup-replica-sweeper.sql`).
+That `SECURITY DEFINER` function ends, on the node it runs on, the sessions of every lease role
+`kilo_lease.lease_role` recorded, of either template, that no longer exists, has no login (a
+revocation blocked it) or is past `VALID UNTIL` (an expiry whose revocation did not run or failed).
+It ends nothing else: not a live lease, `postgres`, a superuser, an admin login or an application
+role, and not a dropped role that was never a lease; a role that still exists counts only while it
+is a member of its row's template. It takes no role name, so it also covers Infisical's own
+expiry, which never calls STS (and STS never stores a lease username). The row of a dropped lease
+role stays 7 days after the role went (`setup.sql`'s `end_sessions` forgot it at the next
+revocation, possibly before the replica's next sweep), so a sweep that could not reach a replica
+for less than 7 days still finds its sessions.
+
+- **Bound.** A replica session of a revoked, blocked or expired lease ends within 60 seconds plus
+  the sweep's own time (at most 10 seconds: 5 to connect, 5 for the statement, and the sweeper
+  login's `statement_timeout` of 5 seconds) and the replica's replication delay, while the replica
+  answers. `replica-sweep-check.ts` measured it through STS (Tests).
+- **Failures.** Each replica gets one attempt per minute and no retry inside the minute; a failure
+  is a warning, the 15th in a row (15 minutes) is logged as an error once per streak, and the next
+  sweep retries. A listed name without a Hyperdrive binding counts as a failing sweep.
+- **Start.** The cron (every 5 minutes) calls `LeaseDO.ensureSweeping` while replicas are
+  configured, so the loop runs with no lease call and comes back if the object lost its alarm.
+- **Audit.** `ai.kilo.sts.lease.replica_swept` above. A sweep that ended nothing writes no row (it
+  would be 1,440 rows a day per replica that change nothing); its failures are audited.
+- **Why this mechanism.** A call per revocation would miss Infisical's own expiry; pg_cron runs no
+  job while a server is in hot standby (https://github.com/citusdata/pg_cron, Setting up
+  pg_cron); the lease object already has the alarm, the audit stream and the environment's
+  config. Hyperdrive, not a direct socket: a Worker's TLS socket accepts only publicly trusted
+  certificates, and Supabase's database certificates chain to Supabase's own CA (the dashboard's
+  SSL certificate; a Worker build of a Postgres driver fails the handshake against it,
+  https://github.com/porsager/postgres/issues/1213), so a Worker cannot verify a direct
+  connection. Hyperdrive verifies it (`--sslmode verify-full` with the uploaded Supabase CA,
+  https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/)
+  and holds the sweeper password itself, so no STS code or storage sees it.
+
+While a block's `LEASE_REPLICA_SWEEP_BINDINGS` is empty nothing ends a replica session: what bounds
+it is the consumer's own run deadline (bouncer-watch: 55 and 130 minutes, under the 60 and
+150-minute leases); `VALID UNTIL` and the dropped role refuse a new login on both nodes. So no
+policy grants `replica-read` in an environment before its block names every replica (design
+decision Q63). `check.sh` shows on a streaming replica that the revocation leaves the replica
+session open and that the sweep ends it, after a revocation, a half-done revocation, an expiry and
+a `ci-migration` revocation, and never ends the others.
 
 **Risks.**
 
@@ -956,6 +1001,20 @@ that runs the session-ending function on each replica): no production policy gra
   and 4 at the policies' `maxActive`), but the login sets the limit itself when it creates a role,
   so only `max_connections` caps a leaked login. Each login's own `CONNECTION LIMIT 4` caps its
   sessions, not the roles it makes.
+- The sweeper login `kilo_lease_sweeper` holds `USAGE` on `kilo_lease`, `EXECUTE` on
+  `kilo_lease.sweep_sessions` and what PUBLIC holds (the reach `report.sql` lists for a lease,
+  without its `SELECT` on `public`). Its sweep ends only sessions of leases that already ended; it
+  cannot end a live lease's session or any other one, directly or through another `kilo_lease`
+  function (`check.sh`). It logs in on both nodes (no per-role host rule), with `CONNECTION LIMIT
+  5`. Its password sits in each replica's Hyperdrive configuration and in Infisical `/admin`;
+  `postgres` created it and can reset it, which gives a `ci-migration` lease nothing it lacks.
+- What the sweep does not bound: a session of an ended lease lives until the next sweep that
+  reaches its replica (about 70 seconds plus the replication delay). While a replica stays
+  unreachable or its replication lags, longer: the error after 15 failed sweeps is the signal, and
+  a person ends the sessions by hand (`SELECT kilo_lease.sweep_sessions()` as the sweeper, or
+  `pg_terminate_backend` as `postgres`). A replica that `LEASE_REPLICA_SWEEP_BINDINGS` does not name
+  is not swept. The row of a role gone over 7 days is forgotten, so a replica the sweep could not
+  reach for that long keeps that role's sessions until someone ends them.
 - A `replica-read` role is read-only by grant only. The role setting
   `default_transaction_read_only` stops accidental writes; a session can turn it off. Beyond its
   `SELECT` grants, a role holds what PostgreSQL and the installed extensions grant to PUBLIC.
@@ -1035,6 +1094,16 @@ psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
   -f services/sts/sql/leases/setup.sql
 ```
 
+Then, as `postgres` too, right after it and before `setup-ci-migration.sql`, the replica sweep's
+part (Replica sessions above; the password goes into Infisical `/admin` as
+`LEASE_REPLICA_SWEEPER_PASSWORD` and into each replica's Hyperdrive configuration, below):
+
+```sh
+psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
+  -v sweeper_password="$(openssl rand -hex 32)" \
+  -f services/sts/sql/leases/setup-replica-sweeper.sql
+```
+
 Generate the password into the break-glass owner's session only (or into a variable) and enter it
 into the dynamic secret below. `setup.sql` ends with `report.sql`, one row per finding and a
 `summary` row; every count in the summary must be 0 (Risks lists the rows that remain by design).
@@ -1051,6 +1120,11 @@ functions to `kilo_lease_owner` (no login, created by the superuser, a member of
 `pg_signal_backend`), and turns off activity tracking for both admin logins, so a `ci-migration`
 lease can neither reset an admin password, replace `kilo_lease.create_lease` to record later
 passwords, nor read a creation statement in `pg_stat_activity` (`check.sh`).
+`setup-replica-sweeper.sql` adds the `gone_since` column (the 7-day row retention), replaces
+`kilo_lease.end_sessions` with the version that keeps those rows, and creates
+`kilo_lease.sweep_sessions` and the sweeper login; `setup-ci-migration.sql` moves
+`sweep_sessions` to `kilo_lease_owner` with the rest, so it fails when run before the sweep's
+part.
 
 **Infisical setup, per environment (staging first).**
 
@@ -1088,10 +1162,30 @@ passwords, nor read a creation statement in `pg_stat_activity` (`check.sh`).
    revocation succeeds; until this is confirmed, STS treats a 404 after a recorded failure as
    `unconfirmed`.
 7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
-   in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. In
-   production, grant no `replica-read` until the replica-side session sweeper ships, and leave
+   in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. Grant no
+   `replica-read` until the replica sweep below runs in that environment, and leave
    `LEASE_CI_MIGRATION_TARGET` empty and grant no `ci-migration` until `setup-ci-migration.sql` ran
    there.
+
+**Replica sweep setup, per environment (staging first).** After `setup-replica-sweeper.sql`:
+
+1. Infisical `/admin` (human-only, no STS role reads it): `LEASE_REPLICA_SWEEPER_PASSWORD`, the
+   password the setup used, so a secret admin can rebuild a Hyperdrive configuration.
+2. Cloudflare, once per account: upload Supabase's CA (dashboard → Database settings → SSL
+   configuration) with `npx wrangler cert upload certificate-authority --ca-cert
+   supabase-ca.crt --name supabase-ca`.
+3. One Hyperdrive configuration per read replica of the project, with the replica's direct
+   connection string (dashboard → Connect, source: the replica) and the sweeper login:
+   `npx wrangler hyperdrive create sts-<environment>-lease-sweep-<replica> --connection-string
+   "postgres://kilo_lease_sweeper:<password>@<replica host>:5432/postgres" --ca-certificate-id
+   <id> --sslmode verify-full --caching-disabled --origin-connection-limit 5`.
+4. In that environment's block of `wrangler.jsonc`, a `hyperdrive` binding per replica
+   (`{ "binding": "LEASE_SWEEP_<REPLICA>", "id": "<config id>" }`) and their names in
+   `LEASE_REPLICA_SWEEP_BINDINGS`; deploy. The repo check refuses a listed name without its binding.
+5. Trial: with a lease from the Infisical dashboard, open a session on the replica, revoke the
+   lease, and see the session end within about 70 seconds and an
+   `ai.kilo.sts.lease.replica_swept` row with `sessions` 1 in Axiom; no `failed` row in the next
+   15 minutes. Then add `replica-read` grants.
 
 **Cost.** One lease is one `LeaseDO` call and one Infisical create, plus a login and one `SignerDO`
 call when the object's 10-minute token has lapsed (leases are sparse, so assume it has), and one
@@ -1112,6 +1206,13 @@ sized at twice that for retried runs, 48 and 2 leases, each revoked at the end o
 makes 100 `LeaseDO` calls, at most 200 Infisical requests (against 600 a minute), 100 `SignerDO`
 calls and 100 audit rows a day. CI: 2 `LeaseDO` calls, at most 4 Infisical requests, 2 `SignerDO`
 calls and 2 audit rows per migration job.
+
+The replica sweep costs, per configured replica, one alarm, one Hyperdrive connection and one
+`SELECT kilo_lease.sweep_sessions()` a minute (1,440 a day), whatever the lease count; the
+statement scans `pg_stat_activity` (one row per connection) joined with `kilo_lease.lease_role`
+(the live leases and the roles gone in the last 7 days, tens of rows). It writes an audit row only
+when it ended sessions or failed, and the cron adds one `LeaseDO` call every 5 minutes while a
+replica is configured.
 
 Only a workload whose policy lists a `dynamic` grant makes leases; no client or Vercel request
 path does. So lease volume is the same at 10,000, 50,000 or 200,000 clients, at any number of
@@ -1725,6 +1826,10 @@ mocked Infisical: login, folder reads, resolution, references, backoff, webhooks
 timeline with an injected clock, the token signer, mint over both entry points and token denials;
 leases over both entry points against a mocked Infisical lease API: lifetimes, clamping, the
 active and per-minute limits, owner-only revocation, undelivered leases, pruning, lease denials;
+the replica sweep with a fake sweep function: one attempt per replica per minute through its own
+binding, the audit rows (ended sessions, the first and 15th failure, the recovery), warnings until
+the one error, a listed name without a binding, no sweep and no alarm without replicas, and the
+cron's `ensureSweeping` call only while replicas are configured;
 Cloudflare deploy tokens over HTTP against a fake Cloudflare API and a fake `/ci/minting`: the
 request Cloudflare gets, the limits, owner- and run-bound revocation, failed and retried
 deletions, the reaper and the sweep, the window check of scripts and routes with its timing,
@@ -1862,8 +1967,10 @@ with the PR's proof, not in the repository.
 **Local check of the lease SQL.** `sql/leases/check.sh` starts a throwaway PostgreSQL in Docker
 (`PG_IMAGE`, default `postgres:16`; `PG_PORT`, default 55432) shaped like Supabase (`postgres` a
 non-superuser owner of the database and `public`, member of `pg_signal_backend`; a stand-in for
-`pg_net`'s PUBLIC grants; `dblink` in `extensions`). It runs `setup.sql` as `postgres` and
-`setup-ci-migration.sql` as the superuser, and each statement file the way Infisical does. It
+`pg_net`'s PUBLIC grants; `dblink` in `extensions`), and a second container that is a streaming
+hot standby of it (`PG_REPLICA_PORT`, default `PG_PORT` + 1). It runs `setup.sql` and
+`setup-replica-sweeper.sql` as `postgres` and `setup-ci-migration.sql` as the superuser, and each
+statement file the way Infisical does. It
 proves that the setup report lists what PUBLIC reaches and that `setup.sql` removed PUBLIC's
 `EXECUTE` on definer functions in `public`; that under `log_statement = 'ddl'` neither admin
 password (both setup files) reaches the server log; that with the server at `log_statement =
@@ -1884,4 +1991,33 @@ as `postgres`, holds none of its rights after `SET ROLE NONE`, and its DDL (`CRE
 included) leaves nothing owned by the lease role, and that neither it nor `postgres` can replace,
 add or take over a `kilo_lease` function after `setup-ci-migration.sql`; that `DROP ROLE` alone
 would leave a session open and unnamed, which the next revocation ends for a lease role; and that
-no revocation ends the session of a dropped role that was never a lease.
+no revocation ends the session of a dropped role that was never a lease. On the replica it proves
+that the revocation on the primary leaves the lease's idle replica session open (Q63), and that
+`kilo_lease.sweep_sessions()` as `kilo_lease_sweeper` ends it, and the replica sessions of an
+expired lease whose revocation did not run, of a lease blocked by a half-done revocation, of a
+revoked `ci-migration` lease, and of a lease dropped before a later revocation of its template
+(whose row now stays 7 days, then goes); that no sweep ends the replica sessions of `app_pool`,
+`postgres`, the superuser, a live lease of each template, the sweeper or a dropped role that was
+never a lease; and that the sweeper login cannot end a session directly, call `end_sessions` or
+read a table, and its sweep on the primary ends nothing live.
+
+**Local end-to-end check of the replica sweep.** `test/fixtures/e2e/replica-sweep-check.ts` runs
+on its own (Docker, psql, and ports 8827 and 8830 free; `PG_IMAGE`, default `postgres:16`):
+
+```sh
+cd services/sts
+PG_IMAGE=postgres:17 ../../node_modules/.bin/tsx test/fixtures/e2e/replica-sweep-check.ts
+```
+
+It starts a primary and a streaming replica in Docker shaped like Supabase, runs the three setup
+files, serves a fake Infisical whose lease API runs the real statement files on the primary as the
+replica admin and runs its own expiry revocation without STS, and starts the test build of STS and
+the probe sweeping the replica through the `LEASE_SWEEP_REPLICA_E2E` Hyperdrive binding (a
+temporary copy of `wrangler.sts.jsonc` names it and the sweeper's local connection string). It
+checks that a replica session of a lease revoked through STS stays open right after the
+revocation and ends within 80 seconds; that the replica sessions of a lease Infisical revoked at
+its expiry and of one whose expiry revocation failed end within 80 seconds of the expiry, with no
+STS revoke; that live leases keep their sessions through several sweeps; that the sessions of
+`app_pool`, `postgres` and a dropped role that was never a lease survive every sweep; that a
+paused replica gives a `failed` row and its return an `ended` row with `afterFailures`; and that
+no sweep row or log line carries a lease username, a password or a host.

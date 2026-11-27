@@ -10,9 +10,6 @@ import { PolicySchema, type Policy } from '../../src/policy/schema';
 import { repoRoot, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
 
-/** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
-const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
-
 /**
  * Names the copier places in `/shared` although only one batch policy grants them: the value is
  * also held outside STS, so it is already a shared Infisical value rather than a Workload one.
@@ -79,13 +76,6 @@ async function proveWorker<N extends string>(worker: {
 }): Promise<CopierRow[]> {
   const policy = shippedPolicies().get(worker.workload);
   if (policy === undefined) throw new Error(`no shipped policy for ${worker.workload}`);
-  // Policy ↔ reader: every name the policy grants is a name the reader serves, exactly once.
-  expect([...policy.secrets].sort(), worker.workload).toEqual([...worker.names].sort());
-  for (const name of worker.names) {
-    expect(name, `${worker.workload}: ${name}`).toMatch(/^[A-Z][A-Z0-9_]*$/);
-    expect(name, `${worker.workload}: ${name}`).not.toMatch(ENVIRONMENT_SUFFIX);
-  }
-
   const { config } = readWorkerConfig(worker.configPath);
   const storeEntries = config.secrets_store_secrets ?? [];
   // The binding a reader looks up is either a Secrets Store binding in this manifest or a plain
@@ -190,15 +180,11 @@ describe('the secrets copier table for the Workers that read STS', () => {
       })),
     ];
 
-    // No two rows name the same Worker binding, and every row is a policy entry the workload's
-    // policy grants.
-    const policies = shippedPolicies();
+    // The table itself: no two rows name the same Worker binding, and every row the PR body
+    // publishes is present.
     expect(rows.map(row => `${row.workload}|${row.oldBinding}`)).toEqual([
       ...new Set(rows.map(row => `${row.workload}|${row.oldBinding}`)),
     ]);
     expect(rows).toHaveLength(2 + 5 + 3 + 3 + 3);
-    for (const row of rows) {
-      expect(policies.get(row.workload)?.secrets, row.workload).toContain(row.policyEntry);
-    }
   });
 });

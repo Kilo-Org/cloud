@@ -2272,6 +2272,9 @@ importers:
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts
+      '@kilocode/uts-contracts':
+        specifier: workspace:*
+        version: link:../uts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../worker-utils

@@ -7,7 +7,7 @@ import {
 import type { MintRequest, MintResult } from '@kilocode/sts-contracts';
 import {
   BOUNCER_BREAKER_THRESHOLD,
-  BOUNCER_MISS_LOG_INTERVAL_MS,
+  BOUNCER_COUNT_LOG_INTERVAL_MS,
   BOUNCER_TOKEN_WAIT_MS,
   BouncerStsConfigError,
   bouncerAuthHeaders,
@@ -131,7 +131,9 @@ describe('createBouncerAuth', () => {
         { audience: 'bouncer', scope },
         { waitUntil: h.waitUntil }
       );
-      expect(h.lines()).toEqual([]);
+      expect(h.lines()).toEqual([
+        { event: 'bouncer_sts_token_attached', caller: 'kilocode-app', scope, count: 1 },
+      ]);
     }
   );
 
@@ -199,13 +201,53 @@ describe('createBouncerAuth', () => {
       { reason: 'unavailable', scope: 'bouncer:decide', count: 1 },
       { reason: 'unavailable', scope: 'bouncer:usage.write', count: 1 },
     ]);
-    h.clock.now += BOUNCER_MISS_LOG_INTERVAL_MS;
+    h.clock.now += BOUNCER_COUNT_LOG_INTERVAL_MS;
     await h.auth('bouncer:decide');
     expect(h.lines()[2]).toMatchObject({
       reason: 'unavailable',
       scope: 'bouncer:decide',
       count: 3,
     });
+  });
+
+  it('logs one attached line per scope per interval, with the count since the last', async () => {
+    const h = harness();
+    h.read.mockResolvedValue(TOKEN);
+    await h.auth('bouncer:decide');
+    await h.auth('bouncer:decide');
+    await h.auth('bouncer:decide');
+    await h.auth('bouncer:usage.write');
+    expect(h.lines()).toEqual([
+      {
+        event: 'bouncer_sts_token_attached',
+        caller: 'kilocode-app',
+        scope: 'bouncer:decide',
+        count: 1,
+      },
+      {
+        event: 'bouncer_sts_token_attached',
+        caller: 'kilocode-app',
+        scope: 'bouncer:usage.write',
+        count: 1,
+      },
+    ]);
+    h.clock.now += BOUNCER_COUNT_LOG_INTERVAL_MS;
+    await h.auth('bouncer:decide');
+    expect(h.lines()[2]).toEqual({
+      event: 'bouncer_sts_token_attached',
+      caller: 'kilocode-app',
+      scope: 'bouncer:decide',
+      count: 3,
+    });
+    // A call without a token is a miss, never an attach.
+    h.read.mockRejectedValue(unavailable());
+    h.clock.now += BOUNCER_COUNT_LOG_INTERVAL_MS;
+    await h.auth('bouncer:decide');
+    expect(h.lines()[3]).toMatchObject({
+      event: 'bouncer_sts_token_missed',
+      reason: 'unavailable',
+    });
+    expect(h.lines()).toHaveLength(4);
   });
 
   it('never puts a token or an error text in a log line', async () => {
@@ -347,7 +389,15 @@ describe('createBouncerAuth', () => {
       await expect(h.auth('bouncer:decide')).resolves.toMatchObject({
         authorization: 'Bearer bouncer:decide-2',
       });
-      expect(h.lines()).toEqual([]);
+      // Four calls with a token on one instance clock: one attached line, no miss.
+      expect(h.lines()).toEqual([
+        {
+          event: 'bouncer_sts_token_attached',
+          caller: 'kilocode-app',
+          scope: 'bouncer:decide',
+          count: 1,
+        },
+      ]);
     });
   });
 });

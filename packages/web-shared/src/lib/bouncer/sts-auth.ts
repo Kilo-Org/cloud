@@ -14,11 +14,12 @@ import { waitUntil } from '@vercel/functions';
  * Budgets: the token client keeps each token in memory and renews it in the background at 80 % of
  * its lifetime, so a warm instance reads it with no network call. An admission call
  * (`bouncer:decide`, `bouncer:signup.decide`) waits at most `BOUNCER_TOKEN_WAIT_MS` for a token it
- * does not hold; a write (`bouncer:usage.write`), whose durable outbox retries it, never waits. A
- * call without a token proceeds with the legacy key alone and is counted. After
- * `BOUNCER_BREAKER_THRESHOLD` consecutive admission waits that ran out, the wait drops to 0 until
- * a mint succeeds. The mint keeps running under the request's `waitUntil` after a call stops
- * waiting for it.
+ * does not hold, and never past the call's own deadline (`signal`), which also bounds the request
+ * that follows, so the wait never lengthens the call. A write (`bouncer:usage.write`), whose
+ * durable outbox retries it, never waits. A call without a token proceeds with the legacy key
+ * alone and is counted, and so is a call that sends one. After `BOUNCER_BREAKER_THRESHOLD`
+ * consecutive admission waits that ran out, the wait drops to 0 until a mint succeeds. The mint
+ * keeps running under the request's `waitUntil` after a call stops waiting for it.
  *
  * This module stays light: the token client, the Vercel OIDC exchange and the Runtime Cache load
  * on the first call with the flag on (`sts-token-transport.ts`).
@@ -49,8 +50,11 @@ export type BouncerTokenRead = (
 export const BOUNCER_TOKEN_WAIT_MS = 250;
 /** Design 3.1: consecutive admission waits that ran out before the breaker sets the wait to 0. */
 export const BOUNCER_BREAKER_THRESHOLD = 10;
-/** One miss line per reason and scope per this interval and instance, with the count since. */
-export const BOUNCER_MISS_LOG_INTERVAL_MS = 60_000;
+/**
+ * One `bouncer_sts_token_missed` line per reason and scope, and one `bouncer_sts_token_attached`
+ * line per scope, per this interval and instance, each with the count since the previous line.
+ */
+export const BOUNCER_COUNT_LOG_INTERVAL_MS = 60_000;
 
 const ADMISSION_SCOPES: Readonly<Record<BouncerScope, boolean>> = {
   'bouncer:decide': true,
@@ -153,7 +157,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
   const callerHeaders: BouncerAuthHeaders = { 'x-kilo-caller': options.caller };
   let loading: Promise<BouncerTokenRead> | null = null;
   let timeouts = 0;
-  const pending = new Map<string, { count: number; loggedAt: number | null }>();
+  const counts = new Map<string, { count: number; loggedAt: number | null }>();
 
   function load(): Promise<BouncerTokenRead> {
     loading ??= options.loadTokens().catch((error: unknown) => {
@@ -163,26 +167,25 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     return loading;
   }
 
-  /** Counts a miss; logs it with the count since the last line, once per interval per key. */
-  function miss(reason: BouncerTokenMissReason, scope: BouncerScope): void {
-    const key = `${reason} ${scope}`;
-    const entry = pending.get(key) ?? { count: 0, loggedAt: null };
+  /**
+   * Counts one call under `event` and `fields`; logs it with the count since the last line, once
+   * per interval per event and fields. The fields are fixed names, never a token or error text.
+   */
+  function count(event: string, fields: Readonly<Record<string, string>>): void {
+    const key = JSON.stringify([event, fields]);
+    const entry = counts.get(key) ?? { count: 0, loggedAt: null };
     entry.count += 1;
     const at = now();
-    if (entry.loggedAt === null || at - entry.loggedAt >= BOUNCER_MISS_LOG_INTERVAL_MS) {
-      log(
-        JSON.stringify({
-          event: 'bouncer_sts_token_missed',
-          caller: options.caller,
-          reason,
-          scope,
-          count: entry.count,
-        })
-      );
+    if (entry.loggedAt === null || at - entry.loggedAt >= BOUNCER_COUNT_LOG_INTERVAL_MS) {
+      log(JSON.stringify({ event, caller: options.caller, ...fields, count: entry.count }));
       entry.count = 0;
       entry.loggedAt = at;
     }
-    pending.set(key, entry);
+    counts.set(key, entry);
+  }
+
+  function miss(reason: BouncerTokenMissReason, scope: BouncerScope): void {
+    count('bouncer_sts_token_missed', { reason, scope });
   }
 
   function succeeded(): void {
@@ -223,6 +226,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
       miss(missReasonOf(raced.error), scope);
       return callerHeaders;
     }
+    count('bouncer_sts_token_attached', { scope });
     return { ...callerHeaders, authorization: `Bearer ${raced.token}` };
   };
 }

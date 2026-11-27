@@ -18,7 +18,7 @@ import {
 } from './services/token-minting-service';
 import { withDORetry } from './util/do-retry';
 import { renderPromptTemplate } from './util/prompt-template';
-import { getSecretValue } from './util/secret';
+import { readSecret } from './secrets';
 
 export class ExistingChatDeliveryError extends Error {
   constructor(
@@ -113,7 +113,7 @@ export async function deliverExistingChatMessage(
 
   const digest = await sha256Hex(`webhook-trigger:${request.id}`);
   const messageId = `msg_${digest.slice(0, 26)}`;
-  const internalApiSecret = await getSecretValue(env.INTERNAL_API_SECRET);
+  const internalApiSecret = await readSecret(env, 'INTERNAL_API_SECRET');
   const response = await env.CLOUD_AGENT.fetch(
     new Request('https://cloud-agent/trpc/send', {
       method: 'POST',

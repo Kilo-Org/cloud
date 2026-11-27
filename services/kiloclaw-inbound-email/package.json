@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "drizzle-orm": "catalog:",
     "node-html-markdown": "2.0.0",
     "postal-mime": "2.7.4"

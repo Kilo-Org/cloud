@@ -15,7 +15,6 @@ import type { SecurityFindingTriage } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
 import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { emitApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_TRIAGE_MODEL } from '../core/constants';
 
 const log = sentryLogger('security-agent:triage', 'info');
@@ -335,7 +334,7 @@ export async function triageSecurityFinding(options: {
           span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
         }
 
-        if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
+        if (usage && userId) {
           const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
           const toolsUsed = responseToolCalls
             .filter(tc => tc.type === 'function')

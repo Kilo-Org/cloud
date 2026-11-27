@@ -19,9 +19,17 @@
     "GITHUB_APP_BOT_USER_ID": "240665456",
     "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
     "GITHUB_LITE_APP_BOT_USER_ID": "257753004",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding and legacy
+    // Worker secrets below) or `sts` (the bundle over the `STS` binding). An absent value means
+    // `secrets-store`; any other value refuses every read. The `sts` source never falls back to
+    // the legacy source.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "observability": {
     "enabled": true,
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "kv_namespaces": [
     {
@@ -35,6 +43,18 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // git-token-service.yaml grants every credential below. Nothing reads it while SECRETS_SOURCE is
+  // `secrets-store`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "git-token-service" },
     },
   ],
   "secrets_store_secrets": [

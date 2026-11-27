@@ -113,6 +113,7 @@ const GrantRowSchema = z.object({
   dpop_jkt: z.instanceof(Buffer),
   allowed_scopes: z.array(z.string()),
   org_id: z.string().nullable(),
+  audit_environment: z.string().nullable(),
   expires_at: z.date(),
   idle_expires_at: z.date(),
 });
@@ -120,7 +121,8 @@ const GrantRowSchema = z.object({
 async function grantRow(id: string) {
   const result = await owner.query(
     `SELECT status, revoke_reason, parent_grant_id, device_session_id, client_id, client_class,
-       dpop_jkt, allowed_scopes::text[] AS allowed_scopes, org_id, expires_at, idle_expires_at
+       dpop_jkt, allowed_scopes::text[] AS allowed_scopes, org_id, audit_environment, expires_at,
+       idle_expires_at
      FROM uts.refresh_grants WHERE id = $1`,
     [id]
   );
@@ -190,6 +192,7 @@ describe('the home-widget exchange', () => {
     expect(row).toMatchObject({
       status: 'active',
       parent_grant_id: parent.grantId,
+      audit_environment: 'development',
       device_session_id: parent.sessionId,
       client_id: 'kilo-mobile',
       client_class: 'mobile',
@@ -288,6 +291,65 @@ describe('the home-widget exchange', () => {
       revoke_reason: 'sign_out',
     });
     expect(await sessionStatus(parent.sessionId)).toBe('revoked');
+    const widgetAudit = await owner.query<{ actor: unknown; attributes: unknown; source: string }>(
+      `SELECT event #> '{data,actor}' AS actor, event #> '{data,attributes}' AS attributes,
+         event ->> 'source' AS source
+       FROM uts.audit_events
+       WHERE account_id = $1 AND event_type = 'ai.kilo.uts.grant.revoked'
+         AND event #>> '{data,attributes,grantId}' = $2`,
+      [parent.accountId, widget.grantId]
+    );
+    expect(widgetAudit.rows).toEqual([
+      {
+        actor: expect.objectContaining({ kind: 'system' }),
+        attributes: expect.objectContaining({ parentGrantId: parent.grantId, reason: 'sign_out' }),
+        source: 'kilo:uts:development',
+      },
+    ]);
+    // A retry of the sign-out publishes both entries again.
+    const retry = await grants.revoke({
+      environment,
+      tokenHash: sha256(parent.token),
+      clientId: 'kilo-mobile',
+    });
+    expect(retry.outcome).toBe('already_revoked');
+    expect(retry.feedEntries.map(entry => entry.id).sort()).toEqual(
+      [parent.grantId, widget.grantId].sort()
+    );
+  });
+
+  it('makes an end of the widget grant lock its app grant before it touches the widget', async () => {
+    const parent = await appGrant();
+    const widget = await issuedWidget(parent);
+    const holder = await db.connectAsOwner();
+    const ender = await db.connectAsOwner();
+    await holder.query('BEGIN');
+    await holder.query('SELECT 1 FROM uts.refresh_grants WHERE id = $1 FOR NO KEY UPDATE', [
+      parent.grantId,
+    ]);
+    const ending = ender.query(
+      `SELECT uts.end_grant('first_party', $1, 'user_revoke') AS account`,
+      [widget.grantId]
+    );
+    await sleep(200);
+    // The waiting end holds no lock on the widget row: it waits on the app grant first, so an
+    // exchange holding the app grant can still end the widget, and no cycle forms.
+    await owner.query('BEGIN');
+    expect(
+      (
+        await owner.query(
+          'SELECT status FROM uts.refresh_grants WHERE id = $1 FOR NO KEY UPDATE NOWAIT',
+          [widget.grantId]
+        )
+      ).rows
+    ).toEqual([{ status: 'active' }]);
+    await owner.query('ROLLBACK');
+    await holder.query('COMMIT');
+    expect((await ending).rows).toEqual([{ account: parent.accountId }]);
+    expect((await grantRow(widget.grantId)).status).toBe('revoked');
+    expect((await grantRow(parent.grantId)).status).toBe('active');
+    await holder.end();
+    await ender.end();
   });
 
   it('makes a revoke of the app grant wait for an exchange in flight, and refuses it after', async () => {
@@ -377,13 +439,17 @@ describe('the home-widget exchange', () => {
 
   it('keeps every stored widget grant to the widget scope on a mobile grant', async () => {
     const parent = await appGrant();
-    const insert = (scopes: string[], clientClass: 'desktop' | 'mobile') =>
+    const insert = (
+      scopes: string[],
+      clientClass: 'desktop' | 'mobile',
+      environmentName: string | null = 'development'
+    ) =>
       owner.query(
         `INSERT INTO uts.refresh_grants (
            account_id, device_session_id, client_id, client_class, token_hash, dpop_jkt,
-           allowed_scopes, idle_expires_at, expires_at, parent_grant_id
+           allowed_scopes, idle_expires_at, expires_at, parent_grant_id, audit_environment
          ) VALUES ($1, $2, 'kilo-mobile', $3, $4, $5, $6, now() + interval '1 day',
-           now() + interval '1 day', $7)`,
+           now() + interval '1 day', $7, $8)`,
         [
           parent.accountId,
           parent.sessionId,
@@ -392,10 +458,14 @@ describe('the home-widget exchange', () => {
           parent.jkt,
           scopes,
           parent.grantId,
+          environmentName,
         ]
       );
     expect(await sqlStateOf(() => insert(MOBILE_SCOPES, 'mobile'))).toBe('23514');
     expect(await sqlStateOf(() => insert([KILO_API_HOME_WIDGET_SCOPE], 'desktop'))).toBe('23514');
+    expect(await sqlStateOf(() => insert([KILO_API_HOME_WIDGET_SCOPE], 'mobile', null))).toBe(
+      '23514'
+    );
   });
 });
 

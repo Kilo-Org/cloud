@@ -12,19 +12,30 @@
 --   each revoked grant holds a feed entry for 20 minutes.
 -- * `uts.end_grant` also ends the live widget grant of the grant it ends, so a sign-out, a device
 --   revoke, a reuse detection, a member removal or a subject operation that ends the app grant
---   ends the widget with it, each with its own feed entry. Ending the widget grant alone leaves
---   the app grant and its device session as they are.
+--   ends the widget with it, each with its own feed entry, and writes the widget's own
+--   `grant.revoked` audit row (system actor, the app grant's reason) under the environment the
+--   widget grant recorded at its exchange (`audit_environment`). Ending the widget grant alone
+--   leaves the app grant and its device session as they are.
+-- * A device revoke (`uts.revoke_web_device`) that names the app grant also names its widget
+--   grants, and answers with the feed entries its statement wrote, the widget's included, so the
+--   widget's entry is published before the call succeeds. A `/revoke` retry of an app grant that
+--   is already revoked publishes its widget grants' live entries too
+--   (`uts.live_feed_entries_of_refresh_token`).
 -- * A widget grant records no device sign-in (no `uts.sign_ins` row, no new-device notice): the
 --   device signed in when its app grant was created.
 -- * `uts.issue_ticket` refuses a widget grant: a ticket carries no scope, so a ticket of a widget
 --   grant could open more than the widget's one scope.
 --
--- Locks: the exchange locks the app grant (`FOR NO KEY UPDATE`), so an `uts.end_grant` of it
--- waits for the exchange to commit and then sees and ends the new widget grant, and two exchanges
--- of one app grant run one after the other. A personal app grant that names an organization
--- also locks the membership row (`FOR SHARE`), so a member removal that arrives at the same time
--- waits for the widget grant and then revokes it with the member's other org-bound grants
--- (design 5.8).
+-- Locks: every path takes the app grant's row lock before the widget grant's. The exchange locks
+-- the app grant (`FOR NO KEY UPDATE`) and then may end the previous widget; `uts.end_grant` of an
+-- app grant revokes it (its row lock) before its widget; `uts.end_grant` of a widget grant locks
+-- its app grant (`FOR NO KEY UPDATE`) before it touches the widget. So a device-revoke loop over
+-- both grants, in either order, and a concurrent exchange never wait on each other in a cycle; an
+-- end of the app grant waits for an exchange in flight and then sees and ends the new widget
+-- grant, and two exchanges of one app grant run one after the other. A personal app grant that
+-- names an organization also locks the membership row (`FOR SHARE`), so a member removal that
+-- arrives at the same time waits for the widget grant and then revokes it with the member's other
+-- org-bound grants (design 5.8).
 
 SET LOCAL ROLE uts_owner;
 
@@ -32,12 +43,17 @@ ALTER TYPE uts.revoke_reason ADD VALUE 'replaced';
 
 ALTER TABLE uts.refresh_grants
   ADD COLUMN parent_grant_id uuid REFERENCES uts.refresh_grants (id) ON DELETE CASCADE,
+  ADD COLUMN audit_environment text
+    CHECK (audit_environment IN ('development', 'staging', 'production')),
   ADD CONSTRAINT refresh_grants_widget_shape CHECK (
-    parent_grant_id IS NULL
-    OR (
-      parent_grant_id <> id
-      AND client_class = 'mobile'
-      AND allowed_scopes = ARRAY['kilo-api:home-widget.use']::text[]
+    (parent_grant_id IS NULL) = (audit_environment IS NULL)
+    AND (
+      parent_grant_id IS NULL
+      OR (
+        parent_grant_id <> id
+        AND client_class = 'mobile'
+        AND allowed_scopes = ARRAY['kilo-api:home-widget.use']::text[]
+      )
     )
   );
 
@@ -53,9 +69,10 @@ CREATE OR REPLACE TRIGGER refresh_grants_record_sign_in
   FOR EACH ROW WHEN (NEW.parent_grant_id IS NULL)
   EXECUTE FUNCTION uts.record_device_sign_in();
 
--- As in 0004, plus: a first-party grant's live widget grant ends with it, with its own feed entry,
--- after the grant itself is revoked (the grant's row lock comes first, as in the exchange) and
--- before its device session is checked, so the session ends once neither grant is live.
+-- As in 0004, plus two steps. A widget grant first locks its app grant (see the lock order above).
+-- A first-party grant's live widget grant ends with it, with its own feed entry and audit row,
+-- after the grant itself is revoked and before its device session is checked, so the session ends
+-- once neither grant is live.
 CREATE OR REPLACE FUNCTION uts.end_grant(
   p_kind uts.client_kind,
   p_grant_id uuid,
@@ -67,9 +84,17 @@ AS $$
 DECLARE
   revoked_account text;
   session_id uuid;
-  widget_id uuid;
+  app_grant_id uuid;
+  widget record;
 BEGIN
   IF p_kind = 'first_party' THEN
+    SELECT grant_row.parent_grant_id INTO app_grant_id
+    FROM uts.refresh_grants AS grant_row WHERE grant_row.id = p_grant_id;
+    IF app_grant_id IS NOT NULL THEN
+      PERFORM 1 FROM uts.refresh_grants AS app_grant
+      WHERE app_grant.id = app_grant_id
+      FOR NO KEY UPDATE;
+    END IF;
     UPDATE uts.refresh_grants AS grant_row
     SET status = 'revoked', revoked_at = now(), revoke_reason = p_reason
     WHERE grant_row.id = p_grant_id AND grant_row.status = 'active'
@@ -77,11 +102,23 @@ BEGIN
     IF NOT FOUND THEN
       RETURN NULL;
     END IF;
-    SELECT widget.id INTO widget_id
-    FROM uts.refresh_grants AS widget
-    WHERE widget.parent_grant_id = p_grant_id AND widget.status = 'active';
+    SELECT widget_row.id, widget_row.account_id, widget_row.client_id, widget_row.audit_environment
+    INTO widget
+    FROM uts.refresh_grants AS widget_row
+    WHERE widget_row.parent_grant_id = p_grant_id AND widget_row.status = 'active';
     IF FOUND THEN
-      PERFORM uts.end_grant('first_party', widget_id, p_reason);
+      IF uts.end_grant('first_party', widget.id, p_reason) IS NOT NULL THEN
+        PERFORM uts.write_system_audit_event(
+          widget.audit_environment, 'ai.kilo.uts.grant.revoked', 3002, 2, widget.account_id,
+          jsonb_build_object(
+            'clientId', uts.audit_client_id(widget.client_id),
+            'clientKind', 'first_party',
+            'grantId', widget.id,
+            'parentGrantId', p_grant_id,
+            'reason', p_reason
+          )
+        );
+      END IF;
     END IF;
     UPDATE uts.device_sessions AS session
     SET status = 'revoked', revoked_at = now(), revoke_reason = p_reason
@@ -389,26 +426,28 @@ BEGIN
   SELECT widget.id INTO replaced_id
   FROM uts.refresh_grants AS widget
   WHERE widget.parent_grant_id = parent.id AND widget.status = 'active';
-  IF FOUND AND uts.end_grant('first_party', replaced_id, 'replaced') IS NOT NULL THEN
-    PERFORM uts.write_audit_event(
-      p_environment, 'ai.kilo.uts.grant.revoked', 3002, 2, 'success', NULL, parent.account_id,
-      jsonb_build_object(
-        'clientId', uts.audit_client_id(parent.client_id),
-        'clientKind', 'first_party',
-        'grantId', replaced_id,
-        'parentGrantId', parent.id,
-        'reason', 'replaced'
-      )
-    );
+  IF FOUND THEN
+    IF uts.end_grant('first_party', replaced_id, 'replaced') IS NOT NULL THEN
+      PERFORM uts.write_audit_event(
+        p_environment, 'ai.kilo.uts.grant.revoked', 3002, 2, 'success', NULL, parent.account_id,
+        jsonb_build_object(
+          'clientId', uts.audit_client_id(parent.client_id),
+          'clientKind', 'first_party',
+          'grantId', replaced_id,
+          'parentGrantId', parent.id,
+          'reason', 'replaced'
+        )
+      );
+    END IF;
   END IF;
 
   INSERT INTO uts.refresh_grants (
     id, account_id, device_session_id, client_id, client_class, token_hash, dpop_jkt,
-    allowed_scopes, org_id, idle_expires_at, expires_at, parent_grant_id
+    allowed_scopes, org_id, idle_expires_at, expires_at, parent_grant_id, audit_environment
   ) VALUES (
     p_widget_grant_id, parent.account_id, parent.device_session_id, parent.client_id, 'mobile',
     p_widget_token_hash, parent.dpop_jkt, ARRAY[p_scope], widget_org, parent.idle_expires_at,
-    parent.idle_expires_at, parent.id
+    parent.idle_expires_at, parent.id, p_environment
   );
 
   token_ids := ARRAY[gen_random_uuid()];
@@ -444,3 +483,119 @@ $$;
 GRANT EXECUTE ON FUNCTION uts.exchange_home_widget_grant(
   text, bytea, uuid, text, bytea, text, uuid, bytea, text, uuid
 ) TO uts_app;
+
+-- `uts.revoke_web_device()` as 0013 left it, with two changes: a `sid` that names an app grant
+-- also names its widget grants, and the answer carries the feed entries the statement wrote
+-- (`uts.feed_entries_of_statement()`), a widget grant that ended with its app grant included, so
+-- the caller publishes every entry before it answers. A repeat that revokes nothing answers the
+-- entries still in the feed, as before. The return type and the grant stay.
+CREATE OR REPLACE FUNCTION uts.revoke_web_device(
+  p_environment text,
+  p_handle_hash bytea,
+  p_assertion_jkt bytea,
+  p_assertion_jti text,
+  p_assertion_expires_at timestamptz,
+  p_sid uuid
+) RETURNS TABLE (outcome text, feed_entries jsonb)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  caller uts.browser_sessions%ROWTYPE;
+  grant_ids uuid[];
+  revoked_ids uuid[] := '{}';
+  grant_id uuid;
+BEGIN
+  PERFORM uts.require_inputs('uts.revoke_web_device',
+    p_environment IS NOT NULL AND p_handle_hash IS NOT NULL AND p_assertion_jkt IS NOT NULL
+    AND p_assertion_jti IS NOT NULL AND p_assertion_expires_at IS NOT NULL AND p_sid IS NOT NULL);
+  feed_entries := '[]'::jsonb;
+  IF NOT uts.accept_client_assertion(p_assertion_jkt, p_assertion_jti, p_assertion_expires_at) THEN
+    outcome := 'assertion_replay';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  SELECT * INTO caller FROM uts.live_web_session(p_handle_hash);
+  IF NOT FOUND THEN
+    outcome := 'invalid_session';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  grant_ids := ARRAY(
+    SELECT grant_row.id FROM uts.refresh_grants AS grant_row
+    WHERE grant_row.account_id = caller.account_id
+      AND (
+        grant_row.id = p_sid
+        OR grant_row.device_session_id = p_sid
+        OR grant_row.parent_grant_id = p_sid
+      )
+    ORDER BY grant_row.id
+  );
+  FOREACH grant_id IN ARRAY grant_ids LOOP
+    IF uts.end_grant('first_party', grant_id, 'user_revoke') IS NOT NULL THEN
+      revoked_ids := revoked_ids || grant_id;
+    END IF;
+  END LOOP;
+  IF cardinality(revoked_ids) > 0 THEN
+    PERFORM uts.write_audit_event(
+      p_environment, 'ai.kilo.uts.grant.revoked', 3002, 2, 'success', NULL, caller.account_id,
+      jsonb_build_object(
+        'clientId', 'kilo-web',
+        'clientKind', 'first_party',
+        'grantIds', to_jsonb(revoked_ids::text[]),
+        'sessionId', caller.id,
+        'reason', 'user_revoke'
+      )
+    );
+  END IF;
+  outcome := 'ended';
+  feed_entries := CASE
+    WHEN cardinality(revoked_ids) > 0 THEN uts.feed_entries_of_statement()
+    ELSE uts.live_feed_entries('grant', grant_ids::text[])
+  END;
+  RETURN NEXT;
+END
+$$;
+
+-- `uts.live_feed_entries_of_refresh_token()` as 0019 left it, plus the live entries of the widget
+-- grants of a first-party grant (one probe of `refresh_grants_parent_created_idx`), so a `/revoke`
+-- retry of an app grant republishes its widget's entry too. The grant stays.
+CREATE OR REPLACE FUNCTION uts.live_feed_entries_of_refresh_token(p_token_hash bytea, p_client_id text)
+RETURNS jsonb
+LANGUAGE sql VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+  SELECT coalesce(
+    (
+      SELECT uts.live_feed_entries(grant_ref.kind, grant_ref.id::text)
+      FROM (
+        SELECT 'grant'::uts.revocation_kind AS kind, grant_row.id, grant_row.client_id
+        FROM uts.refresh_grants AS grant_row
+        WHERE grant_row.token_hash = p_token_hash
+        UNION ALL
+        SELECT 'third_party_family', family.id, family.client_id
+        FROM uts.third_party_refresh_tokens AS token
+        JOIN uts.third_party_grant_families AS family ON family.id = token.family_id
+        WHERE token.token_hash = p_token_hash
+        UNION ALL
+        SELECT 'third_party_family', family.id, family.client_id
+        FROM uts.third_party_rotated_tokens AS rotated
+        JOIN uts.third_party_grant_families AS family ON family.id = rotated.family_id
+        WHERE rotated.token_key = uts.rotated_token_key(p_token_hash)
+        LIMIT 1
+      ) AS grant_ref
+      WHERE grant_ref.client_id = p_client_id
+    ),
+    '[]'::jsonb
+  ) || coalesce(
+    (
+      SELECT uts.live_feed_entries('grant', array_agg(widget.id::text))
+      FROM uts.refresh_grants AS app_grant
+      JOIN uts.refresh_grants AS widget ON widget.parent_grant_id = app_grant.id
+      WHERE app_grant.token_hash = p_token_hash AND app_grant.client_id = p_client_id
+    ),
+    '[]'::jsonb
+  )
+$$;

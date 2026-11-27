@@ -86,7 +86,7 @@ export type ObjectIdCheck =
 function indexOfObjectId(
   config: UtsConfig,
   id: Pick<DurableObjectId, 'name' | 'jurisdiction'>,
-  kind: 'signer' | 'key-set shard' | 'feed' | 'audit relay',
+  kind: 'signer' | 'key-set shard' | 'feed',
   indexOfName: (environment: UtsEnvironment, name: string) => number | null
 ): ObjectIdCheck {
   const index = id.name === undefined ? null : indexOfName(config.environment, id.name);
@@ -238,26 +238,45 @@ const AuditShardSchema = z
   .min(0)
   .max(AUDIT_SHARD_COUNT - 1);
 
-const AUDIT_RELAY_NAME_PATTERN = /^(production|staging|development):audit-relay:(\d)$/;
-
 export function auditRelayObjectName(environment: UtsEnvironment, shard: number): string {
   return `${environment}:audit-relay:${AuditShardSchema.parse(shard)}`;
 }
 
-/** The audit shard an object name names in this environment, or null for any other name. */
-export function auditShardOfObjectName(environment: UtsEnvironment, name: string): number | null {
-  const match = AUDIT_RELAY_NAME_PATTERN.exec(name);
-  if (match === null || match[1] !== environment) return null;
-  const shard = AuditShardSchema.safeParse(Number(match[2]));
-  return shard.success ? shard.data : null;
+function auditRelayNamespace(env: Env, config: UtsConfig): DurableObjectNamespace<UtsAuditRelayDO> {
+  return config.jurisdiction === 'eu'
+    ? env.UTS_AUDIT_RELAY_DO.jurisdiction('eu')
+    : env.UTS_AUDIT_RELAY_DO;
 }
 
-/** The audit shard an audit relay object takes from its id. */
+/**
+ * The audit shard of a relay object: the shard whose name gives this object's id in this
+ * environment and jurisdiction. The relay stores no state that names its shard, and an id does
+ * not always carry its name (an alarm after an eviction or a deploy starts the object without
+ * one), so the check compares ids, as `storedObjectCheck` does: 8 local name hashes, once per
+ * object start. Any other object, such as one of another environment, is refused.
+ */
 export function auditShardOfObjectId(
+  env: Env,
   config: UtsConfig,
-  id: Pick<DurableObjectId, 'name' | 'jurisdiction'>
+  id: DurableObjectId
 ): ObjectIdCheck {
-  return indexOfObjectId(config, id, 'audit relay', auditShardOfObjectName);
+  const jurisdiction = id.jurisdiction ?? 'none';
+  if (jurisdiction !== config.jurisdiction) {
+    return {
+      status: 'refused',
+      reason: `audit relay object is in jurisdiction ${jurisdiction}, not ${config.jurisdiction}`,
+    };
+  }
+  const namespace = auditRelayNamespace(env, config);
+  for (let shard = 0; shard < AUDIT_SHARD_COUNT; shard += 1) {
+    if (id.equals(namespace.idFromName(auditRelayObjectName(config.environment, shard)))) {
+      return { status: 'accepted', index: shard };
+    }
+  }
+  return {
+    status: 'refused',
+    reason: `audit relay object is not the object of an audit relay name of ${config.environment}`,
+  };
 }
 
 export function getAuditRelayStub(
@@ -265,10 +284,7 @@ export function getAuditRelayStub(
   config: UtsConfig,
   shard: number
 ): DurableObjectStub<UtsAuditRelayDO> {
-  const namespace =
-    config.jurisdiction === 'eu'
-      ? env.UTS_AUDIT_RELAY_DO.jurisdiction('eu')
-      : env.UTS_AUDIT_RELAY_DO;
+  const namespace = auditRelayNamespace(env, config);
   return namespace.get(namespace.idFromName(auditRelayObjectName(config.environment, shard)), {
     locationHint: UTS_OBJECT_LOCATION_HINT,
   });

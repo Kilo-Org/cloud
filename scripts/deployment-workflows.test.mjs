@@ -712,11 +712,14 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   }
 });
 
-test('one database gate per deployment runs the migration proxy script and holds no database credential', () => {
-  for (const [name, deployment, environment, proxyUrl, timeout, budget] of [
-    ['production', production, 'production', 'https://migration-proxy.kiloapps.io', 45, '2580'],
-    ['staging', staging, 'staging', 'https://migration-proxy-staging.kiloapps.io', 15, '780'],
-  ]) {
+// Staging's db-gate migrates through the migration proxy; production's switches the same way in a
+// later change and until then keeps the credential, the probe and drizzle migrate (test below).
+const PROXY_GATES = [
+  ['staging', staging, 'staging', 'https://migration-proxy-staging.kiloapps.io', 15, '780'],
+];
+
+test('a switched database gate runs the migration proxy script and holds no database credential', () => {
+  for (const [name, deployment, environment, proxyUrl, timeout, budget] of PROXY_GATES) {
     const job = deployment.jobs['db-gate'];
     assert.equal(job.environment, environment);
     assert.equal(job['timeout-minutes'], timeout);
@@ -773,18 +776,12 @@ test('one database gate per deployment runs the migration proxy script and holds
     new URL('../services/migration-proxy/wrangler.jsonc', import.meta.url),
     'utf8'
   );
-  for (const host of ['migration-proxy.kiloapps.io', 'migration-proxy-staging.kiloapps.io']) {
+  for (const host of PROXY_GATES.map(([, , , proxyUrl]) => new URL(proxyUrl).host)) {
     assert.ok(
       wrangler.includes(`"pattern": "${host}"`),
       `the proxy Worker must serve ${host}, the URL db-gate calls`
     );
   }
-
-  assert.equal(
-    existsSync(new URL('./check-production-db-startup.ts', import.meta.url)),
-    false,
-    'the proxy probes the database; the CI probe script is gone'
-  );
 
   // Counterweight to the skipped LFS above: the web build itself keeps its
   // objects, because next.config.mjs fails on the kilo-anim pointer file.
@@ -817,17 +814,61 @@ test('one database gate per deployment runs the migration proxy script and holds
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
 });
 
-test('only db-gate may mint a GitHub OIDC token in either deploy workflow', () => {
-  for (const [name, deployment] of [
-    ['production', production],
-    ['staging', staging],
+test('only a switched db-gate may mint a GitHub OIDC token in a deploy workflow', () => {
+  for (const [name, deployment, expected] of [
+    ['production', production, []],
+    ['staging', staging, [['db-gate', 'write']]],
   ]) {
     assert.equal(deployment.permissions['id-token'], undefined, `${name} workflow-level block`);
     const minting = Object.entries(deployment.jobs)
       .filter(([, job]) => job.permissions?.['id-token'] !== undefined)
       .map(([id, job]) => [id, job.permissions['id-token']]);
-    assert.deepEqual(minting, [['db-gate', 'write']], `${name} jobs with id-token`);
+    assert.deepEqual(minting, expected, `${name} jobs with id-token`);
   }
+});
+
+test('the unswitched production database gate checks out, installs, probes and migrates once', () => {
+  const dbGateInstall =
+    "pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo";
+  // The deploy gate narrows its install to the workspace set the CI drizzle
+  // check already proves: the probe and drizzle-kit both resolve there.
+  const ciDrizzleInstall = ci.jobs['drizzle-check'].steps.find(
+    step => step.name === 'Install dependencies'
+  ).run;
+  assert.equal(dbGateInstall, ciDrizzleInstall);
+
+  const dbJobs = Object.keys(production.jobs).filter(
+    job => !production.jobs[job].uses && production.jobs[job].env?.POSTGRES_URL
+  );
+  assert.deepEqual(dbJobs, ['db-gate'], 'production must gate the database with one job');
+
+  const job = production.jobs['db-gate'];
+  assert.equal(job.environment, 'production');
+  assert.equal(job['timeout-minutes'], 45);
+  assert.equal(job.permissions, undefined, 'the unswitched db-gate must not mint an OIDC token');
+  assert.equal(job.env.POSTGRES_URL, '${{ secrets.POSTGRES_URL }}');
+  assert.equal(job.env.DATABASE_CA, '${{ secrets.DATABASE_CA }}');
+
+  const steps = job.steps;
+  assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
+  assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
+  const checkout = steps.find(step => step.uses?.startsWith('useblacksmith/checkout@'));
+  assert.equal(checkout.with.ref, '${{ needs.check-changes.outputs.target_sha }}');
+  // The job installs two workspaces and migrates; it never builds apps/web, so
+  // it must not pay for the LFS objects only the web build reads.
+  assert.equal(checkout.with.lfs, undefined, 'production db-gate checkout must skip LFS');
+
+  const startupIndex = steps.findIndex(step => step.name === 'Check production DB startup path');
+  const migrateIndex = steps.findIndex(step => step.name === 'Run Drizzle migrations');
+  const installIndex = steps.findIndex(step => step.run === dbGateInstall);
+  assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
+  assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
+  assert.ok(
+    existsSync(new URL('./check-production-db-startup.ts', import.meta.url)),
+    'the production probe script must exist while production db-gate runs it'
+  );
+  assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');
+  assert.equal(steps[migrateIndex].if, undefined);
 });
 
 // The db-gate script against a mocked proxy and a mocked runner token endpoint. Every token is a

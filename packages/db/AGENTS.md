@@ -42,9 +42,10 @@ concurrent-index migration must therefore survive a retry:
    `COMMIT;`, and `RESET lock_timeout;` and `RESET statement_timeout;` before
    `BEGIN;`. A concurrent build waits on older transactions through lock
    waits, and a server default `statement_timeout` or `lock_timeout` cancels
-   it, so both must be lifted. The migration proxy's run deadline (6 hours)
-   still caps how long the build can wait; the deploy job's `timeout-minutes`
-   does not stop it.
+   it, so both must be lifted. Through the migration proxy, its run deadline
+   (6 hours) caps how long the build can wait; the deploy job's
+   `timeout-minutes` does not stop it. A `db-gate` that still runs
+   `drizzle-kit migrate` itself is capped by its `timeout-minutes`.
 3. Precede each `CREATE ... INDEX CONCURRENTLY` with `DROP INDEX CONCURRENTLY
    IF EXISTS` for the same index name, so a retry rebuilds an `INVALID` index.
 4. Keep the first transaction, before `COMMIT;`, to DDL that locks only objects
@@ -74,26 +75,36 @@ skips an `INVALID` index and leaves it broken.
 
 To recover a deploy that is already failing on a concurrent-index migration:
 
+Staging's `db-gate` migrates through the migration proxy
+(`services/migration-proxy`); production's still runs `drizzle-kit migrate`
+with `POSTGRES_URL` until it switches the same way. The proxy steps below apply
+to every environment whose `db-gate` calls the proxy.
+
 - Read the failed run in the `db-gate` job log: the migration proxy's run view
   (`services/migration-proxy/README.md`) gives `failure.code`, `sqlstate`,
   `migrationTag` and the `applied` and `pending` tags. The view never carries
   the Postgres message; read it in the proxy Worker's logs (Workers Logs for
   `migration-proxy` or `migration-proxy-staging`, kept 7 days) or in the
-  provider's Postgres log.
+  provider's Postgres log. Where `db-gate` still runs `drizzle-kit migrate`,
+  the provider's Postgres log is the only place that names the error:
+  `drizzle-kit migrate` exits with status 1 without printing it.
 - Check `drizzle.__drizzle_migrations` to confirm the migration is not recorded.
 - Check `pg_index.indisvalid` for each of its indexes.
-- For `invalid_index_present`, the run lists the invalid indexes in
-  `failure.indexes`: the proxy refuses to migrate while an `INVALID` index
-  exists, so the migration's own `DROP` never runs. Check that no build is
-  running on each one (`SELECT * FROM pg_stat_progress_create_index`), then
-  run `DROP INDEX CONCURRENTLY <name>` in the SQL editor and redeploy.
+- For a proxy run that fails with `invalid_index_present`, the run lists the
+  invalid indexes in `failure.indexes`: the proxy refuses to migrate while an
+  `INVALID` index exists, so the migration's own `DROP` never runs. Check that
+  no build is running on each one (`SELECT * FROM
+  pg_stat_progress_create_index`), then run `DROP INDEX CONCURRENTLY <name>` in
+  the SQL editor and redeploy.
 - Check `pg_stat_activity` for long-running transactions.
 - Check `pg_stat_activity` for a `CREATE INDEX CONCURRENTLY` left behind by a
-  lost run. A blocked index build does not notice that its client
-  disconnected, and it holds `SHARE UPDATE EXCLUSIVE` on the table, so a retry
-  waits behind it without a limit. The proxy ends its own leftover sessions
-  before the next run (`leftover_not_ended` when one does not end); a build
-  left by any other client must be ended by hand.
+  lost proxy run or a cancelled `drizzle-kit migrate` job. A blocked index
+  build does not notice that its client disconnected, and it holds `SHARE
+  UPDATE EXCLUSIVE` on the table, so a retry waits behind it without a limit.
+  The proxy ends its own leftover sessions before the next run
+  (`leftover_not_ended` when one does not end); a build left by any other
+  client, including a cancelled `drizzle-kit migrate` job, must be ended by
+  hand.
 - Then make the unrecorded migration retry-safe as above. Editing it is safe
   because drizzle only compares the newest recorded migration timestamp.
 

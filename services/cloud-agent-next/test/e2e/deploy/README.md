@@ -221,7 +221,10 @@ Prerequisites, in order:
     repeats this step. CI never uploads them. The preflight and upload are
     `test/e2e/deploy/upload-access-secrets.sh cloud-agent-e2e-test <values>`,
     where `<values>` is `-` (standard input) or a file with mode 0600 holding
-    `E2E_ACCESS_CLIENT_ID=…` and `E2E_ACCESS_CLIENT_SECRET=…` lines.
+    `E2E_ACCESS_CLIENT_ID=…` and `E2E_ACCESS_CLIENT_SECRET=…` lines. It runs
+    every wrangler call with `WRANGLER_WRITE_LOGS=false`, so Wrangler 4 writes
+    no log file on the VM; the deploy scripts and the workflow's deploy job do
+    the same.
 13. Tests: dispatch again (the `deploy` input may be off). The `preflight` job,
     which runs no package code and is the only job besides `deploy` with the
     Cloudflare credential, checks the variables and, names only, that both

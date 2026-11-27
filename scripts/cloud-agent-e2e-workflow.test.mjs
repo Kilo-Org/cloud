@@ -51,3 +51,14 @@ test('the Cloudflare credential is read only by deploy and preflight', () => {
   }
   assert.deepEqual(jobs.tests.needs, ['deploy', 'build', 'preflight']);
 });
+
+test('every wrangler caller turns Wrangler log files off', () => {
+  assert.equal(jobs.deploy.env?.WRANGLER_WRITE_LOGS, 'false');
+  for (const script of ['deploy-e2e-worker.sh', 'deploy-fake-llm.sh', 'upload-access-secrets.sh']) {
+    const text = readFileSync(
+      new URL(`../services/cloud-agent-next/test/e2e/deploy/${script}`, import.meta.url),
+      'utf8'
+    );
+    assert.match(text, /^export WRANGLER_WRITE_LOGS=false$/m, script);
+  }
+});

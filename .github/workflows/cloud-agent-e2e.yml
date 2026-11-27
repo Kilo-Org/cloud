@@ -63,6 +63,8 @@ jobs:
       E2E_ACCESS_TEAM_DOMAIN: ${{ vars.CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN }}
       # Audience of the fake LLM's own Access application (fake-llm-e2e-test).
       E2E_FAKE_LLM_ACCESS_AUD: ${{ vars.CLOUD_AGENT_E2E_FAKE_LLM_ACCESS_AUD }}
+      # Wrangler 4 writes its logger output to log files by default; no step here keeps them.
+      WRANGLER_WRITE_LOGS: 'false'
     steps:
       # Inert until both Access applications exist. The deploy reads no Access
       # credential: an operator uploads it after the closed deploy, and the

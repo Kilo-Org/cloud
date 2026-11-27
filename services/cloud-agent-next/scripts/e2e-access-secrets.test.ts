@@ -28,14 +28,18 @@ function run(args: string[], stdin = '') {
     `#!/usr/bin/env bash
 n=$(ls "${dir}" | grep -c '^call-' || true)
 printf '%s\\n' "$@" > "${dir}/call-$n.argv"
+printf '%s' "\${WRANGLER_WRITE_LOGS-unset}" > "${dir}/call-$n.env"
 cat > "${dir}/call-$n.stdin"
 `
   );
   chmodSync(wrangler, 0o755);
+  // The script itself must turn Wrangler's log files off, whatever the caller has.
+  const env: NodeJS.ProcessEnv = { ...process.env, WRANGLER_BIN: wrangler };
+  delete env.WRANGLER_WRITE_LOGS;
   const result = spawnSync('bash', [script, ...args.map(a => a.replace('$DIR', dir))], {
     encoding: 'utf8',
     input: stdin,
-    env: { ...process.env, WRANGLER_BIN: wrangler },
+    env,
   });
   const calls = readdirSync(dir)
     .filter(name => name.endsWith('.argv'))
@@ -43,6 +47,7 @@ cat > "${dir}/call-$n.stdin"
     .map(name => ({
       argv: readFileSync(join(dir, name), 'utf8').trim().split('\n'),
       stdin: readFileSync(join(dir, name.replace('.argv', '.stdin')), 'utf8'),
+      writeLogs: readFileSync(join(dir, name.replace('.argv', '.env')), 'utf8'),
     }));
   return { ...result, dir, calls, output: result.stdout + result.stderr };
 }
@@ -55,10 +60,12 @@ describe('upload-access-secrets.sh', () => {
       {
         argv: ['secret', 'put', 'E2E_ACCESS_CLIENT_ID', '--name', 'cloud-agent-e2e-test'],
         stdin: CLIENT_ID,
+        writeLogs: 'false',
       },
       {
         argv: ['secret', 'put', 'E2E_ACCESS_CLIENT_SECRET', '--name', 'cloud-agent-e2e-test'],
         stdin: CLIENT_SECRET,
+        writeLogs: 'false',
       },
     ]);
     expect(result.output).not.toContain(CLIENT_ID);
@@ -79,6 +86,7 @@ describe('upload-access-secrets.sh', () => {
     const strict = run(['cloud-agent-e2e-test', file]);
     expect(strict.status, strict.output).toBe(0);
     expect(strict.calls).toHaveLength(2);
+    for (const call of strict.calls) expect(call.writeLogs).toBe('false');
   });
 
   it('refuses another script, another name, a duplicate or a missing value before any call', () => {

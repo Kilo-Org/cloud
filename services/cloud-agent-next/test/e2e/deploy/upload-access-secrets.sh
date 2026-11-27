@@ -18,6 +18,9 @@ if ((BASH_VERSINFO[0] < 4)); then
   printf 'upload-access-secrets: needs bash 4 or later (found %s)\n' "$BASH_VERSION" >&2
   exit 1
 fi
+# Wrangler 4 also writes its logger output to log files by default; every
+# wrangler call below runs without them.
+export WRANGLER_WRITE_LOGS=false
 
 ALLOWED_SCRIPT="cloud-agent-e2e-test"
 ALLOWED_NAMES=(E2E_ACCESS_CLIENT_ID E2E_ACCESS_CLIENT_SECRET)

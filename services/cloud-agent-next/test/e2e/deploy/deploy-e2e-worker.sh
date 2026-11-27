@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set +x
+# Wrangler 4 also writes its logger output to log files by default; none here.
+export WRANGLER_WRITE_LOGS=false
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SERVICE_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)

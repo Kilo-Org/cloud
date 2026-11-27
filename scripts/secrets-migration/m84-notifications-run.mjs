@@ -1399,9 +1399,9 @@ async function main() {
 }
 
 /**
- * `--dispatch-guard`: the first job, with no secret, no token and no environment. It refuses a
- * wrong dispatch (repository, ref, event, expected commit, checkout) before the protected copy
- * job asks its reviewers for approval.
+ * `--dispatch-guard`: the first job, with no secret, no environment and `contents: read` only;
+ * this step gets no token. It refuses a wrong dispatch (repository, ref, event, expected commit,
+ * checkout) before the protected copy job asks its reviewers for approval.
  */
 async function dispatchGuardMain() {
   const failures = dispatchProblems(process.env, await gitHead());

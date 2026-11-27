@@ -581,6 +581,7 @@ test('context and operator refusals make no provider, GitHub or process call', a
     [{ GITHUB_REPOSITORY: 'someone/cloud' }, 'repository'],
     [{ GITHUB_EVENT_NAME: 'push' }, 'event'],
     [{ EXPECTED_COMMIT: 'd'.repeat(40) }, 'expected_commit'],
+    [{ GITHUB_TOKEN: '' }, 'github_token'],
     [{ [WRITER_SECRET]: '' }, 'writer_secret'],
     [{ [OPERATOR_META]: '' }, 'operator_meta'],
     [{ M65_INFISICAL_CLIENT_ID: 'not-a-uuid' }, 'client_id'],

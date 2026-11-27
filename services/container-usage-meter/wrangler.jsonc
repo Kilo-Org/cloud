@@ -21,10 +21,10 @@
   },
   "vars": {
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
-    // The credential of the `/api/internal/organizations/compute-balance-alert` call (decision
-    // D59): `sts` sends a `web:compute-balance-alert.send` STS service token over the `STS`
-    // binding, `legacy` the `INTERNAL_API_SECRET` as `X-Internal-Secret`. Rollback is `legacy`.
-    "WEB_INTERNAL_AUTH": "sts",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the compute-balance-alert call sends
+    // `INTERNAL_API_SECRET` as `X-Internal-Secret`. `"sts"` sends a `web:compute-balance-alert.send`
+    // STS service token over the `STS` binding instead; set it only once the Worker has that
+    // binding, STS grants the scope and the route accepts STS. Removing it is the rollback.
     "CONTAINER_BILLING_SERVICES": "cloud-agent-next",
     "CONTAINER_BILLING_USER_IDS": "",
     "CONTAINER_BILLING_ORG_IDS": "",

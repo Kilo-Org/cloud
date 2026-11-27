@@ -28,3 +28,17 @@ updates:
       interval: 'weekly'
     cooldown:
       default-days: 7
+
+  - package-ecosystem: 'github-actions'
+    directories:
+      - '/'
+      - '/.github/actions/*'
+      - '/.github/actions/pnpm-store/cleanup'
+    schedule:
+      interval: 'weekly'
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - '*'

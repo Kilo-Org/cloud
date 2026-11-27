@@ -1,3 +1,7 @@
+import {
+  awsEc2BuildTargetSchema,
+  resolveAwsEc2EnvironmentBuildTarget,
+} from './aws-ec2-build-target.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import type {
   EnvironmentBuildInput,
@@ -22,7 +26,6 @@ import {
   type ByocVercelCredentialFetchInput,
 } from '../byoc/vercel-credential-resolver.js';
 import { enrolledByocVercelOwner, type ByocVercelOwner } from '../byoc/vercel-owner.js';
-import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
 import { resolveSavedSandboxAllocation } from '../session/sandbox-allocation-resolution.js';
 import type { Env } from '../types.js';
 
@@ -34,6 +37,7 @@ import type { Env } from '../types.js';
 const vercelBuilderInstanceSchema = z.enum(['vercel-small', 'vercel-large']);
 
 export const environmentBuildTargetSchema = z.discriminatedUnion('provider', [
+  awsEc2BuildTargetSchema,
   z
     .object({
       provider: z.literal('cloudflare-containers'),
@@ -203,6 +207,10 @@ export async function resolveEnvironmentBuildTarget(args: {
     ...(args.egressMode === 'allowlist' ? { runtime: { egressMode: 'allowlist' } } : {}),
   });
 
+  if (allocation === 'aws-ec2-8g') {
+    return resolveAwsEc2EnvironmentBuildTarget(env, reference);
+  }
+
   if (allocation !== undefined && getSandboxAllocationProvider(allocation) === 'vercel') {
     return resolveVercelTarget(env, reference, allocation);
   }
@@ -285,14 +293,4 @@ function allowedNativeBuild(env: Env): boolean {
 function nativeUnsupportedReason(env: Env): string {
   if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
   return builderRuntimeUnsupportedReason(env) ?? 'The saved sandbox allocation is not supported';
-}
-
-/** The base identity compatibility compares for a pinned target. */
-export function targetBaseImage(
-  target: EnvironmentBuildTarget,
-  nativeImage: () => Promise<string | null>
-): Promise<string | null> {
-  return target.provider === 'vercel'
-    ? Promise.resolve(vercelSnapshotBaseImage(target))
-    : nativeImage();
 }

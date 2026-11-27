@@ -36,8 +36,6 @@ import type { SessionCredentialGrant } from './session-credentials.js';
 import { buildControlNetworkPolicy } from './session-credentials.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { leaseAtLeastMs } from './deadlines.js';
-import { awsProviderFixture } from '../../test/fixtures/aws-provider.js';
-import { encodeAwsProviderRef } from './aws-operation.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
 /**
@@ -360,45 +358,10 @@ function vercelHarness(): ContractHarness {
  * below then runs against the new adapter. The retired `cloudflare` provider
  * starts no compute and has no harness.
  */
-function awsHarness(): ContractHarness {
-  const fixture = awsProviderFixture(SANDBOX);
-  const adapter = fixture.adapter();
-  return {
-    name: 'aws',
-    adapter,
-    create: () => requireRef(adapter),
-    foreignRef: () =>
-      encodeAwsProviderRef({
-        provider: 'aws',
-        sandboxId: FOREIGN,
-        intentId: intent.intentId,
-        createdAt: 0,
-      }),
-    setRunning: fixture.setRunning,
-    failObserve: fixture.failObserve,
-    failStop: fixture.failStop,
-    failCreate: () => fixture.failRuntime(new ProviderCreationError('invalid_configuration')),
-    launchedEnv: () => fixture.launchedDocument()?.env,
-    launchSupervisor: () => undefined,
-    launchInvocation: () => fixture.launchedDocument()?.argv,
-    leaseCalls: () => 0,
-    leaseMs: () => [],
-    leaseModel: 'fixed',
-    expectedRuntime: {
-      provider: 'aws',
-      sandboxId: SANDBOX,
-      instanceId: intent.intentId,
-      region: 'us-east-1',
-      instanceType: 'microvm-8g',
-    },
-  };
-}
-
 const harnessFactories: Record<
-  Exclude<AgentSandboxProvider, 'cloudflare'>,
+  Exclude<AgentSandboxProvider, 'cloudflare' | 'aws-ec2'>,
   () => ContractHarness
 > = {
-  aws: awsHarness,
   'cloudflare-containers': () => containersHarness(),
   vercel: vercelHarness,
 };
@@ -527,7 +490,7 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
       const ref = await harness.create();
 
       await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-      if (harness.leaseModel === 'fixed') expect(harness.leaseCalls()).toBe(0);
+      if (harness.leaseModel !== undefined) expect(harness.leaseCalls()).toBe(0);
       else expect(harness.leaseCalls()).toBeGreaterThan(0);
     });
 
@@ -562,8 +525,18 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    expect(harness.adapter.environmentSnapshots).toBe('launch');
-    const snapshot = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
+    expect(harness.adapter.environmentSnapshots).toEqual({
+      provider: 'cloudflare-containers',
+      phase: 'launch',
+    });
+    const snapshot = {
+      kind: 'environment' as const,
+      provider: 'cloudflare-containers' as const,
+      buildId: 'build-test',
+      snapshotId: 'snap-env',
+      baseImage: 'registry.example/app:1',
+      currentBaseImage: 'registry.example/app:2',
+    };
     const snapshotDiagnostic = {
       allocationId: 'allocation-test',
       source: 'environment' as const,
@@ -575,7 +548,10 @@ describe('provider-specific contract differences', () => {
       { command: supervisorStartup(), env: {} },
       { snapshot, snapshotDiagnostic }
     );
-    expect(harness.launchInputs!().at(-1)?.snapshot).toEqual(snapshot);
+    expect(harness.launchInputs!().at(-1)?.snapshot).toEqual({
+      snapshotId: snapshot.snapshotId,
+      baseImage: snapshot.currentBaseImage,
+    });
     expect(harness.launchInputs!().at(-1)?.snapshotDiagnostic).toEqual(snapshotDiagnostic);
     await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
     expect(harness.launchInputs!().at(-1)).not.toHaveProperty('snapshot');
@@ -691,7 +667,7 @@ describe('provider-specific contract differences', () => {
     const leases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseMs()).toHaveLength(leases);
-    expect(harness.adapter.environmentSnapshots).toBe('create');
+    expect(harness.adapter.environmentSnapshots).toEqual({ provider: 'vercel', phase: 'create' });
 
     await expect(
       harness.adapter.applyContainedCredentials!(ref, [] as readonly SessionCredentialGrant[])

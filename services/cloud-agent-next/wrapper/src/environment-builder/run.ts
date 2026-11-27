@@ -113,6 +113,8 @@ export type BuildRunDeps = {
   repository: Pick<RepositoryPreparation, 'cloneRepository' | 'runSetupCommands' | 'headCommit'>;
   runGit: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   stopProcesses: () => Promise<void>;
+  /** Acknowledged authority retirement after setup descendants stop. */
+  retireScm?: () => Promise<void>;
   cleanup: (input: CleanupInput) => Promise<string | null>;
   writeStamp: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
   /** Aborted on a cancel reply or at the build deadline. */
@@ -282,6 +284,8 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
     reporter.setStep('cleanup');
     signal.throwIfAborted();
     await deps.stopProcesses();
+    await deps.retireScm?.();
+    signal.throwIfAborted();
     for (const target of targets) {
       const cleanupFailure = await deps.cleanup({
         git: args => deps.runGit(args, { cwd: target.directory, env, inheritEnv: false }),

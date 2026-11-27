@@ -10,7 +10,7 @@ import {
   type VercelRestrictedEgress,
 } from '../sandbox-control/vercel-provider.js';
 import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
+import { sameVercelAccount, vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
 import {
   ByocCredentialMissingError,
   ByocVercelNotReadyError,
@@ -57,7 +57,7 @@ export function createByocVercelProviderAdapter(deps: {
   }
 
   return {
-    environmentSnapshots: 'create',
+    environmentSnapshots: { provider: 'vercel', phase: 'create' },
     ensureBillingAdmission: async () => {},
     async create(intent) {
       let snapshot: ByocVercelRuntimeSnapshot | undefined;
@@ -77,14 +77,16 @@ export function createByocVercelProviderAdapter(deps: {
           config: { ...config, resources: deps.resources },
         });
         const requested = intent.snapshot;
+        const baseImage = vercelSnapshotBaseImage({
+          ...config,
+          credentialId: deps.source.credentialId,
+          baseSnapshotId: config.snapshotId,
+        });
         const compatible =
-          requested?.provider === 'vercel' &&
-          requested.baseImage ===
-            vercelSnapshotBaseImage({
-              ...config,
-              credentialId: deps.source.credentialId,
-              baseSnapshotId: config.snapshotId,
-            });
+          requested?.kind === 'environment' &&
+          requested.provider === 'vercel' &&
+          (requested.currentBaseImage ?? requested.baseImage) === baseImage &&
+          sameVercelAccount(requested.baseImage, baseImage);
         if (requested !== undefined && !compatible)
           throw new ProviderSnapshotCreationError('image_mismatch');
         try {

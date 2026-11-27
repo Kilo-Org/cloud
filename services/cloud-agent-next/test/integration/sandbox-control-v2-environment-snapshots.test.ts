@@ -54,16 +54,20 @@ const REFERENCE: SessionEnvironmentReference = {
   repository: { platform: 'github', repoFullName: 'acme/widgets' },
 };
 const SNAPSHOT = {
+  kind: 'environment' as const,
+  provider: 'cloudflare-containers' as const,
+  buildId: '66666666-6666-4666-8666-666666666666',
   snapshotId: 'snap-env',
   baseImage: 'registry.example/app:1',
 };
 const RESOLVED: SnapshotResolution = {
   snapshot: {
-    ...SNAPSHOT,
-    provider: 'cloudflare-containers',
+    snapshotId: SNAPSHOT.snapshotId,
+    baseImage: SNAPSHOT.baseImage,
+    provider: SNAPSHOT.provider,
     revision: 1,
     capturedAt: 1,
-    buildId: '66666666-6666-4666-8666-666666666666',
+    buildId: SNAPSHOT.buildId,
     stale: 'revision',
   },
   reason: 'eligible',
@@ -77,7 +81,7 @@ const MISSING: SnapshotResolution = {
 const VERCEL_SNAPSHOT = { ...SNAPSHOT, provider: 'vercel' as const };
 const RESOLVED_VERCEL: SnapshotResolution = {
   ...RESOLVED,
-  snapshot: { ...RESOLVED.snapshot!, ...VERCEL_SNAPSHOT },
+  snapshot: { ...RESOLVED.snapshot!, provider: VERCEL_SNAPSHOT.provider },
 };
 const BYOC = {
   credentialId: '88888888-8888-4888-8888-888888888888',
@@ -301,7 +305,11 @@ function createFakeProvider(
     ...(options.vercel ? { applyContainedCredentials: async () => {} } : {}),
     ...(options.snapshots === false
       ? {}
-      : { environmentSnapshots: options.vercel ? ('create' as const) : ('launch' as const) }),
+      : {
+          environmentSnapshots: options.vercel
+            ? { provider: 'vercel', phase: 'create' }
+            : { provider: 'cloudflare-containers', phase: 'launch' },
+        }),
   };
   provider.adapterFor = allocationName =>
     options.vercel
@@ -1156,13 +1164,11 @@ describe('Vercel BYOC environment snapshot restore', () => {
     ]);
     expect(provider.createIntents).toHaveLength(1);
     expect(provider.createIntents[0]?.allocationName).toMatch(/^sbx-[0-9a-f]{32}$/);
-    const selectedSnapshot = {
-      snapshotId: VERCEL_SNAPSHOT.snapshotId,
-      baseImage: VERCEL_SNAPSHOT.baseImage,
-      provider: 'vercel',
-    };
+    const selectedSnapshot = VERCEL_SNAPSHOT;
     expect(provider.createIntents[0]).toMatchObject({ snapshot: selectedSnapshot });
-    expect(provider.launchOptions).toEqual([{ snapshot: selectedSnapshot }]);
+    expect(provider.launchOptions).toEqual([
+      { snapshot: selectedSnapshot, nativeImage: 'runtime-free' },
+    ]);
     // Vercel always downloads its own runtime, including a restore from a snapshot.
     const command = provider.launchCommands[0]!;
     expect(command.argv.some(value => value.includes('package/bin/kilo'))).toBe(true);

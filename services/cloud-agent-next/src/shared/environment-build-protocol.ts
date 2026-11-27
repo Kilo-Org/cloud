@@ -95,34 +95,33 @@ export type EnvironmentBuildPinGroup = z.infer<typeof environmentBuildPinGroupSc
  * serves its `members`, and `directory` is the cwd a session of that environment
  * would have: `/workspace/<leaf>` for one repository, `/workspace` for several.
  */
+const environmentBuildInputFields = {
+  environmentId: z.string().uuid(),
+  buildId: z.string().uuid(),
+  allocationId: z.string().uuid(),
+  commands: z.array(setupScriptSchema.min(1)).max(20),
+  env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
+  /** Names of the secret entries in `env`, so the builder redacts their values. */
+  secretKeys: z.array(z.string().min(1).max(128)).max(50),
+  retireScm: z.literal(true).optional(),
+  deadlineAt: z.number().int().positive(),
+};
+
 export const environmentBuildInputSchema = z.union([
   z
     .object({
-      environmentId: z.string().uuid(),
-      buildId: z.string().uuid(),
-      allocationId: z.string().uuid(),
+      ...environmentBuildInputFields,
       git: environmentBuildGitSchema,
       members: z.undefined().optional(),
       directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
-      commands: z.array(setupScriptSchema.min(1)).max(20),
-      env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
-      /** Names of the secret entries in `env`, so the builder redacts their values. */
-      secretKeys: z.array(z.string().min(1).max(128)).max(50),
-      deadlineAt: z.number().int().positive(),
     })
     .strict(),
   z
     .object({
-      environmentId: z.string().uuid(),
-      buildId: z.string().uuid(),
-      allocationId: z.string().uuid(),
+      ...environmentBuildInputFields,
       members: z.array(environmentBuildMemberSchema).min(1),
       git: z.undefined().optional(),
       directory: z.string().regex(/^\/workspace(\/[^/]+)?$/),
-      commands: z.array(setupScriptSchema.min(1)).max(20),
-      env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
-      secretKeys: z.array(z.string().min(1).max(128)).max(50),
-      deadlineAt: z.number().int().positive(),
     })
     .strict(),
 ]);

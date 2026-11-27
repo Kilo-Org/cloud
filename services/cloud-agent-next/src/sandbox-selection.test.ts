@@ -215,7 +215,7 @@ describe('sandbox selection policy', () => {
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
           'Configure Vercel BYOC'
         );
-      else if (preset === 'aws-microvm-8g')
+      else if (preset === 'aws-ec2-8g')
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
           'Configure AWS BYOC'
         );
@@ -225,6 +225,37 @@ describe('sandbox selection policy', () => {
         );
       else
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).resolves.toBeUndefined();
+    }
+  });
+
+  it('offers only EC2 from a ready AWS connection', async () => {
+    const userId = 'oauth/aws-selection-user';
+    const providers: Array<string | null> = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      providers.push(url.searchParams.get('provider'));
+      return Response.json({
+        credentialId: '11111111-1111-4111-8111-111111111111',
+        userId,
+        setupStatus: 'ready',
+        credentialsEncrypted: {},
+      });
+    });
+    try {
+      const env = {
+        ...configured,
+        BYOC_AWS_IDS: userId,
+        KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
+        INTERNAL_API_SECRET_PROD: { get: async () => 'synthetic-internal-secret' },
+      } as Env;
+      const capabilities = await getSandboxSelectionCapabilities(env, { userId });
+      const available = availableOptions(capabilities).map(getSandboxAllocation);
+      expect(available).toContain('aws-ec2-8g');
+      expect(available).not.toContain('aws-ecs-8g');
+      expect(providers.length).toBeGreaterThan(0);
+      expect(providers.every(provider => provider === 'aws-ec2')).toBe(true);
+    } finally {
+      fetchMock.mockRestore();
     }
   });
 

@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gt, inArray, lt, or } from 'drizzle-orm';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { and, asc, desc, eq, gt, inArray, like, lt, or } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { z } from 'zod';
 import {
@@ -42,6 +43,10 @@ const ACTIVE_STATES: readonly BuildState[] = [
   'publishing',
   'stopping',
 ];
+const snapshotCleanupSchema = z.object({
+  snapshot: publishedSnapshotSchema,
+  nextAt: z.number().int().nonnegative(),
+});
 
 export function isTerminal(state: BuildState): state is BuildOutcome {
   return (TERMINAL_STATES as readonly string[]).includes(state);
@@ -63,6 +68,7 @@ export const buildInputRecordSchema = z.union([
       commands: z.array(z.string()),
       plainVars: z.record(z.string(), z.string()),
       target: environmentBuildTargetSchema.optional(),
+      egressPolicy: egressPolicySchema.optional(),
     })
     .strict(),
   z
@@ -72,6 +78,7 @@ export const buildInputRecordSchema = z.union([
       commands: z.array(z.string()),
       plainVars: z.record(z.string(), z.string()),
       target: environmentBuildTargetSchema.optional(),
+      egressPolicy: egressPolicySchema.optional(),
     })
     .strict(),
 ]);
@@ -235,6 +242,37 @@ export class BuildStore {
       .run();
   }
 
+  queueSnapshotCleanup(snapshot: PublishedSnapshot, nextAt: number): void {
+    const id = `cleanup:${snapshot.buildId}`;
+    const descriptor = JSON.stringify(snapshotCleanupSchema.parse({ snapshot, nextAt }));
+    this.db
+      .insert(publishedSnapshot)
+      .values({ id, descriptor })
+      .onConflictDoUpdate({ target: publishedSnapshot.id, set: { descriptor } })
+      .run();
+  }
+
+  snapshotCleanups() {
+    return this.db
+      .select()
+      .from(publishedSnapshot)
+      .where(like(publishedSnapshot.id, 'cleanup:%'))
+      .all()
+      .map(row => snapshotCleanupSchema.parse(JSON.parse(row.descriptor)))
+      .sort((a, b) => a.nextAt - b.nextAt);
+  }
+
+  clearSnapshotCleanup(buildId: string): void {
+    this.db
+      .delete(publishedSnapshot)
+      .where(eq(publishedSnapshot.id, `cleanup:${buildId}`))
+      .run();
+  }
+
+  clearPublishedSnapshot(): void {
+    this.db.delete(publishedSnapshot).where(eq(publishedSnapshot.id, 'current')).run();
+  }
+
   autoAttempt(revision: number): AutoAttempt | null {
     const row = this.db
       .select()
@@ -329,6 +367,9 @@ export class BuildStore {
         )
         .map(row => row.id)
     );
+    const published = this.published();
+    if (published) keep.add(published.buildId);
+    for (const { snapshot } of this.snapshotCleanups()) keep.add(snapshot.buildId);
     const remove = terminal.filter(row => !keep.has(row.id)).map(row => row.id);
     if (remove.length === 0) return;
     for (let index = 0; index < remove.length; index += 50) {

@@ -1106,6 +1106,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         group !== undefined && options.shell !== true && typeof options.shell !== 'string';
 
       const spawnChild = (gatedChild: boolean): OwnedChild => {
+        if (!gatedChild && placement) placement.writerContainmentLost = true;
         const child = gatedChild
           ? spawnGated(command, args, { ...options, detached: true, stdio: 'pipe' })
           : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
@@ -1308,6 +1309,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         }
         if (entries.find(entry => entry.pid === root.process.pid)?.identity !== root.identity) {
           contained = false;
+          if (placement) placement.writerContainmentLost = true;
           throw new Error('Native process containment changed');
         }
         let pid = root.process.pid;

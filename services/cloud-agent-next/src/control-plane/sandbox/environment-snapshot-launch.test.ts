@@ -195,6 +195,9 @@ describe('environment snapshot lookup', () => {
     expect(lookup).toEqual({ kind: 'resolved', resolution: RESOLVED });
     expect(requests).toEqual([{ reference: REFERENCE, actorUserId: 'user-1', provider: 'vercel' }]);
     expect(snapshotStart(RESOLVED)).toEqual({
+      kind: 'environment',
+      buildId: RESOLVED.snapshot!.buildId,
+      provider: 'cloudflare-containers',
       snapshotId: 'snap-1',
       baseImage: 'registry.example/app:1',
     });
@@ -262,7 +265,14 @@ describe.each(ADMISSIONS)('environment snapshot selection with admission %j', ad
           )
         ).toEqual({
           kind: 'start',
-          snapshot: { snapshotId: 'snap-1', baseImage: 'registry.example/app:1' },
+          snapshot: {
+            kind: 'environment',
+            buildId: RESOLVED.snapshot!.buildId,
+            provider: 'cloudflare-containers',
+            snapshotId: 'snap-1',
+            baseImage: 'registry.example/app:1',
+            ...(stale === 'image' ? { currentBaseImage: 'registry.example/app:1' } : {}),
+          },
         });
       }
     }
@@ -445,7 +455,13 @@ describe('environmentSnapshotDecision', () => {
       environmentSnapshotDecision(candidate, { kind: 'resolved', resolution: RESOLVED })
     ).toEqual({
       kind: 'start',
-      snapshot: { snapshotId: 'snap-1', baseImage: 'registry.example/app:1' },
+      snapshot: {
+        kind: 'environment',
+        buildId: RESOLVED.snapshot!.buildId,
+        provider: 'cloudflare-containers',
+        snapshotId: 'snap-1',
+        baseImage: 'registry.example/app:1',
+      },
     });
   });
 
@@ -545,7 +561,7 @@ describe('environmentSnapshotDecision', () => {
     });
   });
 
-  it('uses the current image identity for an earlier-image snapshot', () => {
+  it('preserves both base identities for an earlier-image snapshot', () => {
     const resolution: SnapshotResolution = {
       ...RESOLVED,
       snapshot: {
@@ -557,8 +573,12 @@ describe('environmentSnapshotDecision', () => {
       admission: { status: 'admitted', buildId: BUILD_ID },
     };
     expect(snapshotStart(resolution)).toEqual({
+      kind: 'environment',
+      buildId: RESOLVED.snapshot!.buildId,
+      provider: 'cloudflare-containers',
       snapshotId: 'snap-1',
-      baseImage: 'registry.example/app:2',
+      baseImage: 'registry.example/app:previous',
+      currentBaseImage: 'registry.example/app:2',
     });
   });
 
@@ -608,4 +628,17 @@ describe('environmentSnapshotDecision', () => {
       buildId: BUILD_ID,
     });
   });
+});
+
+describe('BYOC environment snapshot provider identity', () => {
+  it.each(['vercel', 'aws-ec2'] as const)(
+    'preserves %s instead of using native restore',
+    provider => {
+      const snapshot = RESOLVED.snapshot;
+      if (!snapshot) throw new Error('Missing fixture snapshot');
+      expect(snapshotStart({ ...RESOLVED, snapshot: { ...snapshot, provider } })).toMatchObject({
+        provider,
+      });
+    }
+  );
 });

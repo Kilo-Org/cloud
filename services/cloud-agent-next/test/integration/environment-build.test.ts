@@ -1,3 +1,6 @@
+import { resolveBuilderSnapshotBase } from '../../src/environment-build/builder-snapshot-base.js';
+import { createBuilderPreparation } from '../../src/environment-build/builder-preparation.js';
+import { createBuilderLifecycleState } from '../../src/environment-build/builder-state.js';
 import {
   ContainerAccountBlockedError,
   ContainerCapacityUnavailableError,
@@ -20,7 +23,7 @@ import type {
   BuilderProvider,
 } from '../../src/environment-build/builder-provider.js';
 import type { BuildStore } from '../../src/environment-build/store.js';
-import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
+import type { SnapshotCaptureResult } from '../../src/sandbox-control/snapshots.js';
 import { BuilderRetryableError } from '../../src/environment-build/builder-errors.js';
 import { MAX_BUILD_LOG_BYTES } from '../../src/environment-build/policy.js';
 import type { BuildTargetResolution } from '../../src/environment-build/target.js';
@@ -53,7 +56,7 @@ type Harness = {
   captures: Array<{ captureId: string }>;
   snapshotsTaken: Map<string, number>;
   stops: BuilderAllocation[];
-  captureResult: (captureId: string) => NativeCaptureResult;
+  captureResult: (captureId: string) => SnapshotCaptureResult;
   stopResult: 'terminal' | 'retryable';
   launchError: Error | null;
   accountError?: Error;
@@ -119,30 +122,34 @@ async function setup(): Promise<Harness> {
     unsupportedReason: null,
   };
   const provider: BuilderProvider = {
-    admitBilling: async allocation => {
-      await harness.billingAdmission?.(allocation);
-    },
-    launch: async (allocation, launch) => {
-      if (harness.launchError) throw harness.launchError;
-      harness.launches.push({
-        allocation,
-        runner: launch.runner,
-        networkSecretHosts: launch.networkSecretHosts,
-      });
-    },
-    capture: async (_allocation, captureId) => {
-      harness.captures.push({ captureId });
-      // A capture id is taken once; a repeated call returns the stored outcome.
-      harness.snapshotsTaken.set(captureId, 1);
-      return harness.captureResult(captureId);
-    },
-    stop: async allocation => {
-      harness.stops.push(allocation);
-      return harness.stopResult;
-    },
-    renewLease: async () => undefined,
+    bind: allocation => ({
+      admitBilling: async () => {
+        await harness.billingAdmission?.(allocation);
+      },
+      launch: async launch => {
+        if (harness.launchError) throw harness.launchError;
+        harness.launches.push({
+          allocation,
+          runner: launch.runner,
+          networkSecretHosts: launch.networkSecretHosts,
+        });
+      },
+      capture: async captureId => {
+        harness.captures.push({ captureId });
+        // A capture id is taken once; a repeated call returns the stored outcome.
+        harness.snapshotsTaken.set(captureId, 1);
+        return harness.captureResult(captureId);
+      },
+      stop: async () => {
+        harness.stops.push(allocation);
+        return harness.stopResult;
+      },
+      renewLease: async () => undefined,
+    }),
     runtimeReleaseId: async () => 'release-1',
-    currentImage: async () => harness.currentImage,
+    snapshotBase: input => resolveBuilderSnapshotBase(input, async () => harness.currentImage),
+    publishedSnapshotBase: (target, capturedBase) =>
+      target.provider === 'vercel' ? vercelSnapshotBaseImage(target) : capturedBase,
   };
   await runInDurableObject(stub, async (instance: EnvironmentBuild, state) => {
     const host = instance as unknown as {
@@ -211,7 +218,10 @@ async function setup(): Promise<Harness> {
       runnerCredential: async claims => `cred:${claims.buildId}:${claims.allocationId}`,
       runnerCredentialMatches: async (claims, credential) =>
         credential === `cred:${claims.buildId}:${claims.allocationId}`,
-      decryptSecrets: () => ({ TOKEN: 'secret-value' }),
+      preparation: createBuilderPreparation({
+        gitSource: input => deps.environment.gitSource(input),
+        decryptSecrets: () => ({ TOKEN: 'secret-value' }),
+      }),
       billingInput: ({ sandboxId, buildId }) => ({
         sandboxId: sandboxId as never,
         subject: { type: 'org', id: OWNER.id },
@@ -1392,5 +1402,65 @@ describe('environment snapshot resolution', () => {
     harness.launchError = null;
     await tick(harness);
     expect(harness.launches).toHaveLength(1);
+  });
+});
+
+describe('transactional shared builder state', () => {
+  it('preserves compute, SCM and archive changes across concurrent completions', async () => {
+    const harness = await setup();
+    const accepted = await manualBuild(harness);
+    if (accepted.status !== 'accepted') throw new Error('Build was not accepted');
+    await runInDurableObject(harness.stub, async (instance, state) => {
+      const store = (instance as unknown as { store: BuildStore }).store;
+      const lifecycle = createBuilderLifecycleState({
+        read: () => store.providerState(accepted.buildId),
+        write: value => store.setProviderState(accepted.buildId, value),
+        transaction: write => state.storage.transactionSync(write),
+      });
+      await lifecycle.set({ operation: { phase: 'launching' } });
+      await Promise.all([
+        lifecycle.update(current => ({
+          ...(current as Record<string, unknown>),
+          scm: { alias: 'synthetic-alias' },
+        })),
+        lifecycle.update(current => ({
+          ...(current as Record<string, unknown>),
+          archive: { reservedAt: 100 },
+        })),
+        lifecycle.update(current => ({
+          ...(current as Record<string, unknown>),
+          operation: { phase: 'running', id: 'synthetic-compute' },
+        })),
+      ]);
+      expect(store.providerState(accepted.buildId)).toEqual({
+        operation: { phase: 'running', id: 'synthetic-compute' },
+        scm: { alias: 'synthetic-alias' },
+        archive: { reservedAt: 100 },
+      });
+    });
+  });
+  it('rejects asynchronous or failed transitions without changing persisted state', async () => {
+    const harness = await setup();
+    const accepted = await manualBuild(harness);
+    if (accepted.status !== 'accepted') throw new Error('Build was not accepted');
+    await runInDurableObject(harness.stub, async (instance, state) => {
+      const store = (instance as unknown as { store: BuildStore }).store;
+      const lifecycle = createBuilderLifecycleState({
+        read: () => store.providerState(accepted.buildId),
+        write: value => store.setProviderState(accepted.buildId, value),
+        transaction: write => state.storage.transactionSync(write),
+      });
+      await lifecycle.set({ operation: { phase: 'launching' } });
+      await expect(lifecycle.update(() => Promise.resolve({ operation: null }))).rejects.toThrow(
+        'must be synchronous'
+      );
+      await expect(
+        lifecycle.update(current => {
+          delete (current as Record<string, unknown>).operation;
+          throw new Error('Synthetic failed transition');
+        })
+      ).rejects.toThrow('Synthetic failed transition');
+      expect(store.providerState(accepted.buildId)).toEqual({ operation: { phase: 'launching' } });
+    });
   });
 });

@@ -87,6 +87,7 @@ export type ControlPlaneConnectionOptions = {
   proxyUrl?: string;
   allocationId: string;
   timers: ControlPlaneTimers;
+  snapshotRestoreConfirmed?: true;
   wrapperId?: string;
   /** Sent as an upgrade header so the Worker can attribute runs to Kilo v1 or v2. */
   runtimeHarness?: RuntimeHarness;
@@ -291,6 +292,7 @@ export function createControlPlaneConnection(
           allocationId: options.allocationId,
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           ...(FALLBACK_HELLO_CAPABILITIES[index] ?? {}),
+          ...(options.snapshotRestoreConfirmed ? { snapshotRestoreConfirmed: true } : {}),
         })
       )
         return;
@@ -486,6 +488,7 @@ export function createControlPlaneConnection(
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           heartbeatAck: true,
           workspaceSnapshots: true,
+          ...(options.snapshotRestoreConfirmed ? { snapshotRestoreConfirmed: true } : {}),
           redactsNamedSecrets: true,
           installsSkillsSh: true,
           startCommands: true,

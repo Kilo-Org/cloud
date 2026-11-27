@@ -34,12 +34,12 @@ type SelectionOwner = { userId: string; orgId?: string };
 export type SessionRepositoryType = 'github' | 'gitlab' | 'bitbucket' | 'git';
 
 export const RETIRED_SANDBOX_ALLOCATION_MESSAGE =
-  'This sandbox allocation has been retired. Choose Cloudflare Containers or Vercel BYOC.';
+  'This sandbox allocation has been retired. Choose one of the available allocations.';
 
 /**
  * Retired allocations a new session cannot choose. `cloudflare-shared` is gone
- * because every sandbox serves one workspace. `cloudflare-single` is not here:
- * it is the compatibility alias for the native containers default.
+ * because every sandbox serves one workspace. `cloudflare-single` is the
+ * compatibility alias for the native containers default.
  */
 export function isRetiredSandboxAllocation(allocation: SandboxAllocation): boolean {
   return allocation === 'cloudflare-shared' || allocation === 'isolated-standard';
@@ -107,7 +107,7 @@ export function sandboxAllocationUnavailableReason(
   if (capabilityReason) return capabilityReason;
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
-    case 'aws':
+    case 'aws-ec2':
       return enrolledByocOwner(env.BYOC_AWS_IDS, owner) === undefined
         ? 'Configure AWS BYOC in Cloud Agent settings to use AWS compute'
         : undefined;
@@ -148,7 +148,7 @@ export async function getSandboxSelectionCapabilities(
   const candidates = await Promise.all(
     SELECTABLE_SANDBOX_ALLOCATIONS.filter(
       allocation =>
-        getSandboxAllocationProvider(allocation) !== 'aws' ||
+        getSandboxAllocationProvider(allocation) !== 'aws-ec2' ||
         enrolledByocOwner(env.BYOC_AWS_IDS, owner) !== undefined
     ).map(async allocation => {
       let unavailableReason = sandboxAllocationUnavailableReason(
@@ -158,7 +158,10 @@ export async function getSandboxSelectionCapabilities(
         capability,
         options?.vercelUnavailableReason
       );
-      if (getSandboxAllocationProvider(allocation) === 'aws' && unavailableReason === undefined) {
+      if (
+        getSandboxAllocationProvider(allocation) === 'aws-ec2' &&
+        unavailableReason === undefined
+      ) {
         try {
           const connection = await fetchAwsByocConnection(
             env,

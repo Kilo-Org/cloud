@@ -70,6 +70,13 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
 BYOC_VERCEL_IDS=
 
+# AWS EC2 enrollment. Empty disables enrollment.
+BYOC_AWS_IDS=
+AWS_BYOC_KILO_ROLE_ARN=
+AWS_BYOC_CREDENTIALS=
+AWS_EC2_BYOC_RELEASE=
+AWS_EC2_HOST_AMI_IDS=
+
 # Comma-separated user or organization IDs allowed to capture and restore registered workspace tail snapshots.
 # `*` enables snapshots for everyone; empty or unset is off.
 WORKSPACE_SNAPSHOT_IDS=

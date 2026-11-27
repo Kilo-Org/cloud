@@ -33,6 +33,7 @@
     "./setup-script": "./src/setup-script.ts",
     "./egress-audit": "./src/egress-audit.ts",
     "./network-secrets": "./src/network-secrets.ts",
+    "./egress-http": "./src/egress-http.ts",
     "./scm-capability-contract": "./src/scm-capability-contract.ts",
     "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
@@ -68,11 +69,9 @@
     "./r2-client": "./src/r2-client.ts",
     "./aws-client": "./src/aws-client.ts",
     "./aws-cloudformation": "./src/aws-cloudformation.ts",
-    "./aws-egress": "./src/aws-egress.ts",
-    "./egress-http": "./src/egress-http.ts",
-    "./aws-ec2": "./src/aws-ec2.ts",
-    "./aws-ec2-client": "./src/aws-ec2-client.ts",
+    "./aws-onboarding": "./src/aws-onboarding.ts",
     "./aws-byoc": "./src/aws-byoc.ts",
+    "./aws-egress": "./src/aws-egress.ts",
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
     "./github-task-grant": "./src/github-task-grant.ts",
@@ -89,7 +88,10 @@
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
-    "./environment-setup-authority": "./src/environment-setup-authority.ts"
+    "./environment-setup-authority": "./src/environment-setup-authority.ts",
+    "./aws-onboarding-api": "./src/aws-onboarding-api.ts",
+    "./aws-ec2": "./src/aws-ec2.ts",
+    "./aws-ec2-client": "./src/aws-ec2-client.ts"
   },
   "scripts": {
     "test": "vitest run",

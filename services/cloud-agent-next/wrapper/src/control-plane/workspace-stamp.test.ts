@@ -69,6 +69,18 @@ describe('workspace stamp', () => {
     expect(await readWorkspaceStamp(directory)).toBeNull();
   });
 
+  it('rejects an oversized stamp even when the prefix is valid JSON', async () => {
+    const file = workspaceStampPath(directory, true);
+    await fs.writeFile(file, '{"allocationId":"a","commit":"c"}' + ' '.repeat(16 * 1024));
+    expect(await readWorkspaceStamp(directory)).toBeNull();
+  });
+
+  it.skipIf(process.platform !== 'linux')('returns without waiting for a FIFO writer', async () => {
+    const file = workspaceStampPath(directory, true);
+    expect(Bun.spawnSync(['mkfifo', file]).exitCode).toBe(0);
+    expect(await readWorkspaceStamp(directory)).toBeNull();
+  });
+
   it.each(['corrupt', 'invalid', 'unreadable'])(
     'does not fall back to a sidecar when the primary stamp is %s',
     async kind => {

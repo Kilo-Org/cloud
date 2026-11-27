@@ -44,6 +44,7 @@ const journalSchema = z
     destroyed: z.boolean(),
     completed: z.boolean().default(false),
     exclusiveTeardown: z.boolean().default(false),
+    retainedGeneration: z.string().nullable().optional(),
   })
   .strict();
 export type WorktreeRuntimeDeletionJournal = z.infer<typeof journalSchema>;
@@ -87,7 +88,13 @@ function journalKey(worktreeId: string): string {
 }
 
 /** What the queue-free provider phase must do, or the terminal result. */
-export type WorktreeDeletionAction = 'replay' | 'complete' | 'stop' | 'observe' | 'shared';
+export type WorktreeDeletionAction =
+  | 'replay'
+  | 'complete'
+  | 'destroy'
+  | 'stop'
+  | 'observe'
+  | 'shared';
 
 export type WorktreeDeletionPlan = {
   action: WorktreeDeletionAction;
@@ -106,6 +113,7 @@ export type WorktreeDeletionBeginInput = {
   storage: DurableObjectStorage;
   allocation: AllocationState;
   hasConnection: boolean;
+  retainedGeneration?: string | null;
 };
 
 export async function beginWorktreeDeletion(
@@ -132,8 +140,24 @@ export async function beginWorktreeDeletion(
     destroyed: previous?.destroyed ?? false,
     completed: false,
     exclusiveTeardown: exclusive || (previous?.exclusiveTeardown ?? false),
+    retainedGeneration:
+      previous?.retainedGeneration !== undefined
+        ? previous.retainedGeneration
+        : exclusive
+          ? input.retainedGeneration
+          : undefined,
   };
   await storage.put(journalKey(request.worktreeId), journal);
+
+  if (journal.retainedGeneration) {
+    return {
+      action: 'destroy',
+      journal,
+      exclusive,
+      allocationId: allocation.allocationId,
+      providerRef: null,
+    };
+  }
 
   if (allocation.kind === 'stopped') {
     // FIX 1: `stopped` alone is not proof. Only a null unconfirmed ref means the

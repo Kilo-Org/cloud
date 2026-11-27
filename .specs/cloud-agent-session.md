@@ -401,13 +401,14 @@ repository.
    snapshot. Standalone sessions MUST NOT capture or restore one.
 3. A snapshot MUST belong to one workspace, user, organization, sandbox binding,
    and canonical directory. The source allocation is provenance, not session ownership.
-   Only isolated native Cloudflare Containers with interactive origins qualify.
-   A sandbox serves one workspace only. Other providers retain ordinary recovery.
+   Only isolated Cloudflare Containers and AWS EC2 sandboxes with interactive origins qualify.
+   A sandbox serves one workspace only. Other providers use ordinary recovery.
 4. All sibling sessions in that workspace MUST share one current snapshot.
    A sibling joining or leaving MUST NOT permanently disable future capture.
 5. Capture MAY run once after one minute of aggregate workspace inactivity.
    Preparation, native child executions, terminals and admitted filesystem mutations MUST
    fence capture. Provider capture MUST run outside the Sandbox DO queue and MUST NOT delay Stop.
+   EC2 capture MUST require the workload to stop and the data volume to unmount cleanly.
 6. Publication MUST reject changed allocation, connection, workspace binding, preparation,
    membership, activity or mutation generation. New admitted work MUST fence pending
    publication before dispatch and MUST NOT delete the current snapshot. A capture failure
@@ -419,8 +420,9 @@ repository.
    recreate a deleted workspace.
 8. When a private workspace snapshot exists, cold startup MUST use it as the only source.
    Selection MUST validate ownership, enrollment, provider, startup mode, image class and
-   the 30-day lifetime from durable Sandbox DO metadata. A later base image MUST NOT block
-   the restore. A compatible downloaded runtime release MAY update the restored disk.
+   the 30-day lifetime from durable Sandbox DO metadata. The provider checks base compatibility.
+   EC2 snapshots MUST use the same AWS connection and storage layout as capture.
+   A compatible downloaded runtime release MAY update the restored disk.
 9. Only a confirmed provider restore MAY supply frame-only workspace provenance.
    Every authorized sibling, including later joins, MUST receive it.
    Registration MUST reject supplied restore provenance. Older peers use ordinary recovery.
@@ -444,9 +446,10 @@ repository.
     discards. A failure that may be transient MUST also say that a new message retries. Diagnostics MUST identify workspace, requesting session, allocation, capture
     time, selected source and failure reason. Logs MUST NOT contain snapshot handles,
     credentials or file contents.
-13. Superseded descriptors MUST remain unselectable. Provider artifacts expire 30 days after
-    creation or their last restore; each restore resets this TTL. Snapshots preserve disk,
-    not running processes, terminals or memory.
+   After an issued EC2 restore fails, retry MUST use a new allocation after confirmed cleanup.
+   The EC2 host MUST mount the restored volume before the wrapper starts.
+13. Superseded descriptors MUST remain unselectable. Cloudflare artifacts expire 30 days after creation or their last restore.
+    EC2 workspace selection expires 30 days after capture. Snapshots preserve disk state only.
 
 ### Turn
 

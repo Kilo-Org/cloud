@@ -7513,7 +7513,7 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "aws"
+                              "const": "aws-ec2"
                             },
                             "account": {
                               "type": "string",
@@ -7528,7 +7528,7 @@
                         },
                         "instanceType": {
                           "type": "string",
-                          "const": "microvm-8g"
+                          "const": "m7i.large"
                         }
                       },
                       "required": [
@@ -7616,7 +7616,7 @@
                     "cloudflare-containers-standard-4",
                     "vercel-small",
                     "vercel-large",
-                    "aws-microvm-8g"
+                    "aws-ec2-8g"
                   ]
                 }
               ]
@@ -8302,7 +8302,7 @@
                           "properties": {
                             "id": {
                               "type": "string",
-                              "const": "aws"
+                              "const": "aws-ec2"
                             },
                             "account": {
                               "type": "string",
@@ -8317,7 +8317,7 @@
                         },
                         "instanceType": {
                           "type": "string",
-                          "const": "microvm-8g"
+                          "const": "m7i.large"
                         }
                       },
                       "required": [
@@ -8405,7 +8405,7 @@
                     "cloudflare-containers-standard-4",
                     "vercel-small",
                     "vercel-large",
-                    "aws-microvm-8g"
+                    "aws-ec2-8g"
                   ]
                 }
               ]
@@ -9758,7 +9758,7 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g"
+                "aws-ec2-8g"
               ]
             },
             {
@@ -9858,7 +9858,7 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g"
+                "aws-ec2-8g"
               ]
             },
             {
@@ -10372,7 +10372,7 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g"
+                "aws-ec2-8g"
               ]
             },
             {
@@ -11574,7 +11574,7 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g"
+                "aws-ec2-8g"
               ]
             },
             {
@@ -21134,7 +21134,7 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "aws"
+                                  "const": "aws-ec2"
                                 },
                                 "account": {
                                   "type": "string",
@@ -21149,7 +21149,7 @@
                             },
                             "instanceType": {
                               "type": "string",
-                              "const": "microvm-8g"
+                              "const": "m7i.large"
                             }
                           },
                           "required": [
@@ -21237,7 +21237,7 @@
                         "cloudflare-containers-standard-4",
                         "vercel-small",
                         "vercel-large",
-                        "aws-microvm-8g"
+                        "aws-ec2-8g"
                       ]
                     }
                   ]
@@ -21929,7 +21929,7 @@
                               "properties": {
                                 "id": {
                                   "type": "string",
-                                  "const": "aws"
+                                  "const": "aws-ec2"
                                 },
                                 "account": {
                                   "type": "string",
@@ -21944,7 +21944,7 @@
                             },
                             "instanceType": {
                               "type": "string",
-                              "const": "microvm-8g"
+                              "const": "m7i.large"
                             }
                           },
                           "required": [
@@ -22032,7 +22032,7 @@
                         "cloudflare-containers-standard-4",
                         "vercel-small",
                         "vercel-large",
-                        "aws-microvm-8g"
+                        "aws-ec2-8g"
                       ]
                     }
                   ]
@@ -40593,7 +40593,7 @@
             "cloudflare-containers-standard-4",
             "vercel-small",
             "vercel-large",
-            "aws-microvm-8g"
+            "aws-ec2-8g"
           ]
         },
         "environmentId": {
@@ -41008,7 +41008,7 @@
                 "cloudflare-containers-standard-4",
                 "vercel-small",
                 "vercel-large",
-                "aws-microvm-8g"
+                "aws-ec2-8g"
               ]
             },
             {

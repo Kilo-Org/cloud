@@ -46,6 +46,10 @@ function memoryState(initial: Record<string, unknown> = {}): BuilderLifecycleSta
   let value: unknown = initial;
   return {
     get: async () => value,
+    update: async transition => {
+      value = transition(value);
+      return value;
+    },
     set: async next => {
       value = next;
     },

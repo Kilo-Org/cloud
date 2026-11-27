@@ -22,7 +22,7 @@ import {
   workspaceSnapshotStatus,
   writeWorkspaceSnapshotAllocation,
 } from '../../src/control-plane/sandbox/workspace-snapshot.js';
-import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
+import type { SnapshotCaptureResult } from '../../src/sandbox-control/snapshots.js';
 
 const IDENTITY = {
   sandboxId: `sbx-${'d'.repeat(48)}`,
@@ -78,7 +78,7 @@ const route = (): RouteRecord => ({
   attemptDeadlineAt: 0,
   reason: null,
 });
-const stored = (): NativeCaptureResult => ({
+const stored = (): SnapshotCaptureResult => ({
   status: 'stored',
   snapshotId: 'captured-private-handle',
   baseImage: 'image:1',
@@ -110,11 +110,15 @@ function captureInput(db: RouteDatabase) {
   let state = connected();
   let routes = [route()];
   let capable = true;
-  const capture = vi.fn(async (): Promise<NativeCaptureResult> => stored());
+  const capture = vi.fn(async (): Promise<SnapshotCaptureResult> => stored());
   const input: Parameters<typeof captureIdleWorkspaceSnapshot>[0] = {
     db,
     sandboxId: IDENTITY.sandboxId,
-    provider: { capture, currentImage: async () => 'image:1' },
+    provider: {
+      provider: 'cloudflare-containers',
+      capture,
+      compatibleBase: async () => ({ currentBaseImage: 'image:1' }),
+    },
     idleMs: 60_000,
     read: async () => ({ state, routes, capable }),
     enqueue: async operation => operation(),
@@ -176,6 +180,7 @@ describe('workspace snapshot diagnostics with durable SQLite', () => {
       change: descriptor({ capturedAt: Date.now() - WORKSPACE_SNAPSHOT_TTL_MS - 1 }),
       reason: 'expired',
     },
+    { change: descriptor({ provider: 'aws-ec2' }), reason: 'provider_mismatch' },
     { change: descriptor({ baseImage: 'old-image' }), reason: 'selected' },
     { change: descriptor(), reason: 'selected' },
   ])('reports $reason without changing the descriptor', async ({ change, reason }) =>
@@ -187,7 +192,7 @@ describe('workspace snapshot diagnostics with durable SQLite', () => {
         db,
         IDENTITY,
         RUNTIME,
-        'image:1',
+        'cloudflare-containers',
         'workspace-requester'
       );
       expect(selected !== null).toBe(reason === 'selected');

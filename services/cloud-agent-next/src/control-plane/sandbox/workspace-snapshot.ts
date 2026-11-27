@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from '../../types.js';
 import { isOrgInList } from '../../sandbox-id.js';
 import type {
@@ -8,6 +7,13 @@ import type {
   ControlPlaneRouteSpec,
 } from '../../shared/control-plane-protocol.js';
 import type { ProviderAdapter } from '../../sandbox-control/provider.js';
+import {
+  snapshotProviderSchema,
+  workspaceSnapshotIdentitySchema,
+  type SnapshotProvider,
+  type WorkspaceSnapshotIdentity,
+} from '../../sandbox-control/snapshots.js';
+export { workspaceSnapshotIdentitySchema, type WorkspaceSnapshotIdentity };
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { SandboxWorkspaceSnapshotSchema } from '../../shared/sandbox-status.js';
 import type { AllocationState } from './allocation.js';
@@ -17,14 +23,9 @@ import { workspaceDiskAllocation, workspaceDiskSnapshots } from './sqlite-schema
 export const WORKSPACE_SNAPSHOT_IDLE_MS = 60_000;
 /** A captured workspace is restorable for 30 days. After that the descriptor is kept but unusable. */
 export const WORKSPACE_SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
-export const workspaceSnapshotIdentitySchema = z.object({
-  sandboxId: z.string().min(1),
-  workspaceId: cloudAgentWorktreeIdSchema,
-  directory: z.string().min(1),
-  userId: z.string().min(1),
-  orgId: z.string().optional(),
-});
 const descriptorSchema = workspaceSnapshotIdentitySchema.extend({
+  provider: snapshotProviderSchema.default('cloudflare-containers'),
+  captureId: z.string().uuid().optional(),
   sourceAllocationId: z.string().min(1),
   snapshotId: z.string().min(1),
   baseImage: z.string().min(1),
@@ -38,8 +39,18 @@ const allocationSchema = z.object({
   invalidationGeneration: z.number().int().nonnegative().default(0),
   idleConnectionId: z.string().optional(),
   attemptedIdleAt: z.number().optional(),
+  captureId: z.uuid().optional(),
   lastMutationAt: z.number().nonnegative().default(0),
-  restore: z.object({ sourceAllocationId: z.string().min(1), confirmed: z.boolean() }).optional(),
+  restore: z
+    .object({
+      sourceAllocationId: z.string().min(1),
+      confirmed: z.boolean(),
+      confirmation: z.literal('hello').optional(),
+      attempt: z.union([z.literal(1), z.literal(2)]).optional(),
+      selected: descriptorSchema.optional(),
+      retryAfterStop: z.literal(true).optional(),
+    })
+    .optional(),
   /**
    * The most recent tail startup this allocation failed, so the recovery query
    * can offer "Start fresh" only on that failure. A new preparation allocates a
@@ -58,7 +69,6 @@ const runtimeIdentitySchema = z.object({
   image: z.enum(['all-in-one', 'runtime-free']),
 });
 export type WorkspaceSnapshotDescriptor = z.infer<typeof descriptorSchema>;
-export type WorkspaceSnapshotIdentity = z.infer<typeof workspaceSnapshotIdentitySchema>;
 export type WorkspaceSnapshotAllocation = z.infer<typeof allocationSchema>;
 export type WorkspaceSnapshotSelectionReason =
   | 'missing'
@@ -66,7 +76,9 @@ export type WorkspaceSnapshotSelectionReason =
   | 'ownership_mismatch'
   | 'runtime_mismatch'
   | 'expired'
+  | 'provider_mismatch'
   | 'image_unavailable'
+  | 'image_mismatch'
   | 'selected';
 export type WorkspaceSnapshotSelection =
   | { kind: 'selected'; descriptor: WorkspaceSnapshotDescriptor }
@@ -143,6 +155,14 @@ export function readWorkspaceSnapshot(db: RouteDatabase, workspaceId: string) {
   return parsed.success ? parsed.data : null;
 }
 
+export function writeWorkspaceSnapshot(db: RouteDatabase, descriptor: WorkspaceSnapshotDescriptor) {
+  const data = descriptorSchema.parse(descriptor);
+  db.insert(workspaceDiskSnapshots)
+    .values({ workspace_id: data.workspaceId, data })
+    .onConflictDoUpdate({ target: workspaceDiskSnapshots.workspace_id, set: { data } })
+    .run();
+}
+
 /**
  * The stored descriptor payload without validation, so a malformed descriptor is
  * still distinguishable from an absent one. A malformed descriptor is retained
@@ -215,7 +235,7 @@ export function selectWorkspaceSnapshotResult(
   db: RouteDatabase,
   identity: WorkspaceSnapshotIdentity,
   runtimeIdentity: string,
-  baseImage: string | null,
+  provider: SnapshotProvider,
   sessionId?: string
 ): WorkspaceSnapshotSelection {
   const raw = readWorkspaceSnapshotRaw(db, identity.workspaceId);
@@ -235,8 +255,8 @@ export function selectWorkspaceSnapshotResult(
           ? 'runtime_mismatch'
           : descriptor.capturedAt < Date.now() - WORKSPACE_SNAPSHOT_TTL_MS
             ? 'expired'
-            : baseImage === null
-              ? 'image_unavailable'
+            : descriptor.provider !== provider
+              ? 'provider_mismatch'
               : 'selected';
   logControlDiagnostic('workspace_snapshot_selection', {
     sandboxId: identity.sandboxId,
@@ -271,14 +291,14 @@ export function selectWorkspaceSnapshot(
   db: RouteDatabase,
   identity: WorkspaceSnapshotIdentity,
   runtimeIdentity: string,
-  baseImage: string | null,
+  provider: SnapshotProvider,
   sessionId?: string
 ): WorkspaceSnapshotDescriptor | null {
   const selection = selectWorkspaceSnapshotResult(
     db,
     identity,
     runtimeIdentity,
-    baseImage,
+    provider,
     sessionId
   );
   return selection.kind === 'selected' ? selection.descriptor : null;
@@ -287,6 +307,18 @@ export function selectWorkspaceSnapshot(
 export function snapshotRestorePending(db: RouteDatabase, allocationId: string | null): boolean {
   const disk = readWorkspaceSnapshotAllocation(db);
   return disk?.allocationId === allocationId && disk.restore?.confirmed === false;
+}
+
+export function pendingWorkspaceRestore(db: RouteDatabase, allocationId: string | null) {
+  const disk = readWorkspaceSnapshotAllocation(db);
+  if (
+    disk?.allocationId !== allocationId ||
+    disk.restore?.confirmed !== false ||
+    disk.restore.confirmation !== 'hello' ||
+    disk.restore.selected === undefined
+  )
+    return undefined;
+  return { ...disk, restore: { ...disk.restore, selected: disk.restore.selected } };
 }
 
 export function workspaceSnapshotFrame(
@@ -404,12 +436,14 @@ export async function captureIdleWorkspaceSnapshot(input: {
   db: RouteDatabase;
   sandboxId: string;
   provider: NonNullable<ProviderAdapter['workspaceSnapshots']>;
+  signal?: AbortSignal;
   idleMs: number;
   read(): Promise<CaptureContext>;
   enqueue<T>(operation: () => Promise<T>): Promise<T>;
   eligible(route: RouteRecord): boolean;
   stored(): Promise<void>;
 }): Promise<void> {
+  if (!input.provider.capture) return;
   const logCapture = (
     phase: string,
     fields: Record<string, string | number | boolean | null | undefined>
@@ -451,8 +485,19 @@ export async function captureIdleWorkspaceSnapshot(input: {
     if (live.some(route => route.state !== 'ready')) return reject('route_not_ready');
     if (!workspaceSnapshotRoutesEligible(routes, route => input.eligible(route)))
       return reject('route_ineligible');
-    return { ok: true as const, state, disk, routes, live, providerRef: state.providerRef };
+    return {
+      ok: true as const,
+      state,
+      disk,
+      routes,
+      live,
+      providerRef: state.providerRef,
+      allocationId: state.allocationId,
+      connectionId: state.connectionId,
+    };
   };
+  const captureId = crypto.randomUUID();
+  const signal = input.signal ?? new AbortController().signal;
   const fence = await input.enqueue(async () => {
     const current = await candidate();
     const reason = !current.ok
@@ -470,6 +515,7 @@ export async function captureIdleWorkspaceSnapshot(input: {
     }
     writeWorkspaceSnapshotAllocation(input.db, {
       ...current.disk,
+      captureId,
       attemptedIdleAt: workspaceSnapshotIdleAt(current.state, current.disk),
     });
     return current;
@@ -481,7 +527,36 @@ export async function captureIdleWorkspaceSnapshot(input: {
     workspaceId: fence.disk.owner.workspaceId,
     sessionId: fence.live[0]?.sessionId,
   });
-  const result = await input.provider.capture(fence.providerRef, crypto.randomUUID());
+  const changed = (current: Awaited<ReturnType<typeof candidate>>): string | undefined => {
+    if (!current.ok) return current.reason;
+    if (current.allocationId !== fence.allocationId) return 'allocation_changed';
+    if (current.connectionId !== fence.connectionId) return 'connection_changed';
+    if (current.state.lastActivityAt !== fence.state.lastActivityAt) return 'activity_changed';
+    if (current.disk.invalidationGeneration !== fence.disk.invalidationGeneration)
+      return 'workspace_mutated';
+    if (!sameWorkspaceSnapshotIdentity(fence.disk.owner, current.disk.owner))
+      return 'ownership_changed';
+    if (
+      current.routes.length !== fence.routes.length ||
+      current.routes.some(
+        route =>
+          !fence.routes.some(
+            previous =>
+              previous.sessionId === route.sessionId && previous.attemptId === route.attemptId
+          )
+      )
+    )
+      return 'preparation_or_membership_changed';
+    if (signal.aborted || current.disk.captureId !== captureId) return 'capture_cancelled';
+  };
+  const result = await input.provider.capture(fence.providerRef, {
+    captureId,
+    workspace: fence.disk.owner,
+    allocationId: fence.allocationId,
+    connectionId: fence.connectionId,
+    signal,
+    isCurrent: () => input.enqueue(async () => changed(await candidate()) === undefined),
+  });
   logCapture('provider_result', {
     status: result.status,
     reason: result.status === 'failed' ? result.reason : undefined,
@@ -491,27 +566,7 @@ export async function captureIdleWorkspaceSnapshot(input: {
   if (result.status !== 'stored') return;
   await input.enqueue(async () => {
     const current = await candidate();
-    const reason = !current.ok
-      ? current.reason
-      : current.state.allocationId !== fence.state.allocationId
-        ? 'allocation_changed'
-        : current.state.connectionId !== fence.state.connectionId
-          ? 'connection_changed'
-          : current.state.lastActivityAt !== fence.state.lastActivityAt
-            ? 'activity_changed'
-            : current.disk.invalidationGeneration !== fence.disk.invalidationGeneration
-              ? 'workspace_mutated'
-              : current.routes.length !== fence.routes.length ||
-                  current.routes.some(
-                    route =>
-                      !fence.routes.some(
-                        previous =>
-                          previous.sessionId === route.sessionId &&
-                          previous.attemptId === route.attemptId
-                      )
-                  )
-                ? 'preparation_or_membership_changed'
-                : undefined;
+    const reason = changed(current);
     if (reason !== undefined) {
       logControlDiagnostic('workspace_snapshot_capture_skipped', {
         sandboxId: input.sandboxId,
@@ -529,19 +584,17 @@ export async function captureIdleWorkspaceSnapshot(input: {
       });
       return;
     }
-    const data = descriptorSchema.parse({
+    const data = {
       ...fence.disk.owner,
-      sourceAllocationId: fence.state.allocationId,
+      provider: input.provider.provider,
+      captureId,
+      sourceAllocationId: fence.allocationId,
       runtimeIdentity: fence.disk.runtimeIdentity,
       snapshotId: result.snapshotId,
       baseImage: result.baseImage,
       capturedAt: result.capturedAt,
-    });
-    input.db
-      .insert(workspaceDiskSnapshots)
-      .values({ workspace_id: data.workspaceId, data })
-      .onConflictDoUpdate({ target: workspaceDiskSnapshots.workspace_id, set: { data } })
-      .run();
+    };
+    writeWorkspaceSnapshot(input.db, data);
     // A recovery offer names the descriptor that failed; a newer one replaces it,
     // so a pending "Start fresh" can never discard this capture.
     if (current.disk?.recovery !== undefined)

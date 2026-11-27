@@ -1,3 +1,4 @@
+import type { BuilderLifecycleState } from './builder-state.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type {
@@ -18,10 +19,11 @@ const allocation = {
   allocationId: 'allocation',
   instance: 'standard-4' as const,
 };
-const lifecycle = {
+const lifecycle: BuilderLifecycleState = {
   get: async () => null,
   set: async () => undefined,
   clear: async () => undefined,
+  update: async transition => transition(undefined),
 };
 const runner = { url: 'https://worker.test/environment-build/test', credential: 'synthetic' };
 const command = { argv: ['/bin/sh', '-c', 'download-selected-builder'] };
@@ -72,7 +74,7 @@ describe('environment builder startup selection', () => {
         builderRuntimeUnsupportedReason({ ...runtimeEnv, ...overrides } as Env)
       ).not.toBeNull();
       await expect(
-        provider.launch(allocation, { runner, deadlineAt: 100 }, lifecycle)
+        provider.bind(allocation).launch({ runner, deadlineAt: 100 }, lifecycle)
       ).rejects.toMatchObject({
         code: 'invalid_configuration',
       });
@@ -86,7 +88,7 @@ describe('environment builder startup selection', () => {
       RUNTIME_INTERACTIVE_ORG_IDS: '22222222-2222-4222-8222-222222222222',
     });
     expect(builderRuntimeUnsupportedReason(runtimeEnv as Env)).toBeNull();
-    await provider.launch(allocation, { runner, deadlineAt: 100 }, lifecycle);
+    await provider.bind(allocation).launch({ runner, deadlineAt: 100 }, lifecycle);
     expect(downloadedStartup).toHaveBeenCalledWith(
       expect.objectContaining({
         descriptor: 'release',
@@ -101,9 +103,17 @@ describe('environment builder startup selection', () => {
 
   it('reads snapshot compatibility from the runtime-free image', async () => {
     const { provider, currentImage } = harness();
-    expect(await provider.currentImage(allocation.sandboxId)).toBe(
-      'registry.example/runtime-free@sha256:base'
-    );
+    expect(
+      (
+        await provider.snapshotBase({
+          target: {
+            ok: true,
+            target: { provider: 'cloudflare-containers', instance: 'standard-4' },
+          },
+          sandboxId: allocation.sandboxId,
+        })
+      ).baseImage
+    ).toBe('registry.example/runtime-free@sha256:base');
     expect(currentImage).toHaveBeenCalledWith('runtime-free');
   });
 

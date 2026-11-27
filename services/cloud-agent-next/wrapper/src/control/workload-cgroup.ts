@@ -103,6 +103,8 @@ export type WorkloadPlacement = {
   cpuController: boolean;
   sweepIntervalMs: number;
   report?: ControlDiagnosticReporter;
+  /** A writer could have run outside this group. Capture stays disabled for this wrapper. */
+  writerContainmentLost?: true;
 };
 
 export type ControlWorkload = {
@@ -1176,6 +1178,7 @@ export function admitControlWorkload(
   try {
     verifyWorkloadParent(workload.placement);
   } catch (error) {
+    workload.placement.writerContainmentLost = true;
     createWorkloadReporter(workload.placement.report).emit(undefined, {
       phase: 'failed',
       workloadPhase: 'failed',

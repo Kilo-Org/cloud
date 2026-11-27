@@ -6,7 +6,7 @@ import { loadRuntimeRelease } from './runtime-release-loader.js';
 import { mintRuntimeArtifactGrant } from './runtime-artifact-grant.js';
 import { renderRuntimeBootstrap } from './runtime-bootstrap.js';
 import {
-  runtimeArtifactForRole,
+  runtimeArtifactHashes,
   runtimeReleaseHarness,
   RUNTIME_ARTIFACT_HTTP_PREFIX,
   serializeRuntimeRelease,
@@ -19,6 +19,8 @@ export async function downloadedStartup(input: {
   allocationId: string;
   deadlineAt: number;
   mainProcess?: 'environment-builder';
+  /** The owning coordinator receives builder startup failures. */
+  reportUrl?: string;
   /** The sandbox's stored harness. A release for another harness is a configuration error. */
   harness?: RuntimeHarness;
 }): Promise<ProviderStartupCommand> {
@@ -27,23 +29,19 @@ export async function downloadedStartup(input: {
     throw new ProviderCreationError('invalid_configuration');
   const secret = await resolveSecret(input.env.NEXTAUTH_SECRET);
   if (!secret) throw new Error('Runtime signing unavailable');
-  const grant = mintRuntimeArtifactGrant(
-    [
-      runtimeArtifactForRole(release, 'cli').sha256,
-      runtimeArtifactForRole(release, 'control').sha256,
-    ],
-    secret,
-    input.deadlineAt
-  );
+  const hashes = runtimeArtifactHashes(release);
+  const grant = mintRuntimeArtifactGrant(hashes, secret, input.deadlineAt);
   let command: ProviderStartupCommand;
   try {
     command = renderRuntimeBootstrap({
       descriptor: new TextDecoder().decode(serializeRuntimeRelease(release)),
       artifactBaseUrl: new URL(RUNTIME_ARTIFACT_HTTP_PREFIX, input.env.WORKER_URL).toString(),
-      reportUrl: new URL(
-        `/sandbox-control/${encodeURIComponent(input.sandboxId)}/startup-failure`,
-        input.env.WORKER_URL
-      ).toString(),
+      reportUrl:
+        input.reportUrl ??
+        new URL(
+          `/sandbox-control/${encodeURIComponent(input.sandboxId)}/startup-failure`,
+          input.env.WORKER_URL
+        ).toString(),
       allocationId: input.allocationId,
       grant,
       deadlineAt: input.deadlineAt,
@@ -54,5 +52,5 @@ export async function downloadedStartup(input: {
   }
   if (command.argv.some(arg => new TextEncoder().encode(arg).byteLength >= 128 * 1024))
     throw new ProviderCreationError('invalid_configuration');
-  return { ...command, user: 'root' };
+  return { ...command, user: 'root', runtimeArtifactHashes: hashes };
 }

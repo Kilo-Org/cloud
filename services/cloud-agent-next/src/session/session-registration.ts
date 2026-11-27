@@ -1245,7 +1245,7 @@ async function allocateNewSession(
           credentialId: enrollment.credentialId,
         },
       };
-    } else if (sandboxProvider === 'aws') {
+    } else if (sandboxProvider === 'aws-ec2') {
       let connection: Awaited<ReturnType<typeof fetchAwsByocConnection>>;
       try {
         connection = await fetchAwsByocConnection(
@@ -1261,7 +1261,7 @@ async function allocateNewSession(
       if (connection.setupStatus !== 'ready')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
       sandboxProviderBinding = {
-        kind: 'aws',
+        kind: sandboxProvider,
         source: {
           kind: 'byoc',
           ...byocVercelOwnerFields(connection),

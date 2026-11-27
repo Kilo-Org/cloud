@@ -796,6 +796,8 @@ describe('startup failure admission', () => {
     );
     for (const [body, status] of [
       [JSON.stringify({ allocationId, code: 'artifact_invalid' }), 204],
+      [JSON.stringify({ allocationId, code: 'environment_restore_unavailable' }), 204],
+      [JSON.stringify({ allocationId, code: 'environment_restore_failed' }), 204],
       [JSON.stringify({ allocationId: crypto.randomUUID(), code: 'artifact_invalid' }), 400],
       [JSON.stringify({ allocationId, code: 'unknown' }), 400],
       ['x'.repeat(1025), 413],
@@ -809,7 +811,7 @@ describe('startup failure admission', () => {
           )
         ).status
       ).toBe(status);
-    expect(dispatches).toBe(1);
+    expect(dispatches).toBe(3);
   });
   it('maps only permanent codes to the public pre-dispatch contract', () => {
     for (const value of Object.values(STARTUP_FAILURES)) {

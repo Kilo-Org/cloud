@@ -1,24 +1,19 @@
+import { ByocAwsProviderError } from './aws-errors.js';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
+import { readAwsResponse } from '@kilocode/worker-utils/aws-client';
 import {
-  assumeAwsRole,
-  awsCredentialsSchema,
-  AwsRequestError,
-  readAwsResponse,
-} from '@kilocode/worker-utils/aws-client';
-import {
-  AWS_BYOC_ENVELOPE_KEY_ID,
-  AWS_BYOC_ENVELOPE_SCHEME,
-  AWS_BYOC_TEMPLATE_VERSION,
-  awsByocConfigurationSchema,
-  type AwsByocConfiguration,
-} from '@kilocode/worker-utils/aws-byoc';
+  awsEc2ByocConfigurationSchema,
+  type AwsEc2ByocConfiguration,
+} from '@kilocode/worker-utils/aws-ec2';
+import { awsEc2ConfigurationEnvelope } from '@kilocode/worker-utils/aws-onboarding';
+import { AWS_BYOC_ENVELOPE_KEY_ID } from '@kilocode/worker-utils/aws-byoc';
 import { z } from 'zod';
 import { byocOwnerKey, byocOwnerSchema, type ByocOwner, type ByocSource } from './owner.js';
 import type { Env } from '../types.js';
-import { createMicrovmClient } from '../agent-sandbox/aws/microvm-client.js';
-import { createAwsObjectStore } from '../agent-sandbox/aws/object-store.js';
-import type { AwsRuntimeAccess } from '../sandbox-control/aws-provider.js';
 import { logger } from '../logger.js';
+
+export { ByocAwsProviderError } from './aws-errors.js';
+export { assumeAwsKiloRole } from './aws-account-access.js';
 
 const connectionSchema = z
   .object({
@@ -28,25 +23,16 @@ const connectionSchema = z
   })
   .and(byocOwnerSchema);
 
-export class ByocAwsProviderError extends Error {
-  constructor(
-    readonly reason:
-      | 'byoc_credential_missing'
-      | 'byoc_aws_not_ready'
-      | 'byoc_aws_forbidden'
-      | 'byoc_aws_stack_outdated'
-  ) {
-    super(reason);
-    this.name = 'ByocAwsProviderError';
-  }
-}
-
 function lookupFailure(
   stage: 'configuration' | 'internal_auth' | 'request' | 'response' | 'contract',
   status?: number
 ) {
   logger
-    .withFields({ provider: 'aws', stage, ...(status === undefined ? {} : { httpStatus: status }) })
+    .withFields({
+      provider: 'aws-ec2',
+      stage,
+      ...(status === undefined ? {} : { httpStatus: status }),
+    })
     .warn('AWS BYOC connection lookup failed');
   return new ByocAwsProviderError('byoc_aws_not_ready');
 }
@@ -55,7 +41,7 @@ export async function fetchAwsByocConnection(env: Env, owner: ByocOwner, credent
   const base = env.KILOCODE_BACKEND_BASE_URL?.replace(/\/+$/, '');
   if (!base) throw lookupFailure('configuration');
   const query = new URLSearchParams({
-    provider: 'aws',
+    provider: 'aws-ec2',
     ...(owner.organizationId !== undefined
       ? { organizationId: owner.organizationId }
       : { userId: owner.userId }),
@@ -96,69 +82,30 @@ export async function fetchAwsByocConnection(env: Env, owner: ByocOwner, credent
   return parsed.data;
 }
 
-export async function resolveAwsByocConfiguration(
+export async function resolveAwsEc2ByocConfiguration(
   env: Env,
   source: ByocSource
-): Promise<AwsByocConfiguration> {
+): Promise<AwsEc2ByocConfiguration> {
   const connection = await fetchAwsByocConnection(env, source, source.credentialId);
   if (connection.setupStatus !== 'ready' || !env.AGENT_ENV_VARS_PRIVATE_KEY)
     throw new ByocAwsProviderError('byoc_aws_not_ready');
-  let configuration: AwsByocConfiguration;
   try {
+    const purpose = awsEc2ConfigurationEnvelope(
+      source.organizationId !== undefined
+        ? { organizationId: source.organizationId }
+        : { userId: source.userId },
+      source.credentialId
+    );
     const decoded = decryptKeyedEnvelope(
       JSON.stringify(connection.credentialsEncrypted),
-      AWS_BYOC_ENVELOPE_SCHEME,
+      purpose.scheme,
       {
         active: { keyId: AWS_BYOC_ENVELOPE_KEY_ID, privateKeyPem: env.AGENT_ENV_VARS_PRIVATE_KEY },
       },
-      `byoc-aws-configuration:v1:${byocOwnerKey(source)}:${source.credentialId}`
+      purpose.aad
     );
-    configuration = awsByocConfigurationSchema.parse(JSON.parse(decoded));
+    return awsEc2ByocConfigurationSchema.parse(JSON.parse(decoded));
   } catch {
     throw new ByocAwsProviderError('byoc_aws_not_ready');
-  }
-  if (configuration.templateVersion < AWS_BYOC_TEMPLATE_VERSION)
-    throw new ByocAwsProviderError('byoc_aws_stack_outdated');
-  return configuration;
-}
-
-export async function awsRuntimeAccess(
-  env: Env,
-  configuration: AwsByocConfiguration
-): Promise<AwsRuntimeAccess & { expiresAt: number }> {
-  let bootstrap;
-  try {
-    bootstrap = awsCredentialsSchema.parse(JSON.parse(env.AWS_BYOC_CREDENTIALS ?? ''));
-  } catch {
-    throw new ByocAwsProviderError('byoc_aws_not_ready');
-  }
-  if (!env.AWS_BYOC_KILO_ROLE_ARN) throw new ByocAwsProviderError('byoc_aws_not_ready');
-  try {
-    const kilo = await assumeAwsRole({
-      credentials: bootstrap,
-      region: configuration.region,
-      roleArn: env.AWS_BYOC_KILO_ROLE_ARN,
-    });
-    const credentials = await assumeAwsRole({
-      credentials: kilo,
-      region: configuration.region,
-      roleArn: configuration.roleArn,
-      externalId: configuration.externalId,
-    });
-    if (credentials.expiresAt === undefined) throw new ByocAwsProviderError('byoc_aws_not_ready');
-    return {
-      config: configuration,
-      expiresAt: credentials.expiresAt,
-      client: createMicrovmClient({ credentials, region: configuration.region }),
-      objects: createAwsObjectStore({
-        credentials,
-        region: configuration.region,
-        bucket: configuration.bucket,
-      }),
-    };
-  } catch (error) {
-    if (error instanceof AwsRequestError && error.status === 403)
-      throw new ByocAwsProviderError('byoc_aws_forbidden');
-    throw error;
   }
 }

@@ -41,6 +41,7 @@ export type FakeWrapperHelloInput = {
   redactsNamedSecrets?: boolean;
   installsSkillsSh?: boolean;
   workspaceSnapshots?: boolean;
+  snapshotRestoreConfirmed?: boolean;
   /** The retired capability sent by wrappers built before workspace snapshots. */
   sessionSnapshots?: boolean;
   startCommands?: boolean;
@@ -206,6 +207,7 @@ export class FakeWrapper {
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
       ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
+      ...(input.snapshotRestoreConfirmed ? { snapshotRestoreConfirmed: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
       ...(input.startCommands ? { startCommands: true } : {}),
       ...(input.worktreeGit ? { worktreeGit: true } : {}),

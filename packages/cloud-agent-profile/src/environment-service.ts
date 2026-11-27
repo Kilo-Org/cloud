@@ -1120,6 +1120,7 @@ export async function loadEnvironmentBuildInput(
         networkSecrets,
         sandboxAllocation: environment.sandbox_allocation,
         egressMode: environment.egress_mode,
+        egressAllowlist: environment.egress_allowlist,
       };
       return reference.repositories
         ? { ...common, repositories: reference.repositories }

@@ -6,19 +6,29 @@ import {
   reset,
   runInDurableObject,
 } from 'cloudflare:test';
+import { Hono } from 'hono';
+import type { HonoContext } from '../../src/hono-context.js';
+import type { Env } from '../../src/types.js';
+import { registerStartupFailureRoute } from '../../src/sandbox-control/startup-failure.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../../src/logger.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-identity.js';
+import { ProviderStoppedError } from '../../src/sandbox-control/provider.js';
+import { ProviderLifecycleError } from '../../src/sandbox-control/provider-failure.js';
 import type {
   ProviderAdapter,
   ProviderLaunchOptions,
   ProviderLaunchResult,
   ProviderStartupCommand,
 } from '../../src/sandbox-control/provider.js';
-import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
+import type {
+  SnapshotCaptureResult,
+  WorkspaceSnapshotCaptureRequest,
+} from '../../src/sandbox-control/snapshots.js';
 import {
+  deleteWorkspaceSnapshot,
   readWorkspaceSnapshot,
   readWorkspaceSnapshotRaw,
   readWorkspaceSnapshotAllocation,
@@ -26,6 +36,7 @@ import {
   WORKSPACE_SNAPSHOT_IDLE_MS,
   selectWorkspaceSnapshot,
 } from '../../src/control-plane/sandbox/workspace-snapshot.js';
+import { stoppedWorkspaceSnapshots } from '../../src/control-plane/sandbox/stopped-workspace-snapshot.js';
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
@@ -51,7 +62,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: DurableObjectNamespace<Sa
   .SANDBOX_SESSION;
 const USER = 'snapshot-user';
 const KILO = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
-const stored = (): NativeCaptureResult => ({
+const stored = (): SnapshotCaptureResult => ({
   status: 'stored',
   snapshotId: 'session-snapshot',
   baseImage: 'image:1',
@@ -74,6 +85,9 @@ async function setup(
     origin?: string;
     startCommands?: string[];
     standalone?: boolean;
+    confirmRestore?: boolean;
+    reconcileLaunch?: ProviderAdapter['reconcileLaunch'];
+    retainedWorkspace?: ProviderAdapter['retainedWorkspace'];
   } = {}
 ) {
   const workspaceId = `worktree_${crypto.randomUUID()}` as const;
@@ -86,16 +100,23 @@ async function setup(
   const launchCommands: ProviderStartupCommand[] = [];
   const launchOptions: Array<ProviderLaunchOptions | undefined> = [];
   const captures: string[] = [];
+  const stoppedRefs: string[] = [];
   const controls = {
     imageLookups: 0,
     beforeCreate: async (): Promise<void> => {},
     currentImage: async (): Promise<string> => 'image:1',
-    capture: async (): Promise<NativeCaptureResult> => stored(),
-    launch: async (options?: ProviderLaunchOptions): Promise<ProviderLaunchResult> => ({
-      startSource: options?.snapshot ? 'repository' : 'image',
+    capture: async (_binding: WorkspaceSnapshotCaptureRequest): Promise<SnapshotCaptureResult> =>
+      stored(),
+    validateWrapperAdmission: async (_ref: string): Promise<void> => {},
+    launch: async (launch?: ProviderLaunchOptions): Promise<ProviderLaunchResult> => ({
+      startSource: launch?.snapshot ? 'repository' : 'image',
+      ...(options.confirmRestore && launch?.snapshot?.kind === 'workspace'
+        ? { awaitingSnapshotConfirmation: true }
+        : {}),
     }),
   };
   const adapter: ProviderAdapter = {
+    retainedWorkspace: options.retainedWorkspace,
     async ensureBillingAdmission() {},
     async create(intent) {
       await controls.beforeCreate();
@@ -110,39 +131,50 @@ async function setup(
     async observe() {
       return { status: 'active' };
     },
-    async stop() {
+    reconcileLaunch: options.reconcileLaunch,
+    validateWrapperAdmission: ref => controls.validateWrapperAdmission(ref),
+    async stop(ref) {
+      if (ref !== null) stoppedRefs.push(ref);
       return 'terminal';
     },
     async ensureLeaseAtLeast() {},
     async logs() {
       return '';
     },
-    environmentSnapshots: 'launch',
+    environmentSnapshots: {
+      provider: 'cloudflare-containers',
+      phase: options.confirmRestore ? 'create' : 'launch',
+    },
     workspaceSnapshots: {
-      currentImage: async () => {
+      provider: 'cloudflare-containers',
+      ...(options.confirmRestore ? { confirmation: 'hello' } : {}),
+      compatibleBase: async () => {
         controls.imageLookups += 1;
-        return controls.currentImage();
+        return { currentBaseImage: await controls.currentImage() };
       },
-      async capture(_ref, captureId) {
-        captures.push(captureId);
-        return controls.capture();
+      async capture(_ref, binding) {
+        captures.push(binding.captureId);
+        return controls.capture(binding);
       },
     },
   };
   let sandboxInstance: SandboxControlV2 | undefined;
-  await runInDurableObject(sandbox, async instance => {
-    sandboxInstance = instance;
-    await instance.getAllocationState();
-    installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
-      WORKSPACE_SNAPSHOT_IDS: options.enabled === false ? '' : USER,
-      SANDBOX_CONTAINERS: { idFromName: (name: string) => ({ toString: () => `oc_${name}` }) },
+  async function installAdapter() {
+    await runInDurableObject(sandbox, async instance => {
+      sandboxInstance = instance;
+      await instance.getAllocationState();
+      installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
+        WORKSPACE_SNAPSHOT_IDS: options.enabled === false ? '' : USER,
+        SANDBOX_CONTAINERS: { idFromName: (name: string) => ({ toString: () => `oc_${name}` }) },
+      });
+      installFakeRuntimeProxyPeer(instance, async (owner, id) => ({
+        userId: owner,
+        kiloSessionId: nativeIdentities.get(id) ?? KILO,
+      }));
+      Object.assign(instance, { provider: adapter, createProviderAdapter: () => adapter });
     });
-    installFakeRuntimeProxyPeer(instance, async (owner, id) => ({
-      userId: owner,
-      kiloSessionId: nativeIdentities.get(id) ?? KILO,
-    }));
-    Object.assign(instance, { provider: adapter, createProviderAdapter: () => adapter });
-  });
+  }
+  await installAdapter();
   const registration = {
     sandboxId,
     spec: {
@@ -181,6 +213,8 @@ async function setup(
         wrapperId: `wrapper-${index}`,
         allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
         workspaceSnapshots: options.capability !== false,
+        snapshotRestoreConfirmed:
+          options.confirmRestore && launchOptions[index]?.snapshot?.kind === 'workspace',
         sessionSnapshots: options.legacyHello,
       })
     ).toMatchObject({ type: 'welcome' });
@@ -250,7 +284,7 @@ async function setup(
       await waitFor(async () =>
         expect(
           await runInDurableObject(sandbox, instance => instance['workspaceSnapshotCapturePending'])
-        ).toBe(false)
+        ).toBeNull()
       );
   };
   /** The next create leaves only `ms` of its create window for the first launch attempt. */
@@ -364,10 +398,12 @@ async function setup(
     registration,
     controls,
     captures,
+    stoppedRefs,
     launchOptions,
     launchEnvs,
     launchCommands,
     wrappers,
+    installAdapter,
     connect,
     start,
     idle,
@@ -391,6 +427,114 @@ afterEach(async () => {
 });
 
 describe('idle workspace disk checkpoint', () => {
+  it('uses one retained workspace allocation for two sibling turns despite an older checkpoint', async () => {
+    const available = vi.fn(async () => false);
+    const test = await setup({
+      retainedWorkspace: {
+        available,
+        generation: async () => 'synthetic-generation',
+        destroy: async () => 'terminal',
+      },
+    });
+    const first = await test.checkpoint();
+    const sibling = await test.attachSibling(first);
+    const checkpoint = await test.snapshot();
+    const previous = await test.sandbox.getAllocationState();
+    await test.cold();
+
+    available.mockClear();
+    available.mockResolvedValue(true);
+    await Promise.all([
+      test.session.send(prompt('wake-first')),
+      sibling.session.send(prompt('wake-sibling')),
+    ]);
+    const { wrapper, frame } = await test.connect(1);
+    const second = await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary']);
+    expect(
+      [frame, second].map(item => item && 'spec' in item && item.spec.sessionId).sort()
+    ).toEqual([test.sessionId, sibling.id].sort());
+
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    wrapper.send({ type: 'session.ready', sessionId: sibling.id });
+    await test.messageState('wake-first', 'accepted');
+    await waitFor(async () => {
+      const state = await sibling.session.getSession();
+      expect(
+        state.type === 'found' &&
+          state.messages.find(message => message.messageId === 'wake-sibling')?.state
+      ).toBe('accepted');
+    });
+    expect(available).toHaveBeenCalledTimes(1);
+    expect(test.launchEnvs).toHaveLength(2);
+    expect(test.launchOptions[1]?.snapshot).toBeUndefined();
+    expect(test.controls.imageLookups).toBe(0);
+    expect(await test.snapshot()).toEqual(checkpoint);
+    expect((await test.sandbox.getAllocationState()).allocationId).not.toBe(previous.allocationId);
+    test.wrappers.forEach(current => current.close());
+  });
+
+  it('reuses a stopped capture ID after an uncertain request and discards it if deletion wins', async () => {
+    const test = await setup();
+    const wrapper = await test.checkpoint();
+    const previous = await test.snapshot();
+    const allocation = await test.sandbox.getAllocationState();
+    if (!previous || !allocation.allocationId || !allocation.providerRef)
+      throw new Error('Missing workspace checkpoint or allocation');
+    const { allocationId, providerRef } = allocation;
+    await runInDurableObject(test.sandbox, async (instance, ctx) => {
+      const openJournal = () => stoppedWorkspaceSnapshots(instance['db'], ctx.storage);
+      const poll = Promise.withResolvers<SnapshotCaptureResult>();
+      const polling = Promise.withResolvers<void>();
+      type SnapshotProvider = NonNullable<ProviderAdapter['workspaceSnapshots']>;
+      const startCapture = vi
+        .fn<NonNullable<SnapshotProvider['stoppedCapture']>['start']>()
+        .mockResolvedValueOnce('uncertain')
+        .mockResolvedValueOnce('accepted');
+      const discard = vi.fn(async () => 'done' as const);
+      const snapshotProvider: SnapshotProvider = {
+        provider: 'aws-ec2',
+        compatibleBase: async () => ({ currentBaseImage: 'image:1' }),
+        stoppedCapture: {
+          start: startCapture,
+          async poll() {
+            polling.resolve();
+            return poll.promise;
+          },
+          discard,
+        },
+      };
+      openJournal().prepare({
+        owner: previous,
+        allocationId,
+        runtimeIdentity: previous.runtimeIdentity,
+        ref: providerRef,
+        provider: 'aws-ec2',
+      });
+      expect(await openJournal().start(snapshotProvider, providerRef)).toBe(false);
+      expect(openJournal().awaitingCaptureStart()).toBe(true);
+      expect(await openJournal().start(snapshotProvider, providerRef)).toBe(true);
+      expect(openJournal().awaitingCaptureStart()).toBe(false);
+      const captureId = startCapture.mock.calls[0]?.[1];
+      expect(captureId).toBeTruthy();
+      expect(startCapture).toHaveBeenNthCalledWith(2, providerRef, captureId);
+      expect(readWorkspaceSnapshot(instance['db'], test.workspaceId)).toEqual(previous);
+
+      const published = vi.fn(async () => {});
+      const reconcile = openJournal().reconcile(snapshotProvider, published);
+      await polling.promise;
+      deleteWorkspaceSnapshot(instance['db'], test.workspaceId);
+      openJournal().remove(test.workspaceId);
+      poll.resolve(stored());
+      await reconcile;
+      expect(readWorkspaceSnapshot(instance['db'], test.workspaceId)).toBeNull();
+      expect(published).not.toHaveBeenCalled();
+      await openJournal().reconcile(snapshotProvider, published);
+      expect(discard).toHaveBeenCalledExactlyOnceWith(captureId);
+      expect(openJournal().nextAlarmAt()).toBeNull();
+    });
+    wrapper.close();
+  });
+
   it('publishes accepted capture time and retains it during workspace activity without chat events', async () => {
     const test = await setup();
     const wrapper = await test.start();
@@ -572,7 +716,7 @@ describe('idle workspace disk checkpoint', () => {
     async change => {
       const test = await setup();
       const wrapper = await test.start();
-      const held = Promise.withResolvers<NativeCaptureResult>();
+      const held = Promise.withResolvers<SnapshotCaptureResult>();
       test.controls.capture = () => held.promise;
       await test.idle(wrapper);
       const alarm = test.alarm(false);
@@ -704,7 +848,7 @@ describe('idle workspace disk checkpoint', () => {
   it('does not republish an in-flight capture after Stop and another idle heartbeat', async () => {
     const test = await setup();
     const wrapper = await test.start();
-    const held = Promise.withResolvers<NativeCaptureResult>();
+    const held = Promise.withResolvers<SnapshotCaptureResult>();
     test.controls.capture = () => held.promise;
     await test.idle(wrapper);
     await test.alarm(false);
@@ -792,12 +936,104 @@ describe('idle workspace disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
-  it.each(['answer', 'terminal', 'preparation', 'membership', 'deletion'] as const)(
+  it('restores the workspace without readmitting a deleted sibling native identity', async () => {
+    const test = await setup({ confirmRestore: true });
+    const original = await test.start();
+    const sibling = await test.attachSibling(original);
+    const directory = test.registration.spec.directory;
+    const deletedMember = {
+      ownerId: USER,
+      sessionId: sibling.id,
+      kiloSessionId: sibling.registration.spec.kiloSessionId,
+      directory,
+    };
+    const survivingMember = {
+      ownerId: USER,
+      sessionId: test.sessionId,
+      kiloSessionId: KILO,
+      directory,
+    };
+    const priorFence = await test.sandbox.getRuntimeCredentialProxyFence(deletedMember);
+    expect(priorFence?.allocationId).toBe(test.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID);
+
+    await test.idle(original);
+    await test.alarm();
+    const checkpoint = await test.snapshot();
+    expect(checkpoint?.sourceAllocationId).toBe(priorFence?.allocationId);
+    await sibling.session.deleteSession();
+    expect(await sibling.session.getSession()).toEqual({ type: 'session-not-found' });
+    expect(await test.snapshot()).toEqual(checkpoint);
+    await test.cold();
+
+    await test.session.send(prompt('resume-survivor'));
+    const { wrapper, frame } = await test.connect(1);
+    expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe(checkpoint?.snapshotId);
+    expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({
+      workspaceId: test.workspaceId,
+      sourceAllocationId: checkpoint?.sourceAllocationId,
+    });
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('resume-survivor', 'accepted');
+
+    const survivingFence = await test.sandbox.getRuntimeCredentialProxyFence(survivingMember);
+    expect(survivingFence?.allocationId).toBe(test.launchEnvs[1].CONTROL_PLANE_ALLOCATION_ID);
+    expect(survivingFence?.allocationId).not.toBe(priorFence?.allocationId);
+    expect(await test.sandbox.getRuntimeCredentialProxyFence(deletedMember)).toBeNull();
+    expect(
+      await test.sandbox.getRuntimeCredentialProxyFence({
+        ...survivingMember,
+        kiloSessionId: deletedMember.kiloSessionId,
+      })
+    ).toBeNull();
+    test.wrappers.forEach(current => current.close());
+  });
+
+  it('removes the checkpoint and cancels a pending capture on workspace deletion', async () => {
+    const test = await setup();
+    const wrapper = await test.checkpoint();
+    await test.sandbox.abort({ sessionId: test.sessionId });
+    const capture = Promise.withResolvers<WorkspaceSnapshotCaptureRequest>();
+    const held = Promise.withResolvers<SnapshotCaptureResult>();
+    test.controls.capture = binding => {
+      capture.resolve(binding);
+      return held.promise;
+    };
+    await test.idle(wrapper);
+    await test.alarm(false);
+    await waitFor(() => expect(test.captures).toHaveLength(2));
+    const binding = await capture.promise;
+
+    try {
+      const reservedCaptureId = await runInDurableObject(
+        test.sandbox,
+        instance => readWorkspaceSnapshotAllocation(instance['db'])?.captureId
+      );
+      expect(reservedCaptureId).toBe(binding.captureId);
+      expect(
+        await test.sandbox.deleteWorktreeResources({
+          worktreeId: test.workspaceId,
+          kiloUserId: USER,
+          organizationId: test.registration.credentials.orgId,
+          location: { sandboxId: test.sandboxId, provider: 'cloudflare-containers' },
+          sessionIds: [KILO],
+        })
+      ).toMatchObject({ deleted: true });
+      expect(binding.signal.aborted).toBe(true);
+      expect(await test.snapshot()).toBeUndefined();
+    } finally {
+      held.resolve({ ...stored(), snapshotId: 'late-upload' });
+    }
+    await test.alarm();
+    expect(await test.snapshot()).toBeUndefined();
+    test.wrappers.forEach(current => current.close());
+  });
+
+  it.each(['answer', 'terminal', 'preparation', 'membership'] as const)(
     'fences a held capture before %s without another heartbeat',
     async mutation => {
       const test = await setup();
       const wrapper = await test.start();
-      const held = Promise.withResolvers<NativeCaptureResult>();
+      const held = Promise.withResolvers<SnapshotCaptureResult>();
       test.controls.capture = () => held.promise;
       await test.idle(wrapper);
       await test.alarm(false);
@@ -832,16 +1068,8 @@ describe('idle workspace disk checkpoint', () => {
           credentials: test.registration.credentials,
           sandboxSelection: test.registration.sandboxSelection,
         });
-      } else if (mutation === 'membership') {
-        await test.sandbox.release({ sessionId: test.sessionId });
       } else {
-        await test.sandbox.deleteWorktreeResources({
-          worktreeId: test.workspaceId,
-          kiloUserId: USER,
-          organizationId: '00000000-0000-4000-8000-000000000009',
-          location: { sandboxId: test.registration.sandboxId, provider: 'cloudflare-containers' },
-          sessionIds: [KILO],
-        });
+        await test.sandbox.release({ sessionId: test.sessionId });
       }
       held.resolve(stored());
       await test.alarm();
@@ -950,9 +1178,11 @@ describe('idle workspace disk checkpoint', () => {
     });
     await test.session.send(prompt('m2'));
     const { wrapper } = await test.connect(1);
-    expect(test.launchOptions[1]?.snapshot).toEqual({
+    expect(test.launchOptions[1]?.snapshot).toMatchObject({
+      kind: 'workspace',
+      provider: 'cloudflare-containers',
       snapshotId: 'session-snapshot',
-      baseImage: 'image:1',
+      currentBaseImage: 'image:1',
     });
     wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
     await test.messageState('m2', 'accepted');
@@ -1137,9 +1367,11 @@ describe('idle workspace disk checkpoint', () => {
     await test.cold();
     await test.session.send(prompt('m2'));
     const { wrapper, frame } = await test.connect(1);
-    expect(test.launchOptions[1]?.snapshot).toEqual({
+    expect(test.launchOptions[1]?.snapshot).toMatchObject({
+      kind: 'workspace',
+      provider: 'cloudflare-containers',
       snapshotId: 'session-snapshot',
-      baseImage: 'image:1',
+      currentBaseImage: 'image:1',
     });
     expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toEqual({
       sourceAllocationId,
@@ -1210,6 +1442,166 @@ describe('idle workspace disk checkpoint', () => {
     );
     test.wrappers.forEach(wrapper => wrapper.close());
   });
+
+  it('keeps the tail and queued message through DO eviction, bootstrap failure and fresh allocation', async () => {
+    const test = await setup({ confirmRestore: true });
+    await test.checkpoint();
+    const tail = await test.snapshot();
+    await test.cold();
+    await test.session.send(prompt('m2'));
+    await waitFor(async () => {
+      expect(test.launchEnvs).toHaveLength(2);
+      expect((await test.sandbox.getAllocationState()).kind).toBe('starting');
+    });
+    const launched = test.launchEnvs[1];
+    const allocationId = launched.CONTROL_PLANE_ALLOCATION_ID;
+    const artifact = test.launchOptions[1]?.snapshot;
+    const app = new Hono<HonoContext>();
+    registerStartupFailureRoute(app);
+    const report = () =>
+      app.request(
+        `/sandbox-control/${test.sandboxId}/startup-failure`,
+        {
+          method: 'POST',
+          headers: { authorization: `Bearer ${launched.SANDBOX_CONTROL_CREDENTIAL}` },
+          body: JSON.stringify({ allocationId, code: 'workspace_restore_unavailable' }),
+        },
+        env as unknown as Env
+      );
+    await evictAllDurableObjects();
+    await test.installAdapter();
+    const pending = await runInDurableObject(test.sandbox, instance =>
+      readWorkspaceSnapshotAllocation(instance['db'])
+    );
+    expect(pending?.restore).toMatchObject({ confirmed: false, attempt: 1, selected: tail });
+    expect((await report()).status).toBe(204);
+    await waitFor(() => expect(test.launchEnvs).toHaveLength(3));
+    expect(test.stoppedRefs).toContain(`mem_${allocationId}`);
+    expect(test.launchEnvs[2].CONTROL_PLANE_ALLOCATION_ID).not.toBe(allocationId);
+    expect(test.launchEnvs[2].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
+      launched.SANDBOX_CONTROL_CREDENTIAL
+    );
+    expect(test.launchOptions[2]?.snapshot).toEqual(artifact);
+    expect((await report()).status).toBe(409);
+    const { wrapper, frame } = await test.connect(2);
+    expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({
+      sourceAllocationId: tail?.sourceAllocationId,
+    });
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('retries an unconfirmed restore when provider admission finds that the first task stopped', async () => {
+    const test = await setup({ confirmRestore: true });
+    await test.checkpoint();
+    await test.cold();
+    await test.session.send(prompt('m2'));
+    await waitFor(async () => {
+      expect(test.launchEnvs).toHaveLength(2);
+      expect((await test.sandbox.getAllocationState()).kind).toBe('starting');
+    });
+    const first = test.launchEnvs[1];
+    const firstId = first.CONTROL_PLANE_ALLOCATION_ID;
+    test.controls.validateWrapperAdmission = async ref => {
+      if (ref === `mem_${firstId}`) throw new ProviderStoppedError();
+    };
+    const stale = await FakeWrapper.connect({
+      sandboxId: test.sandboxId,
+      credential: first.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    test.wrappers.push(stale);
+    try {
+      expect(
+        await stale.hello({
+          wrapperId: 'stopped-wrapper',
+          allocationId: firstId,
+          workspaceSnapshots: true,
+          snapshotRestoreConfirmed: true,
+        })
+      ).toBeNull();
+      expect(await stale.waitForClose()).toBe(1008);
+      await waitFor(() => expect(test.launchEnvs).toHaveLength(3));
+      expect(test.stoppedRefs).toContain(`mem_${firstId}`);
+      expect(test.launchEnvs[2].CONTROL_PLANE_ALLOCATION_ID).not.toBe(firstId);
+      expect(test.launchEnvs[2].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
+        first.SANDBOX_CONTROL_CREDENTIAL
+      );
+      expect(test.launchOptions[2]?.snapshot).toEqual(test.launchOptions[1]?.snapshot);
+      const { wrapper } = await test.connect(2);
+      wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+      await test.messageState('m2', 'accepted');
+    } finally {
+      test.wrappers.forEach(wrapper => wrapper.close());
+    }
+  });
+
+  it('retries workspace restore preflight on the same intent before submission', async () => {
+    const test = await setup({ confirmRestore: true });
+    await test.checkpoint();
+    await test.cold();
+    const stopped = [...test.stoppedRefs];
+    const original = test.controls.launch;
+    test.controls.launch = async () => {
+      test.controls.launch = original;
+      return {
+        startSource: 'repository',
+        snapshotFailed: true,
+        snapshotFailureReason: 'transient',
+        snapshotPreflightFailed: true,
+      };
+    };
+    await test.session.send(prompt('m2'));
+    await waitFor(() => expect(test.launchEnvs).toHaveLength(3));
+    expect(test.launchEnvs[2]).toEqual(test.launchEnvs[1]);
+    expect(test.launchOptions[2]?.snapshot).toEqual(test.launchOptions[1]?.snapshot);
+    expect(test.stoppedRefs).toEqual(stopped);
+    const { wrapper } = await test.connect(2);
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it.each(['launch', 'reconciliation'] as const)(
+    'preserves a permanent provider error during workspace restore %s',
+    async stage => {
+      const failure = new ProviderLifecycleError('byoc_aws_forbidden');
+      let rejectReconciliation = false;
+      const test = await setup({
+        confirmRestore: true,
+        reconcileLaunch: async () => {
+          if (rejectReconciliation) throw failure;
+          return { startSource: 'repository' };
+        },
+      });
+      await test.checkpoint();
+      const tail = await test.snapshot();
+      await test.cold();
+      if (stage === 'launch') {
+        test.controls.launch = async () => {
+          throw failure;
+        };
+      }
+      await test.session.send(prompt('m2'));
+      if (stage === 'reconciliation') {
+        await waitFor(async () => {
+          expect((await test.sandbox.getAllocationState()).kind).toBe('starting');
+        });
+        rejectReconciliation = true;
+        await test.alarm();
+      }
+      await waitFor(async () => {
+        const route = await runInDurableObject(test.sandbox, instance =>
+          readRoute(instance['db'], test.sessionId)
+        );
+        expect(route).toMatchObject({ state: 'failed', reason: 'byoc_aws_forbidden' });
+        expect((await test.sandbox.getAllocationState()).kind).toBe('stopped');
+      });
+      expect(test.launchEnvs).toHaveLength(2);
+      expect(test.stoppedRefs).toContain(`mem_${test.launchEnvs[1].CONTROL_PLANE_ALLOCATION_ID}`);
+      expect(await test.snapshot()).toEqual(tail);
+    }
+  );
 
   it('restores a tail without sending any command fields', async () => {
     const test = await setup({ startCommands: ['serve'] });
@@ -1330,6 +1722,30 @@ describe('idle workspace disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
+  it('restores a workspace checkpoint on day 29 without renewing its age', async () => {
+    const test = await setup({ confirmRestore: true });
+    await test.checkpoint();
+    await test.cold();
+    const capturedAt = Date.now() - 29 * 24 * 60 * 60 * 1_000;
+    await runInDurableObject(test.sandbox, instance => {
+      const snapshot = readWorkspaceSnapshot(instance['db'], test.workspaceId);
+      if (!snapshot) throw new Error('Missing checkpoint');
+      instance['db']
+        .update(workspaceDiskSnapshots)
+        .set({ data: { ...snapshot, capturedAt } })
+        .run();
+    });
+    await test.session.send(prompt('m2'));
+    const { wrapper, frame } = await test.connect(1);
+    expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({
+      workspaceId: test.workspaceId,
+    });
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
+    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot', capturedAt });
+    test.wrappers.forEach(connection => connection.close());
+  });
+
   it('fails an expired checkpoint after 30 days without restoring or deleting it', async () => {
     const test = await setup();
     const fields = vi.spyOn(logger, 'withFields');
@@ -1438,7 +1854,7 @@ describe('idle workspace disk checkpoint', () => {
           instance['db'],
           disk.owner,
           JSON.stringify({ mode: selectedMode, image: selectedImage, descriptor: 'new-release' }),
-          'image:1'
+          'cloudflare-containers'
         );
       });
       expect(selected?.snapshotId).toBe(restores ? 'session-snapshot' : undefined);

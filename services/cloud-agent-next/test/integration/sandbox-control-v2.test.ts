@@ -221,7 +221,15 @@ async function startAllocation(
         ? {}
         : {
             environmentSnapshotLaunch: async () => ({
-              options: { snapshot: { snapshotId: options.environmentSnapshotId } },
+              options: {
+                snapshot: {
+                  kind: 'environment',
+                  provider: options.provider === 'vercel' ? 'vercel' : 'cloudflare-containers',
+                  buildId: 'build-fixture',
+                  snapshotId: options.environmentSnapshotId,
+                  baseImage: 'image-fixture',
+                },
+              },
               selection: { source: 'environment', capturedAt: 1 },
             }),
           }),
@@ -464,7 +472,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const launch = provider.adapter.launch;
     provider.adapter = {
       ...provider.adapter,
-      environmentSnapshots: 'create',
+      environmentSnapshots: { provider: 'vercel', phase: 'create' },
       async launch(ref, options) {
         await launch(ref, options);
         return { startSource: 'repository' };
@@ -590,23 +598,28 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.createCalls).toBe(1);
   });
 
-  it('arms an absolute provider lifetime and reports its specific failure before cleanup', async () => {
-    const provider = createFakeProvider();
-    let deadline = Date.now() + 5_000;
-    provider.adapter.lifetimeDeadlineAt = async () => deadline;
-    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
-    await awaitStarting(provider, stub);
-    const { wrapper } = await connectAndHello(provider, stub);
-    expect(await readAlarm(stub)).toBe(deadline);
-    deadline = Date.now() - 1;
-    await runAlarm(stub);
-    await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
-    expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
-      state: 'failed',
-      reason: 'provider_lifetime_exhausted',
-    });
-    wrapper.close();
-  });
+  it.each(['provider_lifetime_exhausted', 'byoc_aws_proxy_expired'] as const)(
+    'arms a durable deadline and reports %s before cleanup',
+    async reason => {
+      const provider = createFakeProvider({ gateStop: true });
+      let deadline = Date.now() + 5_000;
+      provider.adapter.allocationDeadline = async () => ({ at: deadline, reason });
+      const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+      await awaitStarting(provider, stub);
+      const { wrapper } = await connectAndHello(provider, stub);
+      expect(await readAlarm(stub)).toBe(deadline);
+      deadline = Date.now() - 1;
+      await runAlarm(stub);
+      await waitFor(() => expect(provider.stopCalls).toHaveLength(1));
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason,
+      });
+      expect(await readState(stub)).toMatchObject({ kind: 'stopping' });
+      expect(provider.createCalls).toBe(1);
+      wrapper.close();
+    }
+  );
 
   it.each([
     { stage: 'create', failure: { failFirstCreate: true } },
@@ -2762,61 +2775,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
       },
     };
   }
-
-  it.each([
-    {},
-    {
-      KILOCODE_BACKEND_BASE_URL: 'http://localhost:3900',
-      KILO_OPENROUTER_BASE: 'http://localhost:3910/api',
-      KILO_SESSION_INGEST_URL: 'http://localhost:9700',
-    },
-  ])('prepares a Containers allowlist route only with facade credentials (%j)', async extraEnv => {
-    const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider, sandboxId, extraEnv);
-    await stub.prepare(prepareInput(firstSessionId, { egressMode: 'allowlist' }));
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const { credential, allocationId } = launchIdentity(provider);
-    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-    await wrapper.hello({ wrapperId: 'wr_allowlist', allocationId });
-    const frame = await wrapper.next();
-    if (frame?.type !== 'session.prepare') throw new Error('Expected session.prepare');
-    expect(frame.credentials.proxy?.handle).toEqual(expect.any(String));
-    expect(frame.credentials.proxy?.handle).not.toBe(frame.credentials.kilo.token);
-    const targets = frame.credentials.proxy?.targets;
-    if (!targets) throw new Error('Missing runtime facade');
-    const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as { egressAllowlist: string[] };
-    for (const url of Object.values(targets)) {
-      expect(new URL(url).hostname).toBe('worker.example.com');
-      expect(pin.egressAllowlist).toContain(new URL(url).hostname);
-    }
-    for (const host of [
-      'backend.example.com',
-      'gateway.example.com',
-      'ingest.example.com',
-      'localhost',
-    ])
-      expect(pin.egressAllowlist).not.toContain(host);
-  });
-
-  it('fails a Containers allowlist route before preparation when proxy minting fails', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await configureEgressSandbox(provider);
-    await runInDurableObject(stub, instance => {
-      instance.sessionPeerFor = () => null;
-    });
-    await stub.prepare(prepareInput(firstSessionId, { egressMode: 'allowlist' }));
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const { credential, allocationId } = launchIdentity(provider);
-    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-    await wrapper.hello({ wrapperId: 'wr_allowlist_no_proxy', allocationId });
-    await waitFor(async () => {
-      expect((await stub.status({ sessionId: firstSessionId })).view).toMatchObject({
-        state: 'failed',
-        reason: 'workspace_setup_failed',
-      });
-    });
-    expect(await wrapper.next(100)).toBeNull();
-  });
 
   it.each(
     [

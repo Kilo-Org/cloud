@@ -52,7 +52,7 @@ type TerminalBridge = {
 };
 
 type AuthenticatedWebSocketConstructor = typeof WebSocket & {
-  new (url: string, options: { headers: Record<string, string> }): WebSocket;
+  new (url: string, options: { headers: Record<string, string>; proxy?: string }): WebSocket;
 };
 
 const MAX_TERMINAL_BUFFERED_BYTES = 1024 * 1024;
@@ -174,6 +174,7 @@ function waitForSocketOpen(socket: WebSocket): Promise<void> {
 
 export function createControlTerminalRuntime(options: {
   controlUrl: string;
+  proxyUrl?: string;
   wrapperInstanceId: string;
   getKiloRuntime: (identity: SessionRequestIdentity) => TerminalRuntimePort | undefined;
   getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => TerminalRuntimePort | undefined;
@@ -633,6 +634,7 @@ export function createControlTerminalRuntime(options: {
       try {
         const WebSocketImpl = WebSocket as AuthenticatedWebSocketConstructor;
         reverse = new WebSocketImpl(reverseUrl.toString(), {
+          proxy: options.proxyUrl,
           headers: { Authorization: `Bearer ${payload.capability}` },
         });
       } catch {

@@ -14,6 +14,10 @@ export const STARTUP_FAILURES = {
   deadline_exceeded: { exitCode: 75, reason: null },
   cli_probe_failed: { exitCode: 76, reason: 'runtime_cli_probe_failed' },
   supervisor_missing: { exitCode: 77, reason: 'runtime_supervisor_missing' },
+  environment_restore_failed: { exitCode: 78, reason: 'environment_restore_failed' },
+  environment_restore_unavailable: { exitCode: 79, reason: 'environment_restore_unavailable' },
+  workspace_restore_failed: { exitCode: 80, reason: null },
+  workspace_restore_unavailable: { exitCode: 81, reason: null },
 } as const;
 
 export type StartupFailureCode = keyof typeof STARTUP_FAILURES;

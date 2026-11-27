@@ -96,6 +96,7 @@ export type AllocationEvent =
    */
   | { type: 'provider-ref'; at: number; allocationId: string; providerRef: string }
   | { type: 'startup-failed'; at: number; allocationId: string; code: StartupFailureCode }
+  | { type: 'snapshot-cleanup'; at: number; allocationId: string }
   | { type: 'created'; at: number; allocationId: string; providerRef: string }
   /**
    * A snapshot launch retry starts with its own attempt bound. The create
@@ -141,6 +142,8 @@ export type AllocationEvent =
       at: number;
       reason: ControlPlaneFailureReason;
       billingFailure?: CustomerBillingFailure;
+      /** Distinguishes idle expiry from a caller-requested stop with the same reason. */
+      trigger?: 'idle-heartbeat';
     }
   | {
       type: 'stop-result';
@@ -320,6 +323,21 @@ export function reduceAllocation(
         timers,
         STARTUP_FAILURES[event.code].reason ?? 'connection_lost'
       );
+    }
+
+    case 'snapshot-cleanup': {
+      if (
+        (state.kind !== 'creating' && state.kind !== 'starting') ||
+        state.allocationId !== event.allocationId
+      )
+        return { state, effects: NO_EFFECTS };
+      const { state: stopping, effects } = enterStopping(
+        state,
+        event.at,
+        timers,
+        'connection_lost'
+      );
+      return { state: stopping, effects };
     }
 
     case 'created': {

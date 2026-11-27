@@ -4,6 +4,7 @@ import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type * as vercelCredentialResolver from '../byoc/vercel-credential-resolver.js';
 import type * as vercelOwner from '../byoc/vercel-owner.js';
+import type * as awsCredentialResolver from '../byoc/aws-credential-resolver.js';
 import type { Env } from '../types.js';
 
 const resolveSaved = vi.hoisted(() => vi.fn());
@@ -11,6 +12,8 @@ const fetchCredential = vi.hoisted(() => vi.fn());
 const fetchEnrollment = vi.hoisted(() => vi.fn());
 const fetchEnrollmentForUser = vi.hoisted(() => vi.fn());
 const enrolledOwner = vi.hoisted(() => vi.fn());
+const fetchAwsConnection = vi.hoisted(() => vi.fn());
+const resolveEc2Configuration = vi.hoisted(() => vi.fn());
 
 vi.mock('../session/sandbox-allocation-resolution.js', () => ({
   resolveSavedSandboxAllocation: resolveSaved,
@@ -24,6 +27,11 @@ vi.mock('../byoc/vercel-credential-resolver.js', async importOriginal => ({
 vi.mock('../byoc/vercel-owner.js', async importOriginal => ({
   ...(await importOriginal<typeof vercelOwner>()),
   enrolledByocVercelOwner: enrolledOwner,
+}));
+vi.mock('../byoc/aws-credential-resolver.js', async importOriginal => ({
+  ...(await importOriginal<typeof awsCredentialResolver>()),
+  fetchAwsByocConnection: fetchAwsConnection,
+  resolveAwsEc2ByocConfiguration: resolveEc2Configuration,
 }));
 
 import { resolveEnvironmentBuildTarget } from './target.js';
@@ -40,8 +48,10 @@ const REFERENCE: EnvironmentReference = {
   repository: { platform: 'github', repoFullName: 'acme/widgets' },
 };
 const CREDENTIAL_ID = '44444444-4444-4444-8444-444444444444';
+const INSTALLATION = '55555555-5555-4555-8555-555555555555';
 const ENV = {
   BYOC_VERCEL_IDS: OWNER.id,
+  BYOC_AWS_IDS: OWNER.id,
   SANDBOX_CONTAINERS: {},
   RUNTIME_STARTUP_MODE: 'downloaded',
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
@@ -83,6 +93,26 @@ beforeEach(() => {
 });
 
 describe('resolveEnvironmentBuildTarget', () => {
+  it('routes a saved EC2 allocation to the EC2 builder and pins its connection and storage layout', async () => {
+    resolveSaved.mockResolvedValue('aws-ec2-8g');
+    fetchAwsConnection.mockResolvedValue({ credentialId: CREDENTIAL_ID, setupStatus: 'ready' });
+    resolveEc2Configuration.mockResolvedValue({ installation: INSTALLATION });
+    await expect(target()).resolves.toEqual({
+      ok: true,
+      target: {
+        provider: 'aws-ec2',
+        instance: 'aws-ec2-8g',
+        credentialId: CREDENTIAL_ID,
+        baseImage: `aws-ec2-ebs:v1:${CREDENTIAL_ID}/${INSTALLATION}`,
+      },
+    });
+    expect(fetchAwsConnection).toHaveBeenCalledWith(ENV, { organizationId: OWNER.id });
+    expect(resolveEc2Configuration).toHaveBeenCalledWith(ENV, {
+      organizationId: OWNER.id,
+      credentialId: CREDENTIAL_ID,
+    });
+  });
+
   it('pins the BYOC credential, account and base snapshot of a saved Vercel allocation', async () => {
     resolveSaved.mockResolvedValue('vercel-small');
     await expect(target()).resolves.toEqual({

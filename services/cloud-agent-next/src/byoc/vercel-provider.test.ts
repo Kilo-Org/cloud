@@ -145,6 +145,8 @@ describe('BYOC Vercel provider on the current control plane', () => {
   });
 
   const environmentSnapshot = {
+    kind: 'environment' as const,
+    buildId: 'build_environment',
     snapshotId: 'snap_environment',
     provider: 'vercel' as const,
     baseImage: vercelSnapshotBaseImage({

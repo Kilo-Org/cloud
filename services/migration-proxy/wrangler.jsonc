@@ -14,7 +14,8 @@
   // Traces stay off: a trace keeps outbound URLs and Durable Object SQL bindings.
   "observability": {
     "enabled": true,
-    "logs": { "enabled": true, "invocation_logs": true },
+    // Invocation logs hold request details, possibly the Authorization header (README).
+    "logs": { "enabled": true, "invocation_logs": false },
     "traces": { "enabled": false },
   },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],

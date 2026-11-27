@@ -59,7 +59,11 @@ async function refuseUnprovenExistingAccountLink(
     return NextResponse.json({ error: 'WRONG_ACCOUNT' }, { status: 403 });
   }
   if (!webSessionId) return refused('sessionReauthRequired', 403);
-  const policyRefusal = await authorizeSignInMethodChange({ user: sessionUser, change: 'link' });
+  const policyRefusal = await authorizeSignInMethodChange({
+    user: sessionUser,
+    change: 'link',
+    provider: row.provider,
+  });
   if (policyRefusal) return refused(policyRefusal, 403);
 
   const proof = codeProofSchema.safeParse(await request.json().catch(() => undefined));

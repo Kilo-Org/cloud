@@ -53,7 +53,6 @@ type UniquePools = {
   countries: string[];
   cities: string[];
   ja4Digests: string[];
-  systemPromptPrefixes: string[];
   userIds: string[];
 };
 
@@ -153,18 +152,6 @@ function generateRandomRecord(
       pickRandom(uniquePools.ja4Digests, Math.random()),
       metaStats.ja4_digest_id_null_pct
     ),
-    user_prompt_prefix: maybeNull(
-      randomString(
-        metaStats.user_prompt_prefix_avg_len,
-        metaStats.user_prompt_prefix_min_len,
-        metaStats.user_prompt_prefix_max_len
-      ),
-      metaStats.user_prompt_prefix_null_pct
-    ),
-    system_prompt_prefix: maybeNull(
-      pickRandom(uniquePools.systemPromptPrefixes, Math.random()),
-      metaStats.system_prompt_prefix_id_null_pct
-    ),
     system_prompt_length: maybeNull(
       randomInt(
         metaStats.system_prompt_length_avg,
@@ -210,8 +197,6 @@ function generateRandomRecord(
     market_cost: core.cost,
     non_inference_cost: null,
     is_free: Math.random() < 0.1,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
     system_prompt_kind: null,
   };
 
@@ -242,7 +227,6 @@ async function truncateTables() {
   await db.execute(sql`TRUNCATE TABLE vercel_ip_country CASCADE`);
   await db.execute(sql`TRUNCATE TABLE vercel_ip_city CASCADE`);
   await db.execute(sql`TRUNCATE TABLE ja4_digest CASCADE`);
-  await db.execute(sql`TRUNCATE TABLE system_prompt_prefix CASCADE`);
   await db.execute(
     sql`DELETE FROM kilocode_users WHERE google_user_email LIKE 'benchmark-%@test.local'`
   );
@@ -365,13 +349,6 @@ async function runBenchmark() {
       dedup.ja4_digest_avg_len,
       dedup.ja4_digest_min_len,
       dedup.ja4_digest_max_len,
-      totalRows
-    ),
-    systemPromptPrefixes: generateStringPool(
-      dedup.system_prompt_prefix_count,
-      dedup.system_prompt_prefix_avg_len,
-      dedup.system_prompt_prefix_min_len,
-      dedup.system_prompt_prefix_max_len,
       totalRows
     ),
     userIds,

@@ -10,7 +10,6 @@ import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { useFakeByokKmsForSuite } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { staticKeyOpenAiChatGptConnection } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { openAiChatGptConnectorGone } from './connector';
 import {
@@ -365,15 +364,14 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
   });
 
-  it('reads a row without an envelope as no connection, even if the obsolete column holds a static-key ciphertext', async () => {
+  it('reads a row without an envelope as no connection', async () => {
     const person = await insertTestUser({
-      google_user_email: `static-key-only-${randomUUID()}@example.com`,
+      google_user_email: `no-envelope-${randomUUID()}@example.com`,
     });
     const personalOwner: OpenAiChatGptOwner = { kiloUserId: person.id, organizationId: null };
     await db.insert(openai_chatgpt_connections).values({
       kilo_user_id: person.id,
       organization_id: null,
-      encrypted_connection: staticKeyOpenAiChatGptConnection(connection('static-only@example.com')),
       encrypted_connection_envelope: null,
       created_by: person.id,
     });

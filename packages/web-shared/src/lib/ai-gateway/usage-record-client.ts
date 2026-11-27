@@ -5,7 +5,11 @@ import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-sec
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import type { UsageRecordInsertResult } from './processUsage.types';
-import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  UsageRecordResponseSchema,
+  toUsageRecordWireBody,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 
 /**
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.
@@ -90,7 +94,7 @@ export async function recordUsageInPrimaryRegion(
   }
 
   const url = new URL(USAGE_RECORD_PATH, APP_URL).toString();
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify(toUsageRecordWireBody(payload));
   let lastReason = 'unknown';
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

@@ -3,6 +3,7 @@ import {
   ExaUsageWriteResponseSchema,
   UsageRecordResponseSchema,
   USAGE_CLASS_LIMIT_HEADER,
+  toUsageRecordWireBody,
   type EnkryptUsageWrite,
   type EnkryptUsageWriteResponse,
   type ExaUsageRecord,
@@ -19,12 +20,12 @@ const AdmissionRejectionSchema = z.strictObject({
 });
 type AdmissionReason = z.infer<typeof AdmissionRejectionSchema>['reason'];
 
+/** Exactly one credential: the legacy shared secret or an STS service token, never both. */
 export type UsageWriterConfig = {
   url?: string;
-  secret?: string;
   protectionBypass?: string;
   source?: 'queue' | 'queue_vercel';
-};
+} & ({ secret?: string; serviceToken?: never } | { secret?: never; serviceToken: string });
 
 type UnavailableWrite = {
   kind: 'unavailable';
@@ -111,7 +112,10 @@ async function sendUsageWrite<Result, Status extends WriterStatus>(
     };
   };
 
-  if (!config.url || !config.secret) return unavailable('missing_config');
+  if (!config.url) return unavailable('missing_config');
+  const bearer = config.serviceToken !== undefined;
+  const credential = bearer ? config.serviceToken : config.secret;
+  if (!credential || (bearer && config.secret !== undefined)) return unavailable('missing_config');
 
   const signal = AbortSignal.timeout(USAGE_WRITER_TIMEOUT_MS);
   let response: Response | undefined;
@@ -121,7 +125,9 @@ async function sendUsageWrite<Result, Status extends WriterStatus>(
       redirect: 'manual',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': config.secret,
+        [bearer ? 'authorization' : 'x-internal-api-key']: bearer
+          ? `Bearer ${credential}`
+          : credential,
         ...(config.source ? { 'x-usage-write-source': config.source } : {}),
         ...(config.protectionBypass
           ? { 'x-vercel-protection-bypass': config.protectionBypass }
@@ -205,7 +211,7 @@ export function recordLlmUsage(
   return sendUsageWrite(
     {
       usageId: payload.core.id,
-      body: payload,
+      body: toUsageRecordWireBody(payload),
       acknowledge(value) {
         const parsed = UsageRecordResponseSchema.safeParse(value);
         if (!parsed.success) return 'invalid';

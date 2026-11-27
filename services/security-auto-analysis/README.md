@@ -23,20 +23,19 @@ The consumer claims rows per-owner with `FOR UPDATE SKIP LOCKED`, resolves an ac
 - `CLOUD_AGENT_NEXT` — launches analysis sessions
 - `GIT_TOKEN_SERVICE` — resolves GitHub tokens for repo access (RPC via `GitTokenRPCEntrypoint`)
 
-## Operational commands
+## Local development
 
 ```bash
-# Trigger the dispatcher cron immediately (dev)
-pnpm --filter cloudflare-security-auto-analysis exec wrangler triggers trigger --name security-auto-analysis-dev
+pnpm dev
+```
 
-# Enqueue a single owner message manually (dev)
-pnpm --filter cloudflare-security-auto-analysis exec wrangler queues produce security-auto-analysis-owner-queue-dev \
-  '{"ownerType":"org","ownerId":"<org_id>","dispatchId":"manual","enqueuedAt":"2026-01-01T00:00:00.000Z"}'
+The `dev` environment is local-only: `wrangler dev` runs it against the local database, with no
+hosted cron or Worker. Do not run `pnpm deploy:dev`.
 
-# Stream worker logs
-pnpm --filter cloudflare-security-auto-analysis exec wrangler tail security-auto-analysis-dev
+## Operational commands (production)
 
-# Inspect queues
+```bash
+# Inspect queues (read-only)
 pnpm --filter cloudflare-security-auto-analysis exec wrangler queues list
 ```
 

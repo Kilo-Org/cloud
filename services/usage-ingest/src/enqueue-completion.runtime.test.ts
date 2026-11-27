@@ -95,7 +95,7 @@ it('registers the observation on the real ExecutionContext and logs one accepted
     });
     expect(observed?.send_duration_ms).toBeTypeOf('number');
     expect(JSON.stringify(observed)).not.toContain(publishSecret);
-    expect(JSON.stringify(observed)).not.toContain(usage.metadata.user_prompt_prefix);
+    expect(JSON.stringify(observed)).not.toContain(usage.metadata.http_user_agent);
   } finally {
     try {
       await worker?.dispose();

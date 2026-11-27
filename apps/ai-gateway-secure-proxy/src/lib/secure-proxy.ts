@@ -2,8 +2,15 @@ import {
   SECURE_PROXY_BODY_KEY,
   SecureProxyRequestBodySchema,
 } from '@kilocode/ai-gateway-secure-proxy-contracts';
-import { NextResponse } from 'next/server';
+import type { WaitUntil } from '@kilocode/verify';
+import { NextResponse, after } from 'next/server';
 import { createHash, timingSafeEqual } from 'node:crypto';
+import {
+  CREDENTIAL_ACCEPT_ENV,
+  createServiceTokenAdmission,
+  credentialAcceptance,
+  misconfigured,
+} from './credential-admission';
 
 function getOutputHeaders(response: Response) {
   const outputHeaders = new Headers();
@@ -56,18 +63,52 @@ function describeFetchError(error: unknown) {
   };
 }
 
-// Upstream URLs, headers, and error messages can carry credentials, so logs name only the host.
-export async function handleSecureProxyRequest(request: Request): Promise<Response> {
-  const secret = process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET;
-  if (!secret) {
-    console.error('[secure-proxy] KILO_AI_GATEWAY_SECURE_PROXY_SECRET is not configured');
-    return errorResponse(500, 'Secure proxy secret is not configured');
-  }
-  if (!isAuthorized(request, secret)) {
-    console.warn('[secure-proxy] Rejected request with missing or invalid authorization');
-    return errorResponse(401, 'Unauthorized');
+/** The credential that admitted a request: the shared secret or an STS service token. */
+type Credential = 'legacy' | 'sts';
+
+export type SecureProxyHandlerOptions = {
+  /** Keeps the verifier's key-set refresh alive after the response; Next's `after` by default. */
+  waitUntil?: WaitUntil;
+};
+
+/**
+ * The relay: the credential check first, then the body. Each check is decided once and never
+ * retried: under `legacy-and-sts` the shared secret is compared exactly, and only a request it
+ * does not match goes to the service-token check, whose refusal is final.
+ */
+export function createSecureProxyHandler({ waitUntil = after }: SecureProxyHandlerOptions = {}): (
+  request: Request
+) => Promise<Response> {
+  const admitServiceToken = createServiceTokenAdmission(waitUntil);
+
+  async function authenticate(request: Request): Promise<Credential | Response> {
+    const acceptance = credentialAcceptance(process.env[CREDENTIAL_ACCEPT_ENV]);
+    if (acceptance === null) return misconfigured(`unknown ${CREDENTIAL_ACCEPT_ENV} mode`);
+    if (acceptance.legacy) {
+      const secret = process.env.KILO_AI_GATEWAY_SECURE_PROXY_SECRET;
+      if (!secret) {
+        console.error('[secure-proxy] KILO_AI_GATEWAY_SECURE_PROXY_SECRET is not configured');
+        return errorResponse(500, 'Secure proxy secret is not configured');
+      }
+      if (isAuthorized(request, secret)) return 'legacy';
+    }
+    if (!acceptance.sts) {
+      console.warn('[secure-proxy] Rejected request with missing or invalid authorization');
+      return errorResponse(401, 'Unauthorized');
+    }
+    return (await admitServiceToken(request)) ?? 'sts';
   }
 
+  return async request => {
+    const credential = await authenticate(request);
+    return credential instanceof Response ? credential : await forward(request, credential);
+  };
+}
+
+export const handleSecureProxyRequest = createSecureProxyHandler();
+
+// Upstream URLs, headers, and error messages can carry credentials, so logs name only the host.
+async function forward(request: Request, credential: Credential): Promise<Response> {
   const parsed = SecureProxyRequestBodySchema.safeParse(
     await request.json().catch(() => undefined)
   );
@@ -97,8 +138,10 @@ export async function handleSecureProxyRequest(request: Request): Promise<Respon
   try {
     // No SSRF check here on purpose: this is an internal service whose only
     // caller is the gateway, which applies its upstream URL policy to
-    // `config.url` before relaying. The endpoint is publicly reachable and the
-    // shared secret is its only gate, so any other caller must run that check.
+    // `config.url` before relaying. The endpoint is publicly reachable, and only
+    // the gateway may pass `authenticate`: with the shared secret, or with an STS
+    // forward token of the `ai-gateway` workload. Any other caller admitted here
+    // would have to run that check itself.
     response = await fetch(config.url, {
       method: 'POST',
       headers,
@@ -135,6 +178,7 @@ export async function handleSecureProxyRequest(request: Request): Promise<Respon
     upstreamHost,
     status: response.status,
     headersAfterMs,
+    credential,
   });
 
   return wrapInSafeNextResponse(response);

@@ -53,14 +53,19 @@
   "env": {
     "dev": {
       "name": "model-eval-ingest-dev",
-      "workers_dev": true,
+      "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
+      "triggers": {
+        "crons": [],
+      },
       "vars": {
         "ENVIRONMENT": "development",
       },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

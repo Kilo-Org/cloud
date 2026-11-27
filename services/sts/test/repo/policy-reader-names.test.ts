@@ -16,16 +16,16 @@ import { parseWorkerConfig, workerConfigPaths, type WorkerConfig } from './worke
  * The three artefacts must agree one-to-one:
  * - the policy's `secrets` list,
  * - the reader's `BINDINGS` keys,
- * - and the wrangler manifest: each entry's old binding must be the config's Secrets Store binding
- *   of that name, or a plain Worker secret (`wrangler secret put`), which the manifest cannot show,
- *   but never a `vars` entry.
+ * - and the wrangler manifest: an entry's binding may never be a `vars` entry, and where the
+ *   manifest declares a Secrets Store binding of that name, its `secret_name` is the canonical name
+ *   or that name with the `_PROD` alias.
  *
  * A name present in one place and absent from another fails only at cutover: the legacy read keeps
  * working while `sts` answers `not_granted`.
  *
- * Policies whose Worker has no `src/secrets.ts` keep their earlier reader shape (notifications,
- * o11y, audit-relay, migration-proxy) or live in another repository (bouncer-watch); their own
- * suites cover their names. A Worker that has the file must have the map.
+ * `migration-proxy` has no `src/secrets.ts`; `notifications`, `o11y` and `audit-relay` have one in
+ * their earlier shape (listed below); `bouncer-watch` lives in another repository. Their own suites
+ * cover their names. A Worker that has the file must have the map.
  */
 
 const BINDINGS_START = /^(?:export )?const BINDINGS = \{/m;
@@ -107,18 +107,21 @@ describe('policy secrets match the reader that serves them', () => {
       const worker = dir === undefined ? undefined : byDir.get(dir);
       if (worker === undefined) throw new Error(`${workload} has no config`);
       const vars = new Set(Object.keys(worker.config.vars ?? {}));
-      const storeBindings = new Set(
-        (worker.config.secrets_store_secrets ?? []).map(secret => secret.binding)
-      );
+      const storeEntries = worker.config.secrets_store_secrets ?? [];
       expect(new Set(reader.map(([stsName]) => stsName)).size).toBe(reader.length);
       for (const [stsName, binding] of reader) {
         expect(vars.has(binding), `${workload}: ${binding} is a var, not a secret`).toBe(false);
-        // A Secrets Store binding is in the manifest; a plain Worker secret is not, so it is
-        // accepted when the manifest names neither a var nor a store binding of that name.
-        const known = storeBindings.has(binding) || !vars.has(binding);
-        expect(known, `${workload}: ${stsName} -> ${binding} is not a secret of its config`).toBe(
-          true
-        );
+        // A Secrets Store binding is in the manifest, and the entry behind it must carry the
+        // canonical name or the `_PROD` alias the first Workers already used, or the copier
+        // copies a different secret than the policy grants. A plain Worker secret
+        // (`wrangler secret put`) has no manifest entry at all: only the deployment holds it, and
+        // the Worker's own reader suite pins the binding names it reads.
+        const entry = storeEntries.find(secret => secret.binding === binding);
+        if (entry !== undefined) {
+          expect([stsName, `${stsName}_PROD`], `${workload}: ${stsName} -> ${binding}`).toContain(
+            entry.secret_name
+          );
+        }
       }
     });
   }

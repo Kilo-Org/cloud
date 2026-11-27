@@ -1,0 +1,1 @@
+ALTER TABLE "user_deletion_provider_credentials" ADD COLUMN "saved_at" timestamp with time zone;

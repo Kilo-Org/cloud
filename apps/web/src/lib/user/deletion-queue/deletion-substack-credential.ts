@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { user_deletion_provider_credentials } from '@kilocode/db/schema';
+import { kilocode_users, user_deletion_provider_credentials } from '@kilocode/db/schema';
 import { UserDeletionProviderScope } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -209,12 +209,14 @@ export async function replaceSubstackCredential(params: {
     .values({
       provider_scope: UserDeletionProviderScope.Substack,
       encrypted_material: encrypted,
+      saved_at: sql`now()`,
       updated_by_kilo_user_id: params.actorKiloUserId,
     })
     .onConflictDoUpdate({
       target: user_deletion_provider_credentials.provider_scope,
       set: {
         encrypted_material: encrypted,
+        saved_at: sql`now()`,
         updated_by_kilo_user_id: params.actorKiloUserId,
       },
     });
@@ -257,21 +259,39 @@ export async function getSubstackCredentialMeta(): Promise<{
   configured: boolean;
   totpConfigured: boolean;
   updatedAt: string | null;
+  savedAt: string | null;
   updatedByKiloUserId: string | null;
+  savedByEmail: string | null;
+  savedByName: string | null;
 }> {
   const [row] = await db
     .select({
       encrypted_material: user_deletion_provider_credentials.encrypted_material,
       updated_at: user_deletion_provider_credentials.updated_at,
+      saved_at: user_deletion_provider_credentials.saved_at,
       updated_by_kilo_user_id: user_deletion_provider_credentials.updated_by_kilo_user_id,
+      saved_by_email: kilocode_users.google_user_email,
+      saved_by_name: kilocode_users.google_user_name,
     })
     .from(user_deletion_provider_credentials)
+    .leftJoin(
+      kilocode_users,
+      eq(kilocode_users.id, user_deletion_provider_credentials.updated_by_kilo_user_id)
+    )
     .where(
       eq(user_deletion_provider_credentials.provider_scope, UserDeletionProviderScope.Substack)
     )
     .limit(1);
   if (!row) {
-    return { configured: false, totpConfigured: false, updatedAt: null, updatedByKiloUserId: null };
+    return {
+      configured: false,
+      totpConfigured: false,
+      updatedAt: null,
+      savedAt: null,
+      updatedByKiloUserId: null,
+      savedByEmail: null,
+      savedByName: null,
+    };
   }
 
   let totpConfigured = false;
@@ -288,7 +308,10 @@ export async function getSubstackCredentialMeta(): Promise<{
     configured: true,
     totpConfigured,
     updatedAt: new Date(row.updated_at).toISOString(),
+    savedAt: row.saved_at ? new Date(row.saved_at).toISOString() : null,
     updatedByKiloUserId: row.updated_by_kilo_user_id,
+    savedByEmail: row.saved_by_email,
+    savedByName: row.saved_by_name,
   };
 }
 

@@ -1082,10 +1082,13 @@ export const user_deletion_provider_credentials = pgTable(
   {
     provider_scope: text().$type<UserDeletionProviderScope>().primaryKey().notNull(),
     encrypted_material: text().notNull(),
+    /** Bumped by any write, including an automatic session-cookie refresh. */
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+    /** Set only when a user replaces the credential; automatic refreshes leave it unchanged. */
+    saved_at: timestamp({ withTimezone: true, mode: 'string' }),
     updated_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
   },
   table => [

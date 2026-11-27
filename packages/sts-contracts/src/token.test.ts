@@ -36,7 +36,6 @@ import {
   STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH,
   STS_WEB_SCIM_SYNC,
   STS_WEB_SECURITY_ANALYSIS_CALLBACK,
-  STS_WEB_SECURITY_REMEDIATION_CALLBACK,
   STS_WEB_MCP_CATALOG_TOKEN_MINT,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
@@ -218,7 +217,6 @@ describe('STS scope registry', () => {
           'web:hosted-workspace-pull-requests.refresh',
           'web:bot-session.callback',
           'web:security-analysis.callback',
-          'web:security-remediation.callback',
           'web:code-review.agent-callback',
           'web:code-review.status-callback',
           'web:mcp-catalog-token.mint',
@@ -341,7 +339,6 @@ describe('STS scope registry', () => {
     ],
     ['web:bot-session.callback', 'web', STS_WEB_BOT_SESSION_CALLBACK],
     ['web:security-analysis.callback', 'web', STS_WEB_SECURITY_ANALYSIS_CALLBACK],
-    ['web:security-remediation.callback', 'web', STS_WEB_SECURITY_REMEDIATION_CALLBACK],
     ['web:code-review.agent-callback', 'web', STS_WEB_CODE_REVIEW_AGENT_CALLBACK],
     ['web:code-review.status-callback', 'web', STS_WEB_CODE_REVIEW_STATUS_CALLBACK],
     [

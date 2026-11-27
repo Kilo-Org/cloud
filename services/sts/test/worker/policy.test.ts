@@ -1016,7 +1016,6 @@ describe('phase 2 C1 grants of the shipped policies', () => {
     'web:hosted-workspace-pull-requests.refresh': 'cloud-agent-next',
     'web:bot-session.callback': 'cloud-agent-next',
     'web:security-analysis.callback': 'cloud-agent-next',
-    'web:security-remediation.callback': 'cloud-agent-next',
     'web:code-review.agent-callback': 'cloud-agent-next',
     'webhook-agent-ingest:execution.callback': 'cloud-agent-next',
     'security-auto-analysis:analysis.callback': 'cloud-agent-next',

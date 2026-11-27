@@ -472,7 +472,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `security-auto-analysis` | `web`: `web:security-notifications.lifecycle` | none | production |
 | `auto-routing-benchmark` | `web`: `web:auto-routing.pool-pins.write`, `web:usage.receipts.read`, `web:auto-routing.production-profile.read`, `web:usage.benchmark-grader.record` | none | production |
 | `auto-routing` | `web`: `web:usage.classifier.record` | none | production |
-| `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:security-remediation.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback`, `security-auto-analysis:remediation.callback` | none | production |
+| `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback`, `security-auto-analysis:remediation.callback` | none | production |
 | `kilo-code-review-worker` | `web`: `web:code-review.status-callback` | none | production |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants

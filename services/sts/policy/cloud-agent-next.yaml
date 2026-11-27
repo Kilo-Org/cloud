@@ -1,8 +1,8 @@
 # The cloud-agent-next Worker (services/cloud-agent-next/wrangler.jsonc). Production only. Over its
 # `STS` SecretsBroker binding it reads and writes BYOC credentials and refreshes hosted workspace
-# pull requests at the web app, and sends its callbacks: bot session, security analysis, security
-# remediation and code review agent status to the web app, execution to Webhook Agent Ingest, and
-# analysis and remediation to Security Auto Analysis, one scope each.
+# pull requests at the web app, and sends its callbacks: bot session, security analysis and code
+# review agent status to the web app, execution to Webhook Agent Ingest, and analysis and
+# remediation to Security Auto Analysis, one scope each.
 workload: cloud-agent-next
 environments:
   - production
@@ -19,7 +19,6 @@ scopes:
   - web:hosted-workspace-pull-requests.refresh
   - web:bot-session.callback
   - web:security-analysis.callback
-  - web:security-remediation.callback
   - web:code-review.agent-callback
   - webhook-agent-ingest:execution.callback
   - security-auto-analysis:analysis.callback

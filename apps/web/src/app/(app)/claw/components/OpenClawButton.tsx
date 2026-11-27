@@ -8,7 +8,8 @@ import { useAccessCode } from '../hooks/useAccessCode';
 
 type OpenClawButtonProps = {
   canShow: boolean;
-  gatewayUrl: string;
+  /** Null when the deployment has no KiloClaw destination; no button is shown then. */
+  gatewayUrl: string | null;
   label?: string;
   className?: string;
 };
@@ -25,6 +26,8 @@ export function OpenClawButton({
   // Open the window synchronously (in the click handler's call stack) to avoid
   // popup blockers, then navigate it once the access code arrives.
   const openWithAutoAuth = useCallback(async () => {
+    // No destination: open nothing and mint no access code.
+    if (!gatewayUrl) return;
     setIsOpening(true);
     const win = window.open('about:blank', '_blank');
     try {
@@ -44,7 +47,7 @@ export function OpenClawButton({
     }
   }, [gatewayUrl, generateAccessCode]);
 
-  if (!canShow) return null;
+  if (!canShow || !gatewayUrl) return null;
 
   return (
     <Button

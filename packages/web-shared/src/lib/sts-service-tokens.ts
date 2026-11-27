@@ -54,21 +54,21 @@ export function stsServiceToken(
   return clientFor(environment).get(request, lifetime);
 }
 
-/** Why a token read failed, for a log line: the error's name and the client's closed reasons. */
+/** Why there was no token: the error's name and the token client's closed reasons, never a message. */
 export type StsTokenFailure = {
   errorName: string;
   reason?: ServiceTokenError['reason'];
   deniedReason?: ServiceTokenError['deniedReason'];
 };
 
-/** Never the error message: a Vercel identity error may quote what it was given. */
+/** The loggable part of a token read's error; the message, which names the scope, is left out. */
 export function stsTokenFailure(error: unknown): StsTokenFailure {
-  if (!(error instanceof ServiceTokenError)) {
-    return { errorName: error instanceof Error ? error.name : typeof error };
+  if (error instanceof ServiceTokenError) {
+    return error.deniedReason === undefined
+      ? { errorName: error.name, reason: error.reason }
+      : { errorName: error.name, reason: error.reason, deniedReason: error.deniedReason };
   }
-  return error.deniedReason === undefined
-    ? { errorName: error.name, reason: error.reason }
-    : { errorName: error.name, reason: error.reason, deniedReason: error.deniedReason };
+  return { errorName: error instanceof Error ? error.name : typeof error };
 }
 
 export type HeldTokenRead =

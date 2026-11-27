@@ -64,6 +64,7 @@ import {
 } from './db/queries.js';
 import { InsufficientCreditsError } from './launch.js';
 import { logger, sanitizedExceptionName } from './logger.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import { generateControlToken } from './token.js';
 import { type QueueOwner, type SecurityAgentConfig } from './types.js';
 
@@ -1114,7 +1115,7 @@ async function blockAttempt(params: {
 
 export async function recoverStaleRemediationLaunchAttempts(
   db: WorkerDb,
-  params: { env: CloudflareEnv; claimedBefore: Date }
+  params: { env: CloudflareEnv; claimedBefore: Date; ctx?: ExecutionContext }
 ): Promise<{ requeuedCount: number; failedCount: number; cancelledCount: number }> {
   const rows = await db
     .select()
@@ -1158,6 +1159,7 @@ export async function recoverStaleRemediationLaunchAttempts(
         cancelledCount += 1;
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'cancelled',
@@ -1185,6 +1187,7 @@ export async function recoverStaleRemediationLaunchAttempts(
         failedCount += 1;
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'failed',
@@ -1346,15 +1349,16 @@ async function launchAttempt(params: {
   finding: SecurityFindingRecord;
   owner: QueueOwner;
   actor: ActorUser;
+  ctx?: ExecutionContext;
 }): Promise<LaunchAttemptResult> {
   if (!params.finding.platform_integration_id) {
     throw new Error('Security remediation finding is missing its GitHub integration');
   }
   const githubIntegrationId = params.finding.platform_integration_id;
   const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-    params.env.NEXTAUTH_SECRET.get(),
-    params.env.INTERNAL_API_SECRET.get(),
-    params.env.CALLBACK_TOKEN_SECRET.get(),
+    readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET', params.ctx),
+    readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET', params.ctx),
+    readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET', params.ctx),
   ]);
   const authToken = await generateControlToken(
     params.actor,
@@ -1502,6 +1506,7 @@ export async function processRemediationAttempt(params: {
   env: CloudflareEnv;
   attemptId: string;
   dispatchId: string;
+  ctx?: ExecutionContext;
 }): Promise<'launched' | 'skipped' | 'failed'> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const jobId = randomUUID();
@@ -1560,6 +1565,7 @@ export async function processRemediationAttempt(params: {
       if (applied) {
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'blocked',
@@ -1581,6 +1587,7 @@ export async function processRemediationAttempt(params: {
       if (applied) {
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'blocked',
@@ -1602,6 +1609,7 @@ export async function processRemediationAttempt(params: {
       if (transition.terminal) {
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'failed',
@@ -1621,6 +1629,7 @@ export async function processRemediationAttempt(params: {
     if (transition.terminal) {
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'failed',
@@ -1630,7 +1639,15 @@ export async function processRemediationAttempt(params: {
   }
 
   try {
-    const launch = await launchAttempt({ db, env: params.env, attempt, finding, owner, actor });
+    const launch = await launchAttempt({
+      db,
+      env: params.env,
+      attempt,
+      finding,
+      owner,
+      actor,
+      ctx: params.ctx,
+    });
     if (launch.status === 'claim-lost' || launch.status === 'cancelled') return 'skipped';
 
     try {
@@ -1667,6 +1684,7 @@ export async function processRemediationAttempt(params: {
     if (transition.terminal) {
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'failed',
@@ -2277,6 +2295,7 @@ export async function dispatchSecurityLifecycleEventForFinding(params: {
   event: SecurityLifecycleEvent;
   remediationId?: string;
   prUrl?: string;
+  ctx?: ExecutionContext;
 }): Promise<void> {
   try {
     const finding = await getSecurityFindingById(params.db, params.findingId);
@@ -2289,7 +2308,10 @@ export async function dispatchSecurityLifecycleEventForFinding(params: {
     const credential = await webInternalCredential(
       params.env,
       STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
-      { header: 'X-Internal-Secret', secret: () => params.env.INTERNAL_API_SECRET.get() }
+      {
+        header: 'X-Internal-Secret',
+        secret: () => readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET', params.ctx),
+      }
     );
     if (credential.kind === 'unavailable') return;
     const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
@@ -2330,6 +2352,7 @@ async function emitRemediationTerminalLifecycleEvent(params: {
   attempt: SecurityRemediationAttempt;
   status: string;
   prUrl?: string | null;
+  ctx?: ExecutionContext;
 }): Promise<void> {
   const event = remediationTerminalLifecycleEvent(params.status);
   if (!event) return;
@@ -2340,6 +2363,7 @@ async function emitRemediationTerminalLifecycleEvent(params: {
     event,
     remediationId: params.attempt.remediation_id,
     prUrl: params.prUrl ?? undefined,
+    ctx: params.ctx,
   });
 }
 
@@ -2348,6 +2372,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
   attemptId: string;
   attemptToken: string;
   payload: SecurityRemediationCallbackPayload;
+  ctx?: ExecutionContext;
 }): Promise<{ status: string }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const [attempt] = await db
@@ -2398,6 +2423,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       });
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'cancelled',
@@ -2412,7 +2438,13 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       message: params.payload.errorMessage ?? 'Cloud Agent interrupted',
     });
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
-    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      ctx: params.ctx,
+      db,
+      attempt,
+      status: 'failed',
+    });
     return { status: 'failed-finalized' };
   }
 
@@ -2425,7 +2457,13 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       message: params.payload.errorMessage ?? 'Cloud Agent failed',
     });
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
-    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      ctx: params.ctx,
+      db,
+      attempt,
+      status: 'failed',
+    });
     return { status: 'failed-finalized' };
   }
 
@@ -2448,7 +2486,13 @@ export async function finalizeRemediationCallbackFromEnv(params: {
         : 'Remediation result block missing or malformed',
     });
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
-    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      ctx: params.ctx,
+      db,
+      attempt,
+      status: 'failed',
+    });
     return { status: 'failed-finalized' };
   }
   await finalizeAttemptOutcome({
@@ -2462,6 +2506,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
   await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: result.status });
   await emitRemediationTerminalLifecycleEvent({
     env: params.env,
+    ctx: params.ctx,
     db,
     attempt,
     status: result.status,
@@ -2473,6 +2518,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
 export async function startManualRemediation(params: {
   env: CloudflareEnv;
   request: ManualRemediationStartRequest;
+  ctx?: ExecutionContext;
 }): Promise<AdmissionResult> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.request.owner);
@@ -2528,6 +2574,7 @@ export async function startManualRemediation(params: {
     findingId: params.request.findingId,
     event: 'remediation_queued',
     remediationId: result.remediationId,
+    ctx: params.ctx,
   });
   if (params.request.retry) {
     if (finding) {
@@ -2559,6 +2606,7 @@ export async function startManualRemediation(params: {
 export async function applyAutoRemediationCommand(params: {
   env: CloudflareEnv;
   command: ApplyAutoRemediationCommand;
+  ctx?: ExecutionContext;
 }): Promise<ApplyAutoRemediationCommandResult> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.command.owner);
@@ -2625,6 +2673,7 @@ export async function applyAutoRemediationCommand(params: {
             findingId: row.id,
             event: 'remediation_queued',
             remediationId: result.remediationId,
+            ctx: params.ctx,
           })
         );
       } else {
@@ -2654,6 +2703,7 @@ export async function maybeAdmitAutoRemediationForCompletedAnalysis(params: {
   db: WorkerDb;
   env: CloudflareEnv;
   findingId: string;
+  ctx?: ExecutionContext;
 }): Promise<AdmissionResult> {
   const result = await admitRemediationAttempt({
     db: params.db,
@@ -2691,6 +2741,7 @@ export async function maybeAdmitAutoRemediationForCompletedAnalysis(params: {
     findingId: params.findingId,
     event: 'remediation_queued',
     remediationId: result.remediationId,
+    ctx: params.ctx,
   });
   return result;
 }
@@ -2698,6 +2749,7 @@ export async function maybeAdmitAutoRemediationForCompletedAnalysis(params: {
 export async function cancelRemediation(params: {
   env: CloudflareEnv;
   request: CancelRemediationRequest;
+  ctx?: ExecutionContext;
 }): Promise<{ success: true; status: 'cancelled' | 'cancellation_requested' }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.request.owner);
@@ -2733,6 +2785,7 @@ export async function cancelRemediation(params: {
       });
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'cancelled',
@@ -2777,7 +2830,11 @@ export async function cancelRemediation(params: {
     })
     .where(eq(security_remediation_attempts.id, attempt.id));
   if (attempt.cloud_agent_session_id) {
-    const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
+    const nextAuthSecret = await readSecurityAutoAnalysisSecret(
+      params.env,
+      'NEXTAUTH_SECRET',
+      params.ctx
+    );
     const authToken = await generateControlToken(
       actor,
       nextAuthSecret,
@@ -2844,7 +2901,8 @@ export async function discoverQueuedRemediationAttempts(
 
 export async function consumeRemediationAttemptBatch(
   batch: MessageBatch<unknown>,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   for (const message of batch.messages) {
     const parsed = RemediationAttemptQueueMessageSchema.safeParse(message.body);
@@ -2857,6 +2915,7 @@ export async function consumeRemediationAttemptBatch(
         env,
         attemptId: parsed.data.attemptId,
         dispatchId: parsed.data.dispatchId,
+        ctx,
       });
       message.ack();
     } catch (error) {
@@ -2871,7 +2930,8 @@ export async function consumeRemediationAttemptBatch(
 
 export async function consumeApplyAutoRemediationBatch(
   batch: MessageBatch<unknown>,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   for (const message of batch.messages) {
     const parsed = ApplyAutoRemediationCommandSchema.safeParse(message.body);
@@ -2880,7 +2940,7 @@ export async function consumeApplyAutoRemediationBatch(
       continue;
     }
     try {
-      await applyAutoRemediationCommand({ env, command: parsed.data });
+      await applyAutoRemediationCommand({ env, command: parsed.data, ctx });
       message.ack();
     } catch (error) {
       logger.error('Apply auto remediation command failed', {
@@ -2894,7 +2954,8 @@ export async function consumeApplyAutoRemediationBatch(
 
 export async function consumeRemediationCallbackBatch(
   batch: MessageBatch<unknown>,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   for (const message of batch.messages) {
     const parsed = SecurityRemediationCallbackMessageSchema.safeParse(message.body);
@@ -2908,6 +2969,7 @@ export async function consumeRemediationCallbackBatch(
         attemptId: parsed.data.attemptId,
         attemptToken: parsed.data.attemptToken,
         payload: parsed.data.payload,
+        ctx,
       });
       message.ack();
     } catch (error) {

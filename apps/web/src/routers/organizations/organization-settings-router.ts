@@ -392,9 +392,15 @@ const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
 });
 
 const GatewaySettingsResponseSchema = z.object({
+  /** Whether the `gateway_settings` feature makes the OpenRouter and region policies available. */
   available: z.boolean(),
   disable_openrouter: z.boolean(),
   data_region: OrganizationDataRegionSchema.nullable(),
+  disable_new_models: z.boolean(),
+});
+
+const UpdateNewModelsPolicyInputSchema = OrganizationIdInputSchema.extend({
+  disable_new_models: z.boolean(),
 });
 
 const ModelGatewayAvailabilityResponseSchema = z.object({
@@ -446,6 +452,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         available: await isGatewaySettingsAvailable(input.organizationId, organization.plan),
         disable_openrouter: organization.settings.disable_openrouter ?? false,
         data_region: organization.settings.data_region ?? null,
+        disable_new_models: organization.settings.disable_new_models ?? false,
       };
     }),
 
@@ -523,6 +530,46 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 }
               : undefined,
           message: createGatewaySettingsDiffMessage(previousSettings, settings),
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+      return { settings: updatedSettings };
+    }),
+
+  // Unlike the gateway policies above, this policy is available to every enterprise
+  // organization, whether or not the `gateway_settings` feature is enabled for it.
+  updateNewModelsPolicy: organizationAdminMutationProcedure
+    .input(UpdateNewModelsPolicyInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, disable_new_models } = input;
+      const updatedSettings = await db.transaction(async tx => {
+        let previousSettings: OrganizationSettings = {};
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          organization => {
+            if (organization.plan !== 'enterprise') {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Advanced policies are not available for this organization.',
+              });
+            }
+            previousSettings = organization.settings;
+            return { ...organization.settings, disable_new_models };
+          },
+          tx
+        );
+        const changed = !!previousSettings.disable_new_models !== disable_new_models;
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: changed
+            ? `Updated advanced policies: New models ${disable_new_models ? 'disabled' : 'enabled'} by default`
+            : 'Updated advanced policies: no changes',
           organization_id: organizationId,
           tx,
         });

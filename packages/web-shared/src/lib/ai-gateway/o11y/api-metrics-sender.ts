@@ -32,7 +32,7 @@ export const O11Y_STS_ORIGINS = {
   development: 'http://localhost:8801',
 } as const satisfies Partial<Record<StsEnvironment, string>>;
 
-type O11yStsEnvironment = keyof typeof O11Y_STS_ORIGINS;
+export type O11yStsEnvironment = keyof typeof O11Y_STS_ORIGINS;
 
 /** The deployment's runtime variables; `process.env` itself in production. */
 export type VercelRuntime = Readonly<Record<string, string | undefined>> & {
@@ -41,11 +41,12 @@ export type VercelRuntime = Readonly<Record<string, string | undefined>> & {
 };
 
 /**
- * The STS environment an `sts` sender mints from: Vercel production is production, and a process
- * outside Vercel (local development) is development. Every other deployment, the `staging` custom
- * environment and previews included, has none: o11y has no deployment there.
+ * The STS environment an `sts` sender to o11y mints from: Vercel production is production, and a
+ * process outside Vercel (local development) is development. Every other deployment, the `staging`
+ * custom environment and previews included, has none: o11y has no deployment there. The API-metrics
+ * and admin-alerting senders both use it.
  */
-function stsEnvironmentOf(runtime: VercelRuntime): O11yStsEnvironment | null {
+export function o11yStsEnvironmentOf(runtime: VercelRuntime): O11yStsEnvironment | null {
   const { VERCEL_ENV: environment, VERCEL_TARGET_ENV: target } = runtime;
   if (environment === 'production' && target === 'production') return 'production';
   if (environment === undefined && target === undefined) return 'development';
@@ -88,7 +89,7 @@ export function resolveApiMetricsSender(config: {
       ? { kind: 'legacy', url, secret: config.secret }
       : { kind: 'off', reason: 'unconfigured' };
   }
-  const environment = stsEnvironmentOf(config.runtime);
+  const environment = o11yStsEnvironmentOf(config.runtime);
   if (environment === null) return { kind: 'off', reason: 'sts_production_only' };
   if (url.origin !== O11Y_STS_ORIGINS[environment]) {
     return { kind: 'misconfigured', reason: 'origin_mismatch' };

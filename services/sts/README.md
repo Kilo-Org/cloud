@@ -504,6 +504,10 @@ Workloads with a policy, all over `worker-binding`:
 | `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `security-auto-analysis` | production | `services/security-auto-analysis/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `session-ingest` | production | `services/session-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `kilo-chat` | production | `services/kilo-chat/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `git-token-service` | production | `services/git-token-service/wrangler.jsonc`; reads stay on the Secrets Store and legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
@@ -555,7 +559,7 @@ review covers its STS binding; this repository refuses any config that deploys u
 
 `test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
 `wrangler*.toml` the checkout tracks, or holds untracked and not ignored, test fixtures included
-(`cloud-agent-e2e-deploy.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
+(`cloud-agent-e2e.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
 Ignored configs stay out: `wrangler.runtime-generated.json` and
 `.wrangler/wrangler.e2e-test.jsonc` are rendered at deploy time from a tracked `wrangler.jsonc` this
 check already reads. Each file is parsed with Wrangler's own parser, every env block and every

@@ -55,19 +55,25 @@ describe('internal auth observation', () => {
     ]);
   });
 
-  it('aggregates the rest of the minute into one line when the minute turns', () => {
-    for (let i = 0; i < 5; i++) observeInternalAuth('web', 'usage_record', 'legacy_shared_secret');
-    expect(lines()).toHaveLength(1);
+  it('flushes every bucket of an earlier minute when another key starts the next one', () => {
+    // Two keys: the second is never touched again, so only `flushBefore` can write its remainder.
+    for (let i = 0; i < 2; i++) {
+      observeInternalAuth('web', 'usage_record', 'legacy_shared_secret', 'usage-ingest');
+      observeInternalAuth('o11y', 'alerting_read', 'sts', 'web');
+    }
+    expect(lines()).toHaveLength(2);
 
     vi.setSystemTime(new Date(START.getTime() + 60_000));
-    observeInternalAuth('web', 'usage_record', 'legacy_shared_secret');
+    observeInternalAuth('web', 'usage_record', 'legacy_shared_secret', 'usage-ingest');
 
+    expect(totalCount()).toBe(5);
     expect(lines().map(line => [line.minute, line.count])).toEqual([
       [START_MINUTE, 1],
-      [START_MINUTE, 4],
+      [START_MINUTE, 1],
+      [START_MINUTE, 1],
+      [START_MINUTE, 1],
       [START_MINUTE + 60, 1],
     ]);
-    expect(totalCount()).toBe(6);
   });
 
   it('keeps receivers, routes, methods and callers in separate buckets', () => {
@@ -103,12 +109,15 @@ describe('internal auth observation', () => {
     }
   });
 
-  it('splits a bucket at the memory cap without losing a count', () => {
-    for (let route = 0; route < 513; route++) {
-      observeInternalAuth('web', `route_${route}`, 'legacy_shared_secret');
+  it('flushes at the memory cap without losing a count', () => {
+    for (let route = 0; route < 512; route++) {
+      for (let i = 0; i < 3; i++) observeInternalAuth('web', `route_${route}`, 'legacy_shared_secret');
     }
-    expect(totalCount()).toBe(513);
-    expect(lines()).toHaveLength(513);
+    // The 513th bucket forces the cap flush: every held bucket writes its two unsent requests.
+    observeInternalAuth('web', 'route_512', 'legacy_shared_secret');
+
+    expect(totalCount()).toBe(512 * 3 + 1);
+    expect(lines()).toHaveLength(513 + 512);
   });
 
   it('never throws, even when the log itself throws', () => {

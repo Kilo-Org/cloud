@@ -189,10 +189,10 @@ test('runs only on a dispatch by iscekic on main, in the copy-secrets environmen
     group: 'copy-secrets-to-infisical',
     'cancel-in-progress': false,
   });
-  assert.deepEqual(Object.keys(workflow.jobs), ['environment-guard', 'copy', 'probe-login']);
+  assert.deepEqual(Object.keys(workflow.jobs), ['copy', 'probe-login']);
   for (const name of ['copy', 'probe-login']) {
     const job = workflow.jobs[name];
-    assert.equal(job.needs, 'environment-guard', `${name} needs the environment guard`);
+    assert.equal(job.needs, undefined, name);
     assert.equal(job.if, `${GATE} && inputs.mode == '${name}'`, name);
     assert.equal(job.environment, 'copy-secrets', name);
     assert.deepEqual(job.permissions, { 'id-token': 'write' }, name);
@@ -210,56 +210,25 @@ test('runs only on a dispatch by iscekic on main, in the copy-secrets environmen
     assert.equal(job.steps[0].env.EXPECTED_COMMIT, EXPECTED_COMMIT_ENV, name);
     const run = job.steps[0].run;
     assert.ok(run.includes(COMMIT_CHECK), `${name}: expected_commit is checked`);
-    // The first request each job makes: the OIDC token request, or the guard's first API read.
-    const firstRequest = [run.indexOf('jwt=$(curl '), run.indexOf('resp=$(api ')].filter(
-      i => i >= 0
-    );
-    assert.equal(firstRequest.length, 1, `${name}: one first request`);
-    assert.ok(run.indexOf(COMMIT_CHECK) < firstRequest[0], `${name}: checked before any request`);
+    const firstRequest = run.indexOf('jwt=$(curl ');
+    assert.ok(firstRequest >= 0, `${name}: OIDC token request`);
+    assert.ok(run.indexOf(COMMIT_CHECK) < firstRequest, `${name}: checked before any request`);
   }
-  assert.ok(workflow.jobs['environment-guard']['timeout-minutes'] <= 5);
   assert.ok(workflow.jobs.copy['timeout-minutes'] <= 10);
   assert.ok(workflow.jobs['probe-login']['timeout-minutes'] <= 5);
 });
 
-test('the environment guard reads copy-secrets back with no environment and no secret', () => {
-  const guard = workflow.jobs['environment-guard'];
-  assert.equal(guard.if, GATE);
-  assert.equal(guard.needs, undefined);
-  assert.equal(guard.environment, undefined, 'naming the environment would auto-create it');
-  assert.deepEqual(guard.permissions, { actions: 'read' });
-  assert.deepEqual(guard.steps[0].env, {
-    EXPECTED_COMMIT: EXPECTED_COMMIT_ENV,
-    GH_TOKEN: '${{ github.token }}',
-  });
-  assert.doesNotMatch(JSON.stringify(guard), /secrets\./);
-  const run = guard.steps[0].run;
-  assert.match(run, /readonly ENVIRONMENT=copy-secrets\n/);
-  assert.match(run, /api "environments\/\$ENVIRONMENT"\)/);
-  assert.match(
-    run,
-    /api "environments\/\$ENVIRONMENT\/deployment-branch-policies\?per_page=100"\)/
-  );
-  // Exists (404 fails), admin bypass off, a custom branch policy of exactly main, and one
-  // required-reviewers rule with at least two reviewers (iscekic among them) and self-review
-  // prevented, so the dispatcher cannot approve their own run.
-  assert.match(run, /\[\[ \$status != 404 \]\] \|\| fail/);
-  assert.match(run, /\[\[ \$bypass == false \]\] \|\| fail/);
-  assert.match(
-    run,
-    /\[\[ \$custom == true && \$protected == false && \$branches == branch:main \]\] \|\|\n\s*fail/
-  );
-  assert.ok(run.includes('select(.type == "required_reviewers")'));
-  assert.ok(run.includes('(($r[0].reviewers // []) | length | tostring)'));
-  assert.ok(run.includes('any(.reviewer.login == "iscekic")'));
-  assert.ok(run.includes('($r[0].prevent_self_review | tostring)'));
-  assert.match(
-    run,
-    /\[\[ \$rules == 1 && \$reviewers -ge 2 && \$listed == true && \$self == true \]\] \|\|\n\s*fail/
-  );
-  assert.doesNotMatch(workflowText, /no required reviewers/i);
-  // The token reaches curl through --config, never argv.
-  assert.match(run, /-K <\(printf 'header = "Authorization: Bearer %s"\\n' "\$GH_TOKEN"\)/);
+// The job token cannot read an environment's settings (that needs the administration
+// permission), so the operator reads copy-secrets back before dispatch and no job tries.
+test('no job calls the environments API with the job token', () => {
+  assert.doesNotMatch(workflowText, /github\.token|secrets\.GITHUB_TOKEN/);
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    assert.equal(job.permissions.actions, undefined, name);
+    assert.equal(job.permissions.administration, undefined, name);
+    const step = JSON.stringify(job.steps[0]);
+    assert.doesNotMatch(step, /GH_TOKEN|GITHUB_TOKEN|GITHUB_API_URL|api\.github\.com/, name);
+    assert.doesNotMatch(step, /\/environments\b|deployment-branch-policies/, name);
+  }
 });
 
 test('the probe job holds no secret', () => {

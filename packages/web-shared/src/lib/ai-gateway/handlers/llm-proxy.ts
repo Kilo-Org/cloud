@@ -19,6 +19,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isOwnerByokModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/owner-byok-model-id';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   findCustomLlm,
@@ -360,8 +361,12 @@ export async function handleLlmProxyRequest(
   const servedModelLowerCased = (
     await resolveOpenRouterModelAlias(effectiveModelIdLowerCased)
   ).toLowerCase();
-  // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
-  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(servedModelLowerCased);
+  // Anonymous callers cannot use private custom LLMs, so those are never publicly free, and
+  // neither are ids a BYOK key's owner pays for.
+  const isPubliclyFreeModel =
+    !isPrivateCustomLlm &&
+    isFreeModel(servedModelLowerCased) &&
+    !(await isOwnerByokModelId(effectiveModelIdLowerCased));
 
   // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
   // the report-only decide call and the usage event, which share this request.

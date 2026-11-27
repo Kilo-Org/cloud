@@ -17,6 +17,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
     getDirectByokCatalogModelId: jest.fn().mockResolvedValue(null),
     getDirectByokModelChatApis: actual.getDirectByokModelChatApis,
     getDirectByokPolicyProviderId: actual.getDirectByokPolicyProviderId,
+    getDirectByokPolicyTarget: actual.getDirectByokPolicyTarget,
+    getByokPrivateProviders: actual.getByokPrivateProviders,
     supportsCatalogMode: jest.fn(() => true),
   };
 });

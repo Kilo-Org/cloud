@@ -11,13 +11,16 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createDirectByokReferenceResolver,
+  findDirectByokProvider,
   getDirectByokCatalogModelId,
-  listDirectByokCatalogModels,
+  listCatalogModelsOfProvider,
   offersCatalogMode,
   findDirectByokCatalogModels,
   getDirectByokCatalogModelIds,
+  getDirectByokCatalogServing,
   getDirectByokModelsForUser,
   supportsCatalogMode,
+  type DirectByokPolicyTarget,
 } from './index';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -28,6 +31,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   isValidOpenRouterModelId: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+  getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set()),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
@@ -99,6 +103,12 @@ const ALIAS_TARGETS: Record<string, string> = {
   '~example/unknown-latest': 'example/unknown',
 };
 
+function provider(id: string) {
+  const found = findDirectByokProvider(id);
+  if (!found) throw new Error(`no provider ${id}`);
+  return found;
+}
+
 function keys(entries: Record<string, boolean>): EnabledByokProvider[] {
   return Object.entries(entries).map(([providerId, serveCatalogModels]) => ({
     providerId: providerId as EnabledByokProvider['providerId'],
@@ -119,16 +129,16 @@ beforeEach(() => {
 
 describe('catalog mode support', () => {
   test('requires a models.dev id and at least one current catalog mapping', async () => {
-    expect(supportsCatalogMode('synthetic')).toBe(true);
-    expect(supportsCatalogMode('kimi-coding')).toBe(false);
-    await expect(offersCatalogMode('synthetic')).resolves.toBe(true);
-    await expect(offersCatalogMode('morph-byok')).resolves.toBe(false);
-    await expect(offersCatalogMode('chutes-byok')).resolves.toBe(false);
-    await expect(offersCatalogMode('kimi-coding')).resolves.toBe(false);
+    expect(supportsCatalogMode(provider('synthetic'))).toBe(true);
+    expect(supportsCatalogMode(provider('kimi-coding'))).toBe(false);
+    await expect(offersCatalogMode(provider('synthetic'))).resolves.toBe(true);
+    await expect(offersCatalogMode(provider('morph-byok'))).resolves.toBe(false);
+    await expect(offersCatalogMode(provider('chutes-byok'))).resolves.toBe(false);
+    await expect(offersCatalogMode(provider('kimi-coding'))).resolves.toBe(false);
   });
 
   test('lists the current catalog ids a provider serves with their primary model', async () => {
-    const entries = await listDirectByokCatalogModels('synthetic');
+    const entries = await listCatalogModelsOfProvider(provider('synthetic'));
 
     expect(entries.map(({ catalogModelId, model }) => [catalogModelId, model.id])).toEqual([
       ['moonshotai/kimi-k2.6', 'hf:moonshotai/Kimi-K2.6'],
@@ -138,7 +148,7 @@ describe('catalog mode support', () => {
 
 describe('free models in catalog mode', () => {
   test('does not list a free catalog id or the auto small free model', async () => {
-    const entries = await listDirectByokCatalogModels('synthetic');
+    const entries = await listCatalogModelsOfProvider(provider('synthetic'));
 
     expect(entries.map(({ catalogModelId }) => catalogModelId)).toEqual(['moonshotai/kimi-k2.6']);
   });
@@ -194,6 +204,16 @@ describe('direct BYOK model lists in catalog mode', () => {
     expect([...catalogIds]).toEqual(['moonshotai/kimi-k2.6', '~moonshotai/kimi-latest']);
   });
 
+  test('lists the APIs of each key serving a catalog id, aliases included', async () => {
+    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': true }));
+    const chatCompletions = { chatApis: ['chat_completions'], clientApi: 'chat_completions' };
+
+    const serving = await getDirectByokCatalogServing({ type: 'user', id: 'user-id' });
+
+    expect(serving.get('moonshotai/kimi-k2.6')).toEqual([chatCompletions, chatCompletions]);
+    expect(serving.get('~moonshotai/kimi-latest')).toEqual([chatCompletions, chatCompletions]);
+  });
+
   test('omits latest aliases that left the catalog', async () => {
     mockedKeys.mockResolvedValueOnce(keys({ synthetic: true }));
     mockedIsValid.mockImplementation(
@@ -216,8 +236,8 @@ describe('direct BYOK model lists in catalog mode', () => {
     async (allowedProviderId, expected) => {
       mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': true }));
       const isServingAllowed = jest.fn(
-        async (_catalogModelId: string, policyProviderId: string) =>
-          policyProviderId === allowedProviderId
+        async (_catalogModelId: string, target: DirectByokPolicyTarget) =>
+          target.kind === 'provider' && target.providerSlug === allowedProviderId
       );
 
       const catalogIds = await getDirectByokCatalogModelIds(
@@ -226,8 +246,14 @@ describe('direct BYOK model lists in catalog mode', () => {
       );
 
       expect([...catalogIds]).toEqual(expected);
-      expect(isServingAllowed).toHaveBeenCalledWith('moonshotai/kimi-k2.6', 'synthetic');
-      expect(isServingAllowed).toHaveBeenCalledWith('~z-ai/glm-latest', 'z-ai');
+      expect(isServingAllowed).toHaveBeenCalledWith('moonshotai/kimi-k2.6', {
+        kind: 'provider',
+        providerSlug: 'synthetic',
+      });
+      expect(isServingAllowed).toHaveBeenCalledWith('~z-ai/glm-latest', {
+        kind: 'provider',
+        providerSlug: 'z-ai',
+      });
     }
   );
 

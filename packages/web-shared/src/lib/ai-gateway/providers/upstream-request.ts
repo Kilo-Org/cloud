@@ -98,7 +98,7 @@ export class UpstreamTimeoutError extends Error {
 
 // fetchWithBackoff reserves the next delay before retrying, so 75s yields about one minute.
 const GENERATION_FETCH_MAX_DELAY_MS = 75 * 1000;
-const CHAT_API_PATHS = {
+export const CHAT_API_PATHS = {
   chat_completions: '/chat/completions',
   responses: '/responses',
   messages: '/messages',

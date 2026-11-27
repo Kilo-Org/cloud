@@ -31,6 +31,17 @@ describe('sortByokKeysInRouteOrder', () => {
     ]);
   });
 
+  test("ranks the organization's private providers before every other key by default", () => {
+    expect(
+      order([
+        { providerId: 'openrouter' },
+        { providerId: 'synthetic' },
+        { providerId: 'private-a1b2c3d4e5' },
+        { providerId: 'anthropic' },
+      ])
+    ).toEqual(['private-a1b2c3d4e5', 'synthetic', 'anthropic', 'openrouter']);
+  });
+
   test('follows the priorities the owner chose', () => {
     expect(
       order([

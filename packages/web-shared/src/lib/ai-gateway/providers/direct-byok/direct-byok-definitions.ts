@@ -1,5 +1,5 @@
 import type { DirectByokProviderMetaId } from './direct-byok-meta';
-import type { DirectByokProvider } from './types';
+import type { StaticDirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
 import bedrockByok from './bedrock-byok';
 import byteplusCoding from './byteplus-coding';
@@ -41,7 +41,7 @@ const DIRECT_BYOK_PROVIDERS = [
   xiaomiTokenPlanAms,
   xiaomiTokenPlanSgp,
   zaiCoding,
-] satisfies ReadonlyArray<DirectByokProvider>;
+] satisfies ReadonlyArray<StaticDirectByokProvider>;
 
 /**
  * The provider list as one widened list, for lookups and iterations: the tuple keeps
@@ -49,7 +49,8 @@ const DIRECT_BYOK_PROVIDERS = [
  * restating the widening. It is also this module's default export, so both specifiers carry one
  * value and one type.
  */
-export const directByokProviderList: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+export const directByokProviderList: ReadonlyArray<StaticDirectByokProvider> =
+  DIRECT_BYOK_PROVIDERS;
 
 /** A provider the shared metadata names without a definition; such a provider cannot be used. */
 type UndefinedDirectByokProviderId = Exclude<

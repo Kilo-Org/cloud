@@ -24,6 +24,8 @@ const ByokCandidateSkipReasonSchema = z.enum([
   'model-unavailable',
   'provider-settings',
   'ignored-by-request',
+  /** The key could not be decrypted, or authenticating with its upstream failed. */
+  'unusable-credential',
 ]);
 
 export type ByokCandidateSkipReason = z.infer<typeof ByokCandidateSkipReasonSchema>;
@@ -106,6 +108,19 @@ const RoutingDecisionStepSchema = z.union([
     provider_id: z.string(),
     reason: z.literal('catalog-only'),
     catalog_model_id: z.string().nullable(),
+  }),
+  /** An organization private provider's model id, which no other route serves, that its private provider cannot serve. */
+  z.object({
+    step: z.literal('direct-byok-model'),
+    outcome: z.literal('rejected'),
+    provider_id: z.string(),
+    reason: z.enum([
+      'no-organization',
+      'no-key',
+      'disabled',
+      'unknown-model',
+      'invalid-credentials',
+    ]),
   }),
   z.object({ step: z.literal('organization-policy'), excluded_provider_ids: z.array(z.string()) }),
   z.object({ step: z.literal('chatgpt'), outcome: z.literal('selected') }),
@@ -213,6 +228,7 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
       'claude-billing-unavailable',
       'claude-billing-reconnect',
       'custom-llm-unavailable',
+      'byok-private-provider-unavailable',
       'direct-byok-catalog-only',
     ]),
   }),

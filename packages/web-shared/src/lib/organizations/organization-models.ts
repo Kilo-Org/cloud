@@ -14,14 +14,14 @@ import {
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getAllowedDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
+import { getDirectByokModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getAllowedDirectByokCatalogServing } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
-  getOrganizationByokProviderIds,
+  getEnabledByokProviders,
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
@@ -76,32 +76,33 @@ export async function getAvailableModelsForOrganization(
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  // `getOrganizationByokProviderIds` and `getAllowedDirectByokCatalogModelIds` read the
+  // `getEnabledByokProviders` and `getAllowedDirectByokCatalogServing` read the
   // replica on purpose even when the caller injects `fromDb`, so the returned catalog mixes
   // connections: in the web app, where `fromDb` is the primary, a key that was just disabled
   // can keep its model listed until the replica catches up. Both values only shape this list,
   // and inference re-resolves the policy and the keys per request, so the lag cannot change
   // what a request may use. Threading `fromDb` would instead put both reads on the primary for
   // list data alone.
-  const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+  const [responseData, byokKeys, directByokCatalogServing] = await Promise.all([
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
-    getOrganizationByokProviderIds(readDb, organizationId),
-    getAllowedDirectByokCatalogModelIds(organizationId, policy),
+    getEnabledByokProviders(readDb, { type: 'organization', id: organizationId }),
+    getAllowedDirectByokCatalogServing(organizationId, policy),
   ]);
+  const byokProviderIds = byokKeys.map(key => key.providerId);
   const restrictionCandidates = [...responseData.data];
 
   const { filteredModels, allowedProvidersByModel } = await applyModelPolicyToCatalog(
     policy,
     restrictionCandidates,
     byokProviderIds,
-    directByokCatalogModelIds
+    new Set(directByokCatalogServing.keys())
   );
 
   let availableModels = addDirectByokCatalogAvailability(
     await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
       allowedProvidersByModel.get(modelId)
     ),
-    directByokCatalogModelIds
+    directByokCatalogServing
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {
@@ -112,7 +113,7 @@ export async function getAvailableModelsForOrganization(
     availableModels.push(buildAutoModelCatalogEntry(ORG_AUTO_MODEL));
   }
 
-  availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
+  availableModels.push(...(await getDirectByokModels(byokKeys)));
   availableModels.push(
     ...(await listAvailableCustomLlms(
       organizationId,

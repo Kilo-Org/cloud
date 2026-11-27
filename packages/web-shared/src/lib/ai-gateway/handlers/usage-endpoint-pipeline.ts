@@ -29,6 +29,7 @@ import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gatewa
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
 import {
   extractHeaderAndLimitLength,
   makeErrorReadable,
@@ -197,9 +198,12 @@ export async function handleUsageEndpointRequest<Body>(
   const { user } = caller;
   const organizationId = caller.kind === 'signed-in' ? caller.organizationId : undefined;
 
-  // Custom LLMs are served only through chat routes; never forward their ids
+  // Custom LLMs and private providers are served only through chat routes; never forward their ids
   // elsewhere. Checked after auth so anonymous callers cannot probe for them.
-  if (await isCustomLlm(requestedModelLowerCased)) {
+  if (
+    isByokPrivateModelId(requestedModelLowerCased) ||
+    (await isCustomLlm(requestedModelLowerCased))
+  ) {
     return modelDoesNotExistResponse();
   }
 

@@ -149,6 +149,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
           refs: ['refs/heads/main'],
           jobWorkflowRefs: expected.workflows.map(file => pinned(file)),
           events: expected.events,
+          legacySubject: true,
         },
       });
       expect(policy?.dynamic ?? [], expected.workload).toEqual([]);
@@ -244,7 +245,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
     }
   });
 
-  it('refuses another repository, another owner, and the subject forms kilocode issues today', async () => {
+  it('refuses another repository, another owner, and subjects naming another repository', async () => {
     const { verify } = await fixture('production');
     const base = claims('release', 'publish.yml', 'workflow_dispatch');
     // Kilo-Org/bouncer's repository id, with every other claim unchanged.
@@ -256,22 +257,14 @@ describe('shipped Kilo-Org/kilocode policies', () => {
       status: 'denied',
       reason: 'unknown_workload',
     });
-    // Kilo-Org/kilocode has not opted in to immutable subjects (use_immutable_subject false on
-    // 2026-11-26), so its tokens carry the name-only form, which STS refuses.
-    for (const sub of [
-      'repo:Kilo-Org/kilocode:environment:release',
-      `repo:Kilo-Org@${OWNER_ID}/kilocode@${REPOSITORY_ID}:ref:refs/heads/main`,
-    ]) {
-      expect(await verify({ ...base, sub }), sub).toMatchObject({
-        status: 'denied',
-        reason: 'identity_rejected',
-        subject: { actor: 'ci-kilocode-release' },
-      });
-    }
-    // The subject names another repository id while the id claims still name kilocode.
+    // The subject names another repository while the id claims still name kilocode.
     for (const sub of [
       `repo:Kilo-Org@${OWNER_ID}/kilocode@1395255492:environment:release`,
       `repo:Kilo-Org@${OWNER_ID}/bouncer@1395255492:environment:release`,
+      'repo:Kilo-Org/bouncer:environment:release',
+      'repo:Kilo-Org/kilocode:environment:automation',
+      'repo:Kilo-Org/kilocode:ref:refs/heads/main',
+      'repo:Kilo-Org/kilocode:pull_request',
     ]) {
       expect(await verify({ ...base, sub }), sub).toMatchObject({
         status: 'denied',
@@ -279,6 +272,50 @@ describe('shipped Kilo-Org/kilocode policies', () => {
         subject: { actor: 'ci-kilocode-release' },
       });
     }
+  });
+
+  // Kilo-Org/kilocode keeps GitHub's default subject until npm/cli#9969 is fixed (legacySubject).
+  describe('the default subject kilocode issues today', () => {
+    const LEGACY = 'repo:Kilo-Org/kilocode:environment:release';
+
+    it.each(cases)('issues %s for %s on %s', async (workload, file, event, policy) => {
+      const { verify } = await fixture('production');
+      const body = {
+        ...claims(policy.environment, file, event),
+        sub: `repo:Kilo-Org/kilocode:environment:${policy.environment}`,
+      };
+      expect(await verify(body)).toMatchObject({ status: 'verified', workload });
+    });
+
+    it('refuses it with another repository id or owner id', async () => {
+      const { verify } = await fixture('production');
+      const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
+      for (const ids of [
+        { repository_id: '1395255492' },
+        { repository_owner_id: '1' },
+        { repository_id: '1395255492', repository_owner_id: '1' },
+      ]) {
+        const outcome = await verify({ ...base, ...ids });
+        expect(outcome, JSON.stringify(ids)).toMatchObject({ status: 'denied' });
+        expect(outcome).not.toMatchObject({ workload: 'ci-kilocode-release' });
+      }
+    });
+
+    it('keeps every other binding', async () => {
+      const { verify } = await fixture('production');
+      const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
+      for (const change of [
+        { ref: 'refs/heads/v2', job_workflow_ref: pinned('publish.yml', 'refs/heads/v2') },
+        { event_name: 'push' },
+        { job_workflow_ref: pinned('ci.yml') },
+        { environment: 'automation' },
+      ]) {
+        expect(await verify({ ...base, ...change }), JSON.stringify(change)).toMatchObject({
+          status: 'denied',
+          reason: 'identity_rejected',
+        });
+      }
+    });
   });
 
   it.each(['staging', 'development'] as const)(

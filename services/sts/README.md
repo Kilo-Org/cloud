@@ -500,8 +500,9 @@ deploy token; their bundles are `/ci/<workload>`:
 | `ci-kilocode-notify` | `automation` | `outdated-kilo-deps.yml`, `stale-alerts-report.yml`, `stale-bot-pr-notify.yml`, `v2-upstream-release-notify.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-opencode-watch` | `automation` | `watch-opencode-releases.yml` | `schedule`, `workflow_dispatch` |
 
-`Kilo-Org/kilocode` predates GitHub's immutable subjects and has not opted in yet, so STS refuses
-its tokens (`identity_rejected`) until it does. No policy admits the `v2` branch or `release-v2`.
+`Kilo-Org/kilocode` predates GitHub's immutable subjects and cannot opt in yet, so its seven
+policies set `legacySubject: true` (see "Legacy subject" below). No policy admits the `v2` branch
+or `release-v2`.
 
 Two kilocode-side rules hold these policies to what they name:
 
@@ -747,7 +748,9 @@ How a token finds its policy, in this order:
    `repo:<owner>@<owner id>/<repo>@<repository id>:environment:<environment>` (a policy without an
    `environment`: `repo:...:ref:<ref>`), `ref` must be in `refs`, the matched `jobWorkflowRefs`
    entry must be pinned to that same `ref`, and `event_name` must be in `events`. A failure is
-   refused `identity_rejected` and audited under the policy's workload.
+   refused `identity_rejected` and audited under the policy's workload. A `legacySubject` policy
+   also accepts GitHub's default subject `repo:<owner>/<repo>:environment:<environment>` (or
+   `:ref:<ref>`); the id claims and every other binding still apply.
 
 Rules the loader enforces:
 
@@ -780,6 +783,16 @@ Preconditions on the GitHub side, which STS cannot check:
   settings (https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens).
   A name-only subject (`repo:<owner>/<repo>:...`) is refused, and so is a customized subject
   template.
+- **Legacy subject (Kilo-Org/kilocode only, decision 2026-11-27).** `identity.legacySubject: true`
+  accepts the default subject as well; the loader refuses it on any policy whose repository, id and
+  owner id are not `Kilo-Org/kilocode`, `946087422` and `201822503`
+  (`GITHUB_LEGACY_SUBJECT_REPOSITORY`). Why: npm/cli#9969 (open) makes npm trusted publishing fail
+  with "package not found" for repositories using use_immutable_subject, and Azure signing's
+  federated credential matches `sub`, so it needs a new trust entry before the switch. How to
+  upgrade: when npm fixes #9969, add the Azure federated credential for
+  `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main`, turn on use_immutable_subject
+  for kilocode, prove oidc_check on main and v2, then delete the exception (the flag, its loader
+  allowance and the constant).
 - **Protected environment.** STS trusts the `environment` claim; the GitHub environment's branch
   rule (`main`) and its required reviewers are what make that claim mean something.
 - **Environment names** use only letters, digits, `.`, `_` and `-`, and the workflow spells them

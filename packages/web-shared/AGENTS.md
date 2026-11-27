@@ -68,11 +68,16 @@ work, work after the upstream request starts, and exceptional paths may use it.
 - Unselected accounting from Frankfurt is written locally. Direct accounting
   also remains for deployments matching neither label branch (staging or
   production).
-- Selected queue usage falls back to a direct write only in the two
-  pre-publication cases where nothing was sent: missing or unparseable publisher
-  configuration and failed lifetime registration. It does not fall back after
-  any publication attempt, including a timeout or an ambiguous failure, because
-  the event may already be queued.
+- Selected queue usage falls back to a direct write only in the pre-publication
+  cases where nothing was sent: missing or unparseable publisher configuration
+  (including an invalid `USAGE_PUBLISHER_AUTH` or STS destination), failed
+  lifetime registration, and, under `USAGE_PUBLISHER_AUTH=sts`, `not_sent` (STS
+  denied the token or gave none in time: within 1 second for a single attempt or
+  2 seconds with retries, always leaving the first request at least 1 second,
+  before any request). It does not fall back after any publication attempt,
+  including a timeout or an ambiguous failure, because the event may already be
+  queued. In STS mode the publisher never sends `USAGE_INGEST_PUBLISH_SECRET`
+  and never falls back to it; see `USAGE_PUBLISHER_AUTH` in `ENVIRONMENT.md`.
 - For other writes, defer with `after()` or forward them to `fra1` like
   `recordUsageInPrimaryRegion` does.
 - Redis (`lib/redis`) has its primary in `fra1` and a read replica in `sfo1`:

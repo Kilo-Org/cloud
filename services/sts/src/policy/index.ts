@@ -8,6 +8,7 @@ import ciDbMigrateStagingPolicy from '../../policy/ci-db-migrate-staging.yaml';
 import ciDbMigratePolicy from '../../policy/ci-db-migrate.yaml';
 import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
 import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
+import ciKilocodeAppKeyV2Policy from '../../policy/ci-kilocode-app-key-v2.yaml';
 import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
 import ciKilocodeNotifyPolicy from '../../policy/ci-kilocode-notify.yaml';
 import ciKilocodeOpencodeWatchPolicy from '../../policy/ci-kilocode-opencode-watch.yaml';
@@ -57,6 +58,7 @@ const sources: Record<PolicyFile, string> = {
   'ci-db-migrate-staging.yaml': ciDbMigrateStagingPolicy,
   'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,
   'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
+  'ci-kilocode-app-key-v2.yaml': ciKilocodeAppKeyV2Policy,
   'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,
   'ci-kilocode-notify.yaml': ciKilocodeNotifyPolicy,
   'ci-kilocode-opencode-watch.yaml': ciKilocodeOpencodeWatchPolicy,

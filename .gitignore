@@ -119,3 +119,6 @@ run-milvus-test.sh
 # Harness markers: the kwf workflow drops these in a worktree, and one
 # reached a product commit (46640f5e8e96) before it was removed by hand.
 .kwf*
+
+# uv environment for scripts/zizmor.sh
+tools/zizmor/.venv/

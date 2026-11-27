@@ -5,7 +5,7 @@ import { readCodeReviewInfraSecret } from '../../../code-review-infra/src/secret
 import { readSessionSyncSecret } from '../../../session-sync/src/secrets';
 import { readUserDataExportSecret } from '../../../user-data-export/src/secrets';
 import { PolicySchema, type Policy } from '../../src/policy/schema';
-import { repoRoot, shippedPolicyDocuments } from './repo';
+import { repoRoot, SHARED_SECRET_NAMES, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
 
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
@@ -43,20 +43,10 @@ function shippedPolicies(): Map<string, Policy> {
 }
 
 /**
- * The names whose value is the same one across Workloads, so the copier keeps a single copy in
- * `/shared`. Everything else is a credential of one Workload and lives in its own folder: a pool of
- * same-named credentials is a normal layout (`R2_ACCESS_KEY_ID` is this Worker's bucket token and,
- * separately, kilo-chat's media token), so counting granting policies cannot decide the folder.
- *
- * `INTERNAL_API_SECRET` and `NEXTAUTH_SECRET` are read by apps/web; `CALLBACK_TOKEN_SECRET` is the
- * HMAC key apps/web verifies this Worker's callbacks with
- * (`apps/web/src/lib/web-config.server.ts`).
+ * The folder each name resolves from is decided by `SHARED_SECRET_NAMES` (`./repo.ts`), which the
+ * batch-D table imports too: counting granting policies cannot decide it, because same-named
+ * per-Workload credentials are the normal layout.
  */
-const SHARED_NAMES: Record<string, true> = {
-  INTERNAL_API_SECRET: true,
-  NEXTAUTH_SECRET: true,
-  CALLBACK_TOKEN_SECRET: true,
-};
 
 /** The published table's path column: where the copier copies each value. */
 const PUBLISHED_PATHS: Record<string, string> = {
@@ -131,7 +121,7 @@ async function proveWorker<N extends string>(worker: {
       expect(binding, `${worker.workload}: ${name}`).toBe(name);
     }
     // Folder: a shared value lives in `/shared`, a Workload's own credential in its own folder.
-    const shared = SHARED_NAMES[name] === true;
+    const shared = SHARED_SECRET_NAMES.includes(name);
     rows.push({
       workload: worker.workload,
       oldBinding: binding,

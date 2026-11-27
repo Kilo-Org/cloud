@@ -77,16 +77,19 @@ describe('readSessionSyncSecret', () => {
       expect(store.get).toHaveBeenCalledOnce();
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
-      // Flipping the variable back reads the legacy binding, whose value the isolate already holds.
+      // Flipping the variable back reads the legacy binding: the two signing secrets are held for the
+      // isolate, the erase route's secret is read every time.
       expect(await readSessionSyncSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)).toBe(
         'legacy-value'
       );
-      expect(store.get).toHaveBeenCalledOnce();
+      expect(store.get).toHaveBeenCalledTimes(name === 'INTERNAL_API_SECRET' ? 2 : 1);
       expect(sts.getBundle).toHaveBeenCalledOnce();
     }
   );
 
-  it.each(NAMES)('holds the resolved %s for the isolate, not the pending read', async name => {
+  const HELD_NAMES = NAMES.filter(name => name !== 'INTERNAL_API_SECRET');
+
+  it.each(HELD_NAMES)('holds the resolved %s for the isolate, not the pending read', async name => {
     const store = storeSecret('legacy-value');
     const env = legacyEnv(store.secret);
 

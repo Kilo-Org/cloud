@@ -24,13 +24,12 @@ import { parseWorkerConfig, workerConfigPaths, type WorkerConfig } from './worke
  * working while `sts` answers `not_granted`.
  *
  * Readers declare one of two map shapes and both are checked the same way: `BINDINGS` (the
- * canonical name an STS reader asks for) and the earlier `SECRETS_STORE_BINDINGS`, so a sibling
- * batch that has not renamed its map yet is still checked instead of failing the parse.
- * `migration-proxy` and `bouncer-watch` have no `src/secrets.ts` here (`bouncer-watch` lives in
- * another repository); `o11y`, `audit-relay` and `cloudflare-webhook-agent-ingest` declare no map
- * at all — their names are a type union, one name per binding — so their own suites cover them.
- * A config is enumerated by its top-level `name`; one that names its deployment only inside `env`
- * (`notifications`) is not reached here and stays covered by its own suite.
+ * canonical name an STS reader asks for) and the earlier `SECRETS_STORE_BINDINGS`, which main's
+ * `notifications` reader still uses, so a sibling batch that has not renamed its map yet is
+ * checked instead of failing the parse. `migration-proxy` and `bouncer-watch` have no
+ * `src/secrets.ts` here (`bouncer-watch` lives in another repository); `o11y`, `audit-relay` and
+ * `cloudflare-webhook-agent-ingest` declare no map at all — their names are a type union, one name
+ * per binding, no table to copy — so their own suites cover them.
  */
 
 /** The map shapes a reader may declare; a source file carries at most one of them. */
@@ -109,20 +108,22 @@ describe('policy secrets match the reader that serves them', () => {
       expect(new Set(reader.map(([stsName]) => stsName)).size).toBe(reader.length);
       for (const [stsName, binding] of reader) {
         expect(vars.has(binding), `${workload}: ${binding} is a var, not a secret`).toBe(false);
-        // A Secrets Store binding is in the manifest, and the entry behind it must carry the name
-        // of the secret it holds: the canonical lookup name or its `_PROD` alias when the binding
-        // is that name, and the binding's own name or its `_PROD` alias when the binding is a
-        // prefixed or legacy alias of the lookup name. Otherwise the copier copies a different
-        // secret than the policy grants. A plain Worker secret (`wrangler secret put`) has no
-        // manifest entry at all: only the deployment holds it, and the Worker's own reader suite
-        // pins the binding names it reads.
+        // A Secrets Store binding is in the manifest, and the entry behind it must hold the secret
+        // the lookup name denotes: its own name, or that name behind a manager prefix
+        // (`NOTIFICATIONS_APNS_PRIVATE_KEY` reads `APNS_PRIVATE_KEY`). Either may carry the `_PROD`
+        // suffix the first entries used. A row that would copy an unrelated secret fails here
+        // instead of at cutover. A plain Worker secret (`wrangler secret put`) has no manifest
+        // entry at all: only the deployment holds it, and the Worker's own reader suite pins the
+        // binding names it reads.
         const entry = storeEntries.find(secret => secret.binding === binding);
         if (entry !== undefined) {
-          const names =
-            binding === stsName || binding === `${stsName}_PROD`
-              ? [stsName, `${stsName}_PROD`]
-              : [binding, `${binding}_PROD`];
-          expect(names, `${workload}: ${stsName} -> ${binding}`).toContain(entry.secret_name);
+          const base = entry.secret_name.endsWith('_PROD')
+            ? entry.secret_name.slice(0, -'_PROD'.length)
+            : entry.secret_name;
+          expect(
+            base === stsName || stsName.endsWith(`_${base}`),
+            `${workload}: ${stsName} -> ${binding} stores ${entry.secret_name}`
+          ).toBe(true);
         }
       }
     });

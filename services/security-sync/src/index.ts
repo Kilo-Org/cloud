@@ -26,6 +26,7 @@ import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { SECURITY_SYNC_OWNER_BUDGET_MS, releaseOwnerSyncLease, syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
 import { runSecurityNotificationSweep } from './notifications/sweep';
+import { readStsInternalApiSecret, secretsSource, type StsReadFailure } from './secrets';
 
 const SecuritySyncOwnerSchema = z
   .object({
@@ -180,6 +181,46 @@ function getEnvironment(env: CloudflareEnv): string | undefined {
     return env.ENVIRONMENT;
   }
   return undefined;
+}
+
+/** Why a route could not get the expected key from a non-legacy source; fixed values only. */
+type InternalKeyRefusal = StsReadFailure | 'invalid_source';
+
+type ExpectedInternalApiKey = { key: string | undefined } | { refused: InternalKeyRefusal };
+
+/**
+ * The value an inbound `x-internal-api-key` must equal. The `secrets-store` source reads the
+ * binding for every request, as before, and returns or throws exactly what `get()` does. The `sts`
+ * source reads the bundle only for a request that presents a key, so a keyless request costs no
+ * bundle load, and it never falls back. A failed bundle read, and an unrecognised
+ * `SECRETS_SOURCE`, return a fixed refusal instead of throwing.
+ */
+async function expectedInternalApiKey(
+  env: CloudflareEnv,
+  presented: string | null
+): Promise<ExpectedInternalApiKey> {
+  const source = secretsSource(env);
+  if (source === 'secrets-store') return { key: await env.INTERNAL_API_SECRET.get() };
+  if (source === undefined) return { refused: 'invalid_source' };
+  if (!presented) return { key: undefined };
+  const read = await readStsInternalApiSecret(env);
+  return read.ok ? { key: read.value } : { refused: read.reason };
+}
+
+/**
+ * A generic, retryable refusal returned before any body, database or queue read. The log line
+ * carries only fixed fields. The web client treats this 503 as ambiguous transport and retries,
+ * as it does a failed request today; the body matches no disabled-routing error.
+ */
+function internalKeyUnavailable(
+  route: '/internal/manual-sync' | '/internal/dismiss-finding',
+  reason: InternalKeyRefusal
+): Response {
+  console.error('Security Sync internal key unavailable', { route, reason });
+  return new Response(JSON.stringify({ success: false, error: 'Internal key unavailable' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json', 'Retry-After': '30' },
+  });
 }
 
 const QUEUE_SEND_BATCH_LIMIT = 100;
@@ -810,10 +851,12 @@ export default {
           503
         );
       }
-      const [internalSecret, authHeader] = await Promise.all([
-        env.INTERNAL_API_SECRET.get(),
-        Promise.resolve(request.headers.get('x-internal-api-key')),
-      ]);
+      const authHeader = request.headers.get('x-internal-api-key');
+      const expected = await expectedInternalApiKey(env, authHeader);
+      if ('refused' in expected) {
+        return internalKeyUnavailable('/internal/manual-sync', expected.refused);
+      }
+      const internalSecret = expected.key;
 
       if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
@@ -846,10 +889,12 @@ export default {
           503
         );
       }
-      const [internalSecret, authHeader] = await Promise.all([
-        env.INTERNAL_API_SECRET.get(),
-        Promise.resolve(request.headers.get('x-internal-api-key')),
-      ]);
+      const authHeader = request.headers.get('x-internal-api-key');
+      const expected = await expectedInternalApiKey(env, authHeader);
+      if ('refused' in expected) {
+        return internalKeyUnavailable('/internal/dismiss-finding', expected.refused);
+      }
+      const internalSecret = expected.key;
 
       if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);

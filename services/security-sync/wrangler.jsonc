@@ -15,6 +15,14 @@
       "persist": true,
       "invocation_logs": false,
     },
+    // Traces stay off: a trace records outbound URLs and Durable Object SQL
+    // bindings, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts). `env.dev` inherits this
+    // block. Cloudflare records no traces without `traces.enabled: true`, so
+    // this pins the current setting.
+    "traces": {
+      "enabled": false,
+    },
   },
   "logpush": true,
   "routes": [
@@ -36,6 +44,11 @@
     "BACKEND_API_URL": "https://app.kilo.ai",
     "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
     "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
+    // Where every internal API secret read goes (src/secrets.ts):
+    // `secrets-store` reads the INTERNAL_API_SECRET binding below, `sts` reads
+    // the STS bundle over the `STS` binding and never falls back. An absent
+    // value means `secrets-store`; any other value refuses every read.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "triggers": {
     "crons": ["0 */6 * * *", "15 * * * *"],
@@ -81,7 +94,22 @@
       "service": "git-token-service",
       "entrypoint": "GitTokenRPCEntrypoint",
     },
+    // STS serves the runtime secret bundle over the account-internal binding.
+    // `props.caller` is what STS authorizes on and must equal this Worker's
+    // top-level name. This block deploys production only, so it binds the
+    // production `sts`; services/sts/policy/cloudflare-security-sync.yaml
+    // grants no name yet. Nothing reads it while SECRETS_SOURCE is
+    // `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloudflare-security-sync" },
+    },
   ],
+  // The `secrets-store` source reads this binding. It stays bound while STS
+  // reads are proven, so a rollback is one redeploy with SECRETS_SOURCE set to
+  // `secrets-store`.
   "secrets_store_secrets": [
     {
       "binding": "INTERNAL_API_SECRET",
@@ -100,8 +128,15 @@
         "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
         "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
       },
+      // No schedule outside production: a config that binds STS runs none
+      // (services/sts/test/repo/worker-configs.ts), and a deploy of this block
+      // would reach the production database through its Hyperdrive id.
+      // `wrangler dev` never runs crons by itself and uses the local
+      // connection string; trigger a handler by hand, for example
+      // `curl "http://127.0.0.1:8812/cdn-cgi/local/scheduled?cron=15+*+*+*+*"`
+      // for the notification sweep or `cron=0+*%2F6+*+*+*` for the dispatch.
       "triggers": {
-        "crons": ["0 */6 * * *", "15 * * * *"],
+        "crons": [],
       },
       "queues": {
         "producers": [

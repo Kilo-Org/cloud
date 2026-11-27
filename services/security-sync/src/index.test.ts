@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BundleBinding } from '@kilocode/secrets-client';
 import {
   createOrFindSecurityAgentCommandByOperationKey,
   createSecurityAgentCommand,
@@ -34,6 +35,7 @@ vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('@kilocode/db/operation-ledger', () => ({ settleOperation: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
+vi.mock('cloudflare:workers', () => ({ waitUntil: vi.fn() }));
 vi.mock('./sync.js', async importOriginal => {
   const actual = await importOriginal<typeof SyncModule>();
   return { ...actual, syncOwner: vi.fn(), releaseOwnerSyncLease: vi.fn() };
@@ -1715,5 +1717,190 @@ describe('security operation ledger settlement', () => {
     expect(settleOperation).not.toHaveBeenCalled();
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Synthetic fixture values only. Each source holds a different value, so a route that compared
+// against the wrong source, or fell back to it, answers differently.
+const STORE_KEY = 'store-internal-fixture-0123456789abcdef';
+const BUNDLE_KEY = 'bundle-internal-fixture-0123456789abcdef';
+
+type BundleResult = Awaited<ReturnType<BundleBinding['getBundle']>>;
+
+function bundleWith(secrets: Record<string, string>): BundleResult {
+  return {
+    status: 'ok',
+    workload: 'cloudflare-security-sync',
+    environment: 'production',
+    etag: '"0123456789abcdef"',
+    stale: false,
+    fetchedAt: '2026-11-27T00:00:00.000Z',
+    secrets: Object.fromEntries(
+      Object.entries(secrets).map(([name, value]) => [name, { value, version: 1 }])
+    ),
+    missing: [],
+  };
+}
+
+/** The vars a route test sets; every other binding comes from `routeEnv`. */
+type RouteVars = {
+  SECRETS_SOURCE?: string;
+  MANUAL_SYNC_COMMAND_ROUTING_ENABLED?: string;
+  DISMISS_FINDING_COMMAND_ROUTING_ENABLED?: string;
+};
+
+/** A fresh STS binding per call: the reader keeps one bundle per binding for the isolate. */
+function routeEnv(
+  vars: RouteVars,
+  bundle: BundleResult = bundleWith({ INTERNAL_API_SECRET: BUNDLE_KEY })
+) {
+  const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
+  const storeGet = vi.fn(async () => STORE_KEY);
+  const env = {
+    ...vars,
+    INTERNAL_API_SECRET: { get: storeGet },
+    STS: { getBundle } satisfies BundleBinding,
+    // Synthetic: every database call in these tests goes to the mocked `getWorkerDb`.
+    HYPERDRIVE: { connectionString: 'postgres://synthetic-test' },
+  } as unknown as CloudflareEnv;
+  return { env, getBundle, storeGet };
+}
+
+/**
+ * An invalid JSON body: an accepted key answers 400 before any database or queue call, and a
+ * refused key answers 401 before the body is read.
+ */
+function routeRequest(path: string, key?: string): Request {
+  return new Request(`https://security-sync.test${path}`, {
+    method: 'POST',
+    headers: key === undefined ? {} : { 'x-internal-api-key': key },
+    body: 'not-json',
+  });
+}
+
+describe.each(['/internal/manual-sync', '/internal/dismiss-finding'])(
+  'internal route secrets source (%s)',
+  path => {
+    it.each<RouteVars>([{}, { SECRETS_SOURCE: 'secrets-store' }])(
+      'accepts only the Secrets Store key and reads no bundle (%j)',
+      async vars => {
+        const { env, getBundle, storeGet } = routeEnv(vars);
+
+        expect((await worker.fetch(routeRequest(path, STORE_KEY), env)).status).toBe(400);
+        expect((await worker.fetch(routeRequest(path, BUNDLE_KEY), env)).status).toBe(401);
+        expect((await worker.fetch(routeRequest(path), env)).status).toBe(401);
+        // The Secrets Store source reads the binding for every request, a keyless one included.
+        expect(storeGet).toHaveBeenCalledTimes(3);
+        expect(getBundle).not.toHaveBeenCalled();
+        expect(getWorkerDb).not.toHaveBeenCalled();
+      }
+    );
+
+    it('accepts only the bundle key under sts and never reads the Secrets Store', async () => {
+      const { env, getBundle, storeGet } = routeEnv({ SECRETS_SOURCE: 'sts' });
+
+      expect((await worker.fetch(routeRequest(path), env)).status).toBe(401);
+      // A keyless request loads no bundle.
+      expect(getBundle).not.toHaveBeenCalled();
+
+      const accepted = await worker.fetch(routeRequest(path, BUNDLE_KEY), env);
+      expect(accepted.status).toBe(400);
+      await expect(accepted.json()).resolves.toEqual({
+        success: false,
+        error: 'Invalid JSON body',
+      });
+      const refused = await worker.fetch(routeRequest(path, STORE_KEY), env);
+      expect(refused.status).toBe(401);
+      await expect(refused.json()).resolves.toEqual({ success: false, error: 'Unauthorized' });
+      expect(getBundle).toHaveBeenCalledOnce();
+      expect(storeGet).not.toHaveBeenCalled();
+      expect(getWorkerDb).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, RouteVars, BundleResult, string]>([
+      ['no grant', { SECRETS_SOURCE: 'sts' }, bundleWith({}), 'not_granted'],
+      [
+        'an STS denial',
+        { SECRETS_SOURCE: 'sts' },
+        { status: 'denied', reason: 'unknown_workload' },
+        'denied',
+      ],
+      ['a malformed SECRETS_SOURCE', { SECRETS_SOURCE: 'STS' }, bundleWith({}), 'invalid_source'],
+    ])(
+      'answers a generic 503 on %s, logs fixed fields only, and never falls back',
+      async (_case, vars, bundle, reason) => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const { env, storeGet } = routeEnv(vars, bundle);
+
+        const response = await worker.fetch(routeRequest(path, STORE_KEY), env);
+
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Retry-After')).toBe('30');
+        await expect(response.json()).resolves.toEqual({
+          success: false,
+          error: 'Internal key unavailable',
+        });
+        expect(error).toHaveBeenCalledOnce();
+        expect(error).toHaveBeenCalledWith('Security Sync internal key unavailable', {
+          route: path,
+          reason,
+        });
+        expect(storeGet).not.toHaveBeenCalled();
+        expect(getWorkerDb).not.toHaveBeenCalled();
+        error.mockRestore();
+      }
+    );
+
+    it('keeps the Secrets Store failure as before: a failed get() rejects the request', async () => {
+      const { env, getBundle, storeGet } = routeEnv({});
+      const failure = new Error('store read failed');
+      storeGet.mockRejectedValueOnce(failure);
+
+      await expect(worker.fetch(routeRequest(path, STORE_KEY), env)).rejects.toBe(failure);
+      expect(getBundle).not.toHaveBeenCalled();
+      expect(getWorkerDb).not.toHaveBeenCalled();
+    });
+  }
+);
+
+describe('internal route secrets source ordering', () => {
+  it.each<[string, RouteVars]>([
+    ['/internal/manual-sync', { MANUAL_SYNC_COMMAND_ROUTING_ENABLED: 'false' }],
+    ['/internal/dismiss-finding', { DISMISS_FINDING_COMMAND_ROUTING_ENABLED: 'false' }],
+  ])('answers 503 for %s with routing disabled before any read', async (path, disabled) => {
+    const { env, getBundle, storeGet } = routeEnv({ SECRETS_SOURCE: 'sts', ...disabled });
+
+    expect((await worker.fetch(routeRequest(path, BUNDLE_KEY), env)).status).toBe(503);
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(storeGet).not.toHaveBeenCalled();
+  });
+
+  it('reads no secret for health, the queue consumer or the six-hour dispatch under sts', async () => {
+    const { env, getBundle, storeGet } = routeEnv({ SECRETS_SOURCE: 'sts' });
+    vi.mocked(getWorkerDb).mockReturnValue({
+      select: () => ({ from: () => ({ where: async () => [] }) }),
+    } as never);
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const ack = vi.fn();
+
+    expect((await worker.fetch(new Request('https://security-sync.test/health'), env)).status).toBe(
+      200
+    );
+    await worker.queue(
+      {
+        queue: 'security-sync-jobs',
+        messages: [{ body: { invalid: true }, attempts: 1, ack, retry: vi.fn() }],
+      } as unknown as MessageBatch<SecuritySyncQueueMessage>,
+      env
+    );
+    await worker.scheduled(
+      { cron: '0 */6 * * *', scheduledTime: 0, noRetry: vi.fn() } as ScheduledController,
+      env
+    );
+
+    expect(ack).toHaveBeenCalledOnce();
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(storeGet).not.toHaveBeenCalled();
   });
 });

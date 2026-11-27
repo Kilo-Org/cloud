@@ -29,6 +29,7 @@ import {
   resolveNotificationRecipientUserIds,
   type SecurityNotificationOwner,
 } from './recipients';
+import { readStsInternalApiSecret, secretsSource, type SecuritySyncSecretsEnv } from '../secrets';
 
 const STUCK_CLAIM_RECOVERY_MINUTES = 5;
 const MAX_SLA_MATERIALIZATION_PER_TICK = 1000;
@@ -43,7 +44,7 @@ const MAX_ATTEMPTS = 4;
 
 type SecretBinding = { get(): Promise<string> };
 
-export type SecurityNotificationSweepEnv = {
+export type SecurityNotificationSweepEnv = SecuritySyncSecretsEnv & {
   HYPERDRIVE?: { connectionString: string };
   BACKEND_API_URL?: string;
   INTERNAL_API_SECRET?: SecretBinding;
@@ -1090,7 +1091,28 @@ async function dispatchPendingRows(
   };
 }
 
+/**
+ * The dispatch secret, or null when it cannot be used; null skips dispatch for this tick and the
+ * rest of the sweep still runs. The `secrets-store` source keeps its optional, fail-soft read. The
+ * `sts` source is fail-soft the same way and never falls back to the Secrets Store; it logs only a
+ * fixed reason, so a cutover can see a failed bundle read.
+ */
 async function readInternalSecret(env: SecurityNotificationSweepEnv): Promise<string | null> {
+  const source = secretsSource(env);
+  if (source === undefined) {
+    console.warn('[security-notifications] SECRETS_SOURCE is malformed; skipping dispatch read');
+    return null;
+  }
+  if (source === 'sts') {
+    const read = await readStsInternalApiSecret(env);
+    if (!read.ok) {
+      console.warn('[security-notifications] STS internal secret read failed', {
+        reason: read.reason,
+      });
+      return null;
+    }
+    return read.value || null;
+  }
   if (!env.INTERNAL_API_SECRET) return null;
   try {
     const secret = await env.INTERNAL_API_SECRET.get();

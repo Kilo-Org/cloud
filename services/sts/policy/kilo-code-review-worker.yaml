@@ -1,0 +1,4 @@
+# Registration only: services/code-review-infra/wrangler.jsonc. No environment, identity or grant.
+workload: kilo-code-review-worker
+registered: true
+secrets: []

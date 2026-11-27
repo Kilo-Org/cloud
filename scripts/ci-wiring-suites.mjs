@@ -17,6 +17,7 @@ export const wiringSuites = [
   'scripts/production-deploy-failure.test.mjs',
   'scripts/meta-janitor-approve.test.mjs',
   'scripts/mobile-sbom-workflow.test.mjs',
+  'scripts/sts-deployment-watch.test.mjs',
 ];
 
 export const wiringCommand = `node --test ${wiringSuites.join(' ')}`;

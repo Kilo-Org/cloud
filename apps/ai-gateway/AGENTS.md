@@ -50,6 +50,16 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   `packages/web-shared/src/lib/observability`, registered in
   `src/instrumentation.ts` with the `kilocode-ai-gateway` service name. The app
   has no client or Edge runtime code, so it has no client or Edge Sentry config.
+- `src/instrumentation.ts` also installs the shared `INTERNAL_API_SECRET` read
+  (`packages/web-shared/src/lib/sts-secret-reader.ts`), so every internal call this app
+  sends or receives follows `SECRETS_SOURCE` on the `kilocode-ai-gateway` project
+  (`ENVIRONMENT.md`): unset or `env` keeps the environment variable, `sts` reads the
+  `ai-gateway` STS bundle and never falls back. Read it through `readInternalApiSecret`,
+  never the `config.server` constant. Keep the project on `env` until the `ai-gateway`
+  policy grants `INTERNAL_API_SECRET` in that environment and the protected import of the
+  value exists. Receivers answer a failed read with their generic unavailable status and do
+  not log it; the shared reader's `sts_secret_read_failed` line, limited per reason on a best
+  effort basis, is the one signal.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

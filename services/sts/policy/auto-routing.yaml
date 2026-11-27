@@ -1,0 +1,4 @@
+# Registration only: services/auto-routing/wrangler.jsonc. No environment, identity or grant.
+workload: auto-routing
+registered: true
+secrets: []

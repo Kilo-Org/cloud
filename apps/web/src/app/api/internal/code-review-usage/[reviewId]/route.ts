@@ -36,10 +36,11 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
-  try {
-    const unauthorized = authorizeInternalApiRequest(req);
-    if (unauthorized) return unauthorized;
+  // Outside the try: its catch echoes the error message, and a failed secret read must not reach it.
+  const unauthorized = await authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
+  try {
     const { reviewId } = await params;
     const rawPayload = await req.json();
     const parseResult = UsagePayloadSchema.safeParse(rawPayload);

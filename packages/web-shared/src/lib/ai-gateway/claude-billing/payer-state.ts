@@ -5,7 +5,7 @@ import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { KiloOrganizationIdSchema } from '@kilocode/usage-contracts';
 import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import {
   claudeBillingEffectiveConnection,
@@ -85,7 +85,8 @@ export async function getAuthoritativeClaudeBillingState(
     const granted = await getGrantedClaudeBillingConnection(owner, db);
     return claudeBillingPayerState(granted ? claudeBillingEffectiveConnection(granted) : null);
   }
-  if (!INTERNAL_API_SECRET) throw new Error('Claude payer-state authentication is not configured');
+  const internalApiSecret = await readInternalApiSecret();
+  if (!internalApiSecret) throw new Error('Claude payer-state authentication is not configured');
   const payerStateUrl = parseInternalServiceEndpoint(
     APP_URL,
     '/api/internal/claude-billing/payer-state'
@@ -95,7 +96,7 @@ export async function getAuthoritativeClaudeBillingState(
     payerStateUrl.toString(),
     async () => ({
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
+      headers: { 'content-type': 'application/json', 'x-internal-api-key': internalApiSecret },
       body: JSON.stringify(owner),
       cache: 'no-store',
     }),

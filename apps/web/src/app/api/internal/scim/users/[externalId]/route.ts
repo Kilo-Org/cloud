@@ -23,7 +23,7 @@ type RouteParams = { params: Promise<{ externalId: string }> };
  * `users/[externalId]/memberships`.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   const { externalId } = await params;

@@ -10,6 +10,7 @@ const exaFields: readonly string[] = Object.keys(ExaUsageRecordSchema.shape);
 
 const exaIngress: TaggedUsageIngress<ExaUsageQueueMessage> = {
   kind: 'exa_usage',
+  path: '/exa-usage',
   maxBytes: MAX_EXA_USAGE_BYTES,
   toMessage(value) {
     const result = ExaUsageRecordSchema.safeParse(value);
@@ -26,7 +27,8 @@ const exaIngress: TaggedUsageIngress<ExaUsageQueueMessage> = {
 export function handlePublishExaUsage(
   request: Request,
   env: Env,
-  entryAtMs: number
+  entryAtMs: number,
+  ctx: ExecutionContext | undefined
 ): Promise<Response> {
-  return handlePublishTaggedUsage(request, env, entryAtMs, exaIngress);
+  return handlePublishTaggedUsage(request, env, entryAtMs, exaIngress, ctx);
 }

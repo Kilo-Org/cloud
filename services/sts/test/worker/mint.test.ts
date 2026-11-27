@@ -7,6 +7,7 @@ import {
   STS_DENIED_PROBE,
   STS_DENIED_PROBE_REASON,
   STS_DENIED_PROBE_WORKLOAD,
+  STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
   STS_ENVIRONMENTS,
   STS_SECURE_PROXY_FORWARD,
   STS_SECURITY_SYNC_DISMISS_FINDING,
@@ -16,6 +17,7 @@ import {
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
+  STS_WEB_MCP_CATALOG_TOKEN_MINT,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   isStsDeniedProbe,
   type MintRequest,
@@ -820,9 +822,10 @@ describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
   );
 });
 
-describe('phase 4 service scopes under the shipped policies', () => {
+describe('phase 4 service scopes and CI scopes under the shipped policies', () => {
   // The O11y scopes, the Security Sync scopes and the web scopes each share one audience, and a
-  // mint holds one token per audience, so each scope is asked for in a request of its own.
+  // mint holds one token per audience, so each scope is asked for in a request of its own. No
+  // shipped policy grants a CI scope yet, its GitHub Actions sender included.
   const SERVICE_SCOPES = [
     STS_SECURE_PROXY_FORWARD,
     STS_USAGE_PUBLISH,
@@ -833,6 +836,8 @@ describe('phase 4 service scopes under the shipped policies', () => {
     STS_SECURITY_SYNC_MANUAL_SYNC,
     STS_SECURITY_SYNC_DISMISS_FINDING,
     STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+    STS_WEB_MCP_CATALOG_TOKEN_MINT,
+    STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
   ];
   /**
    * The dual-accept grants, each the caller its receiver admits: usage-ingest's queue consumer
@@ -884,6 +889,15 @@ describe('phase 4 service scopes under the shipped policies', () => {
         expect.arrayContaining(['web', 'usage-ingest', 'ai-gateway', 'o11y'])
       );
     }
+  });
+
+  it('covers the opencode sync sender in production', () => {
+    expect(shipped).toContainEqual(
+      expect.objectContaining({
+        environment: 'production',
+        workload: 'ci-kilocode-opencode-watch',
+      })
+    );
   });
 
   it('issues each dual-accept scope to exactly its caller in development', async () => {
@@ -943,7 +957,7 @@ describe('phase 4 service scopes under the shipped policies', () => {
   );
 
   it.each(shipped)(
-    'refuses $workload in $environment every phase 4 service scope it is not granted, never as unknown_scope',
+    'refuses $workload in $environment every phase 4 service or CI scope it is not granted, never as unknown_scope',
     async ({ environment, workload, policy }) => {
       const granted = GRANTED[workload] ?? [];
       for (const entry of SERVICE_SCOPES.filter(scope => !granted.includes(scope))) {

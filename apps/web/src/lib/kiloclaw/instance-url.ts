@@ -8,7 +8,7 @@
  * `https://{label}.kiloclaw.ai`) AND the instance is on the post-PR1
  * controller contract (`controllerCapabilitiesVersion >= 2`), the
  * template is expanded with the sandboxId's hostname label. Otherwise
- * falls back to the legacy single-host `KILOCLAW_API_URL`.
+ * falls back to the legacy single-host URL.
  *
  * The capability gate matters: v1 machines don't have the per-instance
  * origin in their OpenClaw allowlist, so WebSocket upgrades from the
@@ -21,14 +21,16 @@
  *   - `controllerCapabilitiesVersion`: from the worker's `getStatus`
  *     (null → treat as pre-v1, legacy host)
  *   - `template`: `KILOCLAW_INSTANCE_URL_TEMPLATE` (empty → legacy host)
- *   - `fallback`: `KILOCLAW_API_URL` (empty → "https://claw.kilo.ai")
+ *   - `fallback`: `KILOCLAW_LEGACY_WORKER_URL`, already resolved for this
+ *     deployment (see config.server.ts); empty means no legacy host is configured
+ *
+ * Returns null when the legacy host is needed but not configured: the
+ * dashboard then offers no Open link rather than guessing a destination.
  */
 
 import { hostnameLabelFromSandboxId } from '@kilocode/worker-utils/hostname-label';
 
 const MIN_CAPABILITY_VERSION_FOR_PER_INSTANCE_URL = 2;
-
-const DEFAULT_LEGACY_URL = 'https://claw.kilo.ai';
 
 /**
  * Process-local guard so the "misconfigured template" warning fires
@@ -42,10 +44,10 @@ export function workerUrlForInstance(params: {
   sandboxId: string | null;
   controllerCapabilitiesVersion: number | null;
   template: string;
-  fallback: string;
-}): string {
+  fallback: string | null;
+}): string | null {
   const { sandboxId, controllerCapabilitiesVersion, template, fallback } = params;
-  const legacyUrl = fallback || DEFAULT_LEGACY_URL;
+  const legacyUrl = fallback || null;
 
   if (!template) return legacyUrl;
   if (!template.includes('{label}')) {

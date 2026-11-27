@@ -7,8 +7,14 @@
  * tests.
  */
 
+/**
+ * Where a request's authority comes from. `session` is the NextAuth browser session, the only
+ * credential staff authority accepts. `uts_session` is a UTS browser session of the `kilo-web` BFF
+ * (design 5.5): it never carries staff authority until design 5.12 is built for it.
+ */
 export type PrivilegedCredentialKind =
   | 'session'
+  | 'uts_session'
   | 'human_bearer'
   | 'delegated_workload'
   | 'service_assertion';
@@ -136,6 +142,8 @@ export type CredentialProvenanceInput = {
   serviceAssertion?: boolean;
   /** A scoped, delegated Cloud Agent authority that is still a workload. */
   delegatedWorkload?: boolean;
+  /** The browser session was a UTS one (`kilo-web`), not NextAuth. */
+  utsBrowserSession?: boolean;
 };
 
 /**
@@ -156,7 +164,7 @@ const DELEGATED_WORKLOAD_TOKEN_SOURCES = new Set([
 ]);
 
 export function deriveCredentialKind(input: CredentialProvenanceInput): PrivilegedCredentialKind {
-  if (!input.authViaToken) return 'session';
+  if (!input.authViaToken) return input.utsBrowserSession ? 'uts_session' : 'session';
   if (input.serviceAssertion || input.internalApiUse) return 'service_assertion';
   if (
     input.delegatedWorkload ||

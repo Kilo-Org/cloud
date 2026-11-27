@@ -335,6 +335,30 @@ const EXCEPTIONS = {
     reason: sharedWeb,
     signals: { 'helper-call': 6, 'helper-import': 3, 'auth-library-import': 1 },
   },
+  'packages/web-shared/src/lib/uts-bff/browser-session-config.ts': {
+    reason: `${sharedWeb}: the kilo-web BFF compares its own session cookie's pepper binding with the account's current pepper in constant time; no inbound token`,
+    signals: { primitive: 1 },
+    pins: [
+      'export function isBrowserSessionBindingCurrent(',
+      'const right = Buffer.from(browserSessionPepperBinding(pepper));',
+    ],
+  },
+  'packages/web-shared/src/lib/uts-bff/browser-session.ts': {
+    reason: `${sharedWeb}: the kilo-web BFF compares the callback's OAuth state with its own transaction cookie, and a prior session handle with the new one, in constant time; UTS checks the code`,
+    signals: { primitive: 1 },
+    pins: [
+      'function sameValue(received: string, expected: string): boolean {',
+      "if (state === null || !sameValue(state, transaction.state)) return restart('state_mismatch');",
+    ],
+  },
+  'packages/web-shared/src/lib/uts-bff/kilo-web-key.ts': {
+    reason: `${sharedWeb}: the kilo-web BFF proves its own configured signing key by verifying a fixed probe with that key's public half; no inbound token`,
+    signals: { primitive: 1 },
+    pins: [
+      "const PROBE = new TextEncoder().encode('kilo-web signing key check');",
+      'await crypto.subtle.verify(algorithm, publicKey, signature, PROBE)',
+    ],
+  },
   'packages/worker-utils/src/backend-auth-middleware.ts': {
     reason: sharedWorker,
     signals: { 'helper-call': 1, primitive: 1 },

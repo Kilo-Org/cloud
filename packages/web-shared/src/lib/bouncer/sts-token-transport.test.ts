@@ -271,7 +271,12 @@ describe('connectBouncerSts', () => {
     jest.useRealTimers();
   });
 
-  function connection(options: { held: { value: boolean }; status?: number }) {
+  function connection(options: {
+    held: { value: boolean };
+    status?: number;
+    deny?: boolean;
+    random?: () => number;
+  }) {
     const mint = jest.fn<void, [boolean]>();
     const exchangeHeld = jest.fn(async () => options.held.value);
     const identity = jest.fn(async () => IDENTITY_TOKEN);
@@ -282,14 +287,18 @@ describe('connectBouncerSts', () => {
       }
       return Response.json({
         status: 'ok',
-        tokens: request.tokens.map(({ audience, scope }) => ({
-          status: 'issued',
-          audience,
-          scope,
-          token: 'sts-token',
-          jti: 'jti',
-          expiresAt: Math.floor(Date.now() / 1000) + 300,
-        })),
+        tokens: request.tokens.map(({ audience, scope }) =>
+          options.deny
+            ? { status: 'denied', audience, scope, reason: 'audience_not_allowed' }
+            : {
+                status: 'issued',
+                audience,
+                scope,
+                token: 'sts-token',
+                jti: 'jti',
+                expiresAt: Math.floor(Date.now() / 1000) + 300,
+              }
+        ),
       });
     });
     const connected = connectBouncerSts({
@@ -298,10 +307,56 @@ describe('connectBouncerSts', () => {
       identity,
       exchangeHeld,
       fetch: stsFetch as unknown as typeof fetch,
-      random: () => 0.5,
+      random: options.random ?? (() => 0.5),
     });
     return { connected, mint, exchangeHeld, identity, stsFetch };
   }
+
+  it('runs one identity step and one jitter for every scope of a first mint', async () => {
+    jest.useFakeTimers();
+    const held = { value: false };
+    const draws = [0.9, 0.1, 0.5];
+    const { connected, identity, stsFetch } = connection({
+      held,
+      random: () => draws.shift() ?? 0,
+    });
+    const scopes = ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'];
+    let settled = 0;
+    const reads = scopes.map(scope => {
+      const read = connected.tokens.get({ audience: 'bouncer', scope }, ctx);
+      void read.then(() => {
+        settled += 1;
+      });
+      return read;
+    });
+    await jest.advanceTimersByTimeAsync(20);
+    // Another instance's exchange lands in the Runtime Cache while this one is in its jitter.
+    held.value = true;
+    await jest.advanceTimersByTimeAsync(BOUNCER_NOT_HELD_MEMORY_MS);
+    await expect(connected.exchangeReady()).resolves.toBe(false);
+    // The one jitter is the first draw, 0.9 of the range; the others are never drawn.
+    await jest.advanceTimersByTimeAsync(0.9 * BOUNCER_FIRST_MINT_JITTER_MS - 300);
+    await expect(connected.exchangeReady()).resolves.toBe(false);
+    expect(settled).toBe(0);
+    expect(stsFetch).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(100);
+    await expect(Promise.all(reads)).resolves.toEqual(['sts-token', 'sts-token', 'sts-token']);
+    await expect(connected.exchangeReady()).resolves.toBe(true);
+    expect(identity).toHaveBeenCalledTimes(1);
+    expect(draws).toEqual([0.1, 0.5]);
+    expect(stsFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('counts a 200 answer that denies the token as a failed mint', async () => {
+    jest.useFakeTimers();
+    const { connected, mint } = connection({ held: { value: true }, deny: true });
+    const token = connected.tokens.get(DECIDE, ctx);
+    void token.catch(() => undefined);
+    await jest.advanceTimersByTimeAsync(20);
+    await expect(token).rejects.toThrow();
+    expect(mint).toHaveBeenCalledWith(false);
+    expect(mint).not.toHaveBeenCalledWith(true);
+  });
 
   it('delays a first-exchange mint by the jitter and reports not ready meanwhile', async () => {
     jest.useFakeTimers();

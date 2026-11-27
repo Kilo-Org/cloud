@@ -5,7 +5,7 @@ import {
   vercelIdentity,
   type Exchange,
 } from '@kilocode/service-token-client/vercel';
-import { STS_ISSUERS } from '@kilocode/sts-contracts';
+import { MintResultSchema, STS_ISSUERS } from '@kilocode/sts-contracts';
 import {
   BouncerStsConfigError,
   type BouncerTokenRead,
@@ -65,13 +65,20 @@ export function createBouncerTransportFor(options: {
  * The token client over `identity`, with the readiness check, the first-mint jitter and the mint
  * counter.
  *
+ * - Identity step: every STS call of an attempt (one per scope) shares one step, so a first mint
+ *   runs one exchange and one jitter for all scopes. The step starts the readiness check and the
+ *   identity side by side, so a scale-out mint pays for one Runtime Cache round trip, not two in a
+ *   row.
  * - Readiness: `exchangeHeld` (memory, else the Runtime Cache) runs one check at a time; every
  *   caller during a check shares it, and a check that finds nothing is remembered for
- *   `BOUNCER_NOT_HELD_MEMORY_MS`. While the first mint's jitter runs, readiness is false.
- * - Jitter: when the identity step starts without a held exchanged token, this instance exchanges
- *   or polls for the deployment's first one; the mint then waits a random 0 to
- *   `BOUNCER_FIRST_MINT_JITTER_MS` before it goes to STS, so a deployment's instances spread out.
- * - Counter: every STS answer reaches `hooks.mint` (`ok` for 2xx); a request that fails is `false`.
+ *   `BOUNCER_NOT_HELD_MEMORY_MS`. While an identity step has not yet seen a held exchanged token
+ *   (`firstMintPending`, set before the step's first await), readiness is false, so no call waits
+ *   through an exchange or a jitter.
+ * - Jitter: when the step finds no held exchanged token, this instance exchanges or polls for the
+ *   deployment's first one; the mint then waits a random 0 to `BOUNCER_FIRST_MINT_JITTER_MS`
+ *   before it goes to STS, so a deployment's instances spread out.
+ * - Counter: every STS answer reaches `hooks.mint`: `true` only for an answer that issued a token,
+ *   `false` for a denial, any other answer, or a request that failed.
  */
 export function connectBouncerSts(options: {
   stsIssuer: string;
@@ -87,7 +94,8 @@ export function connectBouncerSts(options: {
   const fetchFn = options.fetch ?? fetch;
   let checking: Promise<boolean> | null = null;
   let notHeldUntil = 0;
-  let jitterUntil = 0;
+  let firstMintPending = false;
+  let step: Promise<string> | null = null;
 
   function held(): Promise<boolean> {
     checking ??= options
@@ -102,23 +110,37 @@ export function connectBouncerSts(options: {
   }
 
   async function exchangeReady(): Promise<boolean> {
-    const at = now();
-    if (at < jitterUntil || at < notHeldUntil) return false;
-    return await held();
+    if (firstMintPending || now() < notHeldUntil) return false;
+    const found = await held();
+    return found && !firstMintPending;
+  }
+
+  async function identityStep(): Promise<string> {
+    firstMintPending = true;
+    try {
+      const identity = options.identity();
+      // Rejections surface through the `await identity` below; this keeps an early one handled.
+      void identity.catch(() => undefined);
+      if (await held()) {
+        firstMintPending = false;
+        return await identity;
+      }
+      const token = await identity;
+      const jitter = Promise.withResolvers<void>();
+      setTimeout(jitter.resolve, Math.floor(random() * BOUNCER_FIRST_MINT_JITTER_MS));
+      await jitter.promise;
+      return token;
+    } finally {
+      firstMintPending = false;
+    }
   }
 
   const getIdentityToken: IdentityTokenSource = Object.assign(
     async () => {
-      const heldBefore = await held();
-      const token = await options.identity();
-      if (!heldBefore) {
-        const jitterMs = Math.floor(random() * BOUNCER_FIRST_MINT_JITTER_MS);
-        jitterUntil = now() + jitterMs;
-        const done = Promise.withResolvers<void>();
-        setTimeout(done.resolve, jitterMs);
-        await done.promise;
-      }
-      return token;
+      step ??= identityStep().finally(() => {
+        step = null;
+      });
+      return await step;
     },
     { invalidate: options.identity.invalidate }
   );
@@ -126,7 +148,7 @@ export function connectBouncerSts(options: {
   const countingFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     try {
       const response = await fetchFn(input, init);
-      options.hooks.mint(response.ok);
+      options.hooks.mint(await issuedAToken(response));
       return response;
     } catch (error) {
       options.hooks.mint(false);
@@ -144,6 +166,25 @@ export function connectBouncerSts(options: {
   };
 }
 
+/**
+ * Whether an STS answer issued a token. STS answers 200 for a denial too (a policy without the
+ * Bouncer grant), and that must not count as a successful mint; the token client reads its own
+ * copy of the body.
+ */
+async function issuedAToken(response: Response): Promise<boolean> {
+  if (!response.ok) return false;
+  try {
+    const result = MintResultSchema.safeParse(await response.clone().json());
+    return (
+      result.success &&
+      result.data.status === 'ok' &&
+      result.data.tokens.some(token => token.status === 'issued')
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** The readiness check's exchange: it never exchanges, so a miss costs no Vercel exchange. */
 const NO_EXCHANGE: Exchange = async () => ({ kind: 'failed', detail: 'readiness check only' });
 
@@ -154,6 +195,12 @@ const NO_EXCHANGE: Exchange = async () => ({ kind: 'failed', detail: 'readiness 
  * Runtime Cache, with no jitter, no claim and an exchange that always fails: a token in its memory
  * answers at once, one in the cache costs one read (then memory), and a miss costs three reads (the
  * token, the token again, the refusal marker), never an exchange or a write.
+ *
+ * This identity is separate from the usage publisher's (`ai-gateway/usage-publish-token.ts`) on
+ * purpose: each module loads only when its own flag is on, so neither pulls the other's token
+ * client into a deployment that does not use it. Both read and write the same `sts-exchange`
+ * Runtime Cache entry, so a deployment still exchanges once per issuer; the cost of keeping them
+ * apart is one extra exchanged token held in memory per process.
  */
 export function createBouncerTransport(hooks: BouncerTransportHooks): BouncerTransport {
   return createBouncerTransportFor({

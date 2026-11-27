@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from './env';
+import { readSessionIngestSecret } from './secrets';
 import { z } from 'zod';
 
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
@@ -25,7 +26,7 @@ async function hasValidInternalSecret(c: {
   env: Env;
 }): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
-  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
+  const expected = await readSessionIngestSecret(c.env, 'INTERNAL_API_SECRET');
   if (!provided || !expected) return false;
 
   return timingSafeEqual(provided, expected);

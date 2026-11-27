@@ -1,4 +1,25 @@
-# Registration only: services/git-token-service/wrangler.jsonc. No environment, identity or grant.
+# The git-token-service Worker (services/git-token-service/wrangler.jsonc). It reads its runtime
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets Store
+# bindings and plain Worker secrets) until secrets-cutover flips it. NEXTAUTH_SECRET resolves from
+# /shared; every other name resolves from /workloads/git-token-service.
+#
+# Public identifiers stay plain Worker vars/reads on `env` and are not granted here: GITHUB_APP_ID,
+# GITHUB_APP_CLIENT_ID, GITHUB_LITE_APP_ID, GITLAB_CLIENT_ID,
+# BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID, BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
+# USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID and USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY.
 workload: git-token-service
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - NEXTAUTH_SECRET
+  - SCM_SESSION_CAPABILITY_ENCRYPTION_KEY
+  - BITBUCKET_CLIENT_ID
+  - BITBUCKET_CLIENT_SECRET
+  - GITHUB_APP_PRIVATE_KEY
+  - GITHUB_LITE_APP_PRIVATE_KEY
+  - GITHUB_APP_CLIENT_SECRET
+  - GITLAB_CLIENT_SECRET
+  - BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY
+  - USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY

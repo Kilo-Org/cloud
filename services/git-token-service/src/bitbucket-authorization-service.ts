@@ -17,6 +17,7 @@ import {
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, exists, isNull, sql } from 'drizzle-orm';
 import { availableAccountCondition } from './account-availability.js';
+import { readGitTokenServiceSecret } from './secrets';
 import { z } from 'zod';
 import {
   claimRefreshLease,
@@ -409,8 +410,8 @@ export class BitbucketAuthorizationService {
     }
 
     const [clientId, clientSecret, refreshToken] = await Promise.all([
-      resolveSecret(this.env.BITBUCKET_CLIENT_ID),
-      resolveSecret(this.env.BITBUCKET_CLIENT_SECRET),
+      readGitTokenServiceSecret(this.env, 'BITBUCKET_CLIENT_ID'),
+      readGitTokenServiceSecret(this.env, 'BITBUCKET_CLIENT_SECRET'),
       this.decryptCredential(current.authorization, 'refresh'),
     ]);
     if (!clientId || !clientSecret || !refreshToken) {
@@ -574,8 +575,9 @@ export class BitbucketAuthorizationService {
   ): Promise<string | null> {
     try {
       const keyId = await resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID);
-      const encodedPrivateKey = await resolveSecret(
-        this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY
+      const encodedPrivateKey = await readGitTokenServiceSecret(
+        this.env,
+        'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY'
       );
       if (!keyId || !encodedPrivateKey) return null;
       const privateKeyPem = Buffer.from(encodedPrivateKey, 'base64').toString('utf8');

@@ -3,6 +3,7 @@ import { Octokit } from '@octokit/rest';
 import { createHash } from 'node:crypto';
 import * as z from 'zod';
 import type { GitHubBrokerRejectionProvenance } from '@kilocode/worker-utils/github-authorization';
+import { readGitTokenServiceSecret } from './secrets';
 
 type Token = z.infer<typeof Token>;
 const Token = z.object({
@@ -99,11 +100,16 @@ export class GitHubRepositoryPermissionsUnavailableError extends Error {
 export class GitHubTokenService {
   constructor(private env: CloudflareEnv) {}
 
-  isConfigured(appType: GitHubAppType = 'standard'): boolean {
+  async isConfigured(appType: GitHubAppType = 'standard'): Promise<boolean> {
     if (appType === 'lite') {
-      return Boolean(this.env.GITHUB_LITE_APP_ID && this.env.GITHUB_LITE_APP_PRIVATE_KEY);
+      const privateKey = await readGitTokenServiceSecret(
+        this.env,
+        'GITHUB_LITE_APP_PRIVATE_KEY'
+      );
+      return Boolean(this.env.GITHUB_LITE_APP_ID && privateKey);
     }
-    return Boolean(this.env.GITHUB_APP_ID && this.env.GITHUB_APP_PRIVATE_KEY);
+    const privateKey = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_PRIVATE_KEY');
+    return Boolean(this.env.GITHUB_APP_ID && privateKey);
   }
 
   /**
@@ -126,7 +132,7 @@ export class GitHubTokenService {
       return cached;
     }
 
-    const credentials = this.getCredentials(appType);
+    const credentials = await this.getCredentials(appType);
     const { token, expiresAt } = await this.generateToken(numericId, credentials, {
       repositoryNames: [repoName],
     });
@@ -144,7 +150,7 @@ export class GitHubTokenService {
     const numericId = this.validateInstallationId(installationId);
     if (installationPermissions === null || Object.keys(installationPermissions).length === 0) {
       try {
-        const credentials = this.getCredentials(appType);
+        const credentials = await this.getCredentials(appType);
         const auth = createAppAuth(credentials);
         const { token } = await auth({ type: 'app' });
         const octokit = new Octokit({ auth: token });
@@ -163,10 +169,14 @@ export class GitHubTokenService {
     const cacheKey = `${installationId}:${appType}:${repoName}:repository-only:v1:${permissionKey}`;
     const cached = await this.getCachedToken(cacheKey);
     if (cached) return cached;
-    const { token, expiresAt } = await this.generateToken(numericId, this.getCredentials(appType), {
-      repositoryNames: [repoName],
-      permissions,
-    });
+    const { token, expiresAt } = await this.generateToken(
+      numericId,
+      await this.getCredentials(appType),
+      {
+        repositoryNames: [repoName],
+        permissions,
+      }
+    );
     await this.cacheToken(cacheKey, token, expiresAt);
     return token;
   }
@@ -183,9 +193,13 @@ export class GitHubTokenService {
     const cacheKey = `${installationId}:${appType}:repository-ids:${ids.join(',')}`;
     const cached = await this.getCachedToken(cacheKey);
     if (cached) return cached;
-    const { token, expiresAt } = await this.generateToken(numericId, this.getCredentials(appType), {
-      repositoryIds: ids,
-    });
+    const { token, expiresAt } = await this.generateToken(
+      numericId,
+      await this.getCredentials(appType),
+      {
+        repositoryIds: ids,
+      }
+    );
     await this.cacheToken(cacheKey, token, expiresAt);
     return token;
   }
@@ -198,7 +212,7 @@ export class GitHubTokenService {
   ): Promise<string> {
     const { token } = await this.generateToken(
       this.validateInstallationId(installationId),
-      this.getCredentials(appType),
+      await this.getCredentials(appType),
       { ...selection, permissions: { metadata: 'read' }, signal, refresh: true }
     );
     return token;
@@ -223,7 +237,7 @@ export class GitHubTokenService {
 
     try {
       const numericId = this.validateInstallationId(installationId);
-      const credentials = this.getCredentials(appType);
+      const credentials = await this.getCredentials(appType);
       const auth = createAppAuth({
         appId: credentials.appId,
         privateKey: credentials.privateKey,
@@ -277,17 +291,20 @@ export class GitHubTokenService {
       return cached;
     }
 
-    const credentials = this.getCredentials(appType);
+    const credentials = await this.getCredentials(appType);
     const { token, expiresAt } = await this.generateToken(numericId, credentials, { signal });
     await this.cacheToken(cacheKey, token, expiresAt);
 
     return token;
   }
 
-  private getCredentials(appType: GitHubAppType): GitHubAppCredentials {
+  private async getCredentials(appType: GitHubAppType): Promise<GitHubAppCredentials> {
     if (appType === 'lite') {
       const appId = this.env.GITHUB_LITE_APP_ID;
-      const privateKeyRaw = this.env.GITHUB_LITE_APP_PRIVATE_KEY;
+      const privateKeyRaw = await readGitTokenServiceSecret(
+        this.env,
+        'GITHUB_LITE_APP_PRIVATE_KEY'
+      );
       if (!appId || !privateKeyRaw) {
         throw new Error('GitHub Lite App credentials not configured');
       }
@@ -298,7 +315,7 @@ export class GitHubTokenService {
     }
 
     const appId = this.env.GITHUB_APP_ID;
-    const privateKeyRaw = this.env.GITHUB_APP_PRIVATE_KEY;
+    const privateKeyRaw = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_PRIVATE_KEY');
     if (!appId || !privateKeyRaw) {
       throw new Error('GitHub App credentials not configured');
     }

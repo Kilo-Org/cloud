@@ -23,6 +23,7 @@ import {
 import { and, eq, exists, isNull, lt, or, sql } from 'drizzle-orm';
 import { availableAccountCondition } from './account-availability.js';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
+import { readGitTokenServiceSecret } from './secrets';
 
 export type BitbucketWorkspaceAccessTokenAuthorizationCandidate = {
   integrationId: string;
@@ -505,7 +506,7 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
       [keyId, encodedPublicKey, encodedPrivateKey] = await Promise.all([
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID),
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY),
-        resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY),
+        readGitTokenServiceSecret(this.env, 'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY'),
       ]);
     } catch {
       return temporarilyUnavailable('secret_resolution_failed');

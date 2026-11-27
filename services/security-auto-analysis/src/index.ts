@@ -15,6 +15,7 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { consumeOwnerBatch } from './consumer.js';
 import { dispatchDueOwners } from './dispatcher.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import {
   consumeAnalysisCallbackBatch,
   SecurityAnalysisCallbackPayloadSchema,
@@ -44,7 +45,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/dispatch') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
     const authHeader = request.headers.get('x-internal-api-key');
 
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
@@ -65,7 +66,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
         { status: 503 }
       );
     }
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -106,7 +107,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/start') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -147,7 +148,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/cancel') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -172,7 +173,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/apply-auto-remediation') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -229,7 +230,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     if (!attemptToken) {
       return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
     }
-    const callbackTokenSecret = await env.CALLBACK_TOKEN_SECRET.get();
+    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET');
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!callbackTokenSecret &&
@@ -285,7 +286,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     if (!attemptToken) {
       return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
     }
-    const callbackTokenSecret = await env.CALLBACK_TOKEN_SECRET.get();
+    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET');
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!callbackTokenSecret &&

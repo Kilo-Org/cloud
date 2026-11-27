@@ -94,9 +94,12 @@ describe('session-ingest wrangler.jsonc', () => {
     expect(production.workers_dev).toBeUndefined();
     expect(production.preview_urls).toBeUndefined();
     expect(production.logpush).toBe(true);
-    expect(production.observability).toEqual({ enabled: true });
+    expect(production.observability).toEqual({
+      enabled: true,
+      traces: { enabled: false },
+    });
     expect(production.placement).toEqual({ mode: 'smart' });
-    expect(production.vars).toEqual(VARS);
+    expect(production.vars).toEqual({ ...VARS, SECRETS_SOURCE: 'env' });
     expect(boundKinds(production)).toEqual([
       'durable_objects',
       'hyperdrive',
@@ -135,6 +138,12 @@ describe('session-ingest wrangler.jsonc', () => {
     expect(production.services).toEqual([
       { binding: 'O11Y', service: 'o11y' },
       { binding: 'NOTIFICATIONS', service: 'notifications', entrypoint: 'NotificationsService' },
+      {
+        binding: 'STS',
+        service: 'sts',
+        entrypoint: 'SecretsBroker',
+        props: { caller: 'session-ingest' },
+      },
     ]);
     expect(production.secrets_store_secrets).toEqual([
       {
@@ -166,7 +175,7 @@ describe('session-ingest wrangler.jsonc', () => {
     expect(staging.route).toBeUndefined();
     expect(staging.triggers).toEqual({ crons: [] });
     expect(staging.logpush).toBe(false);
-    expect(staging.observability).toEqual({ enabled: false });
+    expect(staging.observability).toEqual({ enabled: false, traces: { enabled: false } });
     expect(staging.vars).toEqual(VARS);
 
     expect(boundKinds(staging)).toEqual(['durable_objects']);

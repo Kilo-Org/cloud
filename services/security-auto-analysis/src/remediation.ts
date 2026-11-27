@@ -60,6 +60,7 @@ import {
 } from './db/queries.js';
 import { InsufficientCreditsError } from './launch.js';
 import { logger, sanitizedExceptionName } from './logger.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import { generateControlToken } from './token.js';
 import { type QueueOwner, type SecurityAgentConfig } from './types.js';
 
@@ -1348,9 +1349,9 @@ async function launchAttempt(params: {
   }
   const githubIntegrationId = params.finding.platform_integration_id;
   const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-    params.env.NEXTAUTH_SECRET.get(),
-    params.env.INTERNAL_API_SECRET.get(),
-    params.env.CALLBACK_TOKEN_SECRET.get(),
+    readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
+    readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
+    readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
   ]);
   const authToken = await generateControlToken(
     params.actor,
@@ -2280,7 +2281,7 @@ export async function dispatchSecurityLifecycleEventForFinding(params: {
     const recipientUserIds = await resolveSecurityLifecycleRecipientUserIds(params.db, finding);
     if (recipientUserIds.length === 0) return;
     const backendUrl = params.env.KILOCODE_BACKEND_BASE_URL;
-    const internalSecret = await params.env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET');
     if (!backendUrl || !internalSecret) return;
     const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
       method: 'POST',
@@ -2767,7 +2768,7 @@ export async function cancelRemediation(params: {
     })
     .where(eq(security_remediation_attempts.id, attempt.id));
   if (attempt.cloud_agent_session_id) {
-    const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
+    const nextAuthSecret = await readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET');
     const authToken = await generateControlToken(
       actor,
       nextAuthSecret,

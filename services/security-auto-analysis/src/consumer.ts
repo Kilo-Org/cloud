@@ -13,6 +13,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import {
   InsufficientCreditsError,
   startSecurityAnalysis,
@@ -297,9 +298,9 @@ async function processOwnerMessage(params: {
   }
 
   const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-    params.env.NEXTAUTH_SECRET.get(),
-    params.env.INTERNAL_API_SECRET.get(),
-    params.env.CALLBACK_TOKEN_SECRET.get(),
+    readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
+    readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
+    readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
   ]);
 
   ownerLoop: for (const [rowIndex, row] of claim.rows.entries()) {

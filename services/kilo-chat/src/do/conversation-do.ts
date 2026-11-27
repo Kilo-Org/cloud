@@ -41,6 +41,7 @@ import { eq, lt, gte, desc, and, sql, inArray } from 'drizzle-orm';
 import { attachments, conversation, members, messages, reactions } from '../db/conversation-schema';
 import { buildAttachmentR2Key } from '../util/attachment-key';
 import { pushEventToHumanMembers } from '../services/event-push';
+import { readKiloChatSecret } from '../secrets';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
@@ -374,8 +375,8 @@ export class ConversationDO extends DurableObject<Env> {
     // R2 binding sees the object. Fall back to the same S3-compatible API path
     // used for the upload so we still reject truly missing objects.
     const [accessKeyId, secretAccessKey] = await Promise.all([
-      this.env.R2_ACCESS_KEY_ID.get().catch(() => null),
-      this.env.R2_SECRET_ACCESS_KEY.get().catch(() => null),
+      readKiloChatSecret(this.env, 'R2_ACCESS_KEY_ID').catch(() => null),
+      readKiloChatSecret(this.env, 'R2_SECRET_ACCESS_KEY').catch(() => null),
     ]);
     if (!accessKeyId || !secretAccessKey) return null;
 

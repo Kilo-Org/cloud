@@ -30,6 +30,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import { interruptAnalysisCloudAgentSession } from './session-interrupt.js';
 import { generateControlToken } from './token.js';
 import {
@@ -271,9 +272,9 @@ export async function processManualAnalysisStart(params: {
             : {}),
         }),
         getSecurityAgentConfigForOwner(params.db, owner),
-        params.env.NEXTAUTH_SECRET.get(),
-        params.env.INTERNAL_API_SECRET.get(),
-        params.env.CALLBACK_TOKEN_SECRET.get(),
+        readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
+        readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
+        readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
       ]);
     if (!tokenResult.success) return { status: 'token-missing' };
 
@@ -333,9 +334,9 @@ export async function processManualAnalysisStart(params: {
 
     config = await getSecurityAgentConfigForOwner(params.db, owner);
     [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-      params.env.NEXTAUTH_SECRET.get(),
-      params.env.INTERNAL_API_SECRET.get(),
-      params.env.CALLBACK_TOKEN_SECRET.get(),
+      readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
+      readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
+      readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
     ]);
   }
 

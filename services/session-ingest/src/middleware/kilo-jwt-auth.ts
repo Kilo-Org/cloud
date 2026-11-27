@@ -13,6 +13,7 @@ import {
 import { decodeJwt } from 'jose';
 
 import type { Env } from '../env';
+import { readSessionIngestSecret } from '../secrets';
 import { resolveConnectionTicket } from '../dos/connection-ticket';
 
 export type KiloJwtAuthVariables = {
@@ -85,7 +86,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   try {
     const deletionAuth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
       token,
-      nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+      nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET') },
       connectionString: c.env.HYPERDRIVE.connectionString,
       audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
       allowBlocked: true,
@@ -102,7 +103,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     } else {
       auth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
         token,
-        nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+        nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET') },
         connectionString: c.env.HYPERDRIVE.connectionString,
         resourceAudience: { audience: SESSION_INGEST_AUDIENCE, mode: 'allow-legacy' },
       });
@@ -129,7 +130,10 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   if (runtimeAuthorization.success) {
     let attested: boolean;
     try {
-      const secret = await getCachedSecret(c.env.NEXTAUTH_SECRET_PROD, 'NEXTAUTH_SECRET');
+      const secret = await getCachedSecret(
+        { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET') },
+        'NEXTAUTH_SECRET'
+      );
       attested = await verifyRuntimeProxyAttestation({
         value: c.req.header(RUNTIME_PROXY_ATTESTATION_HEADER),
         secret,

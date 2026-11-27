@@ -26,6 +26,7 @@ import {
 import { z } from 'zod';
 
 import type { Env } from '../env';
+import { readSessionIngestSecret, type SessionIngestSecretsEnv } from '../secrets';
 
 export const SESSION_SHARE_TOKEN_ISSUER = 'kilo-session-ingest';
 export const SESSION_SHARE_TOKEN_AUDIENCE = 'kilo-session-share';
@@ -95,8 +96,7 @@ export type ResolvedSessionShare = {
   contentCutoffMs: number | null;
 };
 
-export type SessionShareTokenEnv = {
-  SESSION_SHARE_JWT_SECRET_PROD: Pick<Env['SESSION_SHARE_JWT_SECRET_PROD'], 'get'>;
+export type SessionShareTokenEnv = SessionIngestSecretsEnv & {
   SESSION_SHARE_TOKEN_MIN_IAT: string | undefined;
   HYPERDRIVE: Pick<Env['HYPERDRIVE'], 'connectionString'>;
 };
@@ -120,7 +120,7 @@ function parseMinimumIat(rawValue: string | undefined): number {
 }
 
 async function getSessionShareSecret(env: SessionShareTokenEnv): Promise<string> {
-  const secret = await env.SESSION_SHARE_JWT_SECRET_PROD.get();
+  const secret = await readSessionIngestSecret(env, 'SESSION_SHARE_JWT_SECRET');
   if (!secret) {
     throw new Error('SESSION_SHARE_JWT_SECRET_PROD is not configured');
   }

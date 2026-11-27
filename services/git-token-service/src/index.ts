@@ -54,6 +54,7 @@ import {
 } from './gitlab-runtime-token-resolver.js';
 import { DEFAULT_GITLAB_INSTANCE_URL } from '@kilocode/worker-utils/gitlab-url';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
+import { readGitTokenServiceSecret } from './secrets';
 import { isGitHubDisconnectAssertion } from './github-disconnect-assertion.js';
 import {
   GitLabSessionCapabilityCodec,
@@ -390,13 +391,8 @@ const bitbucketCodeReviewAudiences = new Map([
 ]);
 
 type ServiceHttpEnv = CloudflareEnv & {
-  NEXTAUTH_SECRET: SecretsStoreSecret | string;
   GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED?: string;
 };
-
-async function resolveSecret(secret: SecretsStoreSecret | string): Promise<string> {
-  return typeof secret === 'string' ? secret : secret.get();
-}
 
 async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
@@ -860,7 +856,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     }
     let capability: string;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+      );
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         accessPurpose: params.accessPurpose ?? 'workflow',
@@ -898,7 +897,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   ): Promise<RedeemGitHubSessionCapabilityResult> {
     let claims;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+      );
       claims = new GitHubSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
       if (error instanceof GitHubSessionCapabilityError) {
@@ -1151,7 +1153,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     if (!resolved.success) return resolved;
     const { subject } = resolved;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+      );
       const capability = new BitbucketSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         orgId: params.orgId,
@@ -1179,7 +1184,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   ): Promise<RedeemBitbucketSessionCapabilityResult> {
     let claims;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+      );
       claims = new BitbucketSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
       if (error instanceof BitbucketSessionCapabilityError) {
@@ -1270,7 +1278,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     let capability: string;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+      );
       capability = new GitLabSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         outboundContainerId: params.outboundContainerId,
@@ -1304,7 +1315,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   ): Promise<RedeemGitLabSessionCapabilityResult> {
     let claims;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY'
+      );
       claims = new GitLabSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
       if (error instanceof GitLabSessionCapabilityError) {
@@ -1438,7 +1452,7 @@ export default {
 
     let secret: string;
     try {
-      secret = await resolveSecret(env.NEXTAUTH_SECRET);
+      secret = await readGitTokenServiceSecret(env, 'NEXTAUTH_SECRET');
     } catch {
       return Response.json(
         { error: 'authentication_unavailable' },

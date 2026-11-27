@@ -9,6 +9,7 @@ import { user_github_app_tokens } from '@kilocode/db/schema';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { readGitTokenServiceSecret } from './secrets';
 import {
   claimRefreshLease,
   newRefreshLeaseAttemptId,
@@ -89,10 +90,13 @@ export class GitHubAppCredentialLifecycle {
     return `${this.getGitHubOAuthBaseUrl()}/login/oauth/access_token`;
   }
 
-  protected decryptCredential(authorization: AuthorizationRow, kind: CredentialKind): string {
+  protected async decryptCredential(
+    authorization: AuthorizationRow,
+    kind: CredentialKind
+  ): Promise<string> {
     let keys: Parameters<typeof decryptKeyedEnvelope>[2];
     try {
-      keys = this.getDecryptionKeys();
+      keys = await this.getDecryptionKeys();
     } catch {
       throw new CredentialSelectionError('credential_configuration_error');
     }
@@ -115,9 +119,12 @@ export class GitHubAppCredentialLifecycle {
     }
   }
 
-  protected getDecryptionKeys(): Parameters<typeof decryptKeyedEnvelope>[2] {
+  protected async getDecryptionKeys(): Promise<Parameters<typeof decryptKeyedEnvelope>[2]> {
     const activeKeyId = this.env.USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID;
-    const activePrivateKeyEncoded = this.env.USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY;
+    const activePrivateKeyEncoded = await readGitTokenServiceSecret(
+      this.env,
+      'USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY'
+    );
     if (!activeKeyId || !activePrivateKeyEncoded) {
       throw new EncryptionConfigurationError(
         'Active GitHub user-token private key is not configured'
@@ -207,7 +214,7 @@ export class GitHubAppCredentialLifecycle {
     if (typeof initial !== 'object') return initial;
 
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
+    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
     if (!clientId || !clientSecret) return 'transient_failure';
     // Only the attempt that holds the exchange lease may use the refresh token:
     // a second concurrent exchange would make one of the two attempts look like
@@ -234,7 +241,7 @@ export class GitHubAppCredentialLifecycle {
         authorization: current.authorization,
         clientId,
         clientSecret,
-        refreshToken: this.decryptCredential(current.authorization, 'refresh'),
+        refreshToken: await this.decryptCredential(current.authorization, 'refresh'),
       },
     };
   }
@@ -378,7 +385,7 @@ export class GitHubAppCredentialLifecycle {
 
   protected async revokeAuthorizationOnGitHub(accessToken: string): Promise<RevokeResult> {
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
+    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
     if (!clientId || !clientSecret) {
       throw new EncryptionConfigurationError(
         'GitHub App revocation credentials are not configured'
@@ -409,7 +416,7 @@ export class GitHubAppCredentialLifecycle {
     authorization: AuthorizationRow
   ): Promise<DisconnectRefreshResult> {
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
+    const clientSecret = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_CLIENT_SECRET');
     if (!clientId || !clientSecret) return null;
     if (new Date(authorization.refresh_token_expires_at ?? 0).getTime() <= Date.now()) {
       return 'terminal_refresh_token';
@@ -430,7 +437,7 @@ export class GitHubAppCredentialLifecycle {
       authorization,
       clientId,
       clientSecret,
-      refreshToken: this.decryptCredential(authorization, 'refresh'),
+      refreshToken: await this.decryptCredential(authorization, 'refresh'),
     });
     // Release inside the caller's transaction, so the lease never outlives it.
     const holdsLease = await releaseRefreshLease(db, { ...lease, attemptId });

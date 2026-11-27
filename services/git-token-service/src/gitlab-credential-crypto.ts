@@ -9,6 +9,7 @@ import type {
   GITLAB_PERSONAL_ACCESS_TOKEN_ENVELOPE_SCHEME,
   GITLAB_PROJECT_ACCESS_TOKEN_ENVELOPE_SCHEME,
 } from '@kilocode/worker-utils/gitlab-credential';
+import { readGitTokenServiceSecret } from './secrets';
 
 type Secret = SecretsStoreSecret | string | undefined;
 
@@ -152,7 +153,7 @@ export class GitLabCredentialCrypto {
       [keyId, encodedPublicKey, encodedPrivateKey] = await Promise.all([
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID),
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY),
-        resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY),
+        readGitTokenServiceSecret(this.env, 'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY'),
       ]);
     } catch {
       return { status: 'temporarily_unavailable' };

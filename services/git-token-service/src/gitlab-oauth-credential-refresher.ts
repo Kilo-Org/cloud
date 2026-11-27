@@ -14,6 +14,7 @@ import {
 } from './gitlab-credential-crypto.js';
 import type { GitLabOAuthCredentialRefresher as GitLabOAuthCredentialRefresherContract } from './gitlab-credential-service.js';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
+import { readGitTokenServiceSecret } from './secrets';
 import {
   claimRefreshLease,
   newRefreshLeaseAttemptId,
@@ -286,7 +287,7 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
       }
       clientSecret = customSecret.token;
     } else {
-      clientSecret = await resolveSecret(this.env.GITLAB_CLIENT_SECRET);
+      clientSecret = await readGitTokenServiceSecret(this.env, 'GITLAB_CLIENT_SECRET');
     }
     if (!clientId || !clientSecret) {
       await releaseRefreshLease(tx, { ...lease, attemptId });

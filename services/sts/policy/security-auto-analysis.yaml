@@ -1,4 +1,14 @@
-# Registration only: services/security-auto-analysis/wrangler.jsonc. No environment, identity or grant.
+# The security-auto-analysis Worker (services/security-auto-analysis/wrangler.jsonc). It reads its
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets
+# Store bindings) until secrets-cutover flips it. All three names resolve from /shared:
+# INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET. The `dev` block binds no STS and
+# reads the _DEV store names.
 workload: security-auto-analysis
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET
+  - CALLBACK_TOKEN_SECRET
+  - NEXTAUTH_SECRET

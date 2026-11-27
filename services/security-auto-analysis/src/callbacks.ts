@@ -11,6 +11,7 @@ import {
   getSecurityFindingById,
 } from './db/queries.js';
 import { transitionAnalysisCallbackLifecycle } from './analysis-start-lifecycle.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import { generateTriageToken } from './token.js';
 import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js';
 import { fetchLatestAssistantText as fetchSessionAssistantText } from './session-result.js';
@@ -461,7 +462,10 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       const finding = await getSecurityFindingById(db, params.findingId);
       const userId = finding?.analysis?.triggeredByUserId;
       if (!userId) return null;
-      const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
+      const nextAuthSecret = await readSecurityAutoAnalysisSecret(
+        params.env,
+        'NEXTAUTH_SECRET'
+      );
       return fetchSessionAssistantText({
         sessionId: kiloSessionId,
         userId,
@@ -478,7 +482,9 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       if (!actor) {
         throw new Error(`Analysis actor ${triggeredByUserId} is unavailable`);
       }
-      const [nextAuthSecret] = await Promise.all([params.env.NEXTAUTH_SECRET.get()]);
+      const [nextAuthSecret] = await Promise.all([
+        readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
+      ]);
       const authToken = await generateTriageToken(
         actor,
         nextAuthSecret,

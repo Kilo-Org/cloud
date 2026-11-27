@@ -10,6 +10,11 @@ export const OPENROUTER_APP_TITLE = 'Kilo Code';
 // Only the API key string is cached at module scope, so each classification
 // skips the secrets-store read. The TTL keeps key rotations effective within
 // five minutes.
+//
+// `ttlCached` loaders receive only the env, so this read has no invocation
+// context to hand a STS bundle revalidation to. It is the only ctx-less read on
+// the classification path, and every caller already authenticated through a
+// ctx-bearing middleware read in the same invocation.
 const API_KEY_CACHE_TTL_MS = 300_000;
 
 const apiKeyCache = ttlCached(API_KEY_CACHE_TTL_MS, async (env: OpenRouterEnv) => {

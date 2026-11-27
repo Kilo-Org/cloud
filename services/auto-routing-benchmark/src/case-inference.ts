@@ -40,7 +40,8 @@ import type { Context, Hono } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
 import { BENCHMARK_CASE_HEADER, verifyCaseInferenceCapability } from './case-inference-capability';
-import { readAutoRoutingBenchmarkSecret } from './secrets';
+import { readAutoRoutingBenchmarkSecret, requestContext } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   admitPaidModelRequestStatements,
   readPaidCaseRun,
@@ -927,9 +928,10 @@ async function readPoolRequestActorUserId(
 
 export async function createCaseInferenceDeps(
   env: CaseInferenceBindings,
-  fetchImpl?: typeof fetch
+  fetchImpl?: typeof fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<CaseInferenceDeps> {
-  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   const selectPayer: CaseInferencePayerResolver = async ({ invocation, api, modelRequestId }) => {
     const key = caseKeyFromInvocation(invocation);
     const run = await readPaidCaseRun(env.BENCH_DB, key);
@@ -1100,6 +1102,7 @@ export async function createCaseInferenceDeps(
       // read cannot outlive the request that asked for it.
       signal: options.signal,
       deadline: options.deadline,
+      ctx,
     }).catch((error: unknown) => {
       console.warn(
         JSON.stringify({
@@ -1300,9 +1303,10 @@ async function authoritativeCaseIdentity(
 export async function handleCaseAdmit(
   env: CaseInferenceBindings,
   authorization: string | null,
-  body: unknown
+  body: unknown,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   if (!(await authorizedInternalBearer(authorization, secret)))
     return jsonResponse({ error: { code: 'unauthorized', message: 'Not authorized.' } }, 401);
   const parsed = BenchmarkCaseAdmitRequestSchema.safeParse(body);
@@ -1433,7 +1437,7 @@ export function registerCaseInferenceRoutes(app: Hono<HonoEnv>): void {
   const handleInference = async (c: Context<HonoEnv>) => {
     const api = caseInferenceApiFromPath(new URL(c.req.url).pathname);
     if (!api) return jsonResponse(failure('not_found', 'Unknown case inference route.'), 404);
-    const deps = await createCaseInferenceDeps(c.env);
+    const deps = await createCaseInferenceDeps(c.env, undefined, requestContext(c));
     // The real request context owns the drain: after the runner disconnects, Hono's
     // `waitUntil` keeps the provider stream finishing so the native usage row still commits.
     // `executionCtx` is absent only in direct unit calls, where the caller supplies its own.
@@ -1457,7 +1461,8 @@ export function registerCaseInferenceRoutes(app: Hono<HonoEnv>): void {
     handleCaseAdmit(
       c.env,
       c.req.header('authorization') ?? null,
-      await c.req.json().catch(() => null)
+      await c.req.json().catch(() => null),
+      requestContext(c)
     )
   );
 }

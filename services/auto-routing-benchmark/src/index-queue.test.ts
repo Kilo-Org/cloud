@@ -58,6 +58,11 @@ import worker from './index';
 
 const send = vi.fn();
 const env = { BENCH_QUEUE: { send } } as unknown as Env;
+const executionCtx = {
+  waitUntil: vi.fn(),
+  passThroughOnException: vi.fn(),
+  props: {},
+} as unknown as ExecutionContext;
 
 const dailyResult = {
   router: 'efficient' as const,
@@ -120,8 +125,10 @@ describe('queue handler — jobs branch', () => {
       claimToken: 'token-1',
     };
     const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
-    await worker.queue(batch, env);
-    expect(processJob).toHaveBeenCalledWith(env, body);
+    await worker.queue(batch, env, executionCtx);
+    // The batch's own invocation context reaches the job, so a bundle revalidation a job read
+    // starts is handed to this batch's `waitUntil`.
+    expect(processJob).toHaveBeenCalledWith(env, body, executionCtx);
     expect(messages[0].ack).toHaveBeenCalledOnce();
     expect(messages[0].retry).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
@@ -130,8 +137,8 @@ describe('queue handler — jobs branch', () => {
   it('acknowledges scheduler wakeups without applying queue-level capacity redelivery', async () => {
     const body = { runId: 'r1', kind: 'decider', model: 'm/x', schedulerWake: true };
     const { batch, messages } = fakeBatch('auto-routing-benchmark-jobs', [body]);
-    await worker.queue(batch, env);
-    expect(processJob).toHaveBeenCalledWith(env, body);
+    await worker.queue(batch, env, executionCtx);
+    expect(processJob).toHaveBeenCalledWith(env, body, executionCtx);
     expect(messages[0].ack).toHaveBeenCalledOnce();
     expect(messages[0].retry).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();

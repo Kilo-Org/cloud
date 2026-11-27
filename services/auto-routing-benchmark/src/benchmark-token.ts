@@ -3,6 +3,7 @@ import type {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 const TokenResponseSchema = z.object({ token: z.string().min(1), expiresAt: z.string() });
@@ -41,9 +42,10 @@ export async function fetchBenchmarkUserToken(
   userId: string,
   organizationId: string,
   audience: BenchmarkTokenAudience | typeof UNSPLIT_CLI_TOKEN,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<string> {
-  const secret = await readAutoRoutingBenchmarkSecret(env, 'BOT_TOKEN_MINT_SECRET');
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'BOT_TOKEN_MINT_SECRET', ctx);
   const response = await fetchImpl(new URL('/api/internal/bot-token', env.KILO_WEB_API_BASE_URL), {
     method: 'POST',
     headers: {

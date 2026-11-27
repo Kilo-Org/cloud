@@ -2,6 +2,7 @@ import {
   ClassifierRunError,
   classifyWithSystemOne,
 } from '@kilocode/auto-routing-contracts/classifier';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   CLASSIFIER_WINNER_KV_KEY,
   routingTableKvKey,
@@ -2627,7 +2628,12 @@ async function failDeadLaneAndPaidLinks(
   ]);
 }
 
-async function processScheduledChunk(env: Env, id: string, token: string): Promise<void> {
+async function processScheduledChunk(
+  env: Env,
+  id: string,
+  token: string,
+  ctx?: SecretsExecutionContext
+): Promise<void> {
   const claim = await getChunk(env.BENCH_DB, id, token);
   if (!claim) return;
   if (!(await startChunk(env.BENCH_DB, id, token, Date.now()))) return;
@@ -2672,7 +2678,8 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         caseIds: z.array(z.string()).parse(JSON.parse(claim.case_ids)),
       },
       state,
-      claim
+      claim,
+      ctx
     );
     await finishChunk(env.BENCH_DB, id, token);
   } catch (error) {
@@ -2864,7 +2871,11 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
   }
 }
 
-export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
+export async function processJob(
+  env: Env,
+  rawMessage: unknown,
+  ctx?: SecretsExecutionContext
+): Promise<void> {
   // Validate the message shape; malformed messages are logged and dropped
   // rather than retried forever.
   const parsed = BenchmarkJobMessageSchema.safeParse(rawMessage);
@@ -2889,7 +2900,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       return;
     }
     if (message.claimId && message.claimToken) {
-      await processScheduledChunk(env, message.claimId, message.claimToken);
+      await processScheduledChunk(env, message.claimId, message.claimToken, ctx);
     } else {
       const legacyState = await getRunState(env, message.runId);
       if (legacyState.status === 'running') await initializeScheduledRun(env, message.runId);
@@ -3145,9 +3156,10 @@ async function caseInferenceProxy(
      */
     catalogToken: string | null;
     kiloApiUrl: string;
-  }
+  },
+  ctx?: SecretsExecutionContext
 ): Promise<CaseInferenceProxy> {
-  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   if (!secret) throw new Error('benchmark case inference secret is unavailable');
   const issued = await issueCaseInferenceCapability(secret, {
     engineIdentity: input.engineIdentity,
@@ -3402,7 +3414,8 @@ async function processDeciderJob(
   env: Env,
   message: BenchmarkJobMessage,
   state: RunState,
-  claim: SchedulerClaim
+  claim: SchedulerClaim,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (!message.caseIds?.length) throw new Error('Scheduler chunk has no cases');
   const caseIds = new Set(message.caseIds);
@@ -3497,7 +3510,14 @@ async function processDeciderJob(
           // org snapshot existed lack one; checked here so chunks whose cases are
           // all recorded still finish without a mint.
           if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
-          return fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, audience);
+          return fetchBenchmarkUserToken(
+            env,
+            benchmarkUserId,
+            benchmarkOrgId,
+            audience,
+            fetch,
+            ctx
+          );
         })();
         minted.set(audience, token);
       }
@@ -3511,7 +3531,8 @@ async function processDeciderJob(
           env,
           { benchmarkUserId, benchmarkOrgId },
           fetch,
-          token
+          token,
+          ctx
         );
       });
       // A catalog read that fails after the paid case started is a transient lookup failure,
@@ -3661,18 +3682,22 @@ async function processDeciderJob(
         // just claimed and re-issued for a retry (its `startedAt` moves). Every provider
         // request carries it, so the gateway attributes the call to exactly one paid
         // generation; the platform bot token stays on the exact catalog reads only.
-        let inference = await caseInferenceProxy(env, {
-          engineIdentity: state.engineIdentity,
-          runId: message.runId,
-          model: message.model,
-          variant: storedVariant,
-          caseId: benchCase.id,
-          rep,
-          generation,
-          startedAt,
-          catalogToken: launch.catalogToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-        });
+        let inference = await caseInferenceProxy(
+          env,
+          {
+            engineIdentity: state.engineIdentity,
+            runId: message.runId,
+            model: message.model,
+            variant: storedVariant,
+            caseId: benchCase.id,
+            rep,
+            generation,
+            startedAt,
+            catalogToken: launch.catalogToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+          },
+          ctx
+        );
         // A probe goes straight to the gateway with the captured request template; every
         // other case keeps the CLI container, which owns the workspace and tool execution.
         // Both transports re-check the canonical live generation before they spend
@@ -3800,18 +3825,22 @@ async function processDeciderJob(
         }
         // The retry is a further paid call of the same generation: its capability must name
         // the new signed start or the gateway rejects it as expired.
-        inference = await caseInferenceProxy(env, {
-          engineIdentity: state.engineIdentity,
-          runId: message.runId,
-          model: message.model,
-          variant: storedVariant,
-          caseId: benchCase.id,
-          rep,
-          generation,
-          startedAt,
-          catalogToken: launch.catalogToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-        });
+        inference = await caseInferenceProxy(
+          env,
+          {
+            engineIdentity: state.engineIdentity,
+            runId: message.runId,
+            model: message.model,
+            variant: storedVariant,
+            caseId: benchCase.id,
+            rep,
+            generation,
+            startedAt,
+            catalogToken: launch.catalogToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+          },
+          ctx
+        );
         attemptStartedAt = startedAt;
         retried = true;
         priorCostUsd = first.costUsd;

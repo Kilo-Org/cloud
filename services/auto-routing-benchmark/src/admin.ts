@@ -66,6 +66,7 @@ import {
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { requestContext } from './secrets';
 import {
   listPaidBenchmarkAdminRequests,
   pausePaidBenchmarkAdminRequest,
@@ -825,7 +826,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         c.env,
         benchmarkIdentity.benchmarkUserId,
         benchmarkIdentity.benchmarkOrgId,
-        UNSPLIT_CLI_TOKEN
+        UNSPLIT_CLI_TOKEN,
+        fetch,
+        requestContext(c)
       );
       const result = await debugRunCli(c.env, {
         ...c.req.valid('json'),
@@ -859,7 +862,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         const owner = { ownerType: body.ownerType, ownerId: body.ownerId };
         const catalog = await fetchExecutableBenchmarkModelCatalog(
           c.env,
-          resolveBenchmarkIdentity(config)
+          resolveBenchmarkIdentity(config),
+          fetch,
+          undefined,
+          requestContext(c)
         );
         const previous = await loadSubscriptionSnapshot(c.env.BENCH_DB, config.router, owner);
         const snapshot = resolveSubscriptionSnapshot(body.entries, previous, catalog, false, true);
@@ -1211,7 +1217,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }),
     async c => {
       const { requestId } = c.req.valid('json');
-      const status = await pausePaidBenchmarkAdminRequest(c.env, requestId);
+      const status = await pausePaidBenchmarkAdminRequest(c.env, requestId, {
+        ctx: requestContext(c),
+      });
       return c.json(PaidBenchmarkAdminPauseResponseSchema.parse({ status }));
     }
   );

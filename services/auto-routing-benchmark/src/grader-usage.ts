@@ -5,6 +5,7 @@ import {
   recordLlmUsage,
   type LlmUsageWriteOutcome,
 } from '@kilocode/worker-utils/usage-writer-client';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 export const GRADER_USAGE_MODEL = 'auto-routing/grader';
@@ -89,10 +90,11 @@ export async function buildGraderUsage(
 
 export async function writeGraderUsage(
   env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
-  usage: UsageRecordRequest
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
   return recordLlmUsage(usage, {
     url: new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href,
-    secret: await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET'),
+    secret: await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx),
   });
 }

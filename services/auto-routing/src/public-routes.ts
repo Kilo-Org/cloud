@@ -271,7 +271,13 @@ export const publicDecideHandler = publicHandler(async c => {
   const run = await runDecision(
     c,
     payload,
-    customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+    customRouterTarget(
+      c.env,
+      promise => c.executionCtx.waitUntil(promise),
+      routing,
+      undefined,
+      requestContext(c)
+    )
   );
   const decision = publicCustomRouterDecision(customRouterDecision(routing, run));
   // The verifier re-reads this pool on the primary and compares the signed dispatch with the

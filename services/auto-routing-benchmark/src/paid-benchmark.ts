@@ -30,6 +30,7 @@ import {
   type PaidBenchmarkStartResult,
 } from '@kilocode/auto-routing-contracts';
 import type { Hono } from 'hono';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { fetchBenchmarkModelCatalog, catalogModelVariants } from './platform-models';
 import type { HonoEnv } from './hono-env';
 import {
@@ -915,6 +916,8 @@ export async function reconcilePaidUsageReceipts(
     signal?: AbortSignal;
     /** Hard wall-clock budget for this pass, awaited reads included. */
     deadline?: number;
+    /** The invocation that owns this pass, so a bundle revalidation can outlive it. */
+    ctx?: SecretsExecutionContext;
   } = {}
 ): Promise<{ recorded: number; pending: number; mismatched: number }> {
   const db = env.BENCH_DB;
@@ -971,7 +974,7 @@ export async function reconcilePaidUsageReceipts(
   const readOptions = { signal: options.signal, deadline: options.deadline };
   const remainingMs = () => (options.deadline ?? Number.POSITIVE_INFINITY) - Date.now();
   const spent = () => options.signal?.aborted === true || remainingMs() <= 0;
-  let receipts = await readUsageReceipts(env, usageIds, fetchImpl, readOptions);
+  let receipts = await readUsageReceipts(env, usageIds, fetchImpl, readOptions, options.ctx);
   for (const delayMs of RECEIPT_POLL_DELAYS_MS) {
     if (receipts === null) break;
     if (receipts.every(receipt => receipt.status === 'recorded')) break;
@@ -980,7 +983,7 @@ export async function reconcilePaidUsageReceipts(
     setTimeout(slept.resolve, Math.min(delayMs, Math.max(1, remainingMs())));
     await slept.promise;
     if (spent()) break;
-    receipts = await readUsageReceipts(env, usageIds, fetchImpl, readOptions);
+    receipts = await readUsageReceipts(env, usageIds, fetchImpl, readOptions, options.ctx);
   }
   if (receipts === null) {
     // The receipt read is unavailable: nothing is booked and nothing is free, but every row
@@ -1118,6 +1121,8 @@ export async function reconcilePaidPayerReceipts(
     signal?: AbortSignal;
     /** Hard wall-clock budget for this pass, the native read included. */
     deadline?: number;
+    /** The invocation that owns this pass, so a bundle revalidation can outlive it. */
+    ctx?: SecretsExecutionContext;
   }
 ): Promise<{ recorded: number; pending: number; mismatched: number }> {
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
@@ -1137,6 +1142,7 @@ export async function reconcilePaidPayerReceipts(
     modelRequestIds: ids.results.map(row => row.id),
     signal: input.signal,
     deadline: input.deadline,
+    ctx: input.ctx,
   });
 }
 
@@ -1157,7 +1163,8 @@ async function readUsageReceipts(
   env: Pick<PaidBenchmarkEnv, 'BENCH_DB' | 'KILO_WEB_API_BASE_URL' | 'INTERNAL_API_SECRET_PROD'>,
   usageIds: readonly string[],
   fetchImpl: typeof fetch,
-  limits: { signal?: AbortSignal; deadline?: number } = {}
+  limits: { signal?: AbortSignal; deadline?: number } = {},
+  ctx?: SecretsExecutionContext
 ): Promise<UsageReceipt[] | null> {
   // The read itself is bounded by the caller's abort *and* whatever budget is left, so a slow
   // native read cannot outlive the request that asked for it. Without a caller budget the
@@ -1165,7 +1172,7 @@ async function readUsageReceipts(
   const remaining = (limits.deadline ?? Date.now() + 10_000) - Date.now();
   const timeout = AbortSignal.timeout(Math.max(1, Math.min(10_000, remaining)));
   const signal = limits.signal ? AbortSignal.any([limits.signal, timeout]) : timeout;
-  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   let response: Response;
   try {
     response = await fetchImpl(new URL(BENCHMARK_USAGE_RECEIPTS_PATH, env.KILO_WEB_API_BASE_URL), {
@@ -1288,7 +1295,7 @@ export async function pauseUnfundedPaidRequests(
  */
 export async function reconcilePaidBenchmarkRequests(
   env: PaidBenchmarkEnv,
-  options: { now?: number; fetchImpl?: typeof fetch } = {}
+  options: { now?: number; fetchImpl?: typeof fetch; ctx?: SecretsExecutionContext } = {}
 ): Promise<{ staged: number; completed: string[]; failed: string[]; closed: string[] }> {
   const db = env.BENCH_DB;
   const now = options.now ?? Date.now();
@@ -1398,10 +1405,14 @@ export async function reconcilePaidBenchmarkRequests(
   }
   // A crash between completion and the pin callback leaves the notification on the outbox;
   // draining it here is the replay, and it is idempotent per request and confirmation.
-  await drainPaidBillingOutbox(env, { limit: 25, fetchImpl: options.fetchImpl });
+  await drainPaidBillingOutbox(env, { limit: 25, fetchImpl: options.fetchImpl, ctx: options.ctx });
   // Deferred native usage becomes an accounting receipt as soon as the primary gateway read
   // sees it; anything still absent stays disclosed as pending.
-  await reconcilePaidUsageReceipts(env, { limit: 50, fetchImpl: options.fetchImpl });
+  await reconcilePaidUsageReceipts(env, {
+    limit: 50,
+    fetchImpl: options.fetchImpl,
+    ctx: options.ctx,
+  });
   return summary;
 }
 

@@ -21,3 +21,10 @@ updates:
         # Group all npm dependencies together
         patterns:
           - '*'
+
+  - package-ecosystem: 'uv'
+    directory: '/tools/zizmor'
+    schedule:
+      interval: 'weekly'
+    cooldown:
+      default-days: 7

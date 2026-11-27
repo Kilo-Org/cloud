@@ -452,7 +452,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
-| `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide`, `bouncer:signup.history` | | production only (`environmentGrants`) |
+| `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`); identity Vercel production |
@@ -460,7 +460,8 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
 are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only and accepts only
 production STS tokens; the shared Bouncer client of both apps mints them behind
-`BOUNCER_STS_TOKENS` (`ENVIRONMENT.md`). The `kilo-mcp` grant
+`BOUNCER_STS_TOKENS` (`ENVIRONMENT.md`). `bouncer:signup.history` is registered for the
+signup-history import job, and no policy grants it yet. The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
 config check below refuses a `worker-binding` policy that no config here binds. Its local block

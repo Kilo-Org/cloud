@@ -74,7 +74,7 @@ export const STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH = {
 /**
  * The web app and the AI gateway call Bouncer (repo Kilo-Org/bouncer) for verdicts: `decide`,
  * `charge-decide` and `release`. Bouncer's `ROUTE_SCOPES` (`src/api-auth.ts`) names the scope of
- * each route; these four pairs match it.
+ * each route; the four Bouncer pairs here match it.
  */
 export const STS_BOUNCER_DECIDE = { audience: 'bouncer', scope: 'bouncer:decide' } as const;
 
@@ -90,7 +90,7 @@ export const STS_BOUNCER_SIGNUP_DECIDE = {
   scope: 'bouncer:signup.decide',
 } as const;
 
-/** The web app (and later the signup-history import job) writes signup history to Bouncer. */
+/** The signup-history import job writes signup history to Bouncer; no app holds this scope. */
 export const STS_BOUNCER_SIGNUP_HISTORY = {
   audience: 'bouncer',
   scope: 'bouncer:signup.history',
@@ -106,8 +106,8 @@ export const STS_BOUNCER_SIGNUP_HISTORY = {
  * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
  * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
  * finding dismissal (`STS_SECURITY_SYNC_*`), the web app's security notification dispatch
- * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), and the Bouncer scopes of the web app and the AI
- * gateway (`STS_BOUNCER_*`). STS mints each one only where a policy grants it (default deny).
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), and the Bouncer scopes (`STS_BOUNCER_*`). STS mints
+ * each one only where a policy grants it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   web: {

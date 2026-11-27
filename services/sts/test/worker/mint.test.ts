@@ -743,13 +743,9 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
 });
 
 describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
-  const BOUNCER_SCOPES = [
-    STS_BOUNCER_DECIDE,
-    STS_BOUNCER_USAGE_WRITE,
-    STS_BOUNCER_SIGNUP_DECIDE,
-    STS_BOUNCER_SIGNUP_HISTORY,
-  ];
+  const WEB_SCOPES = [STS_BOUNCER_DECIDE, STS_BOUNCER_USAGE_WRITE, STS_BOUNCER_SIGNUP_DECIDE];
   const GATEWAY_SCOPES = [STS_BOUNCER_DECIDE, STS_BOUNCER_USAGE_WRITE];
+  const BOUNCER_SCOPES = [...WEB_SCOPES, STS_BOUNCER_SIGNUP_HISTORY];
 
   function caller(workload: 'web' | 'ai-gateway'): MintCaller {
     return {
@@ -779,7 +775,7 @@ describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
   }
 
   it.each([
-    ...BOUNCER_SCOPES.map(entry => ['web', entry] as const),
+    ...WEB_SCOPES.map(entry => ['web', entry] as const),
     ...GATEWAY_SCOPES.map(entry => ['ai-gateway', entry] as const),
   ])('lets %s mint a %o token in production', async (workload, entry) => {
     // The policy admits the token, so the mint reaches the token signer. The test Worker's signers
@@ -802,6 +798,14 @@ describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
       });
     }
   );
+
+  it('refuses web bouncer:signup.history in production, since the web app sends no signup-history call', async () => {
+    expect(await mintIn('production', 'web', STS_BOUNCER_SIGNUP_HISTORY)).toEqual({
+      status: 'ok',
+      tokens: [{ status: 'denied', ...STS_BOUNCER_SIGNUP_HISTORY, reason: 'scope_not_allowed' }],
+    });
+    expect(await issuedRows()).toEqual([]);
+  });
 
   it.each(BOUNCER_SCOPES)(
     'refuses web and ai-gateway %o outside production, where no Bouncer accepts it',

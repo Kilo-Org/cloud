@@ -181,7 +181,11 @@ describe('the secrets copier table for the Workers that read STS', () => {
       ...(await proveWorker({
         workload: 'kiloclaw-billing',
         configPath: 'services/kiloclaw-billing/wrangler.jsonc',
-        names: ['INTERNAL_API_SECRET', 'SNOWFLAKE_PRIVATE_KEY_PEM', 'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT'],
+        names: [
+          'INTERNAL_API_SECRET',
+          'SNOWFLAKE_PRIVATE_KEY_PEM',
+          'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+        ],
         read: readKiloclawBillingSecret,
       })),
     ];

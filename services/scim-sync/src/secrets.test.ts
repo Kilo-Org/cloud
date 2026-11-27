@@ -74,9 +74,9 @@ describe('readScimSyncSecret', () => {
     expect(sts.getBundle).toHaveBeenCalledOnce();
 
     // Flipping the variable back reads the legacy binding again.
-    expect(
-      await readScimSyncSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)
-    ).toBe('legacy-value');
+    expect(await readScimSyncSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)).toBe(
+      'legacy-value'
+    );
     expect(store.get).toHaveBeenCalledTimes(2);
     expect(sts.getBundle).toHaveBeenCalledOnce();
   });

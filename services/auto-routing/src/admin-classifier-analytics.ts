@@ -231,11 +231,7 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
   let modelRows: ClassifierModelBreakdownRow[];
 
   try {
-    const apiToken = await readAutoRoutingSecret(
-      c.env,
-      'O11Y_CF_AE_API_TOKEN',
-      requestContext(c)
-    );
+    const apiToken = await readAutoRoutingSecret(c.env, 'O11Y_CF_AE_API_TOKEN', requestContext(c));
     [summaryRows, statusRows, taskRows, subtypeRows, modelRows] = await Promise.all([
       queryAnalyticsEngine(c.env, apiToken, buildSummaryQuery(period), SummaryRowSchema),
       queryAnalyticsEngine(

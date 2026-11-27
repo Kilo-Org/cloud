@@ -338,8 +338,7 @@ export const publicDecideHandler = publicHandler(async c => {
     // isolate, so one read serves every later request whichever source `SECRETS_SOURCE` selects.
     await getCachedSecret(
       {
-        get: () =>
-          readAutoRoutingSecret(c.env, 'AUTO_ROUTING_DECISION_SECRET', requestContext(c)),
+        get: () => readAutoRoutingSecret(c.env, 'AUTO_ROUTING_DECISION_SECRET', requestContext(c)),
       },
       'AUTO_ROUTING_DECISION_SECRET'
     )

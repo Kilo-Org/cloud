@@ -23,11 +23,7 @@ export function validateAdminSecret(
 
 export const adminAuthMiddleware = createMiddleware<HonoContext>(async (c, next) => {
   const secretHeader = c.req.header(ADMIN_SECRET_HEADER);
-  const expectedSecret = await readAiAttributionSecret(
-    c.env,
-    'ADMIN_SECRET',
-    requestContext(c)
-  );
+  const expectedSecret = await readAiAttributionSecret(c.env, 'ADMIN_SECRET', requestContext(c));
 
   const result = validateAdminSecret(secretHeader ?? null, expectedSecret);
 

@@ -98,6 +98,8 @@ const ERROR_KEYS = {
   runtime_supervisor_missing: 'agentChat.preparation.errorRuntimeSupervisorMissing',
   connection_lost: 'agentChat.preparation.errorConnectionLost',
   sandbox_lost: 'agentChat.preparation.errorSandboxLost',
+  // No copy of its own yet: a new key needs all 87 catalogs. It reads like a lost connection.
+  sandbox_unreachable: 'agentChat.preparation.errorConnectionLost',
   agent_restarted: 'agentChat.preparation.errorAgentRestarted',
   sandbox_out_of_memory: 'agentChat.preparation.errorSandboxOutOfMemory',
 } satisfies Record<string, string>;

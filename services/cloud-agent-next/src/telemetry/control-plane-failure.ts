@@ -115,6 +115,7 @@ export function classifyControlPlaneFailure(
     case 'invalid_configuration':
     case 'network_secret_configuration_invalid':
     case 'sandbox_create_failed':
+    case 'sandbox_unreachable':
       return PRE_DISPATCH_SANDBOX_CONNECT;
     case 'agent_unavailable':
       return dispatchState === 'accepted'

@@ -437,8 +437,9 @@ describe('SandboxSessionV2 reports and callbacks', () => {
 
     await runInDurableObject(stub, async (instance, state) => {
       const dueAt = Date.now() - 1;
-      await state.storage.put('control_plane_transport_recovery_at', dueAt);
-      Object.assign(instance, { transportRecoveryAt: dueAt });
+      const recovery = { dueAt, since: dueAt - 15_000 };
+      await state.storage.put('control_plane_transport_recovery_at', recovery);
+      Object.assign(instance, { transportRecovery: recovery });
       await instance.alarm();
     });
     expect(await messageStatus(stub, 'm1')).toBe('running');
@@ -485,8 +486,9 @@ describe('SandboxSessionV2 reports and callbacks', () => {
 
     await runInDurableObject(stub, async (instance, state) => {
       const dueAt = Date.now() - 1;
-      await state.storage.put('control_plane_transport_recovery_at', dueAt);
-      Object.assign(instance, { transportRecoveryAt: dueAt });
+      const recovery = { dueAt, since: dueAt - 15_000 };
+      await state.storage.put('control_plane_transport_recovery_at', recovery);
+      Object.assign(instance, { transportRecovery: recovery });
       await instance.alarm();
     });
     expect(await messageStatus(stub, 'm1')).toBe('running');

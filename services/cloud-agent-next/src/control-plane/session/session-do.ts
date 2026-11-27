@@ -224,6 +224,12 @@ import {
 } from './message-settlement.js';
 import { setupCommandLabel } from './setup-command-label.js';
 import {
+  nextTransportRecovery,
+  parseTransportRecovery,
+  queuedStatusCheck,
+  type TransportRecovery,
+} from './transport-recovery.js';
+import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
   type SharedWorktreeChangesPeer,
@@ -328,6 +334,11 @@ const REGISTRATION_KEY = 'control_plane_session';
 const SESSION_METADATA_KEY = 'session_metadata';
 const ROUTE_KEY = 'control_plane_route';
 const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
+const CLOUD_STATUS_ENTITY_ID = 'cloud-status';
+const SANDBOX_UNREACHABLE = 'sandbox_unreachable';
+const sandboxUnreachableStatusSchema = z.object({
+  cloudStatus: z.object({ type: z.literal('error'), message: z.literal(SANDBOX_UNREACHABLE) }),
+});
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
@@ -670,7 +681,22 @@ const MAX_SNAPSHOT_ROWS_BYTES = 256 * 1024;
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
 
-type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
+/**
+ * One bounded transport pass. `unansweredSince` carries the open window of
+ * unanswered recovery passes into the pass that the alarm consumes.
+ * `outcome` is `answered` once a Sandbox RPC returns, and `unanswered` once
+ * the pass asks for another recovery pass; `unanswered` is final.
+ */
+type TransportPass = {
+  deadlineAt: number;
+  scheduleRecovery: boolean;
+  unansweredSince?: number;
+  outcome?: 'answered' | 'unanswered';
+};
+
+function markAnswered(pass: TransportPass): void {
+  pass.outcome ??= 'answered';
+}
 
 function parseStoredRunContainer(raw: string | null): CloudAgentRunContainer | undefined {
   if (raw == null) return undefined;
@@ -812,7 +838,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
   private workspaceStop: WorkspaceStopState = { epoch: 0, at: 0, attempts: [] };
-  private transportRecoveryAt: number | null = null;
+  private transportRecovery: TransportRecovery | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
@@ -1305,12 +1331,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.workspaceStop = stop.success ? stop.data : { epoch: 0, at: 0, attempts: [] };
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
-    const recoveryAt = z
-      .number()
-      .int()
-      .nonnegative()
-      .safeParse(await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY));
-    this.transportRecoveryAt = recoveryAt.success ? recoveryAt.data : null;
+    this.transportRecovery = parseTransportRecovery(
+      await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY),
+      this.sessionTimers()
+    );
     const parsedLocator = parseWipeLocator(
       await this.ctx.storage.get<unknown>(WIPE_LOCATOR_KEY),
       Date.now()
@@ -2564,13 +2588,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (
         this.messages.some(message => message.state === 'queued') &&
         (this.route.state === 'failed' ||
-          this.transportRecoveryAt !== null ||
+          this.transportRecovery?.since !== undefined ||
           (this.route.state === 'preparing' &&
             parsed.state !== 'unknown' &&
             (parsed.attemptId !== this.route.attemptId || parsed.state !== 'preparing')))
       ) {
         const pass = this.transportPass();
-        pass.scheduleRecovery = this.transportRecoveryAt !== null;
+        pass.scheduleRecovery = this.transportRecovery?.since !== undefined;
         await this.recoverQueued(pass, parsed);
         await this.armAlarm();
         return;
@@ -2578,6 +2602,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const pass = this.transportPass();
       if (parsed.state === 'unknown') {
         await this.applyView(parsed, pass);
+        await this.armAlarm();
         return;
       }
       // A notification names its route attempt. Ignore one for an older or
@@ -2826,9 +2851,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.settleMessages(ids, 'failed', reason);
         }
       }
-      if (this.transportRecoveryAt !== null && this.transportRecoveryAt <= now) {
+      const recovery = this.transportRecovery;
+      if (recovery !== null && recovery.dueAt <= now) {
+        // Read the window start before clearing it, or every pass restarts it.
         await this.clearTransportRecovery();
-        await this.recoverQueued(this.transportPass(false));
+        const pass: TransportPass = { ...this.transportPass(), unansweredSince: recovery.since };
+        await this.recoverQueued(pass);
+        if (recovery.since !== undefined && pass.outcome === 'answered') {
+          logControlDiagnostic('session_transport_recovery', {
+            sessionId: this.sessionId,
+            outcome: 'answered',
+            unansweredMs: Math.max(0, Date.now() - recovery.since),
+          });
+        }
       } else if (reconciled && this.messages.some(message => message.state === 'queued')) {
         await this.recoverQueued(this.transportPass(false));
       }
@@ -2895,10 +2930,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
+    } else if (this.transportRecovery === null) {
+      // Queued work always has a check: a lost notification is found within a minute.
+      const check = queuedStatusCheck(Date.now(), this.sessionTimers());
+      await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, check);
+      this.transportRecovery = check;
     }
     const harnessDueAt = this.runtimeHarnessRecorder.nextDueAt();
     const candidates = [
-      this.transportRecoveryAt,
+      this.transportRecovery?.dueAt ?? null,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
@@ -3748,7 +3788,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.runtimeAuthorization = undefined;
     this.messages = [];
     this.route = { state: 'unknown' };
-    this.transportRecoveryAt = null;
+    this.transportRecovery = null;
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.rootStatus = undefined;
@@ -4112,6 +4152,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       await this.scheduleTransportRecovery(pass);
       return;
     }
+    markAnswered(pass);
     if (result === 'sent') {
       const now = Date.now();
       const reduction = acceptMessages(
@@ -4140,13 +4181,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // `not_ready`: keep them queued and act on the view `prepare` returns
     // (spec §5). A `ready` view only updates the stored route and returns: it
     // must not re-enter delivery in this task, or a write that keeps losing to
-    // a ready route would recurse with no exit. The next `send` or `onRoute`
-    // retries, with one transport recovery opportunity if still ready.
+    // a ready route would recurse with no exit. The Sandbox answered, so the
+    // pass ends any open recovery window. The status check, the next `send`
+    // or `onRoute` retries.
     const view = await this.prepareSandbox(pass);
     if (view === null) return;
     if (view.state === 'ready') {
       await this.persistRoute(view);
-      await this.scheduleTransportRecovery(pass);
+      await this.endTransportWindow();
       return;
     }
     await this.applyView(view, pass);
@@ -4221,7 +4263,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // A Stop refuses work created before its wall clock; a later message is new intent.
     const intent = oldestOpenMessage(this.messages, 'queued');
     try {
-      return await withDORetry(
+      const view = await withDORetry(
         () => this.sandboxPeer() ?? peer,
         async stub =>
           stub.prepare({
@@ -4237,6 +4279,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'session.prepare',
         this.sandboxRpcConfig(pass)
       );
+      markAnswered(pass);
+      return view;
     } catch {
       // `unknown` must come only from the Sandbox, never from a transport error.
       await this.scheduleTransportRecovery(pass);
@@ -4252,6 +4296,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.messages.some(message => message.state === 'queued')) return;
     let view = await this.readSandboxView(pass);
     if (view === null) return;
+    // Without a hint, the same preparing or reconnecting attempt changes nothing.
+    // Applying it again would repeat its status and could lose the step detail.
+    if (
+      ownerHint === undefined &&
+      (view.state === 'preparing' || view.state === 'reconnecting') &&
+      this.route.state === view.state &&
+      this.route.attemptId === view.attemptId
+    ) {
+      return;
+    }
     if (
       ownerHint?.state === 'lost' &&
       ownerHint.attemptId === this.currentAttemptId() &&
@@ -4284,7 +4338,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.route.state === 'failed' &&
         prepared.attemptId === this.route.attemptId
       ) {
-        await this.scheduleTransportRecovery(pass);
+        await this.endTransportWindow();
         return;
       }
       view = prepared;
@@ -4320,6 +4374,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         'session.status',
         this.sandboxRpcConfig(pass)
       );
+      markAnswered(pass);
       if (status.workspaceStopEpoch > this.workspaceStop.epoch) {
         const localAttempt = this.route.state === 'unknown' ? undefined : this.route.attemptId;
         const authoritativeRetired =
@@ -4345,23 +4400,76 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return { deadlineAt: Date.now() + this.sessionTimers().sandboxRpcDeadlineMs, scheduleRecovery };
   }
 
+  /**
+   * Arms the next recovery pass after a pass that the Sandbox did not answer.
+   * The window of unanswered passes is bounded (spec "Queued transport recovery"):
+   * at its end, queued work fails with a specific reason, not at the backstop.
+   */
   private async scheduleTransportRecovery(pass: TransportPass): Promise<void> {
+    pass.outcome = 'unanswered';
     if (
       !pass.scheduleRecovery ||
-      this.transportRecoveryAt !== null ||
+      this.transportRecovery?.since !== undefined ||
       !this.messages.some(message => message.state === 'queued')
     )
       return;
-    const dueAt = Date.now() + this.sessionTimers().transportRecoveryMs;
-    await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, dueAt);
-    this.transportRecoveryAt = dueAt;
+    const now = Date.now();
+    const since = pass.unansweredSince ?? now;
+    const next = nextTransportRecovery(since, now, this.sessionTimers());
+    logControlDiagnostic(
+      'session_transport_recovery',
+      {
+        sessionId: this.sessionId,
+        outcome: next === null ? 'exhausted' : 'scheduled',
+        unansweredMs: now - since,
+        nextDueAt: next?.dueAt,
+      },
+      next === null ? 'warn' : 'info'
+    );
+    if (next === null) {
+      await this.failUnansweredQueued();
+      return;
+    }
+    await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, next);
+    this.transportRecovery = next;
+    await this.armAlarm();
+  }
+
+  /**
+   * Fails queued work when recovery passes stayed unanswered for the whole
+   * window. Accepted work keeps its own backstop: the runtime may still own it.
+   */
+  private async failUnansweredQueued(): Promise<void> {
+    const reason = SANDBOX_UNREACHABLE;
+    if (this.route.state === 'preparing') {
+      this.finalizeAttempt(this.route.attemptId, { status: 'failed', safeError: reason });
+    }
+    this.finishWorktreePreparation();
+    await this.captureQueuedRouteContainer(this.route);
+    // A ready route may still run accepted work, so its status stays ready.
+    if (this.route.state !== 'ready' && this.route.state !== 'reconnecting') {
+      this.emitCloudStatus({ type: 'error', message: reason });
+    }
+    await this.settleMessages(
+      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      'failed',
+      reason
+    );
+  }
+
+  /**
+   * The Sandbox answered, but the pass could not make progress. An answer ends
+   * the window of unanswered passes; queued work keeps the slow status check.
+   */
+  private async endTransportWindow(): Promise<void> {
+    if (this.transportRecovery?.since !== undefined) await this.clearTransportRecovery();
     await this.armAlarm();
   }
 
   private async clearTransportRecovery(): Promise<void> {
-    if (this.transportRecoveryAt === null) return;
+    if (this.transportRecovery === null) return;
     await this.ctx.storage.delete(TRANSPORT_RECOVERY_KEY);
-    this.transportRecoveryAt = null;
+    this.transportRecovery = null;
   }
 
   private sandboxRpcConfig(pass: TransportPass) {
@@ -4823,7 +4931,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     step?: string;
     message?: string;
   }): void {
-    this.emitSynthetic('cloud.status', { cloudStatus: status }, 'cloud-status');
+    this.emitSynthetic('cloud.status', { cloudStatus: status }, CLOUD_STATUS_ENTITY_ID);
   }
 
   /** One row per entity keeps synthetic state replayable by cursor without unbounded growth. */
@@ -4867,6 +4975,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     step?: string;
     message?: string;
   } | null {
+    if (
+      (this.route.state === 'preparing' || this.route.state === 'failed') &&
+      !this.messages.some(message => message.state === 'queued')
+    ) {
+      const payload = this.eventQueries.findByEntityId(CLOUD_STATUS_ENTITY_ID)?.payload;
+      if (payload !== undefined) {
+        try {
+          const status = sandboxUnreachableStatusSchema.safeParse(JSON.parse(payload));
+          if (status.success) return status.data.cloudStatus;
+        } catch {
+          // Older or corrupt event data cannot override the route snapshot.
+        }
+      }
+    }
     switch (this.route.state) {
       case 'unknown':
         return null;

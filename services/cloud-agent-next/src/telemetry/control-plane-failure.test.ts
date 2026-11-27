@@ -120,6 +120,7 @@ const cases: ReadonlyArray<
   ['account_blocked', 'accepted', 'failed', 'pre_dispatch', 'account_blocked'],
   ['invalid_configuration', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   ['invalid_configuration', 'accepted', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
+  ['sandbox_unreachable', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   [
     'billing_unavailable',
     'pre_dispatch',

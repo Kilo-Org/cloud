@@ -3,7 +3,9 @@ import { afterEach } from 'vitest';
 import { getRefresherStub } from '../../src/dos/stubs';
 import { config, env } from './test-env';
 
-const SETTLE_POLL_MS = 5;
+// Must exceed the slowest stubbed manager fetch (`installManager({ latencyMs: 50 })` in
+// bundle-do.test.ts), so a handler in flight re-arms inside the quiet window, not after it.
+const SETTLE_POLL_MS = 60;
 const SETTLE_DEADLINE_MS = 2_000;
 const QUIET_CHECKS = 2;
 
@@ -34,7 +36,7 @@ afterEach(async () => {
   while (quiet < QUIET_CHECKS) {
     if (Date.now() > deadline) {
       throw new Error(
-        `refresher alarm still re-arming ${SETTLE_DEADLINE_MS} ms after the test; teardown cannot disarm it`,
+        `refresher alarm still re-arming ${SETTLE_DEADLINE_MS} ms after the test; teardown cannot disarm it, and the next test file may hang`,
       );
     }
     quiet = (await deleteRefresherAlarm()) ? 0 : quiet + 1;

@@ -522,6 +522,22 @@ Two kilocode-side rules hold these policies to what they name:
   `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
   what makes it mean `main`.
 
+One `Kilo-Org/cloud` policy (repository id `1145038391`, owner id `201822503`, immutable subjects)
+serves a bundle the same way, production only, `refs/heads/main`:
+
+| Workload | GitHub environment | Workflow files | Events | Secrets |
+|---|---|---|---|---|
+| `ci-cloud-agent-e2e` | `cloud-agent-e2e` | `cloud-agent-e2e-deploy.yml`, `cloud-agent-e2e-tests.yml` | `workflow_dispatch` | `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` |
+
+These are the Cloudflare Access service token of the e2e Worker's ingress (D35/D39): the deploy
+job uploads them as Worker secrets, the tests job sends them. Both files have an
+`on: workflow_call` trigger: `cloud-agent-e2e-nightly.yml` calls them, and those jobs carry the
+called file's `job_workflow_ref` with the nightly's `ref` and `event_name`, so they get the bundle
+too. Any other workflow on `main` that calls either file in a `workflow_dispatch` run and in the
+`cloud-agent-e2e` environment would get it as well, so a new caller needs this policy's review.
+The `cloud-agent-e2e` environment must admit deployments from `main` only. Restoring the nightly's
+`schedule` adds `schedule` to the policy's events.
+
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
 review covers its STS binding; this repository refuses any config that deploys under the name.

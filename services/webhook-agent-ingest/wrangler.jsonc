@@ -49,6 +49,12 @@
     // binding and never falls back. An absent value means `secrets-store`;
     // any other value refuses every read.
     "SECRETS_SOURCE": "secrets-store",
+    // One pre-flip check per isolate that the STS copy of each of the three
+    // names equals the Secrets Store value served above
+    // (src/secrets-compare.ts). Only `true` turns it on, and only with
+    // `secrets-store` in production; it never changes the source. `env.dev`
+    // does not set it.
+    "SECRETS_COMPARE_ENABLED": "true",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [
@@ -66,8 +72,11 @@
     // top-level name. This block deploys production only, so it binds the
     // production `sts`; services/sts/policy/cloudflare-webhook-agent-ingest.yaml
     // grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET,
-    // each resolved from /shared. Nothing reads them while SECRETS_SOURCE is
-    // `secrets-store`.
+    // each resolved from /shared. While SECRETS_SOURCE is `secrets-store`,
+    // every request is served from the Secrets Store; the only reader here is
+    // the one background compare per isolate that SECRETS_COMPARE_ENABLED
+    // turns on, after an authenticated internal API or execution callback
+    // request.
     {
       "binding": "STS",
       "service": "sts",

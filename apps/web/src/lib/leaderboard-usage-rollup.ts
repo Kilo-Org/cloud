@@ -9,10 +9,16 @@ export const LEADERBOARD_USAGE_LOOKBACK_DAYS = 7;
 /** Runs before this UTC hour rebuild yesterday even when it is already built. */
 export const YESTERDAY_SETTLING_HOURS = 6;
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const INSERT_BATCH_SIZE = 1_000;
-const HOURLY_READ_STATEMENT_TIMEOUT_MS = 120_000;
+
+// A busy hour is ~800k usage rows. A 15-minute slice keeps each read a few
+// seconds when warm, and well under the replica's 90s
+// `max_standby_streaming_delay` when cold, past which WAL replay may cancel it.
+const SLICE_MS = 15 * 60 * 1000;
+const SLICE_STATEMENT_TIMEOUT_MS = 60_000;
+// The default 32MB spills the usage-side hash join to disk at a busy hour.
+const SLICE_WORK_MEM = '128MB';
 
 type LeaderboardUsageKey = {
   provider: string | null;
@@ -32,7 +38,7 @@ type LeaderboardUsageRow = LeaderboardUsageKey & {
   error_count: number;
 };
 
-type HourlyAggregateRow = LeaderboardUsageKey & {
+type SliceAggregateRow = LeaderboardUsageKey & {
   input_tokens: string;
   output_tokens: string;
   cache_hit_tokens: string;
@@ -56,19 +62,18 @@ export function leaderboardUsageWindow(now: Date): string[] {
   );
 }
 
-async function aggregateHour(
+async function aggregateSlice(
   readDb: DrizzleDatabase,
   start: string,
   end: string
-): Promise<HourlyAggregateRow[]> {
+): Promise<SliceAggregateRow[]> {
   // The metadata row is written in the same statement as its usage row with the
-  // same `created_at`, so bounding both sides by the hour lets the planner range
+  // same `created_at`, so bounding both sides by the slice lets the planner range
   // scan each `created_at` index instead of probing metadata by id.
   return await readDb.transaction(async tx => {
-    await tx.execute(
-      sql.raw(`SET LOCAL statement_timeout = '${HOURLY_READ_STATEMENT_TIMEOUT_MS}'`)
-    );
-    const result = await tx.execute<HourlyAggregateRow>(sql`
+    await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${SLICE_STATEMENT_TIMEOUT_MS}'`));
+    await tx.execute(sql.raw(`SET LOCAL work_mem = '${SLICE_WORK_MEM}'`));
+    const result = await tx.execute<SliceAggregateRow>(sql`
       SELECT
         mu.provider,
         mu.requested_model,
@@ -108,7 +113,7 @@ function keyOf(row: LeaderboardUsageKey): string {
 }
 
 /**
- * Aggregates one UTC day of usage from `readDb` an hour at a time, then replaces
+ * Aggregates one UTC day of usage from `readDb` 15 minutes at a time, then replaces
  * that day's rollup rows on `db` in one transaction. Returns the rows written.
  */
 export async function rebuildLeaderboardUsageDay(
@@ -118,10 +123,14 @@ export async function rebuildLeaderboardUsageDay(
   const dayStartMs = Date.parse(`${usageDate}T00:00:00.000Z`);
   const rows = new Map<string, LeaderboardUsageRow>();
 
-  for (let hour = 0; hour < 24; hour++) {
-    const start = new Date(dayStartMs + hour * HOUR_MS).toISOString();
-    const end = new Date(dayStartMs + (hour + 1) * HOUR_MS).toISOString();
-    for (const aggregate of await aggregateHour(readDb, start, end)) {
+  for (
+    let sliceStartMs = dayStartMs;
+    sliceStartMs < dayStartMs + DAY_MS;
+    sliceStartMs += SLICE_MS
+  ) {
+    const start = new Date(sliceStartMs).toISOString();
+    const end = new Date(sliceStartMs + SLICE_MS).toISOString();
+    for (const aggregate of await aggregateSlice(readDb, start, end)) {
       const key = keyOf(aggregate);
       const existing = rows.get(key);
       const sums = {

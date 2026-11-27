@@ -6,9 +6,11 @@ import { z } from 'zod';
  * `POST /ingest/api-metrics`, set per Vercel project (`kilocode-app`, `kilocode-ai-gateway`):
  * - unset, empty or `legacy`: `O11Y_KILO_GATEWAY_CLIENT_SECRET` in `X-O11Y-ADMIN-TOKEN`, exactly as
  *   before this switch existed;
- * - `sts`: only an `o11y:api-metrics.write` STS service token in `Authorization: Bearer`, only to
- *   o11y's fixed origin in this deployment's STS environment; never the secret, and no return to it
- *   when the token or the send fails.
+ * - `sts`, Vercel production only: only an `o11y:api-metrics.write` STS service token in
+ *   `Authorization: Bearer`, only to o11y's production origin; never the secret, and no return to
+ *   it when the token or the send fails. o11y has no staging or preview deployment, so a staging or
+ *   preview deployment set to `sts` sends nothing. A process outside Vercel (local development)
+ *   uses development STS and o11y's local origin.
  * Any other value sends nothing. o11y must accept STS (`ADMIN_CREDENTIAL_ACCEPT=legacy-and-sts`
  * with its `STS_ENVIRONMENT`) before a sender moves to `sts`; rollback is this switch back to
  * `legacy`, before touching o11y.
@@ -22,14 +24,15 @@ export const ApiMetricsSenderAuthSchema = z.preprocess(
 );
 
 /**
- * o11y's origin in each STS environment, the `RESOURCE_ORIGINS` of
- * `services/o11y/src/admin-middleware.ts`: the only place an STS token is sent. o11y has no isolated
- * staging deployment, so staging has none and sends nothing under `sts`.
+ * o11y's origin in each STS environment it serves, the `RESOURCE_ORIGINS` of
+ * `services/o11y/src/admin-middleware.ts`: the only places an STS token is sent.
  */
-export const O11Y_STS_ORIGINS: Readonly<Partial<Record<StsEnvironment, string>>> = {
+export const O11Y_STS_ORIGINS = {
   production: 'https://o11y.kiloapps.io',
   development: 'http://localhost:8801',
-};
+} as const satisfies Partial<Record<StsEnvironment, string>>;
+
+type O11yStsEnvironment = keyof typeof O11Y_STS_ORIGINS;
 
 /** The deployment's runtime variables; `process.env` itself in production. */
 export type VercelRuntime = Readonly<Record<string, string | undefined>> & {
@@ -38,36 +41,31 @@ export type VercelRuntime = Readonly<Record<string, string | undefined>> & {
 };
 
 /**
- * The STS environment a deployment's tokens come from, the mapping of `services/sts/policy/web.yaml`
- * and `ai-gateway.yaml` (as `sts-secret-transport.ts`): Vercel production is production, the
- * `staging` custom environment is staging, a preview and a process outside Vercel are development.
+ * The STS environment an `sts` sender mints from: Vercel production is production, and a process
+ * outside Vercel (local development) is development. Every other deployment, the `staging` custom
+ * environment and previews included, has none: o11y has no deployment there.
  */
-function stsEnvironmentOf(runtime: VercelRuntime): StsEnvironment | null {
+function stsEnvironmentOf(runtime: VercelRuntime): O11yStsEnvironment | null {
   const { VERCEL_ENV: environment, VERCEL_TARGET_ENV: target } = runtime;
   if (environment === 'production' && target === 'production') return 'production';
-  if (environment === 'preview' && target === 'staging') return 'staging';
-  if (environment === 'preview' && target === 'preview') return 'development';
   if (environment === undefined && target === undefined) return 'development';
   return null;
 }
 
-export type ApiMetricsSenderMisconfiguration =
-  | 'invalid_auth'
-  | 'no_sts_environment'
-  | 'no_o11y_origin'
-  | 'origin_mismatch';
+export type ApiMetricsSenderMisconfiguration = 'invalid_auth' | 'origin_mismatch';
 
 /**
  * What this process sends with each metric, resolved once from its configuration:
- * - `off`: no endpoint, or `legacy` without the secret; nothing is sent, as before the switch;
+ * - `off`: nothing is sent. `unconfigured`: no endpoint, or `legacy` without the secret, as before
+ *   the switch. `sts_production_only`: `sts` on a deployment o11y does not serve (staging, preview);
  * - `legacy`: the secret in `X-O11Y-ADMIN-TOKEN`;
  * - `sts`: a token from `environment`'s STS in `Authorization`;
  * - `misconfigured`: the switch or the STS destination is invalid; nothing is sent.
  */
 export type ApiMetricsSender =
-  | { kind: 'off' }
+  | { kind: 'off'; reason: 'unconfigured' | 'sts_production_only' }
   | { kind: 'legacy'; url: URL; secret: string }
-  | { kind: 'sts'; url: URL; environment: StsEnvironment }
+  | { kind: 'sts'; url: URL; environment: O11yStsEnvironment }
   | { kind: 'misconfigured'; reason: ApiMetricsSenderMisconfiguration };
 
 /**
@@ -84,14 +82,16 @@ export function resolveApiMetricsSender(config: {
   const auth = ApiMetricsSenderAuthSchema.safeParse(config.auth);
   if (!auth.success) return { kind: 'misconfigured', reason: 'invalid_auth' };
   const { url } = config;
-  if (url === null) return { kind: 'off' };
+  if (url === null) return { kind: 'off', reason: 'unconfigured' };
   if (auth.data === 'legacy') {
-    return config.secret ? { kind: 'legacy', url, secret: config.secret } : { kind: 'off' };
+    return config.secret
+      ? { kind: 'legacy', url, secret: config.secret }
+      : { kind: 'off', reason: 'unconfigured' };
   }
   const environment = stsEnvironmentOf(config.runtime);
-  if (environment === null) return { kind: 'misconfigured', reason: 'no_sts_environment' };
-  const origin = O11Y_STS_ORIGINS[environment];
-  if (origin === undefined) return { kind: 'misconfigured', reason: 'no_o11y_origin' };
-  if (url.origin !== origin) return { kind: 'misconfigured', reason: 'origin_mismatch' };
+  if (environment === null) return { kind: 'off', reason: 'sts_production_only' };
+  if (url.origin !== O11Y_STS_ORIGINS[environment]) {
+    return { kind: 'misconfigured', reason: 'origin_mismatch' };
+  }
   return { kind: 'sts', url, environment };
 }

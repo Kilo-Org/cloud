@@ -247,6 +247,16 @@ export const STS_WEB_SECURITY_ANALYSIS_CALLBACK = {
 } as const;
 
 /**
+ * Cloud Agent calls back the web app with a security remediation result
+ * (`/api/internal/security-remediation-callback/{attemptId}`). Only the `cloud-agent-next`
+ * workload may send it.
+ */
+export const STS_WEB_SECURITY_REMEDIATION_CALLBACK = {
+  audience: 'web',
+  scope: 'web:security-remediation.callback',
+} as const;
+
+/**
  * Cloud Agent reports a code review agent's status to the web app
  * (`/api/internal/code-review-status/{reviewId}`). Only the `cloud-agent-next` workload may send
  * it.
@@ -282,6 +292,16 @@ export const STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK = {
 export const STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK = {
   audience: 'security-auto-analysis',
   scope: 'security-auto-analysis:analysis.callback',
+} as const;
+
+/**
+ * Cloud Agent calls back Security Auto Analysis with a remediation result
+ * (`/internal/security-remediation-callback/{attemptId}`). Only the `cloud-agent-next` workload
+ * may send it.
+ */
+export const STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK = {
+  audience: 'security-auto-analysis',
+  scope: 'security-auto-analysis:remediation.callback',
 } as const;
 
 /** The web app dispatches a review to the Code Review Worker. Only the `web` workload may send it. */
@@ -379,6 +399,7 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH.scope,
       STS_WEB_BOT_SESSION_CALLBACK.scope,
       STS_WEB_SECURITY_ANALYSIS_CALLBACK.scope,
+      STS_WEB_SECURITY_REMEDIATION_CALLBACK.scope,
       STS_WEB_CODE_REVIEW_AGENT_CALLBACK.scope,
       STS_WEB_CODE_REVIEW_STATUS_CALLBACK.scope,
       STS_WEB_MCP_CATALOG_TOKEN_MINT.scope,
@@ -418,7 +439,10 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
     scopes: [STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK.scope],
   },
   [STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.audience]: {
-    scopes: [STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.scope],
+    scopes: [
+      STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.scope,
+      STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK.scope,
+    ],
   },
   [STS_CODE_REVIEW_DISPATCH.audience]: {
     scopes: [

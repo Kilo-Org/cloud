@@ -16,6 +16,7 @@ import {
   STS_O11Y_API_METRICS_WRITE,
   STS_SECURE_PROXY_FORWARD,
   STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK,
+  STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK,
   STS_SECURITY_SYNC_DISMISS_FINDING,
   STS_SECURITY_SYNC_MANUAL_SYNC,
   STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
@@ -35,6 +36,7 @@ import {
   STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH,
   STS_WEB_SCIM_SYNC,
   STS_WEB_SECURITY_ANALYSIS_CALLBACK,
+  STS_WEB_SECURITY_REMEDIATION_CALLBACK,
   STS_WEB_MCP_CATALOG_TOKEN_MINT,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
@@ -216,6 +218,7 @@ describe('STS scope registry', () => {
           'web:hosted-workspace-pull-requests.refresh',
           'web:bot-session.callback',
           'web:security-analysis.callback',
+          'web:security-remediation.callback',
           'web:code-review.agent-callback',
           'web:code-review.status-callback',
           'web:mcp-catalog-token.mint',
@@ -246,7 +249,12 @@ describe('STS scope registry', () => {
         ],
       },
       'webhook-agent-ingest': { scopes: ['webhook-agent-ingest:execution.callback'] },
-      'security-auto-analysis': { scopes: ['security-auto-analysis:analysis.callback'] },
+      'security-auto-analysis': {
+        scopes: [
+          'security-auto-analysis:analysis.callback',
+          'security-auto-analysis:remediation.callback',
+        ],
+      },
       'code-review': {
         scopes: [
           'code-review:review.dispatch',
@@ -333,6 +341,7 @@ describe('STS scope registry', () => {
     ],
     ['web:bot-session.callback', 'web', STS_WEB_BOT_SESSION_CALLBACK],
     ['web:security-analysis.callback', 'web', STS_WEB_SECURITY_ANALYSIS_CALLBACK],
+    ['web:security-remediation.callback', 'web', STS_WEB_SECURITY_REMEDIATION_CALLBACK],
     ['web:code-review.agent-callback', 'web', STS_WEB_CODE_REVIEW_AGENT_CALLBACK],
     ['web:code-review.status-callback', 'web', STS_WEB_CODE_REVIEW_STATUS_CALLBACK],
     [
@@ -344,6 +353,11 @@ describe('STS scope registry', () => {
       'security-auto-analysis:analysis.callback',
       'security-auto-analysis',
       STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK,
+    ],
+    [
+      'security-auto-analysis:remediation.callback',
+      'security-auto-analysis',
+      STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK,
     ],
     ['code-review:review.dispatch', 'code-review', STS_CODE_REVIEW_DISPATCH],
     ['code-review:review.status-read', 'code-review', STS_CODE_REVIEW_STATUS_READ],

@@ -274,7 +274,9 @@ function startMint(label: string, urls: E2eStore['urls']): void {
  * second, over the run's state. The reader asks the key-set shard named by `?name=` for every
  * signer's keys through the mint Worker's own `UtsKeySetDO` class, so the run can reach each shard
  * by name, which the random shard of a mint Worker isolate never allows. A binding from another
- * `wrangler dev` reaches the objects without their name, so each would refuse to load.
+ * `wrangler dev` reaches the objects without their name, so each would refuse to load. The binding
+ * takes no jurisdiction because `wrangler.dev.jsonc` sets `DO_JURISDICTION` to `none`, so its
+ * `idFromName` names the same objects as the mint Worker's own stubs (src/dos/stubs.ts).
  */
 function startKeySetReader(urls: E2eStore['urls']): void {
   const main = join(WORK, 'key-set-reader.js');
@@ -711,6 +713,10 @@ async function main(): Promise<void> {
       seeded.length === KEY_SET_SHARDS,
       `each of the ${KEY_SET_SHARDS} key-set shards answers the first set's ${UTS_SIGNER_COUNT * 2} token keys`
     );
+    check(
+      !readLog('key-set-reader').includes('uts.signer.bootstrapped'),
+      'the key-set reader session created no keys'
+    );
 
     console.log('== start 2: same persisted state');
     startMint('mint-2', store.urls);
@@ -985,6 +991,7 @@ async function main(): Promise<void> {
       for (const suffix of ['', '-wal', '-shm']) rmSync(`${base}${suffix}`, { force: true });
     }
     log('key-set shard storages deleted', shardStorages.length);
+    check(shardStorages.length === KEY_SET_SHARDS, 'every key-set shard storage was deleted');
     startMint('mint-5', store.urls);
     await waitForHttp(`${MINT}/`, 'the mint Worker');
     // The feed isolate reads again on a request once its newest keys are 10 seconds old: ask until

@@ -96,7 +96,7 @@ describe('callback tokens', () => {
     await expect(
       verifyCallbackToken({
         ...BASE_PARAMS,
-        token: 'not-hex',
+        token: 'c'.repeat(64),
         observation: { receiver: 'web', caller: 'security-auto-analysis' },
       })
     ).resolves.toBe(false);

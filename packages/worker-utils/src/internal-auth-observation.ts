@@ -12,11 +12,12 @@
  *
  * A minute is aggregated, not a request: a bucket is (receiver, route, auth, caller) inside one
  * minute, and its first request writes one line with `count: 1` immediately. Later requests of that
- * minute only grow the bucket, and the rest of its count is written when the minute turns. The
- * immediate line exists because an isolate can shut down between requests and a lazily flushed
- * bucket would vanish with it: a legacy request that must never be lost is therefore visible the
- * moment it happened, and only the remainder of a busy minute can be lost. Lines of one bucket may
- * appear more than once in a minute; count with `sum(count)`, never `count()`.
+ * minute only grow the bucket, and the rest of its count is written on the next observation after
+ * the minute has turned, which a quiet instance may never make. The immediate line exists because
+ * an isolate can shut down between requests and a lazily flushed bucket would vanish with it: a
+ * legacy request that must never be lost is therefore visible the moment it happened, and only the
+ * remainder of a busy minute can be lost. Lines of one bucket may appear more than once in a
+ * minute; count with `sum(count)`, never `count()`.
  *
  * On unless `INTERNAL_AUTH_OBSERVATION_ENABLED` is exactly `false`, so the counter needs no
  * configuration change on any receiver. Vercel functions read it from `process.env`; Workers read

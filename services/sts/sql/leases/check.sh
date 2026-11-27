@@ -239,6 +239,36 @@ grep -qxF "volatile|planted_writer()|volatile, owner postgres, sql with the call
   fail "the report lists the SQL volatile function without counting it: $(cat "$TMP/report.out")"
 pass 'without pg_net the replica template can create nothing, write nothing and run no definer or volatile function'
 
+# What the removed ci-migration trial left: its roles, a lease role of its template and the
+# kilo_lease objects moved to kilo_lease_owner. The report lists each role as a leftover, the
+# runbook's listing changes nothing, and the runbook (as the superuser, since kilo_lease_owner
+# exists) gives the objects back to postgres and drops every role.
+super -c 'create role kilo_lease_owner nologin' -c 'create role kilo_lease_migration nologin' \
+  -c "create role kilo_lease_migration_admin login password '$(secret)'" \
+  -c "create role lease_cm_abcdefghij0123456789 login password '$(secret)' in role kilo_lease_migration" \
+  -c 'alter schema kilo_lease owner to kilo_lease_owner' \
+  -c 'alter table kilo_lease.lease_role owner to kilo_lease_owner' \
+  -c 'alter function kilo_lease.create_lease(text, text, timestamptz) owner to kilo_lease_owner' \
+  -c 'grant pg_signal_backend to kilo_lease_owner' >/dev/null
+report >"$TMP/report.out"
+for role in kilo_lease_owner kilo_lease_migration kilo_lease_migration_admin lease_cm_abcdefghij0123456789; do
+  grep -qxF "leftover|$role|role of the removed ci-migration trial; follow the README runbook" "$TMP/report.out" ||
+    fail "the report lists the trial role $role: $(cat "$TMP/report.out")"
+done
+super -v list_only=1 -f "$HERE/remove-ci-migration-trial.sql" >"$TMP/trial-list.out"
+[ "$(grep -c '^\(kilo_lease_\|lease_cm_\)' "$TMP/trial-list.out")" = 4 ] || fail "the listing names the 4 trial roles: $(cat "$TMP/trial-list.out")"
+[ "$(role_count kilo_lease_owner)" = 1 ] || fail 'the listing changes nothing'
+super -f "$HERE/remove-ci-migration-trial.sql" >"$TMP/trial-remove.out"
+for role in kilo_lease_owner kilo_lease_migration kilo_lease_migration_admin lease_cm_abcdefghij0123456789; do
+  [ "$(role_count "$role")" = 0 ] || fail "the runbook drops $role"
+done
+[ "$(super -c "select count(*) from pg_proc where pronamespace = 'kilo_lease'::regnamespace and proowner <> 'postgres'::regrole")" = 0 ] &&
+  [ "$(super -c "select nspowner::regrole from pg_namespace where nspname = 'kilo_lease'")" = postgres ] &&
+  [ "$(super -c "select relowner::regrole from pg_class where oid = 'kilo_lease.lease_role'::regclass")" = postgres ] ||
+  fail 'postgres owns every kilo_lease object after the runbook'
+grep -q 'leftover=0' "$TMP/trial-remove.out" || fail "the report after the runbook counts no leftover: $(cat "$TMP/trial-remove.out")"
+pass 'the report lists every ci-migration trial role, and the runbook gives kilo_lease back to postgres and drops them'
+
 # replica-read.
 if replica_admin -c 'select 1 from public.accounts' >/dev/null 2>&1; then
   fail 'replica admin reads nothing while no lease exists'
@@ -268,6 +298,7 @@ pass 'the replica admin holds none of the lease role rights while the lease live
 # duration and the statement of every error: the admin logins' role settings turn all three off for
 # their own sessions. A failed creation's error carries no password either. Another login's
 # statement in the same log shows that the check sees logged statements.
+MARK=$(secret)
 super -c "alter system set log_statement = 'all'" -c 'alter system set log_min_duration_statement = 0' \
   -c 'select pg_reload_conf()' >/dev/null
 sleep 1

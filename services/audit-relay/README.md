@@ -182,9 +182,11 @@ with source `kilo:sts:<env>`; the migration proxy on `kilo-audit-migration-proxy
 `kilo-audit-migration-proxy-staging`, local `kilo-audit-migration-proxy-local`), streams
 `migration-proxy:<env>:` with source `kilo:migration-proxy:<env>` (local: `development`). A batch
 whose stream or any event source belongs to another producer, or that arrives on a queue the table
-does not name, is never archived: it is kept under `dead-letter/`, acked and paged as
-`foreign_producer`, like any dead letter that cannot recover. So a producer's queue write access
-cannot reach another producer's streams. `test/producers.test.ts` covers both directions.
+does not name, is never archived: it is kept under `dead-letter/foreign/<receiving queue>/`, acked
+and paged as `foreign/<receiving queue> (foreign_producer)`, like any dead letter that cannot
+recover. It is filed and rate-limited under the queue, never under the stream it claims, so a
+producer's queue write access cannot reach another producer's streams, their dead-letter prefix or
+their hourly page. `test/producers.test.ts` covers both directions.
 
 ## STS token events
 

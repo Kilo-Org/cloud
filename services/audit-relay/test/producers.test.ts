@@ -75,10 +75,13 @@ describe('per-queue producers', () => {
     expect(result.explicitAcks).toHaveLength(1);
     expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
     const [message] = messages.messages;
-    expect(await listObjectKeys(`dead-letter/${stream}/`)).toEqual([
-      deadLetterKey(stream, message.timestamp, message.id),
-    ]);
-    expect(pageTexts(http.requests).join('\n')).toContain(`${stream} seq 1..2 (foreign_producer)`);
+    expect(await listObjectKeys(`dead-letter/${stream}/`)).toEqual([]);
+    expect(await listObjectKeys('dead-letter/foreign/kilo-audit-migration-proxy/')).toContain(
+      deadLetterKey('foreign/kilo-audit-migration-proxy', message.timestamp, message.id)
+    );
+    const pages = pageTexts(http.requests).join('\n');
+    expect(pages).toContain('foreign/kilo-audit-migration-proxy (foreign_producer)');
+    expect(pages).not.toContain(stream);
   });
 
   it('dead-letters a migration proxy stream on the STS queue and its DLQ', async () => {
@@ -88,7 +91,8 @@ describe('per-queue producers', () => {
       const { result } = await runQueue(queue, proxyBatch(stream));
       expect(result.explicitAcks, queue).toHaveLength(1);
       expect(await listObjectKeys(`streams/${stream}/`), queue).toEqual([]);
-      expect(await listObjectKeys(`dead-letter/${stream}/`), queue).toHaveLength(1);
+      expect(await listObjectKeys(`dead-letter/${stream}/`), queue).toEqual([]);
+      expect(await listObjectKeys(`dead-letter/foreign/${queue}/`), queue).not.toEqual([]);
     }
   });
 

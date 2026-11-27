@@ -130,6 +130,14 @@ findings AS (
   JOIN pg_auth_members m ON m.member = r.oid AND NOT m.admin_option
   WHERE m.roleid = to_regrole('kilo_lease_replica_read')
     AND NOT r.rolcanlogin
+
+  -- Roles of the removed `ci-migration` trial, which no setup creates any more (README "Removing
+  -- the ci-migration trial"): any one left counts until that runbook drops it.
+  UNION ALL
+  SELECT 'leftover', r.rolname::text, 'role of the removed ci-migration trial; follow the README runbook', 'leftover'
+  FROM pg_roles r
+  WHERE r.rolname IN ('kilo_lease_migration_admin', 'kilo_lease_migration', 'kilo_lease_owner')
+    OR r.rolname LIKE 'lease\_cm\_%'
 )
 SELECT kind, object, detail FROM (
   SELECT kind, object, detail, 0 AS part FROM findings

@@ -885,7 +885,7 @@ describe('dispatchReadyNotifications', () => {
     },
   });
 
-  it('sends each ready callback with a web:user-data-exports.ready STS token by default', async () => {
+  it('sends each ready callback with a web:user-data-exports.ready STS token under sts', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const minted: unknown[] = [];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
@@ -894,6 +894,7 @@ describe('dispatchReadyNotifications', () => {
       {
         USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'sts',
         STS: sts(minted),
       },
       pending
@@ -914,7 +915,7 @@ describe('dispatchReadyNotifications', () => {
     ]);
   });
 
-  it('sends the internal secret under WEB_INTERNAL_AUTH=legacy', async () => {
+  it('sends the internal secret, and mints nothing, while WEB_INTERNAL_AUTH is unset', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const minted: unknown[] = [];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
@@ -923,7 +924,6 @@ describe('dispatchReadyNotifications', () => {
       {
         USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: 'shared-secret',
-        WEB_INTERNAL_AUTH: 'legacy',
         STS: sts(minted),
       },
       pending
@@ -940,7 +940,11 @@ describe('dispatchReadyNotifications', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
 
     await dispatchReadyNotifications(
-      { USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai', INTERNAL_API_SECRET: 'shared-secret' },
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'sts',
+      },
       pending
     );
 

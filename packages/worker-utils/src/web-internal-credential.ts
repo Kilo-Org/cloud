@@ -10,10 +10,12 @@ import {
  * The credential a Worker presents to one of the web app's `/api/internal/*` routes (design 6.5:
  * the shared internal API secret moves to STS service tokens, one scope per sender boundary).
  *
- * `WEB_INTERNAL_AUTH` is the sender's switch and its rollback (decision D59):
- * - absent, empty or `sts`: an STS service token for the route's scope, minted over the Worker's
- *   `STS` binding and sent as `Authorization: Bearer`. The legacy secret is never read.
- * - `legacy`: the route's legacy shared-secret header, exactly as before this switch existed.
+ * `WEB_INTERNAL_AUTH` is the sender's switch and its rollback (decision D59). It fails safe:
+ * - absent, empty or `legacy`: the route's legacy shared-secret header, exactly as before this
+ *   switch existed. A Worker deployed without the var keeps working against a secret-only route.
+ * - `sts`: an STS service token for the route's scope, minted over the Worker's `STS` binding and
+ *   sent as `Authorization: Bearer`. The legacy secret is never read. Set it only once the Worker
+ *   has the binding, STS grants the scope, and the receiving route accepts STS.
  * Any other value sends nothing.
  */
 export type WebInternalAuthMode = 'sts' | 'legacy';
@@ -25,14 +27,18 @@ export type WebInternalAuthEnv = {
 };
 
 export function webInternalAuthMode(value: string | undefined): WebInternalAuthMode | null {
-  if (value === undefined || value === '' || value === 'sts') return 'sts';
-  return value === 'legacy' ? 'legacy' : null;
+  if (value === undefined || value === '' || value === 'legacy') return 'legacy';
+  return value === 'sts' ? 'sts' : null;
 }
 
-/**
- * The scopes Workers present to the web app, audience `web`. Each names one sender boundary; the
- * receiving route accepts it only from the workload STS grants it to.
- */
+// ---------------------------------------------------------------------------------------------
+// Scopes pending registration in `@kilocode/sts-contracts`.
+//
+// Workers present these to the web app, audience `web`, one scope per sender boundary; the
+// receiving route accepts each only from the workload STS grants it to. None is in the registry
+// yet. Once one is registered, import it from `@kilocode/sts-contracts` and delete it here.
+// Every scope defined outside the registry lives in this block.
+// ---------------------------------------------------------------------------------------------
 export const STS_WEB_COMPUTE_BALANCE_ALERT = {
   audience: 'web',
   scope: 'web:compute-balance-alert.send',
@@ -57,6 +63,7 @@ export const STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ = {
   audience: 'web',
   scope: 'web:auto-routing.production-profile.read',
 } as const satisfies ServiceTokenRequest;
+// --- End of scopes pending registration. -----------------------------------------------------
 
 export type WebInternalCredentialFailure =
   /** `WEB_INTERNAL_AUTH` holds a value other than `sts` or `legacy`. */

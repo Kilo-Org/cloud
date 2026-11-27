@@ -1015,15 +1015,17 @@ export async function dispatchReadyNotifications(
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   const callbackUrl = new URL('/api/internal/user-data-exports/ready', baseUrl);
   const pending = await state.pendingNotifications();
-  // Nothing to send is the common cron run: it must not fail on a secret read, so the key is read
-  // only once a notification actually needs it.
+  // Nothing to send is the common cron run, and it must not fail on a secret read.
   if (pending.length === 0) return;
-  const internalApiKey = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
+  // The shared key is read only when a send actually falls back to it: under WEB_INTERNAL_AUTH=sts
+  // every item carries a minted token, so a missing INTERNAL_API_SECRET must not fail the sweep.
+  // One read per sweep, and a rejected read surfaces the same way on every item.
+  let sharedKey: Promise<string> | undefined;
   for (const item of pending) {
     // Per item: a held STS token is a memory read, and a long sweep presents a fresh one.
     const credential = await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, {
       header: 'x-internal-api-key',
-      secret: async () => internalApiKey,
+      secret: () => (sharedKey ??= readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx)),
     });
     if (credential.kind === 'unavailable') {
       // The rest of the sweep would fail the same way; the lease keeps every item for the next.

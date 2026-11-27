@@ -5,8 +5,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-01-20",
   "compatibility_flags": ["nodejs_compat"],
-  // Production features. Traces stay off, as a config that binds STS requires (services/sts README,
-  // "Policy"), since a trace records outbound URLs.
   "upload_source_maps": true,
   "observability": {
     "enabled": true,
@@ -18,9 +16,6 @@
   "version_metadata": {
     "binding": "CF_VERSION_METADATA",
   },
-  // No STS binding here yet: batch B (#13047) adds this Worker's STS binding and its worker-binding
-  // policy, and the registry PR adds the status-write grant. Until then
-  // CODE_REVIEW_STATUS_CALLBACK_AUTH=sts fails closed (sts_binding_missing, src/status-callback-auth.ts).
   // Public environment variables
   "vars": {
     "ENVIRONMENT": "production",
@@ -35,10 +30,12 @@
     // the status-write token (README, "Status writes").
   },
   "services": [
-    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
-    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // STS serves both entry points over the account-internal binding. `props.caller` is what STS
+    // authorizes on and must equal this Worker's top-level name; services/sts/policy/
     // kilo-code-review-worker.yaml grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
-    // BACKEND_AUTH_TOKEN. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+    // BACKEND_AUTH_TOKEN. The bundle is not read while SECRETS_SOURCE is `secrets-store`; the
+    // status-write token is minted over this binding whenever CODE_REVIEW_STATUS_CALLBACK_AUTH is
+    // `sts`, and until the registry PR adds the grant that mint fails as denied (unknown_scope).
     {
       "binding": "STS",
       "service": "sts",

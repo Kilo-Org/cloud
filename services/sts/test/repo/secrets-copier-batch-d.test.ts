@@ -9,11 +9,6 @@ import { PolicySchema, type Policy } from '../../src/policy/schema';
 import { repoRoot, SHARED_SECRET_NAMES, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
 
-/**
- * The names whose value is one value across Workloads, and so live in `/shared`
- * (`SHARED_SECRET_NAMES` in ./repo.ts); every other name resolves from the Worker's own
- * `/workloads/<workload>` folder (src/policy/schema.ts `bundleFolder`).
- */
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 

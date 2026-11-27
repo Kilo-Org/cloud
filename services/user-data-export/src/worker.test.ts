@@ -883,8 +883,8 @@ describe('dispatchReadyNotifications', () => {
         })),
       };
     },
-    // One real binding serves both entry points. These tests take the sender path, whose secret
-    // thunk is never called, so a bundle read here is a bug in the test rather than a missing stub.
+    // One real binding serves both entry points. The sweeps below send with a minted token or with
+    // the plain secret, never with a bundle, so a bundle read here is a bug in the test.
     async getBundle(): Promise<never> {
       throw new Error('dispatchReadyNotifications tests never read a bundle');
     },

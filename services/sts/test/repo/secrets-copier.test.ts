@@ -42,12 +42,6 @@ function shippedPolicies(): Map<string, Policy> {
   );
 }
 
-/**
- * The folder each name resolves from is decided by `SHARED_SECRET_NAMES` (`./repo.ts`), which the
- * batch-D table imports too: counting granting policies cannot decide it, because same-named
- * per-Workload credentials are the normal layout.
- */
-
 /** The published table's path column: where the copier copies each value. */
 const PUBLISHED_PATHS: Record<string, string> = {
   'session-sync|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',

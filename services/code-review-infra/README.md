@@ -39,9 +39,9 @@ The review Durable Object writes `running` and failure status to the web app's
   falls back to the derived token.
 
 Production leaves it unset. Set `sts` only once the web route accepts that token; rollback is
-`legacy`. `wrangler.jsonc` binds no STS yet: batch B (#13047) adds the `STS` binding and this
-Worker's worker-binding policy, and the registry PR adds the grant. Until then `sts` fails closed
-(`sts_binding_missing`). The callback target handed to Cloud Agent Next keeps the derived token:
+`legacy`. `wrangler.jsonc` binds `STS` and this Worker's worker-binding policy; the registry PR adds
+the status-write grant, and until it lands `sts` fails closed as denied (`unknown_scope`). The
+callback target handed to Cloud Agent Next keeps the derived token:
 Cloud Agent Next delivers that callback with its own credential. The test config
 (`wrangler.test.jsonc`) binds no STS and stays on `legacy`.
 

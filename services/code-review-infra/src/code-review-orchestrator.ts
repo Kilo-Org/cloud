@@ -9,7 +9,6 @@ import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
   CloudAgentNextError,
-  deriveCallbackToken,
   type CloudAgentNextFetchClient,
   type CloudAgentPrepareSessionInput,
   type CloudAgentSessionHealthOutput,
@@ -27,6 +26,7 @@ import type {
 import { InternalStatusResponseSchema } from './types';
 import { doNameForAttempt } from './do-name';
 import { readCodeReviewInfraSecret } from './secrets';
+import { derivedCallbackHeaders, statusCallbackCredential } from './status-callback-auth';
 import {
   buildGitHubCloudReviewSkillCue,
   GITHUB_CLOUD_REVIEW_SKILL,
@@ -95,6 +95,11 @@ function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: str
   return url.toString();
 }
 
+/**
+ * The callback target Cloud Agent Next delivers terminal status to. It carries the derived callback
+ * token: Cloud Agent Next presents that token itself, so `CODE_REVIEW_STATUS_CALLBACK_AUTH` does not
+ * change it.
+ */
 async function callbackTargetForAttempt(
   apiUrl: string,
   reviewId: string,
@@ -103,13 +108,7 @@ async function callbackTargetForAttempt(
 ): Promise<{ url: string; headers: { 'X-Callback-Token': string } }> {
   return {
     url: callbackUrlForAttempt(apiUrl, reviewId, attemptId),
-    headers: {
-      'X-Callback-Token': await deriveCallbackToken({
-        secret: callbackTokenSecret,
-        scope: 'code-review-status-callback',
-        resourceParts: [reviewId, attemptId ?? ''],
-      }),
-    },
+    headers: await derivedCallbackHeaders(callbackTokenSecret, reviewId, attemptId),
   };
 }
 
@@ -842,12 +841,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       terminalReason?: CloudAgentTerminalReason;
     }
   ): Promise<UpdateStatusResult> {
-    // Use path-based endpoint (same as callback endpoint for consistency)
-    const callbackTarget = await callbackTargetForAttempt(
-      this.env.API_URL,
+    // This Worker's own write: its credential follows CODE_REVIEW_STATUS_CALLBACK_AUTH.
+    const credential = await statusCallbackCredential(
+      this.env,
+      this.ctx,
       this.state.reviewId,
-      this.state.attemptId,
-      await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
+      this.state.attemptId
     );
 
     // Payload without reviewId (it's in the URL path)
@@ -859,14 +858,18 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       terminalReason: options?.terminalReason,
     };
 
-    const response = await fetch(callbackTarget.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...callbackTarget.headers,
-      },
-      body: JSON.stringify(payload),
-    });
+    const response = await fetch(
+      callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...credential.headers,
+        },
+        body: JSON.stringify(payload),
+        ...(credential.redirect === undefined ? {} : { redirect: credential.redirect }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

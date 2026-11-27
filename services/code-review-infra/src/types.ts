@@ -10,6 +10,7 @@ import type {
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import type { MintBinding } from '@kilocode/service-token-client';
 import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
@@ -180,6 +181,11 @@ export interface Env {
   // The `STS` SecretsBroker service binding: `packages/secrets-client`'s `BundleBinding`, which is
   // its RPC shape rather than a generated type. Absent until the binding deploys.
   STS?: BundleBinding;
+
+  /** STS `SecretsBroker`, `props.caller` `kilo-code-review-worker`; mints the status-write token. */
+  STS?: MintBinding;
+  /** `legacy` (default) or `sts`: the credential of this Worker's own status writes. */
+  CODE_REVIEW_STATUS_CALLBACK_AUTH?: string;
 
   // Optional Sentry
   SENTRY_DSN?: string;

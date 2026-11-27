@@ -43,6 +43,11 @@
     // `secrets-store`; any other value refuses every read. The `sts` source never falls back to
     // the legacy binding.
     "SECRETS_SOURCE": "secrets-store",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the `/api/internal/user-data-exports/ready`
+    // callback sends `INTERNAL_API_SECRET` as `x-internal-api-key`. `"sts"` sends a
+    // `web:user-data-exports.ready` STS service token over the `STS` binding instead; set it only
+    // once the Worker has that binding, STS grants the scope and the route accepts STS.
+    // Removing it is the rollback.
   },
   "services": [
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is

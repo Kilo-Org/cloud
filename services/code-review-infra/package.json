@@ -23,6 +23,7 @@
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"

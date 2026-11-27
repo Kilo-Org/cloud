@@ -63,6 +63,11 @@
 // and reads the copier back privately before anything else; `operatorAction` reads
 // `REVOKE THE WRITER NOW` while not-before has not passed.
 //
+// STS deploy token (CLOUDFLARE_TOKEN_SOURCE `sts`): CLOUDFLARE_TOKEN_EXPIRES_AT is the mint step's
+// `expires_at` output. The run refuses at start unless the token outlives the result deadline by
+// 8 minutes, and 5 minutes before it expires it stops admitting phases, caps every wait and child
+// there and goes to the normal cleanup (`token_expiry_abort`) while the token can still delete.
+//
 // CI proves only the Cloudflare half. The operator completes the Infisical post-run and cleanup
 // gates privately with this report's `preflightPins` and `finalReceipt` and its own readback.
 //
@@ -139,6 +144,10 @@ export const TIMING = Object.freeze({
   abortGraceMs: 1_000,
   // After a stop signal each Cloudflare read or delete gets this long, once, with no retry.
   abortCallTimeoutMs: 2_500,
+  // STS path: refuse to start unless the token outlives the result deadline by this much, and
+  // stop admitting phases this long before it expires, so cleanup still holds a live token.
+  tokenStartMarginMs: 8 * 60_000,
+  tokenAbortMarginMs: 5 * 60_000,
   rolloutRunsPerWorkflow: 20,
 });
 
@@ -198,12 +207,25 @@ export function contextProblems(env, headSha) {
   if (!targetOf(env.COPY_WORKER)) p.push('worker');
   if (!/^[0-9]{1,3}$/.test(env.COPY_INDEX ?? '')) p.push('matrix_index');
   if (!['secret', 'sts'].includes(env.CLOUDFLARE_TOKEN_SOURCE)) p.push('token_source');
+  else if (env.CLOUDFLARE_TOKEN_SOURCE === 'sts' && !Number.isFinite(tokenExpiryOf(env))) {
+    p.push('token_expiry');
+  }
   if (!isAbsolute(env.RUNNER_TEMP ?? '')) p.push('runner_temp');
   if (!env.CLOUDFLARE_API_TOKEN) p.push('cloudflare_token');
   if (!env[WRITER_SECRET]) p.push('writer_secret');
   if (!env[OPERATOR_META]) p.push('operator_meta');
   if (!UUID.test(env.M65_INFISICAL_CLIENT_ID ?? '')) p.push('client_id');
   return p;
+}
+
+/**
+ * The STS deploy token's expiry (the mint step's `expires_at` output) in ms, or NaN. The stored
+ * token has no known expiry; it is Infinity there.
+ */
+export function tokenExpiryOf(env) {
+  if (env.CLOUDFLARE_TOKEN_SOURCE !== 'sts') return Infinity;
+  const at = String(env.CLOUDFLARE_TOKEN_EXPIRES_AT ?? '');
+  return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,9})?Z$/.test(at) ? Date.parse(at) : NaN;
 }
 
 const isoSeconds = ms => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -280,7 +302,9 @@ export function parseOperatorMeta(text, env, nowMs, target) {
  * Window: the earliest minute tick at least `leadMs` ahead whose 15-minute window the writer
  * client secret expiry fits. The core preflight requires notAfter <= expiresAt <= notAfter +
  * 15 min; not-after stays at least one minute before expiry. Refused when the secret expires more
- * than 60 minutes from now (the job never holds a longer-lived secret), or when no tick fits.
+ * than 60 minutes from now (the job never holds a longer-lived secret), or when no tick fits. On
+ * the STS path also refused unless the deploy token outlives the result deadline by
+ * `tokenStartMarginMs`; `tokenAbortAt` is when the run stops admitting phases.
  */
 export function planRun(env, operator, nowMs) {
   const expiresAt = Date.parse(String(operator.writer.auth.clientSecretExpiresAt));
@@ -292,6 +316,11 @@ export function planRun(env, operator, nowMs) {
   const notBefore = Math.max(ceilMinute(nowMs + TIMING.leadMs), earliestNotAfter - TIMING.windowMs);
   const notAfter = notBefore + TIMING.windowMs;
   if (notAfter > latestNotAfter) return { problem: 'writer_expiry_too_soon' };
+  const resultDeadline = notAfter + TIMING.resultGraceMs;
+  const tokenExpiresAt = tokenExpiryOf(env);
+  if (!(resultDeadline + TIMING.tokenStartMarginMs <= tokenExpiresAt)) {
+    return { problem: 'token_expires_too_soon' };
+  }
   return {
     runId: `m65-gh-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}-${env.COPY_INDEX}`,
     notBefore,
@@ -299,7 +328,8 @@ export function planRun(env, operator, nowMs) {
     armDeadline: notBefore - TIMING.armBudgetMs,
     putDeadline: notBefore - TIMING.putMarginMs,
     armedReadyDeadline: notBefore - TIMING.readyMarginMs,
-    resultDeadline: notAfter + TIMING.resultGraceMs,
+    resultDeadline,
+    tokenAbortAt: tokenExpiresAt - TIMING.tokenAbortMarginMs,
     out: join(
       env.RUNNER_TEMP,
       `m65-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}-${env.COPY_INDEX}.wrangler.json`
@@ -608,7 +638,7 @@ export async function environmentProblems(gh) {
     reviewers.length !== 1 ||
     reviewers[0].prevent_self_review !== true ||
     !Array.isArray(reviewers[0].reviewers) ||
-    reviewers[0].reviewers.length < 1
+    reviewers[0].reviewers.length < 2
   ) {
     p.push('environment_required_reviewers');
   }
@@ -1063,10 +1093,32 @@ export async function run(io) {
     phases: [],
     gates: [],
   };
+  // STS path: from tokenAbortAt on no phase starts and no wait or child outlives it; the run goes
+  // straight to cleanup while the deploy token still has `tokenAbortMarginMs` left.
+  let tokenAbortAt = Infinity;
+  const pastTokenAbort = () => clock.now() >= tokenAbortAt;
   const phase = (name, { stoppable = true } = {}) => {
     if (stoppable && signal?.aborted) throw new StopError('stopped_by_signal');
+    if (stoppable && pastTokenAbort()) throw new StopError('token_expiry_abort');
     report.phases.push({ name, at: isoSeconds(clock.now()) });
     log({ phase: name });
+  };
+  const bound = deadline => {
+    if (pastTokenAbort()) throw new StopError('token_expiry_abort');
+    return boundBy(clock, Math.min(deadline, tokenAbortAt));
+  };
+  const waitFor = async (matches, deadline) => {
+    const hit = await awaitReceipt(
+      tail,
+      plan.runId,
+      matches,
+      Math.min(deadline, tokenAbortAt),
+      stats,
+      signal,
+      batch
+    );
+    if (!hit && pastTokenAbort()) throw new StopError('token_expiry_abort');
+    return hit;
   };
 
   const problems = contextProblems(env, io.headSha);
@@ -1080,6 +1132,8 @@ export async function run(io) {
   const { operator } = parsed;
   const plan = planRun(env, operator, clock.now());
   if (plan.problem) return { ...report, status: 'refused', problems: [plan.problem] };
+  tokenAbortAt = plan.tokenAbortAt;
+  if (Number.isFinite(tokenAbortAt)) report.tokenAbortAt = isoSeconds(tokenAbortAt);
   Object.assign(report, {
     runId: plan.runId,
     notBefore: isoSeconds(plan.notBefore),
@@ -1162,7 +1216,7 @@ export async function run(io) {
     report.configSha256 = config.configSha256;
 
     phase('deploy_unarmed');
-    const deployTimeout = boundBy(clock, plan.armDeadline);
+    const deployTimeout = bound(plan.armDeadline);
     created = true;
     const deployed = await io.wrangler(['deploy', '--config', plan.out], {
       timeoutMs: deployTimeout,
@@ -1178,15 +1232,7 @@ export async function run(io) {
 
     phase('await_unarmed_readiness');
     tail = io.startTail(clock, copier);
-    const unarmed = await awaitReceipt(
-      tail,
-      plan.runId,
-      unarmedReady(unarmedVersion),
-      plan.armDeadline,
-      stats,
-      signal,
-      batch
-    );
+    const unarmed = await waitFor(unarmedReady(unarmedVersion), plan.armDeadline);
     if (!unarmed) throw new StopError('held_no_readiness_tick');
     report.cronReadyAt = isoSeconds(clock.now());
 
@@ -1227,7 +1273,7 @@ export async function run(io) {
     if (clock.now() >= plan.armDeadline) throw new StopError('held_arm_deadline');
 
     phase('arm');
-    const putTimeout = boundBy(clock, plan.putDeadline);
+    const putTimeout = bound(plan.putDeadline);
     report.armWrite = 'unproved';
     const put = await io.wrangler(['secret', 'put', WRITER_SECRET, '--config', plan.out], {
       stdin: secret,
@@ -1262,27 +1308,11 @@ export async function run(io) {
     report.preflightPins = armed.pins;
 
     phase('await_armed_readiness');
-    const armedReceipt = await awaitReceipt(
-      tail,
-      plan.runId,
-      armedReady(armedId),
-      plan.armedReadyDeadline,
-      stats,
-      signal,
-      batch
-    );
+    const armedReceipt = await waitFor(armedReady(armedId), plan.armedReadyDeadline);
     if (!armedReceipt) throw new StopError('held_no_armed_readiness');
 
     phase('await_result');
-    const final = await awaitReceipt(
-      tail,
-      plan.runId,
-      finalFor(armedId),
-      plan.resultDeadline,
-      stats,
-      signal,
-      batch
-    );
+    const final = await waitFor(finalFor(armedId), plan.resultDeadline);
     if (!final) throw new StopError('result_unobserved');
     report.finalReceipt = final;
 

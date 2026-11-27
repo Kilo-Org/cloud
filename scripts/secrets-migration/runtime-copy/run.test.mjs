@@ -698,6 +698,21 @@ test('missing or loosened protected environment stops before any Cloudflare call
       },
       'environment_required_reviewers',
     ],
+    // The run sequence names two reviewers (iscekic plus one other); one is refused.
+    [
+      {
+        environment: {
+          protection_rules: [
+            {
+              type: 'required_reviewers',
+              prevent_self_review: true,
+              reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
+            },
+          ],
+        },
+      },
+      'environment_required_reviewers',
+    ],
   ]) {
     await t.test(reason, async () => {
       const { world, report } = await drive(o);
@@ -1679,7 +1694,7 @@ test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets
   assert.ok(warm >= 0 && warm < install, 'pnpm cache restored before the install');
   assert.equal(
     job.steps[install].run,
-    "pnpm install --frozen-lockfile --ignore-scripts --filter '{.}...' --filter kilocode-monorepo",
+    "pnpm install --frozen-lockfile --ignore-scripts --filter '{.}'",
     'no lifecycle scripts in the protected job'
   );
 
@@ -1706,8 +1721,10 @@ test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets
     ]
   );
   for (const d of drivers) {
+    const sts = d.env.CLOUDFLARE_TOKEN_SOURCE === 'sts';
     assert.deepEqual(Object.keys(d.env).sort(), [
       'CLOUDFLARE_API_TOKEN',
+      ...(sts ? ['CLOUDFLARE_TOKEN_EXPIRES_AT'] : []),
       'CLOUDFLARE_TOKEN_SOURCE',
       'COPY_INDEX',
       'COPY_WORKER',
@@ -1719,7 +1736,14 @@ test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets
     ]);
     assert.equal(d.env.COPY_WORKER, '${{ matrix.worker }}');
     assert.equal(d.env.COPY_INDEX, '${{ strategy.job-index }}');
+    // The STS step carries the token expiry and stops before a 60-minute token is gone; the
+    // stored-token step runs under the job's 80 minutes.
+    assert.deepEqual(
+      [d.env.CLOUDFLARE_TOKEN_EXPIRES_AT, d['timeout-minutes']],
+      sts ? ['${{ steps.sts.outputs.expires_at }}', 58] : [undefined, undefined]
+    );
   }
+  assert.equal(job['timeout-minutes'], 80);
   const withSecrets = job.steps.filter(s => JSON.stringify(s).includes('secrets.'));
   assert.deepEqual(
     withSecrets.map(s => s.name),
@@ -1759,7 +1783,10 @@ test('plan job: the valid table and every protected environment, else no matrix'
           {
             type: 'required_reviewers',
             prevent_self_review: true,
-            reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
+            reviewers: [
+              { type: 'User', reviewer: { login: 'synthetic-reviewer-a' } },
+              { type: 'User', reviewer: { login: 'synthetic-reviewer-b' } },
+            ],
           },
         ],
       };
@@ -1800,4 +1827,56 @@ test('plan job: the valid table and every protected environment, else no matrix'
     },
   });
   assert.deepEqual([offline.ok, offline.failures, offline.workers], [false, ['ref'], []]);
+});
+
+// The operator readback's writer expires at T0 + 41.5 min: not-before T0 + 24, not-after T0 + 39,
+// result deadline T0 + 42.
+const stsEnv = expiresMs => ({
+  CLOUDFLARE_TOKEN_SOURCE: 'sts',
+  CLOUDFLARE_TOKEN_EXPIRES_AT: new Date(expiresMs).toISOString(),
+});
+
+test('STS token: refused at start unless it outlives the result deadline by 8 minutes', async () => {
+  const operator = operatorMeta();
+  const ok = planRun(baseEnv(stsEnv(T0 + 50 * 60_000)), operator, T0);
+  assert.deepEqual(
+    [ok.resultDeadline, ok.tokenAbortAt],
+    [T0 + 42 * 60_000, T0 + 45 * 60_000],
+    'aborts into cleanup 5 minutes before expiry'
+  );
+  assert.deepEqual(planRun(baseEnv(stsEnv(T0 + 50 * 60_000 - 1)), operator, T0), {
+    problem: 'token_expires_too_soon',
+  });
+  // The stored token has no expiry: nothing to refuse, nothing to abort for.
+  assert.equal(planRun(baseEnv(), operator, T0).tokenAbortAt, Infinity);
+  for (const [env, problem] of [
+    [{ CLOUDFLARE_TOKEN_SOURCE: 'sts' }, 'token_expiry'],
+    [{ CLOUDFLARE_TOKEN_SOURCE: 'sts', CLOUDFLARE_TOKEN_EXPIRES_AT: 'soon' }, 'token_expiry'],
+    [stsEnv(T0 + 45 * 60_000), 'token_expires_too_soon'],
+  ]) {
+    const { world, report } = await drive({}, env);
+    assert.deepEqual([report.status, report.problems], ['refused', [problem]]);
+    assert.deepEqual(world.calls, [], 'no Cloudflare, GitHub or process call');
+  }
+});
+
+test('STS token: a run inside the token lifetime completes and reports the abort time', async () => {
+  const { report } = await drive({}, stsEnv(T0 + 60 * 60_000));
+  assert.equal(report.status, 'cloudflare_complete', JSON.stringify(report.gates));
+  assert.deepEqual([report.tokenSource, report.tokenAbortAt], ['sts', iso(T0 + 55 * 60_000)]);
+});
+
+test('STS token: past expiry - 5 min no phase starts; the armed copier is deleted, nothing read', async () => {
+  const { world, report } = await drive(
+    { onPut: w => (w.clock.t = T0 + 55 * 60_000) },
+    stsEnv(T0 + 60 * 60_000)
+  );
+  assert.equal(report.stopReason, 'token_expiry_abort');
+  assert.equal(report.armWrite, 'proved');
+  assert.equal(report.phases.at(-1).name, 'arm_readback');
+  assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
+  assert.equal(report.cleanup.scriptStatus, 404);
+  assert.equal(report.cleanup.gate.ok, true, 'the full cleanup ran while the token was alive');
+  assert.deepEqual([world.readLog.length, world.infisical.calls.length], [0, 0]);
+  assert.equal(exitCode(report), 1);
 });

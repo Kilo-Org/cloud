@@ -120,9 +120,10 @@ jobs:
 
       - name: Install the pinned Wrangler
         working-directory: services/notifications
-        # No lifecycle scripts: the pinned Wrangler runs from its optional-dependency binaries
+        # Only this package's own dependencies (the pinned Wrangler; the driver imports nothing
+        # else) and no lifecycle scripts: Wrangler runs from its optional-dependency binaries
         # alone (checked with this exact install and a closed `wrangler deploy --dry-run`).
-        run: pnpm install --frozen-lockfile --ignore-scripts --filter '{.}...' --filter kilocode-monorepo
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter '{.}'
 
       - name: Run the copier (stored token)
         if: vars.DEPLOY_TOKEN_SOURCE != 'sts'
@@ -140,6 +141,8 @@ jobs:
 
       # STS twin (after #13048): a deploy token minted over GitHub OIDC for this job only, masked
       # and handed on as a step output; a refusal fails the job and never falls back to the secret.
+      # The mint step must also output `expires_at` (the STS answer's expiresAt); without it the
+      # driver refuses before any Cloudflare call.
       - name: Get a deploy token from STS
         id: sts
         if: vars.DEPLOY_TOKEN_SOURCE == 'sts'
@@ -147,8 +150,13 @@ jobs:
           STS_ENVIRONMENT: production
         run: bash scripts/ci/sts-deploy-token.sh mint
 
+      # The token lives at most 60 minutes from the mint. The driver refuses unless it outlives the
+      # result deadline by 8 minutes and goes to cleanup 5 minutes before expiry; 58 minutes is the
+      # backstop that still stops the step before the token is gone. The job's 80 minutes cover
+      # the stored-token path, where no token expires.
       - name: Run the copier (STS token)
         if: vars.DEPLOY_TOKEN_SOURCE == 'sts'
+        timeout-minutes: 58
         env:
           EXPECTED_COMMIT: ${{ inputs.expected_commit }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -156,6 +164,7 @@ jobs:
           COPY_INDEX: ${{ strategy.job-index }}
           CLOUDFLARE_TOKEN_SOURCE: sts
           CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_TOKEN_EXPIRES_AT: ${{ steps.sts.outputs.expires_at }}
           M65_INFISICAL_CLIENT_ID: ${{ vars.M65_INFISICAL_CLIENT_ID }}
           M65_INFISICAL_CLIENT_SECRET: ${{ secrets.M65_INFISICAL_CLIENT_SECRET }}
           M65_OPERATOR_PREFLIGHT: ${{ secrets.M65_OPERATOR_PREFLIGHT }}

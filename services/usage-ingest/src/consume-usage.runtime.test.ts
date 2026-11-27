@@ -2,17 +2,23 @@ import { createServer } from 'node:http';
 import { setTimeout } from 'node:timers/promises';
 import { createTestHarness } from 'wrangler';
 import { expect, it, vi } from 'vitest';
-import { stsStandIn } from './sts-stand-in.test-fixture';
+import { STS_STAND_IN_TOKEN, stsStandIn } from './sts-stand-in.test-fixture';
 import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import { usage } from './usage.test-fixture';
 
-it.each([undefined, 'staging'])(
+// The committed `USAGE_WRITER_AUTH`: production (no entry) is unset, so legacy sends the secret;
+// staging is `sts`, so it sends only the token its STS binding issued.
+it.each([
+  [undefined, { secret: 'local-writer', authorization: undefined }],
+  ['staging', { secret: undefined, authorization: `Bearer ${STS_STAND_IN_TOKEN}` }],
+])(
   'processes the configured %s entry through Queues and the real HTTP writer client',
-  async env => {
+  async (env, credential) => {
     const calls: {
       path: string | undefined;
       body: unknown;
       secret: string | string[] | undefined;
+      authorization: string | undefined;
       bypass: string | string[] | undefined;
       source: string | string[] | undefined;
     }[] = [];
@@ -24,6 +30,7 @@ it.each([undefined, 'staging'])(
         path: request.url,
         body: JSON.parse(body),
         secret: request.headers['x-internal-api-key'],
+        authorization: request.headers.authorization,
         bypass: request.headers['x-vercel-protection-bypass'],
         source: request.headers['x-usage-write-source'],
       });
@@ -104,7 +111,7 @@ it.each([undefined, 'staging'])(
         Array.from({ length: 2 }, () => ({
           path: '/api/internal/usage/record',
           body: toUsageRecordWireBody(event),
-          secret: 'local-writer',
+          ...credential,
           bypass: 'local-bypass',
           source: 'queue',
         }))
@@ -130,6 +137,7 @@ it.each([undefined, 'staging'])(
         'local-publisher',
         'local-writer',
         'local-bypass',
+        STS_STAND_IN_TOKEN,
         usage.metadata.http_user_agent,
       ])
         expect(JSON.stringify(server.getLogs())).not.toContain(sensitive);

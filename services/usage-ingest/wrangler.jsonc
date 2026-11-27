@@ -105,6 +105,8 @@
         "STS_URL": "https://sts-staging.kiloapps.io",
         "STS_ENVIRONMENT": "staging",
         "WEB_STS_CANARY_URL": "https://staging-app.kilo.ai/api/internal/sts-canary",
+        // Writer switch: README.md#usage_writer_auth-sender. Staging only; production stays legacy.
+        "USAGE_WRITER_AUTH": "sts",
       },
       "triggers": { "crons": ["*/5 * * * *"] },
       "services": [

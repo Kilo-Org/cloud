@@ -15,13 +15,14 @@ type Sample = {
 
 type Samples = Map<string, Sample[]>;
 
-const SAMPLE_LINE = /^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(.*)\})?\s+(\S+)/;
-const LABEL_PAIR = /([a-zA-Z_][a-zA-Z0-9_]*)="((?:[^"\\]|\\.)*)"/g;
+// The text format allows spaces and tabs between tokens, including around `=` in labels.
+const SAMPLE_LINE = /^[ \t]*([a-zA-Z_:][a-zA-Z0-9_:]*)[ \t]*(?:\{(.*)\})?[ \t]+(\S+)/;
+const LABEL_PAIR = /([a-zA-Z_][a-zA-Z0-9_]*)[ \t]*=[ \t]*"((?:[^"\\]|\\.)*)"/g;
 
 export function parsePrometheusText(text: string): Samples {
   const samples: Samples = new Map();
   for (const line of text.split('\n')) {
-    if (line.startsWith('#')) continue;
+    if (line.trimStart().startsWith('#')) continue;
     const match = SAMPLE_LINE.exec(line);
     if (!match) continue;
     const [, name, labelBlock = '', rawValue] = match;
@@ -30,7 +31,7 @@ export function parsePrometheusText(text: string): Samples {
 
     const labels: Record<string, string> = {};
     for (const [, key, labelValue] of labelBlock.matchAll(LABEL_PAIR)) {
-      labels[key] = labelValue.replace(/\\(.)/g, '$1');
+      labels[key] = labelValue.replace(/\\(.)/g, (_, char: string) => (char === 'n' ? '\n' : char));
     }
     const existing = samples.get(name);
     if (existing) existing.push({ labels, value });

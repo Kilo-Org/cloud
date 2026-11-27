@@ -43,6 +43,27 @@ describe('parsePrometheusText', () => {
     expect(samples.get('n')).toEqual([{ labels: {}, value: 7 }]);
   });
 
+  it('accepts whitespace between tokens', () => {
+    const samples = parsePrometheusText(
+      [
+        '  # TYPE m gauge',
+        '\tm { database = "postgres" , user=\t"kilocode_web" }\t42',
+        '  n 7',
+        'o{a="line\\nbreak"} 1',
+      ].join('\n')
+    );
+    expect(samples.get('m')).toEqual([
+      { labels: { database: 'postgres', user: 'kilocode_web' }, value: 42 },
+    ]);
+    expect(samples.get('n')).toEqual([{ labels: {}, value: 7 }]);
+    expect(samples.get('o')?.[0].labels.a).toBe('line\nbreak');
+    expect(
+      parseDatabaseMetrics(
+        'pgbouncer_pools_client_active_connections{database = "postgres", user = "kilocode_web"} 42'
+      ).client_active
+    ).toBe(42);
+  });
+
   it('matches label names exactly', () => {
     const samples = parsePrometheusText('m{xdatabase="postgres"} 1');
     expect(samples.get('m')?.[0].labels).toEqual({ xdatabase: 'postgres' });

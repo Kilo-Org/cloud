@@ -258,6 +258,18 @@ describe('EC2 retained workspace lifecycle', () => {
     expect(f.ec2.runInstance).toHaveBeenCalledTimes(1);
   });
 
+  it('replays a completed launch after the coordinator loses its result', async () => {
+    const f = fixture();
+    const ref = await f.controller.reserve(firstAllocation);
+    await f.controller.launch(ref, startup, 5000);
+
+    const restarted = f.restartController();
+    await expect(restarted.reserve(firstAllocation)).resolves.toBe(ref);
+    await expect(restarted.launch(ref, startup, 5000)).resolves.toEqual({ startSource: 'image' });
+    await expect(restarted.reserve(nextAllocation)).rejects.toMatchObject({ code: 'stopping' });
+    expect(f.events).toEqual(['run', 'upload', 'tag']);
+  });
+
   it('keeps the destruction fence until the instance and its disks are gone', async () => {
     const f = fixture();
     const ref = await f.controller.reserve(firstAllocation);

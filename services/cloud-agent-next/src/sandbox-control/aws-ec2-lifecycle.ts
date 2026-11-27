@@ -447,7 +447,9 @@ export function createAwsEc2Lifecycle(deps: {
         const current = await read();
         if (
           current?.allocation.id === allocationId &&
-          (current.phase === 'starting' || current.phase === 'reserved')
+          (current.phase === 'starting' ||
+            current.phase === 'reserved' ||
+            current.phase === 'active')
         )
           return awsEc2Ref(current);
         if (current && current.phase !== 'retained') throw new ProviderCreationError('stopping');

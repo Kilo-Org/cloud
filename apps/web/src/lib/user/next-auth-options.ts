@@ -1394,7 +1394,7 @@ export const authOptions: NextAuthOptions = {
           auditLinkEmail = linkTarget?.google_user_email ?? null;
           const linkRefusal: AuthErrorType | null = !linkTarget
             ? 'LINKING-FAILED'
-            : (await isSignInMethodLinkAllowed(linkTarget))
+            : (await isSignInMethodLinkAllowed(linkTarget, accountInfo.provider))
               ? null
               : 'SIGN-IN-METHOD-SSO-REQUIRED';
           if (linkRefusal) {

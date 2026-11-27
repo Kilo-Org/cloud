@@ -1,5 +1,5 @@
 import { SignJWT } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 import { app } from '../../src/app';
@@ -61,18 +61,26 @@ async function receivedClose(response: Response): Promise<CloseEvent> {
 }
 
 describe('CLI websocket authentication rejection', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('closes an unauthenticated CLI websocket with 4401', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const response = await app.fetch(cliUpgradeRequest(), env);
 
     expect(response.status).toBe(101);
     await expect(receivedClose(response)).resolves.toEqual({ code: 4401, reason: 'unauthorized' });
+    expect(warn).toHaveBeenCalledWith('cli websocket rejected', { reason: 'missing-token' });
   });
 
   it('closes a CLI websocket with an invalid token with 4401', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const response = await app.fetch(cliUpgradeRequest(`?token=${INVALID_TOKEN}`), env);
 
     expect(response.status).toBe(101);
     await expect(receivedClose(response)).resolves.toEqual({ code: 4401, reason: 'unauthorized' });
+    expect(warn).toHaveBeenCalledWith('cli websocket rejected', { reason: 'invalid-token' });
   });
 
   it('closes a CLI websocket whose token has the wrong signature with 4401', async () => {

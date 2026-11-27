@@ -22,6 +22,7 @@ export type KiloJwtAuthVariables = {
 
 const SESSION_LEAF_DELETE_PATH = /^\/api\/session\/[^/]+$/;
 const CLI_WEBSOCKET_PATH = '/api/user/cli';
+const WEB_WEBSOCKET_PATH = '/api/user/web';
 
 function isSessionLeafDelete(method: string, path: string): boolean {
   return method === 'DELETE' && SESSION_LEAF_DELETE_PATH.test(path);
@@ -29,10 +30,12 @@ function isSessionLeafDelete(method: string, path: string): boolean {
 
 // The CLI client (kilocode packages/opencode/src/kilo-sessions/remote-ws.ts)
 // treats close codes 4401, 4403 and 4409 as permanent, but an HTTP status before
-// the upgrade only reaches it as an abnormal close (1006), which it retries with
-// backoff forever. A websocket that fails authentication is therefore accepted
-// and immediately closed with 4401 so a stale token stops retrying.
-function rejectCliWebsocket(): Response {
+// the upgrade only reaches it as an abnormal close (1006), which it retries
+// forever with backoff capped at 60 s. A websocket that fails authentication is
+// therefore accepted and immediately closed with 4401 so a stale token stops
+// retrying.
+function rejectCliWebsocket(reason: 'missing-token' | 'invalid-token'): Response {
+  console.warn('cli websocket rejected', { reason });
   const pair = new WebSocketPair();
   pair[1].accept();
   pair[1].close(4401, 'unauthorized');
@@ -47,7 +50,8 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   // opaque ticket minted by POST /api/user/web-ticket. This branch runs before
   // the JWT path so a missing ticket is not mistaken for a missing JWT, and so
   // the Authorization header / ?token= query are never read on this path.
-  if (c.req.header('Upgrade') === 'websocket' && c.req.path === '/api/user/web') {
+  const websocketUpgrade = c.req.header('Upgrade') === 'websocket';
+  if (websocketUpgrade && c.req.path === WEB_WEBSOCKET_PATH) {
     const ticket = c.req.query('ticket');
     if (!ticket) {
       return c.json({ success: false, error: 'Missing or invalid ticket' }, 401);
@@ -64,17 +68,15 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   let token = extractBearerToken(c.req.header('Authorization'));
-  if (!token && c.req.header('Upgrade') === 'websocket') {
+  if (!token && websocketUpgrade) {
     token = c.req.query('token') ?? null;
   }
 
   const cliWebsocketUpgrade =
-    c.req.method === 'GET' &&
-    c.req.path === CLI_WEBSOCKET_PATH &&
-    c.req.header('Upgrade') === 'websocket';
+    websocketUpgrade && c.req.method === 'GET' && c.req.path === CLI_WEBSOCKET_PATH;
 
   if (!token) {
-    if (cliWebsocketUpgrade) return rejectCliWebsocket();
+    if (cliWebsocketUpgrade) return rejectCliWebsocket('missing-token');
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }
 
@@ -117,7 +119,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   if (!auth) {
-    if (cliWebsocketUpgrade) return rejectCliWebsocket();
+    if (cliWebsocketUpgrade) return rejectCliWebsocket('invalid-token');
     return c.json({ success: false, error: 'Invalid or expired token' }, 401);
   }
 

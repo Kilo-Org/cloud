@@ -87,26 +87,56 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+export type ReplayCatchUp = {
+  /**
+   * `timed_out` means the replica is still behind after
+   * `REPLAY_CATCH_UP_TIMEOUT_MS`, and `deadline` that `deadline` passed first.
+   */
+  status: 'caught_up' | 'timed_out' | 'deadline';
+  waitedMs: number;
+};
+
 /**
  * Waits until `readDb` has replayed all the WAL it had received when called,
- * up to `REPLAY_CATCH_UP_TIMEOUT_MS`. Returns how long it waited. A primary
- * has no replay, so it returns at once.
+ * giving up after `REPLAY_CATCH_UP_TIMEOUT_MS` or at `deadline`. A primary has
+ * no replay, so it is caught up at once. A replay conflict cancelling one of
+ * these probes is thrown to the caller, which retries it like a slice.
  */
-export async function waitForReplayCatchUp(readDb: DrizzleDatabase): Promise<number> {
+export async function waitForReplayCatchUp(
+  readDb: DrizzleDatabase,
+  deadline?: number
+): Promise<ReplayCatchUp> {
   const startedAt = Date.now();
+  const giveUpAt = Math.min(startedAt + REPLAY_CATCH_UP_TIMEOUT_MS, deadline ?? Infinity);
+  const result = (status: ReplayCatchUp['status']) => ({
+    status,
+    waitedMs: Date.now() - startedAt,
+  });
+  // Checked before every probe, so none starts at or after the cutoff; a probe
+  // already in flight is left to finish.
+  const cutoff = (): ReplayCatchUp['status'] | null => {
+    const now = Date.now();
+    if (deadline !== undefined && now >= deadline) return 'deadline';
+    if (now >= giveUpAt) return 'timed_out';
+    return null;
+  };
+
+  const beforeReceive = cutoff();
+  if (beforeReceive) return result(beforeReceive);
   const received = await readDb.execute<{ receive_lsn: string | null }>(
     sql`SELECT pg_last_wal_receive_lsn()::text AS receive_lsn`
   );
   const receiveLsn = received.rows[0]?.receive_lsn;
-  if (!receiveLsn) return 0;
-  while (Date.now() - startedAt < REPLAY_CATCH_UP_TIMEOUT_MS) {
+  if (!receiveLsn) return result('caught_up');
+  for (;;) {
+    const beforeReplay = cutoff();
+    if (beforeReplay) return result(beforeReplay);
     const replayed = await readDb.execute<{ caught_up: boolean | null }>(
       sql`SELECT pg_last_wal_replay_lsn() >= ${receiveLsn}::pg_lsn AS caught_up`
     );
-    if (replayed.rows[0]?.caught_up !== false) break;
-    await sleep(REPLAY_POLL_MS);
+    if (replayed.rows[0]?.caught_up !== false) return result('caught_up');
+    await sleep(Math.max(0, Math.min(REPLAY_POLL_MS, giveUpAt - Date.now())));
   }
-  return Date.now() - startedAt;
 }
 
 async function aggregateSlice(
@@ -170,6 +200,12 @@ export type LeaderboardUsageDayBuild = {
   conflictRetries: number;
 };
 
+/**
+ * A day left unbuilt without writing anything: the run's `deadline` passed, or
+ * the replica stayed behind, so a scan now would only add to its lag.
+ */
+export type LeaderboardUsageDayStop = { stopped: 'deadline' | 'replica_behind' };
+
 function postgresErrorCode(error: unknown): string | null {
   let current = error;
   for (let depth = 0; depth < 3 && typeof current === 'object' && current !== null; depth++) {
@@ -182,13 +218,14 @@ function postgresErrorCode(error: unknown): string | null {
 /**
  * Aggregates one UTC day of usage from `readDb` 5 minutes at a time, then replaces
  * that day's rollup rows on `db` in one transaction. Returns what was written,
- * or `null` without writing anything when `deadline` passes before the last
- * slice. A failure is logged with the day, the stage and the slice, then rethrown.
+ * or why it stopped without writing anything. `deadline` is checked before
+ * every replay wait and every slice read, including retries. A failure is
+ * logged with the day, the stage and the slice, then rethrown.
  */
 export async function rebuildLeaderboardUsageDay(
   usageDate: string,
   { readDb, db, deadline }: { readDb: DrizzleDatabase; db: DrizzleDatabase; deadline?: number }
-): Promise<LeaderboardUsageDayBuild | null> {
+): Promise<LeaderboardUsageDayBuild | LeaderboardUsageDayStop> {
   const startedAt = Date.now();
   const dayStartMs = Date.parse(`${usageDate}T00:00:00.000Z`);
   const rows = new Map<string, LeaderboardUsageRow>();
@@ -198,32 +235,49 @@ export async function rebuildLeaderboardUsageDay(
   let conflictRetries = 0;
   let stage: { name: 'read'; sliceStart: string } | { name: 'write' } | null = null;
 
+  const stop = (
+    stopped: LeaderboardUsageDayStop['stopped'],
+    sliceStart: string
+  ): LeaderboardUsageDayStop => {
+    logExceptInTest(
+      JSON.stringify({
+        type: 'leaderboard_usage_rollup_day_stopped',
+        usageDate,
+        stopped,
+        sliceStart,
+        slices,
+        replayWaitMs,
+        conflictRetries,
+        durationMs: Date.now() - startedAt,
+      })
+    );
+    return { stopped };
+  };
+  const pastDeadline = () => deadline !== undefined && Date.now() >= deadline;
+
   try {
     for (
       let sliceStartMs = dayStartMs;
       sliceStartMs < dayStartMs + DAY_MS;
       sliceStartMs += SLICE_MS
     ) {
-      if (deadline !== undefined && Date.now() >= deadline) {
-        logExceptInTest(
-          JSON.stringify({
-            type: 'leaderboard_usage_rollup_day_deadline',
-            usageDate,
-            slices,
-            durationMs: Date.now() - startedAt,
-          })
-        );
-        return null;
-      }
       const start = new Date(sliceStartMs).toISOString();
       const end = new Date(sliceStartMs + SLICE_MS).toISOString();
       stage = { name: 'read', sliceStart: start };
       let aggregates: SliceAggregateRow[] | null = null;
       for (let attempt = 1; aggregates === null; attempt++) {
-        replayWaitMs += await waitForReplayCatchUp(readDb);
-        const sliceStartedAt = Date.now();
+        if (pastDeadline()) return stop('deadline', start);
+        // The replay probes are inside the retry: even a tableless SELECT can be
+        // cancelled with 40001 when its snapshot conflicts with replay.
+        let readStartedAt: number | null = null;
         try {
+          const catchUp = await waitForReplayCatchUp(readDb, deadline);
+          replayWaitMs += catchUp.waitedMs;
+          if (catchUp.status === 'deadline' || pastDeadline()) return stop('deadline', start);
+          if (catchUp.status === 'timed_out') return stop('replica_behind', start);
+          readStartedAt = Date.now();
           aggregates = await aggregateSlice(readDb, start, end);
+          slowestSliceMs = Math.max(slowestSliceMs, Date.now() - readStartedAt);
         } catch (error) {
           if (
             postgresErrorCode(error) !== REPLAY_CONFLICT_CODE ||
@@ -238,12 +292,11 @@ export async function rebuildLeaderboardUsageDay(
               usageDate,
               sliceStart: start,
               attempt,
-              sliceMs: Date.now() - sliceStartedAt,
+              failedIn: readStartedAt === null ? 'replay_wait' : 'slice',
+              sliceMs: readStartedAt === null ? null : Date.now() - readStartedAt,
             })
           );
-          continue;
         }
-        slowestSliceMs = Math.max(slowestSliceMs, Date.now() - sliceStartedAt);
       }
       slices++;
       for (const aggregate of aggregates) {
@@ -350,7 +403,7 @@ export type LeaderboardUsageBuildSummary = {
   unsettled: string[];
   /** Days built with no rows, which look missing and are rebuilt every run. */
   emptyDays: string[];
-  stoppedBy: 'deadline' | 'cap' | null;
+  stoppedBy: 'deadline' | 'cap' | 'replica_behind' | null;
   yesterdayBuilt: boolean;
   /** How far `readDb` trails `now`; null on a primary. */
   replicaLagMs: number | null;
@@ -408,8 +461,8 @@ export async function buildLeaderboardUsageDays({
       break;
     }
     const build = await rebuildLeaderboardUsageDay(usageDate, { readDb, db, deadline });
-    if (build === null) {
-      stoppedBy = 'deadline';
+    if ('stopped' in build) {
+      stoppedBy = build.stopped;
       break;
     }
     built.push({ usageDate, ...build });

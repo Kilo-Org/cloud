@@ -13,6 +13,15 @@ import {
 } from '@kilocode/usage-contracts';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
+import {
+  stsPublishTarget,
+  usagePublisherAuth,
+  type PublishEnvironment,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-publish-credential';
+import type {
+  PublishToken,
+  usagePublishToken,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-publish-token';
 
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
 export const USAGE_ENQUEUE_MAX_ATTEMPTS = 4;
@@ -33,22 +42,48 @@ export const USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS = 20_000;
 export const USAGE_ENQUEUE_RETRY_BUDGET_MS = 40_000;
 const RETRY_BASE_DELAY_MS = 500;
 const RETRY_MAX_DELAY_MS = 2_000;
+/**
+ * Under `USAGE_PUBLISHER_AUTH=sts`, how long after the publication starts the first token may
+ * take: `USAGE_ENQUEUE_STS_FIRST_TOKEN_MS` with transient retries,
+ * `USAGE_ENQUEUE_STS_SINGLE_FIRST_TOKEN_MS` for a single attempt, and never so long that less than
+ * `USAGE_ENQUEUE_STS_FIRST_SEND_RESERVE_MS` of the publication's budget is left for the first
+ * request. Counted inside the 2 s and 40 s budgets above. A token that arrives later is not used.
+ * Without a usable token by then, no request has been launched, so the publication ends `not_sent`
+ * and the caller's direct accounting runs at most this much later than for
+ * `publisher_not_configured`; the token client's mint carries on under `waitUntil` for later
+ * publications. Once a request was launched, a retry's token read may use whatever is left of the
+ * 40 s budget.
+ */
+export const USAGE_ENQUEUE_STS_FIRST_TOKEN_MS = 2_000;
+export const USAGE_ENQUEUE_STS_SINGLE_FIRST_TOKEN_MS = 1_000;
+export const USAGE_ENQUEUE_STS_FIRST_SEND_RESERVE_MS = 1_000;
 
 /**
- * `publisher_not_configured` means no publisher URL or secret is set, so nothing was attempted.
- * It is an operator error rather than a transport failure.
+ * `publisher_not_configured` means nothing was attempted: no publisher URL or secret is set, or
+ * `USAGE_PUBLISHER_AUTH` or its STS destination is invalid. It is an operator error rather than a
+ * transport failure.
+ *
+ * `not_sent` (only under `USAGE_PUBLISHER_AUTH=sts`) means STS denied the token or gave none within
+ * the first-token window (see `USAGE_ENQUEUE_STS_FIRST_TOKEN_MS`), and no request was launched: the
+ * event cannot be queued, so a direct write cannot duplicate it. Once any request was launched, a
+ * later token failure ends `unavailable` with `sts_token_denied` or `sts_token_unavailable`, like
+ * any other failure after a send.
  */
-export type UsageEnqueueOutcome = { kind: 'accepted' } | { kind: 'unavailable'; reason: string };
+export type UsageEnqueueOutcome =
+  | { kind: 'accepted' }
+  | { kind: 'unavailable'; reason: string }
+  | { kind: 'not_sent'; reason: StsTokenFailure };
+
+type StsTokenFailure = 'sts_token_denied' | 'sts_token_unavailable';
 
 /** `usage_kind` labels the publisher logs of a tagged non-LLM usage kind; LLM logs omit it. */
 type PublicationIdentity = { usageId: string; usage_kind?: 'enkrypt_usage' | 'exa_usage' };
 
-function reportUnavailable(
+function reportUnpublished<Outcome extends Exclude<UsageEnqueueOutcome, { kind: 'accepted' }>>(
   identity: PublicationIdentity,
-  reason: string,
+  outcome: Outcome,
   duplicatePossible = false
-): UsageEnqueueOutcome {
-  const outcome = { kind: 'unavailable', reason } as const;
+): Outcome {
   console.warn('usage enqueue unavailable', {
     ...identity,
     execution_region: getVercelExecutionRegion(),
@@ -56,6 +91,14 @@ function reportUnavailable(
     ...(duplicatePossible && { duplicate_possible: true }),
   });
   return outcome;
+}
+
+function reportUnavailable(
+  identity: PublicationIdentity,
+  reason: string,
+  duplicatePossible = false
+): UsageEnqueueOutcome {
+  return reportUnpublished(identity, { kind: 'unavailable', reason }, duplicatePossible);
 }
 
 /** Attempts at least this slow are always logged, like failed attempts and retries. */
@@ -143,7 +186,7 @@ export async function enqueueUsage(
 ): Promise<UsageEnqueueOutcome> {
   return publishToUsageIngest(
     { usageId: payload.core.id },
-    USAGE_INGEST_URL,
+    USAGE_INGEST_PATH,
     toUsageRecordWireBody(payload),
     {
       retryTransientFailures,
@@ -154,6 +197,10 @@ export async function enqueueUsage(
 const USAGE_INGEST_PATH = '/usage';
 const ENKRYPT_USAGE_INGEST_PATH = '/enkrypt-usage';
 const EXA_USAGE_INGEST_PATH = '/exa-usage';
+type IngestPath =
+  | typeof USAGE_INGEST_PATH
+  | typeof ENKRYPT_USAGE_INGEST_PATH
+  | typeof EXA_USAGE_INGEST_PATH;
 
 /**
  * `USAGE_INGEST_URL` is documented as the Worker's `/usage` endpoint, and each tagged kind's path
@@ -179,22 +226,20 @@ export async function enqueueEnkryptUsage(
 ): Promise<UsageEnqueueOutcome> {
   return publishToUsageIngest(
     { usageId: usageWrite.id, usage_kind: 'enkrypt_usage' },
-    usageIngestSiblingUrl(USAGE_INGEST_URL, ENKRYPT_USAGE_INGEST_PATH),
+    ENKRYPT_USAGE_INGEST_PATH,
     usageWrite,
     { retryTransientFailures: true }
   );
 }
 
 /**
- * True when the Exa queue fallback would attempt a publication: the ingest URL maps to the
- * sibling `/exa-usage` path and the publish secret is set. Callers use this to avoid reserving
- * invocation time for a publication that cannot happen.
+ * True when the Exa queue fallback would attempt a publication: under `legacy` the ingest URL
+ * maps to the sibling `/exa-usage` path and the publish secret is set; under `sts` the STS
+ * destination is valid. Callers use this to avoid reserving invocation time for a publication
+ * that cannot happen.
  */
 export function isExaUsagePublicationConfigured(): boolean {
-  return (
-    usageIngestSiblingUrl(USAGE_INGEST_URL, EXA_USAGE_INGEST_PATH) !== undefined &&
-    Boolean(USAGE_INGEST_PUBLISH_SECRET)
-  );
+  return publisherCredential(EXA_USAGE_INGEST_PATH) !== null;
 }
 
 /**
@@ -205,27 +250,74 @@ export function isExaUsagePublicationConfigured(): boolean {
 export async function enqueueExaUsage(record: ExaUsageRecord): Promise<UsageEnqueueOutcome> {
   return publishToUsageIngest(
     { usageId: record.id, usage_kind: 'exa_usage' },
-    usageIngestSiblingUrl(USAGE_INGEST_URL, EXA_USAGE_INGEST_PATH),
+    EXA_USAGE_INGEST_PATH,
     record,
     { retryTransientFailures: true }
   );
 }
 
-async function publishToUsageIngest(
-  identity: PublicationIdentity,
-  ingestUrl: string | undefined,
-  payload: LlmUsageQueueMessage | EnkryptUsageWriteInput | ExaUsageRecord,
-  { retryTransientFailures }: { retryTransientFailures: boolean }
-): Promise<UsageEnqueueOutcome> {
-  if (!ingestUrl || !USAGE_INGEST_PUBLISH_SECRET) {
-    return reportUnavailable(identity, 'publisher_not_configured');
-  }
+type PublisherCredential =
+  | { kind: 'secret'; url: string; secret: string }
+  | { kind: 'sts'; url: string; environment: PublishEnvironment };
 
+type UsagePublishTokenReader = typeof usagePublishToken;
+
+/**
+ * Loads the STS token reader, and with it the token client, the Vercel OIDC exchange and the STS
+ * contracts, only for an STS publication, within `budgetMs` of the token window: null when it fails
+ * or is not loaded in time. No promise outlives the publication; the module itself is cached by the
+ * runtime once loaded.
+ */
+async function loadUsagePublishToken(budgetMs: number): Promise<UsagePublishTokenReader | null> {
+  const loaded = import('@kilocode/web-shared/lib/ai-gateway/usage-publish-token').then(
+    module => module.usagePublishToken,
+    () => null
+  );
+  const late = Promise.withResolvers<null>();
+  const timer = setTimeout(() => late.resolve(null), Math.max(0, budgetMs));
+  try {
+    return await Promise.race([loaded, late.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Where `path` is published and with which credential, decided before any token or request; null
+ * when nothing may be sent. Under `sts` the URL is the fixed origin of the deployment's own
+ * environment plus `path`, never the configured URL itself, and the secret is never sent.
+ */
+function publisherCredential(path: IngestPath): PublisherCredential | null {
+  const auth = usagePublisherAuth(process.env.USAGE_PUBLISHER_AUTH);
+  if (auth === null) return null;
+  if (auth === 'sts') {
+    const target = stsPublishTarget(
+      { VERCEL_ENV: process.env.VERCEL_ENV, VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV },
+      USAGE_INGEST_URL
+    );
+    return (
+      target && { kind: 'sts', url: `${target.origin}${path}`, environment: target.environment }
+    );
+  }
+  const ingestUrl =
+    path === USAGE_INGEST_PATH ? USAGE_INGEST_URL : usageIngestSiblingUrl(USAGE_INGEST_URL, path);
+  if (!ingestUrl || !USAGE_INGEST_PUBLISH_SECRET) return null;
   // A URL that is not an absolute http(s) endpoint is configuration, not transport: no
   // request is attempted, so the caller must fall back exactly like a missing publisher.
   const parsedUrl = parseInternalServiceUrl(ingestUrl);
-  if (!parsedUrl) return reportUnavailable(identity, 'publisher_not_configured');
-  const url = parsedUrl.toString();
+  return (
+    parsedUrl && { kind: 'secret', url: parsedUrl.toString(), secret: USAGE_INGEST_PUBLISH_SECRET }
+  );
+}
+
+async function publishToUsageIngest(
+  identity: PublicationIdentity,
+  path: IngestPath,
+  payload: LlmUsageQueueMessage | EnkryptUsageWriteInput | ExaUsageRecord,
+  { retryTransientFailures }: { retryTransientFailures: boolean }
+): Promise<UsageEnqueueOutcome> {
+  const credential = publisherCredential(path);
+  if (!credential) return reportUnavailable(identity, 'publisher_not_configured');
 
   let body: string;
   try {
@@ -237,14 +329,58 @@ async function publishToUsageIngest(
 
   const maxAttempts = retryTransientFailures ? USAGE_ENQUEUE_MAX_ATTEMPTS : 1;
   const publicationStartedAt = performance.now();
+  // An STS single attempt fits its token (at most 1 s) and its send (at least 1 s) into one 2 s
+  // window.
   const deadline = retryTransientFailures
     ? publicationStartedAt + USAGE_ENQUEUE_RETRY_BUDGET_MS
-    : Number.POSITIVE_INFINITY;
+    : credential.kind === 'sts'
+      ? publicationStartedAt + USAGE_ENQUEUE_TIMEOUT_MS
+      : Number.POSITIVE_INFINITY;
+  // Under STS the first token must be in hand by here, which leaves the first request its reserve.
+  const firstTokenDeadline = Math.min(
+    publicationStartedAt +
+      (retryTransientFailures
+        ? USAGE_ENQUEUE_STS_FIRST_TOKEN_MS
+        : USAGE_ENQUEUE_STS_SINGLE_FIRST_TOKEN_MS),
+    deadline - USAGE_ENQUEUE_STS_FIRST_SEND_RESERVE_MS
+  );
   let reason = 'request_failed';
   let duplicatePossible = false;
   let priorBackoff: AttemptDiagnostic['priorBackoff'] = null;
+  /** Set just before the first request goes to `fetch`; from then on a no-send end is unsafe. */
+  let launched = false;
+  /** Loaded at this publication's first token read; null until then or when it could not load. */
+  let readToken: UsagePublishTokenReader | null = null;
+
+  /**
+   * Waits before the next attempt, never less than `minimumDelayMs`; false, without waiting, when
+   * the budget cannot cover that wait.
+   */
+  async function backOff(attempt: number, minimumDelayMs: number): Promise<boolean> {
+    const remainingBackoffBudgetMs = Math.floor(deadline - performance.now());
+    if (remainingBackoffBudgetMs <= 0 || minimumDelayMs >= remainingBackoffBudgetMs) return false;
+    const retryDelayMs = Math.min(
+      Math.max(
+        minimumDelayMs,
+        Math.random() * Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** (attempt - 1))
+      ),
+      remainingBackoffBudgetMs
+    );
+    console.warn('usage enqueue retrying', {
+      ...identity,
+      execution_region: getVercelExecutionRegion(),
+      reason,
+      attempt,
+      ...(duplicatePossible && { duplicate_possible: true }),
+    });
+    const backoffStartedAt = performance.now();
+    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+    priorBackoff = { plannedMs: retryDelayMs, elapsedMs: performance.now() - backoffStartedAt };
+    return true;
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const remainingAttemptBudgetMs = Math.floor(deadline - performance.now());
+    let remainingAttemptBudgetMs = Math.floor(deadline - performance.now());
     if (remainingAttemptBudgetMs <= 0) break;
     // Only the first retry-mode attempt gets the longer window; later attempts keep the per-retry
     // timeout, and every attempt is still clipped to what is left of the total budget.
@@ -254,6 +390,37 @@ async function publishToUsageIngest(
         : retryTransientFailures
           ? USAGE_ENQUEUE_RETRY_TIMEOUT_MS
           : USAGE_ENQUEUE_TIMEOUT_MS;
+    let authorization: string;
+    if (credential.kind === 'secret') {
+      authorization = `Bearer ${credential.secret}`;
+    } else {
+      // Read for every attempt, so no send carries a token the client would no longer serve.
+      // Until a request is launched, the module load and the read end with the first-token window.
+      const tokenDeadline = launched ? deadline : firstTokenDeadline;
+      readToken ??= await loadUsagePublishToken(Math.floor(tokenDeadline - performance.now()));
+      const token: PublishToken = readToken
+        ? await readToken(credential.environment, Math.floor(tokenDeadline - performance.now()))
+        : { kind: 'unavailable', retryAfterMs: 0 };
+      const tokenReadAt = performance.now();
+      remainingAttemptBudgetMs = Math.floor(deadline - tokenReadAt);
+      // A first token that came back after its window, so after the send reserve too, is not used.
+      const lateFirstToken = !launched && tokenReadAt > firstTokenDeadline;
+      if (token.kind !== 'token' || lateFirstToken || remainingAttemptBudgetMs <= 0) {
+        const tokenFailure: StsTokenFailure =
+          token.kind === 'denied' ? 'sts_token_denied' : 'sts_token_unavailable';
+        // Nothing was ever launched, so nothing can be queued: the caller may account directly.
+        if (!launched) {
+          return reportUnpublished(identity, { kind: 'not_sent', reason: tokenFailure });
+        }
+        // An earlier request may already be queued, so this ends like any failure after a send.
+        reason = tokenFailure;
+        if (token.kind === 'denied' || attempt === maxAttempts) break;
+        const retryAfterMs = token.kind === 'unavailable' ? token.retryAfterMs : 0;
+        if (!(await backOff(attempt, retryAfterMs))) break;
+        continue;
+      }
+      authorization = `Bearer ${token.token}`;
+    }
     const signalTimeoutMs = Math.min(attemptTimeoutMs, remainingAttemptBudgetMs);
     const signal = AbortSignal.timeout(signalTimeoutMs);
     const attemptStartedAt = performance.now();
@@ -270,11 +437,12 @@ async function publishToUsageIngest(
     let httpStatus: number | null = null;
     let headersReceivedAt: number | null = null;
     try {
-      const response = await fetch(url, {
+      launched = true;
+      const response = await fetch(credential.url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          Authorization: `Bearer ${USAGE_INGEST_PUBLISH_SECRET}`,
+          Authorization: authorization,
         },
         body,
         signal,
@@ -313,22 +481,7 @@ async function publishToUsageIngest(
     });
 
     if (!retryable || attempt === maxAttempts) break;
-    const remainingBackoffBudgetMs = Math.floor(deadline - performance.now());
-    if (remainingBackoffBudgetMs <= 0) break;
-    const retryDelayMs = Math.min(
-      Math.random() * Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** (attempt - 1)),
-      remainingBackoffBudgetMs
-    );
-    console.warn('usage enqueue retrying', {
-      ...identity,
-      execution_region: getVercelExecutionRegion(),
-      reason,
-      attempt,
-      ...(duplicatePossible && { duplicate_possible: true }),
-    });
-    const backoffStartedAt = performance.now();
-    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
-    priorBackoff = { plannedMs: retryDelayMs, elapsedMs: performance.now() - backoffStartedAt };
+    if (!(await backOff(attempt, 0))) break;
   }
 
   return reportUnavailable(identity, reason, duplicatePossible);

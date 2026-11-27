@@ -214,10 +214,15 @@ describe('Bitbucket repository-list HTTP authorization', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: 'available', repositories: [] });
-    expect(serviceMocks.listBitbucketRepositories).toHaveBeenCalledWith(expect.anything(), {
-      userId: 'member-1',
-      orgId: '123e4567-e89b-12d3-a456-426614174030',
-    });
+    expect(serviceMocks.listBitbucketRepositories).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        userId: 'member-1',
+        orgId: '123e4567-e89b-12d3-a456-426614174030',
+      },
+      undefined,
+      undefined
+    );
   });
 
   it('requires an organization claim before repository lookup', async () => {
@@ -738,7 +743,9 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
         workspaceUuid: oauthSubject.workspaceUuid,
         repositoryUuid: oauthSubject.repositoryUuid,
         repositoryUrl: issueParams.repositoryUrl,
-      }
+      },
+      undefined,
+      expect.anything()
     );
   });
 
@@ -1071,7 +1078,12 @@ describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
       success: true,
       token: 'ATCT-runtime-token',
     });
-    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(expect.anything(), params);
+    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(
+      expect.anything(),
+      params,
+      undefined,
+      expect.anything()
+    );
   });
 });
 

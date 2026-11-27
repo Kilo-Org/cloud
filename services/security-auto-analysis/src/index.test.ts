@@ -118,7 +118,8 @@ describe('scheduled dispatcher', () => {
     const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
     expect(dispatchDueOwners).toHaveBeenCalledWith(
       expect.objectContaining({ ENVIRONMENT: 'development' }),
-      dispatchId
+      dispatchId,
+      undefined
     );
     expect(
       JSON.parse(

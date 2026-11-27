@@ -34,7 +34,17 @@
     "TOKEN_SIGNING_KIDS_REVOKED": "",
     "LEASE_CI_MIGRATION_TARGET": "db.e2e-primary.invalid:5432/postgres",
     "CF_DEPLOY_ACCOUNT_ID": "e2e0000000000000000000000000acc1",
+    // Empty: only replica-sweep-check.ts sweeps, passing `--var` and the binding's local
+    // connection string (CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_LEASE_SWEEP_REPLICA_E2E).
+    "LEASE_REPLICA_SWEEP_BINDINGS": "",
   },
+  "hyperdrive": [
+    {
+      "binding": "LEASE_SWEEP_REPLICA_E2E",
+      "id": "secrets-broker-e2e-replica",
+      "localConnectionString": "postgres://kilo_lease_sweeper:unused@127.0.0.1:1/postgres",
+    },
+  ],
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "secrets-broker-e2e-audit" }],
   },

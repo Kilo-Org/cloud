@@ -184,6 +184,7 @@ describe("Wrangler's config schema", () => {
       ...keysOf(definition('WorkerEntrypointExport')),
     ],
     'secrets_store_secrets[]': keysOf(environment('secrets_store_secrets', 'items')),
+    'hyperdrive[]': keysOf(environment('hyperdrive', 'items')),
   };
 
   it('has no key the check leaves unclassified, at any level the check models', () => {
@@ -293,6 +294,7 @@ describe('worker config rules', () => {
       TOKEN_SIGNING_KIDS_REVOKED: '',
       LEASE_CI_MIGRATION_TARGET: '',
       CF_DEPLOY_ACCOUNT_ID: '',
+      LEASE_REPLICA_SWEEP_BINDINGS: '',
     };
     const sts = (blockVars: Record<string, string>) =>
       parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
@@ -322,6 +324,8 @@ describe('worker config rules', () => {
       { LEASE_CI_MIGRATION_TARGET: 'postgres://user:secret@db.example.invalid/postgres' },
       { LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:99999/postgres' },
       { CF_DEPLOY_ACCOUNT_ID: 'cfat_not-an-account-id' },
+      { LEASE_REPLICA_SWEEP_BINDINGS: 'REPLICA' },
+      { LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_A,LEASE_SWEEP_A' },
     ]) {
       expect(stsVarProblems([sts({ ...vars, ...bad })]), JSON.stringify(bad)).toEqual([
         expect.stringContaining('vars do not pass EnvVarsSchema'),
@@ -329,6 +333,33 @@ describe('worker config rules', () => {
     }
     expect(stsVarProblems([sts({ ...vars, STS_ISSUER: 'https://sts.kiloapps.io' })])).toEqual([
       'services/sts/wrangler.jsonc (top level): STS_ISSUER is https://sts.kiloapps.io, expected https://sts-staging.kiloapps.io',
+    ]);
+  });
+
+  it('refuses an STS block that sweeps a replica it has no Hyperdrive binding for', () => {
+    const vars = {
+      STS_ENVIRONMENT: 'staging',
+      STS_ISSUER: 'https://sts-staging.kiloapps.io',
+      MANAGER_BASE_URL: 'https://eu.infisical.com',
+      MANAGER_PROJECT_ID: 'project',
+      MANAGER_PROJECT_SLUG: '',
+      MANAGER_ENVIRONMENT_SLUG: 'staging',
+      MANAGER_IDENTITY_ID: 'identity',
+      DO_JURISDICTION: 'eu',
+      TOKEN_SIGNING_KIDS_REVOKED: '',
+      LEASE_CI_MIGRATION_TARGET: '',
+      CF_DEPLOY_ACCOUNT_ID: '',
+      LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_EU_WEST, LEASE_SWEEP_EU_NORTH',
+    };
+    const sts = (hyperdrive: string[]) =>
+      parseWorkerConfig('services/sts/wrangler.jsonc', {
+        name: 'sts',
+        vars,
+        hyperdrive: hyperdrive.map(binding => ({ binding, id: `${binding.toLowerCase()}-id` })),
+      });
+    expect(stsVarProblems([sts(['LEASE_SWEEP_EU_WEST', 'LEASE_SWEEP_EU_NORTH'])])).toEqual([]);
+    expect(stsVarProblems([sts(['LEASE_SWEEP_EU_WEST'])])).toEqual([
+      'services/sts/wrangler.jsonc (top level): LEASE_REPLICA_SWEEP_BINDINGS names LEASE_SWEEP_EU_NORTH, which is no Hyperdrive binding of this block',
     ]);
   });
 

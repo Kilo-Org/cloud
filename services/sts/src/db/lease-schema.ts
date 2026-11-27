@@ -57,3 +57,14 @@ export const lease = sqliteTable(
   },
   table => [index('lease_workload_created').on(table.workload, table.createdAt)]
 );
+
+/**
+ * One row per replica the lease object sweeps (README "Replica sessions"), by Hyperdrive binding
+ * name: when its next sweep is due and how many sweeps in a row failed. A replica no longer
+ * configured loses its row at the next sweep.
+ */
+export const leaseReplicaSweep = sqliteTable('lease_replica_sweep', {
+  replica: text('replica').primaryKey(),
+  nextAt: integer('next_at').notNull(),
+  failures: integer('failures').notNull().default(0),
+});

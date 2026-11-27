@@ -520,6 +520,48 @@ export function leaseRevokedEvent(input: {
   });
 }
 
+/**
+ * One sweep of one replica that changed something (README "Replica sessions"): `ended` sessions of
+ * lease roles that are gone, blocked or past `VALID UNTIL` (written when it ended at least one, or
+ * when it is the first sweep to succeed after failures), or `failed` (the first failure of a
+ * streak, and the one that is logged as an error). `replica` is the Hyperdrive binding name; no
+ * row carries a role name, a host or a credential.
+ */
+export type ReplicaSweepResult =
+  | { result: 'ended'; sessions: number; afterFailures: number }
+  | { result: 'failed'; consecutiveFailures: number; detail: string };
+
+export function leaseReplicaSweptEvent(input: {
+  environment: StsEnvironment;
+  replica: string;
+  sweep: ReplicaSweepResult;
+}): AuditEvent {
+  const { sweep } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.lease.replica_swept',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.delete,
+      outcome: sweep.result === 'ended' ? 'success' : 'failure',
+      outcomeDetail: sweep.result,
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        replica: input.replica,
+        result: sweep.result,
+        ...(sweep.result === 'ended'
+          ? { sessions: sweep.sessions, afterFailures: sweep.afterFailures }
+          : { consecutiveFailures: sweep.consecutiveFailures, detail: sweep.detail.slice(0, 200) }),
+      },
+    },
+  });
+}
+
 /** `count` identical refused lease or revoke requests in the minute starting at `windowStart`. */
 export function leaseDeniedEvent(input: {
   environment: StsEnvironment;

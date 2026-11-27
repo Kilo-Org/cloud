@@ -192,7 +192,6 @@ export const INERT_ENVIRONMENT_KEYS: readonly string[] = [
   'find_additional_modules',
   'first_party_worker',
   'flagship',
-  'hyperdrive',
   'images',
   'jsx_factory',
   'jsx_fragment',
@@ -347,6 +346,13 @@ const SecretsStoreSecretSchema = z.strictObject({
   secret_name: z.string(),
 });
 
+/** A Hyperdrive binding: STS sweeps replicas through the ones `LEASE_REPLICA_SWEEP_BINDINGS` names. */
+const HyperdriveBindingSchema = z.strictObject({
+  binding: z.string(),
+  id: z.string(),
+  localConnectionString: z.string().optional(),
+});
+
 const RouteObjectSchema = z.strictObject({
   pattern: z.string(),
   zone_id: z.string().optional(),
@@ -389,6 +395,7 @@ const BINDING_SHAPE = {
   unsafe: z.unknown().optional(),
   observability: ObservabilitySchema.optional(),
   secrets_store_secrets: z.array(SecretsStoreSecretSchema).optional(),
+  hyperdrive: z.array(HyperdriveBindingSchema).optional(),
 };
 
 const ENVIRONMENT_SHAPE = {
@@ -439,6 +446,7 @@ export const CLASSIFIED_KEYS: Readonly<Record<string, readonly string[]>> = {
   'migrations[].transferred_classes[]': Object.keys(TransferredClassSchema.shape),
   'exports.*': EXPORT_KEYS,
   'secrets_store_secrets[]': Object.keys(SecretsStoreSecretSchema.shape),
+  'hyperdrive[]': Object.keys(HyperdriveBindingSchema.shape),
 };
 
 export type WorkerConfig = { path: string; config: z.infer<typeof WorkerConfigSchema> };
@@ -1008,7 +1016,8 @@ export function internalWorkerProblems(configs: readonly WorkerConfig[]): string
  * Problems with the vars of each STS deployment block: Wrangler inherits no vars into an env
  * block, and `readConfig` refuses every request when one is missing or malformed (a bad kid in
  * `TOKEN_SIGNING_KIDS_REVOKED`, say), so each block must pass `EnvVarsSchema` on its own, and its
- * `STS_ISSUER` must be the issuer verifiers expect for its environment (`STS_ISSUERS`).
+ * `STS_ISSUER` must be the issuer verifiers expect for its environment (`STS_ISSUERS`). Each
+ * replica `LEASE_REPLICA_SWEEP_BINDINGS` names must be a Hyperdrive binding of the same block.
  */
 export function stsVarProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -1024,6 +1033,14 @@ export function stsVarProblems(configs: readonly WorkerConfig[]): string[] {
         problems.push(
           `${block.where}: STS_ISSUER is ${vars.data.STS_ISSUER}, expected ${expected}`
         );
+      }
+      const hyperdrive = new Set((block.bindings.hyperdrive ?? []).map(entry => entry.binding));
+      for (const replica of vars.data.LEASE_REPLICA_SWEEP_BINDINGS) {
+        if (!hyperdrive.has(replica)) {
+          problems.push(
+            `${block.where}: LEASE_REPLICA_SWEEP_BINDINGS names ${replica}, which is no Hyperdrive binding of this block`
+          );
+        }
       }
     }
   }

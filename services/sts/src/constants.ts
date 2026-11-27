@@ -197,6 +197,25 @@ export const LEASE_EXPIRY_TOLERANCE_MS = 2 * 60 * 1000;
 export const LEASE_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * The lease object sweeps each configured replica this often (README "Replica sessions"): it ends
+ * there the sessions of lease roles that are gone, blocked or past `VALID UNTIL`. Each alarm starts
+ * the sweep before any other work, and the next sweep is due this long after that alarm fired, so
+ * a replica session of an ended lease ends at most this plus 10 seconds (the timeouts below) after
+ * the role change reaches the replica, plus however late the platform runs the alarm, while the
+ * replica answers.
+ */
+export const LEASE_REPLICA_SWEEP_INTERVAL_MS = 60_000;
+
+/** One sweep connects within this, then its statement must answer within the same again. */
+export const LEASE_REPLICA_SWEEP_STEP_TIMEOUT_MS = 5_000;
+
+/**
+ * A replica's sweep failing this many times in a row (15 minutes) is logged as an error, once per
+ * streak; earlier failures are warnings, since the next sweep retries a minute later.
+ */
+export const LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR = 15;
+
+/**
  * The manager folder that holds the token-minting credentials (design 4.4). Only the deploy-token
  * object reads it, with a read of its own; the refresher drops it from its `/ci` copy, and no
  * policy may name a secret in `MINTING_SECRET_NAMES`, so no bundle can carry one.

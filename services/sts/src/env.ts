@@ -45,6 +45,22 @@ const DatabaseTargetSchema = z.union([
 
 export type DatabaseTarget = { host: string; port: number; database: string };
 
+/**
+ * The Hyperdrive bindings of the replicas the lease object sweeps (README "Replica sessions"): a
+ * comma list of binding names, each `LEASE_SWEEP_` and capitals, digits or `_`; empty sweeps none.
+ * Each named binding must exist in the same block of `wrangler.jsonc` (repo check).
+ */
+const ReplicaSweepBindingsSchema = z
+  .string()
+  .transform(value =>
+    value
+      .split(',')
+      .map(name => name.trim())
+      .filter(name => name.length > 0)
+  )
+  .pipe(z.array(z.string().regex(/^LEASE_SWEEP_[A-Z0-9_]{1,40}$/)))
+  .refine(names => new Set(names).size === names.length, { message: 'a binding is listed twice' });
+
 /** Every plain var STS reads; each deployed block of `wrangler.jsonc` sets all of them (repo check). */
 export const EnvVarsSchema = z.object({
   STS_ENVIRONMENT: StsEnvironmentSchema,
@@ -66,6 +82,7 @@ export const EnvVarsSchema = z.object({
    * Empty: this environment mints none.
    */
   CF_DEPLOY_ACCOUNT_ID: z.union([z.literal(''), z.string().regex(/^[0-9a-f]{32}$/)]),
+  LEASE_REPLICA_SWEEP_BINDINGS: ReplicaSweepBindingsSchema,
 });
 
 /** The claims Infisical JWT Auth checks on the login JWT; every value is exact (design 4.2). */
@@ -99,6 +116,8 @@ export type StsConfig = {
    * none (every deploy-token request answers `unavailable`).
    */
   cloudflareDeployAccountId: string | null;
+  /** The Hyperdrive binding names of the replicas the lease object sweeps; empty for none. */
+  replicaSweepBindings: readonly string[];
 };
 
 export type Env = {
@@ -113,6 +132,7 @@ export type Env = {
   TOKEN_SIGNING_KIDS_REVOKED: string;
   LEASE_CI_MIGRATION_TARGET: string;
   CF_DEPLOY_ACCOUNT_ID: string;
+  LEASE_REPLICA_SWEEP_BINDINGS: string;
   STS_BUNDLE_DO: DurableObjectNamespace<BundleDO>;
   STS_REFRESHER_DO: DurableObjectNamespace<RefresherDO>;
   STS_SIGNER_DO: DurableObjectNamespace<SignerDO>;
@@ -149,5 +169,6 @@ export function readConfig(env: Env): StsConfig {
     revokedTokenKids: vars.TOKEN_SIGNING_KIDS_REVOKED,
     ciMigrationTarget: vars.LEASE_CI_MIGRATION_TARGET,
     cloudflareDeployAccountId: vars.CF_DEPLOY_ACCOUNT_ID === '' ? null : vars.CF_DEPLOY_ACCOUNT_ID,
+    replicaSweepBindings: vars.LEASE_REPLICA_SWEEP_BINDINGS,
   };
 }

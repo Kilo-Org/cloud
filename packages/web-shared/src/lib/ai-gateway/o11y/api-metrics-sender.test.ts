@@ -309,7 +309,7 @@ describe('api metrics sender, sts', () => {
     expect(mockWaitUntil).toHaveBeenCalledTimes(1);
     expect(consoleError).not.toHaveBeenCalled();
 
-    // The renewal lands; the next send finds the held token.
+    // The renewal lands; the next send finds the held token and reports the cold-start drops once.
     mint.resolve(TOKEN);
     await mockWaitUntil.mock.calls[0]?.[0];
     mockTokenGet.mockResolvedValue(TOKEN);
@@ -317,7 +317,30 @@ describe('api metrics sender, sts', () => {
     await runDeferred();
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(sentHeaders().get('authorization')).toBe(`Bearer ${TOKEN}`);
-    expect(consoleInfo).not.toHaveBeenCalled();
+    expect(consoleInfo).toHaveBeenCalledTimes(1);
+    expect(consoleInfo).toHaveBeenCalledWith(
+      'o11y api metrics: first STS token held; sending metrics',
+      { droppedBeforeFirstToken: 3 }
+    );
+
+    sender.emitApiMetrics(params);
+    await runDeferred();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(consoleInfo).toHaveBeenCalledTimes(1);
+  });
+
+  test('a warm first token logs the first-token line once, with no drops', async () => {
+    mockTokenGet.mockResolvedValue(TOKEN);
+    const { sender } = await loadSender({ auth: 'sts' });
+    for (let i = 0; i < 3; i++) sender.emitApiMetrics(params);
+    await runDeferred();
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(consoleInfo).toHaveBeenCalledTimes(1);
+    expect(consoleInfo).toHaveBeenCalledWith(
+      'o11y api metrics: first STS token held; sending metrics',
+      { droppedBeforeFirstToken: 0 }
+    );
   });
 
   test('a mint outage logs once on entry and once on recovery, with the count dropped', async () => {

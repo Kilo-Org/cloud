@@ -175,19 +175,25 @@ function reportSenderStateOnce(): void {
 }
 
 /**
- * This process's STS token health. Metrics dropped for want of a token are counted; the process
- * logs once when it enters `failing` and once when a token is held again, never per metric.
+ * This process's STS token health. Metrics dropped for want of a token are counted. The process
+ * logs once when it holds its first token (with the metrics dropped before it), once when it
+ * enters `failing` and once when a token is held again, never per metric.
  */
 type TokenHealth =
+  | { state: 'cold'; dropped: number }
   | { state: 'healthy'; dropped: number }
   | { state: 'failing'; since: number; dropped: number };
 
-let tokenHealth: TokenHealth = { state: 'healthy', dropped: 0 };
+let tokenHealth: TokenHealth = { state: 'cold', dropped: 0 };
 
 function tokenOf(read: ApiMetricsTokenRead): string | null {
   switch (read.kind) {
     case 'token':
-      if (tokenHealth.state === 'failing') {
+      if (tokenHealth.state === 'cold') {
+        console.info('o11y api metrics: first STS token held; sending metrics', {
+          droppedBeforeFirstToken: tokenHealth.dropped,
+        });
+      } else if (tokenHealth.state === 'failing') {
         console.info('o11y api metrics: STS token held again; sending metrics', {
           dropped: tokenHealth.dropped,
           failingMs: Date.now() - tokenHealth.since,
@@ -199,14 +205,14 @@ function tokenOf(read: ApiMetricsTokenRead): string | null {
       tokenHealth = { ...tokenHealth, dropped: tokenHealth.dropped + 1 };
       return null;
     case 'failed':
-      if (tokenHealth.state === 'healthy') {
+      if (tokenHealth.state === 'failing') {
+        tokenHealth = { ...tokenHealth, dropped: tokenHealth.dropped + 1 };
+      } else {
         console.error('o11y api metrics: no STS token; dropping metrics until one is held', {
           ...read.failure,
           droppedBefore: tokenHealth.dropped,
         });
         tokenHealth = { state: 'failing', since: Date.now(), dropped: 1 };
-      } else {
-        tokenHealth = { ...tokenHealth, dropped: tokenHealth.dropped + 1 };
       }
       return null;
   }

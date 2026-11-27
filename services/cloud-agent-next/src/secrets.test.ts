@@ -26,7 +26,7 @@ function okBundle(secrets: Record<string, string>, missing: string[] = []) {
   return {
     status: 'ok' as const,
     workload: 'cloud-agent-next',
-    environment: 'production',
+    environment: 'production' as const,
     etag: ETAG,
     stale: false,
     fetchedAt: '2026-11-27T00:00:00.000Z',
@@ -61,10 +61,10 @@ function legacyEnv(
 
 describe('secretsSource', () => {
   it('defaults to the legacy binding source', () => {
-    expect(secretsSource({})).toBe('env');
+    expect(secretsSource({})).toBe('secrets-store');
   });
 
-  it.each(['env', 'sts'] as const)('accepts %s', source => {
+  it.each(['secrets-store', 'sts'] as const)('accepts %s', source => {
     expect(secretsSource({ SECRETS_SOURCE: source })).toBe(source);
   });
 
@@ -91,9 +91,9 @@ describe('readCloudAgentNextSecret', () => {
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
       // Flipping the variable back reads the legacy binding again.
-      expect(await readCloudAgentNextSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
-        'legacy-value'
-      );
+      expect(
+        await readCloudAgentNextSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)
+      ).toBe('legacy-value');
       expect(store.get).toHaveBeenCalledTimes(2);
       expect(sts.getBundle).toHaveBeenCalledOnce();
     }

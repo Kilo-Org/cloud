@@ -14,9 +14,9 @@ import {
  * `INTERNAL_API_SECRET` has two storage forms in the deployed Worker: inbound
  * `x-internal-api-key` checks read the plain Worker secret of that name, and outbound requests
  * present the Secrets Store copy `INTERNAL_API_SECRET_PROD`. Each family keeps reading its own
- * legacy binding under the `env` source, so the default deployment is byte-exact; only the `sts`
- * source unifies both on the one bundle value. `readCloudAgentNextStoreSecret` serves the second
- * family.
+ * legacy binding under the `secrets-store` source, so the default deployment is byte-exact; only
+ * the `sts` source unifies both on the one bundle value. `readCloudAgentNextStoreSecret` serves the
+ * second family.
  *
  * `CLOUD_AGENT_SENTRY_DSN` stays outside this module: it is a client-side public key whose
  * consumers are synchronous (the Sentry SDK's `withSentry` /
@@ -52,25 +52,26 @@ type BindingName =
 type LegacySecretValue = string | { get(): Promise<string> };
 
 /**
- * `SECRETS_SOURCE` selects where every read goes: `env` reads the binding the deployment holds
- * today, `sts` reads the bundle over the `STS` service binding. An absent value means `env`, so
- * merging this path changes nothing until secrets-cutover flips the variable. The `sts` source
- * never falls back to the legacy binding: a failed bundle read fails the read.
+ * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the binding the
+ * deployment holds today, `sts` reads the bundle over the `STS` service binding. An absent value
+ * means `secrets-store`, so merging this path changes nothing until secrets-cutover flips the
+ * variable. The `sts` source never falls back to the legacy binding: a failed bundle read fails
+ * the read.
  */
 export type CloudAgentNextSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {
   SECRETS_SOURCE?: string;
   STS?: BundleBinding;
 };
 
-export type SecretsSource = 'env' | 'sts';
+export type SecretsSource = 'secrets-store' | 'sts';
 
 /** Fails closed: an unrecognised value refuses every read instead of guessing a source. */
 export function secretsSource(
   env: Pick<CloudAgentNextSecretsEnv, 'SECRETS_SOURCE'>
 ): SecretsSource {
-  const source = env.SECRETS_SOURCE ?? 'env';
-  if (source !== 'env' && source !== 'sts') {
-    throw new Error('SECRETS_SOURCE must be either "env" or "sts"');
+  const source = env.SECRETS_SOURCE ?? 'secrets-store';
+  if (source !== 'secrets-store' && source !== 'sts') {
+    throw new Error('SECRETS_SOURCE must be either "secrets-store" or "sts"');
   }
   return source;
 }

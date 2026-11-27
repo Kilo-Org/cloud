@@ -573,7 +573,7 @@ export type SessionCreationPolicyOptions = {
 
 type SessionCreationContext = Pick<
   TRPCContext,
-  'env' | 'userId' | 'authToken' | 'cloudAgentAuthority'
+  'env' | 'userId' | 'authToken' | 'cloudAgentAuthority' | 'executionCtx'
 > &
   Partial<Pick<TRPCContext, 'request'>>;
 type EndpointValidator = (request: SessionCreateRequest) => void | Promise<void>;

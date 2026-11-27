@@ -502,17 +502,17 @@ export type Env = {
    */
   ENVIRONMENT?: string;
   /**
-   * Where every runtime secret read goes: `env` (the bindings below) or `sts` (the bundle over the
-   * `STS` binding). Absent means `env`; see secrets.ts. Never read the credential fields below
-   * directly.
+   * Where every runtime secret read goes: `secrets-store` (the bindings below) or `sts` (the
+   * bundle over the `STS` binding). Absent means `secrets-store`; see secrets.ts. Never read the
+   * credential fields below directly.
    */
   SECRETS_SOURCE?: string;
   /** STS SecretsBroker binding; absent until the deployment binds it (services/sts/policy). */
   STS?: BundleBinding;
   /**
    * Sentry DSN, a client-side public key. Its consumers are synchronous (the Sentry SDK's
-   * options callbacks and the egress envelope hostname check), so it stays on `env` and is not
-   * routed through the STS reader; see secrets.ts.
+   * options callbacks and the egress envelope hostname check), so it stays on `secrets-store` and
+   * is not routed through the STS reader; see secrets.ts.
    */
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;

@@ -233,22 +233,25 @@ export async function fetchByocVercelCredential(
 
 export async function fetchByocVercelEnrollment(
   env: Env,
-  organizationId: string
+  organizationId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<ByocVercelEnrollment> {
-  return fetchByocVercelEnrollmentForOwner(env, { organizationId }, 'organization');
+  return fetchByocVercelEnrollmentForOwner(env, { organizationId }, 'organization', ctx);
 }
 
 export async function fetchByocVercelEnrollmentForUser(
   env: Env,
-  userId: string
+  userId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<ByocVercelEnrollment> {
-  return fetchByocVercelEnrollmentForOwner(env, { userId }, 'user');
+  return fetchByocVercelEnrollmentForOwner(env, { userId }, 'user', ctx);
 }
 
 async function fetchByocVercelEnrollmentForOwner(
   env: Env,
   owner: ByocVercelOwner,
-  path: 'organization' | 'user'
+  path: 'organization' | 'user',
+  ctx?: SecretsExecutionContext
 ): Promise<ByocVercelEnrollment> {
   let response: Response;
   try {
@@ -279,7 +282,8 @@ async function fetchByocVercelEnrollmentForOwner(
 
 export async function projectByocVercelStatus(
   env: Env,
-  input: ByocVercelStatusProjection
+  input: ByocVercelStatusProjection,
+  ctx?: SecretsExecutionContext
 ): Promise<boolean> {
   let response: Response;
   try {

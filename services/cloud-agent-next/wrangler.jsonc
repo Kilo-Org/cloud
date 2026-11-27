@@ -89,10 +89,11 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
-    // Where every runtime secret read goes: `env` (the Worker secret and Secrets Store binding
-    // below) or `sts` (the bundle over the `STS` binding). An absent value means `env`; any other
-    // value refuses every read. The `sts` source never falls back to the legacy binding.
-    "SECRETS_SOURCE": "env",
+    // Where every runtime secret read goes: `secrets-store` (the Worker secret and Secrets Store
+    // binding below) or `sts` (the bundle over the `STS` binding). An absent value means
+    // `secrets-store`; any other value refuses every read. The `sts` source never falls back to
+    // the legacy binding.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "placement": { "mode": "smart" },
   "ai": { "binding": "AI" },
@@ -144,7 +145,8 @@
     },
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
     // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
-    // cloud-agent-next.yaml grants the names. Nothing reads it while SECRETS_SOURCE is `env`.
+    // cloud-agent-next.yaml grants the names. Nothing reads it while SECRETS_SOURCE is
+    // `secrets-store`.
     {
       "binding": "STS",
       "service": "sts",

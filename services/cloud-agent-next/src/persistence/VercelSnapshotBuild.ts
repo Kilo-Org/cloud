@@ -549,14 +549,18 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       if (state.step === 'project_failure' || state.step === 'cleanup') {
         if (state.step === 'project_failure') {
           await this.external(ownership, () =>
-            projectByocVercelStatus(this.env, {
-              ...this.projection(state),
-              setupStatus: 'failed',
-              setupError: state.last_error,
-              setupStep: null,
-              runtimeSnapshotId: null,
-              setupCompletedAt: null,
-            })
+            projectByocVercelStatus(
+              this.env,
+              {
+                ...this.projection(state),
+                setupStatus: 'failed',
+                setupError: state.last_error,
+                setupStep: null,
+                runtimeSnapshotId: null,
+                setupCompletedAt: null,
+              },
+              this.ctx
+            )
           );
         }
         await this.abandon(ownership);
@@ -586,7 +590,11 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         : undefined;
       const previousSnapshotId = credential.runtimeSnapshotId;
       const projected = await this.external(ownershipFromRow(next), () =>
-        projectByocVercelStatus(this.env, this.projection(next, terminalConfirmed, identity))
+        projectByocVercelStatus(
+          this.env,
+          this.projection(next, terminalConfirmed, identity),
+          this.ctx
+        )
       );
       if (!projected) {
         await this.abandon(ownershipFromRow(next), client);

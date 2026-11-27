@@ -238,8 +238,8 @@ async function resolveVercelTarget(
     // ready base snapshot. It is decrypted only in the operation that uses it.
     const enrollment =
       reference.owner.type === 'organization'
-        ? await fetchByocVercelEnrollment(env, reference.owner.id)
-        : await fetchByocVercelEnrollmentForUser(env, reference.owner.id);
+        ? await fetchByocVercelEnrollment(env, reference.owner.id, ctx)
+        : await fetchByocVercelEnrollmentForUser(env, reference.owner.id, ctx);
     const credential = await fetchByocVercelCredential(
       env,
       credentialInput(reference, enrollment.credentialId),

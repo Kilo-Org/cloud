@@ -1,7 +1,8 @@
 # The cloud-agent-next Worker (services/cloud-agent-next/wrangler.jsonc). It reads its runtime
-# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Worker secret and
-# Secrets Store binding it holds today) until secrets-cutover flips it. INTERNAL_API_SECRET and
-# NEXTAUTH_SECRET resolve from /shared; the rest live in /workloads/cloud-agent-next.
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Worker
+# secret and Secrets Store binding it holds today) until secrets-cutover flips it.
+# INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve from /shared; the rest live in
+# /workloads/cloud-agent-next.
 workload: cloud-agent-next
 environments:
   - production

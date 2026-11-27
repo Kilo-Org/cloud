@@ -2710,6 +2710,13 @@
       "when": 1795707841540,
       "tag": "0386_usage_system_prompt_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 387,
+      "version": "7",
+      "when": 1795727001957,
+      "tag": "0387_obsolete_static_key_columns",
+      "breakpoints": true
     }
   ]
 }

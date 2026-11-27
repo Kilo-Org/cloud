@@ -1,5 +1,6 @@
 # kilocode Slack notifiers (kilocode CI design 6).
-# Kilo-Org/kilocode issues immutable subjects only after its opt-in; until then STS refuses its tokens.
+# legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
+# GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
 workload: ci-kilocode-notify
 environments:
   - production
@@ -8,6 +9,7 @@ identity:
   repository: Kilo-Org/kilocode
   repositoryId: '946087422'
   repositoryOwnerId: '201822503'
+  legacySubject: true
   environment: automation
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/outdated-kilo-deps.yml@refs/heads/main

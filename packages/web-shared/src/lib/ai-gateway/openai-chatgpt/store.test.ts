@@ -1,7 +1,7 @@
 jest.mock('@kilocode/web-shared/lib/drizzle', () => {
   const db = {
     select: jest.fn(),
-    insert: jest.fn(),
+    execute: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   };
@@ -12,21 +12,16 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 }));
 
-import { createHash } from 'node:crypto';
-import {
-  CredentialKmsError,
-  OBSOLETE_STATIC_KEY_PLACEHOLDER,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { EncryptedData, OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import type { OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
 import {
   testByokEnvelope,
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
-import {
-  sealedOpenAiChatGptConnectionColumns,
-  staticKeyOpenAiChatGptConnection,
-} from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
+import { sealedOpenAiChatGptConnectionColumns } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
@@ -38,7 +33,7 @@ import type { OpenAiChatGptConnection } from './types';
 
 type MockDb = {
   select: jest.Mock;
-  insert: jest.Mock;
+  execute: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
 };
@@ -47,7 +42,6 @@ type StoredRow = {
   kilo_user_id: string;
   organization_id: string | null;
   is_shared_services: boolean;
-  encrypted_connection: EncryptedData;
   encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope | null;
   is_enabled: boolean;
   created_by: string;
@@ -77,7 +71,7 @@ function buildConnection(
   };
 }
 
-/** A stored row the way the writers produce it: the placeholder and an envelope. */
+/** A stored row the way the writers produce it. */
 function storedRow(
   connection: OpenAiChatGptConnection,
   overrides: Partial<StoredRow> = {}
@@ -99,10 +93,39 @@ function storedRowWithPlaintext(plaintext: string): StoredRow {
     ...storedRow(buildConnection()),
     encrypted_connection_envelope: {
       ...testByokEnvelope(plaintext),
-      legacy_digest: 'digest',
       key_id: crypto.randomUUID(),
     },
   };
+}
+
+const dialect = new PgDialect();
+
+/** Reads the inserted values and the conflict update from the upsert the store sends. */
+function parseUpsert(query: SQL): { values: Partial<StoredRow>; set: Partial<StoredRow> } {
+  const { sql: text, params } = dialect.sqlToQuery(query);
+  const insert = /INSERT INTO "openai_chatgpt_connections" \(([^)]*)\)\s*VALUES \(([^)]*)\)/.exec(
+    text
+  );
+  const update = /DO UPDATE SET ([^]*)$/.exec(text.trim());
+  if (!insert || !update) throw new Error(`unexpected statement: ${text}`);
+  const value = (placeholder: string): unknown => {
+    const param = params[Number(placeholder.trim().slice(1)) - 1];
+    return typeof param === 'string' && param.startsWith('{') ? JSON.parse(param) : param;
+  };
+  const columns = insert[1].split(', ').map(column => column.replaceAll('"', ''));
+  const placeholders = insert[2].split(', ');
+  const values = Object.fromEntries(
+    columns.map((column, index) => [column, value(placeholders[index])])
+  ) as Partial<StoredRow>;
+  const set = Object.fromEntries(
+    update[1]
+      .split(', ')
+      .map(assignment => assignment.split(' = '))
+      // Server-side assignments such as `now()` carry no parameter.
+      .filter(([, placeholder]) => placeholder.trim().startsWith('$'))
+      .map(([column, placeholder]) => [column.replaceAll('"', ''), value(placeholder)])
+  ) as Partial<StoredRow>;
+  return { values, set };
 }
 
 describe('openai-chatgpt connection store', () => {
@@ -133,24 +156,21 @@ describe('openai-chatgpt connection store', () => {
       })),
     }));
 
-    mockDb.insert.mockReset();
-    mockDb.insert.mockImplementation(() => ({
-      values: jest.fn((values: StoredRow) => ({
-        onConflictDoUpdate: jest.fn(({ set }: { set: Partial<StoredRow> }) => {
-          const index = rows.findIndex(
-            row =>
-              row.kilo_user_id === values.kilo_user_id &&
-              row.organization_id === values.organization_id
-          );
-          if (index >= 0) {
-            rows[index] = { ...rows[index], ...set };
-          } else {
-            rows.push({ ...values });
-          }
-          return Promise.resolve(undefined);
-        }),
-      })),
-    }));
+    mockDb.execute.mockReset();
+    mockDb.execute.mockImplementation((query: SQL) => {
+      const upsert = parseUpsert(query);
+      const index = rows.findIndex(
+        row =>
+          row.kilo_user_id === upsert.values.kilo_user_id &&
+          row.organization_id === upsert.values.organization_id
+      );
+      if (index >= 0) {
+        rows[index] = { ...rows[index], ...upsert.set };
+      } else {
+        rows.push(upsert.values as StoredRow);
+      }
+      return Promise.resolve(undefined);
+    });
 
     mockDb.update.mockReset();
     mockDb.update.mockImplementation(() => ({
@@ -252,13 +272,8 @@ describe('openai-chatgpt connection store', () => {
     expect(stored?.refresh_token).toBe('refresh-token-2');
   });
 
-  it('returns null for a row without an envelope, even if the obsolete column holds a static-key ciphertext', async () => {
-    rows.push(
-      storedRow(buildConnection(), {
-        encrypted_connection: staticKeyOpenAiChatGptConnection(buildConnection()),
-        encrypted_connection_envelope: null,
-      })
-    );
+  it('returns null for a row without an envelope', async () => {
+    rows.push(storedRow(buildConnection(), { encrypted_connection_envelope: null }));
 
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
     await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toBeNull();
@@ -313,16 +328,14 @@ describe('openai-chatgpt connection store', () => {
   });
 
   describe('KMS envelopes', () => {
-    it('writes the payload only into the envelope, with the placeholder in the obsolete column', async () => {
+    it('writes the payload only into the envelope', async () => {
       await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), 'connecting-user');
 
       const [row] = rows;
-      expect(row.encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
       const serialized = JSON.stringify(row.encrypted_connection_envelope);
       expect(serialized).not.toContain('access-token-1');
       expect(serialized).not.toContain('refresh-token-1');
       expect(row.encrypted_connection_envelope).toMatchObject({
-        legacy_digest: createHash('sha256').update('..').digest('hex'),
         envelope_version: 1,
       });
       expect(row.encrypted_connection_envelope?.key_id).toEqual(expect.any(String));
@@ -355,7 +368,6 @@ describe('openai-chatgpt connection store', () => {
       );
 
       const [second] = rows;
-      expect(second.encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
       expect(second.encrypted_connection_envelope).not.toEqual(first.encrypted_connection_envelope);
       expect(second.encrypted_connection_envelope?.key_id).not.toBe(
         first.encrypted_connection_envelope?.key_id
@@ -364,20 +376,6 @@ describe('openai-chatgpt connection store', () => {
         access_token: 'access-token-2',
         refresh_token: 'refresh-token-2',
       });
-    });
-
-    it('replaces a static-key ciphertext left in the obsolete column when the connection is saved again', async () => {
-      rows.push(
-        storedRow(buildConnection(), {
-          encrypted_connection: staticKeyOpenAiChatGptConnection(buildConnection()),
-          encrypted_connection_envelope: null,
-        })
-      );
-
-      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
-
-      expect(rows[0].encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
-      await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toEqual(buildConnection());
     });
 
     it('reads the envelope with the owner, provider and key id as the decrypt context', async () => {
@@ -395,33 +393,8 @@ describe('openai-chatgpt connection store', () => {
       });
     });
 
-    it('ignores the obsolete column when the envelope holds the connection', async () => {
-      await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
-      rows[0] = {
-        ...rows[0],
-        encrypted_connection: staticKeyOpenAiChatGptConnection(
-          buildConnection({ access_token: 'static-access', refresh_token: 'static-refresh' })
-        ),
-      };
-
-      await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toEqual(buildConnection());
-    });
-
     it('throws when the KMS service refuses the decrypt', async () => {
       await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
-      kms.fail('/decrypt');
-
-      await expect(getOpenAiChatGptConnection(USER_OWNER)).rejects.toBeInstanceOf(
-        CredentialKmsError
-      );
-    });
-
-    it('throws instead of reading the obsolete column when the KMS service refuses the decrypt', async () => {
-      rows.push(
-        storedRow(buildConnection(), {
-          encrypted_connection: staticKeyOpenAiChatGptConnection(buildConnection()),
-        })
-      );
       kms.fail('/decrypt');
 
       await expect(getOpenAiChatGptConnection(USER_OWNER)).rejects.toBeInstanceOf(

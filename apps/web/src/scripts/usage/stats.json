@@ -38,16 +38,11 @@
     "message_id_avg_len": 35.2322183610934112,
     "message_id_min_len": 0,
     "message_id_max_len": 60,
-    "user_prompt_prefix_avg_len": 99.4237799012764951,
-    "user_prompt_prefix_min_len": 0,
-    "user_prompt_prefix_max_len": 100,
-    "user_prompt_prefix_null_pct": 2.2335428399843019,
     "http_user_agent_id_null_pct": 0.14717051934237303933,
     "http_ip_id_null_pct": 2.1537245318692199,
     "vercel_ip_city_id_null_pct": 11.0145777716373111,
     "vercel_ip_country_id_null_pct": 0.06156852737504506404,
     "ja4_digest_id_null_pct": 0.05821946988969436006,
-    "system_prompt_prefix_id_null_pct": 2.2883033388425501,
     "vercel_ip_latitude_null_pct": 0.06111812976134583303,
     "vercel_ip_longitude_null_pct": 0.06111812976134583303,
     "system_prompt_length_null_pct": 0.07386562185549379328,
@@ -78,10 +73,6 @@
     "ja4_digest_count": 514,
     "ja4_digest_avg_len": 36.0,
     "ja4_digest_min_len": 36,
-    "ja4_digest_max_len": 36,
-    "system_prompt_prefix_count": 14322689,
-    "system_prompt_prefix_avg_len": 96.900534389876091,
-    "system_prompt_prefix_min_len": 0,
-    "system_prompt_prefix_max_len": 100
+    "ja4_digest_max_len": 36
   }
 }

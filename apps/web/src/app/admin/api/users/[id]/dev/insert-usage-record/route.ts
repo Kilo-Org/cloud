@@ -86,8 +86,6 @@ export const POST = auditedAdminRoute(
       http_x_vercel_ip_latitude: null,
       http_x_vercel_ip_longitude: null,
       http_x_vercel_ja4_digest: null,
-      user_prompt_prefix: `DEV admin insertUsageRecord $${dollarAmount}`.slice(0, 100),
-      system_prompt_prefix: null,
       system_prompt_length: null,
       http_user_agent: 'admin-dev-tools',
       max_tokens: null,
@@ -115,8 +113,6 @@ export const POST = auditedAdminRoute(
       market_cost: cost_mUsd,
       non_inference_cost: null,
       is_free: false,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
       system_prompt_kind: null,
     };
 

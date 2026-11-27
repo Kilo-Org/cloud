@@ -161,6 +161,7 @@
     "local": {
       "name": "o11y-local",
       "workers_dev": false,
+      "preview_urls": false,
       "routes": [],
       "triggers": { "crons": [] },
       "analytics_engine_datasets": [

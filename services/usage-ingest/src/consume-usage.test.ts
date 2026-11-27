@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import type { Env } from './publish-usage';
-import { usage } from './usage.test-fixture';
+import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
+import { usage, wireUsage } from './usage.test-fixture';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 
@@ -160,14 +161,16 @@ describe('usage consumer', () => {
     expect(messages[0].ack).not.toHaveBeenCalled();
     expect(messages[1].ack).not.toHaveBeenCalled();
     expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toEqual([]);
-    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual(usage);
+    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual(wireUsage);
     clock.mockReturnValue(375);
     vi.spyOn(Date, 'now').mockReturnValue(timestamp + 2275);
     first.resolve(acknowledgement());
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(messages[0].ack).toHaveBeenCalledExactlyOnceWith();
     expect(messages[1].ack).not.toHaveBeenCalled();
-    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual(secondEvent);
+    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual(
+      toUsageRecordWireBody(secondEvent)
+    );
     clock.mockReturnValue(500);
     vi.spyOn(Date, 'now').mockReturnValue(timestamp + 2400);
     second.resolve(acknowledgement('duplicate', secondEvent.core.id));
@@ -288,7 +291,7 @@ describe('usage consumer', () => {
         );
       const msg = message({
         ...usage,
-        metadata: { ...usage.metadata, user_prompt_prefix: 'sensitive-prompt' },
+        metadata: { ...usage.metadata, http_user_agent: 'sensitive-prompt' },
         bouncer_usage_event: {
           request_id: 'sensitive-request-id',
           payload: { secret: 'sensitive-bouncer-payload' },
@@ -370,7 +373,7 @@ describe('usage consumer', () => {
       expect(input.ackAll).not.toHaveBeenCalled();
       expect(input.retryAll).not.toHaveBeenCalled();
       expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
-        events
+        events.map(toUsageRecordWireBody)
       );
       expect(
         processingLogs().find(
@@ -397,7 +400,7 @@ describe('usage consumer', () => {
         env.USAGE_WRITER_URL,
         'sensitive-response',
         'sensitive-client-error',
-        usage.metadata.user_prompt_prefix,
+        usage.metadata.http_user_agent,
       ]) {
         expect(serialized).not.toContain(sensitive);
       }
@@ -826,7 +829,7 @@ describe('native retry classification and launch budget', () => {
       for (const index of [2, 3, 4, 5]) expect(messages[index].ack).not.toHaveBeenCalled();
       expect(fetch).toHaveBeenCalledTimes(6);
       expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
-        inputEvents
+        inputEvents.map(toUsageRecordWireBody)
       );
       expect(
         processingLogs().find(
@@ -1110,7 +1113,7 @@ describe('tagged Enkrypt usage messages', () => {
     expect(llm.ack).toHaveBeenCalledOnce();
     expect(enkrypt.ack).toHaveBeenCalledOnce();
     expect(fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init?.body as string)])).toEqual([
-      [env.USAGE_WRITER_URL, usage],
+      [env.USAGE_WRITER_URL, wireUsage],
       [enkryptWriterUrl, enkryptRecord],
     ]);
     const [llmOutcome, enkryptOutcome] = outcomes(processingLogs);
@@ -1343,7 +1346,7 @@ describe('tagged Exa usage messages', () => {
     expect(enkrypt.ack).toHaveBeenCalledOnce();
     expect(exa.ack).toHaveBeenCalledOnce();
     expect(fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init?.body as string)])).toEqual([
-      [env.USAGE_WRITER_URL, usage],
+      [env.USAGE_WRITER_URL, wireUsage],
       [enkryptWriterUrl, enkryptRecord],
       [exaWriterUrl, exaRecord],
     ]);

@@ -8,8 +8,8 @@
   // Production is reached only through its custom domain, so the OAuth issuer
   // is always https://mcp.kiloapps.io (the issuer is derived by the
   // @cloudflare/workers-oauth-provider from the request URL). The workers.dev
-  // URL stays disabled in prod; the `dev` env below keeps its own workers.dev
-  // URL.
+  // URL and preview URLs stay disabled here, and the `dev` env below fences
+  // them off too.
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
@@ -85,13 +85,18 @@
 
   // ============================================
   // DEVELOPMENT ENVIRONMENT
-  // Deploy with: wrangler deploy --env dev
-  // This creates a SEPARATE worker: kilo-mcp-dev
+  // Local-only: run with `pnpm dev` (wrangler dev --local). Never deploy it;
+  // it has no hosted route, workers.dev URL or preview URL.
   // ============================================
   "env": {
     "dev": {
       "name": "kilo-mcp-dev",
-      "workers_dev": true,
+      // Fence: named envs inherit top-level routes; never publish dev to the
+      // production custom domain, workers.dev, or a preview URL.
+      "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
+      "triggers": { "crons": [] },
       "vars": {
         "WEB_BASE_URL": "http://localhost:3000",
       },

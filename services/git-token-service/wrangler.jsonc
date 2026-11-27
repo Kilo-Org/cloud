@@ -70,6 +70,11 @@
   "env": {
     "dev": {
       "name": "git-token-service-dev",
+      // Local `wrangler dev` only; never deployed. Closed explicitly so a stray
+      // `--env dev` deploy gets no route, workers.dev or preview URL.
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [],
       "vars": {
         "GITHUB_APP_SLUG": "kiloconnect-development",
         "GITHUB_APP_BOT_USER_ID": "242397087",
@@ -85,7 +90,9 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          // Not a Hyperdrive resource: keeps the production config off this env.
+          // Local dev connects through localConnectionString only.
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

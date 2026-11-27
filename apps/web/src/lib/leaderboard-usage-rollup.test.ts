@@ -15,6 +15,7 @@ import {
   leaderboardUsageWindow,
   rebuildLeaderboardUsageDay,
   settledLeaderboardUsageDays,
+  waitForReplayCatchUp,
 } from '@/lib/leaderboard-usage-rollup';
 
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -127,9 +128,11 @@ describe('leaderboard usage rollup', () => {
 
     expect(written).toEqual({
       rows: 4,
-      slices: 96,
+      slices: 288,
       durationMs: expect.any(Number),
       slowestSliceMs: expect.any(Number),
+      replayWaitMs: expect.any(Number),
+      conflictRetries: 0,
     });
     const shared = {
       usage_date: '2026-11-10',
@@ -299,8 +302,8 @@ describe('leaderboard usage rollup', () => {
 
     expect(summary).toEqual({
       built: [
-        expect.objectContaining({ usageDate: '2026-11-08', rows: 1, slices: 96 }),
-        expect.objectContaining({ usageDate: '2026-11-07', rows: 1, slices: 96 }),
+        expect.objectContaining({ usageDate: '2026-11-08', rows: 1, slices: 288 }),
+        expect.objectContaining({ usageDate: '2026-11-07', rows: 1, slices: 288 }),
       ],
       remaining: ['2026-11-06', '2026-11-05', '2026-11-04', '2026-11-03'],
       unsettled: ['2026-11-09'],
@@ -346,7 +349,7 @@ describe('leaderboard usage rollup', () => {
       deadline: Date.now(),
     });
 
-    expect(build).toBeNull();
+    expect(build).toEqual({ stopped: 'deadline' });
     expect((await rollupRows()).map(row => row.request_count)).toEqual([1]);
   });
 
@@ -357,6 +360,7 @@ describe('leaderboard usage rollup', () => {
       }),
     });
     const failingReadDb = {
+      execute: db.execute.bind(db),
       transaction: async () => {
         throw timeout;
       },
@@ -373,9 +377,250 @@ describe('leaderboard usage rollup', () => {
       stage: 'read',
       sliceStart: '2026-11-10T00:00:00.000Z',
       slicesCompleted: 0,
+      replayWaitMs: expect.any(Number),
+      conflictRetries: 0,
       durationMs: expect.any(Number),
       errorName: 'Error',
       postgresCode: '57014',
     });
+  });
+
+  function replayConflict(): Error {
+    return Object.assign(new Error('Failed query'), {
+      cause: Object.assign(new Error('canceling statement due to conflict with recovery'), {
+        code: '40001',
+      }),
+    });
+  }
+
+  test('retries a slice cancelled by a replay conflict and keeps the day', async () => {
+    await insertUsage({ created_at: '2026-11-10T00:05:00.000Z' });
+    await insertUsage({ created_at: '2026-11-10T18:50:00.000Z' });
+    let calls = 0;
+    const flakyReadDb = {
+      execute: db.execute.bind(db),
+      transaction: ((callback: Parameters<DrizzleDatabase['transaction']>[0]) => {
+        calls++;
+        if (calls === 1) throw replayConflict();
+        return db.transaction(callback);
+      }) as DrizzleDatabase['transaction'],
+    } as unknown as DrizzleDatabase;
+
+    const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb: flakyReadDb, db });
+
+    expect(build).toMatchObject({ rows: 1, slices: 288, conflictRetries: 1 });
+    expect(calls).toBe(289);
+    expect((await rollupRows()).map(row => row.request_count)).toEqual([2]);
+  });
+
+  test('gives up on a slice after three replay conflicts', async () => {
+    let calls = 0;
+    const conflictingReadDb = {
+      execute: db.execute.bind(db),
+      transaction: async () => {
+        calls++;
+        throw replayConflict();
+      },
+    } as unknown as DrizzleDatabase;
+
+    await expect(
+      rebuildLeaderboardUsageDay('2026-11-10', { readDb: conflictingReadDb, db })
+    ).rejects.toThrow('Failed query');
+
+    expect(calls).toBe(3);
+    const [line] = jest.mocked(errorExceptInTest).mock.calls.at(-1) as [string];
+    expect(JSON.parse(line)).toMatchObject({ postgresCode: '40001', conflictRetries: 2 });
+  });
+
+  test('waits until the replica has replayed what it had received', async () => {
+    const replies = [
+      [{ receive_lsn: '3E72/CFDFAC50' }],
+      [{ caught_up: false }],
+      [{ caught_up: true }],
+    ];
+    const queries: string[] = [];
+    const replicaDb = {
+      execute: async (query: Parameters<DrizzleDatabase['execute']>[0]) => {
+        queries.push(JSON.stringify(query));
+        return { rows: replies.shift() ?? [] };
+      },
+    } as unknown as DrizzleDatabase;
+
+    const catchUp = await waitForReplayCatchUp(replicaDb);
+
+    expect(catchUp.status).toBe('caught_up');
+    expect(catchUp.waitedMs).toBeGreaterThanOrEqual(90);
+    expect(queries).toHaveLength(3);
+    expect(replies).toEqual([]);
+  });
+
+  test('does not wait on a primary', async () => {
+    await expect(waitForReplayCatchUp(db)).resolves.toEqual({
+      status: 'caught_up',
+      waitedMs: expect.any(Number),
+    });
+  });
+
+  // Each probe of a replica that never catches up advances the fake clock by
+  // `msPerQuery`, so the waits end on time without sleeping through them.
+  function laggingReplica(clock: ReturnType<typeof fakeClock>, msPerQuery: number) {
+    const transaction = jest.fn(async () => {
+      throw new Error('a slice must not start');
+    });
+    const readDb = {
+      execute: async (query: Parameters<DrizzleDatabase['execute']>[0]) => {
+        clock.advance(msPerQuery);
+        return JSON.stringify(query).includes('receive_lsn')
+          ? { rows: [{ receive_lsn: '3E72/CFDFAC50' }] }
+          : { rows: [{ caught_up: false }] };
+      },
+      transaction,
+    } as unknown as DrizzleDatabase;
+    return { readDb, transaction };
+  }
+
+  function fakeClock() {
+    let now = Date.parse('2026-11-27T15:00:00.000Z');
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    return {
+      now: () => now,
+      advance: (ms: number) => {
+        now += ms;
+      },
+      restore: () => spy.mockRestore(),
+    };
+  }
+
+  test('reports a replica that stays behind instead of waiting forever', async () => {
+    const clock = fakeClock();
+    try {
+      const { readDb } = laggingReplica(clock, 31_000);
+
+      await expect(waitForReplayCatchUp(readDb)).resolves.toEqual({
+        status: 'timed_out',
+        waitedMs: 31_000,
+      });
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('stops waiting for replay at the deadline', async () => {
+    const clock = fakeClock();
+    try {
+      const { readDb } = laggingReplica(clock, 1_000);
+
+      await expect(waitForReplayCatchUp(readDb, clock.now() + 500)).resolves.toEqual({
+        status: 'deadline',
+        waitedMs: 1_000,
+      });
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('starts no replay probe at or after the deadline', async () => {
+    const clock = fakeClock();
+    try {
+      const deadline = clock.now() + 500_000;
+      clock.advance(499_000);
+      const probeStarts: number[] = [];
+      const readDb = {
+        execute: async (query: Parameters<DrizzleDatabase['execute']>[0]) => {
+          probeStarts.push(clock.now());
+          clock.advance(1_500);
+          return JSON.stringify(query).includes('receive_lsn')
+            ? { rows: [{ receive_lsn: '3E72/CFDFAC50' }] }
+            : { rows: [{ caught_up: false }] };
+        },
+      } as unknown as DrizzleDatabase;
+
+      const catchUp = await waitForReplayCatchUp(readDb, deadline);
+
+      expect(catchUp.status).toBe('deadline');
+      expect(probeStarts).toEqual([deadline - 1_000]);
+      expect(probeStarts.every(start => start < deadline)).toBe(true);
+      await expect(waitForReplayCatchUp(readDb, deadline)).resolves.toEqual({
+        status: 'deadline',
+        waitedMs: 0,
+      });
+      expect(probeStarts).toHaveLength(1);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('does not scan a replica that stayed behind', async () => {
+    await insertUsage({ created_at: '2026-11-10T12:00:00.000Z' });
+    const clock = fakeClock();
+    try {
+      const { readDb, transaction } = laggingReplica(clock, 31_000);
+
+      const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb, db });
+
+      expect(build).toEqual({ stopped: 'replica_behind' });
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      clock.restore();
+    }
+    expect(await rollupRows()).toEqual([]);
+  });
+
+  test('does not start a slice once the deadline passes during the replay wait', async () => {
+    const clock = fakeClock();
+    try {
+      const { readDb, transaction } = laggingReplica(clock, 1_000);
+
+      const build = await rebuildLeaderboardUsageDay('2026-11-10', {
+        readDb,
+        db,
+        deadline: clock.now() + 500,
+      });
+
+      expect(build).toEqual({ stopped: 'deadline' });
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('does not retry a conflicting slice after the deadline', async () => {
+    const clock = fakeClock();
+    try {
+      const deadline = clock.now() + 500_000;
+      const transaction = jest.fn(async () => {
+        clock.advance(600_000);
+        throw replayConflict();
+      });
+      const readDb = {
+        execute: async () => ({ rows: [{ receive_lsn: null }] }),
+        transaction,
+      } as unknown as DrizzleDatabase;
+
+      const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb, db, deadline });
+
+      expect(build).toEqual({ stopped: 'deadline' });
+      expect(transaction).toHaveBeenCalledTimes(1);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('retries a slice when a replay probe is cancelled by a replay conflict', async () => {
+    await insertUsage({ created_at: '2026-11-10T12:00:00.000Z' });
+    let probes = 0;
+    const readDb = {
+      execute: ((query: Parameters<DrizzleDatabase['execute']>[0]) => {
+        probes++;
+        if (probes === 1) throw replayConflict();
+        return db.execute(query);
+      }) as DrizzleDatabase['execute'],
+      transaction: db.transaction.bind(db),
+    } as unknown as DrizzleDatabase;
+
+    const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb, db });
+
+    expect(build).toMatchObject({ rows: 1, slices: 288, conflictRetries: 1 });
+    expect((await rollupRows()).map(row => row.request_count)).toEqual([1]);
   });
 });

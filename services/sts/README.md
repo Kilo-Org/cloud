@@ -445,13 +445,15 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 
 | Workload | Audience: scopes | Secrets | STS environments |
 |---|---|---|---|
-| `usage-ingest` | `web`: `web:sts.canary` | none | development, staging, production |
-| `web` | `usage-ingest`: `usage-ingest:sts.canary` | none | development, staging, production |
+| `usage-ingest` | `web`: `web:sts.canary`, `web:usage.record` | none | development, staging, production |
+| `web` | `usage-ingest`: `usage-ingest:sts.canary`, `usage-ingest:usage.publish` | none | development, staging, production |
+| `web` | `o11y`: `o11y:api-metrics.write`, `o11y:alerting.read`, `o11y:alerting.write` | none | development, staging, production |
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
-| `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (the policy lists only `development`) |
+| `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
+| `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
@@ -461,17 +463,23 @@ must bind `sts-local`, the development STS: its `dev` block may only bind `sts-d
 not deploy, so the binding goes in an `env.local` block named `kilo-mcp-local`, with
 `observability.traces.enabled: false` in every block.
 
-The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
-exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only. Staging
-and production STS refuse a real gateway token whole (401 `identity_rejected`) and audit it with
-actor `ai-gateway`: a preview token as `environment_mismatch`, a staging or production token as
-`identity_rejected`, since the policy lists neither identity. A caller that reached the mint there
-would get `unknown_workload`, as no policy names it. Its activation adds staging and production to
-both its `environments` lists and is reviewed like any policy change.
+The dual-accept grants each serve one receiver that already accepts the scope from exactly these
+workloads, behind its own switch: `web:usage.record` from `usage-ingest` (the web app's
+`USAGE_RECORD_AUTH`), `usage-ingest:usage.publish` from `ai-gateway` on `/usage` and
+`/enkrypt-usage` and from `web` on `/exa-usage` (usage-ingest's `USAGE_INGEST_PUBLISH_AUTH`),
+`o11y:api-metrics.write` from `ai-gateway` and `web` and both alerting scopes from `web` (o11y's
+`ADMIN_CREDENTIAL_ACCEPT`), and `ai-gateway-secure-proxy:request.forward` from `ai-gateway` (the
+Secure Proxy's `KILO_AI_GATEWAY_SECURE_PROXY_CREDENTIAL_ACCEPT`). Each receiver repeats the
+workload check, so a grant alone opens no route to another caller.
 
-Any preview build of `kilocode-ai-gateway`, from any branch, can obtain this development read
-scope, the same as `web`'s development grants. If fork or outside pull-request previews are ever
-enabled on that project, this grant needs a review first.
+The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
+lists the project's `production`, its custom environment `staging` and its previews, mapped to
+production, staging and development STS as for `web`. Its UTS feed read stays development only, in
+`environmentGrants`; staging and production get it with phase 4's activation go.
+
+Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every `ai-gateway` scope on
+development STS, the same as `web`'s development grants. If fork or outside pull-request previews
+are ever enabled on that project, these grants need a review first.
 
 Workloads with a policy, all over `worker-binding`:
 
@@ -492,32 +500,39 @@ A Worker's workload is its top-level config `name`, because STS authorizes on `p
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
 
 GitHub Actions workloads (`github-oidc`, production only, `refs/heads/main`, each workflow file
-pinned to `@refs/heads/main`; see [GitHub Actions callers](#github-actions-callers)). All are in
-`Kilo-Org/kilocode` (repository id `946087422`, owner id `201822503`) and grant no token, lease or
-deploy token; their bundles are `/ci/<workload>`:
+pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2` on `refs/heads/v2`; see
+[GitHub Actions callers](#github-actions-callers)). All are in `Kilo-Org/kilocode` (repository id
+`946087422`, owner id `201822503`) and grant no token, lease or deploy token; their bundles are
+`/ci/<workload>`:
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
 | `ci-kilocode-release` | `release` | `publish.yml` | `workflow_dispatch` |
 | `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
 | `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
+| `ci-kilocode-app-key-v2` | `automation` | `kilo-v2.yml` at `refs/heads/v2` (its `progress-commit` job) | `push` |
 | `ci-kilocode-scan-notify` | `automation` | `security-findings-notify.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-community` | `automation` | `community-sweep.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-notify` | `automation` | `outdated-kilo-deps.yml`, `stale-alerts-report.yml`, `stale-bot-pr-notify.yml`, `v2-upstream-release-notify.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-opencode-watch` | `automation` | `watch-opencode-releases.yml` | `schedule`, `workflow_dispatch` |
 
-`Kilo-Org/kilocode` predates GitHub's immutable subjects and cannot opt in yet, so its seven
-policies set `legacySubject: true` (see "Legacy subject" below). No policy admits the `v2` branch
-or `release-v2`.
+`Kilo-Org/kilocode` predates GitHub's immutable subjects and cannot opt in yet, so its eight
+policies set `legacySubject: true` (see "Legacy subject" below). Only `ci-kilocode-app-key-v2`
+admits the `v2` branch (manager ruling M76): it accepts `refs/heads/v2` alone, with
+`kilo-v2.yml@refs/heads/v2` as its one workflow file and `push` as its one event, and grants only
+`KILOCODE_MAINTAINER_APP_KEY`. The loader refuses a production policy off `main` unless it equals a
+`GITHUB_PRODUCTION_REF_EXCEPTIONS` entry in every field (`src/policy/schema.ts`). No policy admits
+`release-v2`.
 
 Two kilocode-side rules hold these policies to what they name:
 
 - None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
   carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
   `main` that called it with a listed event would get the bundle.
-- The GitHub environments `automation`, `release` and `release-jetbrains` admit deployments from
-  `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
-  what makes it mean `main`.
+- The GitHub environments `release` and `release-jetbrains` admit deployments from `main` only,
+  and `automation` from `main` and `v2` only (a deployment branch policy; `automation` read back on
+  2026-11-27). STS trusts the `environment` claim; the branch rule is what makes it mean those
+  branches, and the policy's ref and workflow pins hold each policy to its own branch.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -663,10 +678,10 @@ environment. Anyone with deploy rights on the project can deploy to that custom 
 staging values must not be production-grade. Team `kilocode` is `team_ItxRShuUkJaEd9GmXMEEgunb`.
 
 The AI gateway (`apps/ai-gateway`, workload `ai-gateway`) is the project `kilocode-ai-gateway`
-(`prj_cFtsRYRBCm4qa8D35LC2j183FohC`). Its policy lists only `preview`, so development STS serves its
-preview deployments and nothing else; its own custom environment `staging`
-(`env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV`) and `production` are not listed yet. Both projects share the
-team issuer `https://oidc.vercel.com/kilocode`; the project id alone tells them apart.
+(`prj_cFtsRYRBCm4qa8D35LC2j183FohC`). Its policy lists `production`, `preview` and its own custom
+environment `staging` (`env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV`), the same mapping as the web app. Both
+projects share the team issuer `https://oidc.vercel.com/kilocode`; the project id alone tells them
+apart.
 
 A policy fails to load when a listed Vercel environment can read none of the policy's STS
 environments, or when one of its STS environments has no listed Vercel environment that may read it.
@@ -776,8 +791,9 @@ Rules the loader enforces:
   lists `workflow_run` lists no other event, binds an `environment`, and does not grant
   `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
   pull request started the upstream run, and STS cannot see that run.
-- A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`; a
-  policy with token grants binds an `environment`.
+- A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`,
+  unless it equals an entry of `GITHUB_PRODUCTION_REF_EXCEPTIONS` in every field (today only
+  `ci-kilocode-app-key-v2`); a policy with token grants binds an `environment`.
 - The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`). No
   other kind of policy may use a `ci-` name, so a workload's name alone fixes its folder and a
   stored bundle never moves between `/workloads` and `/ci`.
@@ -802,7 +818,11 @@ Preconditions on the GitHub side, which STS cannot check:
   subject: `...:environment:<env>` instead if that job runs in a GitHub environment; the kilocode
   CI owner checks this at upgrade time.
 - **Protected environment.** STS trusts the `environment` claim; the GitHub environment's branch
-  rule (`main`) and its required reviewers are what make that claim mean something.
+  rule (`main`, plus `v2` for `automation`) is what makes that claim mean something. `automation`
+  has no required reviewers, so the branch rulesets carry the review: `v2` requires an approved
+  pull request with no bypass actor, the same bar as `main`. `ci-kilocode-app-key-v2` pins the
+  whole `kilo-v2.yml` file, so a job added to that file later with `environment: automation`
+  would also receive the key; such a change needs an approved pull request on `v2`.
 - **Environment names** use only letters, digits, `.`, `_` and `-`, and the workflow spells them
   exactly as the policy does.
 
@@ -824,8 +844,8 @@ copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,0
 a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
 cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
 has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
-push per GitHub policy per refresh: with the 7 kilocode policies, 7 `BundleDO` calls every 4
-minutes, or 2,520 a day in production.
+push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
+minutes, or 2,880 a day in production.
 
 ## Migration run attestation
 

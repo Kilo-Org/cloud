@@ -7,6 +7,7 @@ import { handleEmailRequest } from '../../src/signin/email/routes';
 import { type SignInMethods, flowCookieName } from '../../src/signin/flows';
 import { signInPage } from '../../src/signin/pages';
 import { readSignInConfig } from '../../src/signin/providers/config';
+import { signInInput } from '../secrets-support';
 import { handleProviderRequest } from '../../src/signin/providers/routes';
 import type { ProviderSignInStore } from '../../src/signin/providers/store';
 import { handleSsoRequest } from '../../src/signin/sso/routes';
@@ -58,7 +59,7 @@ function methodsWith(
   const methods: SignInMethods = {
     config,
     settings: readSignInConfig(
-      {
+      signInInput({
         SIGNIN_GOOGLE_CLIENT_ID: 'google-client',
         SIGNIN_GOOGLE_CLIENT_SECRET: 'google-secret',
         SIGNIN_APPLE_CLIENT_ID: 'apple-client',
@@ -66,7 +67,7 @@ function methodsWith(
         SIGNIN_WORKOS_CLIENT_ID: 'client_workos',
         SIGNIN_WORKOS_API_KEY: 'sk_test',
         SIGNIN_EMAIL_HASH_KEY: HASH_KEY,
-      },
+      }),
       config
     ),
     store: work => work(store),
@@ -157,11 +158,11 @@ describe('provider routes', () => {
     const methods: SignInMethods = {
       ...base,
       settings: readSignInConfig(
-        {
+        signInInput({
           SIGNIN_LINKEDIN_CLIENT_ID: 'linkedin-client',
           SIGNIN_LINKEDIN_CLIENT_SECRET: 'linkedin-synthetic',
           SIGNIN_EMAIL_HASH_KEY: HASH_KEY,
-        },
+        }),
         config
       ),
     };
@@ -424,7 +425,7 @@ describe('configuration', () => {
       ctx
     );
     expect(token.status).toBe(400);
-    const settings = readSignInConfig(badEnv, config);
+    const settings = readSignInConfig(signInInput(badEnv), config);
     expect(settings.emailHashKey).toEqual({
       status: 'misconfigured',
       missing: ['SIGNIN_EMAIL_HASH_KEY'],

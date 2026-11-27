@@ -4,6 +4,8 @@ import { exportPKCS8, generateKeyPair } from 'jose';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { APPLE_APP_ATTEST_ROOT } from '../../src/attest/app-attest';
 import { type AttestEnv, attestationPolicy, readAttestationConfig } from '../../src/attest/config';
+import type { UtsSecrets } from '../../src/secrets';
+import { secretsOf } from '../secrets-support';
 import { GOOGLE_PLAY_INTEGRITY_ENDPOINTS } from '../../src/attest/play-integrity';
 
 /**
@@ -11,7 +13,10 @@ import { GOOGLE_PLAY_INTEGRITY_ENDPOINTS } from '../../src/attest/play-integrity
  * and development without any value is the one place it is served without attestation.
  */
 
-let complete: AttestEnv;
+/** The attestation vars and the key, in one record. */
+type Settings = AttestEnv & { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY?: string };
+
+let complete: Settings;
 
 beforeAll(async () => {
   const { privateKey } = await generateKeyPair('RS256', { extractable: true });
@@ -32,8 +37,13 @@ beforeAll(async () => {
 });
 
 const ENVIRONMENTS: UtsEnvironment[] = ['production', 'staging', 'development'];
-const policy = (env: AttestEnv, environment: UtsEnvironment) =>
-  attestationPolicy(readAttestationConfig(env, environment), environment);
+const policy = (
+  { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: key, ...vars }: Settings,
+  environment: UtsEnvironment,
+  secrets: UtsSecrets = secretsOf(
+    key === undefined ? {} : { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: key }
+  )
+) => attestationPolicy(readAttestationConfig(vars, secrets, environment), environment);
 
 describe('attestation policy', () => {
   it('refuses the client in staging and production without any value', () => {
@@ -67,7 +77,7 @@ describe('attestation policy', () => {
       'ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY',
     ] as const;
     for (const name of names) {
-      const partial: AttestEnv = { ...complete, [name]: undefined };
+      const partial: Settings = { ...complete, [name]: undefined };
       expect(policy(partial, environment)).toEqual({ kind: 'refused', problems: [name] });
     }
   });
@@ -132,5 +142,28 @@ describe('attestation policy', () => {
     expect(policy({ ATTEST_APPLE_TEAM_ID: 'ABCDE12345' }, 'development')).toMatchObject({
       kind: 'refused',
     });
+  });
+
+  it.each(ENVIRONMENTS)(
+    'serves the client in %s with a retryable answer while STS gives no bundle',
+    environment => {
+      expect(policy(complete, environment, { status: 'unavailable' })).toEqual({
+        kind: 'unavailable',
+      });
+    }
+  );
+
+  it('keeps the off answer of each environment while STS gives no bundle and no var is set', () => {
+    const unavailable: UtsSecrets = { status: 'unavailable' };
+    expect(policy({}, 'production', unavailable)).toEqual({ kind: 'refused', problems: [] });
+    expect(policy({}, 'development', unavailable)).toEqual({ kind: 'unattested_development' });
+  });
+
+  it('reads the key from the secrets, never from the vars', () => {
+    const { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: key, ...vars } = complete;
+    const onlyInVars = { ...vars, ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: key };
+    expect(
+      attestationPolicy(readAttestationConfig(onlyInVars, secretsOf(), 'production'), 'production')
+    ).toEqual({ kind: 'refused', problems: ['ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY'] });
   });
 });

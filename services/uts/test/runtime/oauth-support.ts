@@ -4,7 +4,7 @@ import { Buffer } from 'node:buffer';
 import { type JWK, SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import { IdentityStoreError } from '../../src/db/client';
 import type { GrantStore, GrantsAccess, Minted } from '../../src/grants/store';
-import type { OAuthDeps } from '../../src/oauth/routes';
+import type { OAuthDeps, SecretDeps } from '../../src/oauth/routes';
 import type { FeedEntry } from '../../src/revocation/entries';
 import type { FeedPublish, PublishOutcome } from '../../src/revocation/publish';
 import type { ScopeRegistry } from '../../src/scopes/policy';
@@ -176,28 +176,41 @@ export const exemptOnlyStore: AttestationAccess = work =>
     exempt: async () => undefined,
   });
 
-/** Endpoint dependencies with the real signer objects of the test pool. */
-export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
+/**
+ * Endpoint dependencies with the real signer objects of the test pool. `overrides` may name the
+ * secret-reading deps (`handoff`, `device`, `signIn`, `attestation`) beside the others; they are
+ * served through `secretDeps`, as the deployed entry builds them.
+ */
+export function oauthDeps(
+  grants: GrantsAccess,
+  overrides: Partial<OAuthDeps & SecretDeps> = {}
+): OAuthDeps {
+  const { handoff, device, signIn, attestation, ...rest } = overrides;
+  const secretDeps: SecretDeps = {
+    handoff:
+      handoff ??
+      (async () => {
+        throw new Error('unexpected hand-off');
+      }),
+    device: device ?? { status: 'off' },
+    signIn: signIn ?? { config, signIn: unexpectedStore, methods: noSignInMethods },
+    // The runtime pool runs in development without attestation config (src/attest/config.ts):
+    // a kilo-mobile exchange only marks its code exempt first.
+    attestation: attestation ?? { kind: 'unattested_development', store: exemptOnlyStore },
+  };
   return {
     config,
     grants,
     sign: signerAccess(env, config),
     scopes: testScopes,
     publish: recordingPublisher().publish,
-    handoff: async () => {
-      throw new Error('unexpected hand-off');
-    },
-    device: { status: 'off' },
-    signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
     tickets: { config, tickets: unexpectedStore },
     clients: async () => {
       throw new Error('unexpected client lookup');
     },
     thirdParty: unexpectedStore,
     exchange: null,
-    // The runtime pool runs in development without attestation config (src/attest/config.ts):
-    // a kilo-mobile exchange only marks its code exempt first.
-    attestation: { kind: 'unattested_development', store: exemptOnlyStore },
+    secretDeps: async () => secretDeps,
     web: {
       config,
       keys: async () => ({ status: 'unconfigured' }),
@@ -209,7 +222,7 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
       windows: new Map(),
       now: Date.now,
     },
-    ...overrides,
+    ...rest,
   };
 }
 

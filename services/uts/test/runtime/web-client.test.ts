@@ -881,7 +881,8 @@ describe('authorization-server metadata for kilo-web', () => {
         kind: 'ready',
         deps: oauthDeps(fakeGrants().access, { web: webDeps(fakeSessions(), web) }),
       },
-      webClientReady
+      webClientReady,
+      false
     );
 
   it('lists private_key_jwt only while the key set is valid, and the exchange only with the bridge on', () => {

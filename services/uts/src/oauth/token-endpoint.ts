@@ -48,6 +48,9 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * token, revokes the family. A code exchange of a client that needs device attestation
  * (`kilo-mobile`) first runs the attestation step (src/attest/gate.ts): two more statements and,
  * for Android, one Play Integrity call, once per code; a retry of an attested exchange runs one.
+ * Only the device grant and that attestation step read the runtime secrets (src/secrets.ts), so a
+ * refresh never waits for STS; a device grant or attestation whose secret STS cannot deliver
+ * answers a retryable 503.
  *
  * A refused exchange or third-party refresh whose statement revoked a grant (a second use of a
  * code, a reused rotated token) publishes the statement's feed entries before it answers; a failed
@@ -56,6 +59,11 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
 export type DeviceCodeGrant = (request: Request, params: Params) => Promise<Response>;
+
+/** The device grant as the runtime secrets allow it: served, or not served and why. */
+export type DeviceGrantState =
+  | { status: 'served'; grant: DeviceCodeGrant }
+  | { status: 'off' | 'misconfigured' | 'unavailable' };
 
 /** The token endpoint of `kilo-web`, which the BFF slice provides. */
 export type WebClientGrant = (
@@ -70,7 +78,8 @@ export type TokenDeps = {
   sign: SignerAccess;
   scopes: ScopeRegistry;
   publish: FeedPublish;
-  deviceCodeGrant: DeviceCodeGrant | null;
+  /** The device grant, read from the runtime secrets on first use in the request. */
+  deviceCodeGrant: () => Promise<DeviceGrantState>;
   /**
    * `kilo-web`, which authenticates with a client assertion (`handleWebClientToken`,
    * src/bff/token.ts): its answer, or null for a request without an assertion.
@@ -82,11 +91,12 @@ export type TokenDeps = {
    */
   exchange: ExchangeService | null;
   /**
-   * Device attestation of a client that needs it (src/attest/gate.ts): `verified` runs the
-   * attestation step before the exchange statement; `unattested_development` skips it, in
-   * development without attestation config only; `refused` refuses the client.
+   * Device attestation of a client that needs it (src/attest/gate.ts), read on first use in the
+   * request: `verified` runs the attestation step before the exchange statement;
+   * `unattested_development` skips it, in development without attestation config only; `refused`
+   * refuses the client; `unavailable` answers a retryable 503.
    */
-  attestation: AttestationService;
+  attestation: () => Promise<AttestationService>;
 };
 
 /** The token endpoint on the issuer origin: the `htu` of every token request's DPoP proof. */
@@ -281,14 +291,16 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
     const proof = await firstPartyProof(request, tokenEndpointUrl(deps.config));
     if (proof instanceof Response) return proof;
     if (identity.client.attestation === 'required') {
-      if (deps.attestation.kind === 'refused') {
+      const attestation = await deps.attestation();
+      if (attestation.kind === 'refused') {
         return oauthError('unauthorized_client', 400, 'device attestation is not configured here');
       }
-      if (deps.attestation.kind === 'unattested_development') {
+      if (attestation.kind === 'unavailable') return temporarilyUnavailable();
+      if (attestation.kind === 'unattested_development') {
         // Development without attestation config: the exchange statement's backstop still needs
         // the code marked, and the statement refuses that outside development (migration 0017).
         const environment = deps.config.environment;
-        await deps.attestation.store(store => store.exempt({ environment, codeHash }));
+        await attestation.store(store => store.exempt({ environment, codeHash }));
       } else {
         const gate = await attestCodeExchange(
           params,
@@ -300,7 +312,7 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
             codeChallenge,
             dpopJkt: proof.jkt,
           },
-          deps.attestation.gate
+          attestation.gate
         );
         if (gate instanceof Response) return gate;
       }
@@ -414,9 +426,12 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
         return await exchangeCode(request, form.params, deps);
       case UTS_GRANT_TYPES.refreshToken:
         return await refresh(request, form.params, deps);
-      case UTS_GRANT_TYPES.deviceCode:
-        if (deps.deviceCodeGrant !== null) return await deps.deviceCodeGrant(request, form.params);
+      case UTS_GRANT_TYPES.deviceCode: {
+        const device = await deps.deviceCodeGrant();
+        if (device.status === 'served') return await device.grant(request, form.params);
+        if (device.status === 'unavailable') return temporarilyUnavailable();
         return oauthError('unsupported_grant_type', 400);
+      }
       case UTS_GRANT_TYPES.tokenExchange:
         if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
         return await handleTokenExchange(request, form.params, {

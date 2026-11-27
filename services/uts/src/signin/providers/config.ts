@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import type { UtsConfig } from '../../env';
 import type { MailgunConfig } from '../../notices/transports';
+import { type UtsSecretName, type UtsSecrets, isUtsSecretName, sameSecrets } from '../../secrets';
 import { isMailDomain, isMailLocalPart } from '../email/address';
 import {
   DevEndpointsSchema,
@@ -14,10 +15,14 @@ import {
 } from './specs';
 
 /**
- * Sign-in configuration from the Worker's vars and secrets (names only here; the values are set
- * per environment, README "Sign-in providers"). A provider is offered only when every value it
- * needs is set. A provider with some values set and others missing is `misconfigured`: it is not
- * offered, and its routes answer 500, a deploy error that no retry fixes.
+ * Sign-in configuration from the Worker's vars and the runtime secrets (names only here; the values
+ * are set per environment, README "Sign-in providers"). The secrets come from the source
+ * `SECRETS_SOURCE` selects (src/secrets.ts), never from the Worker env directly. A provider is
+ * offered only when every value it needs is set. A provider with some values set and others
+ * missing is `misconfigured`: it is not offered, and its routes answer 500, a deploy error that no
+ * retry fixes. A provider whose vars are set while STS gives no usable bundle is `unavailable`: it
+ * is not offered, and its routes answer 503, which a retry can fix. A provider with none of its
+ * vars set stays `off` whatever the bundle's state.
  *
  * Vars (plain): `SIGNIN_<PROVIDER>_CLIENT_ID`, `SIGNIN_APPLE_TEAM_ID`, `SIGNIN_APPLE_KEY_ID`,
  * `SIGNIN_ANTHROPIC_ASSERTION_{AUDIENCE,ISSUER,SUBJECT,KEY_ID}`, `SIGNIN_WORKOS_CLIENT_ID`,
@@ -51,34 +56,32 @@ const CLIENT_SECRET_VARS = {
   gitlab: 'SIGNIN_GITLAB_CLIENT_SECRET',
   discord: 'SIGNIN_DISCORD_CLIENT_SECRET',
   linkedin: 'SIGNIN_LINKEDIN_CLIENT_SECRET',
-} as const satisfies Partial<Record<UtsOAuthProvider, string>>;
+} as const satisfies Partial<Record<UtsOAuthProvider, UtsSecretName>>;
 
 const OTHER_VAR_NAMES = [
   'SIGNIN_APPLE_TEAM_ID',
   'SIGNIN_APPLE_KEY_ID',
-  'SIGNIN_APPLE_PRIVATE_KEY',
   'SIGNIN_ANTHROPIC_ASSERTION_AUDIENCE',
   'SIGNIN_ANTHROPIC_ASSERTION_ISSUER',
   'SIGNIN_ANTHROPIC_ASSERTION_SUBJECT',
   'SIGNIN_ANTHROPIC_ASSERTION_KEY_ID',
-  'SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY',
   'SIGNIN_WORKOS_CLIENT_ID',
-  'SIGNIN_WORKOS_API_KEY',
-  'SIGNIN_EMAIL_HASH_KEY',
-  'UTS_MAILGUN_SENDING_KEY',
   'UTS_MAILGUN_DOMAIN',
   'UTS_MAIL_FROM',
   'UTS_TURNSTILE_SITE_KEY',
-  'UTS_TURNSTILE_SECRET_KEY',
   'UTS_MAIL_ALLOWED_RECIPIENTS',
   'SIGNIN_DEV_ENDPOINTS',
 ] as const;
 
 export type SignInVarName =
   | (typeof CLIENT_ID_VARS)[keyof typeof CLIENT_ID_VARS]
-  | (typeof CLIENT_SECRET_VARS)[keyof typeof CLIENT_SECRET_VARS]
   | (typeof OTHER_VAR_NAMES)[number];
 export type SignInEnv = Partial<Record<SignInVarName, string>>;
+
+/** What the readers see: the plain vars from the Worker env and the secrets of one read. */
+export type SignInInput = { vars: SignInEnv; secrets: UtsSecrets };
+
+type SignInName = SignInVarName | UtsSecretName;
 
 /** How UTS authenticates to a provider's token endpoint. */
 export type ClientCredentials =
@@ -96,9 +99,15 @@ export type ClientCredentials =
       privateKeyPem: string;
     };
 
+/**
+ * `off`: none of the method's vars is set. `on`: every value is set and valid. `misconfigured`:
+ * the names of the values that are missing or invalid (never a value). `unavailable`: the method's
+ * vars are set, or it needs only secrets, and STS gave no usable bundle.
+ */
 export type Configured<Value> =
   | { status: 'off' }
   | { status: 'misconfigured'; missing: readonly string[] }
+  | { status: 'unavailable' }
   | ({ status: 'on' } & Value);
 
 export type ProviderConfig = Configured<{
@@ -149,34 +158,56 @@ export const TURNSTILE_SITEVERIFY_URL = 'https://challenges.cloudflare.com/turns
 
 const ValueSchema = z.string().trim().min(1);
 
-/** `on` when every name has a value, `off` when none has, else `misconfigured`. */
+const UNAVAILABLE = { status: 'unavailable' } as const;
+
+const UNREAD = Symbol('unread');
+
+/** A var from the Worker env; a secret from the read, or `UNREAD` when STS gave no bundle. */
+function rawValue(input: SignInInput, name: SignInName): string | undefined | typeof UNREAD {
+  if (!isUtsSecretName(name)) return input.vars[name];
+  return input.secrets.status === 'read' ? input.secrets.values[name] : UNREAD;
+}
+
+/**
+ * `on` when every name has a value, `off` when none has, else `misconfigured`. With the secrets
+ * unread: `misconfigured` when the vars alone already disagree, `off` when none of the vars is set,
+ * else `unavailable`.
+ */
 function configured<Names extends string, Value>(
-  env: SignInEnv,
-  names: readonly (Names & SignInVarName)[],
+  input: SignInInput,
+  names: readonly (Names & SignInName)[],
   build: (values: Record<Names, string>) => Value
 ): Configured<Value> {
   const values: Partial<Record<Names, string>> = {};
   const missing: string[] = [];
+  let unread = 0;
   for (const name of names) {
-    const value = ValueSchema.safeParse(env[name]);
+    const raw = rawValue(input, name);
+    if (raw === UNREAD) {
+      unread += 1;
+      continue;
+    }
+    const value = ValueSchema.safeParse(raw);
     if (value.success) values[name] = value.data;
     else missing.push(name);
   }
+  const read = names.length - unread;
+  if (missing.length > 0 && missing.length < read) return { status: 'misconfigured', missing };
+  if (unread > 0) return read > 0 && missing.length === read ? { status: 'off' } : UNAVAILABLE;
   if (missing.length === names.length) return { status: 'off' };
-  if (missing.length > 0) return { status: 'misconfigured', missing };
   // Every name was checked above, so `values` holds each of them.
   return { status: 'on', ...build(values as Record<Names, string>) };
 }
 
 function credentialsOf(
   provider: UtsOAuthProvider,
-  env: SignInEnv
+  input: SignInInput
 ): Configured<{
   credentials: ClientCredentials;
 }> {
   if (provider === 'apple') {
     return configured(
-      env,
+      input,
       [
         'SIGNIN_APPLE_CLIENT_ID',
         'SIGNIN_APPLE_TEAM_ID',
@@ -196,7 +227,7 @@ function credentialsOf(
   }
   if (provider === 'anthropic') {
     return configured(
-      env,
+      input,
       [
         'SIGNIN_ANTHROPIC_CLIENT_ID',
         'SIGNIN_ANTHROPIC_ASSERTION_AUDIENCE',
@@ -220,7 +251,7 @@ function credentialsOf(
   }
   const clientId = CLIENT_ID_VARS[provider];
   const clientSecret = CLIENT_SECRET_VARS[provider];
-  return configured(env, [clientId, clientSecret], values => ({
+  return configured(input, [clientId, clientSecret], values => ({
     credentials: {
       kind: 'secret',
       clientId: values[clientId],
@@ -286,23 +317,24 @@ const ALLOWED_RECIPIENTS_PROBLEM = {
  * and the Mailgun sending key and Turnstile secret (secrets) are all set and valid. The vars are
  * the switch: with none of them set the settings are `off` even when the secrets are set, so the
  * secrets can be put first and the deploy that adds the vars turns mail on; with some vars set and
- * anything missing they are `misconfigured`. Outside production `UTS_MAIL_ALLOWED_RECIPIENTS` must
- * also be set and valid; production must not set it, so a test restriction cannot reach
- * production unnoticed.
+ * anything missing they are `misconfigured`; with the vars set and no usable bundle they are
+ * `unavailable`. Outside production `UTS_MAIL_ALLOWED_RECIPIENTS` must also be set and valid;
+ * production must not set it, so a test restriction cannot reach production unnoticed.
  */
 function readMailSettings(
-  env: SignInEnv,
+  input: SignInInput,
   config: UtsConfig,
   dev: DevEndpointsSetting
 ): MailSettings {
   const core = configured(
-    env,
+    input,
     ['UTS_MAILGUN_DOMAIN', 'UTS_MAIL_FROM', 'UTS_TURNSTILE_SITE_KEY'],
     values => values
   );
   if (core.status !== 'on') return core;
-  const apiKey = ValueSchema.safeParse(env.UTS_MAILGUN_SENDING_KEY);
-  const secretKey = ValueSchema.safeParse(env.UTS_TURNSTILE_SECRET_KEY);
+  if (input.secrets.status === 'unavailable') return UNAVAILABLE;
+  const apiKey = ValueSchema.safeParse(input.secrets.values.UTS_MAILGUN_SENDING_KEY);
+  const secretKey = ValueSchema.safeParse(input.secrets.values.UTS_TURNSTILE_SECRET_KEY);
   if (!apiKey.success || !secretKey.success) {
     return {
       status: 'misconfigured',
@@ -322,7 +354,7 @@ function readMailSettings(
   if (!SiteKeySchema.safeParse(core.UTS_TURNSTILE_SITE_KEY).success) {
     return { status: 'misconfigured', missing: ['UTS_TURNSTILE_SITE_KEY'] };
   }
-  const allowList = ValueSchema.safeParse(env.UTS_MAIL_ALLOWED_RECIPIENTS);
+  const allowList = ValueSchema.safeParse(input.vars.UTS_MAIL_ALLOWED_RECIPIENTS);
   let recipients: RecipientRule;
   if (config.environment === 'production') {
     if (allowList.success) return ALLOWED_RECIPIENTS_PROBLEM;
@@ -385,11 +417,11 @@ const DEV_ENDPOINTS_PROBLEM = {
  * `SIGNIN_DEV_ENDPOINTS` counts only in development; set anywhere else, or not valid, it makes
  * every provider, SSO and the mail sender misconfigured.
  */
-export function readSignInConfig(env: SignInEnv, config: UtsConfig): SignInConfig {
-  const dev = devEndpoints(env, config);
+export function readSignInConfig(input: SignInInput, config: UtsConfig): SignInConfig {
+  const dev = devEndpoints(input.vars, config);
   const overrides = dev.status === 'set' ? dev.endpoints : null;
   const provider = (id: UtsOAuthProvider): ProviderConfig => {
-    const credentials = credentialsOf(id, env);
+    const credentials = credentialsOf(id, input);
     if (credentials.status !== 'on') return credentials;
     if (dev.status === 'bad') return DEV_ENDPOINTS_PROBLEM;
     return {
@@ -410,14 +442,18 @@ export function readSignInConfig(env: SignInEnv, config: UtsConfig): SignInConfi
     discord: provider('discord'),
     linkedin: provider('linkedin'),
   };
-  const workos = configured(env, ['SIGNIN_WORKOS_CLIENT_ID', 'SIGNIN_WORKOS_API_KEY'], values => ({
-    clientId: values.SIGNIN_WORKOS_CLIENT_ID,
-    apiKey: values.SIGNIN_WORKOS_API_KEY,
-    endpoints: overrides?.workos ?? WORKOS_ENDPOINTS,
-  }));
+  const workos = configured(
+    input,
+    ['SIGNIN_WORKOS_CLIENT_ID', 'SIGNIN_WORKOS_API_KEY'],
+    values => ({
+      clientId: values.SIGNIN_WORKOS_CLIENT_ID,
+      apiKey: values.SIGNIN_WORKOS_API_KEY,
+      endpoints: overrides?.workos ?? WORKOS_ENDPOINTS,
+    })
+  );
   const sso: SsoConfig =
     workos.status === 'on' && dev.status === 'bad' ? DEV_ENDPOINTS_PROBLEM : workos;
-  const rawKey = configured(env, ['SIGNIN_EMAIL_HASH_KEY'], values => ({
+  const rawKey = configured(input, ['SIGNIN_EMAIL_HASH_KEY'], values => ({
     key: values.SIGNIN_EMAIL_HASH_KEY,
   }));
   let emailHashKey: EmailHashKey;
@@ -429,21 +465,26 @@ export function readSignInConfig(env: SignInEnv, config: UtsConfig): SignInConfi
   } else {
     emailHashKey = rawKey;
   }
-  return { providers, sso, emailHashKey, mail: readMailSettings(env, config, dev) };
+  return { providers, sso, emailHashKey, mail: readMailSettings(input, config, dev) };
 }
 
-const configs = new WeakMap<object, SignInConfig>();
+/** The last parse per `env`, with the secrets it came from. */
+const configs = new WeakMap<object, { secrets: UtsSecrets; settings: SignInConfig }>();
 
 /**
- * The sign-in configuration of one `env`, read once per isolate: an isolate keeps one `env`
- * object, so the token and metadata routes pay for no parse after the first request.
+ * The sign-in configuration of one `env` and one secrets read. It is parsed again only when the
+ * secrets change: an isolate keeps one `env` object, and the `worker` source hands it the same
+ * values object, while the `sts` source changes them only when a revalidation brings a new bundle.
  */
-export function signInConfigFor(env: SignInEnv, config: UtsConfig): SignInConfig {
-  let settings = configs.get(env);
-  if (settings === undefined) {
-    settings = readSignInConfig(env, config);
-    configs.set(env, settings);
-  }
+export function signInConfigFor(
+  env: SignInEnv,
+  secrets: UtsSecrets,
+  config: UtsConfig
+): SignInConfig {
+  const held = configs.get(env);
+  if (held !== undefined && sameSecrets(held.secrets, secrets)) return held.settings;
+  const settings = readSignInConfig({ vars: env, secrets }, config);
+  configs.set(env, { secrets, settings });
   return settings;
 }
 

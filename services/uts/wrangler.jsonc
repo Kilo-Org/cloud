@@ -46,10 +46,16 @@
     // belongs to the later rotation phase, after STS delivers UTS_HYPERDRIVE_SWITCH_TOKEN, the login
     // seeds sit in /db-switch/uts and the origins are pinned (README, "Login rotation").
     "LOGIN_ROTATION": "off",
+    // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
+    // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
+    // Production stays on `worker` until the flip; the flip and its rollback are this one var
+    // (README, "Runtime secrets"). The Worker secrets stay set either way.
+    "SECRETS_SOURCE": "worker",
     // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
     // UTS_TURNSTILE_SITE_KEY are added here, after the secrets SIGNIN_EMAIL_HASH_KEY,
-    // UTS_MAILGUN_SENDING_KEY and UTS_TURNSTILE_SECRET_KEY are set. Staging also needs
-    // UTS_MAIL_ALLOWED_RECIPIENTS; production must not set it (README, "Configuration").
+    // UTS_MAILGUN_SENDING_KEY and UTS_TURNSTILE_SECRET_KEY are set in the source SECRETS_SOURCE
+    // names. Staging also needs UTS_MAIL_ALLOWED_RECIPIENTS; production must not set it (README,
+    // "Configuration").
   },
   "durable_objects": {
     "bindings": [
@@ -77,9 +83,17 @@
   // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
   // streams from it (design 8.1).
   "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
-  // No STS binding yet: STS has no `uts` workload policy, so the rotation job (off) would get no
-  // secrets. The binding `STS` (service `sts`, entrypoint `SecretsBroker`, props.caller `uts`;
-  // `sts-staging` in env.staging) is added with that policy (README, "Login rotation").
+  // The STS secrets broker as caller `uts` (policy services/sts/policy/uts.yaml): the UTS bundle
+  // from /workloads/uts, read for the runtime secrets under SECRETS_SOURCE=sts and for the rotation
+  // job's switch token (README, "Runtime secrets" and "Login rotation").
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "uts" },
+    },
+  ],
   // Every minute: keep the 8 audit shard relays running, maintain audit partitions, OAuth rows and
   // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts).
   "triggers": { "crons": ["* * * * *"] },
@@ -113,8 +127,11 @@
         "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
         "LOGIN_ROTATION": "off",
+        // Staging reads the runtime secrets from its STS bundle (README, "Runtime secrets").
+        "SECRETS_SOURCE": "sts",
         // GitHub and Google sign-in. Each client id is the switch: its SIGNIN_<PROVIDER>_CLIENT_SECRET
-        // Worker secret is set first (README, "Configuration"). Production offers neither yet.
+        // is in the staging /workloads/uts bundle first (README, "Configuration"). Production
+        // offers neither yet.
         "SIGNIN_GITHUB_CLIENT_ID": "Ov23liHukmJusfuEp36F",
         "SIGNIN_GOOGLE_CLIENT_ID": "798264175281-uqim60mc4mnbbecouob37hacetigcaoe.apps.googleusercontent.com",
       },
@@ -129,6 +146,14 @@
         ],
       },
       "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-staging",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "uts" },
+        },
+      ],
       "triggers": { "crons": ["* * * * *"] },
       "hyperdrive": [
         { "binding": "IDENTITY_STORE", "id": "5dd523ea0fa447ebaf442a0300d8f848" },

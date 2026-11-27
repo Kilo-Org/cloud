@@ -14,6 +14,7 @@ import type { UtsManagerAuthDO } from './dos/UtsManagerAuthDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 import type { UtsFeedDO } from './feed/UtsFeedDO';
 import type { SignInEnv } from './signin/providers/config';
+import type { SecretsEnv, SecretsSource } from './secrets';
 
 const HostSchema = z
   .string()
@@ -35,6 +36,10 @@ const OriginSchema = z.string().refine(value => {
  * `PAT_LOOKUP_CONNECTIONS` is the connection limit of the environment's PAT lookup Hyperdrive
  * config, as a decimal string; the per-isolate PAT lookup cap derives from it
  * (`patLookupsInFlight`). Staging and production must set it; development may leave it out.
+ *
+ * `SECRETS_SOURCE` picks where the runtime secrets come from (src/secrets.ts): `worker` (the legacy
+ * Worker secrets) or `sts` (the UTS STS bundle). Staging and production must name one, so a flip
+ * or a rollback is one var in one environment; development without it reads `worker`.
  */
 const EnvVarsSchema = z
   .object({
@@ -58,6 +63,7 @@ const EnvVarsSchema = z
       .regex(/^[1-9][0-9]{0,7}$/, 'a period from 1 second')
       .transform(seconds => Number(seconds) * 1000)
       .optional(),
+    SECRETS_SOURCE: z.enum(['worker', 'sts']).optional(),
   })
   .refine(
     vars => (vars.UTS_ENVIRONMENT === 'development') === (vars.DO_JURISDICTION === 'none'),
@@ -66,6 +72,10 @@ const EnvVarsSchema = z
   .refine(
     vars => vars.UTS_ENVIRONMENT === 'development' || vars.PAT_LOOKUP_CONNECTIONS !== undefined,
     'production and staging set PAT_LOOKUP_CONNECTIONS, the PAT lookup config connection limit'
+  )
+  .refine(
+    vars => vars.UTS_ENVIRONMENT === 'development' || vars.SECRETS_SOURCE !== undefined,
+    'production and staging set SECRETS_SOURCE to worker or sts'
   )
   .refine(
     vars =>
@@ -105,6 +115,8 @@ export type UtsConfig = {
   environment: UtsEnvironment;
   endpoints: UtsEndpoints;
   jurisdiction: 'eu' | 'none';
+  /** Where the runtime secrets come from (src/secrets.ts). */
+  secretsSource: SecretsSource;
   relyingParty: RelyingParty;
   /** Development only: the stand-in manager's origin (src/manager/config.ts). */
   managerBaseUrl: string | null;
@@ -143,10 +155,13 @@ export type Env = {
   /** `on` runs the login rotation job from the cron; absent or `off` keeps it off. */
   LOGIN_ROTATION?: string;
   /**
-   * The STS secrets broker, to be bound as caller `uts` once STS has a `uts` policy. It delivers the
-   * rotation job's Hyperdrive switch token (src/rotation/secrets.ts).
+   * The STS secrets broker, bound as caller `uts`. It delivers the UTS bundle: the runtime secrets
+   * under `SECRETS_SOURCE=sts` (src/secrets.ts) and the rotation job's Hyperdrive switch token
+   * (src/rotation/secrets.ts).
    */
   STS?: BundleBinding;
+  /** `worker` or `sts`; required in staging and production (`EnvVarsSchema`). */
+  SECRETS_SOURCE?: string;
   /** Development only: JSON with the switch token a local run uses instead of STS. */
   UTS_LOCAL_SECRETS?: string;
   /** Development only: origin of a stand-in Cloudflare API for the local end-to-end run. */
@@ -175,11 +190,6 @@ export type Env = {
   /** Development only: origin of a stand-in secrets manager for the local end-to-end run. */
   MANAGER_BASE_URL?: string;
   /**
-   * The HMAC key of RFC 8628 user codes, 32 bytes in base64url, a Worker secret. The device grant
-   * is served only where it is set (src/signin/device/user-code.ts).
-   */
-  DEVICE_USER_CODE_KEY?: string;
-  /**
    * The public keys of the web BFF `kilo-web` (`KiloWebClientJwksSchema`): one or two Ed25519
    * JWKs as JSON. `kilo-web` is served only where it is set (src/bff/client-auth.ts).
    */
@@ -193,7 +203,8 @@ export type Env = {
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
 } & SignInEnv &
-  AttestEnv;
+  AttestEnv &
+  SecretsEnv;
 
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`
@@ -212,6 +223,7 @@ export function readConfig(env: Env): UtsConfig {
     environment: vars.UTS_ENVIRONMENT,
     endpoints: UTS_ENDPOINTS[vars.UTS_ENVIRONMENT],
     jurisdiction: vars.DO_JURISDICTION,
+    secretsSource: vars.SECRETS_SOURCE ?? 'worker',
     relyingParty: { rpId: vars.WEBAUTHN_RP_ID, origins: vars.WEBAUTHN_ORIGINS },
     managerBaseUrl: vars.MANAGER_BASE_URL ?? null,
     loginRotation:

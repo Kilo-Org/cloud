@@ -21,8 +21,9 @@ import { type PatProbeDeps, handlePatProbe } from './pat/probe';
 import { jsonResponse } from './responses';
 import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
-import { credentialNotices } from './notices/credential';
+import { type CredentialNotices, credentialNotices } from './notices/credential';
 import { noticesAccess } from './notices/store';
+import { type UtsSecrets, requestSecrets } from './secrets';
 import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
 import type { SignInMailer } from './signin/email/mailer';
 import { signInConfigFor } from './signin/providers/config';
@@ -72,25 +73,35 @@ const probeWindows: AddressWindows = new Map();
 /**
  * The account API is served once the identity store's primary config is bound. A created
  * credential's notice goes out at once by email where the mail settings are on (push has no
- * deployed provider yet); elsewhere the minute cron settles it.
+ * deployed provider yet); elsewhere, and while STS gives no usable bundle, the minute cron settles
+ * it. The notice runs after the answer, so the account routes never wait for STS.
  */
-function accountDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): AccountDeps | null {
+function accountDeps(
+  env: Env,
+  ctx: ExecutionContext,
+  config: UtsConfig,
+  secrets: () => Promise<UtsSecrets>
+): AccountDeps | null {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return null;
-  const email = noticeEmailTransport(signInConfigFor(env, config).mail, platformFetch);
+  const notices: CredentialNotices = async notice => {
+    const email = noticeEmailTransport(
+      signInConfigFor(env, await secrets(), config).mail,
+      platformFetch
+    );
+    if (email === null) return;
+    await credentialNotices({
+      notices: noticesAccess(binding.connectionString, ctx),
+      transports: { push: null, email },
+      now: () => new Date(),
+    })(notice);
+  };
   return {
     config,
     account: work =>
       withIdentityStore(binding.connectionString, ctx, store => work(identityStoreAccount(store))),
     keys: shardAccessTokenKeys(env, config),
-    notices:
-      email === null
-        ? null
-        : credentialNotices({
-            notices: noticesAccess(binding.connectionString, ctx),
-            transports: { push: null, email },
-            now: () => new Date(),
-          }),
+    notices,
     publish: feedPublisher(env, config, ctx),
     context: ctx,
     nowSeconds: () => Math.floor(Date.now() / 1000),
@@ -138,18 +149,24 @@ export async function handleRequest(
     }
     return await managerKeySet(env, config);
   }
-  const oauth = oauthService(env, ctx, config, mint);
+  const secrets = requestSecrets(env, config, ctx);
+  const oauth = oauthService(env, ctx, config, mint, secrets);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
     }
     const webClientReady =
       oauth.kind === 'ready' && (await oauth.deps.web.keys()).status === 'ready';
-    return jsonResponse(authorizationServerMetadata(config, oauth, webClientReady), 200, {
-      'Cache-Control': 'public, max-age=300',
-    });
+    const device = oauth.kind === 'ready' ? (await oauth.deps.secretDeps()).device.status : 'off';
+    // Without a usable STS bundle the device grant's state is unknown: the answer leaves it out and
+    // is not cached, so the next read lists it again once the bundle is back.
+    return jsonResponse(
+      authorizationServerMetadata(config, oauth, webClientReady, device === 'served'),
+      200,
+      { 'Cache-Control': device === 'unavailable' ? 'no-store' : 'public, max-age=300' }
+    );
   }
-  const account = accountDeps(env, ctx, config);
+  const account = accountDeps(env, ctx, config, secrets);
   const probe = probeDeps(env, ctx, config);
   if (pathname === UTS_PROTECTED_RESOURCE_METADATA_PATH && (account !== null || probe !== null)) {
     if (request.method !== 'GET') {

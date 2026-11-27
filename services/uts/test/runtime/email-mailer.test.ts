@@ -5,7 +5,8 @@ import { handleRequest } from '../../src/http';
 import { emailSignIn, noticeEmailTransport } from '../../src/signin/email/delivery';
 import { handleEmailRequest } from '../../src/signin/email/routes';
 import { type SignInMethods, signInChoices } from '../../src/signin/flows';
-import { type SignInEnv, readSignInConfig } from '../../src/signin/providers/config';
+import { readSignInConfig } from '../../src/signin/providers/config';
+import { type FlatSettings, signInInput } from '../secrets-support';
 import type { ProviderSignInStore } from '../../src/signin/providers/store';
 import { config, env } from './test-env';
 import { noticeStep } from '../../src/scheduled';
@@ -30,7 +31,7 @@ const MAIL_ENV = {
   UTS_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
   UTS_TURNSTILE_SECRET_KEY: TURNSTILE_SECRET,
   UTS_MAIL_ALLOWED_RECIPIENTS: '@example.com, tester@example.org',
-} satisfies SignInEnv;
+} satisfies FlatSettings;
 
 const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const MESSAGES = 'https://api.mailgun.net/v3/mail.example.com/messages';
@@ -80,10 +81,10 @@ function storeRecording(withCode = true) {
 function methods(
   fetcher: typeof fetch,
   store: ProviderSignInStore,
-  vars: SignInEnv = MAIL_ENV,
+  vars: FlatSettings = MAIL_ENV,
   utsConfig: UtsConfig = config
 ): SignInMethods {
-  const settings = readSignInConfig(vars, utsConfig);
+  const settings = readSignInConfig(signInInput(vars), utsConfig);
   return {
     config: utsConfig,
     settings,
@@ -344,7 +345,10 @@ describe('recipient rule', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { calls, fetcher } = standIns();
     const { UTS_MAIL_ALLOWED_RECIPIENTS: _allowList, ...productionVars } = MAIL_ENV;
-    const mail = readSignInConfig(productionVars, { ...config, environment: 'production' }).mail;
+    const mail = readSignInConfig(signInInput(productionVars), {
+      ...config,
+      environment: 'production',
+    }).mail;
     const transport = noticeEmailTransport(mail, fetcher);
     if (transport === null) throw new Error('mail settings are on');
     const notice = { subject: 'New sign-in', text: 'A new sign-in to your account.' };
@@ -370,7 +374,7 @@ describe('recipient rule', () => {
   it('lets the notice email go only to allowed addresses, and to none answers no_target', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { calls, fetcher } = standIns();
-    const mail = readSignInConfig(MAIL_ENV, config).mail;
+    const mail = readSignInConfig(signInInput(MAIL_ENV), config).mail;
     const transport = noticeEmailTransport(mail, fetcher);
     if (transport === null) throw new Error('mail settings are on');
     const notice = { subject: 'New sign-in', text: 'A new sign-in to your account.' };
@@ -383,11 +387,11 @@ describe('recipient rule', () => {
   it('sends to any address in production, where an allow-list is a deploy error', async () => {
     const production: UtsConfig = { ...config, environment: 'production' };
     const { UTS_MAIL_ALLOWED_RECIPIENTS: _allowList, ...productionVars } = MAIL_ENV;
-    expect(readSignInConfig(productionVars, production).mail).toMatchObject({
+    expect(readSignInConfig(signInInput(productionVars), production).mail).toMatchObject({
       status: 'on',
       recipients: { kind: 'any' },
     });
-    expect(readSignInConfig(MAIL_ENV, production).mail).toEqual({
+    expect(readSignInConfig(signInInput(MAIL_ENV), production).mail).toEqual({
       status: 'misconfigured',
       missing: ['UTS_MAIL_ALLOWED_RECIPIENTS'],
     });
@@ -428,7 +432,7 @@ describe('notice step of the cron', () => {
   it('claims nothing while the mail settings are misconfigured, so email stays unsettled', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { UTS_MAILGUN_SENDING_KEY: _key, ...vars } = MAIL_ENV;
-    const mail = readSignInConfig(vars, config).mail;
+    const mail = readSignInConfig(signInInput(vars), config).mail;
     expect(mail.status).toBe('misconfigured');
     const { calls, notices } = noticeStore();
     const { calls: sent, fetcher } = standIns();
@@ -442,7 +446,11 @@ describe('notice step of the cron', () => {
   it('runs the sweep when mail is off or on', async () => {
     for (const vars of [{}, MAIL_ENV]) {
       const { calls, notices } = noticeStore();
-      await noticeStep(readSignInConfig(vars, config).mail, notices, standIns().fetcher);
+      await noticeStep(
+        readSignInConfig(signInInput(vars), config).mail,
+        notices,
+        standIns().fetcher
+      );
       expect(calls).toEqual(['claimDueNotices', 'maintainNoticeRows']);
     }
   });
@@ -475,7 +483,7 @@ describe('switching the email sign-in on', () => {
     'UTS_TURNSTILE_SECRET_KEY',
   ] as const;
 
-  function post(vars: SignInEnv) {
+  function post(vars: FlatSettings) {
     return handleRequest(
       new Request(`${ISSUER}/signin/email/start`, {
         method: 'POST',
@@ -540,12 +548,14 @@ describe('switching the email sign-in on', () => {
     ['a site key that is not a key', { UTS_TURNSTILE_SITE_KEY: 'key" onload="x' }],
     ['a domain that is not a domain', { UTS_MAILGUN_DOMAIN: 'mail.example.com/x' }],
   ])('treats %s as a deploy error', (_case, change) => {
-    expect(readSignInConfig({ ...MAIL_ENV, ...change }, config).mail.status).toBe('misconfigured');
+    expect(readSignInConfig(signInInput({ ...MAIL_ENV, ...change }), config).mail.status).toBe(
+      'misconfigured'
+    );
   });
 
   it('needs the hash key once the mail settings are on', () => {
     const { SIGNIN_EMAIL_HASH_KEY: _key, ...vars } = MAIL_ENV;
-    const settings = readSignInConfig(vars, config);
+    const settings = readSignInConfig(signInInput(vars), config);
     expect(emailSignIn(settings, ISSUER, null, standIns().fetcher)).toEqual({
       status: 'misconfigured',
       missing: ['SIGNIN_EMAIL_HASH_KEY'],
@@ -553,20 +563,23 @@ describe('switching the email sign-in on', () => {
   });
 
   it('uses Mailgun and Turnstile in the development entry too once the mail settings are set', () => {
-    const settings = readSignInConfig(MAIL_ENV, config);
+    const settings = readSignInConfig(signInInput(MAIL_ENV), config);
     const recording = async () => 'sent' as const;
     expect(emailSignIn(settings, ISSUER, recording, standIns().fetcher)).toMatchObject({
       status: 'on',
       delivery: { kind: 'mailgun' },
     });
-    const keyOnly = readSignInConfig({ SIGNIN_EMAIL_HASH_KEY: 'A'.repeat(43) }, config);
+    const keyOnly = readSignInConfig(
+      signInInput({ SIGNIN_EMAIL_HASH_KEY: 'A'.repeat(43) }),
+      config
+    );
     expect(emailSignIn(keyOnly, ISSUER, recording, standIns().fetcher)).toMatchObject({
       status: 'on',
       delivery: { kind: 'recording' },
     });
     expect(emailSignIn(keyOnly, ISSUER, null, standIns().fetcher)).toEqual({ status: 'off' });
     // A bad hash key is a deploy error only where a sender is wired.
-    const badKey = readSignInConfig({ SIGNIN_EMAIL_HASH_KEY: 'not-a-key' }, config);
+    const badKey = readSignInConfig(signInInput({ SIGNIN_EMAIL_HASH_KEY: 'not-a-key' }), config);
     expect(emailSignIn(badKey, ISSUER, null, standIns().fetcher)).toEqual({ status: 'off' });
     expect(emailSignIn(badKey, ISSUER, recording, standIns().fetcher)).toEqual({
       status: 'misconfigured',
@@ -578,7 +591,10 @@ describe('switching the email sign-in on', () => {
     const endpoints = JSON.stringify({
       mail: { mailgun: 'http://127.0.0.1:9503', turnstile: 'http://127.0.0.1:9503/siteverify' },
     });
-    const mail = readSignInConfig({ ...MAIL_ENV, SIGNIN_DEV_ENDPOINTS: endpoints }, config).mail;
+    const mail = readSignInConfig(
+      signInInput({ ...MAIL_ENV, SIGNIN_DEV_ENDPOINTS: endpoints }),
+      config
+    ).mail;
     expect(mail).toMatchObject({
       status: 'on',
       mailgun: { baseUrl: 'http://127.0.0.1:9503' },
@@ -586,7 +602,7 @@ describe('switching the email sign-in on', () => {
     });
     const staging: UtsConfig = { ...config, environment: 'staging' };
     expect(
-      readSignInConfig({ ...MAIL_ENV, SIGNIN_DEV_ENDPOINTS: endpoints }, staging).mail
+      readSignInConfig(signInInput({ ...MAIL_ENV, SIGNIN_DEV_ENDPOINTS: endpoints }), staging).mail
     ).toEqual({ status: 'misconfigured', missing: ['SIGNIN_DEV_ENDPOINTS'] });
   });
 });

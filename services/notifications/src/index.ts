@@ -56,12 +56,19 @@ import {
 import { skipProviderPush } from './lib/push-gate';
 import { queue } from './queue-consumer';
 import { readNotificationsSecret, secretsSource } from './secrets';
+import { createSecretsComparison } from './secrets-compare';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
 const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+
+// Pre-flip STS copy check, off unless `SECRETS_COMPARE_ENABLED` is `'true'`. It runs once per
+// isolate, from the first request that reaches it — an authenticated badge list, or a dispatch
+// past its secret and body checks — under that request's `waitUntil`; the response never waits
+// for it and its result never changes the response.
+const compareSecretsOnce = createSecretsComparison();
 
 // ── Structured logging context ──────────────────────────────────────────
 // Establishes AsyncLocalStorage context so all downstream logs (including
@@ -83,6 +90,7 @@ app.use('/v1/*', authMiddleware);
 
 app.get('/v1/badges', async c => {
   const userId = c.get('callerId');
+  compareSecretsOnce(c.env, c.executionCtx);
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
   const buckets = await stub.listNonZeroBuckets();
   const response = { buckets } satisfies ListBadgesResponse;
@@ -136,6 +144,10 @@ app.post('/internal/v1/dispatch', async c => {
   if (!parsed.success) {
     return c.json({ error: 'Invalid body' }, 400);
   }
+
+  // Only a request that passed both checks above reaches the pre-flip check, and the latch keeps
+  // it to one comparison per isolate whichever eligible route runs first.
+  compareSecretsOnce(c.env, c.executionCtx);
 
   // Staging push gate (`lib/push-gate.ts`): no database client and no
   // preference read. Each recipient still takes the shared dedupe and result

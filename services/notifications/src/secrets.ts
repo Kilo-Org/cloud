@@ -66,13 +66,33 @@ export async function readNotificationsSecret(
     if (binding === undefined) {
       throw new Error('SECRETS_SOURCE is "sts" but the STS service binding is missing');
     }
-    let client = stsClients.get(binding);
-    if (client === undefined) {
-      client = createWorkerSecrets(binding);
-      stsClients.set(binding, client);
-    }
-    return client.get(name, ctx);
+    return readBundleSecret(binding, name, ctx);
   }
+  return readSecretsStoreSecret(env, name);
+}
+
+/**
+ * Reads one secret from the STS bundle over `binding`, whatever `SECRETS_SOURCE` selects, through
+ * the isolate's one client for that binding.
+ */
+export async function readBundleSecret(
+  binding: BundleBinding,
+  name: NotificationsSecretName,
+  ctx: SecretsExecutionContext
+): Promise<string> {
+  let client = stsClients.get(binding);
+  if (client === undefined) {
+    client = createWorkerSecrets(binding);
+    stsClients.set(binding, client);
+  }
+  return client.get(name, ctx);
+}
+
+/** Reads one secret from its Secrets Store binding, whatever `SECRETS_SOURCE` selects. */
+export async function readSecretsStoreSecret(
+  env: SecretsStoreBindings,
+  name: NotificationsSecretName
+): Promise<string> {
   const bindingName = SECRETS_STORE_BINDINGS[name];
   const binding = env[bindingName];
   if (binding === undefined) {

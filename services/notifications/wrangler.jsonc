@@ -31,6 +31,11 @@
     // absent value means `secrets-store`; any other value refuses every read.
     // The `sts` source never falls back to the Secrets Store.
     "SECRETS_SOURCE": "secrets-store",
+    // One pre-flip check per isolate that the STS copy of the APNs key, the
+    // signer and the internal secret equals the Secrets Store value served
+    // above (src/secrets-compare.ts). Only `true` turns it on; it never changes
+    // the source. Production only: staging does not set it.
+    "SECRETS_COMPARE_ENABLED": "true",
   },
 
   "routes": [
@@ -84,7 +89,9 @@
     // `props.caller` is what STS authorizes on and must equal this Worker's
     // top-level name. This config deploys only production, so it binds the
     // production `sts`; services/sts/policy/notifications.yaml grants the four
-    // names. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+    // names. While SECRETS_SOURCE is `secrets-store`, every request is served
+    // from the Secrets Store; the only reader here is the one background
+    // compare per isolate that SECRETS_COMPARE_ENABLED turns on.
     {
       "binding": "STS",
       "service": "sts",

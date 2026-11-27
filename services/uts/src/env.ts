@@ -202,6 +202,11 @@ export type Env = {
    * or empty keeps the exchange off; a value that breaks a rule keeps it off and is logged.
    */
   CI_TOKEN_POLICIES?: string;
+  /**
+   * The bot-token mint's policies (src/bot-token/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the mint off; a value that breaks a rule keeps it off and is logged.
+   */
+  BOT_TOKEN_POLICIES?: string;
 } & SignInEnv &
   AttestEnv;
 

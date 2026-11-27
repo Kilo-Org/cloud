@@ -11,17 +11,9 @@ import {
 import {
   FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS,
   FEED_REFRESH_AFTER_MS,
-  type RevocationFeedSource,
   createVerifier,
 } from '@kilocode/verify';
-import {
-  SignJWT,
-  calculateJwkThumbprint,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  jwtVerify,
-} from 'jose';
+import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify } from 'jose';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CiExchangeService } from '../../src/ci/exchange';
 import {
@@ -32,13 +24,11 @@ import {
 } from '../../src/ci/github-keys';
 import { CI_LEGACY_SUBJECT_REPOSITORY, type CiPolicy, CiPolicySchema } from '../../src/ci/policy';
 import type { CiExchangeInput, CiExchangeResult, CiTokenAccess } from '../../src/ci/store';
-import { signFeedHead } from '../../src/feed/head';
 import { authorizationServerMetadata } from '../../src/metadata/authorization-server';
 import { handleOAuthRequest } from '../../src/oauth/routes';
-import { type FeedEntry, serializeList } from '../../src/revocation/entries';
 import type { SignerAccess } from '../../src/token/mint';
 import { errorOf, formRequest, oauthDeps, storeFailure, unexpectedStore } from './oauth-support';
-import { keySet } from './support';
+import { keySet, utsFeed } from './support';
 import { config } from './test-env';
 
 /**
@@ -542,39 +532,6 @@ describe('the CI token exchange', () => {
     expect(grantTypes({ status: 'off' })).not.toContain(UTS_GRANT_TYPES.tokenExchange);
   });
 });
-
-/**
- * The UTS revocation feed as a verifier reads it: heads signed now under a feed key the test
- * holds, over UTS's own list serialization of `entries`.
- */
-async function utsFeed() {
-  const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
-  const jwk = await exportJWK(publicKey);
-  const kid = `uts-feed-0-${await calculateJwkThumbprint(jwk, 'sha256')}`;
-  const lists = new Map<string, Uint8Array<ArrayBuffer>>();
-  const feed = {
-    entries: [] as FeedEntry[],
-    reachable: true,
-    key: { ...jwk, kid, alg: 'EdDSA', use: 'sig' },
-    source: {
-      async head() {
-        if (!feed.reachable) throw new Error('feed unreachable');
-        const list = serializeList(feed.entries);
-        lists.set(list.hash, new Uint8Array(new TextEncoder().encode(list.text)));
-        return await signFeedHead(privateKey, kid, {
-          iat: Math.floor(Date.now() / 1000),
-          list_hash: list.hash,
-        });
-      },
-      async list(hash) {
-        const bytes = lists.get(hash);
-        if (bytes === undefined) throw new Error('unknown list hash');
-        return bytes;
-      },
-    } satisfies RevocationFeedSource,
-  };
-  return feed;
-}
 
 describe('the emergency stop for issued CI tokens', () => {
   afterEach(() => {

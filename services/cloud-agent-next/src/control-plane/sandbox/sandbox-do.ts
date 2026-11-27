@@ -582,6 +582,11 @@ function runtimeHarnessField(runtimeHarness: RuntimeHarness | undefined) {
   return runtimeHarness === undefined ? {} : { runtimeHarness };
 }
 
+async function readStoredOwner(storage: DurableObjectStorage): Promise<string | null> {
+  const stored = await storage.get<string>(OWNER_KEY);
+  return typeof stored === 'string' && stored.length > 0 ? stored : null;
+}
+
 /** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
 type PrepareFrameMaterializationStage =
   | 'wrapper_redaction_unsupported'
@@ -1114,7 +1119,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const pin = this.providerPin;
     const billing = pin?.billing ? sentryIdentityFromBilling(pin.billing) : undefined;
     return {
-      userId: (await this.requireOwner().catch(() => null)) ?? billing?.userId ?? pin?.byoc?.userId,
+      userId:
+        (await readStoredOwner(this.ctx.storage).catch(() => null)) ??
+        billing?.userId ??
+        pin?.byoc?.userId,
       orgId:
         billing?.orgId ??
         pin?.byoc?.organizationId ??
@@ -3801,17 +3809,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async initializeOwner(userId: string): Promise<void> {
     const normalized = userId.trim();
     if (normalized.length === 0) throw new Error('Sandbox owner is required');
-    const stored = await this.ctx.storage.get<string>(OWNER_KEY);
-    if (typeof stored === 'string' && stored.length > 0) {
+    const stored = await readStoredOwner(this.ctx.storage);
+    if (stored !== null) {
       if (stored !== normalized) throw new Error('Sandbox owner mismatch');
       return;
     }
     await this.ctx.storage.put(OWNER_KEY, normalized);
   }
 
-  private async requireOwner(): Promise<string | null> {
-    const stored = await this.ctx.storage.get<string>(OWNER_KEY);
-    return typeof stored === 'string' && stored.length > 0 ? stored : null;
+  private requireOwner(): Promise<string | null> {
+    return readStoredOwner(this.ctx.storage);
   }
 
   private async issueRouteGrant(

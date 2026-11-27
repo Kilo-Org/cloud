@@ -17,7 +17,7 @@ import { closeSync, openSync, realpathSync, writeSync } from 'node:fs';
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CRON, PIN_FORMAT, RUN_VARS, copierName, windowOf } from './src/core.mjs';
-import { BATCHES } from './src/table.mjs';
+import { TABLE } from './src/table.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const SRC_DIR = join(HERE, 'src');
@@ -31,11 +31,14 @@ export const OBSERVABILITY = Object.freeze({
   traces: { enabled: false },
 });
 
-/** Names-only pin problems; empty when the pins are usable at `nowMs`. */
-export function pinProblems(pins, nowMs) {
+/**
+ * Names-only pin problems; empty when the pins are usable at `nowMs`. `table` is the checked-in
+ * table; tests pass a fixture table.
+ */
+export function pinProblems(pins, nowMs, table = TABLE) {
   const f = [];
   for (const k of RUN_VARS) if (!PIN_FORMAT[k].test(String(pins[k]))) f.push(`pin_${k}`);
-  if (!f.includes('pin_M65_BATCH') && !Object.hasOwn(BATCHES, pins.M65_BATCH)) {
+  if (!f.includes('pin_M65_BATCH') && !Object.hasOwn(table.batches, pins.M65_BATCH)) {
     f.push('batch_not_in_table');
   }
   if (f.length) return f;
@@ -49,8 +52,10 @@ export function pinProblems(pins, nowMs) {
  * The complete config for `pins`, or null when `pins.M65_BATCH` is not a Worker of the valid table.
  * `srcDir` is absolute so the file can live outside the repo.
  */
-export function buildConfig(pins, srcDir = SRC_DIR) {
-  const batch = Object.hasOwn(BATCHES, pins?.M65_BATCH) ? BATCHES[pins.M65_BATCH] : null;
+export function buildConfig(pins, srcDir = SRC_DIR, table = TABLE) {
+  const batch = Object.hasOwn(table.batches, pins?.M65_BATCH)
+    ? table.batches[pins.M65_BATCH]
+    : null;
   if (!batch) return null;
   return {
     name: copierName(batch.sourceScript),

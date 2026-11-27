@@ -1,16 +1,18 @@
 // Runner-side gates: tracked-source match, renderer, receipt parser, preflight, post-run, cleanup.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { RUN_VARS, newReceipt } from './src/core.mjs';
 import * as C from './checks.mjs';
-import { REPO_ROOT, buildConfig, insideRepo, parseArgs, pinProblems } from './render-config.mjs';
+import * as R from './render-config.mjs';
+import { TABLE } from './src/table.mjs';
 import {
   BATCH,
+  FIXTURE,
   CLIENT_ID,
   RUN_ID,
   VERSION_ID,
@@ -20,10 +22,10 @@ import {
   unarmedCopierBindings,
 } from './fakes.mjs';
 
+const { REPO_ROOT, SRC_DIR, insideRepo, parseArgs } = R;
 const {
   WORKER_SOURCES,
   bindArmedPreflight,
-  checkRenderedConfig,
   evaluateCleanup,
   evaluateCleanupCloudflare,
   evaluateCleanupInfisical,
@@ -31,13 +33,17 @@ const {
   parseJsonc,
   pathCovers,
 } = C;
-// The Notifications entry of the per-Worker sources, and every gate bound to its batch.
+// The fixture table's Notifications batch, its per-Worker sources, and every gate bound to it.
 const SRC = WORKER_SOURCES.notifications;
 const NAME_MAP = SRC.names;
 const EXPECTED_ALIASES = SRC.aliases;
 const readTrackedSource = () => C.readTrackedSource(SRC);
-const checkSource = (w, p, r, batch = BATCH, src = SRC) => C.checkSource(w, p, r, batch, src);
-const validatedNameTable = () => C.validatedNameTable(BATCH);
+const checkSource = (w, p, r, batch = BATCH, src = SRC) =>
+  C.checkSource(w, p, r, batch, src, FIXTURE);
+const validatedNameTable = () => C.validatedNameTable(BATCH, REPO_ROOT, FIXTURE);
+const pinProblems = (pins, nowMs) => R.pinProblems(pins, nowMs, FIXTURE);
+const buildConfig = pins => R.buildConfig(pins, SRC_DIR, FIXTURE);
+const checkRenderedConfig = (text, pins) => C.checkRenderedConfig(text, pins, SRC_DIR, FIXTURE);
 const parseReceipt = (text, batch = BATCH) => C.parseReceipt(text, batch);
 const evaluatePreflight = (input, batch = BATCH) => C.evaluatePreflight(input, batch);
 const evaluatePostRun = input => C.evaluatePostRun(input, BATCH);
@@ -110,16 +116,22 @@ test('M108: the copy batch is exactly the Expo row of the four-name map', () => 
   }
 });
 
-test('name map proposals targeting a store name, a *_PROD name or the unprefixed APNs/Expo name refuse', () => {
+test('name map proposals targeting another row’s store name, a *_PROD name or the unprefixed APNs/Expo name refuse', () => {
   const { wranglerText, policyText, readerText } = readTrackedSource();
   const propose = (i, secretKey, secretPath = NAME_MAP[i].secretPath) =>
     NAME_MAP.map((r, j) => (j === i ? { ...r, secretKey, secretPath } : r));
   const cases = [
-    [propose(0, 'APNS_PRIVATE_KEY_PROD', '/shared'), 'target_is_store_name_APNS_PRIVATE_KEY_PROD'],
+    // Another row's store name: the APNs row proposing the Expo store entry's name.
+    [propose(0, 'EXPO_ACCESS_TOKEN'), 'target_is_store_name_EXPO_ACCESS_TOKEN'],
+    [propose(2, 'INTERNAL_API_SECRET_PROD'), 'target_is_store_name_INTERNAL_API_SECRET_PROD'],
+    // Its own store name passes that rule; the suffix, reader and policy checks still refuse.
+    [
+      propose(0, 'APNS_PRIVATE_KEY_PROD', '/shared'),
+      'target_environment_suffix_APNS_PRIVATE_KEY_PROD',
+    ],
     [propose(2, 'NEXTAUTH_SECRET_PROD'), 'target_environment_suffix_NEXTAUTH_SECRET_PROD'],
-    [propose(3, 'INTERNAL_API_SECRET_PROD'), 'target_is_store_name_INTERNAL_API_SECRET_PROD'],
     [propose(0, 'APNS_PRIVATE_KEY', '/shared'), 'reader_lookup_differs_APNS_PRIVATE_KEY'],
-    [propose(1, 'EXPO_ACCESS_TOKEN', '/shared'), 'target_is_store_name_EXPO_ACCESS_TOKEN'],
+    [propose(1, 'EXPO_ACCESS_TOKEN', '/shared'), 'reader_lookup_differs_EXPO_ACCESS_TOKEN'],
   ];
   for (const [names, code] of cases) {
     const failures = checkSource(wranglerText, policyText, readerText, BATCH, { ...SRC, names });
@@ -220,6 +232,8 @@ test('renderer: pins, lead time, window length and a closed config', () => {
 
 test('renderer CLI writes once to scratch with mode 0600 and refuses the repository', () => {
   const dir = mkdtempSync(join(tmpdir(), 'm65-render-'));
+  // The CLI renders from the checked-in table only.
+  const worker = TABLE.workers[0];
   try {
     const now = Date.now();
     const args = out => [
@@ -227,7 +241,7 @@ test('renderer CLI writes once to scratch with mode 0600 and refuses the reposit
       '--run-id',
       RUN_ID,
       '--batch',
-      'notifications',
+      worker,
       '--not-before',
       iso(now + 17 * 60_000),
       '--not-after',
@@ -251,7 +265,8 @@ test('renderer CLI writes once to scratch with mode 0600 and refuses the reposit
     ]);
     assert.equal(statSync(out).mode & 0o777, 0o600);
     const pins = JSON.parse(readFileSync(out, 'utf8')).vars;
-    assert.deepEqual(checkRenderedConfig(readFileSync(out, 'utf8'), pins), []);
+    assert.equal(pins.M65_BATCH, worker);
+    assert.deepEqual(C.checkRenderedConfig(readFileSync(out, 'utf8'), pins), []);
     assert.equal(
       spawnSync(process.execPath, args(out), { encoding: 'utf8' }).status,
       2,
@@ -1126,23 +1141,26 @@ test('post-run and cleanup gates', () => {
 test('checks CLI: verdict JSON on stdout, exit 0/1/2', () => {
   const cli = (args, input) =>
     spawnSync(process.execPath, [join(HERE, 'checks.mjs'), ...args], { input, encoding: 'utf8' });
+  // `source` covers every checked-in Worker; one whose batch PR is not on main yet refuses by name.
   const src = cli(['source'], '');
-  assert.equal(src.status, 0, src.stdout);
-  assert.deepEqual(JSON.parse(src.stdout).failures, []);
+  const verdict = JSON.parse(src.stdout);
   assert.deepEqual(
-    JSON.parse(src.stdout).workers.map(w => w.worker),
-    ['notifications']
+    verdict.workers.map(w => [w.worker, w.failures]),
+    TABLE.workers.map(w => [
+      w,
+      existsSync(join(REPO_ROOT, WORKER_SOURCES[w].reader)) ? [] : [`source_not_on_main: ${w}`],
+    ])
   );
+  assert.equal(src.status, verdict.failures.length === 0 ? 0 : 1, src.stdout);
+  const worker = TABLE.workers[0];
+  const id = TABLE.batches[worker].id;
   const good = JSON.stringify({
-    ...newReceipt(BATCH.id),
+    ...newReceipt(id),
     outcome: 'refused',
     reason: 'not_ready_cron',
   });
-  assert.equal(cli(['receipt', 'notifications'], `${good}\n`).status, 0);
-  const bad = cli(
-    ['receipt', 'notifications'],
-    JSON.stringify({ ...newReceipt(BATCH.id), extra: true })
-  );
+  assert.equal(cli(['receipt', worker], `${good}\n`).status, 0);
+  const bad = cli(['receipt', worker], JSON.stringify({ ...newReceipt(id), extra: true }));
   assert.equal(bad.status, 1);
   assert.deepEqual(JSON.parse(bad.stdout), {
     gate: 'receipt',
@@ -1152,6 +1170,11 @@ test('checks CLI: verdict JSON on stdout, exit 0/1/2', () => {
   });
   assert.equal(cli(['receipt'], `${good}\n`).status, 2, 'a per-Worker gate needs the Worker');
   assert.equal(cli(['receipt', 'other-worker'], `${good}\n`).status, 2, 'only table Workers');
-  assert.equal(cli(['preflight', 'notifications'], '{').status, 2);
+  assert.equal(
+    cli(['receipt', 'notifications'], `${good}\n`).status,
+    2,
+    'the Expo run is not in this table'
+  );
+  assert.equal(cli(['preflight', worker], '{').status, 2);
   assert.equal(cli(['nope'], '').status, 2);
 });

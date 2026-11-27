@@ -7,12 +7,12 @@
 // the fixed final outcome.
 
 import { DurableObject } from 'cloudflare:workers';
-import { BATCHES } from './table.mjs';
+import { TABLE } from './table.mjs';
 import { OUTCOMES, PIN_FORMAT, newReceipt, runTick } from './core.mjs';
 
 const batchOf = env =>
-  typeof env.M65_BATCH === 'string' && Object.hasOwn(BATCHES, env.M65_BATCH)
-    ? BATCHES[env.M65_BATCH]
+  typeof env.M65_BATCH === 'string' && Object.hasOwn(TABLE.batches, env.M65_BATCH)
+    ? TABLE.batches[env.M65_BATCH]
     : undefined;
 
 export class M65Gate extends DurableObject {

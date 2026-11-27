@@ -65,8 +65,10 @@
 //
 // STS deploy token (CLOUDFLARE_TOKEN_SOURCE `sts`): CLOUDFLARE_TOKEN_EXPIRES_AT is the mint step's
 // `expires_at` output. The run refuses at start unless the token outlives the result deadline by
-// 8 minutes, and 5 minutes before it expires it stops admitting phases, caps every wait and child
+// 8 minutes, and 7 minutes before it expires it stops admitting phases, caps every wait and child
 // there and goes to the normal cleanup (`token_expiry_abort`) while the token can still delete.
+// The token lives at most 60 minutes from the mint, so the abort lands by minute 53 and cleanup
+// keeps 5 minutes before the step's 58-minute limit.
 //
 // CI proves only the Cloudflare half. The operator completes the Infisical post-run and cleanup
 // gates privately with this report's `preflightPins` and `finalReceipt` and its own readback.
@@ -98,7 +100,7 @@ import {
   WRITER_SECRET,
   copierName,
 } from './runtime-copy/src/core.mjs';
-import { BATCHES, TABLE_PROBLEMS, WORKERS } from './runtime-copy/src/table.mjs';
+import { TABLE } from './runtime-copy/src/table.mjs';
 
 export const REPOSITORY = 'Kilo-Org/cloud';
 export const REF = 'refs/heads/main';
@@ -145,9 +147,10 @@ export const TIMING = Object.freeze({
   // After a stop signal each Cloudflare read or delete gets this long, once, with no retry.
   abortCallTimeoutMs: 2_500,
   // STS path: refuse to start unless the token outlives the result deadline by this much, and
-  // stop admitting phases this long before it expires, so cleanup still holds a live token.
+  // stop admitting phases this long before it expires, so cleanup still holds a live token and
+  // finishes inside the workflow step's 58-minute limit (60-minute token minus 7 = minute 53).
   tokenStartMarginMs: 8 * 60_000,
-  tokenAbortMarginMs: 5 * 60_000,
+  tokenAbortMarginMs: 7 * 60_000,
   rolloutRunsPerWorkflow: 20,
 });
 
@@ -161,10 +164,11 @@ export const RENDER_CONFIG = join(HERE, 'runtime-copy/render-config.mjs');
 /**
  * Everything one matrix entry acts on, from the valid table only: the Worker's reviewed batch, its
  * copier script, its protected environment and its Infisical targets. Null for anything else.
+ * `table` is the checked-in table; tests pass a fixture table.
  */
-export function targetOf(worker) {
-  if (TABLE_PROBLEMS.length > 0 || !Object.hasOwn(BATCHES, String(worker))) return null;
-  const batch = BATCHES[worker];
+export function targetOf(worker, table = TABLE) {
+  if (table.problems.length > 0 || !Object.hasOwn(table.batches, String(worker))) return null;
+  const batch = table.batches[worker];
   return Object.freeze({
     worker,
     batch,
@@ -202,9 +206,9 @@ export function dispatchProblems(env, headSha) {
 }
 
 /** Names-only context problems for the copy job. Empty means the run may start. */
-export function contextProblems(env, headSha) {
+export function contextProblems(env, headSha, table = TABLE) {
   const p = dispatchProblems(env, headSha);
-  if (!targetOf(env.COPY_WORKER)) p.push('worker');
+  if (!targetOf(env.COPY_WORKER, table)) p.push('worker');
   if (!/^[0-9]{1,3}$/.test(env.COPY_INDEX ?? '')) p.push('matrix_index');
   if (!['secret', 'sts'].includes(env.CLOUDFLARE_TOKEN_SOURCE)) p.push('token_source');
   else if (env.CLOUDFLARE_TOKEN_SOURCE === 'sts' && !Number.isFinite(tokenExpiryOf(env))) {
@@ -1081,7 +1085,8 @@ function writeFailed(reason, output) {
  */
 export async function run(io) {
   const { env, clock, cf, log, signal } = io;
-  const target = targetOf(env.COPY_WORKER);
+  const table = io.table ?? TABLE;
+  const target = targetOf(env.COPY_WORKER, table);
   const report = {
     schema: 'runtime-copy-run/1',
     status: 'started',
@@ -1121,7 +1126,7 @@ export async function run(io) {
     return hit;
   };
 
-  const problems = contextProblems(env, io.headSha);
+  const problems = contextProblems(env, io.headSha, table);
   if (problems.length) return { ...report, status: 'refused', problems };
   const { batch, copier } = target;
   const secret = env[WRITER_SECRET];
@@ -1156,7 +1161,7 @@ export async function run(io) {
 
   try {
     phase('name_table');
-    const names = (io.nameTable ?? validatedNameTable)(batch);
+    const names = (io.nameTable ?? (b => validatedNameTable(b, REPO_ROOT, table)))(batch);
     report.gates.push(verdictOf(names));
     if (!names.ok) throw new StopError('name_table_refused');
     io.printTable(names.table);
@@ -1542,19 +1547,26 @@ async function main() {
 
 /**
  * The workflow's credential-free first job. Offline first: the dispatch identity and the whole row
- * table (`validateTable`), then every table Worker's name check (`validatedNameTable`). Then each
+ * table (`validateTable`), then every table Worker's name check (`validatedNameTable`; a Worker whose
+ * reader or policy is not on main yet refuses as `source_not_on_main: <worker>`). Then each
  * Worker's protected environment is read back before any copy job can reference it, so a dispatch
- * never auto-creates one. `ghFor(environment)` returns a read-only GitHub client. Returns
- * {gate:"plan", ok, failures, workers}; `workers` is the matrix, in table order.
+ * never auto-creates one. Any failure refuses the whole dispatch: no subset of the table runs.
+ * `ghFor(environment)` returns a read-only GitHub client; `table` is the checked-in table and `root`
+ * the checkout (tests pass a fixture). Returns {gate:"plan", ok, failures, workers}; `workers` is
+ * the matrix, in table order.
  */
-export async function planMatrix({ env, headSha, ghFor }) {
+export async function planMatrix({ env, headSha, ghFor, table = TABLE, root = REPO_ROOT }) {
   const failures = [
     ...dispatchProblems(env, headSha),
-    ...TABLE_PROBLEMS.map(p => `table_${p}`),
-    ...WORKERS.flatMap(w => validatedNameTable(BATCHES[w]).failures.map(f => `${w}:${f}`)),
+    ...table.problems.map(p => `table_${p}`),
+    ...table.workers.flatMap(w =>
+      validatedNameTable(table.batches[w], root, table).failures.map(f =>
+        f === `source_not_on_main: ${w}` ? f : `${w}:${f}`
+      )
+    ),
   ];
   if (failures.length === 0) {
-    for (const w of WORKERS) {
+    for (const w of table.workers) {
       try {
         failures.push(
           ...(await environmentProblems(ghFor(environmentName(w)))).map(f => `${w}:${f}`)
@@ -1565,8 +1577,8 @@ export async function planMatrix({ env, headSha, ghFor }) {
       }
     }
   }
-  const ok = failures.length === 0 && WORKERS.length > 0;
-  return { gate: 'plan', ok, failures, workers: ok ? [...WORKERS] : [] };
+  const ok = failures.length === 0 && table.workers.length > 0;
+  return { gate: 'plan', ok, failures, workers: ok ? [...table.workers] : [] };
 }
 
 async function planMain() {

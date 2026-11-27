@@ -9,7 +9,6 @@ import {
   utf8Parity,
   validateBatch,
 } from './src/core.mjs';
-import { ROWS } from './src/table.mjs';
 import { parseReceipt } from './checks.mjs';
 import {
   BATCH,
@@ -238,8 +237,16 @@ test('batch closure: secret_text rows, other targets and other batch shapes are 
   assert.equal(validateBatch(withRow({ storeId: '0'.repeat(32) })), 'row_store_not_allowed');
   assert.equal(validateBatch(withRow({ secretPath: '/ci' })), 'row_target_not_allowed');
   assert.equal(validateBatch(withRow({ secretPath: '/shared' })), 'row_target_not_allowed');
+  // A target may equal its own row's store name, never another row's.
+  assert.equal(validateBatch(withRow({ secretKey: 'EXPO_ACCESS_TOKEN' })), null);
   assert.equal(
-    validateBatch(withRow({ secretKey: 'EXPO_ACCESS_TOKEN' })),
+    validateBatch({
+      ...BATCH,
+      rows: [
+        ...BATCH.rows,
+        { ...BATCH.rows[0], binding: 'OTHER', secretName: BATCH.rows[0].secretKey, secretKey: 'K' },
+      ],
+    }),
     'row_target_is_store_name'
   );
   assert.equal(
@@ -256,9 +263,9 @@ test('batch closure: secret_text rows, other targets and other batch shapes are 
   );
 });
 
-test('M108: the checked-in table holds only the Expo target; the /shared names are never targets', () => {
+test('M108: the fixture batch is the Expo target; the /shared names are never targets', () => {
   assert.deepEqual(
-    ROWS.map(r => r.target),
+    BATCH.rows.map(r => `${r.secretPath}/${r.secretKey}`),
     ['/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN']
   );
   const shared = [

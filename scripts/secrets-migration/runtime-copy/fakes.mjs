@@ -1,14 +1,31 @@
 // Synthetic stand-ins for the copier tests: a fake Infisical EU API (single-use client secret,
 // create-only token with rows + 1 uses, Create-only store), a gate with M65Gate's semantics, and
 // synthetic source values. No real value, credential or provider is involved. Every helper takes
-// a batch; the default is the checked-in table's Notifications batch.
+// a batch; the default is the fixture table's Notifications batch.
+//
+// The fixture table is the one Notifications Expo row (the reviewed source on main, whose name map
+// checks.mjs `WORKER_SOURCES.notifications` keeps), so every table-bound path (source check,
+// renderer, driver, copier module) runs end to end in CI while the checked-in table's Workers wait
+// for their batch PRs (`source_not_on_main`). Functions take it as their `table` argument; the
+// workerd tests load it as the copier's table module (`FIXTURE_TABLE_MODULE`).
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { COMPATIBILITY_DATE } from './render-config.mjs';
-import { BATCHES } from './src/table.mjs';
-import { PROJECT_ID, RUN_VARS, WRITER_SECRET, copierName } from './src/core.mjs';
+import { PROJECT_ID, RUN_VARS, WRITER_SECRET, copierName, tableOf } from './src/core.mjs';
 
-export const BATCH = BATCHES.notifications;
+export const FIXTURE_ROWS = Object.freeze([
+  Object.freeze({
+    worker: 'notifications',
+    binding: 'EXPO_ACCESS_TOKEN',
+    storeId: '342a86d9e3a94da698e82d0c6e2a36f0',
+    secretName: 'EXPO_ACCESS_TOKEN',
+    target: '/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+  }),
+]);
+export const FIXTURE = tableOf(FIXTURE_ROWS);
+/** The fixture table as the source of a `table.mjs` module next to the real core.mjs. */
+export const FIXTURE_TABLE_MODULE = `import { tableOf } from './core.mjs';\nexport const TABLE = tableOf(${JSON.stringify(FIXTURE_ROWS)});\n`;
+export const BATCH = FIXTURE.batches.notifications;
 export const CLIENT_ID = '11111111-2222-4333-8444-555555555555';
 export const CLIENT_SECRET = `synthetic-client-secret-${randomBytes(12).toString('hex')}`;
 export const VERSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';

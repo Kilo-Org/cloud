@@ -1,24 +1,27 @@
-// The reader leg of the name mapping (M89b), proved on the real Notifications reader for all four
-// lookup names, including the three secrets-cutover writes from 1Password (M108): for every name
-// map row, `readNotificationsSecret(env, <STS lookup name>)` must read exactly that row's legacy
-// binding under `secrets-store` and exactly that lookup name from a fake STS bundle under `sts`,
-// with only that row populated in each source (pattern of
-// services/notifications/src/__tests__/secrets-source.test.ts).
-// Runs under tsx (root `test:secrets-migration`) so the TypeScript reader imports as shipped.
+// The reader leg of the name mapping (M89b), proved on each reviewed Worker's real reader for every
+// lookup name it has: for every reader key, `<readerFn>(env, <STS lookup name>)` must read exactly
+// that key's legacy binding under `secrets-store` and exactly that lookup name from a fake STS
+// bundle under `sts`, with only that key populated in each source (pattern of
+// services/notifications/src/__tests__/secrets-source.test.ts). Store names and legacy binding names
+// that are not lookup names must not resolve. A Worker whose reader is not on this checkout yet
+// (its batch PR is unmerged: `source_not_on_main`) is skipped by name; the VM proof overlays the
+// batch files so every Worker runs.
+// Runs under tsx (root `test:secrets-migration`) so the TypeScript readers import as shipped.
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { BATCH } from './fakes.mjs';
-import { WORKER_SOURCES, mappingRows, parseReaderBindings, readTrackedSource } from './checks.mjs';
+import { TABLE } from './src/table.mjs';
+import {
+  WORKER_SOURCES,
+  mappingRows,
+  parseReaderBindings,
+  readTrackedSource,
+  readerKeysOf,
+} from './checks.mjs';
 import { REPO_ROOT } from './render-config.mjs';
-
-const SRC = WORKER_SOURCES.notifications;
-const NAME_MAP = SRC.names;
-
-const { readNotificationsSecret } = await import(
-  pathToFileURL(join(REPO_ROOT, 'services/notifications/src/secrets.ts')).href
-);
 
 const ctx = () => ({ waitUntil: () => {} });
 
@@ -27,14 +30,14 @@ function fakeStore(value) {
   return { calls, secret: { get: async () => (calls.n++, value) } };
 }
 
-function fakeSts(secrets) {
+function fakeSts(workload, secrets) {
   const calls = { n: 0 };
   const binding = {
     getBundle: async () => {
       calls.n++;
       return {
         status: 'ok',
-        workload: 'notifications',
+        workload,
         environment: 'production',
         etag: '"0123456789abcdef"',
         stale: false,
@@ -49,68 +52,90 @@ function fakeSts(secrets) {
   return { calls, binding };
 }
 
-test('each row selects its own value in both source modes, with only that row populated', async () => {
-  for (const row of NAME_MAP) {
-    const store = fakeStore(`store-only-${row.binding}`);
-    const sts = fakeSts({ [row.secretKey]: `bundle-only-${row.secretKey}` });
-    const env = { [row.binding]: store.secret, STS: sts.binding };
-    assert.equal(
-      await readNotificationsSecret(env, row.secretKey, ctx()),
-      `store-only-${row.binding}`
-    );
-    assert.deepEqual([store.calls.n, sts.calls.n], [1, 0], `${row.secretKey}: legacy read only`);
-    assert.equal(
-      await readNotificationsSecret({ ...env, SECRETS_SOURCE: 'sts' }, row.secretKey, ctx()),
-      `bundle-only-${row.secretKey}`
-    );
-    assert.deepEqual([store.calls.n, sts.calls.n], [1, 1], `${row.secretKey}: bundle read only`);
+/** Reader key -> legacy binding, from the reviewed entry. */
+const entriesOf = src => [
+  ...src.names.map(r => [r.secretKey, r.binding]),
+  ...src.plainSecrets.map(p => [p, p]),
+];
 
-    // Every other lookup name misses in both sources: no row reads another row's binding or key.
-    for (const other of NAME_MAP.filter(r => r !== row)) {
-      await assert.rejects(
-        readNotificationsSecret(env, other.secretKey, ctx()),
-        `${other.secretKey} legacy`
-      );
-      await assert.rejects(
-        readNotificationsSecret(
-          { ...env, SECRETS_SOURCE: 'sts', STS: fakeSts({ [row.secretKey]: 'x' }).binding },
-          other.secretKey,
-          ctx()
-        ),
-        `${other.secretKey} sts`
-      );
+/** The copy rows read back through the reader: the checked-in table's, or the fixture's. */
+const copyRowsOf = worker =>
+  worker === 'notifications' ? BATCH.rows : (TABLE.batches[worker]?.rows ?? []);
+
+for (const [worker, src] of Object.entries(WORKER_SOURCES)) {
+  const onMain = existsSync(join(REPO_ROOT, src.reader));
+  const skip = onMain ? false : `source_not_on_main: ${worker}`;
+  const load = async () =>
+    (await import(pathToFileURL(join(REPO_ROOT, src.reader)).href))[src.readerFn];
+
+  test(
+    `${worker}: each reader key selects its own value in both source modes, alone`,
+    { skip },
+    async () => {
+      const read = await load();
+      assert.equal(typeof read, 'function', src.readerFn);
+      const entries = entriesOf(src);
+      for (const [key, binding] of entries) {
+        const store = fakeStore(`store-only-${binding}`);
+        const sts = fakeSts(src.workload, { [key]: `bundle-only-${key}` });
+        const env = { [binding]: store.secret, STS: sts.binding };
+        assert.equal(await read(env, key, ctx()), `store-only-${binding}`);
+        assert.deepEqual([store.calls.n, sts.calls.n], [1, 0], `${key}: legacy read only`);
+        assert.equal(
+          await read({ ...env, SECRETS_SOURCE: 'sts' }, key, ctx()),
+          `bundle-only-${key}`
+        );
+        assert.deepEqual([store.calls.n, sts.calls.n], [1, 1], `${key}: bundle read only`);
+
+        // Every other lookup name misses in both sources: no key reads another key's binding.
+        for (const [other] of entries.filter(([k]) => k !== key)) {
+          await assert.rejects(read(env, other, ctx()), `${other} legacy`);
+          await assert.rejects(
+            read(
+              {
+                ...env,
+                SECRETS_SOURCE: 'sts',
+                STS: fakeSts(src.workload, { [key]: 'x' }).binding,
+              },
+              other,
+              ctx()
+            ),
+            `${other} sts`
+          );
+        }
+      }
     }
-  }
-});
+  );
 
-test('the store names and unprefixed legacy names are not lookup names', async () => {
-  const env = Object.fromEntries(NAME_MAP.map(r => [r.binding, fakeStore('v').secret]));
-  for (const name of [
-    'APNS_PRIVATE_KEY_PROD',
-    'NEXTAUTH_SECRET_PROD',
-    'INTERNAL_API_SECRET_PROD',
-    'APNS_PRIVATE_KEY',
-    'EXPO_ACCESS_TOKEN',
-  ]) {
-    await assert.rejects(readNotificationsSecret(env, name, ctx()), name);
-  }
-});
+  test(
+    `${worker}: store names and legacy binding names are not lookup names`,
+    { skip },
+    async () => {
+      const read = await load();
+      const keys = new Set(readerKeysOf(src));
+      const stored = [...src.names, ...src.legacyStoreBindings];
+      const env = Object.fromEntries(entriesOf(src).map(([, b]) => [b, fakeStore('v').secret]));
+      const names = [...new Set(stored.flatMap(r => [r.secretName, r.binding]))].filter(
+        n => !keys.has(n)
+      );
+      for (const name of names) await assert.rejects(read(env, name, ctx()), name);
+    }
+  );
 
-test('the parsed reader map and the four-column rows agree with the reader behaviour', () => {
-  const sources = readTrackedSource(SRC);
-  const reader = parseReaderBindings(sources.readerText, SRC.readerMap);
-  assert.deepEqual(
-    Object.entries(reader).sort(),
-    NAME_MAP.map(r => [r.secretKey, r.binding]).sort()
+  test(
+    `${worker}: the parsed reader map and the four-column rows agree with the reader`,
+    { skip },
+    () => {
+      const sources = readTrackedSource(src);
+      const reader = parseReaderBindings(sources.readerText, src.readerMap);
+      assert.deepEqual(Object.entries(reader).sort(), entriesOf(src).sort());
+      const rows = mappingRows(sources, src);
+      assert.deepEqual(
+        rows.map(r => [r.binding, r.storeSecretName, r.lookup, r.policyEntry]),
+        src.names.map(r => [r.binding, r.secretName, r.secretKey, r.secretKey])
+      );
+      // Each copy row reads back through the same reader key: target = lookup.
+      for (const r of copyRowsOf(worker)) assert.equal(reader[r.secretKey], r.binding, r.secretKey);
+    }
   );
-  const rows = mappingRows(sources, SRC);
-  assert.deepEqual(
-    rows.map(r => [r.binding, r.storeSecretName, r.lookup, r.policyEntry]),
-    NAME_MAP.map(r => [r.binding, r.secretName, r.secretKey, r.secretKey])
-  );
-  // The copy batch is the Expo row of the name map, read back through the same reader key.
-  assert.deepEqual(
-    BATCH.rows.map(r => [r.secretKey, reader[r.secretKey]]),
-    [['NOTIFICATIONS_EXPO_ACCESS_TOKEN', 'EXPO_ACCESS_TOKEN']]
-  );
-});
+}

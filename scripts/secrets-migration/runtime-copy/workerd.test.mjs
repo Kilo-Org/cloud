@@ -20,13 +20,14 @@ import { after, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { WRITER_SECRET, copierName } from './src/core.mjs';
-import { BATCHES, WORKERS } from './src/table.mjs';
+import { TABLE } from './src/table.mjs';
 import { MODULES, parseReceipt as parseReceiptFor } from './checks.mjs';
 import { COMPATIBILITY_DATE, REPO_ROOT, SRC_DIR, buildConfig } from './render-config.mjs';
 import {
   BATCH,
   CLIENT_ID,
   CLIENT_SECRET,
+  FIXTURE_TABLE_MODULE,
   RUN_ID,
   VERSION_ID,
   fakeInfisical,
@@ -73,7 +74,13 @@ async function start({ armed = true, notBefore, notAfter, fake, persist = false 
       {
         name: COPIER_NAME,
         modulesRoot: SRC_DIR,
-        modules: MODULES.map(m => ({ type: 'ESModule', path: join(SRC_DIR, m) })),
+        // The real worker.mjs and core.mjs; table.mjs is the fixture table (fakes.mjs), so the
+        // synthetic copy runs while the checked-in table waits for its batch PRs.
+        modules: MODULES.map(m => ({
+          type: 'ESModule',
+          path: join(SRC_DIR, m),
+          ...(m === 'table.mjs' ? { contents: FIXTURE_TABLE_MODULE } : {}),
+        })),
         compatibilityDate: COMPATIBILITY_DATE,
         bindings: {
           M65_RUN_ID: RUN_ID,
@@ -318,9 +325,9 @@ test('module surface: only the scheduled handler and the Durable Object class', 
 });
 
 test('every table Worker: the rendered config parses with the pinned Wrangler and dry-runs to exactly the three modules', () => {
-  assert.ok(WORKERS.length > 0);
-  for (const worker of WORKERS) {
-    const batch = BATCHES[worker];
+  assert.ok(TABLE.workers.length > 0);
+  for (const worker of TABLE.workers) {
+    const batch = TABLE.batches[worker];
     const dir = scratch(`m65-config-${worker}-`);
     const pins = {
       M65_RUN_ID: RUN_ID,

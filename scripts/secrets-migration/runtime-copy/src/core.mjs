@@ -5,7 +5,8 @@
 //   Auth login -> per row: one binding read, storable and parity checks, one Create-only POST ->
 //   after the last row or the first stop: one revoke and one denial probe.
 // M122: the batches come from the reviewed row table (table.mjs, `validateTable`): one batch per
-// source Worker, Create-only targets in that Worker's one `/workloads/<folder>`, never /shared.
+// source Worker, Create-only targets in that Worker's one `/workloads/<folder>`, plus (M142) only
+// the exact `/shared/<KEY>` targets of SHARED_TARGETS, each created by one matrix entry.
 // The writer's access token has rows + 1 uses: one per create and the denial probe.
 // Nothing reads a binding or calls Infisical before the gate admits this run once. Receipts carry
 // names, booleans and fixed flags only: no value, digest, credential, id or provider response.
@@ -51,6 +52,12 @@ const BINDING = /^[A-Z][A-Z0-9_]{0,63}$/;
 const KEY = /^[A-Z][A-Z0-9_]{0,127}$/;
 // A Create-only target: a key in one workload folder. /shared never matches.
 const TARGET = /^\/workloads\/[a-z0-9][a-z0-9-]{0,62}\/[A-Z][A-Z0-9_]{0,127}$/;
+// M142: the only /shared targets a copy may create, each exactly (path and key). Any other /shared
+// target is refused. The table creates each once, from the first table Worker that binds it.
+export const SHARED_TARGETS = Object.freeze([
+  '/shared/AUTO_ROUTING_DECISION_SECRET',
+  '/shared/O11Y_CF_AE_API_TOKEN',
+]);
 
 /** The reviewed batch id and copier script name of a source Worker. */
 export const batchId = worker => `m65-${worker}-production-1`;
@@ -99,6 +106,7 @@ export function validateBatch(batch) {
     return 'batch_row_count';
   }
   const seen = new Set();
+  let folder;
   for (const r of rows) {
     if (own(r, 'kind') === 'secret_text') return 'secret_text_not_cross_script';
     if (own(r, 'kind') !== 'secrets_store') return 'row_kind_unsupported';
@@ -111,10 +119,17 @@ export function validateBatch(batch) {
       return 'row_name_invalid';
     }
     const target = `${own(r, 'secretPath')}/${r.secretKey}`;
-    if (!TARGET.test(target)) return 'row_target_not_allowed';
-    if (own(r, 'secretPath') !== own(rows[0], 'secretPath')) return 'row_target_folders';
-    // A target is the STS lookup name: never a store name, never an environment-suffixed name.
-    if (rows.some(x => own(x, 'secretName') === r.secretKey)) return 'row_target_is_store_name';
+    const shared = SHARED_TARGETS.includes(target);
+    if (!shared && !TARGET.test(target)) return 'row_target_not_allowed';
+    if (!shared) {
+      folder ??= own(r, 'secretPath');
+      if (own(r, 'secretPath') !== folder) return 'row_target_folders';
+    }
+    // A target is the STS lookup name: never another row's store name (its own may equal it, as
+    // `WORKOS_API_KEY` -> `WORKOS_API_KEY`), never an environment-suffixed name.
+    if (rows.some(x => x !== r && own(x, 'secretName') === r.secretKey)) {
+      return 'row_target_is_store_name';
+    }
     if (/_(PROD|DEV|STAGING)$/.test(r.secretKey)) return 'row_target_environment_suffix';
     for (const k of [`b:${binding}`, `s:${r.secretName}`, `t:${target}`]) {
       if (seen.has(k)) return 'row_duplicate';
@@ -128,8 +143,9 @@ const TABLE_ROW_KEYS = ['binding', 'secretName', 'storeId', 'target', 'worker'];
 
 /**
  * The reviewed row table (worker | binding | store/secret | Infisical target), validated as a
- * whole before anything else uses it: one row per target and no duplicate target anywhere, only
- * reviewed store ids, no /shared, one workload folder per Worker and no folder shared by two
+ * whole before anything else uses it: one row per target and no duplicate target anywhere (so a
+ * shared target is created by one row only), only reviewed store ids, no /shared target except the
+ * exact SHARED_TARGETS, at most one workload folder per Worker and no workload folder shared by two
  * Workers, at most MAX_ROWS_PER_WORKER rows per Worker, and every Worker's batch closed under
  * `validateBatch`. Returns names-only problem codes; empty when the table is usable.
  */
@@ -157,13 +173,15 @@ export function validateTable(rows) {
     }
     if (!ALLOWED_STORE_IDS.includes(storeId)) bad('store_not_reviewed');
     if (!KEY.test(String(secretName))) bad('store_secret_invalid');
-    if (typeof target === 'string' && /^\/shared(\/|$)/.test(target)) bad('target_shared');
-    else if (!TARGET.test(String(target))) bad('target_invalid');
+    const shared = SHARED_TARGETS.includes(target);
+    if (!shared && typeof target === 'string' && /^\/shared(\/|$)/.test(target)) {
+      bad('target_shared');
+    } else if (!shared && !TARGET.test(String(target))) bad('target_invalid');
     if (targets.has(target)) bad('target_duplicate');
     targets.add(target);
     if (pairs.has(`${worker}|${binding}`)) bad('binding_duplicate');
     pairs.add(`${worker}|${binding}`);
-    if (typeof target === 'string') {
+    if (typeof target === 'string' && !shared) {
       const set = folders.get(worker) ?? new Set();
       set.add(target.slice(0, target.lastIndexOf('/')));
       folders.set(worker, set);
@@ -171,8 +189,7 @@ export function validateTable(rows) {
   });
   const owner = new Map();
   for (const [worker, set] of folders) {
-    if (set.size !== 1)
-      f.push(`worker_${WORKER.test(String(worker)) ? worker : 'invalid'}_folders`);
+    if (set.size > 1) f.push(`worker_${WORKER.test(String(worker)) ? worker : 'invalid'}_folders`);
     for (const folder of set) {
       if (owner.has(folder) && owner.get(folder) !== worker) f.push('table_folder_shared');
       owner.set(folder, worker);
@@ -216,6 +233,21 @@ export function batchesOf(rows) {
     });
   }
   return freeze(out);
+}
+
+/**
+ * The reviewed table as one frozen value: its rows, its problems, one batch per Worker (none when
+ * any problem exists, so nothing can run) and the Workers in table order (the workflow's matrix).
+ */
+export function tableOf(rows) {
+  const problems = Object.freeze(validateTable(rows));
+  const batches = problems.length === 0 ? batchesOf(rows) : Object.freeze(Object.create(null));
+  return Object.freeze({
+    rows: Object.freeze(Array.isArray(rows) ? [...rows] : []),
+    problems,
+    batches,
+    workers: Object.freeze(Object.keys(batches)),
+  });
 }
 
 // Infisical's v4 create schema stores `val.at(-1) === "\n" ? `${val.trim()}\n` : val.trim()`.

@@ -151,9 +151,9 @@ jobs:
         run: bash scripts/ci/sts-deploy-token.sh mint
 
       # The token lives at most 60 minutes from the mint. The driver refuses unless it outlives the
-      # result deadline by 8 minutes and goes to cleanup 5 minutes before expiry; 58 minutes is the
-      # backstop that still stops the step before the token is gone. The job's 80 minutes cover
-      # the stored-token path, where no token expires.
+      # result deadline by 8 minutes and goes to cleanup 7 minutes before expiry (by minute 53), so
+      # cleanup keeps 5 minutes before this step's 58-minute limit. The job's 80 minutes cover the
+      # stored-token path, where no token expires.
       - name: Run the copier (STS token)
         if: vars.DEPLOY_TOKEN_SOURCE == 'sts'
         timeout-minutes: 58

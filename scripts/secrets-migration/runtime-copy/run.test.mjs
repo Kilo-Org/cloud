@@ -39,6 +39,7 @@ import {
   BATCH,
   CLIENT_ID,
   CLIENT_SECRET,
+  FIXTURE,
   armedCopierBindings,
   copierSettingsResult,
   fakeGateNamespace,
@@ -52,7 +53,7 @@ import {
 import { CRON, RECEIPT_SCHEMA, WRITER_SECRET, runTick } from './src/core.mjs';
 
 const NAME_MAP = WORKER_SOURCES.notifications.names;
-const TARGET = targetOf('notifications');
+const TARGET = targetOf('notifications', FIXTURE);
 const { copier: COPIER, environment: ENVIRONMENT, targets: BATCH_TARGETS } = TARGET;
 
 const T0 = Date.parse('2026-11-27T18:00:00Z');
@@ -424,6 +425,7 @@ function ioOf(world, o = {}, env = baseEnv()) {
     log: () => {},
     printTable: world.printTable,
     nameTable: o.nameTable,
+    table: FIXTURE,
     signal: o.signal,
     sleep: async () => {},
   };
@@ -1799,6 +1801,7 @@ test('plan job: the valid table and every protected environment, else no matrix'
   const ok = await planMatrix({
     env,
     headSha: SHA,
+    table: FIXTURE,
     ghFor: name => {
       asked.push(name);
       return protectedEnv(name);
@@ -1810,6 +1813,7 @@ test('plan job: the valid table and every protected environment, else no matrix'
   const missing = await planMatrix({
     env,
     headSha: SHA,
+    table: FIXTURE,
     ghFor: () => ({ environment: async () => null }),
   });
   assert.deepEqual(missing, {
@@ -1822,6 +1826,7 @@ test('plan job: the valid table and every protected environment, else no matrix'
   const offline = await planMatrix({
     env: { ...env, GITHUB_REF: 'refs/heads/feature' },
     headSha: SHA,
+    table: FIXTURE,
     ghFor: () => {
       throw new Error('no GitHub call before the offline checks pass');
     },
@@ -1841,8 +1846,8 @@ test('STS token: refused at start unless it outlives the result deadline by 8 mi
   const ok = planRun(baseEnv(stsEnv(T0 + 50 * 60_000)), operator, T0);
   assert.deepEqual(
     [ok.resultDeadline, ok.tokenAbortAt],
-    [T0 + 42 * 60_000, T0 + 45 * 60_000],
-    'aborts into cleanup 5 minutes before expiry'
+    [T0 + 42 * 60_000, T0 + 43 * 60_000],
+    'aborts into cleanup 7 minutes before expiry'
   );
   assert.deepEqual(planRun(baseEnv(stsEnv(T0 + 50 * 60_000 - 1)), operator, T0), {
     problem: 'token_expires_too_soon',
@@ -1863,12 +1868,12 @@ test('STS token: refused at start unless it outlives the result deadline by 8 mi
 test('STS token: a run inside the token lifetime completes and reports the abort time', async () => {
   const { report } = await drive({}, stsEnv(T0 + 60 * 60_000));
   assert.equal(report.status, 'cloudflare_complete', JSON.stringify(report.gates));
-  assert.deepEqual([report.tokenSource, report.tokenAbortAt], ['sts', iso(T0 + 55 * 60_000)]);
+  assert.deepEqual([report.tokenSource, report.tokenAbortAt], ['sts', iso(T0 + 53 * 60_000)]);
 });
 
-test('STS token: past expiry - 5 min no phase starts; the armed copier is deleted, nothing read', async () => {
+test('STS token: past expiry - 7 min no phase starts; the armed copier is deleted, nothing read', async () => {
   const { world, report } = await drive(
-    { onPut: w => (w.clock.t = T0 + 55 * 60_000) },
+    { onPut: w => (w.clock.t = T0 + 53 * 60_000) },
     stsEnv(T0 + 60 * 60_000)
   );
   assert.equal(report.stopReason, 'token_expiry_abort');

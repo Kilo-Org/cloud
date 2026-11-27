@@ -10,7 +10,7 @@
 // stdout: one JSON verdict {gate, ok, failures, ...}; exit 0 ok, 1 failed, 2 usage or unreadable.
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -21,6 +21,7 @@ import {
   PIN_FORMAT,
   RECEIPT_SCHEMA,
   RUN_VARS,
+  SHARED_TARGETS,
   VERSION_ID,
   WRITER_SECRET,
   copierName,
@@ -28,7 +29,7 @@ import {
   validateBatch,
   windowOf,
 } from './src/core.mjs';
-import { BATCHES, TABLE_PROBLEMS, WORKERS } from './src/table.mjs';
+import { TABLE } from './src/table.mjs';
 import { COMPATIBILITY_DATE, REPO_ROOT, SRC_DIR, buildConfig } from './render-config.mjs';
 
 export const MODULES = Object.freeze(['worker.mjs', 'core.mjs', 'table.mjs']);
@@ -68,7 +69,19 @@ const canon = v =>
       : v;
 const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 
-// The folder rule of each Worker's lookup names lives in its WORKER_SOURCES entry (`workloadPrefix`).
+// STS resolves a lookup name from the Worker's own `/workloads/<workload>` folder first, then from
+// `/shared` (services/sts/src/bundle/resolve.ts `resolveWorkloadSecrets`). These lookup names are
+// shared by several Workers and live in /shared; every other lookup name of a Worker lives in its
+// own folder. A copy row is a names row in the own folder or an exact core.mjs SHARED_TARGETS entry
+// (M142), so no copy can create one of these names in a workload folder, where it would shadow the
+// /shared value for that Worker.
+export const SHARED_KEYS = Object.freeze([
+  'NEXTAUTH_SECRET',
+  'INTERNAL_API_SECRET',
+  'OPENROUTER_API_KEY',
+  'O11Y_CF_AE_API_TOKEN',
+  'AUTO_ROUTING_DECISION_SECRET',
+]);
 
 // Minimal reader for the policy file's flat shape (scalars, lists of scalars, identity.kind).
 export function parsePolicy(text) {
@@ -100,6 +113,15 @@ const storeRows = bindings =>
     .map(b => ({ binding: b.name, storeId: b.store_id, secretName: b.secret_name }));
 const bindingRows = rows =>
   rows.map(r => ({ binding: r.binding, storeId: r.storeId, secretName: r.secretName }));
+const byBinding = rows =>
+  [...rows].sort((a, b) => (a.binding < b.binding ? -1 : a.binding > b.binding ? 1 : 0));
+/** Every Secrets Store binding a Worker's production config holds: its names plus legacy rows. */
+const sourceStoreRows = src => [
+  ...bindingRows(src?.names ?? []),
+  ...bindingRows(src?.legacyStoreBindings ?? []),
+];
+/** Store binding rows (binding, storeId, secretName) equal as sets, in any order. */
+const sameStoreRows = (a, b) => same(byBinding(a), byBinding(b));
 const nameRow = r => ({
   binding: r.binding,
   storeId: r.storeId,
@@ -114,26 +136,35 @@ const names = rows =>
       Object.freeze({ binding, storeId: STORE, secretName, secretPath, secretKey })
     )
   );
+const legacy = rows =>
+  Object.freeze(
+    rows.map(([binding, secretName]) => Object.freeze({ binding, storeId: STORE, secretName }))
+  );
+const NONE = Object.freeze([]);
+const NO_ALIASES = Object.freeze({});
 
 /**
- * M89b per source Worker: every Secrets Store binding of its production config with the STS lookup
- * name (= Infisical target key) and folder, the reader map that resolves those lookup names, the STS
- * policy, and the intentional aliases. `checkSource` holds each entry to the tracked files; a copy
- * batch's rows must be rows of its Worker's `names`. A table Worker without an entry here is refused
- * (`worker_source_unreviewed`): adding a Worker means reviewing its reader shape and this entry.
- * Notifications keeps all four names (three are copied from 1Password by secrets-cutover, M108).
+ * M89b per source Worker, from its tracked files: `names` is every Secrets Store binding of its
+ * production config that its reader routes, with the STS lookup name (= Infisical target key) and
+ * folder; `legacyStoreBindings` the store bindings its reader does not route (they stay on the
+ * binding); `plainSecrets` the reader keys bound to plain Worker secrets (no copier route, M68); the
+ * reader module, its map and read function; the STS policy; the reviewed aliases (reader key ->
+ * binding where they differ). `checkSource` holds each entry to the tracked files; a copy batch's
+ * rows must be rows of its Worker's `names` in its own folder. A table Worker without an entry here
+ * is refused (`worker_source_unreviewed`). Notifications stays as the reviewed source of the
+ * separate one-shot Expo run and as the test fixture; it has no row in this table.
  */
 export const WORKER_SOURCES = Object.freeze({
   notifications: Object.freeze({
     wrangler: 'services/notifications/wrangler.jsonc',
     reader: 'services/notifications/src/secrets.ts',
     readerMap: 'SECRETS_STORE_BINDINGS',
+    readerFn: 'readNotificationsSecret',
     policy: 'services/sts/policy/notifications.yaml',
     workload: 'notifications',
     folder: '/workloads/notifications',
-    workloadPrefix: 'NOTIFICATIONS_',
     productionVars: Object.freeze({ WORKER_ENV: 'production' }),
-    stagingStoreBindings: Object.freeze([]),
+    stagingStoreBindings: NONE,
     aliases: Object.freeze({
       NOTIFICATIONS_APNS_PRIVATE_KEY: 'APNS_PRIVATE_KEY',
       NOTIFICATIONS_EXPO_ACCESS_TOKEN: 'EXPO_ACCESS_TOKEN',
@@ -154,8 +185,256 @@ export const WORKER_SOURCES = Object.freeze({
       ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
       ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
     ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch B (#13047).
+  'session-sync': Object.freeze({
+    wrangler: 'services/session-sync/wrangler.jsonc',
+    reader: 'services/session-sync/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readSessionSyncSecret',
+    policy: 'services/sts/policy/session-sync.yaml',
+    workload: 'session-sync',
+    folder: '/workloads/session-sync',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({ INTERNAL_API_SECRET: 'INTERNAL_API_SECRET_PROD' }),
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'SESSION_SYNC_SECRET',
+        'SESSION_SYNC_SECRET_PROD',
+        '/workloads/session-sync',
+        'SESSION_SYNC_SECRET',
+      ],
+      ['INTERNAL_API_SECRET_PROD', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch D (#13059).
+  'session-ingest': Object.freeze({
+    wrangler: 'services/session-ingest/wrangler.jsonc',
+    reader: 'services/session-ingest/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readSessionIngestSecret',
+    policy: 'services/sts/policy/session-ingest.yaml',
+    workload: 'session-ingest',
+    folder: '/workloads/session-ingest',
+    productionVars: NO_ALIASES,
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({
+      NEXTAUTH_SECRET: 'NEXTAUTH_SECRET_PROD',
+      INTERNAL_API_SECRET: 'INTERNAL_API_SECRET_PROD',
+      SESSION_SHARE_JWT_SECRET: 'SESSION_SHARE_JWT_SECRET_PROD',
+    }),
+    names: names([
+      ['NEXTAUTH_SECRET_PROD', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      ['INTERNAL_API_SECRET_PROD', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+      [
+        'SESSION_SHARE_JWT_SECRET_PROD',
+        'SESSION_SHARE_JWT_SECRET_PROD',
+        '/workloads/session-ingest',
+        'SESSION_SHARE_JWT_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch C (#13061).
+  'kilo-ai-attribution': Object.freeze({
+    wrangler: 'services/ai-attribution/wrangler.jsonc',
+    reader: 'services/ai-attribution/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readAiAttributionSecret',
+    policy: 'services/sts/policy/kilo-ai-attribution.yaml',
+    workload: 'kilo-ai-attribution',
+    folder: '/workloads/kilo-ai-attribution',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: NO_ALIASES,
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'ADMIN_SECRET',
+        'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
+        '/workloads/kilo-ai-attribution',
+        'ADMIN_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch C (#13061). Creates both shared targets (M142): AUTO_ROUTING_DECISION_SECRET and
+  // O11Y_CF_AE_API_TOKEN; it is the first table Worker that binds either.
+  'auto-routing': Object.freeze({
+    wrangler: 'services/auto-routing/wrangler.jsonc',
+    reader: 'services/auto-routing/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readAutoRoutingSecret',
+    policy: 'services/sts/policy/auto-routing.yaml',
+    workload: 'auto-routing',
+    folder: '/workloads/auto-routing',
+    productionVars: NO_ALIASES,
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({ INTERNAL_API_SECRET: 'INTERNAL_API_SECRET_PROD' }),
+    names: names([
+      ['INTERNAL_API_SECRET_PROD', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+      ['OPENROUTER_API_KEY', 'OPENROUTER_API_KEY', '/shared', 'OPENROUTER_API_KEY'],
+      ['O11Y_CF_AE_API_TOKEN', 'O11Y_CF_AE_API_TOKEN', '/shared', 'O11Y_CF_AE_API_TOKEN'],
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'AUTO_ROUTING_DECISION_SECRET',
+        'AUTO_ROUTING_DECISION_SECRET_PROD',
+        '/shared',
+        'AUTO_ROUTING_DECISION_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch C (#13061).
+  'cloudflare-scim-sync': Object.freeze({
+    wrangler: 'services/scim-sync/wrangler.jsonc',
+    reader: 'services/scim-sync/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readScimSyncSecret',
+    policy: 'services/sts/policy/cloudflare-scim-sync.yaml',
+    workload: 'cloudflare-scim-sync',
+    folder: '/workloads/cloudflare-scim-sync',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    // The staging deployment binds its own _STAGING entries, never a production one.
+    stagingStoreBindings: Object.freeze(
+      [
+        ['WORKOS_API_KEY', 'WORKOS_API_KEY_STAGING'],
+        ['WORKOS_CLIENT_ID', 'WORKOS_CLIENT_ID_STAGING'],
+        ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_STAGING'],
+      ].map(([binding, secretName]) =>
+        Object.freeze({ binding, store_id: STORE, secret_name: secretName })
+      )
+    ),
+    aliases: NO_ALIASES,
+    names: names([
+      ['WORKOS_API_KEY', 'WORKOS_API_KEY', '/workloads/cloudflare-scim-sync', 'WORKOS_API_KEY'],
+      ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+      [
+        'WORKOS_CLIENT_ID',
+        'WORKOS_CLIENT_ID',
+        '/workloads/cloudflare-scim-sync',
+        'WORKOS_CLIENT_ID',
+      ],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch D (#13059). The media pair is the kilo-chat-media bucket's own key, not the Web title.
+  'kilo-chat': Object.freeze({
+    wrangler: 'services/kilo-chat/wrangler.jsonc',
+    reader: 'services/kilo-chat/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readKiloChatSecret',
+    policy: 'services/sts/policy/kilo-chat.yaml',
+    workload: 'kilo-chat',
+    folder: '/workloads/kilo-chat',
+    productionVars: Object.freeze({ WORKER_ENV: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: NO_ALIASES,
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'GATEWAY_TOKEN_SECRET',
+        'GATEWAY_TOKEN_SECRET',
+        '/workloads/kilo-chat',
+        'GATEWAY_TOKEN_SECRET',
+      ],
+      [
+        'R2_ACCESS_KEY_ID',
+        'R2_ACCESS_KEY_ID_KILOCHAT_MEDIA',
+        '/workloads/kilo-chat',
+        'R2_ACCESS_KEY_ID',
+      ],
+      [
+        'R2_SECRET_ACCESS_KEY',
+        'R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA',
+        '/workloads/kilo-chat',
+        'R2_SECRET_ACCESS_KEY',
+      ],
+      ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
+  }),
+  // Batch D (#13059). Six reader keys are plain Worker secrets (M68, no copier route); the active
+  // OAuth key id stays a direct store binding outside the reader.
+  'git-token-service': Object.freeze({
+    wrangler: 'services/git-token-service/wrangler.jsonc',
+    reader: 'services/git-token-service/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readGitTokenServiceSecret',
+    policy: 'services/sts/policy/git-token-service.yaml',
+    workload: 'git-token-service',
+    folder: '/workloads/git-token-service',
+    productionVars: NO_ALIASES,
+    stagingStoreBindings: NONE,
+    aliases: NO_ALIASES,
+    names: names([
+      ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+      [
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_PROD',
+        '/workloads/git-token-service',
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+      ],
+      [
+        'BITBUCKET_CLIENT_ID',
+        'BITBUCKET_CLIENT_ID_PROD',
+        '/workloads/git-token-service',
+        'BITBUCKET_CLIENT_ID',
+      ],
+      [
+        'BITBUCKET_CLIENT_SECRET',
+        'BITBUCKET_CLIENT_SECRET_PROD',
+        '/workloads/git-token-service',
+        'BITBUCKET_CLIENT_SECRET',
+      ],
+    ]),
+    legacyStoreBindings: legacy([
+      ['BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID', 'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID_PROD'],
+    ]),
+    plainSecrets: Object.freeze([
+      'GITHUB_APP_PRIVATE_KEY',
+      'GITHUB_LITE_APP_PRIVATE_KEY',
+      'GITHUB_APP_CLIENT_SECRET',
+      'GITLAB_CLIENT_SECRET',
+      'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY',
+      'USER_GITHUB_APP_TOKEN_ACTIVE_PRIVATE_KEY',
+    ]),
+  }),
+  // Batch F (#13068). CF_ANALYTICS_API_KEY reads the shared O11Y_CF_AE_API_TOKEN: auto-routing
+  // creates it, kilo-ops binds the same store entry and only proves parity.
+  'kilo-ops': Object.freeze({
+    wrangler: 'services/kilo-ops/wrangler.jsonc',
+    reader: 'services/kilo-ops/src/secrets.ts',
+    readerMap: 'BINDINGS',
+    readerFn: 'readKiloOpsSecret',
+    policy: 'services/sts/policy/kilo-ops.yaml',
+    workload: 'kilo-ops',
+    folder: '/workloads/kilo-ops',
+    productionVars: Object.freeze({ ENVIRONMENT: 'production' }),
+    stagingStoreBindings: NONE,
+    aliases: Object.freeze({ O11Y_CF_AE_API_TOKEN: 'CF_ANALYTICS_API_KEY' }),
+    names: names([
+      ['CF_ANALYTICS_API_KEY', 'O11Y_CF_AE_API_TOKEN', '/shared', 'O11Y_CF_AE_API_TOKEN'],
+      ['GF_SECRET_KEY', 'GF_SECRET_KEY', '/workloads/kilo-ops', 'GF_SECRET_KEY'],
+    ]),
+    legacyStoreBindings: NONE,
+    plainSecrets: NONE,
   }),
 });
+
+/** Every reader key of a Worker: its store-bound lookup names and its plain-secret names. */
+export const readerKeysOf = src => [...src.names.map(r => r.secretKey), ...src.plainSecrets];
 
 export const sourceOf = batch =>
   Object.hasOwn(WORKER_SOURCES, String(batch?.sourceScript))
@@ -181,18 +460,57 @@ export function parseReaderBindings(readerText, readerMap = 'SECRETS_STORE_BINDI
 }
 
 /**
- * One Worker against the reviewed table and its tracked sources. The batch must be exactly the
- * table's batch for that Worker. Its WORKER_SOURCES names must equal the production Wrangler config
- * (binding -> store name), the reader map (target key = the STS lookup name that indexes that
- * binding) and the STS policy (exactly these keys). A target is never a store name and never
- * carries an environment suffix; the only key/binding differences are the reviewed aliases. Every
- * copy batch row must be exactly one names row, in the Worker's own workload folder.
+ * M142, for one Worker of `table`: a shared target's creating row must belong to the first table
+ * Worker whose reviewed source binds that /shared key, and every table Worker that binds it must
+ * bind the creator's very store entry (parity). Only the creator has a row; the others create
+ * nothing (a second row for the same target is a table duplicate).
  */
-export function checkSource(wranglerText, policyText, readerText, batch, src = sourceOf(batch)) {
+export function sharedTargetProblems(worker, table = TABLE, sources = WORKER_SOURCES) {
   const f = [];
-  if (TABLE_PROBLEMS.length > 0) f.push('table_invalid');
+  const bindingOf = (w, key) =>
+    (Object.hasOwn(sources, w) ? sources[w].names : []).find(
+      n => n.secretPath === '/shared' && n.secretKey === key
+    );
+  for (const r of table.rows) {
+    if (!SHARED_TARGETS.includes(r.target)) continue;
+    const key = r.target.slice('/shared/'.length);
+    const binders = table.workers.filter(w => bindingOf(w, key));
+    if (r.worker === worker && binders[0] !== worker) {
+      f.push(`shared_target_not_first_binder_${key}`);
+    }
+    const n = bindingOf(worker, key);
+    if (n && (n.storeId !== r.storeId || n.secretName !== r.secretName)) {
+      f.push(`shared_parity_differs_${key}`);
+    }
+  }
+  return f;
+}
+
+/**
+ * One Worker against the reviewed table and its tracked sources. The batch must be exactly the
+ * table's batch for that Worker. Its WORKER_SOURCES entry must equal the production Wrangler config
+ * (every store binding -> store name: `names` plus `legacyStoreBindings`), the reader map (each
+ * names row's target key = the STS lookup name that indexes its binding; the plain-secret keys
+ * index their own binding) and the STS policy (exactly the reader keys). A target lives in /shared
+ * exactly when it is a SHARED_KEYS name, is never another row's store name (its own may equal it)
+ * and never carries an environment suffix; the only key/binding differences are the reviewed
+ * aliases. Every copy batch row must be exactly one names row, in the Worker's own workload folder
+ * or an exact SHARED_TARGETS entry, and the shared rules hold (`sharedTargetProblems`). `table` is
+ * the checked-in table and `sources` the reviewed entries; tests pass fixtures.
+ */
+export function checkSource(
+  wranglerText,
+  policyText,
+  readerText,
+  batch,
+  src = sourceOf(batch),
+  table = TABLE,
+  sources = WORKER_SOURCES
+) {
+  const f = [];
+  if (table.problems.length > 0) f.push('table_invalid');
   const worker = String(batch?.sourceScript);
-  if (!Object.hasOwn(BATCHES, worker) || !same(batch, BATCHES[worker])) {
+  if (!Object.hasOwn(table.batches, worker) || !same(batch, table.batches[worker])) {
     f.push('batch_not_in_table');
   }
   const bv = validateBatch(batch);
@@ -203,8 +521,11 @@ export function checkSource(wranglerText, policyText, readerText, batch, src = s
     if (src.names.filter(n => same(nameRow(n), nameRow(r ?? {}))).length !== 1) {
       f.push(`batch_row_not_in_name_map_${r?.secretKey}`);
     }
-    if (r?.secretPath !== src.folder) f.push(`batch_row_folder_${r?.secretKey}`);
+    const shared = SHARED_TARGETS.includes(`${r?.secretPath}/${r?.secretKey}`);
+    if (r?.secretPath !== src.folder && !shared) f.push(`batch_row_folder_${r?.secretKey}`);
   }
+  f.push(...sharedTargetProblems(worker, table, sources));
+  if (src.folder !== `/workloads/${src.workload}`) f.push('source_folder');
   const cfg = parseJsonc(wranglerText);
   if (
     cfg.name !== worker ||
@@ -218,10 +539,14 @@ export function checkSource(wranglerText, policyText, readerText, batch, src = s
     storeId: s.store_id,
     secretName: s.secret_name,
   }));
-  if (!same(live, bindingRows(src.names))) f.push('source_bindings_differ');
-  if (!same(cfg.env?.staging?.secrets_store_secrets, src.stagingStoreBindings)) {
+  if (!sameStoreRows(live, sourceStoreRows(src))) f.push('source_bindings_differ');
+  if (!same(cfg.env?.staging?.secrets_store_secrets ?? [], src.stagingStoreBindings)) {
     f.push('source_staging_binds_store');
   }
+  for (const p of src.plainSecrets) {
+    if (live.some(b => b.binding === p)) f.push(`plain_secret_is_store_binding_${p}`);
+  }
+  const keys = readerKeysOf(src);
   let reader = null;
   try {
     reader = parseReaderBindings(readerText, src.readerMap);
@@ -229,11 +554,12 @@ export function checkSource(wranglerText, policyText, readerText, batch, src = s
     f.push('reader_map_unreadable');
   }
   if (reader) {
-    if (!same(Object.keys(reader).sort(), src.names.map(r => r.secretKey).sort())) {
-      f.push('reader_keys_differ');
-    }
+    if (!same(Object.keys(reader).sort(), [...keys].sort())) f.push('reader_keys_differ');
     for (const r of src.names) {
       if (reader[r.secretKey] !== r.binding) f.push(`reader_lookup_differs_${r.secretKey}`);
+    }
+    for (const p of src.plainSecrets) {
+      if (reader[p] !== p) f.push(`reader_lookup_differs_${p}`);
     }
     const aliases = Object.fromEntries(Object.entries(reader).filter(([k, b]) => k !== b));
     if (!same(aliases, src.aliases)) f.push('reader_aliases_differ');
@@ -246,15 +572,17 @@ export function checkSource(wranglerText, policyText, readerText, batch, src = s
   ) {
     f.push('policy_identity');
   }
-  if (!same([...(pol.lists.secrets ?? [])].sort(), src.names.map(r => r.secretKey).sort())) {
+  if (!same([...(pol.lists.secrets ?? [])].sort(), [...keys].sort())) {
     f.push('policy_targets_differ');
   }
+  const storeNamed = sourceStoreRows(src);
   for (const r of src.names) {
-    const inWorkload = r.secretKey.startsWith(src.workloadPrefix);
-    if (r.secretPath !== (inWorkload ? src.folder : '/shared')) {
+    if (r.secretPath !== (SHARED_KEYS.includes(r.secretKey) ? '/shared' : src.folder)) {
       f.push(`target_folder_${r.secretKey}`);
     }
-    if (src.names.some(x => x.secretName === r.secretKey))
+    // Another row's store name as a target is refused; a row whose store name is its own lookup
+    // name (WORKOS_API_KEY -> WORKOS_API_KEY) is allowed: the reader proof binds target = lookup.
+    if (storeNamed.some(x => x.binding !== r.binding && x.secretName === r.secretKey))
       f.push(`target_is_store_name_${r.secretKey}`);
     if (/_(PROD|DEV|STAGING)$/.test(r.secretKey))
       f.push(`target_environment_suffix_${r.secretKey}`);
@@ -316,27 +644,28 @@ export function mappingTable(rows) {
  * Reads one Worker's tracked sources under `root`, validates them (`checkSource`) and returns the
  * names-only table of all its lookup names: {gate:"table", worker, ok, failures, rows:[{binding,
  * storeSecretName, lookup, target, policyEntry}], table}. Callers must refuse when `ok` is false.
+ * A Worker whose reader module is absent or whose policy grants nothing yet (its batch PR is not on
+ * main) is refused with the single failure `source_not_on_main: <worker>`.
  */
-export function validatedNameTable(batch, root = REPO_ROOT) {
+export function validatedNameTable(batch, root = REPO_ROOT, table = TABLE) {
   const src = sourceOf(batch);
   const worker = typeof batch?.sourceScript === 'string' ? batch.sourceScript : null;
-  if (!src) {
-    return {
-      gate: 'table',
-      worker,
-      ok: false,
-      failures: checkSource('', '', '', batch, null),
-      rows: [],
-      table: '',
-    };
+  const refused = failures => ({ gate: 'table', worker, ok: false, failures, rows: [], table: '' });
+  if (!src) return refused(checkSource('', '', '', batch, null, table));
+  if (![src.wrangler, src.reader, src.policy].every(p => existsSync(join(root, p)))) {
+    return refused([`source_not_on_main: ${worker}`]);
   }
   const sources = readTrackedSource(src, root);
+  if ((parsePolicy(sources.policyText).lists.secrets ?? []).length === 0) {
+    return refused([`source_not_on_main: ${worker}`]);
+  }
   const failures = checkSource(
     sources.wranglerText,
     sources.policyText,
     sources.readerText,
     batch,
-    src
+    src,
+    table
   );
   let rows = [];
   try {
@@ -365,14 +694,14 @@ export function validatedNameTable(batch, root = REPO_ROOT) {
 }
 
 /** A rendered config file must equal `buildConfig(pins)` exactly. */
-export function checkRenderedConfig(text, pins, srcDir = SRC_DIR) {
+export function checkRenderedConfig(text, pins, srcDir = SRC_DIR, table = TABLE) {
   let cfg;
   try {
     cfg = JSON.parse(text);
   } catch {
     return ['config_unparsable'];
   }
-  return same(cfg, buildConfig(pins, srcDir)) ? [] : ['config_not_closed'];
+  return same(cfg, buildConfig(pins, srcDir, table)) ? [] : ['config_not_closed'];
 }
 
 export function moduleHashes(srcDir = SRC_DIR) {
@@ -710,7 +1039,7 @@ function preflightOf(input, batch, sources) {
 
   const source = servingVersion(meta.source);
   if (!source) f.push('source_serving_version_not_single');
-  else if (!same(storeRows(source.bindings), bindingRows(src?.names ?? []))) {
+  else if (!sameStoreRows(storeRows(source.bindings), sourceStoreRows(src))) {
     f.push('source_live_bindings_differ');
   }
   const store = isRecord(meta.store) ? meta.store : {};
@@ -970,7 +1299,7 @@ export function evaluatePostRunCloudflare(input, batch, sources = WORKER_SOURCES
   const source = servingVersion(meta?.source);
   if (
     !source ||
-    !same(storeRows(source.bindings), bindingRows(sources[batch.sourceScript]?.names ?? [])) ||
+    !sameStoreRows(storeRows(source.bindings), sourceStoreRows(sources[batch.sourceScript])) ||
     !same(meta.source.deployments, pre?.pins?.sourceDeployments)
   ) {
     f.push('source_changed_during_run');
@@ -1071,19 +1400,19 @@ const ALL_WORKER_GATES = ['source', 'table'];
 
 /**
  * One gate verdict. `source` and `table` cover the whole table and every Worker; every other gate
- * judges `worker`'s batch (a Worker of the valid table). Null for usage errors.
+ * judges `worker`'s batch (a Worker of the valid table). Null for usage errors. `table` is the
+ * checked-in table; tests pass a fixture table.
  */
-export function runGate(gate, stdinText, worker) {
+export function runGate(gate, stdinText, worker, table = TABLE) {
   if (ALL_WORKER_GATES.includes(gate)) {
-    const per = WORKERS.map(w =>
-      gate === 'table'
-        ? validatedNameTable(BATCHES[w])
-        : { worker: w, ...verdict('source', validatedNameTable(BATCHES[w]).failures) }
-    );
-    const failures = [...TABLE_PROBLEMS.map(p => `table_${p}`), ...per.flatMap(v => v.failures)];
+    const per = table.workers.map(w => {
+      const v = validatedNameTable(table.batches[w], REPO_ROOT, table);
+      return gate === 'table' ? v : { worker: w, ...verdict('source', v.failures) };
+    });
+    const failures = [...table.problems.map(p => `table_${p}`), ...per.flatMap(v => v.failures)];
     return { gate, ok: failures.length === 0, failures, workers: per, modules: moduleHashes() };
   }
-  const batch = Object.hasOwn(BATCHES, String(worker)) ? BATCHES[worker] : null;
+  const batch = Object.hasOwn(table.batches, String(worker)) ? table.batches[worker] : null;
   if (!batch) return null;
   if (gate === 'receipt') {
     const { ok, failures, receipt } = parseReceipt(String(stdinText).trim(), batch);
@@ -1095,7 +1424,9 @@ export function runGate(gate, stdinText, worker) {
   } catch {
     return null;
   }
-  if (gate === 'config') return verdict(gate, checkRenderedConfig(input?.configText, input?.pins));
+  if (gate === 'config') {
+    return verdict(gate, checkRenderedConfig(input?.configText, input?.pins, SRC_DIR, table));
+  }
   return STDIN_GATES[gate]?.(input, batch) ?? null;
 }
 

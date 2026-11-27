@@ -2,12 +2,11 @@
 // target. Each row copies one production Secrets Store binding of one source Worker into one
 // Create-only Infisical production target: in that Worker's own workload folder, or (M142) one of
 // the exact core.mjs SHARED_TARGETS, created once by the first table Worker that binds it; a later
-// Worker binding the same store entry proves parity in checks.mjs and creates nothing. secrets-
-// cutover posts the rows in ~/.omp/progress/secrets-phase234-files/coordination.md (section
-// "M122/M122b Worker runtime source handoff to kc-ci-sts"); each change is a reviewed edit of this
-// file plus, for a new Worker, its checks.mjs `WORKER_SOURCES` entry. Never a runtime parameter.
+// Worker binding the same store entry proves parity in checks.mjs and creates nothing. Each change
+// is a reviewed edit of this file plus, for a new Worker, its checks.mjs `WORKER_SOURCES` entry.
+// Never a runtime parameter.
 //
-// Not here (M142): /shared/OPENROUTER_API_KEY, which secrets-cutover alone creates; the
+// Not here (M142): /shared/OPENROUTER_API_KEY, created by a separate reviewed copy; the
 // Notifications Expo token, its own one-shot run; the per-script Worker secrets, which have no
 // copier route (M68). A Worker's rows can run only once its reader and STS policy are on main
 // (checks.mjs `source_not_on_main`). Remove a row whose target already exists: Create-only

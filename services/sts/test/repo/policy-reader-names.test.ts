@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { experimental_readRawConfig } from 'wrangler';
 import { PolicySchema } from '../../src/policy/schema';
@@ -19,7 +19,8 @@ import { parseWorkerConfig, workerConfigPaths, type WorkerConfig } from './worke
  * - and the wrangler manifest: an entry's binding may never be a `vars` entry, and where the
  *   manifest declares a Secrets Store binding of that name, its `secret_name` is the name the
  *   lookup name denotes — that name, or that name behind a manager prefix — with or without the
- *   `_PROD` suffix the first entries used.
+ *   `_PROD` suffix the first entries used, except a row whose store entry names the resource after
+ *   the lookup name (`STORE_SUFFIX_EXCEPTIONS`, kept to one explicit row per secret).
  *
  * A name present in one place and absent from another fails only at cutover: the legacy read keeps
  * working while `sts` answers `not_granted`.
@@ -39,6 +40,20 @@ const BINDINGS_MAPS = [
   /^(?:export )?const SECRETS_STORE_BINDINGS = \{/m,
 ];
 
+/**
+ * The store entries whose name carries a resource suffix instead of a manager prefix, so the rule
+ * below cannot derive them. Listed one row at a time: an entry is accepted only when its
+ * `secret_name` is exactly the value here, never because it merely shares the canonical name's
+ * prefix, which would let a row copy another app's key of the same name.
+ */
+const STORE_SUFFIX_EXCEPTIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  // kilo-chat reads the media bucket's dedicated R2 token, not the account-wide one.
+  'kilo-chat': {
+    R2_ACCESS_KEY_ID: 'R2_ACCESS_KEY_ID_KILOCHAT_MEDIA',
+    R2_SECRET_ACCESS_KEY: 'R2_SECRET_ACCESS_KEY_KILOCHAT_MEDIA',
+  },
+};
+
 /** The map's entries of a source file, or null when it declares no such map. */
 function bindingEntries(source: string): Array<[stsName: string, binding: string]> | null {
   for (const start of BINDINGS_MAPS) {
@@ -56,11 +71,24 @@ function bindingEntries(source: string): Array<[stsName: string, binding: string
   return null;
 }
 
-/** Every Worker config, by the directory it is deployed from, and by its top-level name. */
+/**
+ * The config a directory deploys from. `wrangler.test.jsonc`, `wrangler.dev.jsonc` and the
+ * fixtures under `test/` are harnesses, not workloads: they carry their own `name` and no store
+ * entries, so including them would register a workload no policy grants and make the manifest
+ * check read the harness instead of the deployment.
+ */
+const DEPLOYMENT_CONFIGS: Readonly<Record<string, true>> = {
+  'wrangler.jsonc': true,
+  'wrangler.json': true,
+  'wrangler.toml': true,
+};
+
+/** Every deployable Worker config, by the directory it is deployed from, and by its top-level name. */
 function configs(): { byDir: Map<string, WorkerConfig>; dirOf: Map<string, string> } {
   const byDir = new Map<string, WorkerConfig>();
   const dirOf = new Map<string, string>();
   for (const path of workerConfigPaths(repoRoot)) {
+    if (DEPLOYMENT_CONFIGS[basename(path)] !== true) continue;
     // Wrangler's own JSON, JSONC and TOML parser, the one a deploy uses.
     const raw = experimental_readRawConfig({ config: join(repoRoot, path) }).rawConfig;
     const parsed = parseWorkerConfig(path, raw);
@@ -118,13 +146,22 @@ describe('policy secrets match the reader that serves them', () => {
         // binding names it reads.
         const entry = storeEntries.find(secret => secret.binding === binding);
         if (entry !== undefined) {
-          const base = entry.secret_name.endsWith('_PROD')
-            ? entry.secret_name.slice(0, -'_PROD'.length)
-            : entry.secret_name;
-          expect(
-            base === stsName || stsName.endsWith(`_${base}`),
-            `${workload}: ${stsName} -> ${binding} stores ${entry.secret_name}`
-          ).toBe(true);
+          const exception = STORE_SUFFIX_EXCEPTIONS[workload]?.[stsName];
+          if (exception !== undefined) {
+            // Named row: the entry is that exact secret, not merely one sharing the name's prefix.
+            expect(
+              entry.secret_name,
+              `${workload}: ${stsName} -> ${binding} stores ${entry.secret_name}`
+            ).toBe(exception);
+          } else {
+            const base = entry.secret_name.endsWith('_PROD')
+              ? entry.secret_name.slice(0, -'_PROD'.length)
+              : entry.secret_name;
+            expect(
+              base === stsName || stsName.endsWith(`_${base}`),
+              `${workload}: ${stsName} -> ${binding} stores ${entry.secret_name}`
+            ).toBe(true);
+          }
         }
       }
     });

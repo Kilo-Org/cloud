@@ -15,6 +15,7 @@ import {
   leaderboardUsageWindow,
   rebuildLeaderboardUsageDay,
   settledLeaderboardUsageDays,
+  waitForReplayCatchUp,
 } from '@/lib/leaderboard-usage-rollup';
 
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -130,6 +131,8 @@ describe('leaderboard usage rollup', () => {
       slices: 96,
       durationMs: expect.any(Number),
       slowestSliceMs: expect.any(Number),
+      replayWaitMs: 0,
+      conflictRetries: 0,
     });
     const shared = {
       usage_date: '2026-11-10',
@@ -357,6 +360,7 @@ describe('leaderboard usage rollup', () => {
       }),
     });
     const failingReadDb = {
+      execute: db.execute.bind(db),
       transaction: async () => {
         throw timeout;
       },
@@ -373,9 +377,83 @@ describe('leaderboard usage rollup', () => {
       stage: 'read',
       sliceStart: '2026-11-10T00:00:00.000Z',
       slicesCompleted: 0,
+      replayWaitMs: 0,
+      conflictRetries: 0,
       durationMs: expect.any(Number),
       errorName: 'Error',
       postgresCode: '57014',
     });
+  });
+
+  function replayConflict(): Error {
+    return Object.assign(new Error('Failed query'), {
+      cause: Object.assign(new Error('canceling statement due to conflict with recovery'), {
+        code: '40001',
+      }),
+    });
+  }
+
+  test('retries a slice cancelled by a replay conflict and keeps the day', async () => {
+    await insertUsage({ created_at: '2026-11-10T00:05:00.000Z' });
+    await insertUsage({ created_at: '2026-11-10T18:50:00.000Z' });
+    let calls = 0;
+    const flakyReadDb = {
+      execute: db.execute.bind(db),
+      transaction: ((callback: Parameters<DrizzleDatabase['transaction']>[0]) => {
+        calls++;
+        if (calls === 1) throw replayConflict();
+        return db.transaction(callback);
+      }) as DrizzleDatabase['transaction'],
+    } as unknown as DrizzleDatabase;
+
+    const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb: flakyReadDb, db });
+
+    expect(build).toMatchObject({ rows: 1, slices: 96, conflictRetries: 1 });
+    expect(calls).toBe(97);
+    expect((await rollupRows()).map(row => row.request_count)).toEqual([2]);
+  });
+
+  test('gives up on a slice after three replay conflicts', async () => {
+    let calls = 0;
+    const conflictingReadDb = {
+      execute: db.execute.bind(db),
+      transaction: async () => {
+        calls++;
+        throw replayConflict();
+      },
+    } as unknown as DrizzleDatabase;
+
+    await expect(
+      rebuildLeaderboardUsageDay('2026-11-10', { readDb: conflictingReadDb, db })
+    ).rejects.toThrow('Failed query');
+
+    expect(calls).toBe(3);
+    const [line] = jest.mocked(errorExceptInTest).mock.calls.at(-1) as [string];
+    expect(JSON.parse(line)).toMatchObject({ postgresCode: '40001', conflictRetries: 2 });
+  });
+
+  test('waits until the replica has replayed what it had received', async () => {
+    const replies = [
+      [{ receive_lsn: '3E72/CFDFAC50' }],
+      [{ caught_up: false }],
+      [{ caught_up: true }],
+    ];
+    const queries: string[] = [];
+    const replicaDb = {
+      execute: async (query: Parameters<DrizzleDatabase['execute']>[0]) => {
+        queries.push(JSON.stringify(query));
+        return { rows: replies.shift() ?? [] };
+      },
+    } as unknown as DrizzleDatabase;
+
+    const waitedMs = await waitForReplayCatchUp(replicaDb);
+
+    expect(waitedMs).toBeGreaterThanOrEqual(90);
+    expect(queries).toHaveLength(3);
+    expect(replies).toEqual([]);
+  });
+
+  test('does not wait on a primary', async () => {
+    await expect(waitForReplayCatchUp(db)).resolves.toBe(0);
   });
 });

@@ -252,13 +252,25 @@ jobs:
             echo 'EXTENSION_NOTES_EOF'
           } >> "$GITHUB_OUTPUT"
 
-      # Same token as the kilo-app and kilo-mcp release tags: GitHub refuses a
-      # GITHUB_TOKEN tag push when the tagged commit's .github/workflows differs
-      # from every branch tip. The token reaches only this step, never
-      # .git/config. A rerun reuses the tag an earlier attempt pushed.
+      # A kilo-maintainer GitHub App token, as for the kilo-app and kilo-mcp
+      # release tags: GitHub refuses a GITHUB_TOKEN tag push when the tagged
+      # commit's .github/workflows differs from every branch tip, so the token
+      # needs Workflows: write as well as Contents: write. The token reaches only
+      # the tag step, never .git/config. A rerun reuses the tag an earlier
+      # attempt pushed.
+      - name: Mint the release tag token
+        id: release-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: Iv23liaoCOSZgYYc58tR # kilo-maintainer
+          private-key: ${{ secrets.KILO_MAINTAINER_APP_SECRET }}
+          repositories: cloud
+          permission-contents: write
+          permission-workflows: write
+
       - name: Tag the release
         env:
-          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ steps.release-token.outputs.token }}
           VERSION: ${{ needs.build-artifacts.outputs.version }}
           CHROME_SHA256: ${{ needs.build-artifacts.outputs.chrome_sha256 }}
           FIREFOX_SHA256: ${{ needs.build-artifacts.outputs.firefox_sha256 }}

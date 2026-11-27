@@ -168,14 +168,26 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-      # Same token as the kilo-app release tags: GitHub refuses a GITHUB_TOKEN
-      # tag push when the tagged commit's .github/workflows differs from every
-      # branch tip, and the deployed commit is often behind main. The token
-      # reaches only this step, never .git/config.
+      # A kilo-maintainer GitHub App token, as for the kilo-app release tags:
+      # GitHub refuses a GITHUB_TOKEN tag push when the tagged commit's
+      # .github/workflows differs from every branch tip, and the deployed commit
+      # is often behind main, so the token needs Workflows: write as well as
+      # Contents: write. The token reaches only this step, never .git/config.
+      - name: Mint the release tag token
+        id: release-token
+        if: steps.bundle.outputs.release == 'true'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: Iv23liaoCOSZgYYc58tR # kilo-maintainer
+          private-key: ${{ secrets.KILO_MAINTAINER_APP_SECRET }}
+          repositories: cloud
+          permission-contents: write
+          permission-workflows: write
+
       - name: Tag the release
         if: steps.bundle.outputs.release == 'true'
         env:
-          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ steps.release-token.outputs.token }}
           TAG: ${{ steps.check.outputs.tag }}
           BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
         run: |

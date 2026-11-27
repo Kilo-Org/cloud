@@ -617,6 +617,24 @@ jobs:
           printf '%s\n' "$IDENTITY"
           printf '%s\n' "$IDENTITY" | sed -n 's/^\(ios_build\|android_build\)=/\1=/p' >> "$GITHUB_OUTPUT"
 
+      # Both tag pushes use a kilo-maintainer GitHub App token with Contents:
+      # write and Workflows: write: GitHub refuses a GITHUB_TOKEN tag push when
+      # the tagged commit's .github/workflows differs from every branch tip,
+      # which happens whenever a workflow change merges while this job runs.
+      # Each push mints its own token, because an installation token expires
+      # after an hour and the submissions between the two pushes can outlast
+      # it. The tokens reach only the two push steps, never .git/config, so
+      # pnpm and eas-cli cannot read them.
+      - name: Mint the iOS upload marker token
+        id: marker-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: Iv23liaoCOSZgYYc58tR # kilo-maintainer
+          private-key: ${{ secrets.KILO_MAINTAINER_APP_SECRET }}
+          repositories: cloud
+          permission-contents: write
+          permission-workflows: write
+
       # The cap ledger must never under-count, so the marker is pushed BEFORE
       # the submission, not after it succeeds. App Store Connect can accept the
       # IPA and the run can then be interrupted, or its push can fail, and
@@ -634,16 +652,11 @@ jobs:
       # same commit pushes a second, distinct marker instead of failing on a
       # name that already exists. An annotated tag needs a tagger identity; the
       # runner has none.
-      # Both tag pushes use KILO_APP_RELEASE_TOKEN (workflow scope): GitHub
-      # refuses a GITHUB_TOKEN tag push when the tagged commit's
-      # .github/workflows differs from every branch tip, which happens whenever
-      # a workflow change merges while this job runs. The token reaches only
-      # these two steps, never .git/config, so pnpm and eas-cli cannot read it.
       # GIT_CONFIG_* is command-line level: the empty value drops the persisted
       # GITHUB_TOKEN header, and the second entry sends the release token.
       - name: Mark the iOS upload
         env:
-          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ steps.marker-token.outputs.token }}
         run: |
           AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
           echo "::add-mask::$AUTH"
@@ -668,11 +681,21 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: pnpm exec eas submit --profile production --platform android --non-interactive --path artifacts/app.aab
 
+      - name: Mint the release tag token
+        id: release-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: Iv23liaoCOSZgYYc58tR # kilo-maintainer
+          private-key: ${{ secrets.KILO_MAINTAINER_APP_SECRET }}
+          repositories: cloud
+          permission-contents: write
+          permission-workflows: write
+
       # Release detection only: the next run reads this to find the last release.
       # The upload cap never counts it (a partial run writes no release tag).
       - name: Tag release
         env:
-          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
+          RELEASE_TOKEN: ${{ steps.release-token.outputs.token }}
         run: |
           AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
           echo "::add-mask::$AUTH"

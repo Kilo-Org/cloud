@@ -8,6 +8,7 @@ import { SessionMetricsParamsSchema } from './session-metrics-schema';
 import type { SessionMetricsParamsInput } from './session-metrics-schema';
 import { writeSessionMetricsDataPoint } from './session-metrics-analytics';
 import { summarizeInternalAuthCounter } from './internal-auth-counter';
+import { runScheduledJobs } from './scheduled';
 
 export { AlertConfigDO } from './alerting/AlertConfigDO';
 
@@ -23,13 +24,11 @@ export default class extends WorkerEntrypoint<Env> {
     return app.fetch(request, this.env, this.ctx);
   }
 
-  async scheduled(_controller: ScheduledController): Promise<void> {
-    try {
-      await evaluateAlerts(this.env, this.ctx);
-    } catch {
-      // The counter summary below must run even when alert evaluation fails.
-    }
-    await summarizeInternalAuthCounter(this.env, this.ctx);
+  async scheduled(controller: ScheduledController): Promise<void> {
+    await runScheduledJobs(
+      () => evaluateAlerts(this.env, this.ctx),
+      () => summarizeInternalAuthCounter(this.env, this.ctx, controller.scheduledTime)
+    );
   }
 
   /** RPC method called by session-ingest via service binding. */

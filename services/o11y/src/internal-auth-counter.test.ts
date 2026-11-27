@@ -8,11 +8,21 @@ const env = {
   O11Y_CF_AE_API_TOKEN: {},
 } as unknown as InternalAuthCounterEnv;
 
-const MINUTE = 1795769280;
-const WINDOW = MINUTE + 60;
+const WINDOW = 1795769220;
+/** Three minutes after the window: the cron's scheduled time for the run that reads it. */
+const SCHEDULED_MS = (WINDOW + 180) * 1000;
+const MINUTE = WINDOW + 60;
 
 function lines(log: { mock: { calls: unknown[][] } }): Record<string, unknown>[] {
   return log.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+}
+
+function stubQuery(rows: unknown[]) {
+  const fetchMock = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ data: rows })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
 }
 
 afterEach(() => {
@@ -21,48 +31,69 @@ afterEach(() => {
 });
 
 describe('summarizeInternalAuthCounter', () => {
-  it('writes one kilo_internal_auth line per Analytics Engine row', async () => {
+  it('writes one kilo_internal_auth line per valid row and pins the closed window', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        Response.json({
-          data: [
-            {
-              receiver: 'usage-ingest',
-              route: 'usage_publish',
-              auth: 'legacy_shared_secret',
-              caller: 'unknown',
-              accepted: 12,
-              minute: MINUTE,
-              window: WINDOW,
-            },
-            {
-              receiver: 'notifications',
-              route: 'dispatch',
-              auth: 'sts',
-              caller: 'web',
-              accepted: '3',
-              minute: MINUTE,
-              window: WINDOW,
-            },
-            // A zero row is not evidence and writes nothing.
-            {
-              receiver: 'notifications',
-              route: 'glanceable_refresh',
-              auth: 'legacy_shared_secret',
-              caller: 'unknown',
-              accepted: 0,
-              minute: MINUTE,
-              window: WINDOW,
-            },
-            { receiver: 'notifications' },
-          ],
-        })
-      )
-    );
+    const fetchMock = stubQuery([
+      {
+        receiver: 'usage-ingest',
+        route: 'usage_publish',
+        auth: 'legacy_shared_secret',
+        caller: 'unknown',
+        accepted: 12,
+        minute: MINUTE,
+      },
+      {
+        receiver: 'notifications',
+        route: 'dispatch',
+        auth: 'sts',
+        caller: 'web',
+        accepted: '3',
+        minute: MINUTE,
+      },
+      // A zero row writes nothing.
+      {
+        receiver: 'notifications',
+        route: 'glanceable_refresh',
+        auth: 'legacy_shared_secret',
+        caller: 'unknown',
+        accepted: 0,
+        minute: MINUTE,
+      },
+      // An unknown receiver, an unknown auth method and a bad route are refused.
+      {
+        receiver: 'o11y',
+        route: 'api_metrics_write',
+        auth: 'legacy_shared_secret',
+        caller: 'unknown',
+        accepted: 5,
+        minute: MINUTE,
+      },
+      {
+        receiver: 'notifications',
+        route: 'dispatch',
+        auth: 'something_else',
+        caller: 'unknown',
+        accepted: 5,
+        minute: MINUTE,
+      },
+      {
+        receiver: 'notifications',
+        route: 'Dispatch!',
+        auth: 'sts',
+        caller: 'unknown',
+        accepted: 5,
+        minute: MINUTE,
+      },
+      { receiver: 'notifications' },
+    ]);
 
-    await summarizeInternalAuthCounter(env);
+    await summarizeInternalAuthCounter(env, undefined, SCHEDULED_MS);
+
+    const sql = String((fetchMock.mock.calls[0]?.[1] as { body?: string } | undefined)?.body);
+    expect(sql).toContain(`toDateTime(${WINDOW})`);
+    expect(sql).toContain(`toDateTime(${WINDOW + 60})`);
+    expect(sql).toContain('toUInt32(index1)');
+    expect(sql).toContain('GROUP BY receiver, route, auth, caller, minute');
 
     expect(lines(log)).toEqual([
       {
@@ -90,6 +121,9 @@ describe('summarizeInternalAuthCounter', () => {
         window: WINDOW,
       },
       { event: 'o11y_internal_auth_summary_failed', reason: 'row' },
+      { event: 'o11y_internal_auth_summary_failed', reason: 'row' },
+      { event: 'o11y_internal_auth_summary_failed', reason: 'row' },
+      { event: 'o11y_internal_auth_summary_failed', reason: 'row' },
     ]);
   });
 
@@ -100,7 +134,7 @@ describe('summarizeInternalAuthCounter', () => {
       vi.fn(async () => new Response('denied', { status: 403 }))
     );
 
-    await summarizeInternalAuthCounter(env);
+    await summarizeInternalAuthCounter(env, undefined, SCHEDULED_MS);
 
     expect(lines(log)).toEqual([
       { event: 'o11y_internal_auth_summary_failed', reason: 'query', status: 403 },
@@ -116,7 +150,9 @@ describe('summarizeInternalAuthCounter', () => {
       })
     );
 
-    await expect(summarizeInternalAuthCounter(env)).resolves.toBeUndefined();
+    await expect(
+      summarizeInternalAuthCounter(env, undefined, SCHEDULED_MS)
+    ).resolves.toBeUndefined();
     expect(lines(log)).toEqual([{ event: 'o11y_internal_auth_summary_failed', reason: 'fetch' }]);
   });
 });

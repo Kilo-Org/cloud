@@ -174,7 +174,7 @@ describe('dual mode', () => {
     stubKeySet();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { env } = setup({ USAGE_INGEST_PUBLISH_AUTH: 'dual' });
+    const { env, writeDataPoint } = setup({ USAGE_INGEST_PUBLISH_AUTH: 'dual' });
 
     expect((await worker.fetch(publish(`Bearer ${SECRET}`), env)).status).toBe(202);
     expect((await worker.fetch(publish(await stsBearer()), env)).status).toBe(202);
@@ -198,6 +198,13 @@ describe('dual mode', () => {
         count: 1,
       }),
     ]);
+    // Both accepted requests also become one Analytics Engine data point each.
+    expect(writeDataPoint).toHaveBeenCalledTimes(2);
+    expect(writeDataPoint).toHaveBeenNthCalledWith(1, {
+      blobs: ['usage-ingest', 'usage_publish', 'legacy_shared_secret', 'unknown'],
+      doubles: [1],
+      indexes: [expect.any(String)],
+    });
   });
 
   it('accepts the secret and a usage-ingest:usage.publish STS token, and labels each', async () => {

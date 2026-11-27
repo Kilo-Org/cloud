@@ -1,14 +1,13 @@
 import 'server-only';
 
-import type { EncryptedData, OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
+import type { OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
 import {
   assertSealable,
-  OBSOLETE_STATIC_KEY_PLACEHOLDER,
   openKmsCredential,
-  sealKmsCredential,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import {
   createByokDataKey,
+  encryptByokWithDataKey,
   type ByokDataKey,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
@@ -115,18 +114,14 @@ export async function createOpenAiChatGptSealingKey(
   return { keyId, dataKey };
 }
 
-/** The payload columns of a connection write. */
+/** The payload column of a connection write. */
 export function sealOpenAiChatGptConnection(
   connection: OpenAiChatGptConnection,
   sealingKey: OpenAiChatGptSealingKey
-): {
-  encrypted_connection: EncryptedData;
-  encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope;
-} {
+): { encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope } {
   return {
-    encrypted_connection: OBSOLETE_STATIC_KEY_PLACEHOLDER,
     encrypted_connection_envelope: {
-      ...sealKmsCredential(JSON.stringify(connection), sealingKey.dataKey),
+      ...encryptByokWithDataKey(JSON.stringify(connection), sealingKey.dataKey),
       key_id: sealingKey.keyId,
     },
   };

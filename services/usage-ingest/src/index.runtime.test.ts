@@ -90,7 +90,7 @@ it.each(['url', 'secret'])(
       expect(serialized).toContain('invalid_event');
       expect(serialized).not.toContain('usage_ingest_receipt');
       expect(serialized).not.toContain('synthetic-writer-secret');
-      expect(serialized).not.toContain(usage.metadata.user_prompt_prefix);
+      expect(serialized).not.toContain(usage.metadata.http_user_agent);
     } finally {
       try {
         await worker?.dispose();

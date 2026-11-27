@@ -41,6 +41,8 @@
   "include": [
     "next-env.d.ts",
     "src/**/*",
+    // `src/**/*` skips dot directories.
+    "src/app/.well-known/**/*",
     // These files are global and module-augmentation declarations that no
     // module imports, so the web program lists this directory. Every
     // importable web-shared module reaches the program through the

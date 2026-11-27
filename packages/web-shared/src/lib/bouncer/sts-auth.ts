@@ -449,8 +449,9 @@ declare global {
  * Installs the auth for `caller` with the Bouncer scopes its STS policy grants
  * (`BOUNCER_APP_SCOPES`); called once from the `instrumentation.ts` of `apps/web` and
  * `apps/ai-gateway`. In `dual` or `sts` it starts importing the transport (no network call); in
- * `sts` it also starts reading every granted scope, so the first mint runs at startup. In `legacy`
- * nothing loads, and the flag is still read on every call.
+ * `sts` it also starts reading every granted scope when the function has its OIDC token outside a
+ * request, so the first mint runs at startup. In `legacy` nothing loads, and the flag is still read
+ * on every call.
  */
 export function installBouncerAuth(caller: BouncerCaller): void {
   globalThis.__kilocodeBouncerAuth = createBouncerAuth({
@@ -466,7 +467,13 @@ export function installBouncerAuth(caller: BouncerCaller): void {
     },
     waitUntil,
     preload: ['dual', 'sts'].includes(bouncerClientAuthMode(process.env.BOUNCER_CLIENT_AUTH)),
-    prewarm: bouncerClientAuthMode(process.env.BOUNCER_CLIENT_AUTH) === 'sts',
+    // At startup there is no request, so no `x-vercel-oidc-token` header: the identity comes from
+    // `VERCEL_OIDC_TOKEN_FILE` or `VERCEL_OIDC_TOKEN` (`@vercel/oidc`). Without either, a startup
+    // read would fail and put the scope into the token client's backoff, so it is skipped and the
+    // first calls mint within their own wait.
+    prewarm:
+      bouncerClientAuthMode(process.env.BOUNCER_CLIENT_AUTH) === 'sts' &&
+      Boolean(process.env.VERCEL_OIDC_TOKEN_FILE || process.env.VERCEL_OIDC_TOKEN),
   });
 }
 

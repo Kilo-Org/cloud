@@ -50,7 +50,13 @@ jest.mock('@vercel/functions/oidc', () => ({
 
 const mockFetch = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
 const realFetch = global.fetch;
-const runtimeNames = ['VERCEL_ENV', 'VERCEL_TARGET_ENV', 'BOUNCER_CLIENT_AUTH'] as const;
+const runtimeNames = [
+  'VERCEL_ENV',
+  'VERCEL_TARGET_ENV',
+  'BOUNCER_CLIENT_AUTH',
+  'VERCEL_OIDC_TOKEN',
+  'VERCEL_OIDC_TOKEN_FILE',
+] as const;
 const savedRuntime = Object.fromEntries(runtimeNames.map(name => [name, process.env[name]]));
 
 function setRuntime(values: Partial<Record<(typeof runtimeNames)[number], string>>): void {
@@ -181,6 +187,7 @@ describe('the installed Bouncer auth with the real transport', () => {
       VERCEL_ENV: 'production',
       VERCEL_TARGET_ENV: 'production',
       BOUNCER_CLIENT_AUTH: 'sts',
+      VERCEL_OIDC_TOKEN: 'startup-oidc-token',
     });
     installBouncerAuth('kilocode-ai-gateway');
     await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
@@ -195,6 +202,17 @@ describe('the installed Bouncer auth with the real transport', () => {
     const [headers] = bouncerCalls();
     expect(headers.get('authorization')).toBe('Bearer sts-decide-token');
     expect(headers.get('x-internal-api-key')).toBeNull();
+  });
+
+  it('reads nothing at install in sts without a startup OIDC token', async () => {
+    setRuntime({
+      VERCEL_ENV: 'production',
+      VERCEL_TARGET_ENV: 'production',
+      BOUNCER_CLIENT_AUTH: 'sts',
+    });
+    installBouncerAuth('kilocode-ai-gateway');
+    await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
+    expect(stsCalls()).toEqual([]);
   });
 
   it('delivers a usage event with the legacy key alone while its token is not held yet', async () => {

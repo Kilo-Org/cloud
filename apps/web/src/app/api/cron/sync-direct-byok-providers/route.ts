@@ -7,7 +7,6 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { alertIfSyncStale } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
 
 // The cron job runs every 5 minutes; keep this below the schedule interval in vercel.json.
@@ -23,12 +22,6 @@ export async function GET(request: NextRequest) {
     jobName: 'web.sync_direct_byok_providers',
     environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
   });
-
-  try {
-    await alertIfSyncStale('direct_byok');
-  } catch (error) {
-    console.error('[sync-direct-byok-providers] stale sync alert escaped', error);
-  }
 
   try {
     const summary = await syncAndStoreDirectByokProviders();

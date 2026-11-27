@@ -1,18 +1,22 @@
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   STS_WEB_COMPUTE_BALANCE_ALERT,
   webInternalCredential,
   type WebInternalAuthEnv,
 } from '@kilocode/worker-utils/web-internal-credential';
+import { readContainerUsageMeterSecret, type ContainerUsageMeterSecretsEnv } from './secrets';
 
 export async function notifyOrganizationBalanceAlert(
-  env: Pick<Cloudflare.Env, 'KILOCODE_BACKEND_BASE_URL' | 'INTERNAL_API_SECRET_PROD'> &
+  env: Pick<Cloudflare.Env, 'KILOCODE_BACKEND_BASE_URL'> &
+    ContainerUsageMeterSecretsEnv &
     WebInternalAuthEnv,
-  organizationId: string
+  organizationId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   try {
     const credential = await webInternalCredential(env, STS_WEB_COMPUTE_BALANCE_ALERT, {
       header: 'X-Internal-Secret',
-      secret: () => env.INTERNAL_API_SECRET_PROD.get(),
+      secret: () => readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET', ctx),
     });
     if (credential.kind === 'unavailable') {
       throw new Error('Internal service authentication is unavailable');

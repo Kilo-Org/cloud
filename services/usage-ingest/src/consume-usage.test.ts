@@ -1359,3 +1359,62 @@ describe('tagged Exa usage messages', () => {
     expect(exaOutcome).toMatchObject({ usage_id: exaRecord.id, usage_kind: 'exa_usage' });
   });
 });
+
+describe('class-only non-LLM admission retries', () => {
+  const classOnlyAdmission = () =>
+    new Response(JSON.stringify({ error: 'Usage writer overloaded', reason: 'queue_limit' }), {
+      status: 429,
+      headers: { 'content-type': 'application/json', 'x-usage-class-limit': 'non_llm' },
+    });
+
+  async function expectClassOnlyRetry(body: unknown, usageId: string, usageKind: string) {
+    const { fetch, logs, processingLogs } = setup();
+    fetch.mockResolvedValue(classOnlyAdmission());
+    const msg = message(body);
+    await worker.queue(batch([msg]), env);
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 15 });
+    const [outcome] = processingLogs().filter(log => log.event === 'usage_ingest_processing');
+    expect(outcome).toMatchObject({
+      level: 'warn',
+      outcome: 'unavailable',
+      reason: 'http_error',
+      queue_action: 'retry',
+      retry_class: 'admission',
+      admission_reason: 'queue_limit',
+      writer_status: 429,
+      usage_id: usageId,
+      usage_kind: usageKind,
+    });
+    expect(outcome).not.toHaveProperty('invocation_failure');
+    expect(JSON.stringify(logs.flatMap(log => log.mock.calls))).not.toContain(writerSecret);
+  }
+
+  it('retries an Enkrypt class-only admission with the 15s floor and resolves the batch', async () => {
+    await expectClassOnlyRetry(enkryptMessage, enkryptRecord.id, 'enkrypt_usage');
+  });
+
+  it('retries an Exa class-only admission with the 15s floor and resolves the batch', async () => {
+    await expectClassOnlyRetry(exaMessage, exaRecord.id, 'exa_usage');
+  });
+
+  it('keeps LLM admission and overload behavior when the writer echoes a class-limit marker', async () => {
+    const { fetch, processingLogs } = setup();
+    fetch.mockResolvedValue(classOnlyAdmission());
+    const msg = message(usage);
+    await expect(worker.queue(batch([msg]), env)).rejects.toThrow(
+      'Usage writer overloaded (HTTP 429/503)'
+    );
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 1 });
+    expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toEqual([
+      expect.objectContaining({
+        retry_class: 'admission',
+        admission_reason: 'queue_limit',
+        writer_status: 429,
+        invocation_failure: 'writer_overloaded',
+        usage_id: usage.core.id,
+      }),
+    ]);
+  });
+});

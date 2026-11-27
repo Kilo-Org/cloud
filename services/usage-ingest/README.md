@@ -222,7 +222,9 @@ The consumer reads the tag before anything else:
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
 so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
-retry schedule. Only the explicitly marked class-only rejection is exempt from invocation failure.
+retry schedule, and a marked class-only rejection also uses the slower 15–30 s early
+window under [Native congestion retries](#native-congestion-retries-and-launch-budget).
+Only the explicitly marked class-only rejection is exempt from invocation failure.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
@@ -446,18 +448,28 @@ admission 429, use `base = max(60, base)`. Choose an integer uniformly from
 at 21 before exponentiation; invalid metadata uses attempt 1. Mixed failure classes
 share the same native count; switching classes never resets it.
 
-| Native attempt | Recognized admission 429 | Other handled failure |
-|---|---|---|
-| 1 | 1–4 s | 60–120 s |
-| 2 | 2–4 s | 60–120 s |
-| 3 | 4–8 s | 60–120 s |
-| 4 | 8–16 s | 60–120 s |
-| 5 | 16–32 s | 60–120 s |
-| 6 | 32–64 s | 60–120 s |
-| 7 | 64–128 s | 64–128 s |
-| 8 | 128–256 s | 128–256 s |
-| 9 | 256–512 s | 256–512 s |
-| 10–20 | 300–600 s | 300–600 s |
+A recognized admission 429 on a validated Enkrypt or Exa message whose writer
+explicitly marks it class-only (`x-usage-class-limit: non_llm` with reason
+`queue_limit`) keeps that admission schedule but with a 15-second floor:
+`base = max(15, min(300, 2 ** min(a - 1, 9)))`. This changes only attempts 1–4
+(15–30 s); from attempt 5 onward the base is already at least 16 seconds, so the
+schedule is identical to a normal admission retry. The class-limit marker never
+changes LLM, unmarked, pool, total-limit or conservative retries. The tradeoff is
+that Enkrypt/Exa accounting recovers more slowly from brief quota pressure; in
+exchange, reducing repeated calls may free processing capacity for useful work.
+
+| Native attempt | Recognized admission 429 | Class-only non-LLM admission 429 | Other handled failure |
+|---|---|---|---|
+| 1 | 1–4 s | 15–30 s | 60–120 s |
+| 2 | 2–4 s | 15–30 s | 60–120 s |
+| 3 | 4–8 s | 15–30 s | 60–120 s |
+| 4 | 8–16 s | 15–30 s | 60–120 s |
+| 5 | 16–32 s | 16–32 s | 60–120 s |
+| 6 | 32–64 s | 32–64 s | 60–120 s |
+| 7 | 64–128 s | 64–128 s | 64–128 s |
+| 8 | 128–256 s | 128–256 s | 128–256 s |
+| 9 | 256–512 s | 256–512 s | 256–512 s |
+| 10–20 | 300–600 s | 300–600 s | 300–600 s |
 
 Processing logs add bounded `retry_class`, selected `retry_delay_seconds`, and
 recognized `admission_reason` to the existing usage ID/native-attempt fields.
@@ -481,7 +493,11 @@ Under sustained failure, polling eventually slows to **5–10 minutes** between
 eligible attempts, so recovery can still wait that long plus scheduling/backlog.
 For a new event receiving only recognized admission rejections, the 20 requested
 delays sum to 63m 31s–127m 04s; for only other handled failures, 68m 28s–136m 56s.
-These are conditional scheduled-delay sums, **not DLQ timing guarantees**, minimum
+A new event receiving only class-only non-LLM admission rejections differs only at
+attempts 1–4: the maximum extra scheduled delay across those four rejected
+deliveries is 88 s (expected extra 66.5 s), with no extra retries, and its 20
+requested delays sum to 64m 16s–128m 32s. These are conditional scheduled-delay
+sums, **not DLQ timing guarantees**, minimum
 recovery windows, or retention requirements. Processing, implicit 60-second
 retries, mixed histories, consumed attempts, scheduling and retention affect the
 actual lifecycle. Increasing the configured count does not reset existing attempts.

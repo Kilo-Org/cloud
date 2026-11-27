@@ -173,8 +173,8 @@ it('isolates only explicit non-LLM class quota retries within a mixed batch', as
       expect(result.explicitAcks).toEqual(['queue-0']);
       expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1']);
       if (expected === 'ok') {
-        expect(result.retryMessages[0].delaySeconds).toBeGreaterThanOrEqual(1);
-        expect(result.retryMessages[0].delaySeconds).toBeLessThanOrEqual(4);
+        expect(result.retryMessages[0].delaySeconds).toBeGreaterThanOrEqual(15);
+        expect(result.retryMessages[0].delaySeconds).toBeLessThanOrEqual(30);
       }
     }
     status = 429;

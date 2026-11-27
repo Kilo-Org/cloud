@@ -835,10 +835,11 @@ Open items before deploy:
   authorizations, and SSO starts 60 a minute in their own window, because an org's staff often
   share one egress address. A refused start answers the sign-in page's message page with 429 and
   `Retry-After`.
-- Past the code cap every sign-in email still carries the link, so an address can be sent many
-  emails; the Turnstile check, the anonymous-write limit and the per-address code cap bound that.
-  A total cap per address is not used, because anyone could then spend the owner's emails and lock
-  the owner out.
+- Past the code cap every sign-in email carries only the link, and at most 5 such link-only emails
+  go to an address in its hour (migration 0020); the Turnstile check and the anonymous-write limit
+  bound the rest. The code emails themselves have no total cap, because anyone could then spend
+  the owner's emails and lock the owner out; a link already sent keeps working past the link-only
+  cap. A code entry without a code hash raises 22004 (migration 0022).
 - The minute cron calls `uts.maintain_provider_sign_in_rows()` beside
   `uts.maintain_sign_in_rows()` (`src/audit/maintenance.ts`), so flow, email and network-count
   rows do not grow without bound.

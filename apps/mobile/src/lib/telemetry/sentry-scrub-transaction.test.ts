@@ -11,6 +11,20 @@ describe('scrubTransactionEvent', () => {
     expect(result?.spans).toEqual([{ data: { 'http.target': '/trpc/user.get', url: '' } }]);
   });
 
+  it('drops the transaction when a span scrub fails', () => {
+    const spans = [
+      {
+        data: {
+          get 'http.target'() {
+            throw new Error('malformed span data');
+          },
+        },
+      },
+    ];
+
+    expect(scrubTransactionEvent({ spans })).toBeNull();
+  });
+
   it('keeps malformed spans and trace contexts without throwing', () => {
     const event = {
       contexts: { trace: 'not-an-object' },

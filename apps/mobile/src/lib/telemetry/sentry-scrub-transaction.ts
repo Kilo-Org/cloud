@@ -71,7 +71,8 @@ function scrubSpan(span: unknown): void {
  * spans. A URL attribute goes through {@link scrubUrl}; the name, span
  * descriptions, and other string attributes lose share-link credentials; query,
  * fragment, response-header and non-allowlisted request-header attributes are
- * dropped.
+ * dropped. A scrub that throws drops the transaction rather than sending it
+ * partly scrubbed.
  */
 export function scrubTransactionEvent<T>(event: T): T | null {
   const scrubbed = scrubEvent(event);
@@ -96,6 +97,8 @@ export function scrubTransactionEvent<T>(event: T): T | null {
     }
     return scrubbed;
   } catch {
-    return scrubbed;
+    // A failed scrub drops the transaction rather than sending partly
+    // scrubbed span data.
+    return null;
   }
 }

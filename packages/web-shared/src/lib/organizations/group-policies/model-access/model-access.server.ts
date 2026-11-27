@@ -13,7 +13,10 @@ import {
   normalizeInferenceProviderId,
   normalizeInferenceProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getProviderSlugsForModel,
+  isModelListedAtOrBefore,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getEligibleProviderRoutes,
   getModelInferenceProviders,
@@ -29,6 +32,13 @@ import {
 
 export type EffectiveOrganizationModelPolicy = {
   requireModelInCurrentSnapshot: boolean;
+  /**
+   * Set by the `disable_new_models` policy: a non-exempt model must be listed by this snapshot
+   * or an older one, including a public custom LLM whose declared providers pin its routes. The
+   * baseline advances in the same transaction that puts the snapshot's new models on the deny
+   * list, so a model is never usable between being listed and being disabled.
+   */
+  newModelsBaselineSnapshotId?: number;
   organizationModelDenyList: string[];
   organizationProviderCeiling?: string[];
   memberGrant:
@@ -101,17 +111,23 @@ export function evaluateEffectiveModelAccessPolicy(
     defaultPolicy.data.mode === 'all' ||
     groupPolicies.some(policy => policy.data.mode === 'all');
   const selectedPolicies = [defaultPolicy, ...groupPolicies].filter(isSelectedModelAccessPolicy);
+  const snapshotRequirement = {
+    requireModelInCurrentSnapshot: true,
+    newModelsBaselineSnapshotId: context.organization.settings.disable_new_models
+      ? context.newModelsBaselineSnapshotId
+      : undefined,
+  };
   if (selectedPolicies.length === 0 && includeOrganizationBaseline) {
     return {
       ...organizationFields,
-      requireModelInCurrentSnapshot: true,
+      ...snapshotRequirement,
       memberGrant: { mode: 'organization_baseline' },
     };
   }
 
   return {
     ...organizationFields,
-    requireModelInCurrentSnapshot: true,
+    ...snapshotRequirement,
     memberGrant: {
       mode: 'selected',
       includeOrganizationBaseline,
@@ -130,7 +146,11 @@ export function evaluateEffectiveModelAccessPolicy(
 export async function getEffectiveModelDecision(
   policy: EffectiveOrganizationModelPolicy,
   modelId: string,
-  providerLookup: ProviderLookup = getProviderSlugsForModel
+  providerLookup: ProviderLookup = getProviderSlugsForModel,
+  isListedAtOrBefore: (
+    snapshotId: number,
+    modelId: string
+  ) => Promise<boolean> = isModelListedAtOrBefore
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
   /** The refusal every organization-level rule returns, so its reason has one expression. */
@@ -155,6 +175,12 @@ export async function getEffectiveModelDecision(
     return { allowed: true };
   }
   if (policy.memberGrant.mode === 'organization_baseline' && isOrganizationModelDenied()) {
+    return organizationModelDenial();
+  }
+  if (
+    policy.newModelsBaselineSnapshotId !== undefined &&
+    !(await isListedAtOrBefore(policy.newModelsBaselineSnapshotId, modelId))
+  ) {
     return organizationModelDenial();
   }
   const pinnedProviders = await getModelInferenceProviders(modelId);

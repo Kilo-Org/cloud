@@ -19,6 +19,7 @@ export const wiringSuites = [
   'scripts/mobile-sbom-workflow.test.mjs',
   'scripts/sts-deployment-watch.test.mjs',
   'scripts/wrangler-nonproduction-fence.test.mjs',
+  'scripts/sts-bundle-action.test.mjs',
 ];
 
 export const wiringCommand = `node --test ${wiringSuites.join(' ')}`;

@@ -507,7 +507,7 @@ export function parseWorkerConfig(path: string, raw: unknown): WorkerConfig {
 
 /**
  * Every Wrangler config in the checkout that a deploy can read, tracked or untracked, test
- * fixtures included (`cloud-agent-e2e-deploy.yml` deploys `test/e2e/wrangler.fake-llm.jsonc`).
+ * fixtures included (`cloud-agent-e2e.yml` deploys `test/e2e/wrangler.fake-llm.jsonc`).
  * Ignored files stay out: they are configs a script renders at deploy time from a tracked config
  * this scan already reads (`wrangler.runtime-generated.json`, `.wrangler/wrangler.e2e-test.jsonc`).
  */

@@ -40,10 +40,14 @@ export type FakeLlmWorkerEnv = {
   FAKE_LLM_ADMIN_TOKEN?: string;
 };
 
+// Marks the Worker's own refusal, as the e2e Worker does, so
+// test/e2e/deploy/check-access-closed.sh can tell it apart from an Access refusal.
+const REFUSAL_HEADER = 'X-Cloud-Agent-E2E-Refusal';
+
 function modelAuthError(status: number, message: string): Response {
   return Response.json(
     { error: { message, code: status, type: status === 500 ? 'server_error' : 'unauthorized' } },
-    { status }
+    { status, headers: { [REFUSAL_HEADER]: 'fake-llm' } }
   );
 }
 

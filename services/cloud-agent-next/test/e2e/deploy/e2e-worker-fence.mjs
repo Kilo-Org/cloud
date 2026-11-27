@@ -1,11 +1,15 @@
-// Fence for the deployed e2e Worker config. The rendered config may carry only
-// the keys the renderer emits, may bind no production resource and must have no
-// public address. Production is every resource a top-level (or env.production)
-// block of a direct services/*/wrangler.{json,jsonc} binds, plus the prepared
-// runtime configuration the renderer reads. Findings name the field only.
+// Fence for the deployed e2e Worker config and the fake-LLM Worker config. Each
+// may carry only the keys its renderer emits, may bind no production resource
+// and must have no public address: workers.dev and preview URLs off, and at
+// most the one Access-protected custom domain the workflow configured.
+// Production is every resource a top-level (or env.production) block of a
+// direct services/*/wrangler.{json,jsonc} binds, plus the prepared runtime
+// configuration the renderer reads. Findings name the field only.
 //
-// CLI, run by deploy-e2e-worker.sh on the file it is about to deploy:
+// CLI, run by the deploy scripts on the file they are about to deploy, with the
+// configured E2E_WORKER_HOSTNAME and E2E_FAKE_LLM_HOSTNAME as the exact hosts:
 //   node test/e2e/deploy/e2e-worker-fence.mjs <rendered config> <prepared source config>
+//   node test/e2e/deploy/e2e-worker-fence.mjs --fake-llm <fake-LLM config>
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -88,15 +92,12 @@ export function collectProduction(extraConfigs = [], servicesDir = defaultServic
   };
 }
 
-export function violations(config, production) {
+/** Findings for a route list that must be exactly one custom domain, or none. */
+function routeViolations(routes, production, expectedHost) {
   const found = [];
-  for (const key of Object.keys(config)) {
-    if (!ALLOWED_KEYS.has(key)) found.push(`${key}: not allowed`);
+  if (expectedHost === undefined && routes.length > 0) {
+    found.push('routes: none allowed without a configured hostname');
   }
-  const routes = routesOf(config);
-  if (config.workers_dev !== false) found.push('workers_dev: must be false');
-  if (config.preview_urls !== false) found.push('preview_urls: must be false');
-  if ((config.triggers?.crons ?? []).length > 0) found.push('triggers.crons: must be empty');
   if (routes.length > 1) found.push('routes: at most the one Access custom domain');
   for (const route of routes) {
     const host = hostOf(route);
@@ -106,11 +107,87 @@ export function violations(config, production) {
     if (production.hosts.some(owned => hostsOverlap(owned, host))) {
       found.push('routes: overlaps a production host');
     }
+    if (expectedHost !== undefined && host !== expectedHost) {
+      found.push('routes: not the configured hostname');
+    }
   }
+  return found;
+}
+
+function addressViolations(config) {
+  const found = [];
+  if (config.workers_dev !== false) found.push('workers_dev: must be false');
+  if (config.preview_urls !== false) found.push('preview_urls: must be false');
+  return found;
+}
+
+function secretAndObjectViolations(config) {
+  const found = [];
+  for (const binding of config.durable_objects?.bindings ?? []) {
+    const script = text(binding.script_name).toLowerCase();
+    if (script) found.push(`durable_objects ${text(binding.name)}: script_name ${script}`);
+  }
+  for (const secret of config.secrets_store_secrets ?? []) {
+    const name = text(secret.secret_name);
+    if (!NONPRODUCTION_SECRET.test(name)) found.push(`secrets_store_secrets: ${name}`);
+  }
+  return found;
+}
+
+/** The host of `https://<plain host>` with nothing else, or undefined. */
+function plainHttpsHost(value) {
+  let url;
+  try {
+    url = new URL(text(value));
+  } catch {
+    return undefined;
+  }
+  return url.protocol === 'https:' && text(value) === `https://${url.hostname}`
+    ? url.hostname
+    : undefined;
+}
+
+/**
+ * Findings for the rendered e2e Worker config. With `expected`, the hostnames
+ * the workflow configured are authoritative: the route and `WORKER_URL` (the
+ * origin callbacks and sandboxes address) must be exactly the Worker hostname,
+ * or absent when it is unset, and the fake-LLM origin exactly its hostname.
+ * Without it, the one route's own host is taken as configured.
+ */
+export function violations(config, production, expected) {
+  const found = [];
+  for (const key of Object.keys(config)) {
+    if (!ALLOWED_KEYS.has(key)) found.push(`${key}: not allowed`);
+  }
+  const routes = routesOf(config);
+  found.push(...addressViolations(config));
+  // Present and empty: wrangler clears live schedules only when the list exists.
+  if (!Array.isArray(config.triggers?.crons) || config.triggers.crons.length > 0) {
+    found.push('triggers.crons: must be present and empty');
+  }
+  const routeHost = routes.length > 0 ? hostOf(routes[0]) : undefined;
+  const workerHost = expected === undefined ? routeHost : expected.workerHostname;
+  found.push(...routeViolations(routes, production, workerHost));
   const vars = config.vars ?? {};
-  const expectedUrl = routes.length === 1 ? `https://${hostOf(routes[0])}` : undefined;
+  const expectedUrl = workerHost === undefined ? undefined : `https://${workerHost}`;
   if (vars.WORKER_URL !== expectedUrl) {
-    found.push('vars.WORKER_URL: must be the custom domain or absent');
+    found.push('vars.WORKER_URL: must be https://<configured Worker hostname> or absent');
+  }
+  const fakeHost = plainHttpsHost(vars.E2E_FAKE_LLM_URL);
+  if (
+    fakeHost === undefined ||
+    fakeHost.endsWith('workers.dev') ||
+    production.hosts.some(owned => hostsOverlap(owned, fakeHost)) ||
+    vars.E2E_FAKE_LLM_URL === vars.WORKER_URL ||
+    (expected !== undefined && fakeHost !== expected.fakeLlmHostname)
+  ) {
+    found.push('vars.E2E_FAKE_LLM_URL: must be https://<configured fake-LLM hostname>');
+  }
+  if (vars.KILO_OPENROUTER_BASE !== `${text(vars.E2E_FAKE_LLM_URL)}/api/openrouter`) {
+    found.push('vars.KILO_OPENROUTER_BASE: must be the fake-LLM origin');
+  }
+  if (vars.E2E_MODEL_VALIDATION_BASE_URL !== vars.E2E_FAKE_LLM_URL) {
+    found.push('vars.E2E_MODEL_VALIDATION_BASE_URL: must be the fake-LLM origin');
   }
   // The e2e entry skips Access verification only in development.
   if (vars.ENVIRONMENT === 'development') found.push('vars.ENVIRONMENT: must not be development');
@@ -120,17 +197,42 @@ export function violations(config, production) {
   if (routes.length > 0 && !ACCESS_TEAM_DOMAIN.test(text(vars.E2E_ACCESS_TEAM_DOMAIN))) {
     found.push('vars.E2E_ACCESS_TEAM_DOMAIN: required with a route');
   }
-  for (const binding of config.durable_objects?.bindings ?? []) {
-    const script = text(binding.script_name).toLowerCase();
-    if (script) found.push(`durable_objects ${text(binding.name)}: script_name ${script}`);
-  }
   for (const queue of queuesOf(config)) {
     if (production.queues.has(queue)) found.push(`queues: production ${queue}`);
   }
-  for (const secret of config.secrets_store_secrets ?? []) {
-    const name = text(secret.secret_name);
-    if (!NONPRODUCTION_SECRET.test(name)) found.push(`secrets_store_secrets: ${name}`);
+  found.push(...secretAndObjectViolations(config));
+  return found;
+}
+
+// Exactly the top-level keys of test/e2e/wrangler.fake-llm.jsonc and its render.
+const FAKE_LLM_ALLOWED_KEYS = new Set([
+  '$schema',
+  'name',
+  'account_id',
+  'main',
+  'compatibility_date',
+  'compatibility_flags',
+  'workers_dev',
+  'preview_urls',
+  'dev',
+  'durable_objects',
+  'migrations',
+  'secrets_store_secrets',
+  'routes',
+]);
+
+/**
+ * Findings for a fake-LLM Worker config: the checked-in file (no hostname, so no
+ * route) or its render, whose one route must be exactly `hostname`.
+ */
+export function fakeLlmViolations(config, production, { hostname } = {}) {
+  const found = [];
+  for (const key of Object.keys(config)) {
+    if (!FAKE_LLM_ALLOWED_KEYS.has(key)) found.push(`${key}: not allowed`);
   }
+  found.push(...addressViolations(config));
+  found.push(...routeViolations(routesOf(config), production, hostname));
+  found.push(...secretAndObjectViolations(config));
   return found;
 }
 
@@ -143,18 +245,35 @@ const isMain = (() => {
 })();
 
 if (isMain) {
-  const [renderedPath, sourcePath] = process.argv.slice(2);
-  if (!renderedPath || !sourcePath) {
-    console.error('Usage: e2e-worker-fence.mjs <rendered config> <prepared source config>');
+  const args = process.argv.slice(2);
+  // Hostnames the workflow configured; unset means the config may have none.
+  const workerHostname = process.env.E2E_WORKER_HOSTNAME || undefined;
+  const fakeLlmHostname = process.env.E2E_FAKE_LLM_HOSTNAME || undefined;
+  let target;
+  let found;
+  if (args[0] === '--fake-llm' && args.length === 2) {
+    target = args[1];
+    found = fakeLlmViolations(parse(readFileSync(target, 'utf8')), collectProduction(), {
+      hostname: fakeLlmHostname,
+    });
+  } else if (args.length === 2 && !args[0].startsWith('--')) {
+    const [renderedPath, sourcePath] = args;
+    target = renderedPath;
+    found = violations(
+      parse(readFileSync(renderedPath, 'utf8')),
+      collectProduction([parse(readFileSync(sourcePath, 'utf8'))]),
+      { workerHostname, fakeLlmHostname }
+    );
+  } else {
+    console.error(
+      'Usage: e2e-worker-fence.mjs <rendered config> <prepared source config>\n' +
+        '       e2e-worker-fence.mjs --fake-llm <fake-LLM config>'
+    );
     process.exit(2);
   }
-  const found = violations(
-    parse(readFileSync(renderedPath, 'utf8')),
-    collectProduction([parse(readFileSync(sourcePath, 'utf8'))])
-  );
   if (found.length > 0) {
-    console.error(`Refusing ${renderedPath}:\n  ${found.join('\n  ')}`);
+    console.error(`Refusing ${target}:\n  ${found.join('\n  ')}`);
     process.exit(1);
   }
-  console.log(`Fence passed: ${renderedPath}`);
+  console.log(`Fence passed: ${target}`);
 }

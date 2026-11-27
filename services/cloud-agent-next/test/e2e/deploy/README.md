@@ -28,10 +28,10 @@ first step, which checks it. A passing run additionally needs:
   session starts. The renderer binds them once their identifiers exist; the
   fence rejects production ones;
 - a Kilo backend that signs control tokens and stream tickets with
-  `NEXTAUTH_SECRET_DEV`, a personal API token issued by it, the repository
-  variable `CLOUD_AGENT_E2E_BACKEND_URL` set to it (the tests workflow's required
-  `backend_url`), and the renderer's `KILOCODE_BACKEND_BASE_URL`, now
-  `https://api.kilo.ai`, changed to match.
+  `NEXTAUTH_SECRET_DEV`, a personal API token issued by it, that backend given
+  as the `Cloud Agent E2E` workflow's required `backend_url` input, and the
+  renderer's `KILOCODE_BACKEND_BASE_URL`, now `https://api.kilo.ai`, changed to
+  match.
 
 Both e2e Workers verify tokens with the development signing key
 (`NEXTAUTH_SECRET_DEV`). This is an intended switch: production binds the
@@ -42,24 +42,33 @@ returns short-lived control tokens and stream tickets for the driver to present
 to the Worker. The production backend at `https://api.kilo.ai` signs those with
 the production key, so the Worker refuses them.
 
-The e2e stack deploys and runs only from `main`: both workflows refuse any other
-ref, the `cloud-agent-e2e` environment admits `main` alone, and the deploy
-checks that its commit is on `origin/main` before any step receives a secret.
+The e2e stack deploys and runs only from `main`, through the `Cloud Agent E2E`
+workflow (`.github/workflows/cloud-agent-e2e.yml`, manual dispatch; a schedule
+returns once the stack can pass). Every job refuses another ref, the
+`cloud-agent-e2e` environment admits `main` alone, the deploy checks that its
+commit is on `origin/main` before any step receives a secret, and the workflow
+is never a reusable workflow.
 
 ## Closed CI path
 
 CI reaches the Worker only through one custom domain behind a Cloudflare Access
 application whose single policy is Service Auth for one service token.
 
-- The driver sends `CF-Access-Client-Id` and `CF-Access-Client-Secret`
-  (`E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET`) on every request to the
-  Worker, follows no redirect, and registers the token on callback targets whose
-  origin is the Worker's own.
+- The `tests` job reads the token from STS (workload `ci-cloud-agent-e2e`,
+  values in Infisical production `/ci/ci-cloud-agent-e2e`) with the local
+  action `.github/actions/sts-bundle`, over the job's GitHub OIDC token. The
+  token never becomes a GitHub secret.
+- The driver sends `CF-Access-Client-Id` and `CF-Access-Client-Secret` on every
+  request to the Worker, follows no redirect, and registers the token on
+  callback targets whose origin is the Worker's own.
 - Requests the Worker makes to its own hostname re-enter Cloudflare's front door
   under `global_fetch_strictly_public` and pass the same Access application:
   callbacks carry the registered headers, and sandbox egress gets the token from
   the e2e `ContainersOutbound` (`src/e2e-surface/access-credentials.ts`), which
-  stamps it only on requests to the Worker's own origin.
+  stamps it only on requests to the Worker's own origin. The Worker holds the
+  token as the Worker secrets `E2E_ACCESS_CLIENT_ID` and
+  `E2E_ACCESS_CLIENT_SECRET`, uploaded once by an operator (below); Worker
+  secrets survive every `wrangler deploy`, so the deploy never carries them.
 - The Worker refuses every request whose `Cf-Access-Jwt-Assertion` does not
   verify against `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` and
   the application audience, or whose `common_name` is not the service token's
@@ -72,43 +81,154 @@ application whose single policy is Service Auth for one service token.
   minutes (six tries, each at most 15 s, 10 s apart); it runs once after a deploy
   and once before the tests.
 
+The jobs of `cloud-agent-e2e.yml`:
+
+| Job | `id-token` | Reads | Runs |
+|---|---|---|---|
+| `deploy` (dispatch input `deploy`, default on) | no | GitHub secrets for Cloudflare and the runtime publication | install, runtime preparation, both deploys |
+| `build` | no | nothing | `pnpm install --frozen-lockfile --ignore-scripts --filter cloud-agent-next...`, then packs the workspace as an artifact |
+| `tests` | yes | the STS bundle | unpacks the workspace and runs the driver with the package's own `tsx`; no install, lifecycle script or package manager |
+
+The `tests` job is a narrow, explicit exception to the STS caller rule that a
+bundle-reading job runs no third-party code
+(`.github/actions/sts-bundle/README.md`): the driver must send the token on
+every request, so it runs in that job, and it executes runtime package code from
+the frozen lockfile.
+
+Only the Access service token comes from STS. The workflow still reads these
+GitHub secrets:
+
+- `CLOUDFLARE_API_TOKEN`, `CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID`,
+  `CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY`: move to STS-served bundles in a
+  separate change.
+- `E2E_USER_TOKEN`: needs a CI user-token exchange, a later phase.
+- `FAKE_LLM_ADMIN_TOKEN`, `E2E_INTERNAL_API_SECRET`: become STS bundle entries
+  later.
+
 Prerequisites, in order:
 
 1. Check that no DNS record exists for `cloud-agent-e2e.kiloapps.io` (zone
    `kiloapps.io`, account `e115e769bcdd4c3d66af59d3332cb394`).
 2. Zero Trust (team `engineering-e11`): create the service token
-   `ci-cloud-agent-e2e`, duration 8760h. Record its client id and secret once.
+   `ci-cloud-agent-e2e`, duration 8760h. Its client id and secret go straight
+   to step 5, nowhere else.
 3. Create the self-hosted Access application `cloud-agent-e2e-test` on
    `cloud-agent-e2e.kiloapps.io`, empty path, with one policy
    `ci-cloud-agent-e2e`: action **Service Auth**, Include = Service Token
    `ci-cloud-agent-e2e`. No Allow, Bypass or Everyone rule.
 4. Read the application's audience (AUD) tag from its overview.
-5. Before merging this change, create the GitHub environment `cloud-agent-e2e`
-   with deployment branches limited to `main`, and set in it:
-   - secrets `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET` (step 2);
-   - variables `CLOUD_AGENT_E2E_WORKER_HOSTNAME=cloud-agent-e2e.kiloapps.io`,
-     `CLOUD_AGENT_E2E_ACCESS_AUD=<AUD from step 4>` and
-     `CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN=engineering-e11.cloudflareaccess.com`.
-   A workflow that names a missing environment creates it without protection.
-   Once the staging backend exists, also set the **repository** variable
-   `CLOUD_AGENT_E2E_BACKEND_URL`; the nightly passes it to the tests workflow,
-   whose calling job has no environment.
-6. Confirm `CLOUDFLARE_API_TOKEN` holds account **Workers Scripts Write** (or
+5. Store the client id and secret in Infisical production
+   `/ci/ci-cloud-agent-e2e` as `E2E_ACCESS_CLIENT_ID` and
+   `E2E_ACCESS_CLIENT_SECRET`.
+6. The STS policy `ci-cloud-agent-e2e` (`services/sts/policy/`) serves exactly
+   those two keys, pinned to this repository, `cloud-agent-e2e.yml` at
+   `refs/heads/main`, the environment `cloud-agent-e2e` and the event
+   `workflow_dispatch`. Only the `tests` job reads the bundle. It merges with
+   or after this change.
+7. Before merging this change, create the GitHub environment `cloud-agent-e2e`
+   with deployment branches limited to `main`, and set in it the variables
+   `CLOUD_AGENT_E2E_WORKER_HOSTNAME=cloud-agent-e2e.kiloapps.io`,
+   `CLOUD_AGENT_E2E_ACCESS_AUD=<AUD from step 4>` and
+   `CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN=engineering-e11.cloudflareaccess.com`
+   (and, after step 9, `CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME`). It holds no Access
+   secret. A workflow that names a missing environment creates it without
+   protection.
+8. Confirm `CLOUDFLARE_API_TOKEN` holds account **Workers Scripts Write** (or
    Workers Editor/Admin), the permission the
    [Attach Worker Domain API](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/update/)
    accepts; Wrangler since workers-sdk #15903 no longer needs zone Workers
    Routes for a deploy whose only routes are custom domains.
-7. Check the Worker's secrets:
-   `pnpm exec wrangler secret list --name cloud-agent-e2e-test` must list only
-   `INTERNAL_API_SECRET`, `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET`
-   (the deploy refuses otherwise). Deleting any other secret is a production
-   change that needs approval first.
-8. Only then deploy from `main`. The deploy attaches the custom domain and the
-   Access check runs right after it.
+9. Fake-LLM Access, before the first deploy of this change. `fake-llm` today
+   has the plain custom domain `fake-llm.kiloapps.ai` (zone `kiloapps.ai`),
+   with no Access application in front of it. Create a second self-hosted
+   Access application for it
+   ([Create an Access application](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/methods/create/),
+   `POST /accounts/e115e769bcdd4c3d66af59d3332cb394/access/apps`), with exactly
+   this body:
+
+   ```json
+   {
+     "name": "fake-llm-e2e-test",
+     "type": "self_hosted",
+     "domain": "fake-llm.kiloapps.ai",
+     "destinations": [{ "type": "public", "uri": "fake-llm.kiloapps.ai" }],
+     "session_duration": "30m",
+     "allowed_idps": [],
+     "auto_redirect_to_identity": false,
+     "app_launcher_visible": false,
+     "policies": [
+       {
+         "name": "ci-cloud-agent-e2e",
+         "decision": "non_identity",
+         "precedence": 1,
+         "include": [{ "service_token": { "token_id": "0e35e631-8a08-4fd0-9f01-d4a75050f303" } }]
+       }
+     ]
+   }
+   ```
+
+   Then set `CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME=fake-llm.kiloapps.ai` in the
+   `cloud-agent-e2e` environment. A second application rather than a second
+   destination of `cloud-agent-e2e-test`: the Access docs require each public
+   hostname to be in an active zone of the account, but do not say whether one
+   application's destinations may span zones (`kiloapps.io` and
+   `kiloapps.ai`); a separate application is the documented case and leaves
+   the live one untouched. The policy is app-scoped (inline and reusable
+   policies cannot be mixed on one application).
+10. Deploy from `main`: dispatch `Cloud Agent E2E`. The `deploy` job refuses a
+    Worker holding any secret outside `INTERNAL_API_SECRET`,
+    `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET` (deleting another is
+    a production change that needs approval first); missing Access secrets only
+    print a notice, because the Worker refuses every request without them. It
+    deploys both Workers (the first deploy attaches
+    `cloud-agent-e2e.kiloapps.io`, keeps `fake-llm.kiloapps.ai`, and turns
+    `workers.dev` and previews off) and requires Access to refuse anonymous
+    requests to both hostnames.
+11. Readback, in the same job (`readback-e2e-workers.mjs`, names only): no
+    production binding remains (bindings equal the deployed configs),
+    schedules are `[]`, `workers.dev` and previews are off, one version at
+    100%, exactly the configured domain. The Access secrets are no finding here.
+12. One-time upload of the two Worker secrets (route set by the operator
+    ruling), only after step 11 passed, with an allowlist preflight: script
+    `cloud-agent-e2e-test`, names `E2E_ACCESS_CLIENT_ID` and
+    `E2E_ACCESS_CLIENT_SECRET` only, values from Infisical production
+    `/ci/ci-cloud-agent-e2e`, never printed. CI never uploads them.
+13. Tests: dispatch again (the `deploy` input may be off). The `tests` job, the
+    only STS bundle reader, first checks names only that both Access secrets
+    exist on the Worker and stops with a pointer to step 12 otherwise, then
+    proves the closed path (anonymous refused; with the service token,
+    `WORKER_URL/health` and the fake LLM answer) before the run.
+14. Rollback: redeploy the previous version id of each Worker
+    (`readback-e2e-workers.mjs` prints the active ones; Cloudflare keeps the
+    earlier ones), through a reviewed change.
+
+Without `CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME`, `CLOUD_AGENT_E2E_WORKER_HOSTNAME`,
+the AUD or the team domain, `deploy` refuses before uploading anything.
+
+Rotating the service token:
+
+1. Rotate the token's secret in Zero Trust (or create a replacement token and
+   add it to both applications' policies), keeping a grace period for the
+   previous secret.
+2. Update `/ci/ci-cloud-agent-e2e` in Infisical production; the next `tests`
+   run reads the new values from STS.
+3. Repeat step 12 with the new values; no deploy is needed.
+4. End the grace period (or remove the old token from the policies).
 
 Until that first closed deploy, the live `cloud-agent-e2e-test` version stays
-open in every other respect: D35 turned off only its `workers.dev` and preview
-addresses, so its production bindings, schedules and queue consumer remain.
+open in every other respect: only its `workers.dev` and preview addresses have
+been turned off, so its production bindings, schedules and queue consumer
+remain. `fake-llm` stays reachable at `fake-llm.kiloapps.ai` and on
+`workers.dev` until step 9 and its first deploy from this change.
+
+What a full run can do today. The `tests` job runs every scenario once the
+deploy succeeds, but a passing run is not possible yet: the closed e2e Worker
+binds no Hyperdrive, Session Ingest, usage meter, Git Token Service or runtime
+bucket (none has a staging replacement in the repository), and the run needs a
+backend that signs with `NEXTAUTH_SECRET_DEV` (`backend_url`) and a user token
+it issued. With those missing, the deploy, the readback and the closed-path
+proof can pass; scenarios that create sessions fail at the first database,
+ingest or runtime-download call.
 
 Wrangler publishes custom domains only when the config lists one, and then
 replaces the script's set with exactly that list. Rendering without
@@ -122,12 +242,12 @@ The Worker keeps refusing requests without a valid Access assertion meanwhile.
 
 - `pnpm install` at the repo root.
 - Bun 1.4.4. The Cloud Agent deploy script builds the wrapper before bundling, including for `dry-run`.
-- Cloudflare auth for account `e115e769bcdd4c3d66af59d3332cb394`.
+- No Cloudflare login: local commands are `render` and `dry-run` only.
 - A verified exact-SHA `wrangler.runtime-generated.json`, prepared with
   `pnpm exec tsx scripts/prepare-runtime-deploy.ts production <source-sha>` and the approved runtime
   publication read credentials. The E2E renderer inherits its descriptor and immutable runtime-free
   image, but never the production runtime bucket. It refuses an absent or non-downloaded
-  configuration. The `Cloud Agent E2E deploy` workflow runs this preparation for its own `main`
+  configuration. The `Cloud Agent E2E` workflow runs this preparation for its own `main`
   SHA, so it only deploys a SHA whose exact-SHA runtime publication has completed.
 - A fake-llm admin token, exported as `FAKE_LLM_ADMIN_TOKEN` or provided by
   `E2E_AUTH_FILE`, and a user token issued by a backend that signs with
@@ -142,7 +262,10 @@ The Worker keeps refusing requests without a valid Access assertion meanwhile.
 
 ## Deploy order
 
-The commands below run from `services/cloud-agent-next` (or use the full path from the repo root).
+Only the reviewed `Cloud Agent E2E` workflow writes to Cloudflare for the test
+Workers; no step below uses a personal login for a write. Locally, the scripts'
+`render` and `dry-run` commands are the whole use. The commands run from
+`services/cloud-agent-next` (or use the full path from the repo root).
 
 1. Make an admin token available for the fake's `/test/*` side channel and for the
    driver, either by exporting `FAKE_LLM_ADMIN_TOKEN`:
@@ -160,51 +283,41 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    The script refuses an empty value and refuses the insecure development
    default used by a zero-config local stack.
 
-2. Deploy the fake LLM:
+2. Render and dry-run the fake LLM locally (no write):
 
    ```sh
-   test/e2e/deploy/deploy-fake-llm.sh dry-run
-   test/e2e/deploy/deploy-fake-llm.sh deploy
+   E2E_FAKE_LLM_HOSTNAME=fake-llm.kiloapps.ai test/e2e/deploy/deploy-fake-llm.sh dry-run
    ```
 
-   `deploy` runs `wrangler deploy`, uploads `FAKE_LLM_ADMIN_TOKEN` as a Worker
-   secret, then checks `/health`, that the JWT-gated model catalogue returns 401
-   without a bearer, that `/test/requests` returns 401 without a bearer, and that
-   it answers with one.
+   The script has no default address: it refuses before rendering or uploading
+   anything without `E2E_FAKE_LLM_HOSTNAME`. In the workflow, `deploy` renders
+   `test/e2e/.wrangler/wrangler.fake-llm.jsonc` with that one custom domain,
+   fences it, runs `wrangler deploy`, uploads `FAKE_LLM_ADMIN_TOKEN` as a Worker
+   secret and requires Access to refuse an anonymous request. `probe`, run by
+   the `tests` job with the Access service token, checks `/health`, that the
+   JWT-gated model catalogue and `/test/requests` return 401 without a bearer,
+   and that `/test/requests` answers with the admin bearer. A 401 from the
+   Worker itself carries `X-Cloud-Agent-E2E-Refusal`, so it never passes for an
+   Access refusal.
 
-   Migration prerequisite: `fake-llm` has never been deployed, so the
-   checked-in config uses the simple `v1` `new_sqlite_classes` migration. Confirm
-   before a first deploy:
+3. Render and dry-run the e2e Worker locally (no write):
 
    ```sh
-   pnpm -C services/cloud-agent-next exec wrangler deployments list --name fake-llm
+   E2E_FAKE_LLM_HOSTNAME=fake-llm.kiloapps.ai test/e2e/deploy/deploy-e2e-worker.sh dry-run
    ```
 
-   If a remote `FakeLlmContainer` class is found, appending a migration that uses
-   `deleted_classes` would destroy old test state and needs explicit user
-   authorization before deploy.
-
-3. Copy the `FAKE_LLM_BASE_URL` that the script prints.
-
-4. Render and deploy the e2e Worker:
-
-   ```sh
-   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
-   FAKE_LLM_BASE_URL=<base> E2E_WORKER_HOSTNAME=cloud-agent-e2e.kiloapps.io \
-     E2E_ACCESS_AUD=<aud> E2E_ACCESS_TEAM_DOMAIN=engineering-e11.cloudflareaccess.com \
-     E2E_ACCESS_CLIENT_ID=<id> E2E_ACCESS_CLIENT_SECRET=<secret> \
-     test/e2e/deploy/deploy-e2e-worker.sh deploy
-   # add E2E_INTERNAL_API_SECRET=<secret> on the first deploy, or to rotate it
-   ```
-
+   The workflow's `deploy` job runs `deploy-e2e-worker.sh deploy` with
+   `E2E_WORKER_HOSTNAME`, `E2E_FAKE_LLM_HOSTNAME`, `E2E_ACCESS_AUD` and
+   `E2E_ACCESS_TEAM_DOMAIN` from the `cloud-agent-e2e` environment.
    `render`, `dry-run` and `deploy` run the fence (`e2e-worker-fence.mjs`) on
-   the rendered file before anything else uses it. `deploy` first refuses a
-   Worker holding any secret other than `INTERNAL_API_SECRET`,
-   `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET`, then deploys the
-   version together with the supplied secrets (`wrangler deploy --secrets-file`,
-   additive), and finally requires Access to refuse an anonymous request to the
-   hostname. Follow [Closed CI path](#closed-ci-path) before the first deploy
-   with a hostname: the custom domain answers as soon as it is attached.
+   the rendered file, with the configured hostnames as the exact hosts, before
+   anything else uses it. `deploy` first refuses a Worker holding any secret
+   other than `INTERNAL_API_SECRET`, `E2E_ACCESS_CLIENT_ID` and
+   `E2E_ACCESS_CLIENT_SECRET`, or lacking either Access secret (the
+   operator uploads those once; see [Closed CI path](#closed-ci-path)),
+   then deploys the version together with `INTERNAL_API_SECRET` when supplied
+   (`wrangler deploy --secrets-file`, additive), and finally requires Access to
+   refuse an anonymous request to the hostname.
 
    The renderer points `E2E_MODEL_VALIDATION_BASE_URL` at the fake Worker origin,
    so model validation with a runtime-authorized token uses the fake catalogue.
@@ -243,7 +356,7 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    `e2eInternalApiSecret` → fail naming both), validates it, and exports the
    resolved value into `E2E_INTERNAL_API_SECRET` for the run.
 
-5. Run the driver with the same admin token available (exported
+4. Run the driver with the same admin token available (exported
    `FAKE_LLM_ADMIN_TOKEN`, or `E2E_AUTH_FILE`) and a user token (exported
    `E2E_USER_TOKEN`, or the auth file's `token` field). The driver itself, not
    only `deploy-fake-llm.sh`, accepts the auth-file source: it resolves the admin
@@ -290,13 +403,13 @@ script never falls back to another token and never prints the token value.
 | `E2E_AUTH_FILE` | no | Optional mode-600 JSON file for a deployed run: `{ token, userId?, email?, fakeLlmAdminToken?, e2eInternalApiSecret? }`. Supplies the user token when `E2E_USER_TOKEN` is unset or empty, and the identity (`userId` derived from the token when omitted; `email` optional). `deploy-fake-llm.sh` reads its `fakeLlmAdminToken` field when `FAKE_LLM_ADMIN_TOKEN` is unset or empty; `deploy-e2e-worker.sh` and the deployed driver read its `e2eInternalApiSecret` field when `E2E_INTERNAL_API_SECRET` is unset or empty. |
 | `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token issued by the backend at `E2E_BACKEND_URL`. The driver sends it only to that backend: it exchanges it for short-lived control tokens and uses it for backend requests, including stream tickets. The Worker never receives it; it verifies the backend-issued control tokens and stream tickets with `NEXTAUTH_SECRET_DEV`, so a token for `https://api.kilo.ai` cannot drive a passing run. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value deployed as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
-| `FAKE_LLM_BASE_URL` | yes | Must be `https://<fake-host>/api/openrouter`. |
+| `FAKE_LLM_URL` | yes, for the driver | `https://<E2E_FAKE_LLM_HOSTNAME>`; the workflow builds it. |
 | `FAKE_LLM_ADMIN_TOKEN` | yes | Bearer for the fake's `/test/*` routes. Uploaded as the Worker secret by `deploy-fake-llm.sh` and exported for the driver. When unset or empty, the script resolves it from `E2E_AUTH_FILE`. Never the development default. |
 | `WORKER_URL` | yes, for the driver | `https://<E2E_WORKER_HOSTNAME>`; the workflow builds it from `CLOUD_AGENT_E2E_WORKER_HOSTNAME`. The Worker has no `workers.dev` or preview address. |
 | `E2E_WORKER_HOSTNAME` | no | Deploy: the one custom domain of the Worker. Unset renders a Worker with no address. |
 | `E2E_ACCESS_AUD`, `E2E_ACCESS_TEAM_DOMAIN` | with a hostname | Deploy: the Access application audience tag and `<team>.cloudflareaccess.com`, rendered as Worker vars. The Worker refuses every request whose `Cf-Access-Jwt-Assertion` does not verify against them, and everything when either is missing. |
-| `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` | with a hostname | The Access service token. The driver sends it on every Worker request and registers it on callback targets to the Worker's own origin; `deploy` deploys it as Worker secrets. Set both or neither. |
-| `FAKE_LLM_WORKER_URL` | no | Default `https://fake-llm.engineering-e11.workers.dev`. |
+| `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` | driver, with a hostname | The Access service token. In CI only the `tests` job reads it from STS (`ci-cloud-agent-e2e`); the driver sends it on every request to `WORKER_URL` and `FAKE_LLM_URL` and registers it on callback targets to the Worker's own origin. Set both or neither. The Worker holds the same values as operator-uploaded Worker secrets; the deploy script never reads or uploads them. |
+| `E2E_FAKE_LLM_HOSTNAME` | yes | The fake LLM's Access-protected hostname; the workflow sets it from `CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME`. No default. |
 
 ## Authentication model
 
@@ -433,8 +546,9 @@ touched again.
   routes require the admin token. A leaked admin token exposes only the test
   side channel (gate release, counters, scenario status), not billing or
   session data.
-- The fake LLM is a public `workers.dev` endpoint with capped, not guaranteed,
-  capacity. The E2E Worker has no public address; it keeps the production
+- The fake LLM has no public address either: its one custom domain sits behind
+  an Access application, and its capacity is capped, not guaranteed. The E2E
+  Worker has no public address; it keeps the production
   runtime classes, and legacy pools have a 40-instance cap.
 - There is no per-user admission guarantee and no concurrent-run isolation.
 - Capacity is capped but there is no total-spending cap.
@@ -468,16 +582,15 @@ profile's expected unsupported. The summary separates passed / failed / unsuppor
 `1` if any scenario failed, else `0`; a capability gap is filtered out before
 spawn and reported as a skip, not a failure.
 
-The `Cloud Agent E2E tests` workflow
-(`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
-and `workflow_call`. The `Cloud Agent E2E nightly` workflow deploys the e2e stack
-and then calls it. Its daily 03:37 UTC schedule is paused (see
-[Why the deployed profile is paused](#why-the-deployed-profile-is-paused)), so it
-runs only on manual dispatch. The tests workflow runs the
-parallel runner (`e2e:parallel`) as one job. Its `parallel` input defaults to
-`4` and sets `E2E_PARALLEL`; `only` selects scenarios. See
-[`../README.md`](../README.md#the-matrix-runner) for the scenario matrix
-and the env contract.
+The `Cloud Agent E2E` workflow (`.github/workflows/cloud-agent-e2e.yml`) runs on
+manual dispatch from `main` only; its schedule returns once the stack can pass
+(see [Why the deployed profile is paused](#why-the-deployed-profile-is-paused)).
+Its `deploy` input (default on) deploys first; the `tests` job then runs the
+parallel runner (`matrix.ts --profile deployed`) with the package's own `tsx`.
+Its `parallel` input defaults to `4` and sets `E2E_PARALLEL`; `only` selects
+scenarios; `backend_url` is required and must be a non-production backend. See
+[`../README.md`](../README.md#the-matrix-runner) for the scenario matrix and
+the env contract.
 
 Under the deployed profile the shared gate owns session teardown, so a scenario
 that did not previously delete its session now releases its sandbox:

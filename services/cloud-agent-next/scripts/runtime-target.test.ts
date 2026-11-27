@@ -266,7 +266,7 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
     release,
   });
   const output = buildE2eWorkerConfig(prepared, {
-    kiloOpenRouterBase: 'https://fake.example.test/api/openrouter',
+    fakeLlmHostname: 'fake.example.test',
   });
   expect(output.vars).toMatchObject({
     RUNTIME_STARTUP_MODE: 'downloaded',

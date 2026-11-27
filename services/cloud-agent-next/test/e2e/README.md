@@ -744,16 +744,17 @@ see
 and [Closed CI path](./deploy/README.md#closed-ci-path). The stack deploys and
 runs only from `main`.
 
-Two Workers, in deploy order:
+Two Workers, each reachable only at its Access-protected custom domain, both
+deployed by the `Cloud Agent E2E` workflow from `main` (never with a personal
+Cloudflare login; locally use `render` and `dry-run`):
 
 1. `fake-llm` — Worker + `FakeLlmState` Durable Object running the
-   shared `fake-llm-core.ts`; deploy first with
-   `test/e2e/deploy/deploy-fake-llm.sh deploy`.
+   shared `fake-llm-core.ts`; `test/e2e/deploy/deploy-fake-llm.sh deploy` with
+   `E2E_FAKE_LLM_HOSTNAME` (no default).
 2. `cloud-agent-e2e-test` — private render of this package's Worker;
-   deploy second with
-   `FAKE_LLM_BASE_URL=<base> E2E_WORKER_HOSTNAME=cloud-agent-e2e.kiloapps.io E2E_ACCESS_AUD=<aud> E2E_ACCESS_TEAM_DOMAIN=engineering-e11.cloudflareaccess.com E2E_ACCESS_CLIENT_ID=<id> E2E_ACCESS_CLIENT_SECRET=<secret> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
-   Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
-   redeploy without it keeps the deployed Worker secret.
+   `test/e2e/deploy/deploy-e2e-worker.sh deploy` with `E2E_WORKER_HOSTNAME`,
+   `E2E_FAKE_LLM_HOSTNAME`, `E2E_ACCESS_AUD` and `E2E_ACCESS_TEAM_DOMAIN`. See
+   [`deploy/README.md`](deploy/README.md#closed-ci-path).
 
 The fake Worker's state model: one Durable Object (`new_sqlite_classes`,
 migration `v1`). Open streams cannot survive Durable Object eviction, so
@@ -764,14 +765,12 @@ tag that is never re-inserted can be evicted and restart its counters at zero.
 
 Two different fake URL bases — do not conflate them:
 
-- The deploy script prints
-  `FAKE_LLM_BASE_URL=https://<fake-host>/api/openrouter`. That value is for the
-  e2e Worker's provider config (`KILO_OPENROUTER_BASE`); pass it to
-  `deploy-e2e-worker.sh`.
+- The e2e Worker's provider config (`KILO_OPENROUTER_BASE`) is
+  `https://<E2E_FAKE_LLM_HOSTNAME>/api/openrouter`; the renderer derives it.
 - The driver's `FAKE_LLM_URL` must be the fake Worker ROOT
-  `https://<fake-host>` with **no** `/api/openrouter`, because the scenarios call
-  `/test/requests` (and the other `/test/*` side channels) on it. Do not reuse
-  the `/api/openrouter` provider base as `FAKE_LLM_URL`.
+  `https://<E2E_FAKE_LLM_HOSTNAME>` with **no** `/api/openrouter`, because the
+  scenarios call `/test/requests` (and the other `/test/*` side channels) on it.
+  The driver sends the Access service token to that origin and to `WORKER_URL`.
 
 Driver env: `E2E_PROFILE=deployed`, `WORKER_URL` (the Access-protected
 hostname; the Worker has no `workers.dev` or preview address),
@@ -836,7 +835,7 @@ Exact run command, from `services/cloud-agent-next`:
 E2E_PROFILE=deployed \
 WORKER_URL=https://<access-protected-e2e-hostname> \
 E2E_ACCESS_CLIENT_ID=<client-id> E2E_ACCESS_CLIENT_SECRET=<client-secret> \
-FAKE_LLM_URL=https://fake-llm.engineering-e11.workers.dev \
+FAKE_LLM_URL=https://<CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME> \
 E2E_BACKEND_URL=https://<backend-signing-with-NEXTAUTH_SECRET_DEV> \
 pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
 ```
@@ -1002,16 +1001,17 @@ children killed by a signal or the watchdog. The retry starts after 60 s in a
 fresh child and fake-LLM scope and appears on a `retried:` line. If the second
 attempt fails, the matrix reports a failure.
 
-The `cloud-agent-e2e-tests` GitHub workflow
-(`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
-and `workflow_call`, from `main` only. The `cloud-agent-e2e-nightly` workflow deploys the e2e stack
-and then calls it with `backend_url` from the repository variable
-`CLOUD_AGENT_E2E_BACKEND_URL`. Its daily 03:37 UTC schedule is paused with the deployed
-profile (see above), so it runs only on manual dispatch. The tests workflow takes
-the Worker hostname from `CLOUD_AGENT_E2E_WORKER_HOSTNAME`, requires a
-non-production `backend_url`, checks that Access refuses an anonymous request,
-runs `e2e:parallel` as one job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
-`E2E_PARALLEL`; `only` selects scenarios. Job failure is the runner's exit code.
+The `Cloud Agent E2E` GitHub workflow (`.github/workflows/cloud-agent-e2e.yml`)
+runs on manual dispatch from `main` only; its schedule returns with the deployed
+profile (see above). Its `deploy` job (input `deploy`, default on) deploys the
+stack; its `build` job installs the driver with `--ignore-scripts` and hands the
+workspace over; its `tests` job reads the Access service token from STS
+(`ci-cloud-agent-e2e`), takes the Worker hostname from
+`CLOUD_AGENT_E2E_WORKER_HOSTNAME`, requires a non-production `backend_url`,
+checks that Access refuses an anonymous request, runs `matrix.ts --profile
+deployed` with the package's own `tsx` and uploads `e2e.log`. Its `parallel`
+input defaults to `4` and sets `E2E_PARALLEL`; `only` selects scenarios. Job
+failure is the runner's exit code.
 The workflow keeps its workflow-level `concurrency` only. Use `run.ts <name> _`
 for a focused single scenario.
 
@@ -1099,8 +1099,8 @@ Troubleshooting:
   deployed profile refuses plain HTTP.
 - **Container cold-start timeout** — `cold-hot` defaults to 240s per
   turn; a first real container boot can exceed two minutes.
-- **Fake Worker `/health`** — `curl https://fake-llm.engineering-e11.workers.dev/health`
-  confirms the container Worker is up.
+- **Fake Worker `/health`** — through Access only: the `Prove the closed path`
+  step of the `Cloud Agent E2E` workflow checks it with the service token.
 
 ## Gateway contract
 

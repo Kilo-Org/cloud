@@ -273,6 +273,14 @@ describe('deployed fake llm worker', () => {
     await expect(res.json()).resolves.toEqual({ status: 'ok', service: 'fake-llm' });
   });
 
+  // check-access-closed.sh fails at once on this marker: a 401 that carries it
+  // came from the Worker, so the request was not stopped by Access.
+  it('marks its own model-route refusal so it cannot pass for an Access refusal', async () => {
+    const res = await SELF.fetch(`${ORIGIN}/`);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('X-Cloud-Agent-E2E-Refusal')).toBe('fake-llm');
+  });
+
   it('guards /test/* with the DO counters behind the admin bearer', async () => {
     const before = await requestCounts();
 

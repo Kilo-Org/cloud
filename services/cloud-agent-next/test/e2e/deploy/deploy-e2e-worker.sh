@@ -17,6 +17,9 @@ INTERNAL_SECRET=""
 # so a name outside this set (a production credential left from an older
 # render) stops the deploy until it is deleted.
 ALLOWED_SECRETS="INTERNAL_API_SECRET E2E_ACCESS_CLIENT_ID E2E_ACCESS_CLIENT_SECRET"
+# The Access service token is uploaded by an operator after the closed deploy,
+# never by CI (README.md, Closed CI path); until then the Worker refuses all traffic.
+REQUIRED_SECRETS="E2E_ACCESS_CLIENT_ID E2E_ACCESS_CLIENT_SECRET"
 
 print_command() {
   local arg
@@ -43,6 +46,9 @@ usage() {
   cat <<USAGE
 Usage: deploy-e2e-worker.sh <command>
 
+Only the reviewed Cloud Agent E2E workflow deploys: Cloudflare writes for the
+test Workers never use a personal login. Locally, use render and dry-run.
+
 Commands:
   render    Render .wrangler/wrangler.e2e-test.jsonc from wrangler.runtime-generated.json
             and run the fence on it
@@ -52,7 +58,9 @@ Commands:
             anonymous request to the hostname, then list deployments
 
 Required environment:
-  FAKE_LLM_BASE_URL  https://<fake-host>/api/openrouter
+  E2E_FAKE_LLM_HOSTNAME  The fake-LLM Worker's Access-protected hostname. The Worker sends model
+                         traffic and model validation to https://<it>/api/openrouter and stamps the
+                         Access service token on those requests.
 Required file:
   wrangler.runtime-generated.json from exact-SHA runtime deployment preparation
 Optional environment:
@@ -74,10 +82,12 @@ Optional environment:
                        Required with E2E_WORKER_HOSTNAME: the Access application's audience tag
                        and <team>.cloudflareaccess.com. The Worker refuses every request whose
                        Cf-Access-Jwt-Assertion does not verify against them.
+Required Worker secrets:
   E2E_ACCESS_CLIENT_ID, E2E_ACCESS_CLIENT_SECRET
-                       The Access service token. Required with E2E_WORKER_HOSTNAME on deploy:
-                       deployed as the Worker's secrets of the same names, so sandbox requests
-                       to the Worker's own origin pass the Access application.
+                       The Access service token, uploaded by an operator after the closed
+                       deploy and its readback (README.md, Closed CI path). Without both the
+                       deploy proceeds and prints a notice: the Worker refuses every request
+                       until the upload. The script never uploads them.
 USAGE
 }
 
@@ -183,28 +193,14 @@ prepare_internal_secret() {
   fi
 }
 
-# The Access service token travels as two Worker secrets of the same names. A
-# hostname without them would leave every sandbox request to the Worker's own
-# origin challenged by Access, so deploy refuses that combination.
-prepare_access_credentials() {
-  local have_id="${E2E_ACCESS_CLIENT_ID:+1}"
-  local have_secret="${E2E_ACCESS_CLIENT_SECRET:+1}"
-  if [[ "$have_id" != "$have_secret" ]]; then
-    printf 'Set both E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET, or neither.\n' >&2
-    exit 1
-  fi
-  if [[ -n "${E2E_WORKER_HOSTNAME:-}" && -z "$have_id" ]]; then
-    printf 'E2E_WORKER_HOSTNAME requires E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET.\n' >&2
-    exit 1
-  fi
-}
-
-# Refuse to deploy over a Worker that holds a secret outside ALLOWED_SECRETS.
+# Refuse to deploy over a Worker that holds a secret outside ALLOWED_SECRETS. A
+# missing Access service token only prints a notice: it is uploaded after the
+# closed deploy, and the Worker refuses every request until then.
 check_existing_secrets() {
   print_command cd "$SERVICE_DIR" '&&' pnpm exec wrangler secret list --name "$WORKER_NAME" --format json
   local listed
   listed=$(cd "$SERVICE_DIR" && pnpm exec wrangler secret list --name "$WORKER_NAME" --format json)
-  SECRET_LIST="$listed" ALLOWED_SECRETS="$ALLOWED_SECRETS" node -e '
+  SECRET_LIST="$listed" ALLOWED_SECRETS="$ALLOWED_SECRETS" REQUIRED_SECRETS="$REQUIRED_SECRETS" node -e '
 const text = process.env.SECRET_LIST;
 const names = JSON.parse(text.slice(text.indexOf("["))).map(secret => secret.name);
 const allowed = new Set(process.env.ALLOWED_SECRETS.split(" "));
@@ -213,7 +209,14 @@ if (unexpected.length > 0) {
   console.error(`Refusing to deploy: delete these Worker secrets first: ${unexpected.join(", ")}`);
   process.exit(1);
 }
-console.log(`Worker secrets: ${names.join(", ") || "(none)"}`);
+const missing = process.env.REQUIRED_SECRETS.split(" ").filter(name => !names.includes(name));
+if (missing.length > 0) {
+  console.log(
+    `Notice: the Worker lacks ${missing.join(" and ")}, so it refuses every request until an operator ` +
+      "uploads them after this deploy (test/e2e/deploy/README.md, Closed CI path)."
+  );
+}
+console.log(`Worker secrets: ${names.join(", ")}`);
 '
 }
 
@@ -230,10 +233,15 @@ ensure_callback_queue() {
   run_service_command pnpm exec wrangler queues create "$CALLBACK_QUEUE" --message-retention-period-secs 345600
 }
 
-# Deploy the version and its supplied secrets in one request. The JSON secrets
-# file is mode 600, written by node from the environment (never an argument) and
-# removed on exit; wrangler applies it additively, so omitted secrets survive.
+# Deploy the version, together with INTERNAL_API_SECRET when a source supplies it.
+# The JSON secrets file is mode 600, written by node from the environment (never
+# an argument) and removed on exit; wrangler applies it additively, so the
+# operator-uploaded Access secrets survive.
 deploy_with_secrets() {
+  if [[ -z "$INTERNAL_SECRET" ]]; then
+    run_service_command pnpm exec wrangler deploy --config "$CONFIG_PATH"
+    return
+  fi
   local secrets_file
   secrets_file=$(mktemp)
   # shellcheck disable=SC2064 # expand the path now
@@ -241,11 +249,7 @@ deploy_with_secrets() {
   chmod 600 "$secrets_file"
   E2E_SECRETS_FILE="$secrets_file" E2E_INTERNAL_SECRET_VALUE="$INTERNAL_SECRET" node -e '
 const { writeFileSync } = require("node:fs");
-const secrets = {};
-if (process.env.E2E_INTERNAL_SECRET_VALUE) secrets.INTERNAL_API_SECRET = process.env.E2E_INTERNAL_SECRET_VALUE;
-for (const name of ["E2E_ACCESS_CLIENT_ID", "E2E_ACCESS_CLIENT_SECRET"]) {
-  if (process.env[name]) secrets[name] = process.env[name];
-}
+const secrets = { INTERNAL_API_SECRET: process.env.E2E_INTERNAL_SECRET_VALUE };
 writeFileSync(process.env.E2E_SECRETS_FILE, JSON.stringify(secrets), { mode: 0o600 });
 '
   run_service_command pnpm exec wrangler deploy --config "$CONFIG_PATH" --secrets-file "$secrets_file"
@@ -263,7 +267,7 @@ main() {
       ;;
   esac
 
-  require_env FAKE_LLM_BASE_URL
+  require_env E2E_FAKE_LLM_HOSTNAME
 
   case "$command" in
     render)
@@ -276,7 +280,6 @@ main() {
       ;;
     deploy)
       prepare_internal_secret
-      prepare_access_credentials
       check_existing_secrets
       render_config
       run_service_command pnpm run build:wrapper

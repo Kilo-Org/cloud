@@ -1,15 +1,19 @@
 /**
- * Cloudflare Access service-token headers for the deployed e2e Worker.
+ * Cloudflare Access service-token headers for the deployed e2e stack.
  *
- * The deployed Worker has no public address. CI reaches its custom domain
- * through an Access application whose only policy is Service Auth for one
- * service token. The driver sends the token on requests to the `WORKER_URL`
- * origin (tRPC, `/stream`, the `/__e2e/*` surface) and registers it as the
- * headers of a callback target on that origin, because callback delivery to the
- * Worker's own origin passes the same Access application. A request to any other
- * origin, such as the backend or the fake LLM, never carries it.
+ * Neither deployed e2e Worker has a public address. CI reaches the Worker's and
+ * the fake LLM's custom domains through one Access application whose only
+ * policy is Service Auth for one service token. The `tests` job reads the token
+ * from the STS `ci-cloud-agent-e2e` bundle and passes it to the driver as
+ * `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET`; this is the only place
+ * the driver reads them. The driver sends the token on requests to the
+ * `WORKER_URL` origin (tRPC, `/stream`, the `/__e2e/*` surface) and the
+ * `FAKE_LLM_URL` origin (the `/test/*` side channel), and registers it as the
+ * headers of a callback target on the Worker's origin, because callback delivery
+ * to the Worker's own origin passes the same Access application. A request to
+ * any other origin, such as the backend, never carries it.
  *
- * Both variables unset adds nothing: the local profiles and a Worker without an
+ * Both variables unset adds nothing: the local profiles and a stack without an
  * Access hostname. Exactly one set is a configuration error.
  */
 export function workerAccessHeaders(
@@ -24,6 +28,10 @@ export function workerAccessHeaders(
   }
   // `ws:`/`wss:` and `http:`/`https:` URLs of one host share an origin here.
   const origin = (value: string) => new URL(value.replace(/^ws(s?):/i, 'http$1:')).origin;
-  if (!env.WORKER_URL || origin(url) !== origin(env.WORKER_URL)) return {};
+  const target = origin(url);
+  const accessOrigins = [env.WORKER_URL, env.FAKE_LLM_URL]
+    .filter((value): value is string => Boolean(value))
+    .map(origin);
+  if (!accessOrigins.includes(target)) return {};
   return { 'CF-Access-Client-Id': clientId, 'CF-Access-Client-Secret': clientSecret };
 }

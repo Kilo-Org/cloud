@@ -5,7 +5,10 @@
   "main": "fake-llm-worker.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
+  // No public address: workers.dev and preview URLs stay off. The fence
+  // (scripts/e2e-worker-fence.test.ts) checks this file.
+  "workers_dev": false,
+  "preview_urls": false,
   "dev": { "port": 8812 },
   "durable_objects": {
     "bindings": [{ "name": "FAKE_LLM", "class_name": "FakeLlmState" }],

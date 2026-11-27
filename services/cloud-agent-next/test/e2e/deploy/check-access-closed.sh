@@ -3,8 +3,9 @@
 #
 # Sends an anonymous GET to https://<hostname>/ and passes only when Cloudflare
 # Access refuses it: a redirect to <team>.cloudflareaccess.com, or 401/403
-# without the e2e Worker's own refusal marker. The Worker's marker means the
-# request reached the Worker without passing Access, so the check fails at once.
+# without the Worker's own refusal marker, which both the e2e Worker and the
+# fake-LLM Worker set. The marker means the request reached the Worker without
+# passing Access, so the check fails at once.
 # A freshly attached custom domain can take a moment to resolve and get its
 # certificate, so any other outcome is retried a bounded number of times
 # (ACCESS_CHECK_ATTEMPTS, default 6, ACCESS_CHECK_INTERVAL_S apart, default 10)

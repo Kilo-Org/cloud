@@ -11,15 +11,22 @@
  * construction.
  */
 
+import { env as workerEnv } from 'cloudflare:workers';
 import production from './index.js';
 import { e2eSurfaceApp } from './e2e-surface/app.js';
 import {
-  withoutSelfOriginCookies,
-  withSelfAccessCredentials,
+  withAccessCredentials,
+  withAccessFetch,
+  withoutAccessOriginCookies,
 } from './e2e-surface/access-credentials.js';
 import { refuseWithoutAccess } from './e2e-surface/access-gate.js';
 import { ContainersOutbound as ProductionContainersOutbound } from './sandbox-containers/containers-outbound.js';
 import type { Env } from './types.js';
+
+// The Worker's own requests to the two Access-protected e2e origins (callback
+// delivery to itself, model validation against the fake LLM) carry the service
+// token. Wrapped once, at module load; every other request is untouched.
+globalThis.fetch = withAccessFetch(globalThis.fetch.bind(globalThis), () => workerEnv);
 
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
@@ -35,15 +42,15 @@ export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 
 /**
  * Container egress with the e2e Worker's Access service token on requests to
- * its own origin, and without any cookie those responses set. `SandboxContainers`
- * installs `ctx.exports.ContainersOutbound` as the outbound handler, so this
- * export replaces production's only in the e2e Worker. Every other destination
- * is forwarded unchanged.
+ * the two e2e origins, and without any cookie those responses set.
+ * `SandboxContainers` installs `ctx.exports.ContainersOutbound` as the outbound
+ * handler, so this export replaces production's only in the e2e Worker. Every
+ * other destination is forwarded unchanged.
  */
 export class ContainersOutbound extends ProductionContainersOutbound {
   override async fetch(request: Request): Promise<Response> {
-    const response = await super.fetch(withSelfAccessCredentials(request, this.env));
-    return withoutSelfOriginCookies(request, response, this.env);
+    const response = await super.fetch(withAccessCredentials(request, this.env));
+    return withoutAccessOriginCookies(request, response, this.env);
   }
 }
 

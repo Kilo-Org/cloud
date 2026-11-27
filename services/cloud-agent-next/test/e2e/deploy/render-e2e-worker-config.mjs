@@ -14,6 +14,14 @@ const packageDevVarsPath = join(packageDir, '.dev.vars');
 const localDevVarsPath = join(packageDir, '.wrangler', '.dev.vars');
 const e2eEntryPath = '../src/e2e-entry.ts';
 const E2E_WORKER_NAME = 'cloud-agent-e2e-test';
+const fakeLlmSourceConfigPath = join(packageDir, 'test', 'e2e', 'wrangler.fake-llm.jsonc');
+const fakeLlmTargetConfigPath = join(
+  packageDir,
+  'test',
+  'e2e',
+  '.wrangler',
+  'wrangler.fake-llm.jsonc'
+);
 
 // Wrangler resolves `.dev.vars` relative to the selected config's directory and
 // prefers `${configDir}/.dev.vars.${env}` over `${configDir}/.dev.vars`, so with
@@ -140,24 +148,46 @@ function hostsOverlap(a, b) {
 }
 
 /**
- * The optional private hostname of the e2e Worker: one custom domain that an
- * Access application must protect. It must be a plain hostname that no route of
- * the source config covers, and never a `workers.dev` address.
+ * A private hostname of the e2e stack: one custom domain that the e2e Access
+ * application must protect. It must be a plain hostname that no route of the
+ * source config covers, and never a `workers.dev` address.
  */
-export function requireE2eWorkerHostname(hostname, sourceConfig) {
+function requirePrivateHostname(variable, hostname, sourceConfig) {
   if (typeof hostname !== 'string' || !HOSTNAME_PATTERN.test(hostname)) {
     throw new Error(
-      'E2E_WORKER_HOSTNAME must be a plain lowercase hostname without scheme, port, path or wildcard.'
+      `${variable} must be a plain lowercase hostname without scheme, port, path or wildcard.`
     );
   }
   if (hostname === 'workers.dev' || hostname.endsWith('.workers.dev')) {
-    throw new Error('E2E_WORKER_HOSTNAME must not be a workers.dev address.');
+    throw new Error(`${variable} must not be a workers.dev address.`);
   }
   const sourceRoutes = sourceConfig.routes ?? (sourceConfig.route ? [sourceConfig.route] : []);
   if (sourceRoutes.some(route => hostsOverlap(routeHost(route), hostname))) {
-    throw new Error('E2E_WORKER_HOSTNAME overlaps a production route of the source config.');
+    throw new Error(`${variable} overlaps a production route of the source config.`);
   }
   return hostname;
+}
+
+/** The optional private hostname of the e2e Worker. */
+export function requireE2eWorkerHostname(hostname, sourceConfig) {
+  return requirePrivateHostname('E2E_WORKER_HOSTNAME', hostname, sourceConfig);
+}
+
+/**
+ * The fake-LLM Worker for the deployed stack. Its checked-in config has no
+ * address; this render adds exactly the one Access-protected custom domain and
+ * keeps workers.dev and preview URLs off. The rendered file lives in
+ * `test/e2e/.wrangler/`, so `main` and `$schema` move one directory up.
+ */
+export function buildFakeLlmConfig(sourceConfig, { hostname }) {
+  const host = requirePrivateHostname('E2E_FAKE_LLM_HOSTNAME', hostname, sourceConfig);
+  const config = structuredClone(sourceConfig);
+  config.$schema = '../../../node_modules/wrangler/config-schema.json';
+  config.main = `../${sourceConfig.main}`;
+  config.workers_dev = false;
+  config.preview_urls = false;
+  config.routes = [{ pattern: host, custom_domain: true }];
+  return config;
 }
 
 /**
@@ -197,11 +227,15 @@ function callbackQueueOnly(queues) {
  * the optional custom domain, which requires its Access application.
  */
 export function buildE2eWorkerConfig(sourceConfig, overrides) {
-  const { workerHostname, access, kiloOpenRouterBase } = overrides;
+  const { workerHostname, access, fakeLlmHostname } = overrides;
   const source = structuredClone(sourceConfig);
   const hostname =
     workerHostname === undefined ? undefined : requireE2eWorkerHostname(workerHostname, source);
   const verifiedAccess = hostname === undefined ? undefined : requireE2eAccess(access);
+  const fakeLlm = requirePrivateHostname('E2E_FAKE_LLM_HOSTNAME', fakeLlmHostname, source);
+  if (fakeLlm === hostname) {
+    throw new Error('E2E_FAKE_LLM_HOSTNAME must differ from E2E_WORKER_HOSTNAME.');
+  }
 
   /** @type {Record<string, any>} */
   const config = {
@@ -289,13 +323,17 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);
 
+  const fakeLlmUrl = `https://${fakeLlm}`;
   const vars = {
     ...source.vars,
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     // The e2e stack validates its models against the fake Worker, which serves
     // the same route shape as the official backend. Production never sets this.
-    E2E_MODEL_VALIDATION_BASE_URL: new URL(kiloOpenRouterBase).origin,
-    KILO_OPENROUTER_BASE: kiloOpenRouterBase,
+    E2E_MODEL_VALIDATION_BASE_URL: fakeLlmUrl,
+    KILO_OPENROUTER_BASE: `${fakeLlmUrl}/api/openrouter`,
+    // The fake LLM's Access-protected origin: the e2e entry stamps the service
+    // token on the Worker's and the sandboxes' requests to it.
+    E2E_FAKE_LLM_URL: fakeLlmUrl,
     WS_ALLOWED_ORIGINS: 'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000',
     TOOL_CGROUP_ORG_IDS: '*',
     TOOL_CGROUP_MODE: 'enforce',
@@ -306,7 +344,8 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
   };
   // Without its hostname the Worker has no address, so it must not inherit
-  // production's, and the e2e entry refuses every request.
+  // production's, and the e2e entry refuses every request. With it, callbacks
+  // and sandbox traffic address the Worker only at this Access hostname.
   if (hostname === undefined) delete vars.WORKER_URL;
   else {
     vars.WORKER_URL = `https://${hostname}`;
@@ -498,40 +537,25 @@ if (isMain) {
       console.error(error instanceof Error ? error.message : error);
       process.exit(1);
     }
+  } else if (process.argv.includes('--fake-llm')) {
+    let rendered;
+    try {
+      rendered = buildFakeLlmConfig(parse(readFileSync(fakeLlmSourceConfigPath, 'utf8')), {
+        hostname: process.env.E2E_FAKE_LLM_HOSTNAME,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+    mkdirSync(dirname(fakeLlmTargetConfigPath), { recursive: true });
+    writeFileSync(fakeLlmTargetConfigPath, `${JSON.stringify(rendered, null, 2)}\n`);
+    console.log(`Rendered ${fakeLlmTargetConfigPath}`);
   } else {
-    const fakeLlmBaseUrl = process.env.FAKE_LLM_BASE_URL;
     const workerHostname = process.env.E2E_WORKER_HOSTNAME || undefined;
     const access = {
       aud: process.env.E2E_ACCESS_AUD ?? '',
       teamDomain: process.env.E2E_ACCESS_TEAM_DOMAIN ?? '',
     };
-
-    if (!fakeLlmBaseUrl) {
-      console.error('FAKE_LLM_BASE_URL is required (https://<fake-host>/api/openrouter).');
-      process.exit(1);
-    }
-    let parsedFakeLlmBaseUrl;
-    try {
-      parsedFakeLlmBaseUrl = new URL(fakeLlmBaseUrl);
-    } catch {
-      console.error('FAKE_LLM_BASE_URL must be a valid absolute URL.');
-      process.exit(1);
-    }
-    if (
-      parsedFakeLlmBaseUrl.protocol !== 'https:' ||
-      parsedFakeLlmBaseUrl.pathname !== '/api/openrouter' ||
-      parsedFakeLlmBaseUrl.search !== '' ||
-      parsedFakeLlmBaseUrl.hash !== '' ||
-      parsedFakeLlmBaseUrl.username !== '' ||
-      parsedFakeLlmBaseUrl.password !== ''
-    ) {
-      console.error(
-        'FAKE_LLM_BASE_URL must be https://<host>/api/openrouter with no query, fragment or credentials, e.g. https://fake-llm.engineering-e11.workers.dev/api/openrouter'
-      );
-      process.exit(1);
-    }
-
-    const kiloOpenRouterBase = `${parsedFakeLlmBaseUrl.origin}${parsedFakeLlmBaseUrl.pathname}`;
     const runtimeConfigPath = join(packageDir, 'wrangler.runtime-generated.json');
     if (!existsSync(runtimeConfigPath)) {
       throw new Error(
@@ -553,7 +577,7 @@ if (isMain) {
       rendered = buildE2eWorkerConfig(sourceConfig, {
         workerHostname,
         access,
-        kiloOpenRouterBase,
+        fakeLlmHostname: process.env.E2E_FAKE_LLM_HOSTNAME,
       });
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);

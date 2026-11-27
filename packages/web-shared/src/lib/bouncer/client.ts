@@ -473,9 +473,7 @@ export function bouncerEnabledForDeployment(
   if (environment === 'production') {
     if (target !== undefined && target !== 'production' && !targetMismatchLogged) {
       targetMismatchLogged = true;
-      console.error('[bouncer] config error: VERCEL_ENV is production but VERCEL_TARGET_ENV is not', {
-        target,
-      });
+      console.error('[bouncer] config error: VERCEL_TARGET_ENV is not production', { target });
     }
     return true;
   }

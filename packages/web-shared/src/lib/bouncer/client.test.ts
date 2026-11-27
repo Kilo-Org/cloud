@@ -1049,16 +1049,16 @@ describe('bouncerEnabledForDeployment', () => {
     expect(errors.mock.calls[0]?.[0]).toContain('[bouncer] config error');
   });
 
-  it.each(['staging', 'preview'])('disables a VERCEL_ENV=preview deployment targeting %s', target => {
-    expect(freshCheck()({ VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: target })).toBe(false);
-  });
-
-  it.each([{}, { VERCEL_ENV: 'development' }])(
-    'leaves %j to BOUNCER_URL, as before',
-    runtime => {
-      expect(freshCheck()(runtime)).toBe(true);
+  it.each(['staging', 'preview'])(
+    'disables a VERCEL_ENV=preview deployment targeting %s',
+    target => {
+      expect(freshCheck()({ VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: target })).toBe(false);
     }
   );
+
+  it.each([{}, { VERCEL_ENV: 'development' }])('leaves %j to BOUNCER_URL, as before', runtime => {
+    expect(freshCheck()(runtime)).toBe(true);
+  });
 });
 
 describe('a preview or staging deployment with BOUNCER_URL set', () => {

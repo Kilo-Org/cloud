@@ -103,7 +103,12 @@ describe('policy token grants', () => {
     // The shipped web policy, which sends the probe, grants neither.
     expect(policyIndex.get('production', 'web')).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'bouncer'],
-      scopes: [...WEB_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'],
+      scopes: [
+        ...WEB_BASE_SCOPES,
+        'bouncer:decide',
+        'bouncer:usage.write',
+        'bouncer:signup.decide',
+      ],
     });
   });
 
@@ -928,19 +933,32 @@ describe('dual-accept grants of the shipped policies', () => {
   it.each(['staging', 'production'] as const)(
     'grants the callers only these scopes and audiences in %s',
     environment => {
+      // Bouncer runs in production only, so its grants are production `environmentGrants`.
+      const bouncer = environment === 'production';
       expect(policyFor(environment, 'usage-ingest')).toMatchObject({
         audiences: ['web'],
         scopes: ['web:sts.canary', 'web:usage.record'],
         secrets: [],
       });
       expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y'],
-        scopes: WEB_BASE_SCOPES,
+        audiences: ['usage-ingest', 'o11y', ...(bouncer ? ['bouncer'] : [])],
+        scopes: [
+          ...WEB_BASE_SCOPES,
+          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] : []),
+        ],
         secrets: [],
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
-        scopes: GATEWAY_BASE_SCOPES,
+        audiences: [
+          'usage-ingest',
+          'o11y',
+          'ai-gateway-secure-proxy',
+          ...(bouncer ? ['bouncer'] : []),
+        ],
+        scopes: [
+          ...GATEWAY_BASE_SCOPES,
+          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
+        ],
         secrets: [],
       });
     }
@@ -1317,7 +1335,12 @@ scopes: ['gateway:models.read']
     });
     expect(policyFor('production', 'web')).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'bouncer'],
-      scopes: [...WEB_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'],
+      scopes: [
+        ...WEB_BASE_SCOPES,
+        'bouncer:decide',
+        'bouncer:usage.write',
+        'bouncer:signup.decide',
+      ],
       secrets: [],
     });
   });

@@ -1366,7 +1366,9 @@ describe('User', () => {
         );
 
         expect(result.success).toBe(true);
-        expect(bouncerCalls(fetchSpy)).toEqual(['https://bouncer.example.com/api/v1/signup-decide']);
+        expect(bouncerCalls(fetchSpy)).toEqual([
+          'https://bouncer.example.com/api/v1/signup-decide',
+        ]);
       });
     });
     it.each([

@@ -200,22 +200,17 @@ describe('the installed Bouncer auth with the real transport', () => {
     ['a preview', { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' }, STS_ISSUERS.development],
     ['staging', { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging' }, STS_ISSUERS.staging],
   ])(
-    'makes no STS call from %s deployment, even with its own STS_URL',
+    'makes no STS or Bouncer call from %s deployment, even with its own STS_URL',
     async (_name, runtime, issuer) => {
       setRuntime({ ...runtime, BOUNCER_CLIENT_AUTH: 'dual' });
       mockStsUrl = issuer;
       installBouncerAuth('kilocode-ai-gateway');
-      await decide(
-        { requestId: 'r-6', tier: 'anonymous', ip: '203.0.113.7' },
-        { timeoutMs: 1_000 }
-      );
-      expect(mockFetch.mock.calls.filter(([input]) => urlOf(input).endsWith('/v1/token'))).toEqual(
-        []
-      );
+      await expect(
+        decide({ requestId: 'r-6', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 })
+      ).resolves.toBeNull();
+      // Bouncer is production-only: the client takes the unconfigured path before any header read.
+      expect(mockFetch).not.toHaveBeenCalled();
       expect(mockIdentity).not.toHaveBeenCalled();
-      const [headers] = bouncerCalls();
-      expect(headers.get('authorization')).toBeNull();
-      expect(headers.get('x-internal-api-key')).toBe('env-only-secret');
     }
   );
 

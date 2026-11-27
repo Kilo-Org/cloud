@@ -28,8 +28,9 @@ import { deliverCreditEventWireBody } from './bouncer/client';
 import { installInternalApiSecretRead } from './internal-api-secret';
 import { dispatchSpendAlertPush } from './notifications-worker-client';
 
-// Each shared sender keeps its own header and failure contract: the web app installs its read, the
-// AI gateway installs nothing and keeps its configured value whatever SECRETS_SOURCE says.
+// Each shared sender keeps its own header and failure contract: an app (web or AI gateway)
+// installs its read; a process with nothing installed keeps its configured value whatever
+// SECRETS_SOURCE says.
 
 const DELIVERED = 'sts-delivered-secret';
 const installedRead = jest.fn<Promise<string>, []>();
@@ -75,8 +76,8 @@ afterEach(() => {
 });
 
 describe.each([
-  ['the AI gateway (nothing installed, an unrelated SECRETS_SOURCE)', false, 'env-only-secret'],
-  ['the web app (installed read)', true, DELIVERED],
+  ['a process with nothing installed and an unrelated SECRETS_SOURCE', false, 'env-only-secret'],
+  ['an app with the installed read', true, DELIVERED],
 ])('in %s', (_name, installed, expected) => {
   beforeEach(() => {
     if (installed) installInternalApiSecretRead(installedRead);

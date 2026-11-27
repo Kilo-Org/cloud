@@ -5,14 +5,14 @@ import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 export type InternalApiSecretRead = () => Promise<string>;
 
 declare global {
-  // Next.js evaluates a module once per bundle layer, so a read the web app installs from
+  // Next.js evaluates a module once per bundle layer, so a read an app installs from
   // `instrumentation.ts` reaches its route handlers only through a process-wide slot.
   var __kilocodeInternalApiSecretRead: InternalApiSecretRead | undefined;
 }
 
 /**
- * Called only by the web app (`apps/web/src/lib/sts-secret-reader.ts`), which owns the source
- * selection. The AI gateway, scripts and tests install nothing.
+ * Called only by `sts-secret-reader.ts`, which owns the source selection, from the
+ * `instrumentation.ts` of `apps/web` and `apps/ai-gateway`. Scripts and tests install nothing.
  */
 export function installInternalApiSecretRead(read: InternalApiSecretRead): void {
   globalThis.__kilocodeInternalApiSecretRead = read;

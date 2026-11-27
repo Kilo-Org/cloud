@@ -3,11 +3,15 @@ import { STS_ISSUERS, type BundleResult } from '@kilocode/sts-contracts';
 import { getCache } from '@vercel/functions';
 import { vercelIdentity } from '@kilocode/service-token-client/vercel';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
-import { installWebInternalApiSecretRead, internalApiSecretFromSts } from './sts-secret-reader';
+import {
+  installSelectedInternalApiSecretRead,
+  internalApiSecretFromSts,
+} from './sts-secret-reader';
 import { createStsSecretReader, stsEnvironmentOfDeployment } from './sts-secret-transport';
 
-// The shipped wiring end to end in one process: `installWebInternalApiSecretRead` loads the real
-// transport on the first STS read, which uses the real `createHttpSecrets` against a faked fetch.
+// The shipped wiring end to end in one process: `installSelectedInternalApiSecretRead` loads the
+// real transport on the first STS read, which uses the real `createHttpSecrets` against a faked
+// fetch.
 
 const mockStsUrl = STS_ISSUERS.production;
 
@@ -157,15 +161,15 @@ describe('createStsSecretReader', () => {
 
 describe('internalApiSecretFromSts', () => {
   it.each(['sts', 'secrets-store'])(
-    'is false without the installed web read, whatever SECRETS_SOURCE says (%s)',
+    'is false without the installed read, whatever SECRETS_SOURCE says (%s)',
     source => {
       setRuntime({ SECRETS_SOURCE: source });
       expect(internalApiSecretFromSts()).toBe(false);
     }
   );
 
-  it('follows the selector once the web read is installed', () => {
-    installWebInternalApiSecretRead();
+  it('follows the selector once the read is installed', () => {
+    installSelectedInternalApiSecretRead();
     expect(internalApiSecretFromSts()).toBe(false);
     setRuntime({ SECRETS_SOURCE: 'sts' });
     expect(internalApiSecretFromSts()).toBe(true);
@@ -174,9 +178,9 @@ describe('internalApiSecretFromSts', () => {
   });
 });
 
-describe('installWebInternalApiSecretRead', () => {
+describe('installSelectedInternalApiSecretRead', () => {
   beforeEach(() => {
-    installWebInternalApiSecretRead();
+    installSelectedInternalApiSecretRead();
   });
 
   it.each([undefined, 'env'])(

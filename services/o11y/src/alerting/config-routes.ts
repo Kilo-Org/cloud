@@ -27,14 +27,14 @@ function queryModelParam(c: { req: { query(name: string): string | undefined } }
 }
 
 export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void {
-  app.get('/alerting/config', requireAdmin, async c => {
+  app.get('/alerting/config', requireAdmin('alertingRead'), async c => {
     const configs = await listAlertingConfigs(c.env);
     return c.json({ success: true, configs });
   });
 
   app.put(
     '/alerting/config',
-    requireAdmin,
+    requireAdmin('alertingWrite'),
     zodJsonValidator(AlertingConfigInputSchema),
     async c => {
       const input = c.req.valid('json');
@@ -46,7 +46,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
     }
   );
 
-  app.delete('/alerting/config', requireAdmin, async c => {
+  app.delete('/alerting/config', requireAdmin('alertingWrite'), async c => {
     const model = c.req.query('model')?.trim();
     if (!model || model.length === 0) {
       return c.json({ success: false, error: 'model is required' }, 400);
@@ -56,7 +56,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
     return c.json({ success: true });
   });
 
-  app.get('/alerting/baseline', requireAdmin, async c => {
+  app.get('/alerting/baseline', requireAdmin('alertingRead'), async c => {
     const model = queryModelParam(c);
     if (!model) {
       return c.json({ success: false, error: 'model is required' }, 400);
@@ -89,14 +89,14 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
 
   // --- TTFB alerting config routes ---
 
-  app.get('/alerting/ttfb-config', requireAdmin, async c => {
+  app.get('/alerting/ttfb-config', requireAdmin('alertingRead'), async c => {
     const configs = await listTtfbAlertingConfigs(c.env);
     return c.json({ success: true, configs });
   });
 
   app.put(
     '/alerting/ttfb-config',
-    requireAdmin,
+    requireAdmin('alertingWrite'),
     zodJsonValidator(TtfbAlertingConfigInputSchema),
     async c => {
       const input = c.req.valid('json');
@@ -108,7 +108,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
     }
   );
 
-  app.delete('/alerting/ttfb-config', requireAdmin, async c => {
+  app.delete('/alerting/ttfb-config', requireAdmin('alertingWrite'), async c => {
     const model = c.req.query('model')?.trim();
     if (!model || model.length === 0) {
       return c.json({ success: false, error: 'model is required' }, 400);
@@ -118,7 +118,7 @@ export function registerAlertingConfigRoutes(app: Hono<{ Bindings: Env }>): void
     return c.json({ success: true });
   });
 
-  app.get('/alerting/ttfb-baseline', requireAdmin, async c => {
+  app.get('/alerting/ttfb-baseline', requireAdmin('alertingRead'), async c => {
     const model = queryModelParam(c);
     if (!model) {
       return c.json({ success: false, error: 'model is required' }, 400);

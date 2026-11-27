@@ -34,7 +34,8 @@ jobs:
       # From the registry on every run, without the Actions cache: a restored
       # tree could be checked by its version only, not by its content, while npm
       # checks each tarball it fetches against the registry's integrity. The
-      # install runs once per deploy run, beside the gate.
+      # install runs once per deploy run, after the gate, so its time adds to
+      # each deploy.
       - name: Install Vercel CLI
         env:
           VERCEL_CLI_PREFIX: ${{ runner.temp }}/vercel-cli

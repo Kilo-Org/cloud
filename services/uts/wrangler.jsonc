@@ -113,6 +113,10 @@
         "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
         "LOGIN_ROTATION": "off",
+        // GitHub and Google sign-in. Each client id is the switch: its SIGNIN_<PROVIDER>_CLIENT_SECRET
+        // Worker secret is set first (README, "Configuration"). Production offers neither yet.
+        "SIGNIN_GITHUB_CLIENT_ID": "Ov23liHukmJusfuEp36F",
+        "SIGNIN_GOOGLE_CLIENT_ID": "798264175281-uqim60mc4mnbbecouob37hacetigcaoe.apps.googleusercontent.com",
       },
       "durable_objects": {
         "bindings": [

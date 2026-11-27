@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { GitLabCredentialBroker } from './gitlab-credential-broker.js';
 import { GitLabCredentialCrypto } from './gitlab-credential-crypto.js';
 import {
@@ -26,14 +27,20 @@ export const GitLabCredentialBrokerRequestSchema = z.discriminatedUnion('credent
 
 export type GitLabCredentialBrokerRequest = z.infer<typeof GitLabCredentialBrokerRequestSchema>;
 
-export function createGitLabCredentialService(env: CloudflareEnv): GitLabCredentialService {
-  const crypto = new GitLabCredentialCrypto(env);
-  const refresher = new GitLabOAuthCredentialRefresher(env, { crypto });
+export function createGitLabCredentialService(
+  env: CloudflareEnv,
+  ctx?: SecretsExecutionContext
+): GitLabCredentialService {
+  const crypto = new GitLabCredentialCrypto(env, ctx);
+  const refresher = new GitLabOAuthCredentialRefresher(env, { crypto }, ctx);
   return new GitLabCredentialService(new DrizzleGitLabCredentialStore(env), crypto, refresher);
 }
 
-export function createGitLabCredentialBroker(env: CloudflareEnv): GitLabCredentialBroker {
-  const credentialService = createGitLabCredentialService(env);
+export function createGitLabCredentialBroker(
+  env: CloudflareEnv,
+  ctx?: SecretsExecutionContext
+): GitLabCredentialBroker {
+  const credentialService = createGitLabCredentialService(env, ctx);
   return new GitLabCredentialBroker({
     getEncryptedCredential: (actor, selector) => credentialService.getCredential(actor, selector),
     hasProjectCredentialCandidates: (actor, integrationId) =>
@@ -44,9 +51,10 @@ export function createGitLabCredentialBroker(env: CloudflareEnv): GitLabCredenti
 export async function handleGitLabCredentialBrokerRequest(
   env: CloudflareEnv,
   actor: GitLabCredentialActor,
-  selector: GitLabCredentialBrokerRequest
+  selector: GitLabCredentialBrokerRequest,
+  ctx?: SecretsExecutionContext
 ) {
-  const result = await createGitLabCredentialBroker(env).resolveCredential(actor, selector);
+  const result = await createGitLabCredentialBroker(env, ctx).resolveCredential(actor, selector);
   if (result.status !== 'available') return result;
   return {
     status: 'available',

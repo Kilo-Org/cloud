@@ -165,7 +165,7 @@ export async function run(orgId?: string, scenarioArg?: string): Promise<void> {
     process.exit(1);
   }
 
-  const message = buildAutoChangeMessage(changes);
+  const message = buildAutoChangeMessage(changes, { addedModelsDisabled: false });
   console.log(`Message: ${message}`);
 
   const log = await createAuditLog({

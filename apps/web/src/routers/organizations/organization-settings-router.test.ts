@@ -1450,6 +1450,7 @@ describe('organizations settings trpc router', () => {
         available: true,
         disable_openrouter: false,
         data_region: null,
+        disable_new_models: false,
       });
     });
 
@@ -1580,6 +1581,158 @@ describe('organizations settings trpc router', () => {
           data_region: 'us',
         })
       ).rejects.toThrow();
+    });
+
+    describe('new models policy', () => {
+      async function auditMessages(organizationId: string) {
+        const auditLogs = await db
+          .select()
+          .from(organization_audit_logs)
+          .where(eq(organization_audit_logs.organization_id, organizationId))
+          .orderBy(organization_audit_logs.created_at, organization_audit_logs.id);
+        return auditLogs
+          .filter(log => log.action === 'organization.settings.change')
+          .map(log => log.message);
+      }
+
+      async function clearAuditLogs() {
+        await db
+          .delete(organization_audit_logs)
+          .where(eq(organization_audit_logs.organization_id, testOrganization.id));
+      }
+
+      beforeEach(clearAuditLogs);
+      afterEach(clearAuditLogs);
+
+      it('reports new models as enabled by default', async () => {
+        const caller = await createCallerForUser(member.id);
+
+        await expect(
+          caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+        ).resolves.toEqual({
+          available: false,
+          disable_openrouter: false,
+          data_region: null,
+          disable_new_models: false,
+        });
+      });
+
+      it('reports disable_new_models after it is set', async () => {
+        await mutateOrganizationSettings(testOrganization.id, settings => ({
+          ...settings,
+          disable_new_models: true,
+        }));
+        const caller = await createCallerForUser(member.id);
+
+        await expect(
+          caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+        ).resolves.toMatchObject({ available: false, disable_new_models: true });
+      });
+
+      it('saves the policy without the gateway_settings feature and records an audit log', async () => {
+        await enableGatewaySettings([orgWithSettings.id]);
+        const caller = await createCallerForUser(owner.id);
+
+        const result = await caller.organizations.settings.updateNewModelsPolicy({
+          organizationId: testOrganization.id,
+          disable_new_models: true,
+        });
+
+        expect(result.settings.disable_new_models).toBe(true);
+        expect((await getOrganizationById(testOrganization.id))?.settings.disable_new_models).toBe(
+          true
+        );
+        await expect(
+          caller.organizations.settings.getGatewaySettings({ organizationId: testOrganization.id })
+        ).resolves.toMatchObject({ available: false, disable_new_models: true });
+        expect(await auditMessages(testOrganization.id)).toEqual([
+          'Updated advanced policies: New models disabled by default',
+        ]);
+      });
+
+      it('enables new models again and records an audit log', async () => {
+        const caller = await createCallerForUser(owner.id);
+        await caller.organizations.settings.updateNewModelsPolicy({
+          organizationId: testOrganization.id,
+          disable_new_models: true,
+        });
+
+        const result = await caller.organizations.settings.updateNewModelsPolicy({
+          organizationId: testOrganization.id,
+          disable_new_models: false,
+        });
+
+        expect(result.settings.disable_new_models).toBe(false);
+        expect(await auditMessages(testOrganization.id)).toEqual([
+          'Updated advanced policies: New models disabled by default',
+          'Updated advanced policies: New models enabled by default',
+        ]);
+      });
+
+      it('preserves other settings', async () => {
+        await mutateOrganizationSettings(testOrganization.id, () => ({
+          model_deny_list: ['gpt-3.5-turbo'],
+          disable_openrouter: true,
+        }));
+        const caller = await createCallerForUser(owner.id);
+
+        const result = await caller.organizations.settings.updateNewModelsPolicy({
+          organizationId: testOrganization.id,
+          disable_new_models: true,
+        });
+
+        expect(result.settings).toMatchObject({
+          model_deny_list: ['gpt-3.5-turbo'],
+          disable_openrouter: true,
+          disable_new_models: true,
+        });
+      });
+
+      it('records a no-change audit log when the policy already has the requested value', async () => {
+        const caller = await createCallerForUser(owner.id);
+
+        await caller.organizations.settings.updateNewModelsPolicy({
+          organizationId: testOrganization.id,
+          disable_new_models: false,
+        });
+
+        expect(await auditMessages(testOrganization.id)).toEqual([
+          'Updated advanced policies: no changes',
+        ]);
+      });
+
+      it('rejects the policy for a non-enterprise organization', async () => {
+        await setPlan(testOrganization.id, 'teams');
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          })
+        ).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+          message: 'Advanced policies are not available for this organization.',
+        });
+        expect(
+          (await getOrganizationById(testOrganization.id))?.settings.disable_new_models
+        ).toBeUndefined();
+        expect(await auditMessages(testOrganization.id)).toEqual([]);
+      });
+
+      it('rejects policy changes by members', async () => {
+        const caller = await createCallerForUser(member.id);
+
+        await expect(
+          caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          })
+        ).rejects.toThrow();
+        expect(
+          (await getOrganizationById(testOrganization.id))?.settings.disable_new_models
+        ).toBeUndefined();
+      });
     });
   });
 

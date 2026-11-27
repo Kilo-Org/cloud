@@ -7,6 +7,11 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
 import { PAGES_AUTH_STATE_PATTERN, verifyPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
@@ -138,6 +143,15 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
     if (!tokenUserId) return refuse(400, 'invalid_token');
     userId = tokenUserId;
   }
+
+  // The Pages client secret is an internal shared secret (design section 6.5, item 9): the client
+  // check and the code/token validation both passed, so this acceptance is counted.
+  observeInternalAuth(
+    'web',
+    'pages_auth_exchange',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   const user = await findUserById(userId);
   if (!user || isBlockedAccount(user) || (await isUserBlacklistedByDomain(user))) {

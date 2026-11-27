@@ -17,6 +17,7 @@ import {
 import { base64urlToBytes } from '@kilocode/worker-utils/base64url';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 
 /** The assignment token lives no longer than one case attempt; the Worker mints it. */
 export const BENCHMARK_ASSIGNMENT_TTL_MS = 15 * 60_000;
@@ -121,6 +122,7 @@ export async function verifyBenchmarkAssignment(
     token: authorization.slice('Bearer '.length),
     scope: BENCHMARK_GATEWAY_ASSIGNMENT_SCOPE,
     resourceParts: benchmarkGatewayAssignmentParts(assignment),
+    observation: { receiver: 'ai-gateway' },
   });
   return authenticated ? { ok: true, assignment } : invalid();
 }
@@ -149,6 +151,11 @@ export async function requestBenchmarkAdmission(
   // The Worker admits on the constant-time Bearer check only, so an absent secret cannot be
   // admitted. Refuse before sending rather than let an unauthenticated call reach it.
   if (!options.secret) return { reason: 'admission_unavailable', retryable: true };
+  // An unset or refused Worker URL ('' outside production) is unavailable the same way, so no
+  // relative or production callback is attempted.
+  if (!parseInternalServiceUrl(workerUrl)) {
+    return { reason: 'admission_unavailable', retryable: true };
+  }
   let response: Response;
   try {
     response = await fetchImpl(`${workerUrl}${BENCHMARK_CASE_ADMIT_PATH}`, {

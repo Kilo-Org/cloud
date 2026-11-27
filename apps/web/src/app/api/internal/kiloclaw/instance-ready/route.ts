@@ -85,7 +85,7 @@ async function hasSentCompatibleInstanceReadyEmail(
 }
 
 export async function POST(req: NextRequest) {
-  const unauthorized = await authorizeInternalApiRequest(req);
+  const unauthorized = await authorizeInternalApiRequest(req, 'kiloclaw_instance_ready');
   if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);

@@ -6,6 +6,9 @@ import type { DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
 /** Complete UTC days before today that the leaderboard routes read. */
 export const LEADERBOARD_USAGE_LOOKBACK_DAYS = 7;
 
+/** Runs before this UTC hour rebuild yesterday even when it is already built. */
+export const YESTERDAY_SETTLING_HOURS = 6;
+
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const INSERT_BATCH_SIZE = 1_000;
@@ -170,11 +173,17 @@ export async function rebuildLeaderboardUsageDay(
 }
 
 /**
- * Builds every day in the leaderboard window that has no rollup rows yet,
- * newest first, until `deadline`. A built day is never rebuilt: usage rows are
- * inserted as requests finish, so a day is complete once it has ended.
+ * Builds every day in the leaderboard window that has no rollup rows yet, and
+ * rebuilds yesterday during its settling period, newest first, until `deadline`.
+ *
+ * A usage row's `created_at` is stamped when the gateway sends it, before it
+ * passes through the usage-ingest queue, whose retries can land it 20+ minutes
+ * later. A replica can also lag at build time. So a day built just after
+ * midnight can miss its last rows, and yesterday is rebuilt on every run until
+ * `YESTERDAY_SETTLING_HOURS` UTC to pick them up. Rows landing later than that,
+ * such as dead-letter replays, are not reflected.
  */
-export async function buildMissingLeaderboardUsageDays({
+export async function buildLeaderboardUsageDays({
   readDb,
   db,
   now,
@@ -192,16 +201,19 @@ export async function buildMissingLeaderboardUsageDays({
     WHERE usage_date >= ${window[window.length - 1]} AND usage_date <= ${window[0]}
   `);
   const builtDates = new Set(existing.rows.map(row => row.usage_date));
-  const missing = window.filter(usageDate => !builtDates.has(usageDate));
+  const settling = now.getUTCHours() < YESTERDAY_SETTLING_HOURS;
+  const toBuild = window.filter(
+    (usageDate, index) => !builtDates.has(usageDate) || (settling && index === 0)
+  );
 
   const built: { usageDate: string; rows: number }[] = [];
-  for (const usageDate of missing) {
+  for (const usageDate of toBuild) {
     if (Date.now() >= deadline) break;
     built.push({ usageDate, rows: await rebuildLeaderboardUsageDay(usageDate, { readDb, db }) });
   }
 
   return {
     built,
-    remaining: missing.filter(usageDate => !built.some(day => day.usageDate === usageDate)),
+    remaining: toBuild.filter(usageDate => !built.some(day => day.usageDate === usageDate)),
   };
 }

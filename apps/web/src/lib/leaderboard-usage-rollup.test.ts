@@ -10,7 +10,7 @@ import {
 } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
-  buildMissingLeaderboardUsageDays,
+  buildLeaderboardUsageDays,
   leaderboardUsageWindow,
   rebuildLeaderboardUsageDay,
 } from '@/lib/leaderboard-usage-rollup';
@@ -207,7 +207,7 @@ describe('leaderboard usage rollup', () => {
     await rebuildLeaderboardUsageDay('2026-11-08', { readDb: db, db });
     await insertUsage({ created_at: '2026-11-08T13:00:00.000Z' });
 
-    const result = await buildMissingLeaderboardUsageDays({
+    const result = await buildLeaderboardUsageDays({
       readDb: db,
       db,
       now,
@@ -232,8 +232,37 @@ describe('leaderboard usage rollup', () => {
     ]);
   });
 
+  test.each([
+    { now: '2026-11-10T05:20:00.000Z', requests: 2, rebuilt: ['2026-11-09'] },
+    { now: '2026-11-10T06:20:00.000Z', requests: 1, rebuilt: [] },
+  ])(
+    'rebuilds yesterday for late usage rows only before 06:00 UTC ($now)',
+    async ({ now, requests, rebuilt }) => {
+      await insertUsage({ created_at: '2026-11-09T12:00:00.000Z' });
+      for (const day of leaderboardUsageWindow(new Date(now))) {
+        await rebuildLeaderboardUsageDay(day, { readDb: db, db });
+      }
+      await insertUsage({ created_at: '2026-11-09T23:59:59.000Z' });
+
+      const result = await buildLeaderboardUsageDays({
+        readDb: db,
+        db,
+        now: new Date(now),
+        deadline: Date.now() + 60_000,
+      });
+
+      // The empty days stay unbuilt and are retried; only yesterday matters here.
+      expect(result.built.map(day => day.usageDate).filter(day => day === '2026-11-09')).toEqual(
+        rebuilt
+      );
+      expect(
+        (await rollupRows()).map(row => ({ date: row.usage_date, requests: row.request_count }))
+      ).toEqual([{ date: '2026-11-09', requests }]);
+    }
+  );
+
   test('stops starting new days once the deadline has passed', async () => {
-    const result = await buildMissingLeaderboardUsageDays({
+    const result = await buildLeaderboardUsageDays({
       readDb: db,
       db,
       now: new Date('2026-11-10T00:20:00.000Z'),

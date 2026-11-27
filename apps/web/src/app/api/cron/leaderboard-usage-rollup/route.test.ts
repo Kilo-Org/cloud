@@ -2,17 +2,17 @@ import { NextRequest } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 jest.mock('@/lib/leaderboard-usage-rollup', () => ({
-  buildMissingLeaderboardUsageDays: jest.fn(),
+  buildLeaderboardUsageDays: jest.fn(),
 }));
 const mockSentryLog = jest.fn();
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => mockSentryLog),
 }));
 
-import { buildMissingLeaderboardUsageDays } from '@/lib/leaderboard-usage-rollup';
+import { buildLeaderboardUsageDays } from '@/lib/leaderboard-usage-rollup';
 import { GET, maxDuration } from './route';
 
-const mockBuild = jest.mocked(buildMissingLeaderboardUsageDays);
+const mockBuild = jest.mocked(buildLeaderboardUsageDays);
 
 function request(secret: string): NextRequest {
   return new NextRequest('http://localhost:3000/api/cron/leaderboard-usage-rollup', {

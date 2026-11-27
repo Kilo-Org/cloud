@@ -70,6 +70,16 @@ describe('deliverCreditEvent', () => {
     expect((url as URL).href).toBe('https://bouncer.example.com/api/v2/credit-event');
   });
 
+  it('never follows a redirect and counts a 3xx as a retryable failure', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(null, { status: 307, headers: { location: 'https://elsewhere.example/' } })
+    );
+    await expect(
+      deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-307', userId: 'user-1' })
+    ).resolves.toEqual({ delivered: false, permanent: false, status: 307, error: 'http_307' });
+    expect(mockFetch.mock.calls[0]?.[1]?.redirect).toBe('manual');
+  });
+
   it('classifies a network error as a retryable failure', async () => {
     mockFetch.mockRejectedValue(new TypeError('fetch failed'));
     const result = await deliverCreditEvent({

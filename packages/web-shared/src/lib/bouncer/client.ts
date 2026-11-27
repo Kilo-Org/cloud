@@ -500,6 +500,9 @@ async function postWithResult(
       body: JSON.stringify(body),
       signal: deadline,
       cache: 'no-store',
+      // The request carries the internal key and an STS token: a redirect is never followed, and a
+      // 3xx is a failed call.
+      redirect: 'manual',
     });
     if (!response.ok) {
       return {

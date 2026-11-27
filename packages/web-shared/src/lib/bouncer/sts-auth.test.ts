@@ -96,21 +96,22 @@ function call(scope: BouncerScope, wait: boolean, signal?: AbortSignal): Bouncer
 
 const decideCall = call('bouncer:decide', true);
 
+type Counts = {
+  attached: unknown;
+  missed: unknown;
+  refused: unknown;
+  mint: unknown;
+  last_mint_age_s: unknown;
+};
+
 /** The counts since the last line: ends the interval and makes one `config` call to write them. */
-async function counts(
-  h: Harness
-): Promise<{ attached: unknown; missed: unknown; mint: unknown; last_mint_age_s: unknown }> {
+async function counts(h: Harness): Promise<Counts> {
   h.clock.offset += BOUNCER_COUNT_LOG_INTERVAL_MS;
   const flag = h.flag.value;
   h.flag.value = 'probe';
   await h.auth.headers(call('bouncer:decide', false));
   h.flag.value = flag;
-  const line = h.lines().at(-1) as unknown as {
-    attached: unknown;
-    missed: unknown;
-    mint: unknown;
-    last_mint_age_s: unknown;
-  };
+  const line = h.lines().at(-1) as unknown as Counts;
   const missed = structuredClone(line.missed) as Record<string, Record<string, number>>;
   const decide = missed['bouncer:decide'];
   if (decide.config === 1) delete decide.config;
@@ -119,10 +120,14 @@ async function counts(
   return {
     attached: line.attached,
     missed,
+    refused: line.refused,
     mint: line.mint,
     last_mint_age_s: line.last_mint_age_s,
   };
 }
+
+const invalidToken = { status: 401, reason: 'invalid_token' } as const;
+const insufficientScope = { status: 403, reason: 'insufficient_scope' } as const;
 
 function denied(): ServiceTokenError {
   return new ServiceTokenError(
@@ -151,7 +156,7 @@ describe('bouncerClientAuthMode', () => {
     ['', 'legacy'],
     ['legacy', 'legacy'],
     ['dual', 'dual'],
-    ['sts', 'invalid'],
+    ['sts', 'sts'],
     ['DUAL', 'invalid'],
     ['on', 'invalid'],
     ['true', 'invalid'],
@@ -185,6 +190,7 @@ describe('createBouncerAuth', () => {
         caller: 'kilocode-app',
         attached: {},
         missed: { 'bouncer:decide': { config: 1 } },
+        refused: {},
         mint: { ok: 0, failed: 0 },
         last_mint_age_s: null,
         level: 'info',
@@ -230,6 +236,7 @@ describe('createBouncerAuth', () => {
         caller: 'kilocode-app',
         attached: { [scope]: 1 },
         missed: {},
+        refused: {},
         mint: { ok: 0, failed: 0 },
         last_mint_age_s: null,
         level: 'info',
@@ -341,7 +348,7 @@ describe('createBouncerAuth', () => {
     h.hooks().mint(false);
     h.hooks().mint(true);
     await jest.advanceTimersByTimeAsync(5_000);
-    h.auth.rejected('bouncer:decide');
+    h.auth.refused('bouncer:decide', invalidToken);
     await expect(counts(h)).resolves.toMatchObject({
       mint: { ok: 2, failed: 1 },
       last_mint_age_s: BOUNCER_COUNT_LOG_INTERVAL_MS / 1000 + 5,
@@ -363,17 +370,17 @@ describe('createBouncerAuth', () => {
     h.read.mockResolvedValue(TOKEN);
     await h.auth.headers(decideCall);
     await counts(h);
-    h.auth.rejected('bouncer:decide');
+    h.auth.refused('bouncer:decide', invalidToken);
     for (const line of h.lines()) expect(JSON.stringify(line)).not.toContain(TOKEN);
   });
 
-  it('holds a scope Bouncer refused back for the hold, then sends it again', async () => {
+  it('holds a scope Bouncer refused with 401 back for the hold in dual, then sends it again', async () => {
     jest.useFakeTimers();
     const h = harness('kilocode-app', WEB_SCOPES);
     h.read.mockResolvedValue(TOKEN);
-    h.auth.rejected('bouncer:decide');
-    h.auth.rejected('bouncer:decide');
-    expect(h.lines()).toEqual([
+    h.auth.refused('bouncer:decide', invalidToken);
+    h.auth.refused('bouncer:decide', invalidToken);
+    expect(h.lines().filter(line => line.event === 'bouncer_sts_token_rejected')).toEqual([
       {
         event: 'bouncer_sts_token_rejected',
         instance: expect.any(String),
@@ -393,10 +400,52 @@ describe('createBouncerAuth', () => {
     await expect(h.auth.headers(decideCall)).resolves.toMatchObject({
       authorization: `Bearer ${TOKEN}`,
     });
-    expect(h.lines()[1]).toMatchObject({
+    // The first refusal wrote the instance's first line at once; this one has the rest.
+    expect(h.lines().at(-1)).toMatchObject({
       event: 'bouncer_sts_tokens',
-      missed: { 'bouncer:decide': { rejected: 1 } },
+      missed: { 'bouncer:decide': { rejected: 2 } },
+      refused: { 'bouncer:decide': { invalid_token: 1 } },
     });
+  });
+
+  it('counts a 403 in dual but holds nothing back', async () => {
+    const h = harness('kilocode-app', WEB_SCOPES);
+    h.read.mockResolvedValue(TOKEN);
+    await h.auth.headers(decideCall);
+    h.auth.refused('bouncer:decide', insufficientScope);
+    await expect(h.auth.headers(decideCall)).resolves.toMatchObject({
+      authorization: `Bearer ${TOKEN}`,
+    });
+    expect(h.lines().some(line => line.event === 'bouncer_sts_token_rejected')).toBe(false);
+    await expect(counts(h)).resolves.toMatchObject({
+      refused: { 'bouncer:decide': { insufficient_scope: 1 } },
+    });
+  });
+
+  it('in sts never holds a refused scope back and counts each refusal under its reason', async () => {
+    const h = harness('kilocode-app', WEB_SCOPES);
+    h.flag.value = 'sts';
+    expect(h.auth.mode()).toBe('sts');
+    h.read.mockResolvedValue(TOKEN);
+    await h.auth.headers(decideCall);
+    h.auth.refused('bouncer:decide', invalidToken);
+    h.auth.refused('bouncer:decide', insufficientScope);
+    await expect(h.auth.headers(decideCall)).resolves.toEqual({
+      'x-kilo-caller': 'kilocode-app',
+      authorization: `Bearer ${TOKEN}`,
+    });
+    expect(h.lines().some(line => line.event === 'bouncer_sts_token_rejected')).toBe(false);
+    await expect(counts(h)).resolves.toMatchObject({
+      attached: { 'bouncer:decide': 1 },
+      missed: {},
+      refused: { 'bouncer:decide': { invalid_token: 1, insufficient_scope: 1 } },
+    });
+  });
+
+  it('ignores a refusal of a scope the app is not granted', async () => {
+    const h = harness('kilocode-ai-gateway', GATEWAY_SCOPES);
+    h.auth.refused('bouncer:signup.decide', invalidToken);
+    expect(h.lines()).toEqual([]);
   });
 
   describe('budgets', () => {

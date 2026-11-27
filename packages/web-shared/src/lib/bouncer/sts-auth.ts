@@ -14,10 +14,12 @@ import { waitUntil } from '@vercel/functions';
  *
  * `apps/web` and `apps/ai-gateway` install one `BouncerAuth` from `instrumentation.ts`, with the
  * Bouncer scopes their STS policy grants (`BOUNCER_APP_SCOPES`). Every call names its caller in
- * `x-kilo-caller`, whatever the flag says. With `BOUNCER_CLIENT_AUTH=dual` a call to
+ * `x-kilo-caller`, whatever the mode says. With `BOUNCER_CLIENT_AUTH=dual` a call to
  * `BOUNCER_STS_ORIGIN` also carries `Authorization: Bearer <STS token>` for the route's scope, next
  * to the unchanged `x-internal-api-key`: Bouncer's `legacy` mode ignores the bearer and its `dual`
- * mode verifies it. Scripts and tests install nothing, so they send neither.
+ * mode verifies it. With `sts` the call carries the token and no `x-internal-api-key` at all
+ * (`bouncerSendsLegacyKey`), so the legacy secret stays unused. Scripts and tests install nothing,
+ * so they send neither the caller nor a token.
  *
  * Tokens: the token client keeps each token in memory; a read after 80 % of a token's lifetime
  * starts its renewal in the background. Every call reads all of the app's granted scopes (the
@@ -32,8 +34,10 @@ import { waitUntil } from '@vercel/functions';
  * legacy key alone. While the breaker is closed, waits that run out count at most once per
  * `BOUNCER_TOKEN_WAIT_MS`, so `BOUNCER_BREAKER_THRESHOLD` counts take about 2.5 s of continuous
  * timeouts; a token that arrives within a wait resets the count. An open breaker sets the wait to
- * 0 until any mint succeeds. After Bouncer answers 401 to a call that carried a scope's token,
- * that scope's token is held back for `BOUNCER_REJECTED_HOLD_MS`.
+ * 0 until any mint succeeds. In `dual`, after Bouncer answers 401 to a call that carried a scope's
+ * token, that scope's token is held back for `BOUNCER_REJECTED_HOLD_MS`. In `sts` nothing is held
+ * back: Bouncer ignores the legacy key there, so a call without the token is a certain refusal.
+ * Every refusal of a token is counted under its reason in either mode.
  *
  * This module stays light: the token client, the Vercel OIDC exchange and the Runtime Cache load
  * on the first call with the flag on, or at install when the flag is already on
@@ -54,10 +58,28 @@ export type BouncerAuthCall = {
   signal?: AbortSignal;
 };
 
+/** `BOUNCER_CLIENT_AUTH` as read; `invalid` sends the legacy key alone. */
+export type BouncerClientAuthMode = 'legacy' | 'dual' | 'sts' | 'invalid';
+
+/**
+ * Why Bouncer refused a call's token: the RFC 6750 `error` of its `WWW-Authenticate` answer, or the
+ * status when the answer names none.
+ */
+export type BouncerTokenRefusalReason =
+  | 'invalid_token'
+  | 'insufficient_scope'
+  | 'invalid_request'
+  | 'http_401'
+  | 'http_403';
+
+export type BouncerTokenRefusal = { status: 401 | 403; reason: BouncerTokenRefusalReason };
+
 export type BouncerAuth = {
+  /** The mode the flag names now. */
+  mode(): BouncerClientAuthMode;
   headers(call: BouncerAuthCall): Promise<BouncerAuthHeaders>;
-  /** Bouncer answered 401 to a call that carried this scope's token. */
-  rejected(scope: BouncerScope): void;
+  /** Bouncer answered 401 or 403 to a call that carried this scope's token. */
+  refused(scope: BouncerScope, refusal: BouncerTokenRefusal): void;
 };
 
 /** The only origin a token goes to: production Bouncer, the only Bouncer that accepts one. */
@@ -70,9 +92,10 @@ export const BOUNCER_TOKEN_WAIT_MS = 250;
  */
 export const BOUNCER_BREAKER_THRESHOLD = 10;
 /**
- * How long a scope's token is held back after Bouncer refused it. This hold-back and the client's
- * retry without the token exist only while `x-internal-api-key` is accepted; the change that
- * removes the legacy key (main design 9.5) removes both.
+ * How long a scope's token is held back after Bouncer refused it with 401, in `dual` only. This
+ * hold-back and the client's retry without the token exist only while `x-internal-api-key` is
+ * accepted; `sts` has neither, and the change that removes the legacy key (main design 9.5)
+ * removes both.
  */
 export const BOUNCER_REJECTED_HOLD_MS = 60_000;
 /**
@@ -91,7 +114,7 @@ export const BOUNCER_COUNT_LOG_INTERVAL_MS = 60_000;
  *   is still in its jitter, so no wait.
  * - `not_held`: the route never waits and no fresh token was held.
  * - `aborted`: the call's own deadline or its caller ended the wait.
- * - `rejected`: Bouncer refused this scope's token within the hold.
+ * - `rejected`: Bouncer refused this scope's token within the hold (`dual` only).
  * - `denied`, `unavailable`: the token client's answer.
  * - `load`: the transport did not load.
  * - `config`: the flag, the deployment's STS settings, a scope the app is not granted, or an
@@ -112,13 +135,13 @@ export type BouncerTokenMissReason =
 
 /**
  * `BOUNCER_CLIENT_AUTH`, the repository's caller-auth mode convention: `legacy` (unset or empty
- * too) sends the legacy key alone; `dual` also sends an STS token. `sts` (token only) comes with
- * the change that removes the legacy key. Any other value sends the legacy key alone and counts as
- * a `config` miss, so a typo can never stop Bouncer calls.
+ * too) sends the legacy key alone; `dual` sends it and an STS token; `sts` sends the STS token
+ * alone. Any other value sends the legacy key alone and counts as a `config` miss, so a typo can
+ * never stop Bouncer calls.
  */
-export function bouncerClientAuthMode(value: string | undefined): 'legacy' | 'dual' | 'invalid' {
+export function bouncerClientAuthMode(value: string | undefined): BouncerClientAuthMode {
   if (value === undefined || value === '' || value === 'legacy') return 'legacy';
-  if (value === 'dual') return 'dual';
+  if (value === 'dual' || value === 'sts') return value;
   return 'invalid';
 }
 
@@ -197,6 +220,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
   let timeouts = 0;
   let countedAt: number | null = null;
   const rejectedUntil = new Map<BouncerScope, number>();
+  let refused: Record<string, Record<string, number>> = {};
   let attached: Record<string, number> = {};
   let missed: Record<string, Record<string, number>> = {};
   let mints = { ok: 0, failed: 0 };
@@ -241,6 +265,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
       line('bouncer_sts_tokens', {
         attached,
         missed,
+        refused,
         mint: mints,
         last_mint_age_s: lastMintAgeSeconds,
       }),
@@ -248,6 +273,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     );
     attached = {};
     missed = {};
+    refused = {};
     mints = { ok: 0, failed: 0 };
     flushedAt = at;
   }
@@ -300,8 +326,15 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
   }
 
   return {
-    rejected(scope) {
+    mode: () => bouncerClientAuthMode(options.flag()),
+
+    refused(scope, { status, reason }) {
       if (!options.scopes.includes(scope)) return;
+      const byReason = (refused[scope] ??= {});
+      byReason[reason] = (byReason[reason] ?? 0) + 1;
+      flushIfDue();
+      // Only `dual` holds a refused token back: there the legacy key still carries the call.
+      if (status !== 401 || bouncerClientAuthMode(options.flag()) !== 'dual') return;
       const held = (rejectedUntil.get(scope) ?? 0) > now();
       rejectedUntil.set(scope, now() + BOUNCER_REJECTED_HOLD_MS);
       if (!held) log(line('bouncer_sts_token_rejected', { scope }), 'warn');
@@ -321,7 +354,9 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
       void transport.catch(() => undefined);
       const reading = readScope(transport, scope);
       warmSiblings(transport, scope);
-      if ((rejectedUntil.get(scope) ?? 0) > now()) return miss('rejected', scope);
+      if (mode === 'dual' && (rejectedUntil.get(scope) ?? 0) > now()) {
+        return miss('rejected', scope);
+      }
 
       const held = await race(reading, 0, signal);
       if (held === 'aborted') return miss('aborted', scope);
@@ -368,8 +403,8 @@ declare global {
 /**
  * Installs the auth for `caller` with the Bouncer scopes its STS policy grants
  * (`BOUNCER_APP_SCOPES`); called once from the `instrumentation.ts` of `apps/web` and
- * `apps/ai-gateway`. With the flag on it starts importing the transport (no network call); with
- * it off nothing loads, and the flag is still read on every call.
+ * `apps/ai-gateway`. In `dual` or `sts` it starts importing the transport (no network call); in
+ * `legacy` nothing loads, and the flag is still read on every call.
  */
 export function installBouncerAuth(caller: BouncerCaller): void {
   globalThis.__kilocodeBouncerAuth = createBouncerAuth({
@@ -384,7 +419,7 @@ export function installBouncerAuth(caller: BouncerCaller): void {
       return createBouncerTransport(hooks);
     },
     waitUntil,
-    preload: process.env.BOUNCER_CLIENT_AUTH === 'dual',
+    preload: ['dual', 'sts'].includes(bouncerClientAuthMode(process.env.BOUNCER_CLIENT_AUTH)),
   });
 }
 
@@ -394,7 +429,15 @@ export async function bouncerAuthHeaders(call: BouncerAuthCall): Promise<Bouncer
   return auth === undefined ? {} : auth.headers(call);
 }
 
-/** Reports Bouncer's 401 to a call that carried this scope's token; a no-op without an auth. */
-export function bouncerAuthRejected(scope: BouncerScope): void {
-  globalThis.__kilocodeBouncerAuth?.rejected(scope);
+/**
+ * Whether a call sends `x-internal-api-key`: every mode but `sts`, and always in a process that
+ * installed nothing (scripts, tests).
+ */
+export function bouncerSendsLegacyKey(): boolean {
+  return globalThis.__kilocodeBouncerAuth?.mode() !== 'sts';
+}
+
+/** Reports Bouncer's refusal of a call's token; a no-op without an auth. */
+export function bouncerTokenRefused(scope: BouncerScope, refusal: BouncerTokenRefusal): void {
+  globalThis.__kilocodeBouncerAuth?.refused(scope, refusal);
 }

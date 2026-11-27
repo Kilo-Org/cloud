@@ -759,21 +759,24 @@ describe('parseBouncerCreditEventBody ja4', () => {
 
 describe('STS headers from the installed Bouncer auth', () => {
   const headersOf = jest.fn<BouncerAuth['headers']>();
-  const rejected = jest.fn<BouncerAuth['rejected']>();
+  const refused = jest.fn<BouncerAuth['refused']>();
+  const mode = { value: 'dual' as ReturnType<BouncerAuth['mode']> };
 
   beforeEach(() => {
+    mode.value = 'dual';
     headersOf.mockImplementation(async ({ scope }) => ({
       'x-kilo-caller': 'kilocode-app',
       authorization: `Bearer token-for-${scope}`,
     }));
-    globalThis.__kilocodeBouncerAuth = { headers: headersOf, rejected };
+    globalThis.__kilocodeBouncerAuth = { mode: () => mode.value, headers: headersOf, refused };
     mockFetch.mockResolvedValue(Response.json({ enforced: false, spendWatch: false, flags: [] }));
   });
 
   afterEach(() => {
     globalThis.__kilocodeBouncerAuth = undefined;
+    globalThis.__kilocodeInternalApiSecretRead = undefined;
     headersOf.mockReset();
-    rejected.mockReset();
+    refused.mockReset();
   });
 
   function sent(): { path: string; headers: Headers } {
@@ -881,7 +884,7 @@ describe('STS headers from the installed Bouncer auth', () => {
     await expect(
       decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
     ).resolves.toEqual(verdict);
-    expect(rejected).toHaveBeenCalledWith('bouncer:decide');
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 401, reason: 'http_401' });
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(authorizationOf(0)).toBe('Bearer token-for-bouncer:decide');
     expect(authorizationOf(1)).toBeNull();
@@ -895,7 +898,7 @@ describe('STS headers from the installed Bouncer auth', () => {
   it('reports a 401 to a release but never resends it, and retries a decide at most once', async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
     await releaseDecideLease({ requestId: 'r', accountId: 'user:u' });
-    expect(rejected).toHaveBeenCalledWith('bouncer:decide');
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 401, reason: 'http_401' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     mockFetch.mockClear();
@@ -906,19 +909,91 @@ describe('STS headers from the installed Bouncer auth', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('neither reports nor resends a 401 to a call without a token, or a 403', async () => {
+  it('neither reports nor resends a 401 to a call without a token, and never resends a 403', async () => {
     headersOf.mockResolvedValue({ 'x-kilo-caller': 'kilocode-app' });
     mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
-    expect(rejected).not.toHaveBeenCalled();
+    expect(refused).not.toHaveBeenCalled();
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     mockFetch.mockClear();
     mockFetch.mockImplementation(async () => new Response(null, { status: 403 }));
     headersOf.mockResolvedValue({ authorization: 'Bearer t' });
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
-    expect(rejected).not.toHaveBeenCalled();
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 403, reason: 'http_403' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('in sts', () => {
+    beforeEach(() => {
+      mode.value = 'sts';
+      // No legacy secret anywhere: a read of it would fail the call.
+      globalThis.__kilocodeInternalApiSecretRead = jest.fn(async () => {
+        throw new Error('the legacy secret was read');
+      });
+    });
+
+    it('sends the token without x-internal-api-key and needs no INTERNAL_API_SECRET', async () => {
+      const verdict = { enforced: false, spendWatch: false, flags: [] };
+      mockFetch.mockResolvedValue(Response.json(verdict));
+      await expect(
+        decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
+      ).resolves.toEqual(verdict);
+      expect(globalThis.__kilocodeInternalApiSecretRead).not.toHaveBeenCalled();
+      const { headers } = sent();
+      expect(headers.get('authorization')).toBe('Bearer token-for-bouncer:decide');
+      expect(headers.get('x-internal-api-key')).toBeNull();
+      expect(headers.get('x-kilo-caller')).toBe('kilocode-app');
+    });
+
+    it('sends neither credential after a token miss', async () => {
+      headersOf.mockResolvedValue({ 'x-kilo-caller': 'kilocode-app' });
+      await deliverCreditEvent({
+        type: 'charge.failed',
+        eventId: 'evt-sts-miss',
+        userId: 'user-1',
+      });
+      const { headers } = sent();
+      expect(headers.get('authorization')).toBeNull();
+      expect(headers.get('x-internal-api-key')).toBeNull();
+      expect(headers.get('x-kilo-caller')).toBe('kilocode-app');
+    });
+
+    it.each([
+      [401, 'invalid_token', 'Bearer error="invalid_token", resource_metadata="https://x"'],
+      [403, 'insufficient_scope', 'Bearer error="insufficient_scope", scope="bouncer:decide"'],
+    ] as const)(
+      'counts a %s %s refusal, holds nothing back and never retries without the token',
+      async (status, reason, challenge) => {
+        mockFetch.mockImplementation(
+          async () => new Response(null, { status, headers: { 'www-authenticate': challenge } })
+        );
+        await expect(
+          decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
+        ).resolves.toBeNull();
+        expect(refused).toHaveBeenCalledWith('bouncer:decide', { status, reason });
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        await expect(
+          signupDecide({ operationId: 'signup:operation-1', ip: '203.0.113.7' })
+        ).resolves.toBeNull();
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+        expect(authorizationOf(1)).toBe('Bearer token-for-bouncer:signup.decide');
+      }
+    );
+  });
+
+  it('names the RFC 6750 error of a dual refusal too', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(null, {
+        status: 401,
+        headers: { 'www-authenticate': 'Bearer error="invalid_token"' },
+      })
+    );
+    await releaseDecideLease({ requestId: 'r', accountId: 'user:u' });
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', {
+      status: 401,
+      reason: 'invalid_token',
+    });
   });
 
   it('sends the legacy key alone when the token headers cannot be read', async () => {

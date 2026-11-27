@@ -6,8 +6,10 @@ import * as z from 'zod';
 
 import {
   bouncerAuthHeaders,
-  bouncerAuthRejected,
+  bouncerSendsLegacyKey,
+  bouncerTokenRefused,
   type BouncerAuthHeaders,
+  type BouncerTokenRefusal,
 } from '@kilocode/web-shared/lib/bouncer/sts-auth';
 import type { BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
@@ -32,9 +34,10 @@ import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-
  * Signup admission returns null on an unavailable or invalid verdict. The caller rejects signup
  * with a retryable error before creating a Stripe customer or account.
  *
- * Every call sends `x-internal-api-key`; an app that installed `BouncerAuth` (`sts-auth.ts`) also
- * names itself in `x-kilo-caller` and, with `BOUNCER_CLIENT_AUTH=dual`, sends the route's STS token
- * as `Authorization: Bearer`. A missing token never stops a call.
+ * Every call sends `x-internal-api-key`, except with `BOUNCER_CLIENT_AUTH=sts`; an app that
+ * installed `BouncerAuth` (`sts-auth.ts`) also names itself in `x-kilo-caller` and, with `dual` or
+ * `sts`, sends the route's STS token as `Authorization: Bearer`. A missing token never stops a
+ * call; in `sts` such a call carries no credential and Bouncer refuses it.
  */
 
 /** Bouncer keeps ids to 128 characters. */
@@ -496,13 +499,14 @@ type PostResult =
  * The request URL comes from the shared endpoint helper, so it derives from the value the transport
  * rule accepted instead of from concatenation. A configured endpoint that carries a trailing
  * separator therefore still reaches the worker's own path, and a value outside the rule, or a
- * missing key, is `unconfigured` and sends nothing. The STS headers are read within the call's
- * own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`, `sts-auth.ts`,
- * and only on a route that waits) and the request, so the call never takes longer than
- * `timeoutMs`; that read never fails, and a token goes only to `BOUNCER_STS_ORIGIN`. A 401 to a
- * call that carried a token is reported, so the auth holds that scope's token back for a while,
- * and a route that waits sends the call once more without the token, within the same deadline.
- * That retry and the hold-back go away with the legacy key (main design 9.5).
+ * missing key outside `sts`, is `unconfigured` and sends nothing. The STS headers are read within
+ * the call's own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`,
+ * `sts-auth.ts`, and only on a route that waits) and the request, so the call never takes longer
+ * than `timeoutMs`; that read never fails, and a token goes only to `BOUNCER_STS_ORIGIN`. A 401 or
+ * 403 to a call that carried a token is reported with its reason. In `dual` a 401 also makes the
+ * auth hold that scope's token back for a while, and a route that waits sends the call once more
+ * without the token, within the same deadline; `sts` does neither. That retry and the hold-back go
+ * away with the legacy key (main design 9.5).
  */
 async function postWithResult(
   path: BouncerApiPath,
@@ -514,13 +518,17 @@ async function postWithResult(
     ? parseInternalServiceEndpoint(BOUNCER_URL, path)
     : null;
   if (!endpoint) return { ok: false, kind: 'unconfigured' };
-  let internalApiSecret: string;
-  try {
-    internalApiSecret = await readInternalApiSecret();
-  } catch (error) {
-    return failedWithoutResponse(error);
+  // `sts` sends no legacy key, so the secret is neither read nor required there.
+  let internalApiSecret: string | null = null;
+  const legacyKey = bouncerSendsLegacyKey();
+  if (legacyKey) {
+    try {
+      internalApiSecret = await readInternalApiSecret();
+    } catch (error) {
+      return failedWithoutResponse(error);
+    }
+    if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
   }
-  if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
   const timeout = AbortSignal.timeout(timeoutMs);
   const deadline = signal ? AbortSignal.any([timeout, signal]) : timeout;
   const { scope, wait } = BOUNCER_ROUTES[path];
@@ -536,7 +544,7 @@ async function postWithResult(
       headers: {
         ...headers,
         'content-type': 'application/json',
-        'x-internal-api-key': internalApiSecret,
+        ...(internalApiSecret === null ? {} : { 'x-internal-api-key': internalApiSecret }),
       },
       body: JSON.stringify(body),
       signal: deadline,
@@ -547,9 +555,12 @@ async function postWithResult(
     });
   try {
     let response = await send(auth);
-    if (response.status === 401 && auth.authorization !== undefined) {
-      bouncerAuthRejected(scope);
-      if (wait) {
+    const refusal = auth.authorization === undefined ? null : tokenRefusal(response);
+    if (refusal !== null) {
+      bouncerTokenRefused(scope, refusal);
+      // `dual` only: the legacy key still carries a call there. Without it (`sts`) a call without
+      // the token is a certain refusal, so it is never sent.
+      if (legacyKey && refusal.status === 401 && wait) {
         await response.body?.cancel();
         response = await send(
           Object.fromEntries(Object.entries(auth).filter(([name]) => name !== 'authorization'))
@@ -569,6 +580,22 @@ async function postWithResult(
   } catch (error) {
     return failedWithoutResponse(error);
   }
+}
+
+const TOKEN_REFUSAL_ERRORS = new Set(['invalid_token', 'insufficient_scope', 'invalid_request']);
+
+/**
+ * Bouncer's refusal of a call's token: a 401 or 403 with the RFC 6750 `error` of its
+ * `WWW-Authenticate` header, or the status when it names no known one. Null for any other status.
+ */
+function tokenRefusal(response: Response): BouncerTokenRefusal | null {
+  const { status } = response;
+  if (status !== 401 && status !== 403) return null;
+  const error = /\berror="([a-z_]+)"/.exec(response.headers.get('www-authenticate') ?? '')?.[1];
+  if (error !== undefined && TOKEN_REFUSAL_ERRORS.has(error)) {
+    return { status, reason: error as BouncerTokenRefusal['reason'] };
+  }
+  return { status, reason: status === 401 ? 'http_401' : 'http_403' };
 }
 
 /** A request that got no answer: a transport error, a timeout, or a secret that could not be read. */

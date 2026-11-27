@@ -373,13 +373,15 @@
       // Do not inherit the top-level custom-domain route. `wrangler dev` takes its
       // origin host from the first route, which would hide the preview Host.
       "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
       "triggers": {
-        "crons": ["17 2 * * *", "*/5 * * * *"],
+        "crons": [],
       },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

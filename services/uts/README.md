@@ -219,10 +219,13 @@ when a check fails. Both stop their Workers when they end, also on SIGINT (exit 
 state directory, and runs the key-set proof: 36 keys with `Age` and `Kilo-Key-Set-Oldest-Age`
 under 17 seconds and cache windows that end with the 24-hour hold, no private key part, RFC 8414
 metadata, a token signed through `/__dev/sign` that verifies with jose while a tampered one does
-not, a restart that keeps the same kids without bootstrapping a signer, an intruder Worker whose
-binding carries another caller that gets no keys, the held set while the mint Worker is down,
-signer 03's rotated keys standing beside signer 07's held ones from a restarted shard, and a cold
-start of both Workers over a shard that stored signer 07's keys.
+not, every key-set shard storing the signers' keys (a reader Worker in one `wrangler dev` with the
+mint Worker asks each shard by name), a restart that keeps the same kids without bootstrapping a
+signer, an intruder Worker whose binding carries another caller that gets no keys, the held set
+while the mint Worker is down, signer 03's rotated keys standing beside signer 07's held ones from
+a restarted shard, a cold start of both Workers over whichever shard the mint Worker draws, each of
+which stored signer 07's keys, and a warm feed isolate that keeps signer 07's keys from its own
+copy once no shard holds stored keys.
 
 `scripts/relay-e2e.ts` runs the mint Worker and the audit relay consumer in one `wrangler dev`
 over two configs (`--env local`) with the local queue and the consumer's R2 archive, and runs the

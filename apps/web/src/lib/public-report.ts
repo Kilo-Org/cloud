@@ -13,19 +13,21 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-// Single source of truth for every cache layer in front of Snowflake: the
+// Single source of truth for every cache layer in front of the data source: the
 // Vercel edge cache, the in-process cache, and the Redis cache all expire after
 // one hour so the data served stays consistent across layers.
 const CACHE_TTL_SECONDS = 3600;
 const IN_MEMORY_CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
-type PublicSnowflakeReportOptions<Usage> = {
+type PublicReportOptions<Usage> = {
   cacheKey: RedisKey;
   errorMessage: string;
-  parseRows: (rows: string[][]) => Usage | Promise<Usage>;
-  query: string;
+  /** Loads the report from its source. Throws when the source fails. */
+  load: () => Promise<Usage>;
   schema: ZodType<Usage>;
   source: string;
+  /** Answers 503 without loading when the source is not configured. */
+  unavailable?: () => string | null;
 };
 
 function successResponse<Usage>(usage: Usage): NextResponse {
@@ -38,13 +40,11 @@ function successResponse<Usage>(usage: Usage): NextResponse {
 }
 
 /**
- * Read the report from Redis, falling back to Snowflake on a miss and
- * repopulating Redis. Throws on Snowflake failure so the in-process cache keeps
+ * Read the report from Redis, falling back to the source on a miss and
+ * repopulating Redis. Throws on source failure so the in-process cache keeps
  * serving the last-known-good value (or `null` when nothing has been cached).
  */
-async function fetchReport<Usage>(
-  options: PublicSnowflakeReportOptions<Usage>
-): Promise<Usage | null> {
+async function fetchReport<Usage>(options: PublicReportOptions<Usage>): Promise<Usage> {
   try {
     const cached = await redisClient.get<string>(options.cacheKey);
     if (cached !== null) {
@@ -56,18 +56,8 @@ async function fetchReport<Usage>(
     });
   }
 
-  const config = resolveSnowflakeConfig();
-  if (!config) {
-    return null;
-  }
-
   try {
-    const rows = await executeSnowflakeStatement({
-      config,
-      statement: options.query,
-      timeoutSeconds: 30,
-    });
-    const usage = options.schema.parse(await options.parseRows(rows));
+    const usage = options.schema.parse(await options.load());
 
     try {
       await redisClient.set(options.cacheKey, JSON.stringify(usage), {
@@ -89,26 +79,27 @@ async function fetchReport<Usage>(
 }
 
 /**
- * Builds a cached GET handler for a public Snowflake-backed report.
+ * Builds a cached GET handler for a public report.
  *
  * Caching cascades through three layers, all expiring after one hour: the
  * Vercel edge cache (`s-maxage`), an in-process `createCachedFetch` so warm
- * instances avoid Redis entirely, and the Redis cache in front of Snowflake.
+ * instances avoid Redis entirely, and the Redis cache in front of the source.
  * The in-process cache is created once per report (module scope) and stores
  * pure data, so it is safe to share across requests.
  */
-export function createPublicSnowflakeReport<Usage>(options: PublicSnowflakeReportOptions<Usage>) {
+export function createPublicReport<Usage>(options: PublicReportOptions<Usage>) {
   const getCachedReport = createCachedFetch<Usage | null>(
     () => fetchReport(options),
     IN_MEMORY_CACHE_TTL_MS,
     null,
-    { name: `publicSnowflakeReport[${options.source}]` }
+    { name: `publicReport[${options.source}]` }
   );
 
   return async function GET(): Promise<NextResponse> {
-    if (!resolveSnowflakeConfig()) {
+    const unavailable = options.unavailable?.();
+    if (unavailable) {
       return NextResponse.json(
-        { error: 'Snowflake is not configured' },
+        { error: unavailable },
         {
           status: 503,
           headers: { ...CORS_HEADERS, 'Cache-Control': 'no-store' },
@@ -131,7 +122,34 @@ export function createPublicSnowflakeReport<Usage>(options: PublicSnowflakeRepor
   };
 }
 
-export function publicSnowflakeReportOptions(): NextResponse {
+/** A public report loaded with one Snowflake statement. */
+export function createPublicSnowflakeReport<Usage>({
+  query,
+  parseRows,
+  ...options
+}: Omit<PublicReportOptions<Usage>, 'load' | 'unavailable'> & {
+  query: string;
+  parseRows: (rows: string[][]) => Usage | Promise<Usage>;
+}) {
+  return createPublicReport({
+    ...options,
+    unavailable: () => (resolveSnowflakeConfig() ? null : 'Snowflake is not configured'),
+    load: async () => {
+      const config = resolveSnowflakeConfig();
+      if (!config) {
+        throw new Error('Snowflake is not configured');
+      }
+      const rows = await executeSnowflakeStatement({
+        config,
+        statement: query,
+        timeoutSeconds: 30,
+      });
+      return await parseRows(rows);
+    },
+  });
+}
+
+export function publicReportOptions(): NextResponse {
   return new NextResponse(null, {
     status: 204,
     headers: CORS_HEADERS,

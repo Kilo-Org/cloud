@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import {
@@ -5,16 +6,22 @@ import {
   LEADERBOARD_SERVED_MODEL_SQL,
   resolveLeaderboardModel,
 } from '@/lib/leaderboard-model';
-import {
-  createPublicSnowflakeReport,
-  publicSnowflakeReportOptions,
-} from '@/lib/public-snowflake-report';
+import { createPublicReport, publicReportOptions } from '@/lib/public-report';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
-const LEADERBOARD_MODEL_USAGE_QUERY = `
+type ModelUsageRow = {
+  usage_date: string;
+  model: string | null;
+  mode: string | null;
+  tokens: number;
+  served_model: string | null;
+};
+
+const LEADERBOARD_MODEL_USAGE_QUERY = sql`
 select
     to_char(mu.usage_date, 'YYYY-MM-DD') as usage_date
-    , ${LEADERBOARD_MODEL_SQL} as "model"
+    , ${sql.raw(LEADERBOARD_MODEL_SQL)} as "model"
     , case
         when mu.mode ilike '%code%' then 'code'
         when mu.mode ilike '%review%' then 'review'
@@ -23,20 +30,19 @@ select
         when mu.mode ilike '%debug%' then 'debug'
         else null
       end as mode
-    , sum(coalesce(mu.total_input_tokens, 0)) + sum(coalesce(mu.total_output_tokens, 0)) as "tokens"
-    , ${LEADERBOARD_SERVED_MODEL_SQL} as "served_model"
-from microdollar_usage_daily as mu
+    , (sum(mu.input_tokens) + sum(mu.output_tokens))::float8 as "tokens"
+    , ${sql.raw(LEADERBOARD_SERVED_MODEL_SQL)} as "served_model"
+from leaderboard_usage_daily as mu
 where
-    mu.usage_date >= dateadd(week, -1, current_date())
-    and mu.usage_date < current_date()
-    and mu.total_input_tokens > 0
+    mu.usage_date >= (now() at time zone 'UTC')::date - 7
+    and mu.usage_date < (now() at time zone 'UTC')::date
+    and mu.input_tokens > 0
     and (
         mu.provider != 'custom'
         or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'
         or coalesce(mu.requested_model, mu.model) = 'stealth/glyph-cluster'
     )
 group by 1, 2, 3, 5
-order by 1 desc, 4 desc;
 `;
 
 const modelUsageSchema = z.array(
@@ -50,17 +56,15 @@ const modelUsageSchema = z.array(
 
 type ModelUsage = z.infer<typeof modelUsageSchema>[number];
 
-async function parseModelUsage(rows: string[][]): Promise<ModelUsage[]> {
+async function aggregateModelUsage(rows: ModelUsageRow[]): Promise<ModelUsage[]> {
   const usageByKey = new Map<string, ModelUsage>();
 
   for (const row of rows) {
-    const [usageDate, rawModel, modeValue, tokenValue, servedModel] = row;
-    const model = await resolveLeaderboardModel(rawModel || '', servedModel);
-    const tokens = Number(tokenValue);
-    const mode = modeValue || null;
+    const model = await resolveLeaderboardModel(row.model ?? '', row.served_model ?? undefined);
+    const { usage_date: usageDate, mode, tokens } = row;
 
-    if (!usageDate || !model || !Number.isFinite(tokens)) {
-      throw new Error('Snowflake returned an invalid model usage row');
+    if (!model) {
+      throw new Error('Leaderboard model usage row has no model');
     }
 
     const key = `${usageDate}\0${model}\0${mode ?? ''}`;
@@ -82,13 +86,20 @@ async function parseModelUsage(rows: string[][]): Promise<ModelUsage[]> {
   );
 }
 
-export const GET = createPublicSnowflakeReport({
+export const GET = createPublicReport({
   cacheKey: LEADERBOARD_MODEL_USAGE_REDIS_KEY,
   errorMessage: 'Failed to fetch leaderboard model usage',
-  parseRows: parseModelUsage,
-  query: LEADERBOARD_MODEL_USAGE_QUERY,
+  load: async () => {
+    const { rows } = await readDb.execute<ModelUsageRow>(LEADERBOARD_MODEL_USAGE_QUERY);
+    // An empty window means the rollup has not been built yet; failing keeps
+    // the last good report in the in-process cache instead of caching nothing.
+    if (rows.length === 0) {
+      throw new Error('leaderboard_usage_daily has no rows for the leaderboard window');
+    }
+    return await aggregateModelUsage(rows);
+  },
   schema: modelUsageSchema,
   source: 'public-leaderboard-model-usage-api',
 });
 
-export const OPTIONS = publicSnowflakeReportOptions;
+export const OPTIONS = publicReportOptions;

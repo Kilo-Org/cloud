@@ -127,8 +127,8 @@ export async function writeClassifierUsage(
   usage: UsageRecordRequest
 ): Promise<LlmUsageWriteOutcome> {
   try {
-    // `WEB_INTERNAL_AUTH`: a `web:usage.classifier.record` STS token by default, the internal
-    // secret under `legacy`. Without either the DO keeps the event and retries.
+    // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
+    // `web:usage.classifier.record` STS token. Without either the DO keeps the event and retries.
     const credential = await resolveWebInternalCredential(
       env,
       STS_WEB_USAGE_RECORD_CLASSIFIER,

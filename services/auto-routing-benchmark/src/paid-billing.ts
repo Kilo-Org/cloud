@@ -49,8 +49,8 @@ async function deliverPaidPoolPins(
   body: CustomRouterPoolPinsRequest,
   fetchImpl: typeof fetch = fetch
 ): Promise<{ ok: true; response: CustomRouterPoolPinsResponse } | { ok: false; error: string }> {
-  // A `web:auto-routing.pool-pins.write` STS token by default, the internal secret under
-  // `WEB_INTERNAL_AUTH=legacy`. Without one the intent stays pending for a later drain.
+  // The internal secret unless `WEB_INTERNAL_AUTH=sts`, then a `web:auto-routing.pool-pins.write`
+  // STS token. Without one the intent stays pending for a later drain.
   const credential = await webInternalCredential(env, STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE, {
     header: 'x-internal-api-key',
     secret: () => env.INTERNAL_API_SECRET_PROD.get(),

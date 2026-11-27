@@ -89,8 +89,8 @@ export async function getAuthoritativeClaudeBillingState(
     const granted = await getGrantedClaudeBillingConnection(owner, db);
     return claudeBillingPayerState(granted ? claudeBillingEffectiveConnection(granted) : null);
   }
-  // `WEB_INTERNAL_SENDER_AUTH`: a `web:claude-billing.payer-state.read` STS token by default, the
-  // internal secret under `legacy`.
+  // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:claude-billing.payer-state.read` STS token.
   const credential = await webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
     legacySecret: readInternalApiSecret,
   });

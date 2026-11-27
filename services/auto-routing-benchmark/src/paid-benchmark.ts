@@ -1176,8 +1176,8 @@ async function readUsageReceipts(
   const remaining = (limits.deadline ?? Date.now() + 10_000) - Date.now();
   const timeout = AbortSignal.timeout(Math.max(1, Math.min(10_000, remaining)));
   const signal = limits.signal ? AbortSignal.any([limits.signal, timeout]) : timeout;
-  // A `web:usage.receipts.read` STS token by default, the internal secret under
-  // `WEB_INTERNAL_AUTH=legacy`; without one the receipts are unreachable for now.
+  // The internal secret unless `WEB_INTERNAL_AUTH=sts`, then a `web:usage.receipts.read` STS
+  // token; without one the receipts are unreachable for now.
   const credential = await webInternalCredential(env, STS_WEB_USAGE_RECEIPTS_READ, {
     header: 'x-internal-api-key',
     secret: () => env.INTERNAL_API_SECRET_PROD.get(),

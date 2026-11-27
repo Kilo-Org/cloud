@@ -82,8 +82,8 @@ function isRetryableError(error: unknown): boolean {
 export async function recordUsageInPrimaryRegion(
   payload: UsageRecordRequest
 ): Promise<RemoteUsageRecordOutcome> {
-  // `WEB_INTERNAL_SENDER_AUTH`: a `web:usage.region-handoff.record` STS token by default, the
-  // internal secret under `legacy`. Without one the caller writes locally.
+  // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:usage.region-handoff.record` STS token. Without one the caller writes locally.
   let credential: WebInternalSenderCredential;
   try {
     credential = await webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {

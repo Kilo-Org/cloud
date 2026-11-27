@@ -1,6 +1,8 @@
 import 'server-only';
 import type { ServiceTokenRequest } from '@kilocode/service-token-client';
+import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { WEB_INTERNAL_SENDER_AUTH } from '@kilocode/web-shared/lib/config.server';
+import type { StsTokenFailure } from '@kilocode/web-shared/lib/sts-service-tokens';
 
 /**
  * The credential `apps/web` and `apps/ai-gateway` present to the web app's own `/api/internal/*`
@@ -9,10 +11,11 @@ import { WEB_INTERNAL_SENDER_AUTH } from '@kilocode/web-shared/lib/config.server
  *
  * `WEB_INTERNAL_SENDER_AUTH`, the senders' switch and their rollback (decision D59), set per
  * Vercel project:
- * - absent, empty or `sts`: an STS service token minted from this deployment's own STS
- *   environment (`stsEnvironmentOfDeployment`) with its Vercel identity, in `Authorization:
- *   Bearer`. The internal secret is never read.
- * - `legacy`: the route's legacy `x-internal-api-key`, exactly as before this switch existed.
+ * - absent, empty or `legacy`: the route's legacy `x-internal-api-key`, exactly as before this
+ *   switch existed. The switch to `sts` is a later config change, once the receiver accepts both.
+ * - `sts`: an STS service token minted from this deployment's own STS environment
+ *   (`stsEnvironmentOfDeployment`) with its Vercel identity, in `Authorization: Bearer`. The
+ *   internal secret is never read.
  * Any other value sends nothing.
  */
 
@@ -31,8 +34,8 @@ export const STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ = {
 export type WebInternalSenderMode = 'sts' | 'legacy';
 
 export function webInternalSenderMode(value: string | undefined): WebInternalSenderMode | null {
-  if (value === undefined || value === '' || value === 'sts') return 'sts';
-  return value === 'legacy' ? 'legacy' : null;
+  if (value === undefined || value === '' || value === 'legacy') return 'legacy';
+  return value === 'sts' ? 'sts' : null;
 }
 
 export type WebInternalSenderFailure =
@@ -79,7 +82,7 @@ export async function webInternalSenderCredential(
   // secrets transport or the Vercel OIDC exchange.
   const { stsEnvironmentOfDeployment } =
     await import('@kilocode/web-shared/lib/sts-secret-transport');
-  let environment;
+  let environment: StsEnvironment;
   try {
     environment = stsEnvironmentOfDeployment(process.env);
   } catch {
@@ -91,14 +94,14 @@ export async function webInternalSenderCredential(
     const token = await stsServiceToken(environment, target);
     return { kind: 'ready', header: 'authorization', value: `Bearer ${token}` };
   } catch (error) {
-    return unavailable(target, 'token_unavailable', stsTokenFailure(error));
+    return unavailable(target, 'token_unavailable', { failure: stsTokenFailure(error) });
   }
 }
 
 function unavailable(
   target: ServiceTokenRequest,
   reason: WebInternalSenderFailure,
-  detail: object = {}
+  detail: { failure?: StsTokenFailure } = {}
 ): WebInternalSenderCredential {
   // One line per failed credential, so a mint-failure monitor can count them by scope. Never the
   // token, the secret or an error message.

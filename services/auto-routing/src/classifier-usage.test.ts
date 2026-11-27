@@ -252,7 +252,7 @@ describe('classifier usage delivery', () => {
     );
   });
 
-  it('posts the usage contract to the existing web writer using the internal secret', async () => {
+  it('posts the usage contract with the internal secret while WEB_INTERNAL_AUTH is unset', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     fetchMock.mockResolvedValueOnce(
       Response.json({
@@ -263,7 +263,6 @@ describe('classifier usage delivery', () => {
     const outcome = await writeClassifierUsage(
       {
         KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
-        WEB_INTERNAL_AUTH: 'legacy',
         INTERNAL_API_SECRET_PROD: { get: async () => 'test-internal-secret' } as SecretsStoreSecret,
       },
       usage
@@ -288,7 +287,6 @@ describe('classifier usage delivery', () => {
       writeClassifierUsage(
         {
           KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
-          WEB_INTERNAL_AUTH: 'legacy',
           INTERNAL_API_SECRET_PROD: {
             get: async () => {
               throw new Error('secrets unavailable');
@@ -301,7 +299,7 @@ describe('classifier usage delivery', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('presents a web:usage.classifier.record STS token by default, never the secret', async () => {
+  it('presents a web:usage.classifier.record STS token under sts, never the secret', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     fetchMock.mockResolvedValueOnce(
       Response.json({
@@ -314,6 +312,7 @@ describe('classifier usage delivery', () => {
     const outcome = await writeClassifierUsage(
       {
         KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+        WEB_INTERNAL_AUTH: 'sts',
         INTERNAL_API_SECRET_PROD: { get: secret } as unknown as SecretsStoreSecret,
         STS: {
           async mintTokens(request) {
@@ -346,13 +345,14 @@ describe('classifier usage delivery', () => {
     ]);
   });
 
-  it('returns unavailable without a request when no STS token can be had', async () => {
+  it('returns unavailable without a request when sts has no STS binding', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     await expect(
       writeClassifierUsage(
         {
           KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+          WEB_INTERNAL_AUTH: 'sts',
           INTERNAL_API_SECRET_PROD: { get: async () => 'unused' } as SecretsStoreSecret,
         },
         usage

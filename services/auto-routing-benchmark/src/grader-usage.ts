@@ -95,8 +95,8 @@ export async function writeGraderUsage(
   env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'> & WebInternalAuthEnv,
   usage: UsageRecordRequest
 ): Promise<LlmUsageWriteOutcome> {
-  // `WEB_INTERNAL_AUTH`: a `web:usage.benchmark-grader.record` STS token by default, the internal
-  // secret under `legacy`.
+  // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:usage.benchmark-grader.record` STS token.
   const credential = await resolveWebInternalCredential(
     env,
     STS_WEB_USAGE_RECORD_BENCHMARK_GRADER,

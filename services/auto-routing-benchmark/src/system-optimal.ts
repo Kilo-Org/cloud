@@ -277,8 +277,8 @@ export async function fetchProductionAutoMetrics(
   env: Env & WebInternalAuthEnv
 ): Promise<ProductionAutoMetrics | null> {
   try {
-    // The route reads a bearer either way: an STS `web:auto-routing.production-profile.read`
-    // token by default, the internal secret under `WEB_INTERNAL_AUTH=legacy`.
+    // The route reads a bearer either way: the internal secret unless `WEB_INTERNAL_AUTH=sts`,
+    // then an STS `web:auto-routing.production-profile.read` token.
     const credential = await webInternalCredential(
       env,
       STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,

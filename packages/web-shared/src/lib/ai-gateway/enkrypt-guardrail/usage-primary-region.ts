@@ -6,6 +6,11 @@ import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-sec
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import {
+  STS_WEB_USAGE_RECORD_REGION_HANDOFF,
+  webInternalSenderCredential,
+  type WebInternalSenderCredential,
+} from '@kilocode/web-shared/lib/web-internal-sts';
+import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageWriteResponseSchema,
   type EnkryptUsageWriteInput,
@@ -38,13 +43,21 @@ export async function recordEnkryptUsageInPrimaryRegion(
 }
 
 async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | null> {
-  let internalApiSecret: string;
+  // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:usage.region-handoff.record` STS token. Without one the caller writes locally.
+  let credential: WebInternalSenderCredential;
   try {
-    internalApiSecret = await readInternalApiSecret();
+    credential = await webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+      legacySecret: readInternalApiSecret,
+    });
   } catch {
     return 'internal_api_secret_unavailable';
   }
-  if (!internalApiSecret) return 'missing_internal_api_secret';
+  if (credential.kind === 'unavailable') {
+    return credential.reason === 'secret_missing'
+      ? 'missing_internal_api_secret'
+      : `credential_${credential.reason}`;
+  }
   if (!APP_URL) return 'missing_app_url';
   if (!parseInternalServiceUrl(APP_URL)) return 'unsupported_app_url';
 
@@ -54,7 +67,7 @@ async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | nul
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': internalApiSecret,
+        [credential.header]: credential.value,
       },
       body: JSON.stringify(usageWrite),
       signal: AbortSignal.timeout(HANDOFF_TIMEOUT_MS),

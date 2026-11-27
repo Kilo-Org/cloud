@@ -2,6 +2,7 @@ import 'server-only';
 import { getCache, waitUntil } from '@vercel/functions';
 import {
   createHttpServiceTokens,
+  ServiceTokenError,
   type ServiceTokenRequest,
   type ServiceTokens,
 } from '@kilocode/service-token-client';
@@ -51,6 +52,23 @@ export function stsServiceToken(
   request: ServiceTokenRequest
 ): Promise<string> {
   return clientFor(environment).get(request, lifetime);
+}
+
+/** Why a token read failed, for a log line: the error's name and the client's closed reasons. */
+export type StsTokenFailure = {
+  errorName: string;
+  reason?: ServiceTokenError['reason'];
+  deniedReason?: ServiceTokenError['deniedReason'];
+};
+
+/** Never the error message: a Vercel identity error may quote what it was given. */
+export function stsTokenFailure(error: unknown): StsTokenFailure {
+  if (!(error instanceof ServiceTokenError)) {
+    return { errorName: error instanceof Error ? error.name : typeof error };
+  }
+  return error.deniedReason === undefined
+    ? { errorName: error.name, reason: error.reason }
+    : { errorName: error.name, reason: error.reason, deniedReason: error.deniedReason };
 }
 
 export type HeldTokenRead =

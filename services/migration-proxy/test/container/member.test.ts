@@ -384,7 +384,7 @@ describe(`member mode on ${IMAGE}`, () => {
     expect(status.failure).toBeNull();
     expect(status.cleanup).toEqual({ terminated: 1, unexpected: 0 });
     expect(status.applied.map(item => item.tag)).toEqual(['0002_widgets_x']);
-    const admin = await db.admin();
+    const admin = await adminOn(database);
     const index = await admin.query<{ valid: boolean }>(
       `SELECT i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = 'widgets_x_idx'`
     );

@@ -225,6 +225,7 @@ export function ModelAccessPolicyEditor({
             <TabsContent value="models" className="mt-4">
               <ModelsTab
                 scope="group"
+                newModelsDisabledByDefault={false}
                 showDetails={false}
                 isLoading={false}
                 canEdit

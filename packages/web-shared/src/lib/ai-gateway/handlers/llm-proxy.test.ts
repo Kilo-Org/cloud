@@ -1152,7 +1152,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
     expect(usageId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
     expect([...fakeR2.objects.keys()]).toEqual([`test-provider-metadata/${usageId}.json`]);
     expect(JSON.parse(fakeR2.objects.get(`test-provider-metadata/${usageId}.json`) ?? '')).toEqual({
@@ -1243,7 +1243,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     );
     const usageId = usageContext?.usageId;
     expect(usageId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
     const key = `test-provider-metadata/${usageId}.json`;
     expect([...fakeR2.objects.keys()]).toEqual([key]);
@@ -6061,7 +6061,7 @@ describe('Enkrypt output guardrail', () => {
     expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
     const usageId = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].usageId;
     expect(usageId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
     expect(
       mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.microdollarUsageId)

@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 import type { HonoContext } from '../types';
 import { validateOidcToken } from '../auth/oidc';
+import { readGmailPushSecret } from '../secrets';
 
 const PubSubMessageIdSchema = z.looseObject({
   message: z.looseObject({
@@ -10,6 +12,21 @@ const PubSubMessageIdSchema = z.looseObject({
 });
 
 export const pushRoute = new Hono<HonoContext>();
+
+/**
+ * Hono's `executionCtx` getter throws outside a request context, which is how unit tests call the
+ * routes. A missing context only costs the `waitUntil` keep-alive for a bundle revalidation; it
+ * never changes which secret a read returns.
+ */
+function requestContext(c: {
+  executionCtx: SecretsExecutionContext;
+}): SecretsExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
 
 // Always return 200 to Pub/Sub — a non-2xx would cause redelivery, but we handle
 // retries ourselves via the CF Queue consumer with custom exponential backoff.
@@ -21,7 +38,7 @@ pushRoute.post('/user/:userId', async c => {
   // This prevents cross-project forgery: an attacker with their own GCP project
   // can get Google-signed tokens with a matching audience, but not with the
   // victim's service account email.
-  const internalSecret = await c.env.INTERNAL_API_SECRET.get();
+  const internalSecret = await readGmailPushSecret(c.env, 'INTERNAL_API_SECRET', requestContext(c));
   const emailRes = await c.env.KILOCLAW.fetch(
     new Request(
       `https://kiloclaw/api/platform/gmail-oidc-email?userId=${encodeURIComponent(userId)}`,

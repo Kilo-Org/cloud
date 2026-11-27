@@ -8,6 +8,8 @@ import {
   type GitHubTaskGrant,
   type GitHubTaskScope,
 } from '@kilocode/worker-utils/github-task-grant';
+import { readGitTokenServiceSecret, type GitTokenServiceSecretsEnv } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 const MAX_TASK_RESOURCE_LOOKUPS = 16;
 
@@ -33,16 +35,18 @@ export class GitHubTaskResourceError extends Error {
     this.name = 'GitHubTaskResourceError';
   }
 }
-type ResourceEnv = Pick<CloudflareEnv, 'GITHUB_APP_CLIENT_ID' | 'GITHUB_APP_CLIENT_SECRET'> & {
-  GITHUB_API_BASE_URL?: string;
-};
+type ResourceEnv = Pick<CloudflareEnv, 'GITHUB_APP_CLIENT_ID'> &
+  GitTokenServiceSecretsEnv & {
+    GITHUB_API_BASE_URL?: string;
+  };
 
 /** Resolves resource identities before any guest request receives upstream authorization. */
 export class GitHubTaskResources {
   private readonly root: string;
   constructor(
     private readonly token: string,
-    private readonly env: ResourceEnv
+    private readonly env: ResourceEnv,
+    private readonly ctx?: SecretsExecutionContext
   ) {
     this.root = (env.GITHUB_API_BASE_URL?.trim() || 'https://api.github.com').replace(/\/+$/, '');
   }
@@ -215,28 +219,28 @@ export class GitHubTaskResources {
 
   /** GitHub limits the token to one owner, even when the parent identity spans multiple installations. */
   async scopeUserToken(scope: GitHubRepositoryScope): Promise<string> {
-    if (!this.env.GITHUB_APP_CLIENT_ID || !this.env.GITHUB_APP_CLIENT_SECRET)
-      throw new GitHubTaskResourceError('source_unavailable');
-    const basic = Buffer.from(
-      `${this.env.GITHUB_APP_CLIENT_ID}:${this.env.GITHUB_APP_CLIENT_SECRET}`
-    ).toString('base64');
-    const value = await this.request(
-      `/applications/${encodeURIComponent(this.env.GITHUB_APP_CLIENT_ID)}/token/scoped`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${basic}`,
-          Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-          'User-Agent': 'Kilo-Git-Token-Service',
-        },
-        body: JSON.stringify({
-          access_token: this.token,
-          target: scope.owner,
-          repository_ids: scope.repositoryIds,
-        }),
-      }
+    const clientId = this.env.GITHUB_APP_CLIENT_ID;
+    const clientSecret = await readGitTokenServiceSecret(
+      this.env,
+      'GITHUB_APP_CLIENT_SECRET',
+      this.ctx
     );
+    if (!clientId || !clientSecret) throw new GitHubTaskResourceError('source_unavailable');
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const value = await this.request(`/applications/${encodeURIComponent(clientId)}/token/scoped`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Kilo-Git-Token-Service',
+      },
+      body: JSON.stringify({
+        access_token: this.token,
+        target: scope.owner,
+        repository_ids: scope.repositoryIds,
+      }),
+    });
     const parsed = z
       .object({
         token: z.string().min(1),

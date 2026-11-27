@@ -11,6 +11,7 @@ import {
   getSecurityFindingById,
 } from './db/queries.js';
 import { transitionAnalysisCallbackLifecycle } from './analysis-start-lifecycle.js';
+import { readSecurityAutoAnalysisSecret } from './secrets';
 import { generateTriageToken } from './token.js';
 import { extractSandboxAnalysis as runSandboxExtraction } from './extraction.js';
 import { fetchLatestAssistantText as fetchSessionAssistantText } from './session-result.js';
@@ -424,6 +425,7 @@ export async function finalizeFailedAnalysisCallbackFromEnv(params: {
   findingId: string;
   attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
+  ctx?: ExecutionContext;
 }): Promise<{ status: 'missing' | CallbackDisposition | 'failed-finalized' }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const result = await finalizeFailedAnalysisCallback({
@@ -438,6 +440,7 @@ export async function finalizeFailedAnalysisCallbackFromEnv(params: {
       db,
       findingId: params.findingId,
       event: 'analysis_failed',
+      ctx: params.ctx,
     });
   }
   return result;
@@ -448,6 +451,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
   findingId: string;
   attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
+  ctx?: ExecutionContext;
 }): Promise<{
   status: 'missing' | CallbackDisposition | 'completed-finalized' | 'result-missing';
 }> {
@@ -461,7 +465,11 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       const finding = await getSecurityFindingById(db, params.findingId);
       const userId = finding?.analysis?.triggeredByUserId;
       if (!userId) return null;
-      const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
+      const nextAuthSecret = await readSecurityAutoAnalysisSecret(
+        params.env,
+        'NEXTAUTH_SECRET',
+        params.ctx
+      );
       return fetchSessionAssistantText({
         sessionId: kiloSessionId,
         userId,
@@ -478,7 +486,9 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       if (!actor) {
         throw new Error(`Analysis actor ${triggeredByUserId} is unavailable`);
       }
-      const [nextAuthSecret] = await Promise.all([params.env.NEXTAUTH_SECRET.get()]);
+      const [nextAuthSecret] = await Promise.all([
+        readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET', params.ctx),
+      ]);
       const authToken = await generateTriageToken(
         actor,
         nextAuthSecret,
@@ -512,6 +522,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
         db,
         env: params.env,
         findingId,
+        ctx: params.ctx,
       });
     },
     trackCompletedAnalysis: async ({ findingId, finding, analysis }) => {
@@ -529,6 +540,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       db,
       findingId: params.findingId,
       event: 'analysis_completed',
+      ctx: params.ctx,
     });
   } else if (result.status === 'result-missing') {
     // The lifecycle transition wrote a failed audit event for the missing
@@ -538,6 +550,7 @@ export async function finalizeCompletedAnalysisCallbackFromEnv(params: {
       db,
       findingId: params.findingId,
       event: 'analysis_failed',
+      ctx: params.ctx,
     });
   }
   return result;
@@ -548,6 +561,7 @@ export async function finalizeAnalysisCallbackFromEnv(params: {
   findingId: string;
   attemptToken?: string;
   payload: SecurityAnalysisCallbackPayload;
+  ctx?: ExecutionContext;
 }): Promise<{
   status:
     | 'missing'
@@ -564,7 +578,8 @@ export async function finalizeAnalysisCallbackFromEnv(params: {
 export async function consumeAnalysisCallbackBatch(
   batch: MessageBatch<unknown>,
   env: CloudflareEnv,
-  finalizeCallback = finalizeAnalysisCallbackFromEnv
+  finalizeCallback = finalizeAnalysisCallbackFromEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   for (const message of batch.messages) {
     const parsed = SecurityAnalysisCallbackMessageSchema.safeParse(message.body);
@@ -578,6 +593,7 @@ export async function consumeAnalysisCallbackBatch(
         findingId: parsed.data.findingId,
         attemptToken: parsed.data.attemptToken,
         payload: parsed.data.payload,
+        ctx,
       });
       message.ack();
     } catch (error) {

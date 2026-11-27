@@ -955,4 +955,43 @@ describe('dispatchReadyNotifications', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('sends with a minted token and never reads the shared key', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const minted: unknown[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+    const state = { pendingNotifications: vi.fn(async () => [{ id: 'export-1' }]) };
+
+    // No INTERNAL_API_SECRET at all: the token path must not need it, or a cutover that drops the
+    // shared key would fail the sweep.
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        WEB_INTERNAL_AUTH: 'sts',
+        STS: sts(minted),
+      },
+      state
+    );
+
+    expect(state.pendingNotifications).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('authorization')).toBe('Bearer sts-ready-token');
+    expect(headers.has('x-internal-api-key')).toBe(false);
+    expect(minted).toHaveLength(1);
+  });
+
+  it('does not read any secret when nothing is pending', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    // `sts` without the binding: a read here would throw, so resolving proves none happened.
+    await expect(
+      dispatchReadyNotifications(
+        { USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai', SECRETS_SOURCE: 'sts' },
+        { pendingNotifications: async () => [] }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

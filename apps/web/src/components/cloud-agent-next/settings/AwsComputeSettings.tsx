@@ -322,7 +322,8 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
               )
             )}
             <p className="text-muted-foreground text-xs">
-              Workspace snapshots are unavailable. Commit and push changes before the sandbox stops.
+              Cloud Agent keeps your workspace disk when the instance stops. When enabled, workspace
+              snapshots can restore files if Cloud Agent replaces the disk.
             </p>
           </>
         )}

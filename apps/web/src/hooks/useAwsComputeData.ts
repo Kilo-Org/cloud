@@ -17,6 +17,21 @@ export function useAwsComputeData(organizationId?: string) {
       : trpc.awsCompute.getEnrollment.queryOptions()
   );
   const invalidate = () => cache.invalidateQueries({ queryKey: statusOptions.queryKey });
+  const invalidateSandboxAvailability = () =>
+    Promise.all([
+      invalidate(),
+      cache.invalidateQueries({
+        queryKey: trpc.cloudAgentSettings.get.queryKey({ organizationId }),
+      }),
+      cache.invalidateQueries({
+        queryKey:
+          organizationId !== undefined
+            ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryKey({
+                organizationId,
+              })
+            : trpc.cloudAgentNext.getSandboxSelectionOptions.queryKey(),
+      }),
+    ]);
   const prepare = useMutation({
     mutationKey: [...statusOptions.queryKey, 'prepare'],
     gcTime: 0,
@@ -41,7 +56,7 @@ export function useAwsComputeData(organizationId?: string) {
       organizationId !== undefined
         ? client.organizations.awsCompute.validate.mutate({ organizationId, roleArn })
         : client.awsCompute.validate.mutate({ roleArn }),
-    onSuccess: invalidate,
+    onSuccess: invalidateSandboxAvailability,
   });
   const discard = useMutation({
     mutationKey: [...statusOptions.queryKey, 'discard'],

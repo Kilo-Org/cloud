@@ -5,7 +5,6 @@ import {
   CODE_REVIEW_WORKER_AUTH_TOKEN,
   CODE_REVIEW_WORKER_SENDER_AUTH,
 } from '@kilocode/web-shared/lib/config.server';
-import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import {
   resolveServiceSenderAuth,
   serviceSenderHeaders,
@@ -13,9 +12,13 @@ import {
 } from '@/lib/service-sender-auth';
 import * as z from 'zod';
 
-// Fetch timeout in milliseconds
+// One deadline per call, in milliseconds: the credential read (a cold STS mint included) and the
+// request share it.
 const FETCH_TIMEOUT_MS = 10000;
 const CODE_REVIEW_WORKER_URL = process.env.CODE_REVIEW_WORKER_URL;
+
+/** An STS token is for the Worker's origin only: a redirect fails rather than carry it on. */
+const STS_REQUEST: RequestInit = { redirect: 'error' };
 
 /**
  * The STS audience and scopes of the Code Review Worker's routes (E4, p4's scope handoff): one
@@ -88,7 +91,7 @@ class CodeReviewWorkerClient {
 
   constructor() {
     if (!CODE_REVIEW_WORKER_URL) {
-      throw new Error('CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
+      throw new Error('CODE_REVIEW_WORKER_URL not configured');
     }
     this.sender = resolveServiceSenderAuth({
       auth: CODE_REVIEW_WORKER_SENDER_AUTH,
@@ -96,7 +99,7 @@ class CodeReviewWorkerClient {
       runtime: process.env,
     });
     if (this.sender.kind === 'legacy' && !CODE_REVIEW_WORKER_AUTH_TOKEN) {
-      throw new Error('CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
+      throw new Error('CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
     }
 
     this.baseUrl = CODE_REVIEW_WORKER_URL;
@@ -121,18 +124,43 @@ class CodeReviewWorkerClient {
   }
 
   /**
-   * A request to the Worker. An STS token is for this origin only, so a redirect is an error rather
-   * than a hop that would carry it elsewhere; the legacy credential keeps the default behaviour.
+   * One call to the Worker under one `FETCH_TIMEOUT_MS` deadline that starts before the credential
+   * read, so a cold STS mint and the request share it rather than add up. Past the deadline the
+   * call fails with the same timeout error as before and the request, if sent, is aborted. An STS
+   * token is for this origin only, so a redirect is an error rather than a hop that would carry it
+   * elsewhere; the legacy credential keeps the default behaviour.
    */
-  private fetchWorker(
+  private async fetchWorker(
     url: string,
-    init: RequestInit & { headers: Record<string, string> }
+    action: CodeReviewWorkerAction,
+    init: { method?: 'POST'; body?: string } = {}
   ): Promise<Response> {
-    return fetchWithTimeout(
-      url,
-      this.sender.kind === 'sts' ? { ...init, redirect: 'error' } : init,
-      FETCH_TIMEOUT_MS
-    );
+    const controller = new AbortController();
+    const deadline = Promise.withResolvers<never>();
+    const timer = setTimeout(() => {
+      deadline.reject(new Error(`Request timeout after ${FETCH_TIMEOUT_MS}ms`));
+      controller.abort();
+    }, FETCH_TIMEOUT_MS);
+    try {
+      const headers = await Promise.race([
+        this.getHeaders(
+          action,
+          init.body === undefined ? undefined : { 'Content-Type': 'application/json' }
+        ),
+        deadline.promise,
+      ]);
+      return await Promise.race([
+        fetch(url, {
+          ...init,
+          headers,
+          signal: controller.signal,
+          ...(this.sender.kind === 'sts' ? STS_REQUEST : {}),
+        }),
+        deadline.promise,
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private buildReviewUrl(reviewId: string, suffix: string, attemptId?: string): string {
@@ -148,11 +176,8 @@ class CodeReviewWorkerClient {
    * Creates a CodeReviewOrchestrator Durable Object and starts the review
    */
   async dispatchReview(payload: CodeReviewPayload): Promise<DispatchReviewResponse> {
-    const response = await this.fetchWorker(`${this.baseUrl}/review`, {
+    const response = await this.fetchWorker(`${this.baseUrl}/review`, 'dispatch', {
       method: 'POST',
-      headers: await this.getHeaders('dispatch', {
-        'Content-Type': 'application/json',
-      }),
       body: JSON.stringify(payload),
     });
 
@@ -179,13 +204,11 @@ class CodeReviewWorkerClient {
     reason?: string,
     attemptId?: string
   ): Promise<CancelReviewResponse> {
-    const response = await this.fetchWorker(this.buildReviewUrl(reviewId, 'cancel', attemptId), {
-      method: 'POST',
-      headers: await this.getHeaders('cancel', {
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({ reason, attemptId }),
-    });
+    const response = await this.fetchWorker(
+      this.buildReviewUrl(reviewId, 'cancel', attemptId),
+      'cancel',
+      { method: 'POST', body: JSON.stringify({ reason, attemptId }) }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -204,13 +227,11 @@ class CodeReviewWorkerClient {
       retryAttemptId?: string;
     }
   ): Promise<RetryReviewFreshResponse> {
-    const response = await this.fetchWorker(`${this.baseUrl}/reviews/${reviewId}/retry-fresh`, {
-      method: 'POST',
-      headers: await this.getHeaders('retryFresh', {
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(input),
-    });
+    const response = await this.fetchWorker(
+      `${this.baseUrl}/reviews/${reviewId}/retry-fresh`,
+      'retryFresh',
+      { method: 'POST', body: JSON.stringify(input) }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -224,9 +245,10 @@ class CodeReviewWorkerClient {
     reviewId: string,
     attemptId?: string
   ): Promise<ReviewStatusResponse | null> {
-    const response = await this.fetchWorker(this.buildReviewUrl(reviewId, 'status', attemptId), {
-      headers: await this.getHeaders('statusRead'),
-    });
+    const response = await this.fetchWorker(
+      this.buildReviewUrl(reviewId, 'status', attemptId),
+      'statusRead'
+    );
 
     if (response.status === 404) {
       return null;

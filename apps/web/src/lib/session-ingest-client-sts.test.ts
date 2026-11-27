@@ -119,6 +119,53 @@ describe('invalidateOrganizationSessionAccess, sts', () => {
       { errorName: 'Error' }
     );
   });
+
+  test('a mint slower than the 8 s upstream budget fails the call then; nothing is sent', async () => {
+    const client = await loadClient({ auth: 'sts' });
+    jest.useFakeTimers();
+    try {
+      mockTokenGet.mockReturnValue(Promise.withResolvers<string>().promise);
+      const outcome = expect(
+        client.invalidateOrganizationSessionAccess(USER_ID, ORGANIZATION_ID)
+      ).rejects.toMatchObject({ name: 'ServiceFetchTimeoutError', totalBudgetMs: 8_000 });
+      await jest.advanceTimersByTimeAsync(7_999);
+      expect(mockFetch).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      await outcome;
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('the mint and the request share the 8 s upstream budget', async () => {
+    const client = await loadClient({ auth: 'sts' });
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      mockTokenGet.mockImplementation(() => {
+        const minted = Promise.withResolvers<string>();
+        setTimeout(() => minted.resolve(TOKEN), 5_000);
+        return minted.promise;
+      });
+      mockFetch.mockImplementation(() => Promise.withResolvers<Response>().promise);
+      let settled = false;
+      const call = client.invalidateOrganizationSessionAccess(USER_ID, ORGANIZATION_ID);
+      call.catch(() => {}).finally(() => (settled = true));
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // The fetch gets the 3 s the mint left, not a fresh 8 s.
+      await jest.advanceTimersByTimeAsync(2_999);
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(call).rejects.toMatchObject({
+        name: 'ServiceFetchTimeoutError',
+        totalBudgetMs: 3_000,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('invalidateOrganizationSessionAccess, legacy and refused', () => {

@@ -51,7 +51,7 @@ const derived = () =>
   });
 
 describe('CODE_REVIEW_STATUS_CALLBACK_AUTH', () => {
-  it.each([undefined, 'legacy'])(
+  it.each([undefined, '', 'legacy'])(
     '%j sends the derived callback token, as before, and mints nothing',
     async mode => {
       const sts = binding(issued);
@@ -111,7 +111,7 @@ describe('CODE_REVIEW_STATUS_CALLBACK_AUTH', () => {
     ).rejects.toMatchObject({ reason: 'sts_binding_missing' });
   });
 
-  it.each(['STS', 'dual', 'secrets-store', ''])('refuses %j', async mode => {
+  it.each(['STS', 'dual', 'secrets-store', ' '])('refuses %j', async mode => {
     const sts = binding(issued);
     await expect(
       statusCallbackCredential(

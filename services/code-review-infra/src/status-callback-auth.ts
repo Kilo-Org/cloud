@@ -23,13 +23,16 @@ export const STATUS_CALLBACK_SCOPE = {
 /**
  * `CODE_REVIEW_STATUS_CALLBACK_AUTH`, the switch of this Worker's own status writes and their
  * rollback (D59). Each write carries exactly one credential:
- * - absent or `legacy`: the derived `X-Callback-Token`, exactly as before this switch existed;
+ * - absent, empty or `legacy`: the derived `X-Callback-Token`, exactly as before;
  * - `sts`: only a `STATUS_CALLBACK_SCOPE` service token minted over the `STS` binding, in
  *   `Authorization: Bearer`. Without a token the write is not sent and fails.
  * Any other value sends nothing. The callback target this Worker hands Cloud Agent Next keeps the
  * derived token: Cloud Agent Next delivers that callback itself, with its own credential.
  */
-const StatusCallbackAuthSchema = z.enum(['legacy', 'sts']).default('legacy');
+const StatusCallbackAuthSchema = z.preprocess(
+  value => (value === '' ? undefined : value),
+  z.enum(['legacy', 'sts']).default('legacy')
+);
 
 export type StatusCallbackEnv = {
   STS?: MintBinding;

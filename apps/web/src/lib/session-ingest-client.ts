@@ -9,7 +9,11 @@ import {
 } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { resolveServiceSenderAuth, serviceSenderHeaders } from '@/lib/service-sender-auth';
-import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+  ServiceFetchTimeoutError,
+  fetchWithinBudget,
+} from '@/lib/bounded-service-fetch';
 import {
   toSharedTranscriptMessages,
   type SharedTranscriptMessage,
@@ -146,10 +150,14 @@ function redactedRouteForLog(requestUrl: string): string {
  * Authorization header, the internal-service token, the session id, the share
  * token or a query string.
  */
-async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): Promise<Response> {
+async function fetchSessionIngest(
+  requestUrl: string,
+  init: RequestInit = {},
+  budgetMs?: number
+): Promise<Response> {
   const startedAt = Date.now();
   try {
-    return await fetchWithinBudget(requestUrl, init);
+    return await fetchWithinBudget(requestUrl, init, budgetMs === undefined ? {} : { budgetMs });
   } catch (error) {
     if (error instanceof ServiceFetchTimeoutError) {
       console.log(
@@ -678,6 +686,21 @@ export async function fetchSharedSession(shareToken: string): Promise<SharedSess
   };
 }
 
+/**
+ * `work` if it settles within `budgetMs`, else a `ServiceFetchTimeoutError`
+ * naming the whole budget: a cold STS mint counts against the same upstream
+ * budget as the fetch it precedes.
+ */
+async function withinBudget<T>(work: Promise<T>, budgetMs: number): Promise<T> {
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(() => expired.reject(new ServiceFetchTimeoutError(budgetMs)), budgetMs);
+  try {
+    return await Promise.race([work, expired.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function invalidateOrganizationSessionAccess(
   kiloUserId: string,
   organizationId: string
@@ -685,19 +708,29 @@ export async function invalidateOrganizationSessionAccess(
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
-  const credential = await serviceSenderHeaders({
-    sender: sessionIngestSender,
-    variable: 'SESSION_INGEST_SENDER_AUTH',
-    label: 'session ingest invalidate',
-    request: SESSION_INGEST_INVALIDATE_SCOPE,
-    legacyHeaders: async () => {
-      const internalApiSecret = await readInternalApiSecret();
-      if (!internalApiSecret) {
-        throw new Error('INTERNAL_API_SECRET is not configured');
-      }
-      return { 'X-Internal-Secret': internalApiSecret };
-    },
-  });
+  // The budget starts before the credential read, so a cold STS mint and the
+  // fetch share `CONTROL_PLANE_UPSTREAM_BUDGET_MS` instead of adding up.
+  const startedAt = Date.now();
+  // Caller deadline, composed with the shared upstream budget by
+  // `fetchWithinBudget`; the shorter budget wins, so a hung worker cannot
+  // hold this past `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+  const signal = AbortSignal.timeout(30_000);
+  const credential = await withinBudget(
+    serviceSenderHeaders({
+      sender: sessionIngestSender,
+      variable: 'SESSION_INGEST_SENDER_AUTH',
+      label: 'session ingest invalidate',
+      request: SESSION_INGEST_INVALIDATE_SCOPE,
+      legacyHeaders: async () => {
+        const internalApiSecret = await readInternalApiSecret();
+        if (!internalApiSecret) {
+          throw new Error('INTERNAL_API_SECRET is not configured');
+        }
+        return { 'X-Internal-Secret': internalApiSecret };
+      },
+    }),
+    CONTROL_PLANE_UPSTREAM_BUDGET_MS
+  );
 
   const init: RequestInit = {
     method: 'POST',
@@ -706,17 +739,15 @@ export async function invalidateOrganizationSessionAccess(
       ...credential,
     },
     body: JSON.stringify({ kiloUserId, organizationId }),
-    // Caller deadline, composed with the shared upstream budget by
-    // `fetchWithinBudget`; the shorter budget wins, so a hung worker cannot
-    // hold this past `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
-    signal: AbortSignal.timeout(30_000),
+    signal,
   };
   // An STS token is for this origin only; a redirect never carries it on.
   if (sessionIngestSender.kind === 'sts') init.redirect = 'error';
 
   const response = await fetchSessionIngest(
     `${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`,
-    init
+    init,
+    Math.max(0, CONTROL_PLANE_UPSTREAM_BUDGET_MS - (Date.now() - startedAt))
   );
 
   if (!response.ok) {

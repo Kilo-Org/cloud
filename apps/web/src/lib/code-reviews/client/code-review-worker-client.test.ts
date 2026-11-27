@@ -156,7 +156,13 @@ describe('code review worker client, legacy', () => {
 
   test('legacy without the worker token refuses to load, as before', async () => {
     await expect(loadClient({ auth: 'legacy', secret: '' })).rejects.toThrow(
-      'CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured'
+      'CODE_REVIEW_WORKER_AUTH_TOKEN not configured'
+    );
+  });
+
+  test('a missing worker URL names only the URL', async () => {
+    await expect(loadClient({ auth: 'sts', url: '' })).rejects.toThrow(
+      /^CODE_REVIEW_WORKER_URL not configured$/
     );
   });
 });
@@ -238,6 +244,50 @@ describe('code review worker client, sts', () => {
           ? { errorName: 'ServiceTokenError', reason: 'unavailable' }
           : { errorName: 'Error' }
     );
+  });
+
+  test('a mint slower than the 10 s deadline fails the call then; nothing is sent', async () => {
+    const { client } = await loadClient({ auth: 'sts' });
+    jest.useFakeTimers();
+    try {
+      mockTokenGet.mockReturnValue(Promise.withResolvers<string>().promise);
+      const outcome = expect(client.codeReviewWorkerClient.dispatchReview(PAYLOAD)).rejects.toThrow(
+        'Request timeout after 10000ms'
+      );
+      await jest.advanceTimersByTimeAsync(9_999);
+      expect(mockFetch).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      await outcome;
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('the mint and the request share one 10 s deadline', async () => {
+    const { client } = await loadClient({ auth: 'sts' });
+    jest.useFakeTimers();
+    try {
+      mockTokenGet.mockImplementation(() => {
+        const minted = Promise.withResolvers<string>();
+        setTimeout(() => minted.resolve(TOKEN), 6_000);
+        return minted.promise;
+      });
+      mockFetch.mockImplementation(() => Promise.withResolvers<Response>().promise);
+      const outcome = expect(
+        client.codeReviewWorkerClient.getReviewStatus(REVIEW_ID)
+      ).rejects.toThrow('Request timeout after 10000ms');
+      await jest.advanceTimersByTimeAsync(6_000);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const signal = mockFetch.mock.calls[0]?.[1]?.signal;
+      expect(signal?.aborted).toBe(false);
+      // 4 s after the mint, not 10: the request only gets what the mint left.
+      await jest.advanceTimersByTimeAsync(4_000);
+      await outcome;
+      expect(signal?.aborted).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

@@ -29,7 +29,7 @@ The review Durable Object writes `running` and failure status to the web app's
 `POST /api/internal/code-review-status/{reviewId}` itself. Its credential is
 `CODE_REVIEW_STATUS_CALLBACK_AUTH` (`src/status-callback-auth.ts`):
 
-- absent or `legacy`: the `X-Callback-Token` derived from `CALLBACK_TOKEN_SECRET`, as before;
+- absent, empty or `legacy`: the `X-Callback-Token` derived from `CALLBACK_TOKEN_SECRET`, as before;
 - `sts`: only a `web:code-review.status-callback` STS service
   token in `Authorization: Bearer`, minted over the `STS` binding (`props.caller`
   `kilo-code-review-worker`), never following a redirect. Without a token the write fails; it never

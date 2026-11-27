@@ -537,9 +537,26 @@ describe('user.linkAuthProvider', () => {
     const caller = await createSessionCallerForUser(member.id);
 
     await expect(
-      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'openai' })
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
     ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.ssoLinkNotAllowed));
     expect(mockSendCode).not.toHaveBeenCalled();
+  });
+
+  it('allows a ChatGPT link for an SSO domain whose organization does not allow other methods', async () => {
+    const { member, organization } = await insertSsoMember();
+    await setSessionCookie(member, {
+      authProvider: 'workos',
+      ssoSourceOrganizationId: organization.id,
+    });
+    const caller = await createSessionCallerForUser(member.id);
+    const { code, challengeId } = await requestCode(caller, 'link', 'openai');
+
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'openai', code, challengeId })
+    ).resolves.toEqual({ success: true });
+    expect(mockCreateLinkingSession).toHaveBeenCalledWith(
+      expect.objectContaining({ existingUserId: member.id, targetProvider: 'openai' })
+    );
   });
 
   it('allows the link for an SSO domain once the organization allows it', async () => {

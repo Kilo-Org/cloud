@@ -80,9 +80,11 @@ const INVALID_SOURCE: StsReadResult = { ok: false, reason: 'invalid_source' };
 /**
  * Reads one name from the STS bundle and returns it as delivered, empty included, so each caller
  * keeps its own empty-value handling. It never throws and never reads the Secrets Store: a failure
- * returns only a fixed reason, so no error name, message or cause reaches a log or a response.
+ * returns only a fixed reason, so no error name, message or cause reaches a log or a response. It
+ * does not check `SECRETS_SOURCE`; the `sts` source and the pre-flip comparison
+ * (src/secrets-compare.ts) both read through it.
  */
-async function readStsSecret(
+export async function readStsSecret(
   env: Pick<WebhookSecretsSelection, 'STS'>,
   name: WebhookSecretName
 ): Promise<StsReadResult> {

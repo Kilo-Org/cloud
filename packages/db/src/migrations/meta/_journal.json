@@ -2738,6 +2738,13 @@
       "when": 1795809778407,
       "tag": "0390_leaderboard_usage_hourly",
       "breakpoints": true
+    },
+    {
+      "idx": 391,
+      "version": "7",
+      "when": 1795813482760,
+      "tag": "0391_drop_leaderboard_usage_daily",
+      "breakpoints": true
     }
   ]
 }

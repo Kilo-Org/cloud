@@ -85,8 +85,8 @@
 
   // ============================================
   // DEVELOPMENT ENVIRONMENT
-  // Deploy with: wrangler deploy --env dev
-  // This creates a SEPARATE worker: kilo-mcp-dev
+  // Local-only: run with `pnpm dev` (wrangler dev --local). Never deploy it;
+  // it has no hosted route, workers.dev URL or preview URL.
   // ============================================
   "env": {
     "dev": {

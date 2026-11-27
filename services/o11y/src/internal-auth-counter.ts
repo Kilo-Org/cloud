@@ -10,10 +10,12 @@ import { readO11ySecret } from './secrets';
  * SQL credentials its alerting uses, so once a minute it reads the closed minute and writes the
  * same line shape to the log, where Logpush ships it to Axiom beside every other receiver's lines.
  *
- * Exactly one closed minute per run, so a receiver's row is emitted once: the window starts at the
- * previous minute boundary and ends at the current one. A duplicated cron run can emit that minute
- * twice; the gate reads `max(count)` per (minute, receiver, route, auth, caller) for these two
- * receivers, which stays exact either way.
+ * A data point can reach Analytics Engine after the minute it counts for, so the reader runs one
+ * minute behind and groups by the point's own `index1` minute (the true bucket start) rather than by
+ * arrival time. It reads the window `[now-3m, now-2m)` once, so a point that arrives later than two
+ * minutes is lost — the accepted trade for a query that never needs a watermark. A duplicated cron
+ * run emits the same `window` again; the gate takes `max(count)` per
+ * `(window, minute, receiver, route, auth, caller)` and then sums over windows, which stays exact.
  */
 export type InternalAuthCounterEnv = {
   O11Y_CF_ACCOUNT_ID: string;
@@ -30,6 +32,7 @@ const RowSchema = z.object({
   caller: z.string(),
   accepted: z.union([z.number(), z.string()]),
   minute: z.union([z.number(), z.string()]),
+  window: z.union([z.number(), z.string()]),
 });
 
 const SQL = `
@@ -39,11 +42,12 @@ const SQL = `
 		blob3 AS auth,
 		blob4 AS caller,
 		SUM(_sample_interval * double1) AS accepted,
-		toUnixTimestamp(toStartOfInterval(timestamp, INTERVAL '1' MINUTE)) AS minute
+		toUInt64OrZero(index1) AS minute,
+		toUnixTimestamp(toStartOfInterval(NOW() - INTERVAL '3' MINUTE, INTERVAL '1' MINUTE)) AS window
 	FROM ${DATASET}
-	WHERE timestamp >= toStartOfInterval(NOW() - INTERVAL '1' MINUTE, INTERVAL '1' MINUTE)
-		AND timestamp < toStartOfInterval(NOW(), INTERVAL '1' MINUTE)
-	GROUP BY receiver, route, auth, caller, minute
+	WHERE timestamp >= toStartOfInterval(NOW() - INTERVAL '3' MINUTE, INTERVAL '1' MINUTE)
+		AND timestamp < toStartOfInterval(NOW() - INTERVAL '2' MINUTE, INTERVAL '1' MINUTE)
+	GROUP BY receiver, route, auth, caller, minute, window
 `;
 
 function log(event: string, fields: Record<string, unknown>): void {
@@ -98,7 +102,9 @@ export async function summarizeInternalAuthCounter(
     }
     const count = Math.round(Number(row.data.accepted));
     const minute = Math.round(Number(row.data.minute));
+    const window = Math.round(Number(row.data.window));
     if (!Number.isFinite(count) || count <= 0 || !Number.isFinite(minute)) continue;
+    if (!Number.isFinite(window)) continue;
     log(INTERNAL_AUTH_OBSERVATION_EVENT, {
       v: 1,
       source: 'analytics_engine',
@@ -108,6 +114,7 @@ export async function summarizeInternalAuthCounter(
       caller: row.data.caller,
       count,
       minute,
+      window,
     });
   }
 }

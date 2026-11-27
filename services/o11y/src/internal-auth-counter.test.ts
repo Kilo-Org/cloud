@@ -8,6 +8,9 @@ const env = {
   O11Y_CF_AE_API_TOKEN: {},
 } as unknown as InternalAuthCounterEnv;
 
+const MINUTE = 1795769280;
+const WINDOW = MINUTE + 60;
+
 function lines(log: { mock: { calls: unknown[][] } }): Record<string, unknown>[] {
   return log.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
 }
@@ -31,7 +34,8 @@ describe('summarizeInternalAuthCounter', () => {
               auth: 'legacy_shared_secret',
               caller: 'unknown',
               accepted: 12,
-              minute: 1795769280,
+              minute: MINUTE,
+              window: WINDOW,
             },
             {
               receiver: 'notifications',
@@ -39,7 +43,8 @@ describe('summarizeInternalAuthCounter', () => {
               auth: 'sts',
               caller: 'web',
               accepted: '3',
-              minute: 1795769280,
+              minute: MINUTE,
+              window: WINDOW,
             },
             // A zero row is not evidence and writes nothing.
             {
@@ -48,7 +53,8 @@ describe('summarizeInternalAuthCounter', () => {
               auth: 'legacy_shared_secret',
               caller: 'unknown',
               accepted: 0,
-              minute: 1795769280,
+              minute: MINUTE,
+              window: WINDOW,
             },
             { receiver: 'notifications' },
           ],
@@ -68,7 +74,8 @@ describe('summarizeInternalAuthCounter', () => {
         auth: 'legacy_shared_secret',
         caller: 'unknown',
         count: 12,
-        minute: 1795769280,
+        minute: MINUTE,
+        window: WINDOW,
       },
       {
         event: 'kilo_internal_auth',
@@ -79,7 +86,8 @@ describe('summarizeInternalAuthCounter', () => {
         auth: 'sts',
         caller: 'web',
         count: 3,
-        minute: 1795769280,
+        minute: MINUTE,
+        window: WINDOW,
       },
       { event: 'o11y_internal_auth_summary_failed', reason: 'row' },
     ]);

@@ -24,7 +24,11 @@ export default class extends WorkerEntrypoint<Env> {
   }
 
   async scheduled(_controller: ScheduledController): Promise<void> {
-    await evaluateAlerts(this.env, this.ctx);
+    try {
+      await evaluateAlerts(this.env, this.ctx);
+    } catch {
+      // The counter summary below must run even when alert evaluation fails.
+    }
     await summarizeInternalAuthCounter(this.env, this.ctx);
   }
 

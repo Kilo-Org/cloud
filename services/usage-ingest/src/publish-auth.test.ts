@@ -40,6 +40,7 @@ function setup(overrides: Partial<Env> = {}) {
   const accepted = { metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } };
   const send = vi.fn<Env['USAGE_INGEST_QUEUE']['send']>().mockResolvedValue(accepted);
   const tagged = vi.fn<Env['USAGE_INGEST_ENKRYPT_QUEUE']['send']>().mockResolvedValue(accepted);
+  const writeDataPoint = vi.fn();
   const env: Env = {
     USAGE_INGEST_PUBLISH_SECRET: SECRET,
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics: vi.fn() },
@@ -47,11 +48,12 @@ function setup(overrides: Partial<Env> = {}) {
     USAGE_INGEST_ENKRYPT_QUEUE: { send: tagged, sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_ENKRYPT_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: 'true',
+    INTERNAL_AUTH_COUNTER: { writeDataPoint },
     STS_URL,
     STS_ENVIRONMENT: 'production',
     ...overrides,
   };
-  return { send, tagged, env };
+  return { send, tagged, env, writeDataPoint };
 }
 
 function publish(

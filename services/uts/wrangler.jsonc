@@ -48,13 +48,15 @@
     "LOGIN_ROTATION": "off",
     // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
     // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
-    // Each environment stays on `worker` until its flip; the flip and its rollback are this one var
-    // (README, "Runtime secrets"). The Worker secrets set before the flip stay set either way.
-    "SECRETS_SOURCE": "sts",
+    // Each environment stays on `worker` until its flip, which is its own change (README, "Runtime
+    // secrets"). The rollback is this one var too, except here while the sign-in client ids below
+    // are set: production keeps their client secrets only in the bundle, so they go first.
+    "SECRETS_SOURCE": "worker",
     // GitHub, Google and GitLab sign-in. Production holds their SIGNIN_<PROVIDER>_CLIENT_SECRET
-    // values only in its /workloads/uts bundle, never as Worker secrets, so these client ids need
-    // SECRETS_SOURCE `sts` (test/repo): they deploy after the flip, and a rollback removes them
-    // before the source goes back (README, "Production sign-in providers").
+    // values only in its /workloads/uts bundle, never as Worker secrets, so test/repo refuses these
+    // client ids until SECRETS_SOURCE above reads `sts`: this change merges only after the flip,
+    // and a rollback removes them before the source goes back (README, "Production sign-in
+    // providers").
     "SIGNIN_GITHUB_CLIENT_ID": "Ov23lie6u5czgxYlcfcO",
     "SIGNIN_GOOGLE_CLIENT_ID": "1000529458754-3qjv67tvqek9r5q1u8ico35mng699t96.apps.googleusercontent.com",
     "SIGNIN_GITLAB_CLIENT_ID": "1d7b8acf64d4298f8438f0d7019e91c17c205832c19151f73460fc224e1d3f56",

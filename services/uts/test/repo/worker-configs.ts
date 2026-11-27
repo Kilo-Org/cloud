@@ -591,9 +591,10 @@ const SIGN_IN_CLIENT_ID_VAR = /^SIGNIN_[A-Z]+_CLIENT_ID$/;
 /**
  * Production holds the sign-in client secrets only in its `/workloads/uts` bundle, never as Worker
  * secrets, so a production block that sets a sign-in client id reads `SECRETS_SOURCE` `sts`: under
- * `worker` that provider would be misconfigured (its routes answer 500). The flip therefore
- * deploys before the client ids, and a rollback removes the client ids before the source goes back
- * (README, "Production sign-in providers").
+ * `worker` that provider would be misconfigured (its routes answer 500). A change that adds the
+ * client ids, and never changes the source, therefore fails here until the flip is on its base
+ * branch, and a rollback removes the client ids before the source goes back (README, "Production
+ * sign-in providers").
  */
 function productionSignInProblems(where: string, bindings: Bindings): string[] {
   const vars = bindings.vars ?? {};

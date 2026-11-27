@@ -425,15 +425,16 @@ describe('the UTS configs themselves', () => {
       mintWith(raw => ({ ...raw, vars: edit(z.record(z.string(), z.unknown()).parse(raw.vars)) }));
     const CLIENT_IDS = 'SIGNIN_GITHUB_CLIENT_ID, SIGNIN_GITLAB_CLIENT_ID, SIGNIN_GOOGLE_CLIENT_ID';
 
-    it('set GitHub, Google and GitLab in production under SECRETS_SOURCE sts', () => {
+    it('set GitHub, Google and GitLab in production, accepted once SECRETS_SOURCE reads sts', () => {
       const vars = z.record(z.string(), z.unknown()).parse(configAt(MINT_CONFIG).config.vars);
       expect(vars).toMatchObject({
-        SECRETS_SOURCE: 'sts',
         SIGNIN_GITHUB_CLIENT_ID: expect.any(String),
         SIGNIN_GOOGLE_CLIENT_ID: expect.any(String),
         SIGNIN_GITLAB_CLIENT_ID: expect.any(String),
       });
-      expect(utsConfigProblems(repoConfigs())).toEqual([]);
+      expect(
+        utsConfigProblems(productionVars(current => ({ ...current, SECRETS_SOURCE: 'sts' })))
+      ).toEqual([]);
     });
 
     it('fail a production client id under the worker source, which holds no client secret there', () => {
@@ -475,13 +476,15 @@ describe('the UTS configs themselves', () => {
       const staging = mintWith(raw => {
         const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
         const vars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        const production = z.record(z.string(), z.unknown()).parse(raw.vars);
         return {
           ...raw,
+          vars: { ...production, SECRETS_SOURCE: 'sts' },
           env: {
             ...env,
             staging: {
               ...env.staging,
-              vars: { ...vars, SECRETS_SOURCE: 'worker', SIGNIN_GITLAB_CLIENT_ID: 'gitlab-client' },
+              vars: { ...vars, SECRETS_SOURCE: 'worker', SIGNIN_ANACONDA_CLIENT_ID: 'client' },
             },
           },
         };

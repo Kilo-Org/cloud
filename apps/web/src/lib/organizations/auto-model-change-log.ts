@@ -342,8 +342,8 @@ async function writePolicyAuditLog(
  * Reconcile one organization from its baseline to `snapshotId`.
  *
  * The policy itself cannot change meanwhile: `updateNewModelsPolicy` waits for the snapshot lock
- * the caller holds. The deny list can, so the organization's locks are taken only when the deny
- * list changes, and the outcome is then decided again on the locked row.
+ * the caller holds. The model and provider lists can, so the outcome is decided on the locked
+ * row; a list edit that commits after an unlocked read could otherwise admit a new model.
  */
 async function reconcileOrganization(
   tx: DrizzleTransaction,
@@ -354,33 +354,29 @@ async function reconcileOrganization(
   // Only enterprise organizations have model restrictions. The baseline still advances, so a
   // later upgrade does not disable everything released in between.
   if (organization.plan === 'enterprise') {
-    const result = {
-      outcome: applyNewModelsPolicy(
-        organization.settings,
-        computeRelevantChangesForOrg(organization, diff)
-      ),
-    };
-    if (result.outcome.modelDenyList) {
-      // Same lock order as `updateAllowLists`: the group policy, then the organization row.
-      await lockOrganizationGroupPolicy(tx, organization.id);
-      await mutateOrganizationSettings(
-        organization.id,
-        locked => {
-          result.outcome = applyNewModelsPolicy(
-            locked.settings,
-            computeRelevantChangesForOrg(locked, diff)
-          );
-          return result.outcome.modelDenyList
-            ? { ...locked.settings, model_deny_list: result.outcome.modelDenyList }
-            : locked.settings;
-        },
-        tx
-      );
+    // Same lock order as `updateAllowLists`: the group policy, then the organization row.
+    await lockOrganizationGroupPolicy(tx, organization.id);
+    const result: { outcome?: NewModelsPolicyOutcome } = {};
+    await mutateOrganizationSettings(
+      organization.id,
+      locked => {
+        const outcome = applyNewModelsPolicy(
+          locked.settings,
+          computeRelevantChangesForOrg(locked, diff)
+        );
+        result.outcome = outcome;
+        return outcome.modelDenyList
+          ? { ...locked.settings, model_deny_list: outcome.modelDenyList }
+          : locked.settings;
+      },
+      tx
+    );
+    if (result.outcome) {
       if (result.outcome.modelDenyList) {
         await bumpOrganizationGroupPolicyRevision(tx, organization.id, null);
       }
+      await writePolicyAuditLog(tx, organization.id, result.outcome);
     }
-    await writePolicyAuditLog(tx, organization.id, result.outcome);
   }
   await upsertBaseline(tx, organization.id, snapshotId);
 }
@@ -424,6 +420,11 @@ export async function applyNewModelsPolicyForPublication(
       eq(organization_new_models_baselines.organization_id, organizations.id)
     )
     .where(and(isNull(organizations.deleted_at), orgDisablesNewModels));
+  // Organization policy locks are taken in ascending id order, like other code that locks
+  // several organizations in one transaction, so the two cannot deadlock.
+  policyOrganizations.sort((a, b) =>
+    a.organization.id < b.organization.id ? -1 : a.organization.id > b.organization.id ? 1 : 0
+  );
 
   await tx.delete(organization_new_models_baselines).where(
     notInArray(
@@ -451,18 +452,28 @@ export async function applyNewModelsPolicyForPublication(
             .where(inArray(modelsByProvider.id, olderBaselineIds))
         ).map(row => [row.id, row.data])
   );
-  const baselineSnapshotFor = (organizationId: string, baselineSnapshotId: number | null) => {
-    if (baselineSnapshotId !== null && baselineSnapshotId === previousSnapshotId) {
-      return previousSnapshot;
+  // An organization without a usable baseline, such as one that turned the policy on before
+  // baselines existed, starts from the previous snapshot. That baseline is written outside its
+  // savepoint, so a failed first reconciliation still leaves the gateway a baseline to hold it to
+  // and the next sync a starting point.
+  const usableBaselines = new Map<string, number | null>();
+  for (const { organization, baselineSnapshotId } of policyOrganizations) {
+    const usable =
+      baselineSnapshotId !== null &&
+      (baselineSnapshotId === previousSnapshotId || olderBaselines.has(baselineSnapshotId));
+    usableBaselines.set(organization.id, usable ? baselineSnapshotId : previousSnapshotId);
+    if (!usable && previousSnapshotId !== null) {
+      console.warn(
+        `[auto-model-change-log] org ${organization.id} has no usable baseline; starting from the previous snapshot`
+      );
+      await upsertBaseline(tx, organization.id, previousSnapshotId);
     }
-    const baseline =
-      baselineSnapshotId === null ? undefined : olderBaselines.get(baselineSnapshotId);
-    if (baseline) return baseline;
-    // Without its baseline, models listed between it and the previous snapshot stay enabled.
-    console.warn(
-      `[auto-model-change-log] org ${organizationId} has no baseline snapshot; reconciling from the previous snapshot`
-    );
-    return previousSnapshot;
+  }
+  const baselineSnapshotFor = (organizationId: string) => {
+    const baselineSnapshotId = usableBaselines.get(organizationId);
+    return baselineSnapshotId === undefined || baselineSnapshotId === null
+      ? previousSnapshot
+      : (olderBaselines.get(baselineSnapshotId) ?? previousSnapshot);
   };
   const diffs = new Map<NormalizedOpenRouterResponse | null, SnapshotDiff>();
   const diffFrom = (baseline: NormalizedOpenRouterResponse | null) => {
@@ -475,12 +486,12 @@ export async function applyNewModelsPolicyForPublication(
   };
 
   const handledOrganizationIds = new Set<string>();
-  for (const { organization, baselineSnapshotId } of policyOrganizations) {
+  for (const { organization } of policyOrganizations) {
     // A failed organization is skipped by the post-commit log too: its additions are not
     // "added", since the next sync disables them.
     handledOrganizationIds.add(organization.id);
     try {
-      const diff = diffFrom(baselineSnapshotFor(organization.id, baselineSnapshotId));
+      const diff = diffFrom(baselineSnapshotFor(organization.id));
       await tx.transaction(sp => reconcileOrganization(sp, organization, diff, newSnapshotId));
     } catch (err) {
       console.error(

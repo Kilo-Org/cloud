@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import * as fs from 'fs';
+import * as path from 'path';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -19,9 +21,11 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { validateOrganizationAutoTarget } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import { createModelsByProviderIndexLoader } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import { applySnapshotChangesAndAudit } from '@/lib/providers/openrouter/sync-providers';
+import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
@@ -476,7 +480,9 @@ describe('applySnapshotChangesAndAudit with disable_new_models', () => {
       expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
       expect(await baselineOf(org.id)).toBe(result.id);
       expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining(`org ${org.id} has no baseline`));
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`org ${org.id} has no usable baseline`)
+      );
     } finally {
       warn.mockRestore();
     }
@@ -928,21 +934,24 @@ describe('applySnapshotChangesAndAudit with disable_new_models', () => {
     expect(await denyList(org.id)).toBeUndefined();
   });
 
-  test('applies a deny list change made while the publication waited for the org lock', async () => {
-    const org = await createPolicyOrg('Concurrent Deny List Org');
-    await seedBaseline(org.id, await seedSnapshot(glm5));
-
+  /**
+   * Publishes `providers` while another transaction holds the org row, then commits that
+   * transaction once the publication waits for the row. The publication has read the org by then.
+   */
+  async function publishWhileHoldingOrganization(
+    organizationId: string,
+    mutate: (settings: OrganizationSettings) => OrganizationSettings,
+    providers: NormalizedOpenRouterResponse
+  ) {
     let publication: ReturnType<typeof applySnapshotChangesAndAudit> | undefined;
     let publicationWaited = false;
     await db.transaction(async tx => {
       await mutateOrganizationSettings(
-        org.id,
-        organization => ({ ...organization.settings, model_deny_list: ['openai/gpt-4o'] }),
+        organizationId,
+        organization => mutate(organization.settings),
         tx
       );
-      publication = applySnapshotChangesAndAudit({ providers: glm51 });
-      // The publication read the org without a lock and now waits for the row this
-      // transaction holds.
+      publication = applySnapshotChangesAndAudit({ providers });
       for (let attempt = 0; attempt < 100; attempt++) {
         const result = await db.execute<{ waiting: number }>(
           sql`SELECT count(*)::int AS waiting FROM pg_stat_activity
@@ -955,13 +964,125 @@ describe('applySnapshotChangesAndAudit with disable_new_models', () => {
         await new Promise(resolve => setTimeout(resolve, 50));
       }
     });
-    const result = await publication;
-
+    const published = await publication;
     expect(publicationWaited).toBe(true);
+    if (!published) throw new Error('the publication did not start');
+    return published;
+  }
+
+  test('applies a deny list change made while the publication waited for the org lock', async () => {
+    const org = await createPolicyOrg('Concurrent Deny List Org');
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    const result = await publishWhileHoldingOrganization(
+      org.id,
+      settings => ({ ...settings, model_deny_list: ['openai/gpt-4o'] }),
+      glm51
+    );
+
     expect(await denyList(org.id)).toEqual(['openai/gpt-4o', 'z-ai/glm-5.1']);
-    expect(await baselineOf(org.id)).toBe(result?.id);
+    expect(await baselineOf(org.id)).toBe(result.id);
     expect(await policyRevision(org.id)).toBe(1);
     expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
+  });
+
+  test('takes a provider allow list change made while the publication waited into account', async () => {
+    const org = await createPolicyOrg('Concurrent Allow List Org', {
+      provider_allow_list: ['anthropic'],
+    });
+    const before = buildSnapshot([
+      { slug: 'anthropic', models: ['anthropic/claude-4.5'] },
+      { slug: 'z-ai', models: ['z-ai/glm-5'] },
+    ]);
+    const after = buildSnapshot([
+      { slug: 'anthropic', models: ['anthropic/claude-4.5'] },
+      { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] },
+    ]);
+    await seedBaseline(org.id, await seedSnapshot(before));
+
+    const result = await publishWhileHoldingOrganization(
+      org.id,
+      settings => ({ ...settings, provider_allow_list: ['anthropic', 'z-ai'] }),
+      after
+    );
+
+    // The model z-ai lists for the first time is reachable through the provider the admin just
+    // allowed, so it has to be disabled even though the unlocked read did not admit it.
+    expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+    expect(await baselineOf(org.id)).toBe(result.id);
+    const logs = await fetchAutoChangeLogs(org.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].message).toBe('Disabled new models from provider z-ai: z-ai/glm-5.1');
+  });
+
+  test.each([
+    ['has no baseline', async () => undefined],
+    ['has a dangling baseline', async (orgId: string) => seedBaseline(orgId, 987_654)],
+  ])(
+    'an org that %s keeps a starting baseline when its first reconciliation fails',
+    async (_label, seedBaselineFor) => {
+      const org = await createPolicyOrg('Starting Baseline Org', {
+        minimum_balance_alert_email: ['not-an-email'],
+      });
+      await seedBaselineFor(org.id);
+      const startId = await seedSnapshot(glm5);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      try {
+        const first = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('has no usable baseline'));
+        expect(consoleError).toHaveBeenCalledTimes(1);
+        expect(await denyList(org.id)).toBeUndefined();
+        expect(await baselineOf(org.id)).toBe(startId);
+        expect(await snapshotIds()).toEqual([startId, first.id]);
+
+        await db
+          .update(organizations)
+          .set({ settings: { disable_new_models: true } })
+          .where(eq(organizations.id, org.id));
+        const second = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+        expect([...((await denyList(org.id)) ?? [])].sort()).toEqual([
+          'z-ai/glm-5.1',
+          'z-ai/glm-5.2',
+        ]);
+        expect(await baselineOf(org.id)).toBe(second.id);
+        expect(await snapshotIds()).toEqual([first.id, second.id]);
+      } finally {
+        warn.mockRestore();
+        consoleError.mockRestore();
+      }
+    }
+  );
+
+  test('leaves an org without a baseline alone when there is no previous snapshot', async () => {
+    const org = await createPolicyOrg('First Publication Org');
+
+    await applySnapshotChangesAndAudit({ providers: glm5 });
+
+    expect(await baselineOf(org.id)).not.toBeNull();
+    expect(await denyList(org.id)).toBeUndefined();
+  });
+
+  test('keeps Organization Auto auto tiers valid after a sync denies a new model', async () => {
+    const org = await createPolicyOrg('Auto Tier Org', {
+      default_model: 'kilo-auto/org',
+      org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+    });
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    const updated = await getOrganizationById(org.id);
+    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
+    await expect(
+      validateOrganizationAutoTarget(
+        { id: org.id, plan: 'enterprise', settings: updated?.settings ?? {} },
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
   });
 });
 
@@ -1115,6 +1236,42 @@ describe('the baseline check after a publication', () => {
     }
   });
 
+  test.each([
+    ['no baseline', undefined],
+    ['a dangling baseline', 987_654],
+  ])(
+    'an org with %s whose first reconciliation failed is denied the models published since',
+    async (_label, danglingSnapshotId) => {
+      const org = await createPolicyOrg('Starting Baseline Org', {
+        minimum_balance_alert_email: ['not-an-email'],
+      });
+      if (danglingSnapshotId !== undefined) {
+        await db
+          .insert(organization_new_models_baselines)
+          .values({ organization_id: org.id, snapshot_id: danglingSnapshotId });
+      }
+      const [{ id: startId }] = await db
+        .insert(modelsByProvider)
+        .values({ data: glm5 })
+        .returning({ id: modelsByProvider.id });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      try {
+        await applySnapshotChangesAndAudit({ providers: glm51 });
+
+        expect(await decide(org.id, 'z-ai/glm-5.1')).toEqual({
+          baselineSnapshotId: startId,
+          decision: denied,
+        });
+        expect((await decide(org.id, 'z-ai/glm-5')).decision).toEqual({ allowed: true });
+      } finally {
+        warn.mockRestore();
+        consoleError.mockRestore();
+      }
+    }
+  );
+
   test('an org without the policy has no baseline check', async () => {
     const owner = await insertTestUser();
     const org = await createTestOrganization('No Policy Org', owner.id, 0);
@@ -1125,6 +1282,93 @@ describe('the baseline check after a publication', () => {
       baselineSnapshotId: undefined,
       decision: { allowed: true },
     });
+  });
+});
+
+describe('the baseline backfill in the migration', () => {
+  const migrationsDir = path.resolve(__dirname, '../../../../../packages/db/src/migrations');
+  const migrationFile = fs
+    .readdirSync(migrationsDir)
+    .find(file => file.endsWith('_organization_new_models_baselines.sql'));
+  const backfill = fs
+    .readFileSync(path.join(migrationsDir, migrationFile ?? 'missing.sql'), 'utf-8')
+    .split('--> statement-breakpoint')
+    .map(statement => statement.trim())
+    .find(statement => statement.startsWith('INSERT INTO "organization_new_models_baselines"'));
+
+  async function runBackfill() {
+    if (!backfill) throw new Error('the migration has no baseline backfill');
+    await db.execute(sql.raw(backfill));
+  }
+
+  async function allBaselines() {
+    const rows = await db.select().from(organization_new_models_baselines);
+    return new Map(rows.map(row => [row.organization_id, row.snapshot_id]));
+  }
+
+  beforeEach(async () => {
+    await clearSnapshots();
+  });
+
+  afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+    await clearSnapshots();
+  });
+
+  test('gives every live org with the policy the latest snapshot', async () => {
+    const owner = await insertTestUser();
+    const withPolicy = await createTestOrganization('Backfill Policy Org', owner.id, 0, {
+      disable_new_models: true,
+    });
+    const policyOff = await createTestOrganization('Backfill Off Org', owner.id, 0, {
+      disable_new_models: false,
+    });
+    const noSettings = await createTestOrganization('Backfill Plain Org', owner.id, 0);
+    const deleted = await createTestOrganization('Backfill Deleted Org', owner.id, 0, {
+      disable_new_models: true,
+    });
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, deleted.id));
+    await db.insert(modelsByProvider).values({ data: buildSnapshot([]) });
+    const [{ id: latestId }] = await db
+      .insert(modelsByProvider)
+      .values({ data: buildSnapshot([]) })
+      .returning({ id: modelsByProvider.id });
+
+    await runBackfill();
+
+    const baselines = await allBaselines();
+    expect(baselines.get(withPolicy.id)).toBe(latestId);
+    expect(baselines.has(policyOff.id)).toBe(false);
+    expect(baselines.has(noSettings.id)).toBe(false);
+    expect(baselines.has(deleted.id)).toBe(false);
+  });
+
+  test('keeps a baseline an org already has', async () => {
+    const owner = await insertTestUser();
+    const org = await createTestOrganization('Backfill Existing Org', owner.id, 0, {
+      disable_new_models: true,
+    });
+    await db.insert(modelsByProvider).values({ data: buildSnapshot([]) });
+    await db
+      .insert(organization_new_models_baselines)
+      .values({ organization_id: org.id, snapshot_id: 1 });
+
+    await runBackfill();
+
+    expect((await allBaselines()).get(org.id)).toBe(1);
+  });
+
+  test('writes nothing when there is no snapshot', async () => {
+    const owner = await insertTestUser();
+    await createTestOrganization('Backfill Empty Org', owner.id, 0, { disable_new_models: true });
+
+    await runBackfill();
+
+    expect((await allBaselines()).size).toBe(0);
   });
 });
 

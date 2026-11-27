@@ -46,6 +46,8 @@ export function hasActiveOrganizationModelPolicy(
   settings: OrganizationSettings | undefined
 ): boolean {
   return (
-    settings?.provider_allow_list !== undefined || (settings?.model_deny_list?.length ?? 0) > 0
+    settings?.provider_allow_list !== undefined ||
+    (settings?.model_deny_list?.length ?? 0) > 0 ||
+    settings?.disable_new_models === true
   );
 }

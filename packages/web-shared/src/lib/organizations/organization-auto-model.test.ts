@@ -153,6 +153,67 @@ describe('validateOrganizationAutoTarget catalog load client', () => {
   });
 });
 
+describe('validateOrganizationAutoTarget with auto tier targets', () => {
+  const autoTierRejection = {
+    kind: 'error',
+    message: expect.stringContaining('cannot use an auto tier'),
+  };
+
+  test('accepts an auto tier when the organization has no model policy', async () => {
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'kilo-auto/balanced')
+    ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ disable_new_models: false }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
+  });
+
+  test('rejects an auto tier for an enterprise organization that disables new models', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ disable_new_models: true }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual(autoTierRejection);
+  });
+
+  test('still rejects an auto tier for a model deny list or provider allow list', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ model_deny_list: ['openai/gpt-4o'] }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual(autoTierRejection);
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ provider_allow_list: ['openai'] }),
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual(autoTierRejection);
+  });
+
+  test('ignores the policy for an organization outside Enterprise', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        { id: 'org-1', plan: 'teams', settings: { disable_new_models: true } },
+        'kilo-auto/balanced'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'kilo-auto/balanced' });
+  });
+
+  test('accepts a concrete model for an organization that disables new models', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ disable_new_models: true }),
+        'moonshotai/kimi-k2.6'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+  });
+});
+
 describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
   test('keeps a bespoke target of a key outside catalog mode', async () => {
     mockedGetEnabledByokProviders.mockResolvedValue([key(false)]);

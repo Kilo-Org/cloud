@@ -28,7 +28,6 @@ import {
 import { SignJWT, calculateJwkThumbprint, decodeJwt, exportJWK, generateKeyPair } from 'jose';
 import pg from 'pg';
 import { z } from 'zod';
-import { isLoopbackHost } from './connection';
 import { startFakeSts } from './fake-sts';
 import { localDatabaseUrl } from './e2e-store';
 

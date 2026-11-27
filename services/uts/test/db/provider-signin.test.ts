@@ -641,20 +641,17 @@ describe('email sign-in', () => {
     await sendEmail(email);
     expect(
       await sqlStateOf(() =>
-        app.query(
-          'SELECT * FROM uts.verify_email_code($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9)',
-          [
-            environment,
-            keyed('kilo-uts-email', email),
-            sha256(token()),
-            network.userAgent,
-            network.clientIp,
-            network.asn,
-            network.country,
-            network.city,
-            newAccountId(),
-          ]
-        )
+        app.query('SELECT * FROM uts.verify_email_code($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9)', [
+          environment,
+          keyed('kilo-uts-email', email),
+          sha256(token()),
+          network.userAgent,
+          network.clientIp,
+          network.asn,
+          network.country,
+          network.city,
+          newAccountId(),
+        ])
       )
     ).toBe('22004');
     const { result } = await enter(email, '123456');

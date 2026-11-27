@@ -577,6 +577,7 @@ describe('finalizeRemediationCallbackFromEnv lifecycle emit sites', () => {
   const env = {
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
+    WEB_INTERNAL_AUTH: 'legacy',
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
   } as unknown as CloudflareEnv;
 
@@ -832,6 +833,7 @@ describe('remediation queued lifecycle emit sites', () => {
     REMEDIATION_ATTEMPT_QUEUE: { sendBatch: vi.fn().mockResolvedValue(undefined) },
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
+    WEB_INTERNAL_AUTH: 'legacy',
   } as unknown as CloudflareEnv;
 
   const actor = {
@@ -1148,6 +1150,7 @@ describe('cancelRemediation queued-cancel lifecycle emit', () => {
     HYPERDRIVE: { connectionString: 'postgres://worker' },
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
+    WEB_INTERNAL_AUTH: 'legacy',
   } as unknown as CloudflareEnv;
 
   const personalFinding = {

@@ -358,6 +358,7 @@ function processEnv(cloudFetch: ReturnType<typeof vi.fn>) {
     KILOCODE_BACKEND_BASE_URL: 'https://app.example',
     NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
     INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
+    WEB_INTERNAL_AUTH: 'legacy',
     CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
     SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'web',
     SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL: 'https://app.example',

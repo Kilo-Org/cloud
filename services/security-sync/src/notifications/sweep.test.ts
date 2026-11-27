@@ -266,7 +266,7 @@ describe('dispatchNotification', () => {
 
     expect(outcome).toEqual({ outcome: 'sent' });
     const [url, init] = fetchMock.mock.calls[0] ?? [];
-    expect(String(url)).toBe('https://app.test/api/internal/security-agent/notifications');
+    expect(url).toBe('https://app.test/api/internal/security-agent/notifications');
     const headers = new Headers(init?.headers);
     expect(headers.get('authorization')).toBe('Bearer sts-token');
     expect(headers.has('X-Internal-Secret')).toBe(false);

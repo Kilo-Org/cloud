@@ -705,6 +705,7 @@ export async function preflightSessionCreation(
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
       typeof expectedInternalApiSecret === 'string' &&
+      expectedInternalApiSecret.length > 0 &&
       internalApiKey !== undefined &&
       internalApiKey !== null &&
       timingSafeEqual(internalApiKey, expectedInternalApiSecret);

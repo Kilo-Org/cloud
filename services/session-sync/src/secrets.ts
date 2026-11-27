@@ -51,11 +51,11 @@ export function secretsSource(env: Pick<SessionSyncSecretsEnv, 'SECRETS_SOURCE'>
 const stsClients = new WeakMap<BundleBinding, Secrets>();
 
 /**
- * One resolved value per binding per isolate, keyed by the binding itself. The `secrets-store`
- * source reads each Secrets Store item once, as `src/auth.ts` did before this switch (its
- * `resolvedSecrets`), and returns the held value on every later read in the isolate. A failed read
- * is not held, so the next read retries. The `sts` source needs no cache of its own: the client
- * holds the bundle.
+ * One resolved value per binding per isolate, keyed by the binding itself: the `secrets-store`
+ * source reads each Secrets Store item once and returns the held value on every later read in the
+ * isolate. A failed read is not held, and neither is an empty value, so a misconfigured or
+ * not-yet-populated item is retried on the next read instead of being pinned for the isolate's
+ * lifetime. The `sts` source needs no cache of its own: the client holds the bundle.
  */
 const resolvedValues = new WeakMap<object, string>();
 
@@ -64,6 +64,7 @@ async function legacyValue(value: LegacySecretValue): Promise<string> {
   const held = resolvedValues.get(value);
   if (held !== undefined) return held;
   const resolved = await value.get();
+  if (resolved === '') return resolved;
   resolvedValues.set(value, resolved);
   return resolved;
 }

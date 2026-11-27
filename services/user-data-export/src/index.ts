@@ -47,9 +47,15 @@ async function authenticatedUserId(
   env: ExportEnv,
   ctx?: SecretsExecutionContext
 ): Promise<Authentication> {
+  // Both secrets are read before any credential is judged: when the second read fails, answering
+  // 401 to a wrong key and 503 to a right one would tell the caller its candidate key is valid.
   let internalApiSecret: string;
+  let nextAuthSecret: string;
   try {
-    internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
+    [internalApiSecret, nextAuthSecret] = await Promise.all([
+      readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx),
+      readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx),
+    ]);
   } catch {
     return { status: 'unavailable' };
   }
@@ -57,12 +63,6 @@ async function authenticatedUserId(
   const token = extractBearerToken(request.headers.get('authorization'));
   if (!token) return { status: 'unauthorized' };
 
-  let nextAuthSecret: string;
-  try {
-    nextAuthSecret = await readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx);
-  } catch {
-    return { status: 'unavailable' };
-  }
   const verified = await verifyKiloToken(token, nextAuthSecret, {
     audience: USER_DATA_EXPORT_AUDIENCE,
   }).then(
@@ -201,10 +201,25 @@ export default {
           logExportEvent('warn', 'export_download_expired', { exportId: parsed.data.exportId });
           return Response.json({ error: 'Export not found' }, { status: 404 });
         }
-        const [accessKeyId, secretAccessKey] = await Promise.all([
-          readUserDataExportSecret(env, 'R2_ACCESS_KEY_ID', ctx),
-          readUserDataExportSecret(env, 'R2_SECRET_ACCESS_KEY', ctx),
-        ]);
+        let keyPair: [string, string];
+        try {
+          keyPair = await Promise.all([
+            readUserDataExportSecret(env, 'R2_ACCESS_KEY_ID', ctx),
+            readUserDataExportSecret(env, 'R2_SECRET_ACCESS_KEY', ctx),
+          ]);
+        } catch (error) {
+          // A source failure is the same dependency failure the auth path reports as 503, not a
+          // client error: the sender retries instead of treating its request as malformed.
+          logExportEvent('error', 'export_download_secret_unavailable', {
+            exportId: parsed.data.exportId,
+            ...safeError(error),
+          });
+          return Response.json(
+            { error: 'Signing unavailable' },
+            { status: 503, headers: { 'Retry-After': '30' } }
+          );
+        }
+        const [accessKeyId, secretAccessKey] = keyPair;
         const signer = createR2Client({
           accessKeyId,
           secretAccessKey,

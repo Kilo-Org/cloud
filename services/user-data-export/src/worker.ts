@@ -1004,8 +1004,12 @@ async function dispatchReadyNotifications(
   }
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   const callbackUrl = new URL('/api/internal/user-data-exports/ready', baseUrl);
+  const pending = await state.pendingNotifications();
+  // Nothing to send is the common cron run: it must not fail on a secret read, so the key is read
+  // only once a notification actually needs it.
+  if (pending.length === 0) return;
   const internalApiKey = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
-  for (const item of await state.pendingNotifications()) {
+  for (const item of pending) {
     try {
       // redirect: 'manual' is fail-closed — we never follow a redirect and therefore
       // never re-send x-internal-api-key to the redirect target. We still capture the

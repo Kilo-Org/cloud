@@ -3653,9 +3653,6 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
-      '@kilocode/secrets-client':
-        specifier: workspace:*
-        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

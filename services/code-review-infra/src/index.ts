@@ -57,10 +57,15 @@ function requestContext(c: {
 
 // Authentication middleware. A failed secret read leaves the token undefined, which the middleware
 // already answers 401: a missing `BACKEND_AUTH_TOKEN` was a 401 before this switch and stays one.
+// The failure is logged so an unavailable secret source is distinguishable from a wrong token; the
+// error names the secret, never a value.
 app.use(
   '*',
   backendAuthMiddleware<HonoEnv>(c =>
-    readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN', requestContext(c)).catch(() => undefined)
+    readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN', requestContext(c)).catch(error => {
+      console.warn('[CodeReviewWorker] BACKEND_AUTH_TOKEN unavailable', error);
+      return undefined;
+    })
   )
 );
 

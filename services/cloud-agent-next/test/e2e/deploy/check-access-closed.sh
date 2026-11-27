@@ -24,7 +24,7 @@ trap 'rm -f "$headers"' EXIT
 
 for ((attempt = 1; attempt <= attempts; attempt++)); do
   : >"$headers"
-  if result=$(curl -sS -o /dev/null -D "$headers" --max-time 30 -w '%{http_code} %{redirect_url}' "https://$host/"); then
+  if result=$(curl -sS -o /dev/null -D "$headers" --connect-timeout 10 --max-time 15 -w '%{http_code} %{redirect_url}' "https://$host/"); then
     status="${result%% *}"
     location="${result#* }"
   else

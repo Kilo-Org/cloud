@@ -40,7 +40,9 @@ export function withSelfAccessCredentials(request: Request, env: SelfAccessEnv):
   const headers = new Headers(request.headers);
   headers.set(CLIENT_ID_HEADER, clientId);
   headers.set(CLIENT_SECRET_HEADER, clientSecret);
-  return new Request(request, { headers });
+  // A redirect would carry the token to the redirect target; the sandbox sees
+  // the 3xx instead and its next request is judged on its own origin.
+  return new Request(request, { headers, redirect: 'manual' });
 }
 
 /**

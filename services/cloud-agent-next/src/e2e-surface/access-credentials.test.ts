@@ -17,6 +17,8 @@ describe('withSelfAccessCredentials', () => {
     expect(stamped.headers.get('CF-Access-Client-Secret')).toBe('client-secret');
     expect(stamped.headers.get('authorization')).toBe('Bearer grant');
     expect(stamped.url).toBe(request.url);
+    // The token never follows a redirect to another URL.
+    expect(stamped.redirect).toBe('manual');
   });
 
   it('leaves every other origin unchanged', () => {

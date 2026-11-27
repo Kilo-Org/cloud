@@ -42,11 +42,21 @@ const STAGING_HOST_DENYLIST = new Set([
   'api.kilo.ai',
 ]);
 
-/** The fenced e2e Worker's hostname, as configured for CI, is never a staging origin. */
+/** The configured fenced e2e Worker hosts (CI variable, deploy input, driver URL). */
+function configuredE2eHosts(): string[] {
+  const hosts = [process.env.CLOUD_AGENT_E2E_WORKER_HOSTNAME, process.env.E2E_WORKER_HOSTNAME];
+  try {
+    if (process.env.WORKER_URL) hosts.push(new URL(process.env.WORKER_URL).hostname);
+  } catch {
+    // An invalid WORKER_URL names no host to refuse.
+  }
+  return hosts.filter((host): host is string => Boolean(host)).map(host => host.toLowerCase());
+}
+
+/** The fenced e2e Worker is never a staging origin, whichever way it is configured. */
 function isDeniedStagingHost(hostname: string): boolean {
   const host = hostname.replace(/\.$/, '').toLowerCase();
-  const e2eHost = process.env.CLOUD_AGENT_E2E_WORKER_HOSTNAME?.toLowerCase();
-  return STAGING_HOST_DENYLIST.has(host) || (e2eHost !== undefined && host === e2eHost);
+  return STAGING_HOST_DENYLIST.has(host) || configuredE2eHosts().includes(host);
 }
 
 const stagedOrigin = z.url().refine(value => {

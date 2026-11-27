@@ -49,8 +49,12 @@ describe('staged hosted multi-repository proof', () => {
     expect(() => parseHostedMultiRepositoryFixture({ ...fixtureInput, ...overrides })).toThrow();
   });
 
-  it('refuses the configured e2e Worker hostname as a staging origin', () => {
-    vi.stubEnv('CLOUD_AGENT_E2E_WORKER_HOSTNAME', 'Fenced-E2E.example.test');
+  it.each([
+    ['CLOUD_AGENT_E2E_WORKER_HOSTNAME', 'Fenced-E2E.example.test'],
+    ['E2E_WORKER_HOSTNAME', 'fenced-e2e.example.test'],
+    ['WORKER_URL', 'https://FENCED-E2E.example.test/'],
+  ])('refuses the e2e Worker host configured through %s', (name, value) => {
+    vi.stubEnv(name, value);
     expect(() =>
       parseHostedMultiRepositoryFixture({
         ...fixtureInput,

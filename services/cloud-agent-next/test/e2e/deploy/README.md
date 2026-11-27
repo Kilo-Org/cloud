@@ -67,7 +67,10 @@ application whose single policy is Service Auth for one service token.
   `E2E_ACCESS_TEAM_DOMAIN` or the `E2E_ACCESS_CLIENT_ID` secret it refuses
   everything.
 - After each deploy, and before each test run, an anonymous request to the
-  hostname must be refused by Access (`check-access-closed.sh`).
+  hostname must be refused by Access (`check-access-closed.sh`). Cost: the check
+  passes in one request; when it never passes it fails after at most about 2.5
+  minutes (six tries, each at most 15 s, 10 s apart); it runs once after a deploy
+  and once before the tests.
 
 Prerequisites, in order:
 
@@ -336,8 +339,9 @@ resources. Any other key of `wrangler.jsonc`, including a binding added later,
 stays out until it is reviewed. The fence (`e2e-worker-fence.mjs`, tested by
 `scripts/e2e-worker-fence.test.ts` and run by `deploy-e2e-worker.sh` on the
 file it deploys) fails on any top-level key the renderer does not emit, any
-Durable Object binding to another script, any secret not named `*_DEV` or
-`*_STAGING`, a development environment, a route without the Access vars, and any
+Durable Object binding to another script, any Secrets Store binding whose secret
+is not named `*_DEV` or `*_STAGING`, a development environment, a route without
+the Access vars, and any
 public address. Its production hosts and queues come from:
 
 - the top level of every direct `services/*/wrangler.json` and

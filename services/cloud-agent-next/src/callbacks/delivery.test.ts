@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
 import { classifyCallbackError, deliverCallbackJob } from './delivery.js';
+import { logger } from '../logger.js';
 import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
 
 const mockPayload: ExecutionCallbackPayload = {
@@ -137,6 +138,32 @@ describe('deliverCallbackJob', () => {
         'https://example.com/callback',
         expect.objectContaining({ redirect: 'manual' })
       );
+    });
+
+    it('logs only the origin of a redirect target', async () => {
+      const withFields = vi.spyOn(logger, 'withFields');
+      const target: CallbackTarget = { url: 'https://example.com/callback' };
+      for (const [location, origin] of [
+        ['https://elsewhere.test/path?token=leak', 'https://elsewhere.test'],
+        ['/relative?token=leak', 'https://example.com'],
+        [null, undefined],
+        ['http://[invalid', undefined],
+      ] as const) {
+        withFields.mockClear();
+        globalThis.fetch = vi
+          .fn()
+          .mockResolvedValue(
+            new Response(null, { status: 307, headers: location ? { Location: location } : {} })
+          );
+
+        await deliverCallbackJob(target, mockPayload, 1);
+
+        const fields = withFields.mock.calls.map(([logged]) => logged);
+        expect(fields).toContainEqual(expect.objectContaining({ status: 307 }));
+        expect(fields.find(logged => 'status' in logged)?.redirectOrigin).toBe(origin);
+        expect(JSON.stringify(fields)).not.toContain('leak');
+      }
+      withFields.mockRestore();
     });
 
     it('should retry on 502 (bad gateway)', async () => {

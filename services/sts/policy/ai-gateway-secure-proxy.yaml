@@ -1,0 +1,5 @@
+# Registration only: Vercel project kilocode-ai-gateway-secure-proxy
+# (apps/ai-gateway-secure-proxy). No environment, identity or grant.
+workload: ai-gateway-secure-proxy
+registered: true
+secrets: []

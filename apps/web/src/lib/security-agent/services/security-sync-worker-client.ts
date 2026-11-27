@@ -1,9 +1,7 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import {
-  INTERNAL_API_SECRET,
-  SECURITY_SYNC_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { SECURITY_SYNC_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
 import {
   isDefinitiveSecurityWorkerRejection,
@@ -43,7 +41,8 @@ export async function postSecurityWorkerCommand(params: {
   disabledRoutingError: string;
   body: Record<string, unknown>;
 }): Promise<AcceptedSecurityWorkerCommand> {
-  if (!SECURITY_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
+  const internalApiSecret = SECURITY_SYNC_WORKER_URL ? await readInternalApiSecret() : '';
+  if (!SECURITY_SYNC_WORKER_URL || !internalApiSecret) {
     // Mirrored by the mobile security mutation classifier: a stable
     // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
     // classifier treats as retryable transport. The sentence is the shared
@@ -60,6 +59,7 @@ export async function postSecurityWorkerCommand(params: {
   const { response, body } = await postSecurityWorkerJson({
     url: `${SECURITY_SYNC_WORKER_URL}${params.path}`,
     service: params.service,
+    internalApiSecret,
     body: params.body,
   });
   const workerBody = body as SecurityWorkerResponse | undefined;

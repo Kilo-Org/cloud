@@ -7,7 +7,7 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { deniedAutoRoutingModelIdsForMember } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 // Internal: the auto-routing worker's CLI decide path applies the gateway's own organization
 // model policy to a custom router's gateway entries (ADR 0005).
@@ -15,7 +15,17 @@ export async function handleAutoRoutingDeniedModelsRequest(
   request: NextRequest
 ): Promise<NextResponse> {
   const token = extractBearerToken(request.headers.get('authorization'));
-  if (!INTERNAL_API_SECRET || !token || !timingSafeEqual(token, INTERNAL_API_SECRET)) {
+  // A request without a credential is refused without reading the expected value.
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  let expected: string;
+  try {
+    expected = await readInternalApiSecret();
+  } catch {
+    // The secret source is unavailable, not the credential wrong: the caller retries a 5xx. The
+    // error is neither logged nor returned.
+    return NextResponse.json({ error: 'Unavailable' }, { status: 503 });
+  }
+  if (!expected || !timingSafeEqual(token, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const parsed = AutoRoutingDeniedModelsRequestSchema.safeParse(

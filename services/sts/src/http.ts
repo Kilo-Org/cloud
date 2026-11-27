@@ -6,21 +6,15 @@ import {
   STS_CLOUDFLARE_DEPLOY_TOKEN_HTTP_PATH,
   STS_CLOUDFLARE_DEPLOY_TOKEN_REVOKE_HTTP_PATH,
   STS_FETCHED_AT_HEADER,
-  STS_LEASE_HTTP_PATH,
-  STS_LEASE_REVOKE_HTTP_PATH,
   STS_STALE_HEADER,
   bundleResultHttpStatus,
   cloudflareDeployTokenResultHttpStatus,
   cloudflareDeployTokenRevokeResultHttpStatus,
-  leaseResultHttpStatus,
-  leaseRevokeResultHttpStatus,
   mintResultHttpStatus,
   type BundleRequest,
   type BundleResult,
   type CloudflareDeployTokenResult,
   type CloudflareDeployTokenRevokeResult,
-  type LeaseResult,
-  type LeaseRevokeResult,
   type MintResult,
 } from '@kilocode/sts-contracts';
 import { recordDenial } from './audit/denials';
@@ -28,7 +22,6 @@ import { serveBundle } from './broker';
 import {
   BUNDLE_REQUEST_MAX_BODY_BYTES,
   DEPLOY_TOKEN_REQUEST_MAX_BODY_BYTES,
-  LEASE_REQUEST_MAX_BODY_BYTES,
   TOKEN_JWKS_CACHE_MS,
   TOKEN_REQUEST_MAX_BODY_BYTES,
   TOKEN_SIGNER_DEADLINE_MS,
@@ -52,7 +45,7 @@ import {
   type IdentityProvider,
 } from './identity/verify';
 import { WebhookGate, type WebhookOutcome } from './infisical/webhook';
-import { recordLeaseDenial, serveLease, serveLeaseRevoke, type LeaseCaller } from './leases/serve';
+import { holdsMigrationRun } from './policy/schema';
 import type { PolicyIndex } from './policy/load';
 import { callWithDeadline } from './rpc';
 import {
@@ -91,7 +84,11 @@ let tokenJwksCache: {
 
 let gateCache: { environment: string; gate: WebhookGate } | null = null;
 
-/** Provider discovery and key sets are cached in the verifier, so one instance serves the isolate. */
+/**
+ * Provider discovery and key sets are cached in the verifier, so one instance serves the isolate.
+ * A trigger-only policy (`migration-run`) is left out: its job's token opens no route here, only
+ * `attestGithubRun` with the migration proxy's audience.
+ */
 let verifierCache: { key: string; policies: PolicyIndex; instance: IdentityVerifier } | null = null;
 
 function jsonResponse(body: unknown, status: number, cacheControl: string): Response {
@@ -125,9 +122,9 @@ function identityVerifier(config: StsConfig, policies: PolicyIndex): IdentityVer
     return cached.instance;
   }
   const instance = new IdentityVerifier({
-    policies: policies.all(),
+    policies: policies.all().filter(policy => !holdsMigrationRun(policy)),
     environment: config.environment,
-    issuer: config.issuer,
+    audience: config.issuer,
     fetch: (input, init) => fetch(input, init),
   });
   verifierCache = { key, policies, instance };
@@ -414,16 +411,6 @@ async function bundleRequest(
   );
 }
 
-/** Maps a lease answer to its HTTP response; exported for the response-shape tests. */
-export function leaseResponse(result: LeaseResult): Response {
-  return noStoreJson(result, leaseResultHttpStatus(result));
-}
-
-/** Maps a revoke answer to its HTTP response; exported for the response-shape tests. */
-export function leaseRevokeResponse(result: LeaseRevokeResult): Response {
-  return noStoreJson(result, leaseRevokeResultHttpStatus(result));
-}
-
 /** Maps a deploy-token answer to its HTTP response; exported for the response-shape tests. */
 export function deployTokenResponse(result: CloudflareDeployTokenResult): Response {
   return noStoreJson(result, cloudflareDeployTokenResultHttpStatus(result));
@@ -440,7 +427,7 @@ function noStoreJson(result: object, status: number): Response {
   return new Response(JSON.stringify(result), { status, headers });
 }
 
-/** The answers the lease and deploy-token routes give before their own logic runs. */
+/** The answers the deploy-token routes give before their own logic runs. */
 type CallerRefusal =
   | { status: 'denied'; reason: DeniedReason }
   | { status: 'unavailable'; retryAfterSeconds: number }
@@ -454,23 +441,12 @@ type VerifiedHttpCaller = {
   claims: Record<string, string>;
 };
 
-function leaseCaller(caller: VerifiedHttpCaller): LeaseCaller {
-  return {
-    workload: caller.workload,
-    identity: caller.provider,
-    channel: 'http',
-    run: caller.run,
-    claims: caller.claims,
-  };
-}
-
 /**
- * `POST /v1/lease`, `/v1/lease/revoke`, `/v1/ci/cloudflare-deploy-token` and its `/revoke`: a
- * provider OIDC token in `Authorization` (a GitHub job for `ci-migration` and deploy tokens), a
- * JSON body. As on `/v1/token`, a token that did not verify is refused and only logged, a verified
- * identity the verifier refused is audited as a denial of the route's kind with the verifier's
- * reason, and the body (at most `maxBodyBytes`) is read only after the token verified. The
- * deploy-token mint takes an empty body as `{}`.
+ * `POST /v1/ci/cloudflare-deploy-token` and its `/revoke`: a provider OIDC token in `Authorization`
+ * (a GitHub deploy job), a JSON body. As on `/v1/token`, a token that did not verify is refused
+ * and only logged, a verified identity the verifier refused is audited as a denial of the route's
+ * kind with the verifier's reason, and the body (at most `maxBodyBytes`) is read only after the
+ * token verified. The deploy-token mint takes an empty body as `{}`.
  */
 async function oidcRoute<Result>(
   request: Request,
@@ -638,36 +614,6 @@ export async function handleRequest(
   }
   if (request.method === 'POST' && pathname === STS_BUNDLE_HTTP_PATH) {
     return await bundleRequest(request, env, ctx, config, authority);
-  }
-  if (request.method === 'POST' && pathname === STS_LEASE_HTTP_PATH) {
-    const { policies } = authority;
-    return await oidcRoute<LeaseResult>(request, env, ctx, config, policies, {
-      route: 'lease',
-      maxBodyBytes: LEASE_REQUEST_MAX_BODY_BYTES,
-      emptyBodyIsObject: false,
-      denyIdentity: (subject, reason, waitUntil) =>
-        recordLeaseDenial(env, config, { channel: 'http', ...subject }, waitUntil, reason),
-      serve: (caller, body, waitUntil) =>
-        serveLease(env, config, {
-          caller: leaseCaller(caller),
-          request: body,
-          policies,
-          waitUntil,
-        }),
-      respond: leaseResponse,
-    });
-  }
-  if (request.method === 'POST' && pathname === STS_LEASE_REVOKE_HTTP_PATH) {
-    return await oidcRoute<LeaseRevokeResult>(request, env, ctx, config, authority.policies, {
-      route: 'lease revoke',
-      maxBodyBytes: LEASE_REQUEST_MAX_BODY_BYTES,
-      emptyBodyIsObject: false,
-      denyIdentity: (subject, reason, waitUntil) =>
-        recordLeaseDenial(env, config, { channel: 'http', ...subject }, waitUntil, reason),
-      serve: (caller, body, waitUntil) =>
-        serveLeaseRevoke(env, config, { caller: leaseCaller(caller), request: body, waitUntil }),
-      respond: leaseRevokeResponse,
-    });
   }
   if (request.method === 'POST' && pathname === STS_CLOUDFLARE_DEPLOY_TOKEN_HTTP_PATH) {
     const { policies } = authority;

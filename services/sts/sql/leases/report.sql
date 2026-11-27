@@ -128,7 +128,7 @@ findings AS (
   SELECT 'leftover', r.rolname::text, 'revoked lease role kept without login; drop it by hand', 'leftover'
   FROM pg_roles r
   JOIN pg_auth_members m ON m.member = r.oid AND NOT m.admin_option
-  WHERE m.roleid IN (to_regrole('kilo_lease_replica_read'), to_regrole('kilo_lease_migration'))
+  WHERE m.roleid = to_regrole('kilo_lease_replica_read')
     AND NOT r.rolcanlogin
 )
 SELECT kind, object, detail FROM (

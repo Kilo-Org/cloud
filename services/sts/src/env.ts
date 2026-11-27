@@ -27,23 +27,14 @@ const RevokedKidsSchema = z
   .pipe(z.array(KidSchema));
 
 /**
- * Where a `ci-migration` lease connects: `<host>:<port>/<database>` of the primary's direct
- * endpoint, or empty when STS returns no target. Plain values, no credential.
+ * The audience a GitHub job's token for the migration proxy carries (README "Migration run
+ * attestation"): the proxy's own URL, so such a token never verifies on another route, and a token
+ * for STS never attests a run. Empty: this environment attests no run.
  */
-const DatabaseTargetSchema = z.union([
-  z.literal('').transform(() => null),
-  z
-    .string()
-    .regex(/^([a-z0-9-]{1,63}\.)+[a-z0-9-]{1,63}:[0-9]{1,5}\/[a-z0-9_]{1,63}$/)
-    .transform(value => {
-      const [hostPort, database] = value.split('/');
-      const colon = hostPort.lastIndexOf(':');
-      return { host: hostPort.slice(0, colon), port: Number(hostPort.slice(colon + 1)), database };
-    })
-    .refine(target => target.port >= 1 && target.port <= 65535, { message: 'port out of range' }),
+const MigrationProxyAudienceSchema = z.union([
+  z.literal(''),
+  z.url({ protocol: /^https$/ }).transform(withoutTrailingSlash),
 ]);
-
-export type DatabaseTarget = { host: string; port: number; database: string };
 
 /**
  * The Hyperdrive bindings of the replicas the lease object sweeps (README "Replica sessions"): a
@@ -76,13 +67,13 @@ export const EnvVarsSchema = z.object({
   MANAGER_IDENTITY_ID: z.string().min(1),
   DO_JURISDICTION: z.enum(['eu', 'none']),
   TOKEN_SIGNING_KIDS_REVOKED: RevokedKidsSchema,
-  LEASE_CI_MIGRATION_TARGET: DatabaseTargetSchema,
   /**
    * The Cloudflare account id STS mints CI deploy tokens in (README "Cloudflare deploy tokens").
    * Empty: this environment mints none.
    */
   CF_DEPLOY_ACCOUNT_ID: z.union([z.literal(''), z.string().regex(/^[0-9a-f]{32}$/)]),
   LEASE_REPLICA_SWEEP_BINDINGS: ReplicaSweepBindingsSchema,
+  MIGRATION_PROXY_AUDIENCE: MigrationProxyAudienceSchema,
 });
 
 /** The claims Infisical JWT Auth checks on the login JWT; every value is exact (design 4.2). */
@@ -109,8 +100,8 @@ export type StsConfig = {
   manager: ManagerConfig;
   /** Token-signing key ids never used again and dropped from the key set (emergency removal). */
   revokedTokenKids: readonly string[];
-  /** The connection target a `ci-migration` lease returns, or null for none. */
-  ciMigrationTarget: DatabaseTarget | null;
+  /** The audience `attestGithubRun` verifies with, or null when this environment attests none. */
+  migrationProxyAudience: string | null;
   /**
    * The Cloudflare account STS mints CI deploy tokens in, or null when this environment mints
    * none (every deploy-token request answers `unavailable`).
@@ -130,7 +121,7 @@ export type Env = {
   MANAGER_IDENTITY_ID: string;
   DO_JURISDICTION: string;
   TOKEN_SIGNING_KIDS_REVOKED: string;
-  LEASE_CI_MIGRATION_TARGET: string;
+  MIGRATION_PROXY_AUDIENCE: string;
   CF_DEPLOY_ACCOUNT_ID: string;
   LEASE_REPLICA_SWEEP_BINDINGS: string;
   STS_BUNDLE_DO: DurableObjectNamespace<BundleDO>;
@@ -150,6 +141,9 @@ export const MANAGER_JWKS_PATH = `${MANAGER_AUTH_PATH}/.well-known/jwks.json`;
 /** Validates every plain configuration var. Called at the start of each entry. */
 export function readConfig(env: Env): StsConfig {
   const vars = EnvVarsSchema.parse(env);
+  if (vars.MIGRATION_PROXY_AUDIENCE === vars.STS_ISSUER) {
+    throw new Error('MIGRATION_PROXY_AUDIENCE must differ from STS_ISSUER');
+  }
   return {
     environment: vars.STS_ENVIRONMENT,
     issuer: vars.STS_ISSUER,
@@ -167,7 +161,8 @@ export function readConfig(env: Env): StsConfig {
       },
     },
     revokedTokenKids: vars.TOKEN_SIGNING_KIDS_REVOKED,
-    ciMigrationTarget: vars.LEASE_CI_MIGRATION_TARGET,
+    migrationProxyAudience:
+      vars.MIGRATION_PROXY_AUDIENCE === '' ? null : vars.MIGRATION_PROXY_AUDIENCE,
     cloudflareDeployAccountId: vars.CF_DEPLOY_ACCOUNT_ID === '' ? null : vars.CF_DEPLOY_ACCOUNT_ID,
     replicaSweepBindings: vars.LEASE_REPLICA_SWEEP_BINDINGS,
   };

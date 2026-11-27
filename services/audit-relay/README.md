@@ -174,6 +174,18 @@ A batch lost at its final delivery stalls its stream: every later batch gap-retr
 To recover, re-send the stored object's bytes to the main queue as a `bytes` message; the
 StreamDO archives the missing batch and dedupes the rest.
 
+## Producers per queue
+
+Each queue and its DLQ carry one producer in one environment (design Q66; `src/producers.ts`):
+STS on `kilo-audit` (staging `kilo-audit-staging`, local `kilo-audit-local`), streams `sts:<env>:`
+with source `kilo:sts:<env>`; the migration proxy on `kilo-audit-migration-proxy` (staging
+`kilo-audit-migration-proxy-staging`, local `kilo-audit-migration-proxy-local`), streams
+`migration-proxy:<env>:` with source `kilo:migration-proxy:<env>` (local: `development`). A batch
+whose stream or any event source belongs to another producer, or that arrives on a queue the table
+does not name, is never archived: it is kept under `dead-letter/`, acked and paged as
+`foreign_producer`, like any dead letter that cannot recover. So a producer's queue write access
+cannot reach another producer's streams. `test/producers.test.ts` covers both directions.
+
 ## STS token events
 
 STS's service-token events travel this path like every other event (design 8.3); the relay
@@ -259,7 +271,7 @@ count() by bin(_time, 5m), workload = tostring(['data.attributes.workload'])`.
 | `AUDIT_VERIFIER` | `VerifierDO`, the daily and full verification passes and the verified anchor |
 | `AUDIT_ARCHIVE` | R2 `kilo-audit-archive` (staging `kilo-audit-archive-staging`), bound with `"jurisdiction": "eu"` because the buckets are created in the EU jurisdiction; the local binding is miniflare's simulated bucket and has none |
 | `STS` | service `sts` (`sts-staging`), entrypoint `SecretsBroker`, `props.caller` = `audit-relay` in every environment (each STS deployment serves one environment) |
-| Queue consumer | `kilo-audit` → DLQ `kilo-audit-dlq` (staging `kilo-audit-staging` / `kilo-audit-staging-dlq`) |
+| Queue consumer | `kilo-audit` → DLQ `kilo-audit-dlq` and `kilo-audit-migration-proxy` → DLQ `kilo-audit-migration-proxy-dlq` (staging `kilo-audit-staging`, `kilo-audit-migration-proxy-staging` and their `-dlq`; [Producers per queue](#producers-per-queue)) |
 | `AXIOM_DATASET` | `kilo-audit` (staging `kilo-audit-staging`, local `kilo-audit-local`) |
 | `AXIOM_URL` | `https://api.axiom.co` |
 | `AUDIT_ENVIRONMENT` | `production` / `staging` / `local` |
@@ -300,7 +312,9 @@ of owed rows per stream per day). Without the Slack webhook, every page fails an
    stalls behind a gap, so merge this Worker within the retention:
 
    ```sh
-   for queue in kilo-audit kilo-audit-dlq kilo-audit-staging kilo-audit-staging-dlq; do
+   for queue in kilo-audit kilo-audit-dlq kilo-audit-staging kilo-audit-staging-dlq \
+     kilo-audit-migration-proxy kilo-audit-migration-proxy-dlq \
+     kilo-audit-migration-proxy-staging kilo-audit-migration-proxy-staging-dlq; do
      pnpm exec wrangler queues create "$queue"
      pnpm exec wrangler queues update "$queue" --message-retention-period-secs 1209600
    done

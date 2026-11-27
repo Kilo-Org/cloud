@@ -1,18 +1,18 @@
+import { describe, expect, it } from 'vitest';
 import {
   AuditBatchTooLargeError,
   AuditEventSchema,
   encodeAuditBatch,
   type AuditBatch,
   type AuditEvent,
-} from '@kilocode/sts-contracts';
-import { describe, expect, it } from 'vitest';
+} from './audit';
 import {
   AuditEventTooLargeError,
   assertRelayable,
   relayAudit,
   type AuditRelayStore,
   type AuditRow,
-} from '../../src/audit/relay';
+} from './audit-relay';
 
 function auditEvent(attributes: Record<string, string | string[]>): AuditEvent {
   return AuditEventSchema.parse({

@@ -35,6 +35,10 @@ export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['sts-local', 'kilo-audit-local'],
   // services/sts/wrangler.test.jsonc, which only the Workers test pool runs.
   ['sts-test', 'kilo-audit-local'],
+  // The migration proxy (services/migration-proxy, design Q64a): its own queue per environment.
+  ['migration-proxy', 'kilo-audit-migration-proxy'],
+  ['migration-proxy-staging', 'kilo-audit-migration-proxy-staging'],
+  ['migration-proxy-local', 'kilo-audit-migration-proxy-local'],
 ];
 
 /**
@@ -48,12 +52,21 @@ export const AUDIT_QUEUE_CONSUMERS: readonly Grant[] = [
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay', 'kilo-audit-migration-proxy'],
+  ['audit-relay', 'kilo-audit-migration-proxy-dlq'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local-dlq'],
 ];
 
 export const AUDIT_QUEUE_DEAD_LETTERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay', 'kilo-audit-migration-proxy-dlq'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local-dlq'],
 ];
 
 /**

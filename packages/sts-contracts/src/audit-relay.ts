@@ -5,7 +5,7 @@ import {
   encodeAuditBatch,
   type AuditBatch,
   type AuditEvent,
-} from '@kilocode/sts-contracts';
+} from './audit';
 
 export type AuditRow = { seq: number; event: AuditEvent };
 

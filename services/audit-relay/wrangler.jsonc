@@ -70,6 +70,25 @@
         "max_retries": 100,
         "retry_delay": 900,
       },
+      // The migration proxy's queue and DLQ (design Q66), consumed the same way; a batch of
+      // another producer on either is dead-lettered (src/producers.ts).
+      {
+        "queue": "kilo-audit-migration-proxy",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 24,
+        "retry_delay": 60,
+        "max_concurrency": 6,
+        "dead_letter_queue": "kilo-audit-migration-proxy-dlq",
+      },
+      {
+        "queue": "kilo-audit-migration-proxy-dlq",
+        "max_batch_size": 100,
+        "max_batch_timeout": 30,
+        "max_concurrency": 1,
+        "max_retries": 100,
+        "retry_delay": 900,
+      },
     ],
   },
   "durable_objects": {
@@ -149,6 +168,23 @@
             "max_retries": 100,
             "retry_delay": 900,
           },
+          {
+            "queue": "kilo-audit-migration-proxy-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 24,
+            "retry_delay": 60,
+            "max_concurrency": 6,
+            "dead_letter_queue": "kilo-audit-migration-proxy-staging-dlq",
+          },
+          {
+            "queue": "kilo-audit-migration-proxy-staging-dlq",
+            "max_batch_size": 100,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 900,
+          },
         ],
       },
       "durable_objects": {
@@ -201,6 +237,22 @@
           },
           {
             "queue": "kilo-audit-local-dlq",
+            "max_batch_size": 100,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 900,
+          },
+          {
+            "queue": "kilo-audit-migration-proxy-local",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 10,
+            "dead_letter_queue": "kilo-audit-migration-proxy-local-dlq",
+          },
+          {
+            "queue": "kilo-audit-migration-proxy-local-dlq",
             "max_batch_size": 100,
             "max_batch_timeout": 30,
             "max_concurrency": 1,

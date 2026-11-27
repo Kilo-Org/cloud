@@ -1,4 +1,9 @@
-import type { StsEnvironment, WorkloadName } from '@kilocode/sts-contracts';
+import {
+  AttestedGithubRunSchema,
+  type AttestedGithubRun,
+  type StsEnvironment,
+  type WorkloadName,
+} from '@kilocode/sts-contracts';
 import {
   createRemoteJWKSet,
   customFetch,
@@ -50,6 +55,11 @@ export type VerifyOutcome =
       attestationIat: number;
       /** A GitHub token's `job_workflow_ref`, `run_id` and `run_attempt`, for the delivery row only; refusals omit them. */
       run: GithubRun | null;
+      /**
+       * A GitHub token's verified repository, environment, ref, sha, event and run claims; set only
+       * by a verifier built with `githubClaims: true` (the migration attestation), else null.
+       */
+      github: AttestedGithubRun | null;
     }
   | { status: 'denied'; reason: DeniedReason; subject?: VerifiedSubject }
   /** A provider's discovery document or key set could not be fetched; the caller retries. */
@@ -111,6 +121,22 @@ function githubRun(payload: JWTPayload): GithubRun | null {
   const run = { jobWorkflowRef, runId };
   const runAttempt = claim(payload, 'run_attempt');
   return runAttempt !== null && RUN_NUMBER.test(runAttempt) ? { ...run, runAttempt } : run;
+}
+
+/** The claims `attestGithubRun` returns, or null when one is missing or malformed. */
+function attestedGithubRun(payload: JWTPayload): AttestedGithubRun | null {
+  const parsed = AttestedGithubRunSchema.safeParse({
+    repositoryId: claim(payload, 'repository_id'),
+    repositoryOwnerId: claim(payload, 'repository_owner_id'),
+    environment: claim(payload, 'environment'),
+    ref: claim(payload, 'ref'),
+    sha: claim(payload, 'sha'),
+    eventName: claim(payload, 'event_name'),
+    jobWorkflowRef: claim(payload, 'job_workflow_ref'),
+    runId: claim(payload, 'run_id'),
+    runAttempt: claim(payload, 'run_attempt'),
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 function isKnownProviderIssuer(issuer: string): boolean {
@@ -264,9 +290,10 @@ function isDependencyFailure(error: unknown): boolean {
 
 /**
  * Verifies provider workload tokens and maps them to a policy. Each policy's own fields decide the
- * issuer and the claim bindings, so an unlisted identity can never match. The audience is always
- * this STS's issuer. Discovery and key sets are cached for the isolate; a fetch that fails is not
- * cached, and it makes the answer `unavailable`, never a rejection (design 7).
+ * issuer and the claim bindings, so an unlisted identity can never match. The audience is the one
+ * the verifier is built with: this STS's issuer for every route, and the migration proxy's own
+ * audience for `attestGithubRun` alone. Discovery and key sets are cached for the isolate; a fetch
+ * that fails is not cached, and it makes the answer `unavailable`, never a rejection (design 7).
  *
  * Only a finished discovery is cached, never its promise: workerd ties a promise to the request
  * that created it, so a request awaiting another request's pending discovery stalls when that
@@ -280,7 +307,10 @@ export class IdentityVerifier {
     private readonly options: {
       policies: Policy[];
       environment: StsEnvironment;
-      issuer: string;
+      /** The only `aud` a token may carry. */
+      audience: string;
+      /** Expose a verified GitHub token's claims as `github` (the migration attestation only). */
+      githubClaims?: boolean;
       fetch: typeof fetch;
     }
   ) {}
@@ -352,7 +382,7 @@ export class IdentityVerifier {
     try {
       const result = await jwtVerify(token, await this.jwksFor(issuer), {
         issuer,
-        audience: this.options.issuer,
+        audience: this.options.audience,
         algorithms: ALGORITHMS,
         clockTolerance: CLOCK_TOLERANCE_SECONDS,
       });
@@ -373,7 +403,7 @@ export class IdentityVerifier {
     }
     // An exchanged Vercel token carries exactly one audience; anything else (the team-wide default
     // `https://vercel.com/<team>`, or a list naming STS among others) did not come from the exchange.
-    if (provider === 'vercel' && payload.aud !== this.options.issuer) {
+    if (provider === 'vercel' && payload.aud !== this.options.audience) {
       return { status: 'denied', reason: 'identity_rejected' };
     }
     const verified = (workload: WorkloadName): VerifyOutcome => ({
@@ -383,6 +413,8 @@ export class IdentityVerifier {
       attestationExp: exp,
       attestationIat: iat,
       run: provider === 'github' ? githubRun(payload) : null,
+      github:
+        provider === 'github' && this.options.githubClaims ? attestedGithubRun(payload) : null,
     });
     const rejected = (workload: string | null, reason: DeniedReason): VerifyOutcome => ({
       status: 'denied',

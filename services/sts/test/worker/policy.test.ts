@@ -844,46 +844,47 @@ describe('policy lease grants', () => {
   const grant = (name: string, max: number, fallback: number, active: number) =>
     `  - grant: ${name}\n    maxTtlSeconds: ${max}\n    defaultTtlSeconds: ${fallback}\n    maxActive: ${active}\n`;
   const worker = (dynamic: string) => `${valid}dynamic:\n${dynamic}`;
-  const github = (dynamic: string, environment = '\n  environment: migrations') => `
+  const github = (dynamic: string) => `
 workload: ci-migrate
 environments: [staging]
 identity:
   kind: github-oidc
   repository: acme/repo
   repositoryId: '123'
-  repositoryOwnerId: '456'${environment}
+  repositoryOwnerId: '456'
+  environment: migrations
   jobWorkflowRefs: [acme/repo/.github/workflows/deploy.yml@refs/heads/main]
   events: [push]
 secrets: []
 dynamic:
 ${dynamic}`;
 
-  it('accepts replica-read on a worker binding and ci-migration on a GitHub job with an environment', () => {
+  it('accepts replica-read on a worker binding', () => {
     const index = loadPolicies({
       'app-one.yaml': worker(grant('replica-read', 9000, 3600, 2)),
-      'ci-migrate.yaml': github(grant('ci-migration', 3600, 3600, 1)),
     });
     expect(index.get('production', 'app-one')?.dynamic).toEqual([
       { grant: 'replica-read', maxTtlSeconds: 9000, defaultTtlSeconds: 3600, maxActive: 2 },
     ]);
     expect(index.snapshot('production').map(entry => entry.dynamic)).toEqual([
       ['replica-read:9000:3600:2'],
-      ['ci-migration:3600:3600:1'],
     ]);
   });
 
-  it('holds each grant to its own identity kind', () => {
-    expectThrow(
+  it('knows no ci-migration grant', () => {
+    const sources: Record<string, string>[] = [
       { 'app-one.yaml': worker(grant('ci-migration', 3600, 3600, 1)) },
-      'dynamic ci-migration is only for a github-oidc policy'
-    );
+      { 'ci-migrate.yaml': github(grant('ci-migration', 3600, 3600, 1)) },
+    ];
+    for (const source of sources) {
+      expectThrow(source, 'does not match the policy schema');
+    }
+  });
+
+  it('holds replica-read to a worker binding', () => {
     expectThrow(
       { 'ci-migrate.yaml': github(grant('replica-read', 3600, 3600, 1)) },
       'dynamic replica-read is only for a worker-binding policy'
-    );
-    expectThrow(
-      { 'ci-migrate.yaml': github(grant('ci-migration', 3600, 3600, 1), '') },
-      'a github-oidc policy with dynamic ci-migration must bind identity.environment'
     );
   });
 
@@ -891,10 +892,6 @@ ${dynamic}`;
     expectThrow(
       { 'app-one.yaml': worker(grant('replica-read', 28_801, 3600, 2)) },
       'dynamic replica-read: maxTtlSeconds is above 28800'
-    );
-    expectThrow(
-      { 'ci-migrate.yaml': github(grant('ci-migration', 3601, 3600, 1)) },
-      'dynamic ci-migration: maxTtlSeconds is above 3600'
     );
     expectThrow(
       { 'app-one.yaml': worker(grant('replica-read', 3600, 7200, 2)) },

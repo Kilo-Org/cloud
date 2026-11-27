@@ -1,9 +1,14 @@
-import { encodeAuditBatch, type AuditEvent } from '@kilocode/sts-contracts';
+import {
+  assertRelayable,
+  encodeAuditBatch,
+  relayAudit,
+  type AuditEvent,
+  type AuditRelayStore,
+} from '@kilocode/sts-contracts';
 import { and, asc, between, eq, gt, lt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { AUDIT_RETENTION_MS, PRUNE_INTERVAL_MS } from '../constants';
 import { auditEvent, auditPrune, auditWatermark } from '../db/audit-tables';
-import { assertRelayable, relayAudit, type AuditRelayStore } from './relay';
 
 /** Rows deleted per statement, and statements per prune, so one alarm stays short. */
 const PRUNE_BATCH_ROWS = 5_000;

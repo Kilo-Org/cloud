@@ -58,7 +58,7 @@ function auditCaller(caller: LeaseCaller): LeaseAuditCaller {
  * deny); the lifetime is the request's, or the policy default, shortened to the policy maximum.
  * Then one lease-object hop, bounded by `LEASE_OBJECT_DEADLINE_MS` and never retried (a creation
  * has a side effect at the database), which enforces the workload's limits, creates the lease and
- * commits its audit row. A `ci-migration` lease carries the configured primary target.
+ * commits its audit row.
  */
 export async function serveLease(
   env: Env,
@@ -112,7 +112,6 @@ export async function serveLease(
     recordLeaseDenial(env, config, caller, waitUntil, result.reason, { grant });
     return result;
   }
-  const target = grant === 'ci-migration' ? config.ciMigrationTarget : null;
   return {
     status: 'ok',
     leaseId: result.leaseId,
@@ -122,15 +121,13 @@ export async function serveLease(
     expiresAt: new Date(result.expiresAt).toISOString(),
     ttlSeconds,
     clamped,
-    ...(target ?? {}),
   };
 }
 
 /**
  * Revokes one of the caller's own leases through the lease object, which knows each lease's
- * workload and, for a GitHub caller, its run. Another workload's lease, another run's lease and an
- * unknown id all answer `not_found`, and each is audited as a lease denial with the reason the
- * object found.
+ * workload. Another workload's lease and an unknown id both answer `not_found`, and each is
+ * audited as a lease denial with the reason the object found.
  */
 export async function serveLeaseRevoke(
   env: Env,

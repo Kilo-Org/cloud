@@ -45,6 +45,9 @@ export const POLICY_FILES = [
   'session-ingest.yaml',
   'session-sync.yaml',
   'user-data-export.yaml',
+  'ci-db-migrate.yaml',
+  'ci-db-migrate-staging.yaml',
+  'migration-proxy.yaml',
 ] as const;
 
 export type PolicyFile = (typeof POLICY_FILES)[number];

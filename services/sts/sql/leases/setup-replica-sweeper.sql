@@ -1,16 +1,12 @@
 -- The replica-side session sweeper (README "Database leases", "Replica sessions"; design decision
 -- Q63). Run it with psql against the PRIMARY's direct endpoint, as `postgres`, right after
--- setup.sql and before setup-ci-migration.sql (which moves the function below to kilo_lease_owner):
+-- setup.sql:
 --
 --   psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
 --     -v sweeper_password="<generated>" -f services/sts/sql/leases/setup-replica-sweeper.sql
 --
 -- The password goes into the Hyperdrive configuration of each replica and into Infisical `/admin`,
 -- by hand, and nowhere else. Everything here reaches each replica through replication.
---
--- Where an earlier setup-ci-migration.sql (one without sweep_sessions) already ran, `postgres` no
--- longer owns the schema: a superuser runs this file instead, then
--- `ALTER FUNCTION kilo_lease.sweep_sessions() OWNER TO kilo_lease_owner;` (README).
 --
 -- Why: a revocation and an expiry run on the primary and end the lease role's sessions there only.
 -- A session already open on a replica stays connected after its role is dropped (its next
@@ -50,8 +46,8 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS 
         AND (r.rolname = username OR NOT r.rolcanlogin OR r.rolvaliduntil < pg_catalog.now()))
   ),
   -- Materialized, so the termination below runs on these sessions only. Selected by user id alone:
-  -- without pg_read_all_stats (kilo_lease_owner has none) pg_stat_activity shows another role's
-  -- pid and usesysid but no backend type, and every backend with a lease role's id is that lease's.
+  -- without pg_read_all_stats, pg_stat_activity shows another role's pid and usesysid but no
+  -- backend type, and every backend with a lease role's id is that lease's.
   targets AS MATERIALIZED (
     SELECT a.pid
     FROM pg_catalog.pg_stat_activity a
@@ -83,8 +79,7 @@ $$;
 -- admin login, not an application role, not a session of a dropped role that was never a lease,
 -- and a role that still exists only while it is a member of the template its row names. It only
 -- reads tables, so it runs on a read-only replica. Runs as its owner, `postgres` (a member of
--- pg_signal_backend on Supabase) or, after setup-ci-migration.sql, kilo_lease_owner. Returns the
--- number of sessions signalled; they exit right after.
+-- pg_signal_backend on Supabase). Returns the number of sessions signalled; they exit right after.
 CREATE FUNCTION kilo_lease.sweep_sessions() RETURNS integer
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
   WITH targets AS MATERIALIZED (
@@ -111,8 +106,7 @@ REVOKE ALL ON FUNCTION kilo_lease.sweep_sessions() FROM PUBLIC;
 -- primary too (Supabase gives no per-role host rule); sweep_sessions does the same there. Its
 -- connection limit caps Hyperdrive's origin pool for this login: one connection in use a minute,
 -- but Hyperdrive may keep up to 5 open and idle on each replica, and they count against that
--- replica's max_connections. `postgres` created it and so administers it: a `ci-migration` lease
--- acting as `postgres` could reset its password, which gives nothing that lease does not hold.
+-- replica's max_connections. `postgres` created it and so administers it.
 --
 -- The password reaches the CREATE ROLE as in setup.sql (a transaction-local setting and EXECUTE),
 -- so `log_statement = 'ddl'` does not log it (check.sh).

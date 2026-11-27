@@ -292,7 +292,7 @@ describe('worker config rules', () => {
       MANAGER_IDENTITY_ID: 'identity',
       DO_JURISDICTION: 'eu',
       TOKEN_SIGNING_KIDS_REVOKED: '',
-      LEASE_CI_MIGRATION_TARGET: '',
+      MIGRATION_PROXY_AUDIENCE: '',
       CF_DEPLOY_ACCOUNT_ID: '',
       LEASE_REPLICA_SWEEP_BINDINGS: '',
     };
@@ -314,15 +314,15 @@ describe('worker config rules', () => {
         sts({
           ...vars,
           MANAGER_PROJECT_SLUG: 'kilo-project',
-          LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:5432/postgres',
+          MIGRATION_PROXY_AUDIENCE: 'https://migration-proxy-staging.kiloapps.io',
           CF_DEPLOY_ACCOUNT_ID: 'e115e769bcdd4c3d66af59d3332cb394',
         }),
       ])
     ).toEqual([]);
     for (const bad of [
       { MANAGER_PROJECT_SLUG: 'Kilo Project' },
-      { LEASE_CI_MIGRATION_TARGET: 'postgres://user:secret@db.example.invalid/postgres' },
-      { LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:99999/postgres' },
+      { MIGRATION_PROXY_AUDIENCE: 'http://migration-proxy-staging.kiloapps.io' },
+      { MIGRATION_PROXY_AUDIENCE: 'migration-proxy-staging' },
       { CF_DEPLOY_ACCOUNT_ID: 'cfat_not-an-account-id' },
       { LEASE_REPLICA_SWEEP_BINDINGS: 'REPLICA' },
       { LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_A,LEASE_SWEEP_A' },
@@ -347,7 +347,7 @@ describe('worker config rules', () => {
       MANAGER_IDENTITY_ID: 'identity',
       DO_JURISDICTION: 'eu',
       TOKEN_SIGNING_KIDS_REVOKED: '',
-      LEASE_CI_MIGRATION_TARGET: '',
+      MIGRATION_PROXY_AUDIENCE: '',
       CF_DEPLOY_ACCOUNT_ID: '',
       LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_EU_WEST, LEASE_SWEEP_EU_NORTH',
     };

@@ -7,6 +7,7 @@ import type { Env } from './env';
 import { pageOperator } from './page';
 import { deadLetterKey, putImmutable } from './relay/archive';
 import { errorName } from './relay/error-name';
+import { admittedOn } from './producers';
 
 const DLQ_SUFFIX = '-dlq';
 /**
@@ -50,15 +51,16 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promi
     return;
   }
 
-  const unreadable: Message<unknown>[] = [];
+  const refused: Message<unknown>[] = [];
   for (const message of batch.messages) {
     const auditBatch = await decodeMessage(message.body);
-    if (auditBatch) await handleBatch(auditBatch, message, env);
-    else unreadable.push(message);
+    if (auditBatch && admittedOn(batch.queue, auditBatch))
+      await handleBatch(auditBatch, message, env);
+    else refused.push(message);
   }
-  // A body `encodeAuditBatch` did not produce never decodes, so a retry cannot help: it is kept
-  // like a dead letter rather than dropped.
-  if (unreadable.length > 0) await keepDeadLetters(unreadable, batch.queue, env);
+  // A body `encodeAuditBatch` did not produce never decodes, and another producer's batch never
+  // belongs on this queue, so a retry cannot help: each is kept like a dead letter, not dropped.
+  if (refused.length > 0) await keepDeadLetters(refused, batch.queue, env);
 }
 
 async function handleBatch(
@@ -90,7 +92,8 @@ export function deadLetterRetrySeconds(
 }
 
 /**
- * Handles messages that will never be delivered normally: a DLQ message or an undecodable body.
+ * Handles messages that will never be delivered normally: a DLQ message, an undecodable body, or
+ * a batch of another producer than the queue's (`producers.ts`).
  *
  * The messages are grouped by stream; streams run in parallel and each stream's batches run in
  * sequence order, so the batches an R2 outage or a gap dead-lettered archive themselves in one
@@ -99,9 +102,9 @@ export function deadLetterRetrySeconds(
  * (they would only gap). Every other message has its raw bytes stored under
  * `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (create-only, so a retry rewrites
  * nothing) and a waiting one is retried: after 30 s while its stream's head is advancing, else
- * after 15 minutes. A message that cannot recover (a forged or conflicting copy, an undecodable
- * body, its final delivery, or bytes that could not be stored by then) is acked and paged; each
- * stream (and the unknown bucket) pages at most once an hour.
+ * after 15 minutes. A message that cannot recover (a forged or conflicting copy, another
+ * producer's batch, an undecodable body, its final delivery, or bytes that could not be stored by
+ * then) is acked and paged; each stream (and the unknown bucket) pages at most once an hour.
  */
 async function keepDeadLetters(
   messages: readonly Message<unknown>[],
@@ -127,6 +130,8 @@ async function keepDeadLetters(
       for (const { message, auditBatch } of group) {
         let fate: DeadLetterFate;
         if (!auditBatch) fate = { kind: 'lost', reason: 'undecodable' };
+        else if (!admittedOn(queue, auditBatch))
+          fate = { kind: 'lost', reason: 'foreign_producer' };
         else if (blocked) fate = blocked;
         else fate = await offerAgain(auditBatch, env);
         if (fate.kind === 'waiting') blocked = fate;

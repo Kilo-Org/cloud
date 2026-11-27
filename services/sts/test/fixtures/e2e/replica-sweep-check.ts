@@ -2,9 +2,9 @@
 // Docker and psql on the machine and ports 8827 and 8830 free:
 //   PG_IMAGE=postgres:16 ../../node_modules/.bin/tsx test/fixtures/e2e/replica-sweep-check.ts
 // It starts a throwaway PostgreSQL primary and a streaming hot standby of it in Docker (Supabase's
-// role shape, as sql/leases/check.sh), runs setup.sql, setup-replica-sweeper.sql and
-// setup-ci-migration.sql, and serves a fake Infisical on port 8830 whose lease API runs the real
-// statement files on the primary as `kilo_lease_replica_admin`, the way Infisical does, and runs
+// role shape, as sql/leases/check.sh), runs setup.sql and setup-replica-sweeper.sql, and serves a
+// fake Infisical on port 8830 whose lease API runs the real statement files on the primary as
+// `kilo_lease_replica_admin`, the way Infisical does, and runs
 // its own expiry revocation at the lease's expiry without telling STS. It then starts the test
 // build of STS with the probe (`wrangler dev`, port 8827), sweeping the replica through the
 // `LEASE_SWEEP_REPLICA_E2E` Hyperdrive binding as `kilo_lease_sweeper`. It checks that a replica
@@ -47,7 +47,6 @@ const SUPER_PW = secret();
 const OWNER_PW = secret();
 const APP_PW = secret();
 const REPLICA_ADMIN_PW = secret();
-const MIGRATION_ADMIN_PW = secret();
 const SWEEPER_PW = secret();
 const work = mkdtempSync(join(tmpdir(), 'sts-replica-sweep-'));
 const stsConfig = join(HERE, 'wrangler.sts-sweep.tmp.jsonc');
@@ -232,15 +231,6 @@ psql(
   `sweeper_password=${SWEEPER_PW}`,
   '-f',
   join(SQL, 'setup-replica-sweeper.sql')
-);
-psql(
-  PORT,
-  'supabase_admin',
-  SUPER_PW,
-  '-v',
-  `migration_admin_password=${MIGRATION_ADMIN_PW}`,
-  '-f',
-  join(SQL, 'setup-ci-migration.sql')
 );
 
 const primary = await connect(PORT, 'supabase_admin', SUPER_PW);

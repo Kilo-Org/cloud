@@ -26,8 +26,6 @@ export const lease = sqliteTable(
     workload: text('workload').notNull(),
     /** The caller's audit fields (`LeaseAuditCaller` as JSON), for the rows the alarm writes. */
     caller: text('caller').notNull(),
-    /** A GitHub caller's run id: only a job of the same run may revoke the lease. Null for a Worker. */
-    runId: text('run_id'),
     grant: text('lease_grant').$type<LeaseGrant>().notNull(),
     state: text('state').$type<LeaseState>().notNull(),
     createdAt: integer('created_at').notNull(),

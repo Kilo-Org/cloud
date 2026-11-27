@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { devMetadataFetcher, devStsCallers } from './dev-clients';
 import { handleDevNoticeRequest } from './dev-notices';
 import type { DevUtsFeedDO } from './dev-feed';
-import { getFeedStub, getSignerStub } from './dos/stubs';
+import { getFeedStub, getLoginRotationStub, getSignerStub } from './dos/stubs';
 import type { SignResult } from './dos/UtsSignerDO';
 import { readConfig, type Env, type UtsConfig } from './env';
 import { rotationSecretName } from './manager/client';
@@ -117,6 +117,9 @@ async function devManagerWrite(request: Request, env: Env, config: UtsConfig): P
   return jsonResponse({ name, created, described }, 200);
 }
 
+/** `GET /__dev/rotation`: the login rotation object's phase and switch times, without passwords. */
+export const DEV_ROTATION_PATH = '/__dev/rotation';
+
 const outbox = new Map<string, SignInEmail>();
 
 const recordingMailer: SignInMailer = async message => {
@@ -211,6 +214,9 @@ export async function handleDevRequest(
   }
   if (pathname === DEV_MANAGER_WRITE_PATH) {
     return await devManagerWrite(request, env, config);
+  }
+  if (pathname === DEV_ROTATION_PATH) {
+    return jsonResponse(await getLoginRotationStub(env, config).phase(), 200);
   }
   if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant

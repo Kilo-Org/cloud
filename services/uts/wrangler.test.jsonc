@@ -23,6 +23,7 @@
       { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
       { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
       { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
+      { "name": "UTS_LOGIN_ROTATION_DO", "class_name": "UtsLoginRotationDO" },
     ],
   },
   "migrations": [
@@ -31,6 +32,7 @@
     { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
     { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
     { "tag": "v5", "new_sqlite_classes": ["UtsManagerAuthDO"] },
+    { "tag": "v6", "new_sqlite_classes": ["UtsLoginRotationDO"] },
   ],
   "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-local" }] },
   // The OAuth routes and the account API are served once IDENTITY_STORE exists, the PAT probe

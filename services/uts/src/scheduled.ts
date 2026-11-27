@@ -1,7 +1,7 @@
 import { errorFields, runMaintenance, step } from './audit/maintenance';
 import { AUDIT_SHARD_COUNT } from './audit/relay';
 import { withIdentityStore } from './db/client';
-import { getAuditRelayStub } from './dos/stubs';
+import { getAuditRelayStub, getLoginRotationStub } from './dos/stubs';
 import { readConfig, type Env, type UtsConfig } from './env';
 import { identityStoreBinding } from './grants/binding';
 import { retainNotices, sweepNotices } from './notices/dispatch';
@@ -54,10 +54,24 @@ export async function noticeStep(
 }
 
 /**
+ * The cron's login rotation step (design 5.2): one call to the rotation object, which runs at most
+ * one cycle's next transitions and returns. The object itself refuses a second run in parallel.
+ * Nothing is called while `LOGIN_ROTATION` is not `on`.
+ */
+export async function loginRotationStep(env: Env, config: UtsConfig): Promise<void> {
+  if (config.loginRotation.status === 'off') return;
+  const result = await getLoginRotationStub(env, config).run();
+  const fields = { event: 'uts.login_rotation.run', ...result };
+  if (result.status === 'misconfigured') console.error(JSON.stringify(fields));
+  else console.log(JSON.stringify(fields));
+}
+
+/**
  * The minute cron: keeps the 8 shard relays running; on one connection ends long transactions,
  * maintains audit partitions, OAuth rows and sign-in rows, and raises the relay-lag alert
  * (`src/audit/maintenance.ts`); then runs the notice step (`noticeStep`), whose claim and finish
- * statements open their own connections (`src/notices/dispatch.ts`). Nothing runs until the
+ * statements open their own connections (`src/notices/dispatch.ts`), and the login rotation step
+ * (`loginRotationStep`), which is off unless the environment turns it on. Nothing runs until the
  * environment binds its identity store. Every statement is its own transaction, and each step logs
  * its own failure.
  */
@@ -80,4 +94,5 @@ export async function scheduled(
       platformFetch
     )
   );
+  await step('login_rotation', () => loginRotationStep(env, config));
 }

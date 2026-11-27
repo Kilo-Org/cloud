@@ -23,6 +23,7 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
 /**
  * Reads a config with Wrangler's own JSON, JSONC and TOML parser, the one a deploy uses. It lives
@@ -587,6 +588,31 @@ describe('the UTS configs themselves', () => {
       enabled: 'true',
       sts: STS_ISSUERS.development,
     });
+  });
+
+  it('leave the login rotation off in every deployed block, and name the configs it switches', () => {
+    const raw = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    const BlockSchema = z.object({
+      vars: z.object({ LOGIN_ROTATION: z.literal('off') }).loose(),
+      hyperdrive: z.array(z.object({ binding: z.string(), id: z.string() })),
+    });
+    const top = BlockSchema.parse(raw);
+    const staging = BlockSchema.parse(
+      z.object({ env: z.object({ staging: z.unknown() }) }).parse(raw).env.staging
+    );
+    const ids = (block: z.infer<typeof BlockSchema>) =>
+      Object.fromEntries(block.hyperdrive.map(({ binding, id }) => [binding, id]));
+    for (const [block, environment] of [
+      [top, 'production'],
+      [staging, 'staging'],
+    ] as const) {
+      const configs = HYPERDRIVE_CONFIG_IDS[environment];
+      expect(ids(block)).toEqual({
+        IDENTITY_STORE: configs.app,
+        IDENTITY_STORE_PAT: configs.pat,
+        IDENTITY_STORE_REPLICA: configs.reader,
+      });
+    }
   });
 
   it('fail a feed switch that is not exactly true, and an STS issuer of another environment', () => {

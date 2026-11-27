@@ -15,7 +15,7 @@ const CONFIG: ManagerConfig = {
   },
 };
 
-const NAME = 'uts_app_a_20261126';
+const NAME = 'uts_app_a_20261126_030512';
 const VALUE = 'synthetic-password-value';
 
 type Call = { method: string; url: URL; body: unknown; authorization: string | null };
@@ -78,6 +78,26 @@ describe('ManagerClient', () => {
       status: 'approval_pending',
     });
     expect(await client.describeIdentityStoreSecret(NAME)).toEqual({ status: 'missing' });
+  });
+
+  it('reads one login seed from /db-switch/uts only, with its value', async () => {
+    const manager = standIn(call =>
+      call.url.pathname === '/api/v4/secrets/uts_app_b'
+        ? Response.json({ secret: { secretKey: 'uts_app_b', secretValue: 'seed-value' } })
+        : Response.json({ message: 'Secret not found' }, { status: 404 })
+    );
+    const client = new ManagerClient(CONFIG, signed, manager.fetcher);
+    expect(await client.readLoginSeed('uts_app_b')).toEqual({
+      status: 'present',
+      value: 'seed-value',
+    });
+    expect(await client.readLoginSeed('uts_pat_a')).toEqual({ status: 'missing' });
+    const read = manager.calls[1];
+    expect(read?.method).toBe('GET');
+    expect(read?.url.searchParams.get('secretPath')).toBe('/db-switch/uts');
+    expect(read?.url.searchParams.get('viewSecretValue')).toBe('true');
+    expect(read?.authorization).toBe('Bearer access-1');
+    await expect(client.readLoginSeed('uts_app_b_20261126_030512')).rejects.toThrow();
   });
 
   it('reports 429 and 5xx as unreachable, with the Retry-After of a 429', async () => {
@@ -156,9 +176,9 @@ describe('ManagerClient', () => {
 });
 
 describe('rotationSecretName', () => {
-  it('names the login and the UTC rotation date', () => {
-    expect(rotationSecretName('uts_pat_b', new Date('2026-11-26T23:30:00Z'))).toBe(
-      'uts_pat_b_20261126'
+  it('names the login and the UTC request time', () => {
+    expect(rotationSecretName('uts_pat_b', new Date('2026-11-26T23:30:05Z'))).toBe(
+      'uts_pat_b_20261126_233005'
     );
     expect(() => rotationSecretName('Bad-Login', new Date('2026-11-26T00:00:00Z'))).toThrow();
   });

@@ -18,6 +18,7 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/uts/src services/uts/test services/uts/scripts"
   },
   "dependencies": {
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/uts-contracts": "workspace:*",
     "@kilocode/verify": "workspace:*",

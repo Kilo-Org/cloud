@@ -35,6 +35,7 @@ function configFor(environment: UtsEnvironment): UtsConfig {
     jurisdiction: environment === 'development' ? 'none' : 'eu',
     relyingParty: { rpId: 'localhost', origins: ['http://localhost:8800'] },
     managerBaseUrl: null,
+    loginRotation: { status: 'off' },
   };
 }
 

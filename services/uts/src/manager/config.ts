@@ -8,6 +8,14 @@ export const MANAGER_JWKS_PATH = `${MANAGER_AUTH_PATH}/.well-known/jwks.json`;
 /** The only folder UTS writes to in the secrets manager (design 5.2). */
 export const IDENTITY_STORE_FOLDER = '/admin/identity-store';
 
+/**
+ * The folder of the identity-store login seeds, one secret per login named by the login (decision
+ * Q88, the `/db-switch` convention of M8). Only `uts-rotation-<environment>` reads it, and only once
+ * the rotation phase grants `readValue` there; a secret admin deletes each seed after that login's
+ * first rotation.
+ */
+export const LOGIN_SEED_FOLDER = '/db-switch/uts';
+
 /** Infisical Cloud, EU region (design 4.1). */
 const INFISICAL_EU = 'https://eu.infisical.com';
 

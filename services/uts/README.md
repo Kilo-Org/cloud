@@ -1302,7 +1302,7 @@ seconds covers sessions of other logins and in other databases.
 ### Manager login for rotation copies
 
 After a rotation, UTS writes the new password to `/admin/identity-store` in the secrets manager as
-a new secret named `<login>_<YYYYMMDD>` (design 5.2). It logs in as `uts-rotation-<environment>`
+a new secret named `<login>_<YYYYMMDD>_<HHMMSS>` (design 5.2). It logs in as `uts-rotation-<environment>`
 with Infisical JWT Auth, the way STS logs in as its own identity:
 
 - One object, `<environment>:manager-auth` in the `eu` jurisdiction (`src/dos/UtsManagerAuthDO.ts`),
@@ -1347,6 +1347,108 @@ manager at once:
    audience, and check that `GET /manager-auth/.well-known/jwks.json` lists only the new `kid`
    after the first login. An isolate of the old version can serve the old set for up to 60
    seconds, and the answer allows HTTP caches the same 60 seconds.
+
+### Login rotation
+
+The rotation job (`src/rotation/`, run by `src/dos/UtsLoginRotationDO.ts`) gives each pool's idle
+login a new password and then switches the pool's Hyperdrive config to it (design 5.2). The pools
+are app (`IDENTITY_STORE`, `uts_app_a/b`), pat (`IDENTITY_STORE_PAT`, `uts_pat_a/b`) and reader
+(`IDENTITY_STORE_REPLICA`, `uts_reader_a/b`).
+
+- **Switch.** `LOGIN_ROTATION` is `off` in every deployed block of `wrangler.jsonc`, and the job has
+  no schedule of its own: the minute cron calls the rotation object only where the var is `on`.
+  Turning it on, and provisioning the secrets below, belong to the later rotation phase; until then
+  the job runs only locally against a local Postgres and stand-ins (`scripts/rotation-e2e.ts`).
+- **State.** One object, `<environment>:login-rotation` in the `eu` jurisdiction, keeps one phase
+  (`idle`, `altering`, `storing`, `awaiting_approval`, `switching`, `lost`) and each login's current
+  password, sealed with AES-256-GCM under a key it generated and stores beside them. Sealing keeps
+  passwords out of storage dumps and traces; it does not protect against a reader of the object's
+  storage. A run reads the state first and builds no client when nothing is due; it commits after
+  each step, and a result whose base revision is no longer stored is dropped. A second run in the
+  same object returns `busy`. If the object's storage is lost, every login is unknown to it: the
+  next cycle stops at the missing seed, or a login whose seed no longer works goes to `lost`. That
+  fails safe; the configs keep serving with the login they hold.
+- **Pinned origins.** `ORIGIN_PINS` (`src/rotation/config.ts`) names the host, port and database
+  each pool's config must hold. The job refuses the `ALTER` when the primary config's origin
+  differs, and the `PATCH` when the pool's config origin differs, so a config edited to another
+  host never receives a password. Staging and production pin nothing yet, so they are
+  `misconfigured`; the rotation phase pins them in a reviewed change.
+- **Cycle.** The due pool that switched longest ago goes first (every 30 days). The job reads the
+  config's login, takes the other login of the pair, seals a new random password as pending,
+  connects as that login over a direct socket to the pinned primary and runs
+  `BEGIN READ WRITE; ALTER ROLE CURRENT_USER PASSWORD '<SCRAM verifier>'; COMMIT`. The password goes
+  only into a SCRAM-SHA-256 exchange: if the server asks for a cleartext or MD5 password, the
+  session ends before the password leaves the Worker and the step is refused. After a crash it
+  tries the pending password first, then the current one. If neither logs in, the phase is `lost`
+  and an error is logged each hour until a seed for that login logs in.
+- **Manager.** It creates `<login>_<YYYYMMDD>_<HHMMSS>` (the UTC time of the request) in
+  `/admin/identity-store`. Under the change policy it waits in `awaiting_approval`, checks with
+  `describeSecret` every hour for this request's name only, and logs
+  `uts.login_rotation.approval_overdue` once a day from 24 hours on. A request still missing after
+  72 hours counts as rejected or expired: the job logs `uts.login_rotation.approval_expired` and
+  asks again under a new name with the same password. Only the newest request counts: a secret
+  admin approves the newest `<login>_…` request and rejects any older one of the same login, since
+  an older one is never checked again. A retry after a lost create answer describes first, so it
+  never asks twice.
+- **Hyperdrive.** Only from 02:00 to 05:00 UTC and at least 5 minutes after the previous switch, it
+  patches the config's user and password through the Cloudflare API, keeping its scheme, host,
+  port and database, then reads the config with a GET and refuses the step if the user differs. It
+  refuses to patch an origin with fields it does not rebuild (such as an Access client id), which
+  the patch would drop.
+- **Failures.** A timeout, 429, 5xx or lost connection waits 1 minute (never less in a deployed
+  environment) and warns (`uts.login_rotation.retry`); a refusal waits 1 hour and logs an error
+  (`uts.login_rotation.refused`).
+
+Secrets (decision Q88; nothing is provisioned before the rotation phase):
+
+| Name | Where | Value | Provisioned by |
+|---|---|---|---|
+| `UTS_HYPERDRIVE_SWITCH_TOKEN` | UTS STS bundle (`/workloads/uts`, policy `services/sts/policy/uts.yaml`, binding `STS` with caller `uts`) | Cloudflare API token of a dedicated account member, Hyperdrive edit only | A secret admin, per environment |
+| `uts_app_a` … `uts_reader_b` | `/db-switch/uts`, one secret per login | The first password of that login | Provisioning, per environment |
+
+Only `uts-rotation-<environment>` reads the seeds, through `ManagerClient.readLoginSeed`, with
+`readValue` on `/db-switch/uts` and nowhere else; the rotation phase grants it. No STS policy reads
+that folder (the `/db-switch` convention of design M8). The switch token stays in the STS bundle:
+the job sends it on every Cloudflare API call, the bundle is how a Worker gets its secrets, and
+moving it would widen the rotation identity's read grant beyond the seeds.
+
+The object reads a login's seed only when it holds no password for that login, or for a `lost`
+login. A secret admin deletes each seed once the job has rotated that login (the
+`uts.login_rotation.altered` log names it): until then, an unrotated login keeps its provisioning
+password. For a `lost` login, a secret admin writes its password back as that login's seed after a
+break-glass read of `/admin/identity-store` (design 4.3), and deletes it again once the job has
+rotated that login.
+
+**Preconditions before the rotation phase turns the job on in an environment:**
+
+1. **TLS to the direct host.** A Worker's socket verifies TLS only against the platform's public
+   roots and cannot pin the Supabase CA, so the direct host may fail the handshake. A deployed
+   handshake test from a Worker against the environment's direct host must pass first. The job
+   never connects with `rejectUnauthorized: false`; if the test fails, the alternatives are a host
+   whose certificate chains to a public root, or running the `ALTER` where the Supabase CA can be
+   pinned (for example the migration proxy's Container), each recorded in design Q88.
+2. **A config edit under load.** The local end-to-end run does not go through Hyperdrive: its
+   clients open their own connections with the stand-in config's login. How a Hyperdrive pool
+   behaves when its config's login changes is not verified here, so a real `PATCH` of a staging
+   config under load, with no failed query, must pass first (design trial check 4).
+3. **The switch token.** At provisioning, check the token with `GET /user/tokens/verify` and its
+   policies: Hyperdrive edit only. The permission covers every Hyperdrive config in the account,
+   which is why the origins are pinned. With the real `uts-rotation-<environment>` identity, also
+   check the seed read: `GET /api/v4/secrets/<login>?projectId=<project>&environment=<slug>&secretPath=/db-switch/uts&viewSecretValue=true&expandSecretReferences=false&includeImports=false`
+   answers 200 with `secret.secretValue` for a seed that exists and 404 for one that does not, and
+   the same read of any other folder is refused.
+4. **The origins.** Pin the environment's direct host, port and database for each pool in
+   `ORIGIN_PINS`.
+
+**Open item:** STS has no `uts` workload policy yet (phase 2 adds it), so `wrangler.jsonc` binds no
+`STS` for now and the job, which is off, would report `misconfigured` (`missing STS`). With that
+policy, add the binding to the top level and to `env.staging`: `{ "binding": "STS", "service":
+"sts" (`"sts-staging"` in staging), "entrypoint": "SecretsBroker", "props": { "caller": "uts" } }`.
+
+`pnpm exec tsx scripts/rotation-e2e.ts` runs the full a -> b -> a rotation locally: the mint Worker
+under `wrangler dev`, a stand-in manager and Cloudflare API on loopback (`UTS_E2E_PORT`, default
+9560, and +1 to +3), and a local Postgres (`UTS_E2E_ADMIN_URL`). Clients that loop queries must see
+no failure.
 
 ### Platform roles
 

@@ -1,3 +1,4 @@
+import type { BundleBinding } from '@kilocode/secrets-client';
 import {
   UTS_ENDPOINTS,
   UtsEnvironmentSchema,
@@ -8,6 +9,7 @@ import { z } from 'zod';
 import type { AttestEnv } from './attest/config';
 import type { UtsAuditRelayDO } from './dos/UtsAuditRelayDO';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
+import type { UtsLoginRotationDO } from './dos/UtsLoginRotationDO';
 import type { UtsManagerAuthDO } from './dos/UtsManagerAuthDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 import type { UtsFeedDO } from './feed/UtsFeedDO';
@@ -49,6 +51,13 @@ const EnvVarsSchema = z
       .transform(value => value.split(','))
       .pipe(z.array(OriginSchema).min(1).max(4)),
     MANAGER_BASE_URL: OriginSchema.optional(),
+    LOGIN_ROTATION: z.enum(['on', 'off']).optional(),
+    CLOUDFLARE_API_BASE_URL: OriginSchema.optional(),
+    LOGIN_ROTATION_PERIOD_SECONDS: z
+      .string()
+      .regex(/^[1-9][0-9]{0,7}$/, 'a period from 1 second')
+      .transform(seconds => Number(seconds) * 1000)
+      .optional(),
   })
   .refine(
     vars => (vars.UTS_ENVIRONMENT === 'development') === (vars.DO_JURISDICTION === 'none'),
@@ -69,7 +78,17 @@ const EnvVarsSchema = z
   .refine(
     vars => vars.UTS_ENVIRONMENT === 'development' || vars.MANAGER_BASE_URL === undefined,
     'only development names its manager; staging and production use Infisical Cloud'
+  )
+  .refine(
+    vars =>
+      vars.UTS_ENVIRONMENT === 'development' ||
+      (vars.CLOUDFLARE_API_BASE_URL === undefined &&
+        vars.LOGIN_ROTATION_PERIOD_SECONDS === undefined),
+    'only development names a Cloudflare API stand-in or a rotation period'
   );
+
+/** 30 days, the period of a deployed rotation, and of development unless it names its own. */
+const DEFAULT_ROTATION_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Design 3: at most 100 PAT lookups in flight per mint isolate. */
 export const MAX_PAT_LOOKUPS_IN_FLIGHT = 100;
@@ -89,6 +108,16 @@ export type UtsConfig = {
   relyingParty: RelyingParty;
   /** Development only: the stand-in manager's origin (src/manager/config.ts). */
   managerBaseUrl: string | null;
+  /** The identity-store login rotation switch (src/rotation/config.ts); off unless `LOGIN_ROTATION=on`. */
+  loginRotation:
+    | { status: 'off' }
+    | {
+        status: 'on';
+        /** Development only: a stand-in Cloudflare API origin; null elsewhere. */
+        cloudflareBaseUrl: string | null;
+        /** The rotation period; only development sets one other than 30 days. */
+        periodMs: number;
+      };
 };
 
 export type Env = {
@@ -109,6 +138,21 @@ export type Env = {
   UTS_FEED_DO: DurableObjectNamespace<UtsFeedDO>;
   /** The one object that holds the manager login key (src/dos/UtsManagerAuthDO.ts). */
   UTS_MANAGER_AUTH_DO: DurableObjectNamespace<UtsManagerAuthDO>;
+  /** The one identity-store login rotation object (src/dos/UtsLoginRotationDO.ts). */
+  UTS_LOGIN_ROTATION_DO: DurableObjectNamespace<UtsLoginRotationDO>;
+  /** `on` runs the login rotation job from the cron; absent or `off` keeps it off. */
+  LOGIN_ROTATION?: string;
+  /**
+   * The STS secrets broker, to be bound as caller `uts` once STS has a `uts` policy. It delivers the
+   * rotation job's Hyperdrive switch token (src/rotation/secrets.ts).
+   */
+  STS?: BundleBinding;
+  /** Development only: JSON with the switch token a local run uses instead of STS. */
+  UTS_LOCAL_SECRETS?: string;
+  /** Development only: origin of a stand-in Cloudflare API for the local end-to-end run. */
+  CLOUDFLARE_API_BASE_URL?: string;
+  /** Development only: the rotation period in seconds. */
+  LOGIN_ROTATION_PERIOD_SECONDS?: string;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.
@@ -170,6 +214,14 @@ export function readConfig(env: Env): UtsConfig {
     jurisdiction: vars.DO_JURISDICTION,
     relyingParty: { rpId: vars.WEBAUTHN_RP_ID, origins: vars.WEBAUTHN_ORIGINS },
     managerBaseUrl: vars.MANAGER_BASE_URL ?? null,
+    loginRotation:
+      vars.LOGIN_ROTATION === 'on'
+        ? {
+            status: 'on',
+            cloudflareBaseUrl: vars.CLOUDFLARE_API_BASE_URL ?? null,
+            periodMs: vars.LOGIN_ROTATION_PERIOD_SECONDS ?? DEFAULT_ROTATION_PERIOD_MS,
+          }
+        : { status: 'off' },
   };
 }
 

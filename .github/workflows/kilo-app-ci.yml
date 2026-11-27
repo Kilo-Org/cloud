@@ -64,17 +64,28 @@ jobs:
   # job marks the change mobile, where `i18n-leftover` already carries it.
   mobile-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # 10 not 5: the old checkout's Blacksmith mirror refresh took ~400 s (3 x 120 s
+    # fetch attempts plus waits) in a slowdown and cancelled this required gate;
+    # the actions/checkout below drops that mirror.
+    timeout-minutes: 10
     outputs:
       mobile: ${{ steps.detect.outputs.mobile }}
       lint_only: ${{ steps.detect.outputs.lint_only }}
       catalogs: ${{ steps.detect.outputs.catalogs }}
     steps:
-      # Full history so the change-detection step can diff against the PR's
-      # base sha or the pushed commit's parent.
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      # Full history so the detection below resolves the PR's base sha or
+      # `github.event.before`, and no blobs up front: the detection's own diff is
+      # tree-only (`git diff --name-only --no-renames`), while the objects
+      # `scripts/affected-workspaces.mjs` reads (rename-detected paths, the base
+      # lockfile) come from the public repository on demand.
+      # actions/checkout has no Blacksmith mirror to refresh.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          filter: blob:none
+          # Nothing here pushes, and the repository is public: the lazy blob
+          # fetches below need no token.
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0

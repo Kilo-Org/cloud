@@ -96,7 +96,10 @@ describe('readSessionIngestSecret', () => {
 
   it('reads a plain Worker secret, which arrives as a string', async () => {
     expect(
-      await readSessionIngestSecret({ INTERNAL_API_SECRET_PROD: 'plain-value' }, 'INTERNAL_API_SECRET')
+      await readSessionIngestSecret(
+        { INTERNAL_API_SECRET_PROD: 'plain-value' },
+        'INTERNAL_API_SECRET'
+      )
     ).toBe('plain-value');
   });
 

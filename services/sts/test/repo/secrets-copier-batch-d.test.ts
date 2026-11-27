@@ -133,7 +133,10 @@ async function proveWorker<N extends string>(worker: WorkerUnderTest<N>): Promis
     ).toContain(entry.binding);
   }
   for (const binding of identifierBindings) {
-    expect(rows.map(row => row.oldBinding), `${worker.workload}: ${binding}`).not.toContain(binding);
+    expect(
+      rows.map(row => row.oldBinding),
+      `${worker.workload}: ${binding}`
+    ).not.toContain(binding);
     expect(
       storeEntries.map(entry => entry.binding),
       `${worker.workload}: ${binding}`
@@ -189,12 +192,7 @@ describe('the secrets copier table for batch D', () => {
       identifierStoreBindings: ['BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID'],
     });
 
-    const rows = [
-      ...securityAutoAnalysis,
-      ...sessionIngest,
-      ...kiloChat,
-      ...gitTokenService,
-    ];
+    const rows = [...securityAutoAnalysis, ...sessionIngest, ...kiloChat, ...gitTokenService];
 
     // No two rows name the same Worker binding, and every row is a policy entry the workload's
     // policy grants under the canonical name its STS folder resolves.

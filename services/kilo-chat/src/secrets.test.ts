@@ -51,7 +51,10 @@ function storeSecret(value: string) {
 }
 
 /** Places the legacy binding under the name this Worker reads today. */
-function legacyEnv(name: KiloChatSecretName, secret: { get(): Promise<string> }): KiloChatSecretsEnv {
+function legacyEnv(
+  name: KiloChatSecretName,
+  secret: { get(): Promise<string> }
+): KiloChatSecretsEnv {
   return { [BINDING[name]]: secret };
 }
 
@@ -80,7 +83,9 @@ describe('readKiloChatSecret', () => {
       expect(await readKiloChatSecret(env, name)).toBe('legacy-value');
       expect(sts.getBundle).not.toHaveBeenCalled();
 
-      expect(await readKiloChatSecret({ ...env, SECRETS_SOURCE: 'sts' }, name)).toBe('bundle-value');
+      expect(await readKiloChatSecret({ ...env, SECRETS_SOURCE: 'sts' }, name)).toBe(
+        'bundle-value'
+      );
       expect(store.get).toHaveBeenCalledOnce();
       expect(sts.getBundle).toHaveBeenCalledOnce();
 

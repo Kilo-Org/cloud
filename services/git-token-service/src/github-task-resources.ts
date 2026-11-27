@@ -227,23 +227,20 @@ export class GitHubTaskResources {
     );
     if (!clientId || !clientSecret) throw new GitHubTaskResourceError('source_unavailable');
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const value = await this.request(
-      `/applications/${encodeURIComponent(clientId)}/token/scoped`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${basic}`,
-          Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-          'User-Agent': 'Kilo-Git-Token-Service',
-        },
-        body: JSON.stringify({
-          access_token: this.token,
-          target: scope.owner,
-          repository_ids: scope.repositoryIds,
-        }),
-      }
-    );
+    const value = await this.request(`/applications/${encodeURIComponent(clientId)}/token/scoped`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Kilo-Git-Token-Service',
+      },
+      body: JSON.stringify({
+        access_token: this.token,
+        target: scope.owner,
+        repository_ids: scope.repositoryIds,
+      }),
+    });
     const parsed = z
       .object({
         token: z.string().min(1),

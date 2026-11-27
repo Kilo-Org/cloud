@@ -289,11 +289,7 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
       }
       clientSecret = customSecret.token;
     } else {
-      clientSecret = await readGitTokenServiceSecret(
-        this.env,
-        'GITLAB_CLIENT_SECRET',
-        this.ctx
-      );
+      clientSecret = await readGitTokenServiceSecret(this.env, 'GITLAB_CLIENT_SECRET', this.ctx);
     }
     if (!clientId || !clientSecret) {
       await releaseRefreshLease(tx, { ...lease, attemptId });

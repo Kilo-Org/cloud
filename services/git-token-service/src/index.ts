@@ -850,11 +850,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
           auth.githubToken,
           this.env,
           this.secretsCtx
-        ).issue(
-          repository.owner,
-          repository.repo,
-          params.taskScope
-        );
+        ).issue(repository.owner, repository.repo, params.taskScope);
       } catch (error) {
         return {
           success: false,
@@ -1151,16 +1147,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   async issueBitbucketSessionCapability(
     params: IssueBitbucketSessionCapabilityParams
   ): Promise<IssueBitbucketSessionCapabilityResult> {
-    const resolved = await resolveBitbucketCapabilitySubject(this.env, {
-      userId: params.userId,
-      orgId: params.orgId,
-      ...(params.expectedIntegrationId !== undefined
-        ? { expectedIntegrationId: params.expectedIntegrationId }
-        : {}),
-      workspaceUuid: params.workspaceUuid,
-      repositoryUuid: params.repositoryUuid,
-      repositoryUrl: params.repositoryUrl,
-    }, undefined, this.secretsCtx);
+    const resolved = await resolveBitbucketCapabilitySubject(
+      this.env,
+      {
+        userId: params.userId,
+        orgId: params.orgId,
+        ...(params.expectedIntegrationId !== undefined
+          ? { expectedIntegrationId: params.expectedIntegrationId }
+          : {}),
+        workspaceUuid: params.workspaceUuid,
+        repositoryUuid: params.repositoryUuid,
+        repositoryUrl: params.repositoryUrl,
+      },
+      undefined,
+      this.secretsCtx
+    );
     if (!resolved.success) return resolved;
     const { subject } = resolved;
     try {
@@ -1218,14 +1219,19 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     );
     if (upstream.failure) return { success: false, reason: upstream.failure };
 
-    const resolved = await resolveBitbucketCapabilitySubject(this.env, {
-      userId: claims.userId,
-      orgId: claims.orgId,
-      expectedIntegrationId: claims.integrationId,
-      workspaceUuid: claims.workspaceUuid,
-      repositoryUuid: claims.repositoryUuid,
-      repositoryUrl: `https://bitbucket.org/${claims.repositoryFullName}.git`,
-    }, undefined, this.secretsCtx);
+    const resolved = await resolveBitbucketCapabilitySubject(
+      this.env,
+      {
+        userId: claims.userId,
+        orgId: claims.orgId,
+        expectedIntegrationId: claims.integrationId,
+        workspaceUuid: claims.workspaceUuid,
+        repositoryUuid: claims.repositoryUuid,
+        repositoryUrl: `https://bitbucket.org/${claims.repositoryFullName}.git`,
+      },
+      undefined,
+      this.secretsCtx
+    );
     if (!resolved.success) return { success: false, reason: 'source_unavailable' };
     const { subject } = resolved;
     if (

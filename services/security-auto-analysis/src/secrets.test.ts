@@ -86,9 +86,9 @@ describe('readSecurityAutoAnalysisSecret', () => {
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
       // Flipping the variable back reads the legacy binding again.
-      expect(await readSecurityAutoAnalysisSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)).toBe(
-        'legacy-value'
-      );
+      expect(
+        await readSecurityAutoAnalysisSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)
+      ).toBe('legacy-value');
       expect(store.get).toHaveBeenCalledTimes(2);
       expect(sts.getBundle).toHaveBeenCalledOnce();
     }
@@ -96,7 +96,10 @@ describe('readSecurityAutoAnalysisSecret', () => {
 
   it('reads a plain Worker secret, which arrives as a string', async () => {
     expect(
-      await readSecurityAutoAnalysisSecret({ INTERNAL_API_SECRET: 'plain-value' }, 'INTERNAL_API_SECRET')
+      await readSecurityAutoAnalysisSecret(
+        { INTERNAL_API_SECRET: 'plain-value' },
+        'INTERNAL_API_SECRET'
+      )
     ).toBe('plain-value');
   });
 
@@ -109,9 +112,9 @@ describe('readSecurityAutoAnalysisSecret', () => {
       SECRETS_SOURCE: 'sts',
     };
 
-    await expect(
-      readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET')
-    ).rejects.toBeInstanceOf(SecretUnavailableError);
+    await expect(readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET')).rejects.toBeInstanceOf(
+      SecretUnavailableError
+    );
     expect(store.get).not.toHaveBeenCalled();
   });
 
@@ -119,22 +122,19 @@ describe('readSecurityAutoAnalysisSecret', () => {
     const store = storeSecret('legacy-value');
     const env = { ...legacyEnv('INTERNAL_API_SECRET', store.secret), SECRETS_SOURCE: 'sts' };
 
+    await expect(readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET')).rejects.toThrow(
+      /STS service binding is missing/
+    );
     await expect(
-      readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET')
-    ).rejects.toThrow(/STS service binding is missing/);
-    await expect(
-      readSecurityAutoAnalysisSecret(
-        { ...env, SECRETS_SOURCE: 'infisical' },
-        'INTERNAL_API_SECRET'
-      )
+      readSecurityAutoAnalysisSecret({ ...env, SECRETS_SOURCE: 'infisical' }, 'INTERNAL_API_SECRET')
     ).rejects.toThrow(/SECRETS_SOURCE/);
     expect(store.get).not.toHaveBeenCalled();
   });
 
   it('fails closed when the legacy binding is absent', async () => {
-    await expect(
-      readSecurityAutoAnalysisSecret({}, 'INTERNAL_API_SECRET')
-    ).rejects.toThrow(/INTERNAL_API_SECRET is not configured/);
+    await expect(readSecurityAutoAnalysisSecret({}, 'INTERNAL_API_SECRET')).rejects.toThrow(
+      /INTERNAL_API_SECRET is not configured/
+    );
   });
 
   it('serves every read in an isolate from one bundle call', async () => {

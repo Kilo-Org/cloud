@@ -408,7 +408,12 @@ export async function resolveBitbucketToken(
   dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies,
   ctx?: SecretsExecutionContext
 ): Promise<GetBitbucketTokenResult> {
-  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides, ctx);
+  const resolved = await resolveBitbucketAuthorizedRepository(
+    env,
+    params,
+    dependencyOverrides,
+    ctx
+  );
   if (!resolved.success) return resolved;
   return { success: true, token: resolved.authorization.token };
 }
@@ -429,7 +434,12 @@ export async function resolveBitbucketCapabilitySubject(
   dependencyOverrides?: BitbucketRuntimeTokenResolverDependencies,
   ctx?: SecretsExecutionContext
 ): Promise<{ success: true; subject: BitbucketCapabilitySubject } | BitbucketTokenFailure> {
-  const resolved = await resolveBitbucketAuthorizedRepository(env, params, dependencyOverrides, ctx);
+  const resolved = await resolveBitbucketAuthorizedRepository(
+    env,
+    params,
+    dependencyOverrides,
+    ctx
+  );
   if (!resolved.success) return resolved;
   const { authorization, repository } = resolved;
   return {

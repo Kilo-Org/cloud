@@ -234,7 +234,11 @@ async function handleFetch(
     if (!attemptToken) {
       return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
     }
-    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET', ctx);
+    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(
+      env,
+      'CALLBACK_TOKEN_SECRET',
+      ctx
+    );
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!callbackTokenSecret &&
@@ -290,7 +294,11 @@ async function handleFetch(
     if (!attemptToken) {
       return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
     }
-    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET', ctx);
+    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(
+      env,
+      'CALLBACK_TOKEN_SECRET',
+      ctx
+    );
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!callbackTokenSecret &&

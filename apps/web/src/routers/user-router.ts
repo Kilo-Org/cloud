@@ -833,7 +833,7 @@ async function signInMethodChangeBinding(
   if (!session.webSessionId) {
     throw signInMethodChangeRefused('sessionReauthRequired');
   }
-  const refusal = await authorizeSignInMethodChange({ user: session.user, change });
+  const refusal = await authorizeSignInMethodChange({ user: session.user, change, provider });
   if (refusal) {
     throw signInMethodChangeRefused(refusal);
   }

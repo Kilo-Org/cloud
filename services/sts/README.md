@@ -499,6 +499,11 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-gmail-push` | production | `services/gmail-push/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `kiloclaw-inbound-email` | production | `services/kiloclaw-inbound-email/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
@@ -511,7 +516,7 @@ pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2` on `refs/heads/v2`
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
-| `ci-kilocode-release` | `release` | `publish.yml` | `workflow_dispatch` |
+| `ci-kilocode-release` | `release-keys` | `publish.yml` | `workflow_dispatch` |
 | `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
 | `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
 | `ci-kilocode-app-key-v2` | `automation` | `kilo-v2.yml` at `refs/heads/v2` (its `progress-commit` job) | `push` |
@@ -528,15 +533,21 @@ admits the `v2` branch (manager ruling M76): it accepts `refs/heads/v2` alone, w
 `GITHUB_PRODUCTION_REF_EXCEPTIONS` entry in every field (`src/policy/schema.ts`). No policy admits
 `release-v2`.
 
-Two kilocode-side rules hold these policies to what they name:
+Three kilocode-side rules hold these policies to what they name:
 
 - None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
   carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
   `main` that called it with a listed event would get the bundle.
-- The GitHub environments `release` and `release-jetbrains` admit deployments from `main` only,
-  and `automation` from `main` and `v2` only (a deployment branch policy; `automation` read back on
-  2026-11-27). STS trusts the `environment` claim; the branch rule is what makes it mean those
-  branches, and the policy's ref and workflow pins hold each policy to its own branch.
+- The GitHub environments `automation`, `release-keys` and `release-jetbrains` admit deployments
+  from `main` only, except `automation`, which admits `main` and `v2` (a deployment branch policy;
+  `automation` read back on 2026-11-27). STS trusts the `environment` claim; the branch rule is
+  what makes it mean those branches, and the policy's ref and workflow pins hold each policy to its
+  own branch.
+- `publish.yml`'s `release-push`, `package-managers` and `jetbrains-pin` jobs are the only jobs
+  that may declare `environment: release-keys`, and they may run only SHA-pinned GitHub-org actions,
+  repository code and runtimes pinned by version and digest: STS cannot tell the jobs of one
+  workflow file apart, so another job of `publish.yml` declaring the environment receives the
+  bundle too.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -751,13 +762,12 @@ identity:
   repository: Kilo-Org/kilocode
   repositoryId: '<repository id>'
   repositoryOwnerId: '<owner id>'
-  environment: release
+  environment: release-keys
   refs: [refs/heads/main]   # the default
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/publish.yml@refs/heads/main
-    - Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main
   events: [workflow_dispatch]
-secrets: [KILOCODE_ANACONDA_API_KEY, KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
+secrets: [KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
 ```
 
 How a token finds its policy, in this order:

@@ -471,6 +471,12 @@ export type LeaseRevokeCause = 'caller' | 'late' | 'expiry_mismatch' | 'audit_fa
  */
 export type LeaseRevocationResult = 'revoked' | 'gone' | 'revoke_failed' | 'unconfirmed';
 
+/**
+ * Set on a `gone` that followed a recorded `revoke_failed`: Infisical deletes such a lease only once
+ * a revocation succeeded, but a forced delete at Infisical looks the same, so the row says so.
+ */
+export type LeaseRevocationDetail = 'gone_after_failure';
+
 export function leaseRevokedEvent(input: {
   environment: StsEnvironment;
   caller: LeaseAuditCaller;
@@ -478,6 +484,7 @@ export function leaseRevokedEvent(input: {
   leaseId: string;
   cause: LeaseRevokeCause;
   result: LeaseRevocationResult;
+  detail?: LeaseRevocationDetail;
 }): AuditEvent {
   const { caller } = input;
   const failed = input.result === 'revoke_failed' || input.result === 'unconfirmed';
@@ -506,6 +513,7 @@ export function leaseRevokedEvent(input: {
         leaseId: input.leaseId,
         cause: input.cause,
         result: input.result,
+        ...(input.detail === undefined ? {} : { detail: input.detail }),
         ...runAttributes(caller.run),
       },
     },

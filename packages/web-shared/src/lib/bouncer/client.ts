@@ -4,7 +4,8 @@ import { createHash } from 'crypto';
 
 import * as z from 'zod';
 
-import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 
 /**
@@ -469,12 +470,19 @@ async function postWithResult(
   signal?: AbortSignal
 ): Promise<PostResult> {
   const endpoint = parseInternalServiceEndpoint(BOUNCER_URL, path);
-  if (!endpoint || !INTERNAL_API_SECRET) return { ok: false, kind: 'unconfigured' };
+  if (!endpoint) return { ok: false, kind: 'unconfigured' };
+  let internalApiSecret: string;
+  try {
+    internalApiSecret = await readInternalApiSecret();
+  } catch (error) {
+    return failedWithoutResponse(error);
+  }
+  if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
   const timeout = AbortSignal.timeout(timeoutMs);
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': INTERNAL_API_SECRET },
+      headers: { 'content-type': 'application/json', 'x-internal-api-key': internalApiSecret },
       body: JSON.stringify(body),
       signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
       cache: 'no-store',
@@ -489,14 +497,19 @@ async function postWithResult(
     }
     return { ok: true, status: response.status, response };
   } catch (error) {
-    const name = (error as { name?: unknown } | null)?.name;
-    return {
-      ok: false,
-      kind: 'failed',
-      status: null,
-      error: typeof name === 'string' ? name : String(error),
-    };
+    return failedWithoutResponse(error);
   }
+}
+
+/** A request that got no answer: a transport error, a timeout, or a secret that could not be read. */
+function failedWithoutResponse(error: unknown): PostResult {
+  const name = (error as { name?: unknown } | null)?.name;
+  return {
+    ok: false,
+    kind: 'failed',
+    status: null,
+    error: typeof name === 'string' ? name : String(error),
+  };
 }
 
 /**

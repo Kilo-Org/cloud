@@ -730,6 +730,28 @@ secrets: [APP_TWO_SECRET]
     expect(policyIndex.has('audit-relay')).toBe(true);
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
+
+  it('binds ai-gateway to kilocode-ai-gateway previews and grants it only the UTS feed, in development only', () => {
+    const gateway = policyFor('development', 'ai-gateway');
+    expect(gateway?.identity).toEqual({
+      kind: 'vercel-oidc',
+      teamSlug: 'kilocode',
+      teamId: 'team_ItxRShuUkJaEd9GmXMEEgunb',
+      projectId: 'prj_cFtsRYRBCm4qa8D35LC2j183FohC',
+      projectName: 'kilocode-ai-gateway',
+      environments: ['preview'],
+    });
+    expect(gateway).toMatchObject({
+      environments: ['development'],
+      audiences: ['uts-feed'],
+      scopes: ['uts-feed:revocation.read'],
+      secrets: [],
+      dynamic: [],
+      environmentGrants: {},
+    });
+    expect(policyFor('staging', 'ai-gateway')).toBeNull();
+    expect(policyFor('production', 'ai-gateway')).toBeNull();
+  });
 });
 
 describe('policy registrations', () => {

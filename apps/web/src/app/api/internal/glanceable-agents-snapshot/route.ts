@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
@@ -33,7 +33,8 @@ function secretMatches(provided: string | null, expected: string): boolean {
  */
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secretMatches(secret, INTERNAL_API_SECRET)) {
+  const expected = secret ? await readInternalApiSecret() : '';
+  if (!expected || !secretMatches(secret, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

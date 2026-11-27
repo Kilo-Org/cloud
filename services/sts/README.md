@@ -23,7 +23,8 @@ Worker.
   failed bundle object call answers the same way, over RPC and HTTP. Each isolate caches a
   provider's discovery and key set once a request has fetched them; requests share only that
   result, never a pending fetch, so a cold isolate makes one discovery fetch per issuer for each
-  request that arrives before the first lands (today only `web`, a Vercel caller, uses one).
+  request that arrives before the first lands (today the Vercel callers `web` and `ai-gateway`, which
+  share team `kilocode`'s issuer).
 - STS waits at most 20 seconds for the bundle object (a fill attempt takes at most 16), then answers
   `unavailable` with `Retry-After: 30`: a caller cannot cancel an RPC, and a Durable Object waiting
   on one stays in memory until it completes. A fill still running at the deadline finishes inside
@@ -450,6 +451,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
+| `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (the policy lists only `development`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
@@ -458,6 +460,18 @@ config check below refuses a `worker-binding` policy that no config here binds. 
 must bind `sts-local`, the development STS: its `dev` block may only bind `sts-dev`, which STS does
 not deploy, so the binding goes in an `env.local` block named `kilo-mcp-local`, with
 `observability.traces.enabled: false` in every block.
+
+The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
+exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only. Staging
+and production STS refuse a real gateway token whole (401 `identity_rejected`) and audit it with
+actor `ai-gateway`: a preview token as `environment_mismatch`, a staging or production token as
+`identity_rejected`, since the policy lists neither identity. A caller that reached the mint there
+would get `unknown_workload`, as no policy names it. Its activation adds staging and production to
+both its `environments` lists and is reviewed like any policy change.
+
+Any preview build of `kilocode-ai-gateway`, from any branch, can obtain this development read
+scope, the same as `web`'s development grants. If fork or outside pull-request previews are ever
+enabled on that project, this grant needs a review first.
 
 Workloads with a policy, all over `worker-binding`:
 
@@ -471,6 +485,33 @@ Workloads with a policy, all over `worker-binding`:
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
+
+GitHub Actions workloads (`github-oidc`, production only, `refs/heads/main`, each workflow file
+pinned to `@refs/heads/main`; see [GitHub Actions callers](#github-actions-callers)). All are in
+`Kilo-Org/kilocode` (repository id `946087422`, owner id `201822503`) and grant no token, lease or
+deploy token; their bundles are `/ci/<workload>`:
+
+| Workload | GitHub environment | Workflow files | Events |
+|---|---|---|---|
+| `ci-kilocode-release` | `release` | `publish.yml` | `workflow_dispatch` |
+| `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
+| `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
+| `ci-kilocode-scan-notify` | `automation` | `security-findings-notify.yml` | `schedule`, `workflow_dispatch` |
+| `ci-kilocode-community` | `automation` | `community-sweep.yml` | `schedule`, `workflow_dispatch` |
+| `ci-kilocode-notify` | `automation` | `outdated-kilo-deps.yml`, `stale-alerts-report.yml`, `stale-bot-pr-notify.yml`, `v2-upstream-release-notify.yml` | `schedule`, `workflow_dispatch` |
+| `ci-kilocode-opencode-watch` | `automation` | `watch-opencode-releases.yml` | `schedule`, `workflow_dispatch` |
+
+`Kilo-Org/kilocode` predates GitHub's immutable subjects and has not opted in yet, so STS refuses
+its tokens (`identity_rejected`) until it does. No policy admits the `v2` branch or `release-v2`.
+
+Two kilocode-side rules hold these policies to what they name:
+
+- None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
+  carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
+  `main` that called it with a listed event would get the bundle.
+- The GitHub environments `automation`, `release` and `release-jetbrains` admit deployments from
+  `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
+  what makes it mean `main`.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -615,6 +656,12 @@ deployed with `--target=staging`), so its policy lists
 environment. Anyone with deploy rights on the project can deploy to that custom environment, so
 staging values must not be production-grade. Team `kilocode` is `team_ItxRShuUkJaEd9GmXMEEgunb`.
 
+The AI gateway (`apps/ai-gateway`, workload `ai-gateway`) is the project `kilocode-ai-gateway`
+(`prj_cFtsRYRBCm4qa8D35LC2j183FohC`). Its policy lists only `preview`, so development STS serves its
+preview deployments and nothing else; its own custom environment `staging`
+(`env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV`) and `production` are not listed yet. Both projects share the
+team issuer `https://oidc.vercel.com/kilocode`; the project id alone tells them apart.
+
 A policy fails to load when a listed Vercel environment can read none of the policy's STS
 environments, or when one of its STS environments has no listed Vercel environment that may read it.
 A token from a listed Vercel environment that this STS deployment may not serve is refused with
@@ -757,8 +804,8 @@ copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,0
 a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
 cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
 has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
-push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
-minutes, or 2,880 a day per environment.
+push per GitHub policy per refresh: with the 7 kilocode policies, 7 `BundleDO` calls every 4
+minutes, or 2,520 a day in production.
 
 ## Database leases
 
@@ -876,10 +923,15 @@ error that says the sessions may still be open. A day after the expiry the objec
 `lease.revoked` with result `unconfirmed`, logs an error naming the lease id, for a person to end
 the role's sessions by hand (Risks below), and ends a delivered lease's row in state `unconfirmed`,
 so a later revoke does not make it owed again; if that row cannot be written, it tries again 30
-seconds later. It stops the same way on a 404 after a recorded `revoke_failed`: until trial check 3
-shows that Infisical keeps a lease whose revocation failed until a revocation succeeds, a missing
-lease may be one deleted without its role being revoked. The alarm takes at most 5 leases, least recently tried
-first, so leases that keep failing cannot hold back a newer one; it retries a lease no sooner than
+seconds later. A 404 after a recorded `revoke_failed` is `gone`: trial check 3 showed (staging,
+2026-11-26) that Infisical keeps a lease whose revocation failed, answering every later revoke with
+200 and the kept row, until a revocation succeeds, and that the 200 of that success still carries
+the stale `Failed to delete` status; the 404 that follows is the confirmation. Its row carries
+`detail: gone_after_failure` and the object logs a warning (not an error, so it pages no one),
+because a forced delete at Infisical answers the same 404 (Risks). Only a 404 whose message names
+exactly the lease id asked for counts; one naming another id keeps the revocation owed. The alarm
+takes at most 5 leases, least recently tried first, so leases that keep failing cannot hold back a
+newer one; it retries a lease no sooner than
 30 seconds after its last attempt, the caller's included, or after Infisical's `Retry-After` on a
 429 when that is longer. A caller's revoke then answers `unavailable`, and the caller may retry
 too. A creation that times out may still have made a role at the database. Its password reached no
@@ -890,9 +942,9 @@ revocation is still owed stays until the object stops it.
 identity, channel, grant, lease id, `ttlSeconds`, `requestedTtlSeconds` when given, `clamped`,
 `expiresAt`, and a GitHub caller's `jobWorkflowRef`, `runId`, `runAttempt`) and
 `ai.kilo.sts.lease.revoked` (`cause`: `caller`, `late`, `expiry_mismatch` or `audit_failed`;
-`result`: `revoked`, `gone` when Infisical no longer had it, `revoke_failed` when Infisical did not
-confirm it, or `unconfirmed` when the object stopped a day after the expiry or on a 404 after a
-recorded failure; the last two with
+`result`: `revoked`, `gone` when Infisical no longer had it (with `detail: gone_after_failure`
+when an earlier attempt had failed), `revoke_failed` when Infisical did not confirm it, or
+`unconfirmed` when the object stopped a day after the expiry; the last two with
 outcome `failure`). Refusals of an identified caller become
 `ai.kilo.sts.lease.denied` through the denial object, merged per minute: the answer's reason, or
 for a revoke the caller heard as `not_found`, `not_owner` (another workload's lease), `other_run`
@@ -969,6 +1021,14 @@ a `ci-migration` revocation, and never ends the others.
 
 **Risks.**
 
+- Never force-delete an STS lease or its dynamic secret at Infisical (the lease's or the dynamic
+  secret's "force delete" in the dashboard or API). Infisical then drops the lease without running
+  the revocation statement, so the role, its login and its sessions stay at the database, and STS
+  hears the same 404 as for a confirmed revocation (`gone`, with `detail: gone_after_failure` when
+  an earlier attempt failed). To end a lease whose revocation keeps failing, fix the cause (the
+  failure's `statusDetails` in the Infisical dashboard) and let STS's retry or a normal revoke run;
+  to remove a dynamic secret, first revoke every lease it holds. If a forced delete happened, end
+  the role's sessions and drop it by hand as its admin login (`revoke.sql` with the role's name).
 - A `ci-migration` lease is equivalent to holding the `postgres` owner credential for up to an
   hour, not a bounded capability (design decision Q64, which Igor accepted on 2026-11-26 on these
   terms: it acts as `postgres` for up to an hour, and its effects outlive the revocation). Within
@@ -1173,8 +1233,8 @@ returns `kilo_lease_owner`, so a forgotten `ALTER` is caught.
    object audit covers schema `kilo_lease`. Force a revocation failure (for example, revoke
    `EXECUTE` on `kilo_lease.revoke_lease` from the admin login for the test) and check that every
    later revoke answers 200 with the kept row (`status` `Failed to delete`) and never a 404 until a
-   revocation succeeds; until this is confirmed, STS treats a 404 after a recorded failure as
-   `unconfirmed`.
+   revocation succeeds (confirmed on staging on 2026-11-26: the successful revoke's 200 still
+   carried `Failed to delete`, and the next revoke got the 404; STS reads that 404 as `gone`).
 7. STS: set `MANAGER_PROJECT_SLUG` (Infisical → project settings) and `LEASE_CI_MIGRATION_TARGET`
    in that environment's block of `wrangler.jsonc`, deploy, then add the policy grants. Grant no
    `replica-read` until the replica sweep below runs in that environment, and leave
@@ -1302,6 +1362,18 @@ see a Worker created and deleted inside the window. Nor can it see a change to t
 its own environment: a token that replaced STS also replaced the code that runs the check. A
 monitor outside STS covers that (setup step 7).
 
+**Residual risk, accepted.** A create-tokens credential in STS can mint any permission and roll
+all account tokens; accepted by Igor 2026-11-26. Staging check 6 showed it: the account-owned
+minting token's own policy is no ceiling, and it reads, rolls and deletes every account token. So
+whoever reads `/ci/minting`, or replaces the STS Worker (which any minted deploy token can, above),
+controls every account token, not only one hour of deploy rights. Igor declined the alternatives
+(STS in its own Cloudflare account; a dedicated member with a restricted role) on 2026-11-26
+(design Q65). The detective controls are the window check's `unexpected_script` and
+`unexpected_route` rows and the monitor of the STS Worker outside STS (setup step 7). The minting
+credential can also roll or delete the monitor's own Cloudflare token; that is why the monitor
+posts every run that fails and, through a second workflow that needs no Cloudflare token, every
+45 minutes without a successful run.
+
 **Policy.** A `github-oidc` policy bound to a GitHub environment lists one `cloudflare-deploy`
 entry in `dynamic`:
 
@@ -1321,10 +1393,10 @@ dynamic:
   - grant: cloudflare-deploy
     permissionSet: bouncer-deploy
     permissionGroups: # ids from GET /accounts/<account>/tokens/permission_groups (setup step 3)
-      - { id: '<id>', name: Workers Scripts Write, scope: account }
-      - { id: '<id>', name: Containers Write, scope: account }
-      - { id: '<id>', name: Workers Routes Write, scope: zone }
-    zones: ['<kiloapps.io zone id>']
+      - { id: 'e086da7e2179491d91ee5f35b3ca210a', name: Workers Scripts Write, scope: account }
+      - { id: 'bdbcd690c763475a985e8641dddc09f7', name: Workers Containers Write, scope: account }
+      - { id: '28f4b596e7d643029c524985477ae49a', name: Workers Routes Write, scope: zone }
+    zones: ['9f7103cbcadbe93a052c120f231e8507'] # kiloapps.io
     intendedScripts: [bouncer, bouncer-watch]
     intendedRoutes: [] # zone route patterns the job may add or change; bouncer uses a Custom Domain
     ttlSeconds: 3600 # the default; 300 to 3600
@@ -1554,8 +1626,11 @@ channel, `provider: cloudflare`, `permissionSet`, `tokenId`, `tokenName`, `ttlSe
 last `reason`). Refusals go through the denial object as `ai.kilo.sts.deploy_token.denied` with
 their reason, the token id for a revoke, and the caller's stable claims.
 
-**Setup, per environment (staging first). Needs Igor's approval before any step runs.** No step
-is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
+**Setup, per environment (staging first). Igor approved it on 2026-11-26.** Steps 3 and 7 are in
+the repository: `CLOUDFLARE_DEPLOY_PINS` holds the ids below, `CF_DEPLOY_ACCOUNT_ID` is set in the
+staging and production blocks of `wrangler.jsonc` (development stays empty), and the monitor of
+step 7 runs as two scheduled workflows. Steps 2 and 4 follow the deploy of that change, staging
+first; the production deploy policy (step 5) follows the staging proof.
 
 1. **Creator.** The minting credential is an account-owned API token, not a person or a dedicated
    member: account tokens "act as service principals with their own specific set of permissions"
@@ -1580,21 +1655,24 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    /accounts/<account>/tokens/permission_groups`, which lists every group with its id and name
    (https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/permission_groups/methods/list/);
    copy the ids and Cloudflare's exact names of the deploy groups of step 2 (`Workers Scripts
-   Write`, `Containers Write`, `Workers Routes Write`) into the policy. Fill
-   `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`): `allowedGroups` with those three ids and their
-   scopes (account, account, zone); `allowedZones` with the `kiloapps.io` zone id for staging and
-   production; and `forbiddenGroupIds` with the ids of every group that reads or writes API tokens,
-   members, roles or account settings (for example `Account API Tokens Write`, `API Tokens Write`,
-   `Account Settings Write`, `Memberships Write`). Then deploy. Ids are resolved here, once, never
-   by name at runtime. Until this deploy, STS refuses every mint (`not_configured`) once step 5
-   set the account.
+   Write`, `Workers Containers Write` (the dashboard's "Containers"), `Workers Routes Write`) into
+   the policy. Fill `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`): `allowedGroups` with those three
+   ids and their scopes (account, account, zone); `allowedZones` with the `kiloapps.io` zone id for
+   staging and production; and `forbiddenGroupIds` with the ids of every group that reads or writes
+   API tokens, members, roles or account settings (`Account API Tokens Read` and `Write`, `Account
+   Settings Read` and `Write`, and from `GET /user/tokens/permission_groups` the user-level `API
+   Tokens Read` and `Write` and `Memberships Read` and `Write`). Then deploy. Ids are resolved here,
+   once, never by name at runtime. While `CF_DEPLOY_ACCOUNT_ID` is set and the pins are empty, STS
+   refuses every mint (`not_configured`); here both land in one change.
 4. **Infisical.** Store the minting token as `CLOUDFLARE_MINTING_TOKEN` in `/ci/minting` of the
    environment. The STS identity's `readValue` on `/ci/**` (the grant every GitHub policy needs,
    [Infisical setup](#infisical-setup-per-environment)) covers it. No other identity, role or
    person except the break-glass owner may read `/ci/minting`; the STS deploy job's identity reads
    `/sts-deploy` only.
-5. **STS.** Set `CF_DEPLOY_ACCOUNT_ID` in that environment's block of `wrangler.jsonc` and deploy;
-   then add the policy (`ci-deploy-bouncer`) with its grant and deploy again.
+5. **STS.** `CF_DEPLOY_ACCOUNT_ID` and the pins went in with step 3, in one change with the two
+   throwaway proof policies (`ci-sts-deploy-proof-staging` and `-production`). After the staging
+   proof passes, the production deploy policy (`ci-deploy-bouncer`) lands in its own change and
+   deploys; the proof policies are removed right after the production proof.
 6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Try to create a
    token scoped to one Worker ("Specified Workers", `Individual Workers Editor`), once in the
    dashboard and once through `POST /accounts/<account>/tokens` with the minting token; record
@@ -1621,23 +1699,71 @@ is done yet; `CF_DEPLOY_ACCOUNT_ID` is empty in every block of `wrangler.jsonc`.
    deploying repository's settings that the GitHub environment a staging `cloudflare-deploy` policy
    binds carries the same protection rules as production's (required reviewers, deployment branch
    `main`, no self-review): a staging token reaches production Workers.
+   **Answers, 2026-11-26 (staging minting token `sts-minting-staging`, by API at 23:07Z, since
+   deleted): Q65 was reopened, and Igor accepted the residual risk the same day (above).** A token
+   with `DNS Read` on `kiloapps.io`, a group outside the minting token's policy, was created (200):
+   its policy is not a ceiling. A Super Administrator's canary token was read, rolled (a new value
+   returned) and deleted (200 each): the minting token reaches every account token, including the
+   value of each by rolling it. So whoever reads `/ci/minting`, or replaces the STS Worker (which a
+   minted deploy token can, see above), controls every account token, not one hour of deploy
+   rights. A token scoped to one Worker (`Individual Workers Editor`, resource
+   `com.cloudflare.edge.worker.script.<account>.<script>`) was refused (400, code 1001) through the
+   API; the dashboard attempt is pending the staging proof. The minting token lists the tokens it
+   did not create too (all 24 account tokens), and created, listed and deleted its own child (200
+   each). The script list (200) and the zone's route list (200) work. Its calls carry `Ratelimit:
+   "default";r=1199;t=1` and `Ratelimit-Policy: "default";q=1200;w=300`; whether a deploy's calls
+   lower it is pending the staging proof. Also pending the staging proof: a minted token's own
+   token creation answering 403, an unrevoked minted token gone about an hour later, the sweep's
+   `include_expired=true` list, and the monitor live test (step 7: the first scheduled watch run
+   reports no unexpected deployment; a deployment of `sts-staging` made with a minted staging token
+   outside any deploy job is posted; the health workflow's first run is green). GitHub
+   environments: the only staging `cloudflare-deploy` policy is the throwaway proof policy
+   (`ci-sts-deploy-proof-staging`); its environment `sts-proof-staging` in
+   `iscekic/sts-deploy-token-proof` carries the same rules as `sts-proof-production` (deployment
+   branch `main` only, no required reviewers, in a repository whose only writer is Igor), and both
+   policies are removed right after the production proof. `ci-deploy-bouncer` will bind production
+   only.
 7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
-   report a change to the STS Worker of its own environment. Set up a scheduled job outside STS
-   (an Axiom monitor on Cloudflare's Workers deployment data, or a cron job with a read-only
-   token) that compares the STS Worker's `modified_on` or current deployment id, per environment,
-   with the runs of the STS deploy job, and alerts on any deployment no run made. This is setup
-   work for staging and production; STS does not build it.
+   report a change to the STS Worker of its own environment.
+   `.github/workflows/sts-deployment-watch.yml` runs every 15 minutes on `main`
+   (`scripts/sts-deployment-watch.mjs watch`): it lists the Cloudflare deployments of `sts` and
+   `sts-staging` (`GET /accounts/<account>/workers/scripts/<script>/deployments`) and the jobs named
+   `Deploy services/sts` of `deploy-production.yml` (production), `deploy-staging.yml` (staging) and
+   `deploy-workers.yml` (either), and posts to Slack (`DEPLOY_NOTIFY_SLACK_WEBHOOK_URL`) each
+   deployment made since the previous successful scheduled run on `main` started (less 5 minutes)
+   that is not a `wrangler deploy` (source `wrangler`, `workers/triggered_by` `deployment`, as every
+   CI deploy of STS records) inside a span of a deploy job run on `main` of this repository, from a
+   push, schedule, dispatch or workflow event, for its environment (from 1 minute before the job
+   started to 2 minutes after it ended). A rollback, a secret change or a dashboard edit is
+   reported even inside a job. A `wrangler deploy` with any other credential inside a span of a
+   deploy job run on `main` is hidden: Cloudflare records no author for an API token, so nothing
+   tells it apart. A run on another branch or from a fork makes no span. Outside a span it is
+   reported. A window clamped to 7 days (no successful run for a week) is posted too. It reads
+   Cloudflare with `STS_WATCH_CLOUDFLARE_TOKEN`, a repository secret holding an account token
+   (`sts-deployment-watch`, only `Workers Scripts Read`, expires 2027-11-27), and GitHub with the
+   job's own token (`actions: read`). A run that cannot check fails, posts that it failed (plain
+   text), and the next run covers its window. A flood of watch-failure alerts means the watch
+   cannot read Cloudflare or GitHub: fix `STS_WATCH_CLOUDFLARE_TOKEN` (a rolled, deleted or expired
+   token) before anything else, since STS deployments go unchecked meanwhile.
+   `.github/workflows/sts-deployment-watch-health.yml` runs twice an hour with only the GitHub
+   token and posts when the watch has had no successful scheduled run on `main` for 45 minutes, so
+   a revoked or rolled Cloudflare token, a stopped schedule or a broken workflow cannot silence the
+   watch. Budget: per watch run 2 Cloudflare calls, 4 Actions list calls and 1 jobs call per deploy
+   run updated inside the window (about 1 to 3), so about 700 GitHub API calls and 200 Cloudflare
+   calls a day; the health job adds 2 GitHub calls per run, 96 a day. Together they use about 4,300
+   GitHub Actions minutes a month (96 and 48 one-minute runs a day).
 
 **Rotation (every 90 days, or at once on a leak).** A Super Administrator creates the new minting
 token as in step 2, puts it into `/ci/minting`, and waits 5 minutes (STS reads it within 4). Then
 they wait 1 hour and 5 minutes more, so every token the old credential minted has expired and its
 deletion or sweep has run, and look in **Account API tokens** (a Super Administrator sees every
-account token) for any `sts-<env>-` token still there: STS's deletes with the new credential may be
-refused for tokens the old one created (Cloudflare documents no rule either way; such a 403 fails
-that deletion alone, which STS retries up to hourly). Delete each by hand (STS's next retry then
-finds it gone), then delete the old minting token. On a leak of the minting token, delete it at
-once instead and clear its `sts-<env>-` children by hand the same way; on a leak of a minted token,
-delete it in the dashboard; it expires within the hour anyway.
+account token) for any `sts-<env>-` token still there. The staging check found that a minting
+token lists every account token, not only those it created, so its successor very likely deletes
+its predecessor's tokens; if a delete is refused anyway (a 403 fails that deletion alone, which STS
+retries up to hourly), delete each by hand (STS's next retry then finds it gone), then delete the
+old minting token. On a leak of the minting token, delete it at once instead and clear its
+`sts-<env>-` children by hand the same way; on a leak of a minted token, delete it in the
+dashboard; it expires within the hour anyway.
 
 **Cost.** Per deploy (one token for both of bouncer's deploy steps, revoked by the job): 2 STS
 requests, 2 `DeployTokenDO` calls, 2 Cloudflare API calls (create and delete; a token the job does

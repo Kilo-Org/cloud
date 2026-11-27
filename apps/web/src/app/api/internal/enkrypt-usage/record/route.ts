@@ -20,7 +20,7 @@ export const maxDuration = 150;
 const QUEUE_ADMISSION_MAX_WAIT_MS = 250;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   let body: unknown;

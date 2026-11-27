@@ -1,0 +1,20 @@
+# kilocode security-findings-notify: reads alerts with an app installation token and posts them
+# to Slack (kilocode CI design 6).
+# Kilo-Org/kilocode issues immutable subjects only after its opt-in; until then STS refuses its tokens.
+workload: ci-kilocode-scan-notify
+environments:
+  - production
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  environment: automation
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/security-findings-notify.yml@refs/heads/main
+  events:
+    - schedule
+    - workflow_dispatch
+secrets:
+  - KILOCODE_MAINTAINER_APP_KEY
+  - KILOCODE_SECURITY_ALERTS_SLACK_WEBHOOK

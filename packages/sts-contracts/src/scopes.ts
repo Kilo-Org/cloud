@@ -21,14 +21,67 @@ export const STS_DENIED_PROBE = { audience: 'canary', scope: 'canary:denied-prob
 export const STS_RESERVED_SCOPES: readonly string[] = [STS_DENIED_PROBE.scope];
 
 /**
+ * The AI Gateway forwards a provider request to the AI Gateway Secure Proxy. Only the `ai-gateway`
+ * workload may send it; the Secure Proxy accepts it only from that service caller.
+ */
+export const STS_SECURE_PROXY_FORWARD = {
+  audience: 'ai-gateway-secure-proxy',
+  scope: 'ai-gateway-secure-proxy:request.forward',
+} as const;
+
+/** A publisher (the AI Gateway or the web app) sends usage to Usage Ingest's publisher routes. */
+export const STS_USAGE_PUBLISH = {
+  audience: 'usage-ingest',
+  scope: 'usage-ingest:usage.publish',
+} as const;
+
+/** Usage Ingest's queue consumer records usage at the web app's private record routes. */
+export const STS_USAGE_RECORD = { audience: 'web', scope: 'web:usage.record' } as const;
+
+/** The AI Gateway and the web app write API metrics to O11y's ingestion endpoint. */
+export const STS_O11Y_API_METRICS_WRITE = {
+  audience: 'o11y',
+  scope: 'o11y:api-metrics.write',
+} as const;
+
+/** The web app's admin alerts router reads O11y's alerting configuration and baselines. */
+export const STS_O11Y_ALERTING_READ = { audience: 'o11y', scope: 'o11y:alerting.read' } as const;
+
+/** The web app's admin alerts router changes O11y's alerting configuration and baselines. */
+export const STS_O11Y_ALERTING_WRITE = { audience: 'o11y', scope: 'o11y:alerting.write' } as const;
+
+/**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
  * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
- * reserved denied probe.
+ * reserved denied probe. The UTS scopes are those UTS and its feed accept from a service: the web
+ * app reads the revocation feed and ends or revokes a subject's sessions and credentials;
+ * `uts:token-exchange` authenticates kilo-mcp's RFC 8693 exchange. The service-only scopes of
+ * phase 4 are the Secure Proxy forward (`STS_SECURE_PROXY_FORWARD`), the usage publish to Usage
+ * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), and O11y's
+ * API-metrics write and alerting read and write (`STS_O11Y_*`). STS mints each one only where a
+ * policy grants it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
-  web: { scopes: ['web:sts.canary'] },
-  'usage-ingest': { scopes: ['usage-ingest:sts.canary'] },
+  web: { scopes: ['web:sts.canary', STS_USAGE_RECORD.scope] },
+  'usage-ingest': { scopes: ['usage-ingest:sts.canary', STS_USAGE_PUBLISH.scope] },
   [STS_DENIED_PROBE.audience]: { scopes: [STS_DENIED_PROBE.scope] },
+  'uts-feed': { scopes: ['uts-feed:revocation.read'] },
+  uts: {
+    scopes: [
+      'uts:subjects.revoke',
+      'uts:browser-sessions.end',
+      'uts:api-credentials.revoke',
+      'uts:token-exchange',
+    ],
+  },
+  [STS_SECURE_PROXY_FORWARD.audience]: { scopes: [STS_SECURE_PROXY_FORWARD.scope] },
+  o11y: {
+    scopes: [
+      STS_O11Y_API_METRICS_WRITE.scope,
+      STS_O11Y_ALERTING_READ.scope,
+      STS_O11Y_ALERTING_WRITE.scope,
+    ],
+  },
 };
 
 /** Whether `scope` is registered under `audience`. Inherited object keys never match. */

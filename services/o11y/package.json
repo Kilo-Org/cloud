@@ -25,6 +25,7 @@
     "@kilocode/encryption": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
     "@kilocode/sts-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

@@ -11,6 +11,7 @@ import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity
 import { sendWidgetApns } from './apns-widget';
 import { sendPushNotifications } from './expo-push';
 import type { GlanceableDeliveryDeps, IosActivityToken } from './glanceable-delivery';
+import { skipProviderPush } from './push-gate';
 import { sessionCardSourceSchema, sessionLiveUpdateExpoMessage } from './session-card-delivery';
 
 const deliveryExtrasSchema = z.object({
@@ -216,6 +217,7 @@ export function glanceableDeliveryDeps(
       );
     },
     sendAndroidSessionLiveUpdate: async (send, isCurrent) => {
+      if (skipProviderPush(env, 'expo_push')) return false;
       const accessToken = await readNotificationsSecret(
         env,
         'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
@@ -396,6 +398,7 @@ export function glanceableDeliveryDeps(
       return row !== undefined;
     },
     sendExpoPush: async (messages, isCurrent) => {
+      if (skipProviderPush(env, 'expo_push')) return;
       const accessToken = await readNotificationsSecret(
         env,
         'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
@@ -407,10 +410,15 @@ export function glanceableDeliveryDeps(
   };
 }
 
+/**
+ * `null` skips the APNs send. The staging push gate answers before any
+ * credential binding is read, so its skip never logs a missing credential.
+ */
 async function readApnsCredentials(
   env: Env,
   ctx: SecretsExecutionContext
 ): Promise<ApnsCredentials | null> {
+  if (skipProviderPush(env, 'apns')) return null;
   const { APNS_TEAM_ID: teamId, APNS_KEY_ID: keyId, APNS_TOPIC: topic } = env;
   // The Secrets Store binding is optional; the STS bundle holds the key or reports it unavailable,
   // which skips delivery below like a failed Secrets Store read.

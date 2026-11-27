@@ -10,6 +10,7 @@ const enkryptFields: readonly string[] = Object.keys(EnkryptUsageWriteSchema.sha
 
 const enkryptIngress: TaggedUsageIngress<EnkryptUsageQueueMessage> = {
   kind: 'enkrypt_usage',
+  path: '/enkrypt-usage',
   maxBytes: MAX_ENKRYPT_USAGE_BYTES,
   toMessage(value) {
     const result = EnkryptUsageWriteSchema.safeParse(value);
@@ -26,7 +27,8 @@ const enkryptIngress: TaggedUsageIngress<EnkryptUsageQueueMessage> = {
 export function handlePublishEnkryptUsage(
   request: Request,
   env: Env,
-  entryAtMs: number
+  entryAtMs: number,
+  ctx: ExecutionContext | undefined
 ): Promise<Response> {
-  return handlePublishTaggedUsage(request, env, entryAtMs, enkryptIngress);
+  return handlePublishTaggedUsage(request, env, entryAtMs, enkryptIngress, ctx);
 }

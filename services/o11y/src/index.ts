@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
+import { RESOURCE_METADATA_PATH, protectedResourceMetadata } from './admin-middleware';
 import { registerApiMetricsRoutes } from './api-metrics-routes';
 import { evaluateAlerts } from './alerting/evaluate';
 import { registerAlertingConfigRoutes } from './alerting/config-routes';
@@ -11,6 +12,8 @@ export { AlertConfigDO } from './alerting/AlertConfigDO';
 
 const app = new Hono<{ Bindings: Env }>();
 
+// RFC 9728 metadata for the STS admin challenge; the ordinary 404 unless an STS mode is on.
+app.get(RESOURCE_METADATA_PATH, c => protectedResourceMetadata(c.env) ?? c.notFound());
 registerApiMetricsRoutes(app);
 registerAlertingConfigRoutes(app);
 

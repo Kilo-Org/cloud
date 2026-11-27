@@ -62,7 +62,7 @@ async function workloadBundle(
     secrets: sealed,
     missing: options?.missing ?? [],
     fetchedAt: new Date().toISOString(),
-    policyHash: options?.policyHash ?? (await workloadPolicyHash('o11y')),
+    policyHash: options?.policyHash ?? (await workloadPolicyHash('development', 'o11y')),
     stale: options?.stale ?? false,
   };
 }

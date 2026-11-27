@@ -52,10 +52,8 @@ import {
   type PaidBenchmarkWorkerRequest,
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import {
-  AUTO_ROUTING_BENCHMARK_WORKER_URL,
-  INTERNAL_API_SECRET,
-} from '@kilocode/web-shared/lib/config.server';
+import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import * as z from 'zod';
 import {
@@ -229,7 +227,9 @@ export async function registerOwnerBenchmarkProfiles(
     AUTO_ROUTING_BENCHMARK_WORKER_URL,
     `/admin/profiles/register?router=${request.router}`
   );
-  if (!endpoint || !INTERNAL_API_SECRET) {
+  // A secret that cannot be read sends nothing and answers like a missing one, without its reason.
+  const internalApiSecret = endpoint ? await readInternalApiSecret().catch(() => '') : '';
+  if (!endpoint || !internalApiSecret) {
     return {
       ok: false,
       status: 500,
@@ -239,7 +239,7 @@ export async function registerOwnerBenchmarkProfiles(
   const response = await fetch(endpoint.toString(), {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${INTERNAL_API_SECRET}`,
+      authorization: `Bearer ${internalApiSecret}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify(request),
@@ -351,7 +351,9 @@ async function postPaidBenchmark<T>(
     AUTO_ROUTING_BENCHMARK_WORKER_URL,
     PAID_BENCHMARK_PATH
   );
-  if (!endpoint || !INTERNAL_API_SECRET) {
+  // A secret that cannot be read sends nothing and answers like a missing one, without its reason.
+  const internalApiSecret = endpoint ? await readInternalApiSecret().catch(() => '') : '';
+  if (!endpoint || !internalApiSecret) {
     return {
       ok: false,
       status: 500,
@@ -366,7 +368,7 @@ async function postPaidBenchmark<T>(
     response = await fetch(endpoint.toString(), {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${INTERNAL_API_SECRET}`,
+        authorization: `Bearer ${internalApiSecret}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify(request),

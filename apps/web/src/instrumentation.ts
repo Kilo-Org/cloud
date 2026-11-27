@@ -5,6 +5,11 @@ export async function register() {
     const { registerNodeInstrumentation } =
       await import('@kilocode/web-shared/lib/observability/node-instrumentation');
     registerNodeInstrumentation('kilocode-app');
+    // Node-only, loaded like the instrumentation above so the edge bundle never includes it.
+    // Installing builds nothing: SECRETS_SOURCE is checked per read (`sts-secret-reader.ts`).
+    const { installSelectedInternalApiSecretRead } =
+      await import('@kilocode/web-shared/lib/sts-secret-reader');
+    installSelectedInternalApiSecretRead();
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {

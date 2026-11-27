@@ -1,0 +1,99 @@
+name: Notifications runtime copy (M84, temporary)
+
+# One-shot copy of the four Notifications Secrets Store values into Infisical through a
+# temporary cron-only copier Worker (scripts/secrets-migration/m84-notifications-run.mjs).
+# Removed after the run. It takes no input except the exact commit the dispatcher approved,
+# and it runs only from Kilo-Org/cloud main in the protected `notifications-runtime-copy`
+# environment. That environment must already exist with main as its only deployment branch
+# and no admin bypass. A first job with no secret and no environment reads it back; the copy
+# job references the environment only after that guard passes, so a dispatch can never
+# auto-create it unprotected. The driver reads it back again. This workflow never creates
+# or configures it.
+#
+# Concurrency: its own group, so it can never replace or cancel a pending production or
+# staging rollout. Instead the driver refuses while any Worker rollout workflow is queued or
+# running (at start and again before arming). It also requires every existing Worker's
+# deployment (versions and percentages) to be identical before arming and after cleanup.
+#
+# Credentials: the existing CLOUDFLARE_API_TOKEN (M84b/M84c), the one-use writer client secret
+# and the operator's names-only Infisical readback. All three reach only the driver step's
+# environment. The driver passes the client secret only to `wrangler secret put` on stdin;
+# install and checkout steps see no secret.
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: 'Exact main commit SHA the run was approved for'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: notifications-runtime-copy
+  cancel-in-progress: false
+
+jobs:
+  environment-guard:
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout the dispatched commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Read back the protected environment
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/secrets-migration/m84-notifications-run.mjs --environment-guard
+
+  copy:
+    needs: environment-guard
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    environment: notifications-runtime-copy
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout the dispatched commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install the pinned Wrangler
+        working-directory: services/notifications
+        run: pnpm install --frozen-lockfile --filter '{.}...' --filter kilocode-monorepo
+
+      - name: Run the copier
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          M65_INFISICAL_CLIENT_ID: ${{ vars.M65_INFISICAL_CLIENT_ID }}
+          M65_INFISICAL_CLIENT_SECRET: ${{ secrets.M65_INFISICAL_CLIENT_SECRET }}
+          M65_OPERATOR_PREFLIGHT: ${{ secrets.M65_OPERATOR_PREFLIGHT }}
+        run: node scripts/secrets-migration/m84-notifications-run.mjs

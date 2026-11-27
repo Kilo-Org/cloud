@@ -1,7 +1,44 @@
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 
 const MAX_DOCUMENT_BYTES = 262_144;
+
+export function parseLaunchDocument(bytes, expectedDeadlineAt, now = Date.now()) {
+  if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new Error('AWS launch document is too large');
+  let input;
+  try {
+    input = JSON.parse(Buffer.from(bytes).toString('utf8'));
+  } catch {
+    throw new Error('Invalid AWS launch document');
+  }
+  if (
+    !input ||
+    input.format !== 1 ||
+    !Number.isSafeInteger(input.deadlineAt) ||
+    (expectedDeadlineAt !== undefined && input.deadlineAt !== expectedDeadlineAt) ||
+    input.deadlineAt <= now ||
+    input.deadlineAt > now + 15 * 60_000 ||
+    !Array.isArray(input.argv) ||
+    input.argv.length < 1 ||
+    input.argv.length > 64 ||
+    !input.argv[0] ||
+    input.argv.some(value => typeof value !== 'string' || value.includes('\0')) ||
+    !input.env ||
+    typeof input.env !== 'object' ||
+    Array.isArray(input.env) ||
+    Object.keys(input.env).length > 1024 ||
+    Object.entries(input.env).some(
+      ([name, value]) =>
+        !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || typeof value !== 'string' || value.includes('\0')
+    )
+  ) {
+    throw new Error('Invalid AWS launch document');
+  }
+  return { argv: input.argv, env: input.env };
+}
 
 export function parseLaunchEnvelope(input) {
   if (
@@ -73,44 +110,64 @@ export async function readLaunchDocument(envelope, fetcher = fetch) {
   const bytes = Buffer.concat(chunks, size);
   if (createHash('sha256').update(bytes).digest('hex') !== envelope.sha256)
     throw new Error('AWS launch integrity check failed');
-  let input;
-  try {
-    input = JSON.parse(bytes.toString('utf8'));
-  } catch {
-    throw new Error('Invalid AWS launch document');
-  }
-  if (
-    !input ||
-    input.format !== 1 ||
-    input.deadlineAt !== envelope.deadlineAt ||
-    Date.now() >= input.deadlineAt ||
-    !Array.isArray(input.argv) ||
-    input.argv.length < 1 ||
-    input.argv.length > 64 ||
-    !input.argv[0] ||
-    input.argv.some(value => typeof value !== 'string' || value.includes('\0')) ||
-    !input.env ||
-    typeof input.env !== 'object' ||
-    Array.isArray(input.env) ||
-    Object.keys(input.env).length > 1024 ||
-    Object.entries(input.env).some(
-      ([name, value]) =>
-        !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || typeof value !== 'string' || value.includes('\0')
-    )
-  )
-    throw new Error('Invalid AWS launch document');
-  return { argv: input.argv, env: input.env };
+  return parseLaunchDocument(bytes, envelope.deadlineAt);
+}
+
+/** The public proxy CA extends public roots. It never replaces the ordinary HTTPS trust store. */
+export async function installProxyTrust(env, options = {}) {
+  const pem = env.KILO_AWS_EGRESS_CA_CERTIFICATE;
+  if (pem === undefined) return env;
+  if (typeof pem !== 'string' || pem.length > 16_384 || !new X509Certificate(pem).ca)
+    throw new Error('Invalid AWS proxy CA');
+  const publicRoots = await readFile(
+    options.publicRootsPath ?? '/etc/ssl/certs/ca-certificates.crt',
+    'utf8'
+  );
+  if (!publicRoots.includes('-----BEGIN CERTIFICATE-----'))
+    throw new Error('AWS public trust store unavailable');
+  const directory = await mkdtemp(join(options.tempRoot ?? tmpdir(), 'kilo-aws-trust-'));
+  // These files contain public certificates. The runtime workload can use them after dropping root.
+  await chmod(directory, 0o755);
+  const extra = join(directory, 'proxy-ca.pem');
+  const combined = join(directory, 'public-and-proxy.pem');
+  await writeFile(extra, pem, { mode: 0o644 });
+  await writeFile(combined, publicRoots + '\n' + pem, { mode: 0o644 });
+  const { KILO_AWS_EGRESS_CA_CERTIFICATE: _publicCertificate, ...rest } = env;
+  return {
+    ...rest,
+    NODE_EXTRA_CA_CERTS: extra,
+    SSL_CERT_FILE: combined,
+    GIT_SSL_CAINFO: combined,
+    CURL_CA_BUNDLE: combined,
+  };
 }
 
 export async function startLaunchDocument(input) {
   const envelope = parseLaunchEnvelope(input);
-  const document = await readLaunchDocument(envelope);
+  await startRuntime(await readLaunchDocument(envelope), 'inherit');
+}
+
+async function startRuntime(document, stdin, trust) {
   // Supply the complete environment explicitly. Image-build or platform credentials cannot be inherited.
   const child = spawn(document.argv[0], document.argv.slice(1), {
-    env: document.env,
-    stdio: 'inherit',
+    env: await installProxyTrust(document.env, trust),
+    stdio: [stdin, 'inherit', 'inherit'],
   });
   process.on('SIGTERM', () => child.kill('SIGTERM'));
   child.on('error', () => process.exit(1));
   child.on('exit', code => process.exit(code ?? 1));
+}
+
+/** The EC2 supervisor sends the document once over stdin. Docker does not store it in its configuration. */
+export async function startLaunchFromStdin(stream = process.stdin) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of stream) {
+    size += chunk.byteLength;
+    if (size > MAX_DOCUMENT_BYTES) throw new Error('AWS launch document is too large');
+    chunks.push(chunk);
+  }
+  await startRuntime(parseLaunchDocument(Buffer.concat(chunks, size)), 'ignore', {
+    tempRoot: '/run/kilo-boot',
+  });
 }

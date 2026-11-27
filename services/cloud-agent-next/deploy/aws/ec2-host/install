@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+test "$(id -u)" = 0
+test "$#" = 1
+bundle=$1
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# Install only a host bundle produced by the Cloud Agent release build.
+tar -xzf "$bundle" -C "$work"
+cd "$work"
+sha256sum -c manifest.sha256
+test "$(uname -m)" = x86_64
+test -x /usr/bin/node
+command -v dockerd nft dnsmasq openssl mkfs.ext4 >/dev/null
+systemctl disable --now docker.service docker.socket containerd.service 2>/dev/null || true
+
+install -d -m 0700 /opt/kilo/ec2 /etc/kilo-ec2 /var/lib/kilo-ec2
+install -m 0755 attach-workspace detach-workspace /opt/kilo/ec2/
+install -m 0600 daemon.json dnsmasq.conf workload.nft host.mjs image-id image.tar /opt/kilo/ec2/
+install -m 0644 kilo-ec2.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable kilo-ec2.service

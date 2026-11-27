@@ -1,0 +1,20 @@
+[Unit]
+Description=Kilo Cloud Agent EC2 workspace
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/kilo-ec2/host.conf
+
+[Service]
+Type=simple
+User=root
+UMask=0077
+RuntimeDirectory=kilo-ec2
+RuntimeDirectoryMode=0700
+EnvironmentFile=/etc/kilo-ec2/host.conf
+Environment=DOCKER_HOST=unix:///run/kilo-ec2/docker.sock
+ExecStart=/usr/bin/node /opt/kilo/ec2/host.mjs
+KillMode=mixed
+TimeoutStopSec=110s
+
+[Install]
+WantedBy=multi-user.target

@@ -68,6 +68,8 @@
     "./r2-client": "./src/r2-client.ts",
     "./aws-client": "./src/aws-client.ts",
     "./aws-cloudformation": "./src/aws-cloudformation.ts",
+    "./aws-egress": "./src/aws-egress.ts",
+    "./egress-http": "./src/egress-http.ts",
     "./aws-ec2": "./src/aws-ec2.ts",
     "./aws-ec2-client": "./src/aws-ec2-client.ts",
     "./aws-byoc": "./src/aws-byoc.ts",

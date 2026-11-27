@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+umask 077
+mountpoint=/var/lib/kilo-ec2/workspace
+findmnt --mountpoint "$mountpoint" >/dev/null
+case "$1" in
+  clean) printf '%s %s\n' "$2" "$3" > "$mountpoint/.clean-stop" ;;
+  unclean) ;;
+  *) exit 1 ;;
+esac
+sync -f "$mountpoint"
+umount "$mountpoint"

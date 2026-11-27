@@ -55,7 +55,13 @@ export type DatabaseMetrics = {
   server_idle: number | null;
   server_used: number | null;
   max_client_connections: number | null;
+  /**
+   * PgBouncer's server connection limit **per role** for the app database, not a total.
+   * Compare it with `server_max_per_role`, never with the all-role `server_*` sums.
+   */
   pool_size: number | null;
+  /** The busiest role's server connections (active + idle + used), at `pool_size`'s scope. */
+  server_max_per_role: number | null;
   current_connections: number | null;
   /** Host load. Load averages are gauges, so compare them with `cpu_count` directly. */
   cpu_count: number | null;
@@ -106,7 +112,22 @@ export function parseDatabaseMetrics(text: string): DatabaseMetrics {
   const max = aggregate(values => Math.max(...values));
   const count = aggregate(values => values.length);
 
+  // `SHOW POOLS` labels the configured PgBouncer entry `database`, while `SHOW DATABASES`
+  // labels it `name` and uses `database` for the backing PostgreSQL database.
   const pool = { database: APP_DATABASE };
+  const entry = { name: APP_DATABASE };
+
+  const serverByRole = new Map<string, number>();
+  for (const name of [
+    'pgbouncer_pools_server_active_connections',
+    'pgbouncer_pools_server_idle_connections',
+    'pgbouncer_pools_server_used_connections',
+  ]) {
+    for (const sample of matching(samples, name, pool)) {
+      const role = sample.labels.user ?? '';
+      serverByRole.set(role, (serverByRole.get(role) ?? 0) + sample.value);
+    }
+  }
 
   return {
     client_active: sum('pgbouncer_pools_client_active_connections', pool),
@@ -115,8 +136,9 @@ export function parseDatabaseMetrics(text: string): DatabaseMetrics {
     server_idle: sum('pgbouncer_pools_server_idle_connections', pool),
     server_used: sum('pgbouncer_pools_server_used_connections', pool),
     max_client_connections: max('pgbouncer_config_max_client_connections'),
-    pool_size: max('pgbouncer_databases_pool_size', pool),
-    current_connections: sum('pgbouncer_databases_current_connections', pool),
+    pool_size: max('pgbouncer_databases_pool_size', entry),
+    server_max_per_role: serverByRole.size > 0 ? Math.max(...serverByRole.values()) : null,
+    current_connections: sum('pgbouncer_databases_current_connections', entry),
     cpu_count: count('node_cpu_seconds_total', { mode: 'idle' }),
     load1: max('node_load1'),
     load5: max('node_load5'),

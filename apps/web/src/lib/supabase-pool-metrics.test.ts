@@ -16,6 +16,9 @@ const scrape = [
   `pgbouncer_databases_pool_size{${base},database="postgres",name="postgres"} 320`,
   `pgbouncer_databases_pool_size{${base},database="pgbouncer",name="pgbouncer"} 2`,
   `pgbouncer_databases_current_connections{${base},database="postgres",name="postgres"} 119`,
+  `pgbouncer_databases_pool_size{${base},database="postgres",name="postgres_alias"} 999`,
+  `pgbouncer_databases_current_connections{${base},database="postgres",name="postgres_alias"} 50`,
+  `pgbouncer_pools_server_active_connections{${base},database="postgres",user="kilocode_worker"} 4`,
   `node_cpu_seconds_total{${base},cpu="0",mode="idle"} 900`,
   `node_cpu_seconds_total{${base},cpu="0",mode="user"} 80`,
   `node_cpu_seconds_total{${base},cpu="0",mode="iowait"} 20`,
@@ -76,13 +79,30 @@ describe('parseDatabaseMetrics', () => {
     expect(metrics).toMatchObject({
       client_active: 42,
       client_waiting: 3,
-      server_active: 30,
+      server_active: 34,
       server_idle: 5,
       server_used: 1,
       max_client_connections: 3000,
-      pool_size: 320,
       current_connections: 119,
     });
+  });
+
+  it('reports per-role capacity with the busiest role at the same scope', () => {
+    const metrics = parseDatabaseMetrics(scrape);
+    expect(metrics.pool_size).toBe(320);
+    expect(metrics.server_max_per_role).toBe(36);
+  });
+
+  it('ignores other PgBouncer entries backed by the same database', () => {
+    const metrics = parseDatabaseMetrics(
+      [
+        'pgbouncer_databases_pool_size{database="postgres",name="postgres_alias"} 999',
+        'pgbouncer_databases_current_connections{database="postgres",name="postgres_alias"} 50',
+      ].join('\n')
+    );
+    expect(metrics.pool_size).toBeNull();
+    expect(metrics.current_connections).toBeNull();
+    expect(metrics.server_max_per_role).toBeNull();
   });
 
   it('reports host and Postgres load', () => {

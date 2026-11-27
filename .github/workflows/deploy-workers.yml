@@ -240,8 +240,14 @@ jobs:
         if: inputs.worker == 'services/cloud-agent-next'
         continue-on-error: true
         working-directory: ${{ inputs.worker }}
+        # handoff.json binds the maps to this run attempt and the deployed commit.
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
           pnpm run sentry:stage "$RUNNER_TEMP/cloud-agent-sentry"
+          jq -n --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg source_sha "$SOURCE_SHA" \
+            '{run_id: $run_id, run_attempt: $run_attempt, source_sha: $source_sha, worker: "services/cloud-agent-next"}' \
+            > "$RUNNER_TEMP/cloud-agent-sentry/handoff.json"
           tar -czf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$RUNNER_TEMP/cloud-agent-sentry" .
 
       - name: Hand over Cloud Agent Sentry source maps
@@ -579,8 +585,14 @@ jobs:
         if: matrix.worker == 'services/cloud-agent-next'
         continue-on-error: true
         working-directory: ${{ matrix.worker }}
+        # handoff.json binds the maps to this run attempt and the deployed commit.
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
           pnpm run sentry:stage "$RUNNER_TEMP/cloud-agent-sentry"
+          jq -n --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg source_sha "$SOURCE_SHA" \
+            '{run_id: $run_id, run_attempt: $run_attempt, source_sha: $source_sha, worker: "services/cloud-agent-next"}' \
+            > "$RUNNER_TEMP/cloud-agent-sentry/handoff.json"
           tar -czf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$RUNNER_TEMP/cloud-agent-sentry" .
 
       - name: Hand over Cloud Agent Sentry source maps
@@ -759,8 +771,14 @@ jobs:
         id: sentry-stage
         continue-on-error: true
         working-directory: services/cloud-agent-next
+        # handoff.json binds the maps to this run attempt and the deployed commit.
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
           pnpm run sentry:stage "$RUNNER_TEMP/cloud-agent-sentry"
+          jq -n --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg source_sha "$SOURCE_SHA" \
+            '{run_id: $run_id, run_attempt: $run_attempt, source_sha: $source_sha, worker: "services/cloud-agent-next"}' \
+            > "$RUNNER_TEMP/cloud-agent-sentry/handoff.json"
           tar -czf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$RUNNER_TEMP/cloud-agent-sentry" .
 
       - name: Hand over Cloud Agent Sentry source maps

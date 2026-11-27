@@ -386,7 +386,10 @@ test('the Vercel CLI and app closure hand-offs are per attempt and digest-checke
   assert.equal(appUpload.with.overwrite, undefined);
 });
 
-test('the Sentry hand-off check refuses anything but the staged files', () => {
+// GNU tar and find: the archive checks run on the Linux runners, so these two tests skip elsewhere.
+const linuxOnly = { skip: process.platform !== 'linux' && 'GNU tar and find (Linux runners)' };
+
+test('the Sentry hand-off check refuses anything but the staged files', linuxOnly, () => {
   const work = mkdtempSync(join(tmpdir(), 'sentry-handoff-'));
   const check = archive =>
     spawnSync('bash', ['scripts/ci/check-sentry-handoff.sh', archive], { encoding: 'utf8' });
@@ -420,56 +423,106 @@ test('the Sentry hand-off check refuses anything but the staged files', () => {
   }
 });
 
-test('the Sentry hand-off check refuses absolute and parent paths, extra files and parent config', () => {
-  const work = mkdtempSync(join(tmpdir(), 'sentry-handoff-more-'));
-  const check = (...args) =>
-    spawnSync('bash', ['scripts/ci/check-sentry-handoff.sh', ...args], { encoding: 'utf8' });
-  try {
-    const root = join(work, 'root');
-    mkdirSync(join(root, '0'), { recursive: true });
-    writeFileSync(join(root, 'uploads.json'), '[]');
-    writeFileSync(join(root, 'sentry-cli'), 'binary');
-    writeFileSync(join(root, '0', 'x.js'), 'code');
-    for (const [name, target] of [
-      ['absolute', '/etc/x.js'],
-      ['dotdot', '../x.js'],
-    ]) {
-      const archive = join(work, `${name}.tgz`);
-      execFileSync('tar', [
-        '-czf',
-        archive,
-        '-P',
-        `--transform=s,^\\./0/x\\.js$,${target},`,
-        '-C',
-        root,
-        '.',
-      ]);
-      assert.match(
-        execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }),
-        new RegExp(target.replace(/[./]/g, '\\$&'))
-      );
-      const result = check(archive);
-      assert.notEqual(result.status, 0, `${name} is refused`);
-      assert.match(result.stderr, /::error title=sentry-handoff::/, name);
+test(
+  'the Sentry hand-off check refuses absolute and parent paths, extra files and parent config',
+  linuxOnly,
+  () => {
+    const work = mkdtempSync(join(tmpdir(), 'sentry-handoff-more-'));
+    const check = (...args) =>
+      spawnSync('bash', ['scripts/ci/check-sentry-handoff.sh', ...args], { encoding: 'utf8' });
+    try {
+      const root = join(work, 'root');
+      mkdirSync(join(root, '0'), { recursive: true });
+      writeFileSync(join(root, 'uploads.json'), '[]');
+      writeFileSync(join(root, 'sentry-cli'), 'binary');
+      writeFileSync(join(root, '0', 'x.js'), 'code');
+      for (const [name, target] of [
+        ['absolute', '/etc/x.js'],
+        ['dotdot', '../x.js'],
+      ]) {
+        const archive = join(work, `${name}.tgz`);
+        execFileSync('tar', [
+          '-czf',
+          archive,
+          '-P',
+          `--transform=s,^\\./0/x\\.js$,${target},`,
+          '-C',
+          root,
+          '.',
+        ]);
+        assert.match(
+          execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }),
+          new RegExp(target.replace(/[./]/g, '\\$&'))
+        );
+        const result = check(archive);
+        assert.notEqual(result.status, 0, `${name} is refused`);
+        assert.match(result.stderr, /::error title=sentry-handoff::/, name);
+      }
+
+      // The downloaded artifact must hold exactly one regular file.
+      const artifact = join(work, 'artifact');
+      mkdirSync(artifact);
+      writeFileSync(join(artifact, 'cloud-agent-sentry.tgz'), 'x');
+      assert.equal(check('--artifact', artifact).status, 0);
+      writeFileSync(join(artifact, '.sentryclirc'), 'x');
+      assert.notEqual(check('--artifact', artifact).status, 0, 'a second file is refused');
+
+      // A .sentryclirc or sentry.properties in the working directory or any parent is refused.
+      const nested = join(work, 'parent', 'child');
+      mkdirSync(nested, { recursive: true });
+      assert.equal(check('--workdir', nested).status, 0);
+      writeFileSync(join(work, 'parent', '.sentryclirc'), '[defaults]\nurl=https://x');
+      const parent = check('--workdir', nested);
+      assert.notEqual(parent.status, 0, 'a parent .sentryclirc is refused');
+      assert.match(parent.stderr, /sentryclirc exists/);
+    } finally {
+      rmSync(work, { recursive: true, force: true });
     }
-
-    // The downloaded artifact must hold exactly one regular file.
-    const artifact = join(work, 'artifact');
-    mkdirSync(artifact);
-    writeFileSync(join(artifact, 'cloud-agent-sentry.tgz'), 'x');
-    assert.equal(check('--artifact', artifact).status, 0);
-    writeFileSync(join(artifact, '.sentryclirc'), 'x');
-    assert.notEqual(check('--artifact', artifact).status, 0, 'a second file is refused');
-
-    // A .sentryclirc or sentry.properties in the working directory or any parent is refused.
-    const nested = join(work, 'parent', 'child');
-    mkdirSync(nested, { recursive: true });
-    assert.equal(check('--workdir', nested).status, 0);
-    writeFileSync(join(work, 'parent', '.sentryclirc'), '[defaults]\nurl=https://x');
-    const parent = check('--workdir', nested);
-    assert.notEqual(parent.status, 0, 'a parent .sentryclirc is refused');
-    assert.match(parent.stderr, /sentryclirc exists/);
-  } finally {
-    rmSync(work, { recursive: true, force: true });
   }
+);
+
+test('the Sentry upload job is pinned to its lookup, environment and argument allowlists', () => {
+  const sentry = workflows['cloud-agent-sentry-sourcemaps.yml'].jobs.upload;
+  assert.equal(sentry.permissions.actions, 'read');
+  const caller = workflows['deploy-workers.yml'].jobs['upload-cloud-agent-sentry'];
+  assert.equal(caller.permissions.actions, 'read');
+  const run = sentry.steps.find(step => step.name === 'Upload source maps').run;
+  // Exactly this attempt's name, no fallback to an older attempt.
+  assert.ok(run.includes('name="cloud-agent-sentry-$GITHUB_RUN_ATTEMPT"'));
+  assert.match(run, /artifacts\?name=\$name/);
+  assert.doesNotMatch(run, /for \(\(n = /);
+  assert.match(run, /\.run_id == \$run_id and \.run_attempt == \$run_attempt/);
+  assert.match(run, /\.source_sha == \$source_sha and \.worker == "services\/cloud-agent-next"/);
+  // env -i with exactly this allowlist.
+  const envStart = run.indexOf('env -i');
+  const envLine = run.slice(envStart, run.indexOf('"$cli" "${args[@]}"', envStart));
+  assert.ok(envStart > 0 && envLine.length > 0, 'sentry-cli runs under env -i');
+  const names = [...envLine.matchAll(/\b([A-Z_]+)=/g)].map(match => match[1]).sort();
+  assert.deepEqual(names, [
+    'HOME',
+    'PATH',
+    'SENTRY_AUTH_TOKEN',
+    'SENTRY_LOAD_DOTENV',
+    'SENTRY_URL',
+    'TMPDIR',
+  ]);
+  assert.match(envLine, /SENTRY_URL=https:\/\/sentry\.io\/ SENTRY_LOAD_DOTENV=0/);
+  // The argument allowlist: flags with a value, bare flags, and nothing else but map paths.
+  assert.match(run, /--org \| --project \| --release \| --wait-for\)/);
+  assert.match(run, /--strict \| --validate \| --no-rewrite\) args\+=/);
+  const valuePattern = run.match(/\[\[ \$value =~ (\S+) \]\]/)[1];
+  const value = new RegExp(valuePattern);
+  assert.equal(valuePattern, '^[A-Za-z0-9@._][A-Za-z0-9@._-]*$');
+  for (const refused of ['--url', '-u', '--auth-token', 'https://x', '']) {
+    assert.doesNotMatch(refused, value, `--org ${refused} is refused`);
+  }
+  for (const allowed of [
+    'kilo-code',
+    'kilo-cloud-agent',
+    '120',
+    `cloud-agent-wrapper@${'a'.repeat(64)}`,
+  ]) {
+    assert.match(allowed, value);
+  }
+  assert.match(run, /neither an allowed flag nor a map path/);
 });

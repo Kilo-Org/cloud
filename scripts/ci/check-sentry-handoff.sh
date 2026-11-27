@@ -61,6 +61,6 @@ while IFS= read -r name; do
   member=${name#./}
   [[ -z $member ]] && continue
   [[ $member != *..* ]] || fail "the hand-off archive holds a member with .."
-  [[ $member =~ ^(uploads\.json|sentry-cli|[0-9]+/?|[0-9]+/[A-Za-z0-9_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*\.(js|mjs|cjs)(\.map)?)$ ]] ||
+  [[ $member =~ ^(uploads\.json|handoff\.json|sentry-cli|[0-9]+/?|[0-9]+/[A-Za-z0-9_][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*\.(js|mjs|cjs)(\.map)?)$ ]] ||
     fail "the hand-off archive holds an unexpected member"
 done <<<"$names"

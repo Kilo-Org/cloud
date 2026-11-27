@@ -76,12 +76,14 @@ jobs:
           workload: ${{ inputs.target_environment == 'production' && 'ci-cloud-agent-sentry' || format('ci-cloud-agent-sentry-{0}', inputs.target_environment) }}
           secrets: SENTRY_AUTH_TOKEN
 
-      # The hand-off has no digest: the archive check, the lockfile-verified
-      # binary and the argument allowlist below are what this job relies on.
-      # A re-run of failed jobs keeps the deploy job's attempt number, so the
-      # newest cloud-agent-sentry-<n> of this run, n = this attempt down to 1, is
-      # the hand-off. It lands in a private directory that must hold exactly one
-      # regular file. sentry-cli then runs with `env -i` and an allowlist: HOME and
+      # The hand-off has no digest: the archive check, handoff.json, the
+      # lockfile-verified binary and the argument allowlist below are what this
+      # job relies on. It takes only this attempt's cloud-agent-sentry-<attempt>,
+      # whose handoff.json must name this run, attempt and deployed commit; an older
+      # attempt's maps are never uploaded under this run's result (a missing one is
+      # skipped with a warning). The hand-off lands in a private directory that must
+      # hold exactly one regular file.
+      # sentry-cli then runs with `env -i` and an allowlist: HOME and
       # its working directory are new empty directories with no .sentryclirc or
       # sentry.properties up to /, no SENTRY_* variable but the token, the fixed
       # host and SENTRY_LOAD_DOTENV=0, and each argument list is a source map
@@ -90,18 +92,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SENTRY_AUTH_TOKEN: ${{ steps.sts.outputs.SENTRY_AUTH_TOKEN }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
           set -euo pipefail
           fail() { echo "::error::$1"; exit 1; }
           handoff=$(mktemp -d "$RUNNER_TEMP/handoff.XXXXXX")
-          artifact_id=""
-          for ((n = GITHUB_RUN_ATTEMPT; n >= 1; n--)); do
-            artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=cloud-agent-sentry-$n" \
-              --jq '.artifacts | map(select(.expired | not)) | .[0].id // empty')
-            [[ -z $artifact_id ]] || break
-          done
+          name="cloud-agent-sentry-$GITHUB_RUN_ATTEMPT"
+          artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$name" \
+            --jq '[.artifacts[] | select(.name == "'"$name"'" and (.expired | not))] | .[0].id // empty')
           if [[ -z $artifact_id ]]; then
-            echo "::warning::No Cloud Agent Sentry hand-off in this run (cloud-agent-sentry-1 to -$GITHUB_RUN_ATTEMPT); no source maps uploaded"
+            echo "::warning::No $name hand-off in this run attempt; no Cloud Agent source maps uploaded"
             exit 0
           fi
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$RUNNER_TEMP/handoff.zip"
@@ -111,6 +111,10 @@ jobs:
           stage=$(mktemp -d "$RUNNER_TEMP/stage.XXXXXX")
           package=$(mktemp -d "$RUNNER_TEMP/sentry-cli-package.XXXXXX")
           tar -xzf "$handoff/cloud-agent-sentry.tgz" -C "$stage" --no-same-owner
+          jq -e --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" --arg source_sha "$EXPECTED_SOURCE_SHA" '
+            type == "object" and .run_id == $run_id and .run_attempt == $run_attempt
+            and .source_sha == $source_sha and .worker == "services/cloud-agent-next"
+          ' "$stage/handoff.json" >/dev/null || fail "handoff.json does not name this run attempt and deployed commit"
 
           version=$(sed -nE "s/^  '@sentry\/cli': ([0-9]+\.[0-9]+\.[0-9]+)$/\1/p" deployed/pnpm-workspace.yaml | head -n 1)
           case "$RUNNER_ARCH" in
@@ -148,7 +152,7 @@ jobs:
                 --org | --project | --release | --wait-for)
                   ((k + 1 < ${#raw[@]})) || fail "upload $i: $arg has no value"
                   value=${raw[k + 1]}
-                  [[ $value =~ ^[A-Za-z0-9@._-]+$ ]] || fail "upload $i: $arg has an unexpected value"
+                  [[ $value =~ ^[A-Za-z0-9@._][A-Za-z0-9@._-]*$ ]] || fail "upload $i: $arg has an unexpected value"
                   args+=("$arg" "$value")
                   k=$((k + 1))
                   ;;

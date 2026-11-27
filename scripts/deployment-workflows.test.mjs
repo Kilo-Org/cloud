@@ -36,7 +36,7 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
     assert.ok(steps.indexOf(stage) > steps.indexOf(retry));
     assert.match(stage.run, /^pnpm run sentry:stage "\$RUNNER_TEMP\/cloud-agent-sentry"\n/);
     // The deploy job never holds the Sentry token: the upload job reads it from STS.
-    assert.equal(stage.env, undefined);
+    assert.deepEqual(stage.env, { SOURCE_SHA: '${{ inputs.source_sha || github.sha }}' });
     assert.equal(handover['continue-on-error'], true);
     assert.equal(handover.if, "steps.sentry-stage.outcome == 'success'");
     assert.equal(handover.with.name, 'cloud-agent-sentry-${{ github.run_attempt }}');

@@ -11,9 +11,11 @@ export const OPENROUTER_APP_TITLE = 'Kilo Code';
 // five minutes.
 const API_KEY_CACHE_TTL_MS = 300_000;
 
-const apiKeyCache = ttlCached(API_KEY_CACHE_TTL_MS, (env: OpenRouterEnv) =>
-  env.OPENROUTER_API_KEY.get()
-);
+const apiKeyCache = ttlCached(API_KEY_CACHE_TTL_MS, async (env: OpenRouterEnv) => {
+  const apiKey = await env.OPENROUTER_API_KEY.get();
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured');
+  return apiKey;
+});
 
 export async function createSystemOneClient(env: OpenRouterEnv): Promise<SystemOneClient> {
   return {

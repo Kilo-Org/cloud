@@ -19,8 +19,7 @@ jest.mock('@kilocode/web-shared/lib/auth/openai/config', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { EncryptedData, OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
-import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
+import type { OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -28,10 +27,7 @@ import {
   TEST_BYOK_DATA_KEY,
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
-import {
-  sealedOpenAiChatGptConnectionColumns,
-  staticKeyOpenAiChatGptConnection,
-} from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
+import { sealedOpenAiChatGptConnectionColumns } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import {
   OPENAI_TOKEN_ENDPOINT,
   OPENAI_RESOURCE,
@@ -57,7 +53,6 @@ type StoredRow = {
   kilo_user_id: string;
   organization_id: string | null;
   is_shared_services: boolean;
-  encrypted_connection: EncryptedData;
   encrypted_connection_envelope: OpenAiChatGptConnectionEnvelope | null;
   is_enabled: boolean;
 };
@@ -98,17 +93,6 @@ function encryptedRow(connection: OpenAiChatGptConnection): StoredRow {
   };
 }
 
-/** A row whose envelope holds `sealed` next to a real static-key ciphertext of `staticCopy`. */
-function rowWithStaticKeyCopy(
-  sealed: OpenAiChatGptConnection,
-  staticCopy: OpenAiChatGptConnection
-): StoredRow {
-  return {
-    ...encryptedRow(sealed),
-    encrypted_connection: staticKeyOpenAiChatGptConnection(staticCopy),
-  };
-}
-
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return {
     ok: status >= 200 && status < 300,
@@ -118,9 +102,8 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
   } as unknown as Response;
 }
 
-/** The payload a write stored in its envelope, after checking the obsolete column holds the placeholder. */
+/** The payload a write stored in its envelope. */
 function decodeStored(setCall: Record<string, unknown>): OpenAiChatGptConnection {
-  expect(setCall.encrypted_connection).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
   const envelope = setCall.encrypted_connection_envelope as OpenAiChatGptConnectionEnvelope;
   return OpenAiChatGptConnectionSchema.parse(
     JSON.parse(decryptApiKey(envelope.encrypted_data, TEST_BYOK_DATA_KEY))
@@ -865,10 +848,9 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       expect(written.is_enabled).toBe(false);
     });
 
-    it('refreshes with the envelope refresh token, never the one in the obsolete static-key column', async () => {
-      storedRow = rowWithStaticKeyCopy(
-        buildConnection({ access_token: 'envelope-access', refresh_token: 'envelope-refresh' }),
-        buildConnection({ access_token: 'static-access', refresh_token: 'static-refresh' })
+    it('refreshes with the envelope refresh token', async () => {
+      storedRow = encryptedRow(
+        buildConnection({ access_token: 'envelope-access', refresh_token: 'envelope-refresh' })
       );
       fetchMock.mockResolvedValue(
         jsonResponse({ access_token: 'new-access-token', expires_in: 60 })
@@ -888,10 +870,9 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       expect(decodeStored(txUpdateSetCalls[0]).refresh_token).toBe('envelope-refresh');
     });
 
-    it('serves the access token of the envelope, not the static-key copy', async () => {
-      storedRow = rowWithStaticKeyCopy(
-        buildConnection({ access_token: 'envelope-access', expires_at: nowSeconds() + 3600 }),
-        buildConnection({ access_token: 'static-access', expires_at: nowSeconds() + 3600 })
+    it('serves the access token of the envelope', async () => {
+      storedRow = encryptedRow(
+        buildConnection({ access_token: 'envelope-access', expires_at: nowSeconds() + 3600 })
       );
 
       await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
@@ -901,12 +882,9 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       });
     });
 
-    it('reports no connection for a row without an envelope, even if the static-key column holds a connection', async () => {
+    it('reports no connection for a row without an envelope', async () => {
       storedRow = {
-        ...rowWithStaticKeyCopy(
-          buildConnection({ expires_at: nowSeconds() + 3600 }),
-          buildConnection({ access_token: 'static-access', expires_at: nowSeconds() + 3600 })
-        ),
+        ...encryptedRow(buildConnection({ expires_at: nowSeconds() + 3600 })),
         encrypted_connection_envelope: null,
       };
 

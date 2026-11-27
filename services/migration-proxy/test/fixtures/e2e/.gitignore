@@ -1,0 +1,4 @@
+Dockerfile
+ca.pem
+.dev.vars
+.wrangler/

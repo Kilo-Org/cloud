@@ -6,8 +6,11 @@ import {
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
   STS_SECURE_PROXY_FORWARD,
+  STS_SECURITY_SYNC_DISMISS_FINDING,
+  STS_SECURITY_SYNC_MANUAL_SYNC,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
+  STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   isRegisteredStsScope,
   stsScopeRegistryProblems,
   type StsScopeRegistry,
@@ -159,7 +162,9 @@ describe('scope strings', () => {
 describe('STS scope registry', () => {
   it('lists only the pilot scopes, the reserved probe, the UTS scopes and the phase 4 service scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
-      web: { scopes: ['web:sts.canary', 'web:usage.record'] },
+      web: {
+        scopes: ['web:sts.canary', 'web:usage.record', 'web:security-notifications.dispatch'],
+      },
       'usage-ingest': { scopes: ['usage-ingest:sts.canary', 'usage-ingest:usage.publish'] },
       canary: { scopes: ['canary:denied-probe'] },
       'uts-feed': { scopes: ['uts-feed:revocation.read'] },
@@ -173,6 +178,9 @@ describe('STS scope registry', () => {
       },
       'ai-gateway-secure-proxy': { scopes: ['ai-gateway-secure-proxy:request.forward'] },
       o11y: { scopes: ['o11y:api-metrics.write', 'o11y:alerting.read', 'o11y:alerting.write'] },
+      'security-sync': {
+        scopes: ['security-sync:manual-sync.enqueue', 'security-sync:dismiss-finding.enqueue'],
+      },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
@@ -182,6 +190,10 @@ describe('STS scope registry', () => {
     expect(isRegisteredStsScope('uts', 'uts-feed:revocation.read')).toBe(false);
     expect(isRegisteredStsScope('web', 'usage-ingest:usage.publish')).toBe(false);
     expect(isRegisteredStsScope('usage-ingest', 'web:usage.record')).toBe(false);
+    expect(isRegisteredStsScope('web', 'security-sync:manual-sync.enqueue')).toBe(false);
+    expect(isRegisteredStsScope('security-sync', 'web:security-notifications.dispatch')).toBe(
+      false
+    );
   });
 
   it('lists each shipped scope under its own audience', () => {
@@ -199,6 +211,9 @@ describe('STS scope registry', () => {
     ['o11y:api-metrics.write', 'o11y', STS_O11Y_API_METRICS_WRITE],
     ['o11y:alerting.read', 'o11y', STS_O11Y_ALERTING_READ],
     ['o11y:alerting.write', 'o11y', STS_O11Y_ALERTING_WRITE],
+    ['security-sync:manual-sync.enqueue', 'security-sync', STS_SECURITY_SYNC_MANUAL_SYNC],
+    ['security-sync:dismiss-finding.enqueue', 'security-sync', STS_SECURITY_SYNC_DISMISS_FINDING],
+    ['web:security-notifications.dispatch', 'web', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });
     expect(scopeAudience(pair.scope)).toBe(pair.audience);

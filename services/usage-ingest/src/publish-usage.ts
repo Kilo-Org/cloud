@@ -1,6 +1,7 @@
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import {
   UsageRecordRequestSchema,
+  toUsageRecordWireBody,
   type EnkryptUsageQueueMessage,
   type ExaUsageQueueMessage,
   type LlmUsageQueueMessage,
@@ -147,15 +148,16 @@ async function handlePublishUsage(
     return errorResponse('Invalid usage payload', 400);
   }
 
+  // The queued body, with the retired metadata keys, so a rolled-back consumer still accepts it.
+  const usage = toUsageRecordWireBody(result.data);
   try {
-    if (new TextEncoder().encode(JSON.stringify(result.data)).byteLength > MAX_USAGE_BYTES) {
+    if (new TextEncoder().encode(JSON.stringify(usage)).byteLength > MAX_USAGE_BYTES) {
       return errorResponse('Usage payload too large', 413);
     }
   } catch {
     return errorResponse('Usage payload too large', 413);
   }
 
-  const usage = result.data;
   if (
     hedgeMode(env.USAGE_INGEST_HEDGE_MODE) === 'on' &&
     hedgeEligible(usage.core.id, hedgePercent(env.USAGE_INGEST_HEDGE_PERCENT))

@@ -1,0 +1,14 @@
+# The migration proxy Worker (services/migration-proxy, design Q64a). Its MigrationRunDO reads
+# the bundle at each run start: the Postgres password of its login (production: the
+# kilo_migration_proxy member login, never the postgres password; staging: staging's postgres)
+# and the private key of the read-only kilo-migration-proxy GitHub App, both in Infisical
+# /workloads/migration-proxy. attestGithubRun serves only this props caller, by name.
+workload: migration-proxy
+environments:
+  - staging
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - MIGRATION_PROXY_DB_PASSWORD
+  - MIGRATION_PROXY_GITHUB_APP_KEY

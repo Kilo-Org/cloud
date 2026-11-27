@@ -4,12 +4,15 @@ import type { Event, NodeOptions } from '@sentry/nextjs';
 import {
   addBreadcrumb,
   captureException,
+  captureMessage,
   captureRequestError,
   close,
   flush,
+  trpcMiddleware,
   withIsolationScope,
   withScope,
 } from '@sentry/nextjs';
+import { initTRPC } from '@trpc/server';
 import { DrizzleQueryError } from 'drizzle-orm';
 import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
 
@@ -257,5 +260,81 @@ describe('initServerSentry through the real SDK pipeline', () => {
     expect(event?.fingerprint).toEqual(['drizzle-query-error', 'generic', 'DrizzleQueryError']);
     expect(event?.contexts?.drizzle_query).toEqual({ query });
     expect(JSON.stringify(event)).not.toContain(FAKE_SECRET);
+  });
+
+  test('sends a tRPC procedure error with safe database diagnostics', async () => {
+    const query = 'select * from items where id = $1';
+    const cause = Object.assign(
+      new Error(`invalid input syntax for type uuid: "${FAKE_DB_INPUT}"`),
+      {
+        code: '22P02',
+      }
+    );
+    const t = initTRPC.create();
+    const caller = t
+      .router({
+        lookup: t.procedure.use(trpcMiddleware({ attachRpcInput: false })).query(() => {
+          throw new DrizzleQueryError(query, [FAKE_SECRET], cause);
+        }),
+      })
+      .createCaller({});
+
+    await expect(caller.lookup()).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    const [event] = await sentEvents();
+    expect(event).toBeDefined();
+    expect(JSON.stringify(event)).not.toContain(FAKE_SECRET);
+    expect(JSON.stringify(event)).not.toContain(FAKE_DB_INPUT);
+    expect(event?.fingerprint).toEqual(['drizzle-query-error', '22P02', 'PostgresError']);
+    expect(event?.tags).toMatchObject({ 'db.error_code': '22P02' });
+    expect(event?.contexts?.drizzle_query).toEqual({ query });
+    expect(event?.contexts?.trpc).toEqual({ procedure_path: 'lookup', procedure_type: 'query' });
+    expect(event?.exception?.values).toHaveLength(1);
+    expect(event?.exception?.values?.[0]).toMatchObject({
+      type: 'PostgresError',
+      value: 'invalid input syntax for type uuid: "[Filtered]"',
+      stacktrace: { frames: expect.any(Array) },
+      mechanism: { handled: false, type: 'auto.rpc.trpc.middleware' },
+    });
+  });
+
+  test('removes bound values from formatted query errors in event text', async () => {
+    const query = 'select *\nfrom items where id = $1';
+    const error = new DrizzleQueryError(query, [`${FAKE_SECRET}\n${FAKE_DB_INPUT}`]);
+    const expected = `Failed query: ${query}`;
+    withIsolationScope(scope => {
+      scope.setExtra('args', [{ message: error.message }]);
+      addBreadcrumb({ category: 'app', message: `lookup failed: ${error.message}` });
+      captureMessage(`lookup failed: ${error.message}`);
+    });
+
+    const [event] = await sentEvents();
+    expect(event?.message).toBe(`lookup failed: ${expected}`);
+    expect(event?.extra?.args).toEqual([{ message: expected }]);
+    expect(event?.breadcrumbs?.[0]?.message).toBe(`lookup failed: ${expected}`);
+    expect(JSON.stringify(event)).not.toContain(FAKE_SECRET);
+    expect(JSON.stringify(event)).not.toContain(FAKE_DB_INPUT);
+  });
+
+  test('omits bound values from query error extras and keeps unrelated params', async () => {
+    const query = 'select * from items where id = $1';
+    const cause = Object.assign(new Error(`Invalid input: ${FAKE_DB_INPUT}`), {
+      code: '22P02',
+    });
+    captureMessage('lookup failed', {
+      extra: {
+        error: new DrizzleQueryError(query, [FAKE_SECRET], cause),
+        diagnostics: { query, params: ['test-mode'] },
+      },
+    });
+
+    const [event] = await sentEvents();
+    expect(event?.extra).toMatchObject({
+      error: { query, message: `Failed query: ${query}` },
+      diagnostics: { query, params: ['test-mode'] },
+    });
+    const serializedEvent = JSON.stringify(event);
+    expect(serializedEvent.includes(FAKE_SECRET)).toBe(false);
+    expect(serializedEvent.includes(FAKE_DB_INPUT)).toBe(false);
   });
 });

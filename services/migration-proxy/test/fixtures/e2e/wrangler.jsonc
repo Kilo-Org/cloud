@@ -1,0 +1,43 @@
+/**
+ * The local e2e (contract §10 step 5): the real Worker and object with the container, a fake STS
+ * (fake-sts.wrangler.jsonc, same `wrangler dev` session) and a fake GitHub (test/e2e/fake-github.mjs).
+ * test/e2e/run.sh writes Dockerfile, ca.pem and .dev.vars here and passes the vars that differ per
+ * leg. Never deployed: deploy-workers.yml skips test/fixtures.
+ */
+{
+  "name": "migration-proxy-local",
+  "main": "../../../src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "observability": { "enabled": true, "traces": { "enabled": false } },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "services": [
+    { "binding": "STS", "service": "migration-proxy-e2e-sts", "entrypoint": "SecretsBroker" },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "MIGRATION_RUN_DO", "class_name": "MigrationRunDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MigrationRunDO"] }],
+  "containers": [
+    {
+      "class_name": "MigrationRunDO",
+      "scheduling_policy": "durable_object",
+      "images": { "proxy": { "dockerfile": "./Dockerfile", "build_context": "." } },
+    },
+  ],
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-migration-proxy-local" }],
+  },
+  "vars": {
+    "MIGRATION_PROXY_ENVIRONMENT": "development",
+    "MIGRATION_DB_TARGET": "",
+    "MIGRATION_DB_USER": "kilo_migration_proxy",
+    "MIGRATION_DB_LOGIN_MODE": "member",
+    "MIGRATION_SESSION_KEY": "label",
+    "MIGRATION_SESSION_SAMPLE_MINUTES": "0",
+    "MIGRATION_RUN_DEADLINE_SECONDS": "21600",
+    "MIGRATION_PROXY_GITHUB_APP_ID": "12345",
+    "MIGRATION_PROXY_GITHUB_INSTALLATION_ID": "67890",
+    "MIGRATION_REVIEW_BASELINE_SHA": "",
+    "MIGRATION_PROXY_GITHUB_API_URL": "http://127.0.0.1:8787",
+  },
+}

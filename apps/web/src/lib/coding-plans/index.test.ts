@@ -3,7 +3,6 @@ import { randomBytes } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   cancelCodingPlanSubscription,
@@ -825,7 +824,6 @@ describe('coding plans', () => {
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
     expect(credential.status).toBe('revocation_pending');
     expect(credential.upstream_plan_id).toBe('byteplus-revoke-plan');
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
 
     await markCredentialManuallyRevoked(subscription.key_inventory_id!);
@@ -836,7 +834,6 @@ describe('coding plans', () => {
 
     expect(credential.status).toBe('revoked');
     expect(credential.upstream_plan_id).toBe('byteplus-revoke-plan');
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);
   });
@@ -884,7 +881,6 @@ describe('coding plans', () => {
     });
     expect(credential.status).toBe('available');
     expect(credential.upstream_plan_id).toBe('byteplus-replace-plan');
-    expect(credential.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(credential.encrypted_api_key_envelope).not.toBeNull();
     expect(credential.assigned_to_user_id).toBeNull();
     expect(credential.revocation_requested_at).toBeNull();
@@ -969,7 +965,6 @@ describe('coding plans', () => {
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
     expect(credential.status).toBe('revocation_pending');
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
   });
 
@@ -1062,7 +1057,6 @@ describe('coding plans', () => {
 
     expect(credential.status).toBe('revocation_failed');
     expect(credential.upstream_plan_id).toEqual(expect.any(String));
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
     expect(credential.revocation_attempt_count).toBe(1);
     expect(credential.last_revocation_error).toContain('api_key=[redacted]');

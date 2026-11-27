@@ -1,7 +1,10 @@
 import type { MicrodollarUsageView } from '@kilocode/db/schema';
 
 export type ApiResponse = GroupedDataResponse | PaginatedRawDataResponse;
-export type UsageForTableDisplay = MicrodollarUsageView & {
+export type UsageForTableDisplay = Omit<
+  MicrodollarUsageView,
+  'user_prompt_prefix' | 'system_prompt_prefix' | 'abuse_delay' | 'abuse_downgraded_from'
+> & {
   is_ja4_whitelisted: boolean;
 };
 

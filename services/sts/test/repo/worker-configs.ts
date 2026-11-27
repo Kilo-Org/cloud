@@ -28,32 +28,64 @@ export const AUDIT_RELAY_DEPLOYMENTS: readonly string[] = [
 /** [deployed Worker name, resource]: one right on an audit queue or archive bucket. */
 type Grant = readonly [worker: string, resource: string];
 
-/** Each STS deployment produces only to its own environment's audit queue. */
+/**
+ * Each STS deployment produces only to its own environment's STS audit queue, each UTS mint
+ * deployment (its audit outbox relay) only to its environment's UTS audit queue, and each migration
+ * proxy deployment only to its environment's migration proxy audit queue. The relay trusts the
+ * queue a batch arrives on to name its producer, so no producer shares a queue with another.
+ */
 export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['sts', 'kilo-audit'],
   ['sts-staging', 'kilo-audit-staging'],
   ['sts-local', 'kilo-audit-local'],
   // services/sts/wrangler.test.jsonc, which only the Workers test pool runs.
   ['sts-test', 'kilo-audit-local'],
+  ['uts', 'kilo-audit-uts'],
+  ['uts-staging', 'kilo-audit-uts-staging'],
+  ['uts-local', 'kilo-audit-uts-local'],
+  // services/uts/wrangler.test.jsonc, which only the Workers test pool runs.
+  ['uts-test', 'kilo-audit-uts-local'],
+  // The migration proxy (services/migration-proxy, design Q64a): its own queue per environment.
+  ['migration-proxy', 'kilo-audit-migration-proxy'],
+  ['migration-proxy-staging', 'kilo-audit-migration-proxy-staging'],
+  ['migration-proxy-local', 'kilo-audit-migration-proxy-local'],
 ];
 
 /**
- * Each relay deployment consumes its own environment's audit queue and dead-letter queue. Nothing
+ * Each relay deployment consumes its own environment's audit queues and dead-letter queues. Nothing
  * produces to a dead-letter queue: only the relay's own consumer moves messages there.
  */
 export const AUDIT_QUEUE_CONSUMERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit'],
   ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay', 'kilo-audit-uts'],
+  ['audit-relay', 'kilo-audit-uts-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay-local', 'kilo-audit-uts-local'],
+  ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
+  ['audit-relay', 'kilo-audit-migration-proxy'],
+  ['audit-relay', 'kilo-audit-migration-proxy-dlq'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local-dlq'],
 ];
 
 export const AUDIT_QUEUE_DEAD_LETTERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay', 'kilo-audit-uts-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
+  ['audit-relay', 'kilo-audit-migration-proxy-dlq'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local-dlq'],
 ];
 
 /**
@@ -96,6 +128,19 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ...AUDIT_RELAY_DEPLOYMENTS.map((name): [string, string] => [name, 'audit-relay']),
   ['sts-test', 'sts-test'],
   ['audit-relay-test', 'audit-relay-test'],
+  // The UTS mint Worker holds an audit queue producer grant under these names, so only its own
+  // configs may deploy as them (services/uts/test/repo pins the rest of the UTS names):
+  // services/uts/wrangler.dev.jsonc is the `uts-local` config.
+  ['uts', 'uts'],
+  ['uts-staging', 'uts'],
+  ['uts-local', 'uts-local'],
+  ['uts-test', 'uts-test'],
+  // The migration proxy holds an audit queue producer grant under these names, so only its own
+  // configs may deploy as them: services/migration-proxy/test/fixtures/e2e/wrangler.jsonc is the
+  // `migration-proxy-local` config.
+  ['migration-proxy', 'migration-proxy'],
+  ['migration-proxy-staging', 'migration-proxy'],
+  ['migration-proxy-local', 'migration-proxy-local'],
 ]);
 
 /**
@@ -167,7 +212,6 @@ export const INERT_ENVIRONMENT_KEYS: readonly string[] = [
   'find_additional_modules',
   'first_party_worker',
   'flagship',
-  'hyperdrive',
   'images',
   'jsx_factory',
   'jsx_fragment',
@@ -322,6 +366,13 @@ const SecretsStoreSecretSchema = z.strictObject({
   secret_name: z.string(),
 });
 
+/** A Hyperdrive binding: STS sweeps replicas through the ones `LEASE_REPLICA_SWEEP_BINDINGS` names. */
+const HyperdriveBindingSchema = z.strictObject({
+  binding: z.string(),
+  id: z.string(),
+  localConnectionString: z.string().optional(),
+});
+
 const RouteObjectSchema = z.strictObject({
   pattern: z.string(),
   zone_id: z.string().optional(),
@@ -364,6 +415,7 @@ const BINDING_SHAPE = {
   unsafe: z.unknown().optional(),
   observability: ObservabilitySchema.optional(),
   secrets_store_secrets: z.array(SecretsStoreSecretSchema).optional(),
+  hyperdrive: z.array(HyperdriveBindingSchema).optional(),
 };
 
 const ENVIRONMENT_SHAPE = {
@@ -414,6 +466,7 @@ export const CLASSIFIED_KEYS: Readonly<Record<string, readonly string[]>> = {
   'migrations[].transferred_classes[]': Object.keys(TransferredClassSchema.shape),
   'exports.*': EXPORT_KEYS,
   'secrets_store_secrets[]': Object.keys(SecretsStoreSecretSchema.shape),
+  'hyperdrive[]': Object.keys(HyperdriveBindingSchema.shape),
 };
 
 export type WorkerConfig = { path: string; config: z.infer<typeof WorkerConfigSchema> };
@@ -701,8 +754,12 @@ function grantProblem(
 }
 
 /**
- * An audit batch is trusted as the producing STS deployment's own stream, so a foreign producer
- * could forge one, and a foreign consumer (or dead-letter target) would take batches from the relay.
+ * A queue message carries no producer identity, so the audit relay takes the producer from the
+ * queue a batch arrives on: an STS queue may carry only `sts:<env>:` streams with STS sources, a
+ * UTS queue only the 8 `uts:<env>:` shard streams with UTS sources, and a migration proxy queue only
+ * `migration-proxy:<env>:` streams with migration proxy sources. That holds only while each
+ * audit queue has exactly one producer per environment, which these grants enforce. A foreign
+ * consumer (or dead-letter target) would take batches from the relay.
  */
 function auditQueueProblems(block: Block): string[] {
   const worker = block.deployedName;
@@ -980,7 +1037,8 @@ export function internalWorkerProblems(configs: readonly WorkerConfig[]): string
  * Problems with the vars of each STS deployment block: Wrangler inherits no vars into an env
  * block, and `readConfig` refuses every request when one is missing or malformed (a bad kid in
  * `TOKEN_SIGNING_KIDS_REVOKED`, say), so each block must pass `EnvVarsSchema` on its own, and its
- * `STS_ISSUER` must be the issuer verifiers expect for its environment (`STS_ISSUERS`).
+ * `STS_ISSUER` must be the issuer verifiers expect for its environment (`STS_ISSUERS`). Each
+ * replica `LEASE_REPLICA_SWEEP_BINDINGS` names must be a Hyperdrive binding of the same block.
  */
 export function stsVarProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -996,6 +1054,14 @@ export function stsVarProblems(configs: readonly WorkerConfig[]): string[] {
         problems.push(
           `${block.where}: STS_ISSUER is ${vars.data.STS_ISSUER}, expected ${expected}`
         );
+      }
+      const hyperdrive = new Set((block.bindings.hyperdrive ?? []).map(entry => entry.binding));
+      for (const replica of vars.data.LEASE_REPLICA_SWEEP_BINDINGS) {
+        if (!hyperdrive.has(replica)) {
+          problems.push(
+            `${block.where}: LEASE_REPLICA_SWEEP_BINDINGS names ${replica}, which is no Hyperdrive binding of this block`
+          );
+        }
       }
     }
   }

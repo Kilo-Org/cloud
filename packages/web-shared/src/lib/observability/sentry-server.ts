@@ -30,6 +30,18 @@ function isDrizzleQueryError(error: unknown): error is DrizzleQueryError {
   );
 }
 
+function findDrizzleQueryError(error: unknown): DrizzleQueryError | undefined {
+  const seen = new Set<Error>();
+  while (error instanceof Error && !seen.has(error)) {
+    if (isDrizzleQueryError(error)) {
+      return error;
+    }
+    seen.add(error);
+    error = error.cause;
+  }
+  return undefined;
+}
+
 function causeTypeName(cause: NonNullable<DrizzleQueryError['cause']>): string {
   if (typeof cause.code === 'string' && /^[A-Z0-9]{5}$/.test(cause.code)) {
     return 'PostgresError';
@@ -136,8 +148,7 @@ export function initServerSentry(): void {
     ],
 
     beforeSend(event, hint) {
-      const error = hint.originalException;
-      if (isTRPC4xxError(error)) {
+      if (isTRPC4xxError(hint.originalException)) {
         return null;
       }
 
@@ -147,7 +158,8 @@ export function initServerSentry(): void {
       // `error.cause`). Rewrite the primary exception so the reported error
       // reflects the cause without input values, keep only the parameterized
       // query in a context, and group by SQLSTATE and cause type.
-      if (isDrizzleQueryError(error)) {
+      const error = findDrizzleQueryError(hint.originalException);
+      if (error) {
         const cause = error.cause;
         const pgCode = cause?.code;
         event.fingerprint = [
@@ -169,8 +181,11 @@ export function initServerSentry(): void {
         // the rewritten primary exception.
         const values = event.exception?.values;
         if (values && values.length > 0) {
-          const primaryException =
-            values.find(isDrizzleWrapperException) ?? values[values.length - 1];
+          const rootException = values[values.length - 1];
+          const primaryException = values.find(isDrizzleWrapperException) ?? rootException;
+          if (primaryException !== rootException) {
+            primaryException.mechanism = rootException.mechanism;
+          }
           if (cause) {
             primaryException.type = causeTypeName(cause);
             primaryException.value = withoutDatabaseInput(

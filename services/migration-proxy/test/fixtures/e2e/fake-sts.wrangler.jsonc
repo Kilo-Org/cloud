@@ -1,0 +1,6 @@
+// The local e2e's fake STS (fake-sts.ts); run with wrangler.jsonc in one `wrangler dev` session.
+{
+  "name": "migration-proxy-e2e-sts",
+  "main": "fake-sts.ts",
+  "compatibility_date": "2026-06-10",
+}

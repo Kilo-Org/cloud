@@ -1,11 +1,5 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
-import {
-  LeaseResultSchema,
-  LeaseRevokeResultSchema,
-  type LeaseRequest,
-  type LeaseResult,
-  type LeaseRevokeResult,
-} from '@kilocode/sts-contracts';
+import { LeaseResultSchema, type LeaseRequest, type LeaseResult } from '@kilocode/sts-contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDenialBuffers } from '../../src/audit/denials';
 import { AuditLog } from '../../src/audit/log';
@@ -17,7 +11,7 @@ import {
 } from '../../src/constants';
 import { LeaseDO, type LeaseCreateRequest } from '../../src/dos/LeaseDO';
 import { getDenialStub, getLeaseStub } from '../../src/dos/stubs';
-import { handleRequest, leaseResponse, leaseRevokeResponse } from '../../src/http';
+import { handleRequest } from '../../src/http';
 import { loadPolicies } from '../../src/policy/load';
 import type { MintAuthority } from '../../src/tokens/mint';
 import { stubOfflineNetwork } from './manager';
@@ -81,11 +75,6 @@ identity:
   jobWorkflowRefs: [${DEPLOY_WORKFLOW}]
   events: [push]
 secrets: []
-dynamic:
-  - grant: ci-migration
-    maxTtlSeconds: 3600
-    defaultTtlSeconds: 3600
-    maxActive: 1
 `,
   }),
 };
@@ -432,9 +421,7 @@ describe('worker-binding lease', () => {
     const refused = results.find(result => result.status === 'limited');
     expect(refused).toMatchObject({ status: 'limited', reason: 'too_many_active' });
     expect(manager.creates()).toHaveLength(2);
-    const response = leaseResponse(refused ?? { status: 'invalid_request' });
-    expect(response.status).toBe(429);
-    expect(Number(response.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(refused?.status === 'limited' && refused.retryAfterSeconds).toBeGreaterThan(0);
 
     const denials = await flushedDenials();
     expect(denials.map(event => event.type)).toEqual(['ai.kilo.sts.lease.denied']);
@@ -468,10 +455,6 @@ describe('worker-binding lease', () => {
       status: 'denied',
       reason: 'grant_not_allowed',
     });
-    expect(await lease('bouncer-watch', { grant: 'ci-migration' })).toEqual({
-      status: 'denied',
-      reason: 'grant_not_allowed',
-    });
     expect(await lease('staging-worker', { grant: 'replica-read' })).toEqual({
       status: 'denied',
       reason: 'environment_mismatch',
@@ -480,7 +463,7 @@ describe('worker-binding lease', () => {
       status: 'denied',
       reason: 'unknown_workload',
     });
-    expect(await lease('ci-migrate', { grant: 'ci-migration' })).toEqual({
+    expect(await lease('ci-migrate', { grant: 'replica-read' })).toEqual({
       status: 'denied',
       reason: 'identity_rejected',
     });
@@ -492,7 +475,6 @@ describe('worker-binding lease', () => {
     expect(reasons).toEqual(
       expect.arrayContaining([
         ['plain-worker', 'grant_not_allowed'],
-        ['bouncer-watch', 'grant_not_allowed'],
         ['staging-worker', 'environment_mismatch'],
         ['nobody', 'unknown_workload'],
         ['ci-migrate', 'identity_rejected'],
@@ -657,7 +639,6 @@ describe('revoke', () => {
         }),
       ])
     );
-    expect(leaseRevokeResponse({ status: 'not_found' }).status).toBe(404);
   });
 
   it('frees the slot once a lease is revoked', async () => {
@@ -1133,142 +1114,36 @@ describe('HTTP lease', () => {
     github = await createProvider(GITHUB_ISSUER, config.issuer);
   });
 
-  const jobClaims = {
-    sub: 'repo:acme@456/repo@123:environment:migrations',
-    repository: 'acme/repo',
-    repository_id: '123',
-    repository_owner_id: '456',
-    environment: 'migrations',
-    ref: 'refs/heads/main',
-    event_name: 'push',
-    job_workflow_ref: DEPLOY_WORKFLOW,
-    run_id: '777',
-    run_attempt: '1',
-  };
-
-  async function post(path: string, body: string, token?: string): Promise<Response> {
-    const ctx = {
-      waitUntil: (promise: Promise<unknown>) => {
-        pending.push(promise);
-      },
-      passThroughOnException: () => undefined,
-      props: {},
-    };
-    return await handleRequest(
-      new Request(`${config.issuer}${path}`, {
-        method: 'POST',
-        headers: token === undefined ? {} : { authorization: `Bearer ${token}` },
-        body,
-      }),
-      env,
-      ctx as unknown as ExecutionContext,
-      authority
-    );
-  }
-
-  it('gives a GitHub job a ci-migration lease with the primary target, and revokes it', async () => {
+  it('serves no lease or revoke over HTTP, not even to a verified GitHub job', async () => {
     const manager = installLeaseManager(providerFetch([github]).fetch);
-    const token = await signToken(github, jobClaims);
-    const response = await post('/v1/lease', JSON.stringify({ grant: 'ci-migration' }), token);
-    expect(response.status).toBe(200);
-    expect(response.headers.get('cache-control')).toBe('no-store');
-    const result = issued(LeaseResultSchema.parse(await response.json()));
-    expect(result).toMatchObject({
-      grant: 'ci-migration',
-      ttlSeconds: 3600,
-      host: 'db.sts-test.invalid',
-      port: 5432,
-      database: 'postgres',
+    const token = await signToken(github, {
+      sub: 'repo:acme@456/repo@123:environment:migrations',
+      repository: 'acme/repo',
+      repository_id: '123',
+      repository_owner_id: '456',
+      environment: 'migrations',
+      ref: 'refs/heads/main',
+      event_name: 'push',
+      job_workflow_ref: DEPLOY_WORKFLOW,
+      run_id: '777',
+      run_attempt: '1',
     });
-    expect(manager.creates()[0].body).toMatchObject({
-      dynamicSecretName: 'ci-migration',
-      path: '/dynamic/ci-migration',
-      ttl: '3600s',
-    });
-    expect((await leaseEvents())[0].data.attributes).toMatchObject({
-      workload: 'ci-migrate',
-      identity: 'github',
-      channel: 'http',
-      grant: 'ci-migration',
-      jobWorkflowRef: DEPLOY_WORKFLOW,
-      runId: '777',
-      runAttempt: '1',
-    });
-
-    const second = await post('/v1/lease', JSON.stringify({ grant: 'ci-migration' }), token);
-    expect(second.status).toBe(429);
-
-    const revoked = await post(
-      '/v1/lease/revoke',
-      JSON.stringify({ leaseId: result.leaseId }),
-      await signToken(github, jobClaims)
-    );
-    expect(revoked.status).toBe(200);
-    expect(LeaseRevokeResultSchema.parse(await revoked.json())).toEqual<LeaseRevokeResult>({
-      status: 'revoked',
-      leaseId: result.leaseId,
-    });
-  });
-
-  it('lets only the job run that got a ci-migration lease revoke it', async () => {
-    const manager = installLeaseManager(providerFetch([github]).fetch);
-    const response = await post(
-      '/v1/lease',
-      JSON.stringify({ grant: 'ci-migration' }),
-      await signToken(github, jobClaims)
-    );
-    const result = issued(LeaseResultSchema.parse(await response.json()));
-    const otherRun = await post(
-      '/v1/lease/revoke',
-      JSON.stringify({ leaseId: result.leaseId }),
-      await signToken(github, { ...jobClaims, run_id: '778' })
-    );
-    expect(otherRun.status).toBe(404);
-    expect(manager.revokes()).toEqual([]);
-    // A re-run attempt of the same run may revoke it.
-    const sameRun = await post(
-      '/v1/lease/revoke',
-      JSON.stringify({ leaseId: result.leaseId }),
-      await signToken(github, { ...jobClaims, run_attempt: '2' })
-    );
-    expect(sameRun.status).toBe(200);
-    expect(manager.revokes()).toHaveLength(1);
-    const denials = (await flushedDenials()).map(event => event.data.attributes);
-    expect(denials).toEqual([
-      expect.objectContaining({
-        reason: 'other_run',
-        workload: 'ci-migrate',
-        leaseId: result.leaseId,
-      }),
-    ]);
-  });
-
-  it('refuses a missing token, a job of another workflow, a big body and a bad grant', async () => {
-    const manager = installLeaseManager(providerFetch([github]).fetch);
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect((await post('/v1/lease', '{"grant":"ci-migration"}')).status).toBe(401);
-    const other = await signToken(github, {
-      ...jobClaims,
-      job_workflow_ref: 'acme/repo/.github/workflows/other.yml@refs/heads/main',
-    });
-    const refused = await post('/v1/lease', '{"grant":"ci-migration"}', other);
-    expect(refused.status).toBe(401);
-    expect(await refused.json()).toEqual({ status: 'denied', reason: 'identity_rejected' });
-    const token = await signToken(github, jobClaims);
-    expect((await post('/v1/lease', 'x'.repeat(2048), token)).status).toBe(413);
-    expect((await post('/v1/lease', '{"grant":"replica-read"}', token)).status).toBe(403);
-    expect((await post('/v1/lease', 'not json', token)).status).toBe(400);
-    expect(manager.creates()).toEqual([]);
-    const denials = (await flushedDenials()).map(event => event.data.attributes);
-    expect(denials).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ reason: 'identity_rejected', channel: 'http' }),
-        expect.objectContaining({
-          reason: 'grant_not_allowed',
-          workload: 'ci-migrate',
-          grant: 'replica-read',
+    for (const [path, body] of [
+      ['/v1/lease', '{"grant":"replica-read"}'],
+      ['/v1/lease/revoke', JSON.stringify({ leaseId: crypto.randomUUID() })],
+    ]) {
+      const response = await handleRequest(
+        new Request(`${config.issuer}${path}`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+          body,
         }),
-      ])
-    );
+        env,
+        { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as ExecutionContext,
+        authority
+      );
+      expect(response.status, path).toBe(404);
+    }
+    expect(manager.calls).toEqual([]);
   });
 });

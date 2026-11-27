@@ -49,7 +49,7 @@ async function fixture(environment: StsEnvironment): Promise<Fixture> {
   const verifier = new IdentityVerifier({
     policies: policies.all(),
     environment,
-    issuer: STS_ISSUER,
+    audience: STS_ISSUER,
     fetch: local.fetch,
   });
   return { local, verify: token => verifier.verify(token), slug, teamId };
@@ -90,6 +90,7 @@ describe('Vercel function identity', () => {
       attestationExp: issuedAt + 7200,
       attestationIat: issuedAt,
       run: null,
+      github: null,
     });
   });
 
@@ -400,7 +401,7 @@ describe('Vercel identity of the shipped ai-gateway policy', () => {
     const verifier = new IdentityVerifier({
       policies: policyIndex.all(),
       environment,
-      issuer: STS_ISSUER,
+      audience: STS_ISSUER,
       fetch: providerFetch([kilocode]).fetch,
     });
     return async (claims: JWTPayload) => await verifier.verify(await signToken(kilocode, claims));

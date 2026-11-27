@@ -780,34 +780,79 @@ describe('kiloJwtAuthMiddleware', () => {
     ).toBe(401);
   });
 
-  it.each(['cloud-agent-next', 'kilo-api', null])(
-    'rejects a %s audience in a legacy CLI websocket query token before lookup',
-    async audience => {
-      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
-      const token = await signAudienceToken(audience);
-      const { response } = request(null, {
-        path: '/api/user/cli',
-        websocket: true,
-        query: `?token=${token}`,
-      });
-
-      expect((await response).status).toBe(401);
-      expect(getWorkerDbMock).not.toHaveBeenCalled();
-      expect(dbState.downstreamCalls).toBe(0);
-    }
-  );
-
-  it('does not fall back from an invalid bearer to a valid websocket query token', async () => {
+  // A CLI websocket upgrade closes with 4401 only for a credential that can never
+  // become valid. These failures keep their HTTP status so the CLI keeps retrying.
+  it.each([
+    [
+      'the secret store rejects',
+      (env: TestEnv) => {
+        env.NEXTAUTH_SECRET_PROD.get = async () => {
+          throw new Error('secrets store unavailable');
+        };
+      },
+    ],
+    [
+      'the secret is missing',
+      (env: TestEnv) => {
+        env.NEXTAUTH_SECRET_PROD.get = async () => null;
+      },
+    ],
+    [
+      'the database fails',
+      () => {
+        dbState.fails = true;
+      },
+    ],
+  ])('keeps a retryable 503 on a CLI websocket upgrade when %s', async (_name, alter) => {
     userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
-    const validToken = await signAudienceToken(SESSION_INGEST_AUDIENCE);
-    const { response } = request('not-a-jwt', {
+    const env = makeEnv(TEST_JWT_SECRET);
+    alter(env);
+    const token = await signAudienceToken(SESSION_INGEST_AUDIENCE);
+
+    const response = await request(null, {
       path: '/api/user/cli',
       websocket: true,
-      query: `?token=${validToken}`,
-    });
+      query: `?token=${token}`,
+      env,
+    }).response;
 
-    expect((await response).status).toBe(401);
-    expect(dbState.queries).toBe(0);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Service temporarily unavailable',
+    });
+  });
+
+  it('keeps the 403 for a deletion-audience token on a CLI websocket upgrade', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signModernInternalToken(SESSION_INGEST_USER_DELETION_AUDIENCE);
+
+    const response = await request(null, {
+      path: '/api/user/cli',
+      websocket: true,
+      query: `?token=${token}`,
+    }).response;
+
+    expect(response.status).toBe(403);
+    expect(dbState.downstreamCalls).toBe(0);
+  });
+
+  it('keeps the 401 for a runtime bearer without attestation on a CLI websocket upgrade', async () => {
+    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+    const token = await signCloudAgentRuntimeToken();
+
+    const response = await request(null, {
+      path: '/api/user/cli',
+      websocket: true,
+      query: `?token=${token}`,
+    }).response;
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Invalid runtime proxy attestation',
+    });
+    expect(dbState.downstreamCalls).toBe(0);
   });
 
   it('keeps web websocket tickets opaque and cannot fall back to JWT credentials', async () => {

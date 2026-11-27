@@ -50,7 +50,7 @@ export async function resetTokenSignerObject(stub: DurableObjectStub): Promise<v
 
 /** The aborted instance also forgets its manager access token. */
 export async function resetLeaseObject(stub: DurableObjectStub): Promise<void> {
-  await resetObject(stub, ['lease']);
+  await resetObject(stub, ['lease', 'lease_replica_sweep']);
 }
 
 /** The aborted instance also forgets its minting credential and manager access token. */

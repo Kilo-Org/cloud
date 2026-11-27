@@ -1,5 +1,5 @@
--- One-time database setup for the Infisical dynamic secret `replica-read`, and the helpers both
--- lease kinds use (services/sts/README.md, "Database leases"). Run it with psql against the
+-- One-time database setup for the Infisical dynamic secret `replica-read` and its helpers
+-- (services/sts/README.md, "Database leases"). Run it with psql against the
 -- PRIMARY's direct endpoint (not Supavisor), as `postgres` (the role that owns the database and
 -- the application schema on Supabase), on PostgreSQL 16 or later:
 --
@@ -7,8 +7,8 @@
 --     -v replica_admin_password="<generated>" -f services/sts/sql/leases/setup.sql
 --
 -- The password goes into the Infisical dynamic secret once, by hand, and nowhere else. Roles are
--- created on the primary; a replica receives them through replication. `ci-migration` needs
--- setup-ci-migration.sql afterwards, which only a superuser can run.
+-- created on the primary; a replica receives them through replication. `replica-read` also needs
+-- setup-replica-sweeper.sql right after this file.
 
 \if :{?replica_admin_password}
 \else
@@ -55,9 +55,8 @@ GRANT USAGE ON SCHEMA public TO kilo_lease_replica_read;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO kilo_lease_replica_read;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT ON TABLES TO kilo_lease_replica_read;
 
--- The login Infisical creates and drops replica-read lease roles with (setup-ci-migration.sql
--- makes a separate one for ci-migration, so a leaked replica login can never create a migration
--- role). CREATEROLE lets it create, alter and drop the roles it created; ADMIN on its template
+-- The login Infisical creates and drops replica-read lease roles with. CREATEROLE lets it create,
+-- alter and drop the roles it created; ADMIN on its template
 -- role (without INHERIT or SET) lets it grant that membership and gives it none of the template's
 -- rights. It holds no lease role's rights either: kilo_lease.revoke_lease grants it a lease role,
 -- for DROP OWNED, only inside the revocation that drops the role. It cannot end another role's
@@ -82,7 +81,6 @@ GRANT kilo_lease_replica_read TO kilo_lease_replica_admin WITH ADMIN TRUE, INHER
 -- server-wide settings: these role settings are superuser-only parameters, which Supabase lets
 -- `postgres` set per role (supautils; https://supabase.com/docs/guides/database/postgres/postgres-log-config),
 -- and the login itself cannot change them. pgaudit and auto_explain get the same when loaded.
--- setup-ci-migration.sql, run as a superuser, also hides its statements from pg_stat_activity.
 ALTER ROLE kilo_lease_replica_admin SET log_statement = 'none';
 ALTER ROLE kilo_lease_replica_admin SET log_min_duration_statement = -1;
 ALTER ROLE kilo_lease_replica_admin SET log_min_error_statement = 'panic';
@@ -97,13 +95,11 @@ BEGIN
 END
 $$;
 
--- The lease statements' helpers. Each knows its caller's template by `session_user`, which a
--- session cannot change without superuser rights: replica admin -> kilo_lease_replica_read and
--- names `lease_rr_<20 of [a-z0-9]>`; migration admin -> kilo_lease_migration and `lease_cm_...`.
--- `postgres` owns the schema, its table and its functions here; setup-ci-migration.sql moves them
--- to kilo_lease_owner before any lease can act as `postgres`, so such a lease cannot replace them.
--- With setup.sql alone no lease acts as `postgres`, and whoever holds `postgres` already holds
--- every right a replica-read lease has.
+-- The lease statements' helpers. Each checks its caller by `session_user`, which a session cannot
+-- change without superuser rights: the replica admin login, its template kilo_lease_replica_read
+-- and names `lease_rr_<20 of [a-z0-9]>`. `postgres` owns the schema, its table and its functions;
+-- no lease acts as `postgres`, and whoever holds `postgres` already holds every right a
+-- replica-read lease has.
 CREATE SCHEMA kilo_lease;
 
 -- The lease's template and name prefix for the calling admin login; an error for any other login.
@@ -113,11 +109,8 @@ BEGIN
   IF session_user = 'kilo_lease_replica_admin' THEN
     template := 'kilo_lease_replica_read'::regrole;
     prefix := 'lease_rr_';
-  ELSIF session_user = 'kilo_lease_migration_admin' THEN
-    template := 'kilo_lease_migration'::regrole;
-    prefix := 'lease_cm_';
   ELSE
-    RAISE EXCEPTION 'kilo_lease helpers serve the lease admin logins only, not %', session_user;
+    RAISE EXCEPTION 'kilo_lease helpers serve the lease admin login only, not %', session_user;
   END IF;
 END
 $$;
@@ -171,11 +164,12 @@ $$;
 -- that are `username`, have no login (a revocation blocked them), have passed their VALID UNTIL, or
 -- no longer exist. Nothing else: not a superuser, not an admin login, not an application role, not
 -- a session of a dropped role that was never a lease. Runs as its owner, `postgres` (which Supabase
--- makes a member of pg_signal_backend) or, after setup-ci-migration.sql, kilo_lease_owner (granted
--- pg_signal_backend there). Returns the number of sessions signalled; they exit right after. It
+-- makes a member of pg_signal_backend). Returns the number of sessions signalled; they exit right
+-- after. It
 -- drops the transaction's activity snapshot first, so a second call in the same revocation sees
 -- the logins that landed since the first, and it forgets the rows of roles that are gone with no
--- session left.
+-- session left. setup-replica-sweeper.sql replaces it with one that keeps such a row 7 days, so a
+-- replica's sweep still knows the dropped role was a lease.
 CREATE FUNCTION kilo_lease.end_sessions(username text) RETURNS integer
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
   SELECT pg_catalog.pg_stat_clear_snapshot();
@@ -190,8 +184,8 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS 
         AND (r.rolname = username OR NOT r.rolcanlogin OR r.rolvaliduntil < pg_catalog.now()))
   ),
   -- Materialized, so the termination below runs on these sessions only. Selected by user id alone:
-  -- without pg_read_all_stats (kilo_lease_owner has none) pg_stat_activity shows another role's
-  -- pid and usesysid but no backend type, and every backend with a lease role's id is that lease's.
+  -- without pg_read_all_stats, pg_stat_activity shows another role's pid and usesysid but no
+  -- backend type, and every backend with a lease role's id is that lease's.
   targets AS MATERIALIZED (
     SELECT a.pid
     FROM pg_catalog.pg_stat_activity a
@@ -208,7 +202,7 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS 
   SELECT (count(*) FILTER (WHERE pg_catalog.pg_terminate_backend(pid)))::integer FROM targets
 $$;
 
--- The creation statement (replica-read.create.sql, ci-migration.create.sql): the lease role, in the
+-- The creation statement (replica-read.create.sql): the lease role, in the
 -- caller's template, with its connection limit and settings, recorded in kilo_lease.lease_role. The
 -- CREATE ROLE runs here through EXECUTE, so the statement Infisical sends is a SELECT, and the
 -- admin login's role settings keep that SELECT out of the server log. A failed CREATE ROLE is
@@ -223,20 +217,15 @@ BEGIN
   PERFORM kilo_lease.check_username(username);
   SELECT * INTO caller FROM kilo_lease.caller_template();
   BEGIN
-    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT %s IN ROLE %I',
-      username, password, valid_until, CASE WHEN caller.prefix = 'lease_rr_' THEN 4 ELSE 2 END,
-      caller.template);
+    EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L VALID UNTIL %L CONNECTION LIMIT 4 IN ROLE %I',
+      username, password, valid_until, caller.template);
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'lease role % was not created: %', username, SQLERRM USING ERRCODE = SQLSTATE;
   END;
-  IF caller.prefix = 'lease_rr_' THEN
-    EXECUTE format('ALTER ROLE %I SET default_transaction_read_only = on', username);
-    EXECUTE format('ALTER ROLE %I SET statement_timeout = %L', username, '60s');
-    EXECUTE format('ALTER ROLE %I SET idle_in_transaction_session_timeout = %L', username, '60s');
-    EXECUTE format('ALTER ROLE %I SET idle_session_timeout = %L', username, '15min');
-  ELSE
-    EXECUTE format('ALTER ROLE %I SET role = %L', username, 'postgres');
-  END IF;
+  EXECUTE format('ALTER ROLE %I SET default_transaction_read_only = on', username);
+  EXECUTE format('ALTER ROLE %I SET statement_timeout = %L', username, '60s');
+  EXECUTE format('ALTER ROLE %I SET idle_in_transaction_session_timeout = %L', username, '60s');
+  EXECUTE format('ALTER ROLE %I SET idle_session_timeout = %L', username, '15min');
   PERFORM kilo_lease.track_lease(username);
 END
 $$;

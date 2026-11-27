@@ -554,9 +554,10 @@ describe('createBouncerAuth', () => {
       expect(h.waitUntil).toHaveBeenCalledTimes(WEB_SCOPES.length);
       // 20 waits ran out together: one count, far below the threshold.
       expect(breakerOpened(h)).toBe(0);
+      // Sibling reads start as each read settles; they find the token at once.
+      h.read.mockResolvedValue(TOKEN);
       for (const mint of mints.values()) mint.resolve(TOKEN);
       await jest.advanceTimersByTimeAsync(0);
-      h.read.mockResolvedValue(TOKEN);
       await expect(h.auth.headers(decideCall)).resolves.toMatchObject({
         authorization: `Bearer ${TOKEN}`,
       });

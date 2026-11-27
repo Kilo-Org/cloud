@@ -879,7 +879,9 @@ describe('STS headers from the installed Bouncer auth', () => {
   const invalidToken = () =>
     new Response('refused', {
       status: 401,
-      headers: { 'www-authenticate': 'Bearer error="invalid_token", resource_metadata="https://x"' },
+      headers: {
+        'www-authenticate': 'Bearer error="invalid_token", resource_metadata="https://x"',
+      },
     });
 
   it('reports a 401 invalid_token to a decide and sends it once more without the token', async () => {
@@ -907,7 +909,9 @@ describe('STS headers from the installed Bouncer auth', () => {
       .mockResolvedValueOnce(
         new Response(null, {
           status: 403,
-          headers: { 'www-authenticate': 'Bearer error="insufficient_scope", scope="bouncer:decide"' },
+          headers: {
+            'www-authenticate': 'Bearer error="insufficient_scope", scope="bouncer:decide"',
+          },
         })
       )
       .mockResolvedValueOnce(Response.json({ enforced: false, spendWatch: false, flags: [] }));

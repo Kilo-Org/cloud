@@ -291,6 +291,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     missed = {};
     refused = {};
     prewarm = {};
+    mints = { ok: 0, failed: 0 };
     flushedAt = at;
   }
 

@@ -191,10 +191,11 @@ describe('the installed Bouncer auth with the real transport', () => {
     });
     installBouncerAuth('kilocode-ai-gateway');
     await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
-    expect(stsCalls().flatMap(call => call.tokens.map(token => token.scope)).sort()).toEqual([
-      'bouncer:decide',
-      'bouncer:usage.write',
-    ]);
+    expect(
+      stsCalls()
+        .flatMap(call => call.tokens.map(token => token.scope))
+        .sort()
+    ).toEqual(['bouncer:decide', 'bouncer:usage.write']);
     expect(bouncerCalls()).toEqual([]);
 
     await decide({ requestId: 'r-9', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
@@ -361,7 +362,7 @@ describe('connectBouncerSts', () => {
       held,
       random: () => draws.shift() ?? 0,
     });
-    const scopes = ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'];
+    const scopes = ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] as const;
     let settled = 0;
     const reads = scopes.map(scope => {
       const read = connected.tokens.get({ audience: 'bouncer', scope }, ctx);
@@ -381,6 +382,9 @@ describe('connectBouncerSts', () => {
     expect(settled).toBe(0);
     expect(stsFetch).not.toHaveBeenCalled();
     await jest.advanceTimersByTimeAsync(100);
+    expect(stsFetch).toHaveBeenCalledTimes(3);
+    // A read that joined another's attempt checks for its answer on its own poll timer.
+    await jest.advanceTimersByTimeAsync(1_000);
     await expect(Promise.all(reads)).resolves.toEqual(['sts-token', 'sts-token', 'sts-token']);
     await expect(connected.exchangeReady()).resolves.toBe(true);
     expect(identity).toHaveBeenCalledTimes(1);

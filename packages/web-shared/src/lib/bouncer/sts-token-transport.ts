@@ -118,7 +118,7 @@ export function connectBouncerSts(options: {
   async function identityStep(): Promise<string> {
     firstMintPending = true;
     try {
-      const identity = options.identity();
+      const identity = Promise.resolve(options.identity());
       // Rejections surface through the `await identity` below; this keeps an early one handled.
       void identity.catch(() => undefined);
       if (await held()) {

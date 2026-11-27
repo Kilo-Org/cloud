@@ -311,6 +311,7 @@ audit row. It mints only scopes the registry allows `kilo-cli`.
 | `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
 | `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and the same refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
 | `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation with no grace; any later use of a replaced token revokes the family and writes a feed entry, until the family's 90-day end | `uts.refresh_first_party`, `uts.refresh_third_party` |
+| `POST /token` token exchange, refresh-token subject | The home-widget exchange (below): `kilo-mobile` exchanges its grant, with a DPoP proof of its key, for a widget grant that holds only `kilo-api:home-widget.use` | `uts.exchange_home_widget_grant` |
 | `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; a token issued to another client answers 200 like an unknown token and writes a denied row (at most one per grant per minute); an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
 
@@ -446,6 +447,66 @@ mint Worker with one value missing: it checks an admitted key attestation, asser
 Integrity verdict, refused replays, repeated counters, missing attestations, wrong packages,
 unrecognized apps and other signers, one decode per code across a retry, the refusal by default,
 and that no credential value reaches an audit row.
+
+## Home-widget grant
+
+The mobile home-screen widget reads `GET /api/mobile/widgets` and registers its push token at
+`POST /api/mobile/widgets/push-token` on the web app while the app is not running (design 9.3).
+Today a 30-day HS256 credential under the shared web secret serves it; under UTS the widget holds
+its own refresh grant, narrowed to one scope, and refreshes 10-minute access tokens like any
+first-party client (`src/home-widget/exchange.ts`, migration 0024, contract in
+`@kilocode/uts-contracts` `home-widget.ts`).
+
+**Why an exchange of the app's grant, not a new grant type.** Design 5.3 and 5.5 already give
+first-party clients one credential shape: a DPoP-bound refresh grant with an allowed scope list
+and 10-minute access tokens. The widget needs exactly that, with less: one scope, the same device,
+and no longer life than the app's sign-in. So the app exchanges its own grant at `/token` with RFC
+8693 (`subject_token_type` refresh token), and the result is an ordinary `uts.refresh_grants` row
+that the widget refreshes with `refresh_token`. No new client, grant type, signer path or verifier
+rule exists. Sharing the app's grant with the widget extension was rejected: that grant holds
+every mobile scope, and the extension's keychain item is readable by a second process.
+
+| Property | Rule |
+|---|---|
+| Client | `kilo-mobile` only; another first-party client gets `unauthorized_client`, a third-party one too |
+| Proof | A DPoP proof of the app grant's key; the widget grant takes the same key, which the app keeps in the keychain access group it shares with the widget extension (Android: the app's own keystore). The app's refresh token stays in the app's private keychain item, so the extension holds only the widget grant |
+| Scope | Exactly `kilo-api:home-widget.use` (audience `kilo-api`, 10 minutes, session-bound), which the app grant must list |
+| Organization | `org` optional: an org-bound app grant names its own organization or none; a personal app grant may name any organization with an active membership whose SSO requirement the session's sign-in meets (design 5.8). The organization becomes every widget token's `org` claim; without one the widget is personal. Each widget refresh rechecks it |
+| Lifetime | The widget grant expires at the app grant's idle expiry at the time of the exchange, so it never outlives the app's sign-in; the app exchanges again when it opens and `refresh_token_expires_in` is under 7 days, or when the widget's organization changes |
+| One per app grant | A new exchange revokes the previous widget grant (`replaced`, with its feed entry); at most 10 exchanges per app grant per hour, then 429 `slow_down` with `Retry-After` |
+| Revocation | `/revoke` with the widget's refresh token ends only the widget. Anything that ends the app grant (sign-out, device revoke, reuse detection, member removal, subject operations) ends the widget in the same statement (`uts.end_grant`), each grant with its own feed entry; the device session ends with its last grant. A member removal revokes an org widget of a personal app grant with the member's other org-bound grants |
+| Not allowed | A widget grant mints no ticket (`uts.issue_ticket` answers `invalid_grant`), cannot be exchanged again, and records no device sign-in or new-device notice |
+| Switch | Offered only where `HOME_WIDGET_GRANT_ENABLED` is exactly `true`; otherwise the exchange answers `invalid_request`. `test/repo` keeps it off in production |
+
+**Wire contract.** `POST /token`, form-encoded, `DPoP` header: `grant_type`
+`urn:ietf:params:oauth:grant-type:token-exchange`, `client_id` `kilo-mobile`, `subject_token` the
+app's `kilo_rt_` token, `subject_token_type` `urn:ietf:params:oauth:token-type:refresh_token`,
+`scope` `kilo-api:home-widget.use`, optional `requested_token_type` (access token only),
+`resource` (`kilo-api` only) and `org`. A 200 is `HomeWidgetGrantResponseSchema`: the widget's
+first access token with `issued_token_type`, and its `refresh_token` and
+`refresh_token_expires_in`. Errors: 400 `invalid_request` (malformed form, actor or `audience`
+parameters, switch off), 401 `invalid_client`, 400 `unauthorized_client`, 400 `invalid_scope`,
+400 `invalid_target`, 400 `invalid_dpop_proof` (missing, invalid or replayed proof), 400
+`invalid_grant` (app grant unknown, revoked, expired, another key, a widget grant, or the
+organization refused), 429 `slow_down`, 503 `temporarily_unavailable` with `Retry-After` (retry
+the exchange with a new proof), 500 `server_error`. A lost answer after the statement committed
+costs nothing but the next exchange, which replaces the grant the lost answer carried.
+
+**Verifying.** The widget routes verify with `@kilocode/verify` as audience `kilo-api`, route
+`{ issuer: 'uts', scope: 'kilo-api:home-widget.use', requiresSession: true }`; the principal is
+`sub` and `org` (absent: personal). The verifier's feed check (`revoked_sids`, `revoked_before`,
+`blocked_accounts`) replaces the legacy route's per-request database rechecks; UTS rechecks the
+account, device session, membership and SSO requirement at each widget refresh.
+
+**Cost.** An exchange is one SQL statement (the app grant by its token hash with its row lock, the
+proof row, a range probe of the hourly count, the membership row when a personal grant names an
+organization, at most one replaced grant, one grant insert, one or two audit rows), at most one
+feed publish (two feed-object calls, only when a grant was replaced) and one signer call. It runs
+when the app opens and its widget grant is under 7 days from expiry, so about once per 53 days
+per device. A widget refresh is the ordinary refresh: one statement and one signer call per
+widget run with an expired token, at most one per 10 minutes per device, inside the "mint or
+refresh a user token" budget (design 3). The cascade in `uts.end_grant` adds one probe of
+`refresh_grants_live_widget_key` per first-party grant revoke.
 
 ## Third-party clients, consent and the broker exchange
 

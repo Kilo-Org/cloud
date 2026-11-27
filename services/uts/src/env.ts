@@ -192,6 +192,11 @@ export type Env = {
   KILO_WEB_BRIDGE_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
+  /**
+   * `true` offers the home-widget exchange at the token endpoint (src/home-widget/exchange.ts);
+   * absent keeps it off, and any other value keeps it off and is logged.
+   */
+  HOME_WIDGET_GRANT_ENABLED?: string;
 } & SignInEnv &
   AttestEnv;
 

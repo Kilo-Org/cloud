@@ -211,6 +211,8 @@ export const RefreshGrantRowSchema = z.strictObject({
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
   denied_audited_at: timestamp.nullable(),
+  /** The app grant a widget grant was exchanged from (migration 0024); null for any other grant. */
+  parent_grant_id: uuid.nullable(),
 });
 
 export const ThirdPartyClientRowSchema = z.strictObject({

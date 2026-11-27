@@ -1,6 +1,7 @@
 import {
   UTS_GRANT_TYPES,
   UTS_MAX_TOKENS_PER_CALL,
+  UTS_REFRESH_TOKEN_TYPE_URN,
   UTS_TOKEN_PATH,
   type UtsAccessTokenClaims,
 } from '@kilocode/uts-contracts';
@@ -36,7 +37,10 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 /**
  * POST /token (design 5.3 and 5.4). Grants: `authorization_code` (DPoP-bound for a first-party
  * client), `refresh_token` (DPoP-bound first-party grant, or third-party rotation with reuse
- * detection) and the RFC 8628 device grant through its hook. `client_credentials` is not offered.
+ * detection), the RFC 8628 device grant through its hook, and the two RFC 8693 exchanges: the
+ * broker exchange (src/exchange/endpoint.ts) and the home-widget exchange
+ * (src/home-widget/exchange.ts), told apart by `subject_token_type`. `client_credentials` is not
+ * offered.
  *
  * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
  * also records the proof's `jti` under the proof's key, and signs one token per scope (up to 8)
@@ -64,6 +68,9 @@ export type WebClientGrant = (
   params: Params
 ) => Promise<Response | null>;
 
+/** The home-widget exchange, which src/home-widget/exchange.ts provides. */
+export type HomeWidgetGrant = (request: Request, params: Params) => Promise<Response>;
+
 export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
@@ -81,6 +88,11 @@ export type TokenDeps = {
    * wired, and the grant is then not offered.
    */
   exchange: ExchangeService | null;
+  /**
+   * The home-widget exchange (a `subject_token_type` of refresh token); null where
+   * `HOME_WIDGET_GRANT_ENABLED` is not `true`, and the exchange is then not offered.
+   */
+  homeWidgetGrant: HomeWidgetGrant | null;
   /**
    * Device attestation of a client that needs it (src/attest/gate.ts): `verified` runs the
    * attestation step before the exchange statement; `unattested_development` skips it, in
@@ -417,12 +429,20 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
       case UTS_GRANT_TYPES.deviceCode:
         if (deps.deviceCodeGrant !== null) return await deps.deviceCodeGrant(request, form.params);
         return oauthError('unsupported_grant_type', 400);
-      case UTS_GRANT_TYPES.tokenExchange:
+      case UTS_GRANT_TYPES.tokenExchange: {
+        const subjectType = form.params.one('subject_token_type');
+        if (subjectType.status === 'present' && subjectType.value === UTS_REFRESH_TOKEN_TYPE_URN) {
+          if (deps.homeWidgetGrant === null) {
+            return oauthError('invalid_request', 400, 'a refresh token is not exchanged here');
+          }
+          return await deps.homeWidgetGrant(request, form.params);
+        }
         if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
         return await handleTokenExchange(request, form.params, {
           ...deps,
           exchange: deps.exchange,
         });
+      }
       default:
         return oauthError('unsupported_grant_type', 400);
     }

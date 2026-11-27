@@ -647,6 +647,29 @@ describe('the UTS configs themselves', () => {
     ).toEqual([expect.stringContaining(`${FEED_CONFIG} (env.staging): STS_URL`)]);
   });
 
+  it('leave the home-widget exchange off in every mint block, and fail a malformed or production switch', () => {
+    const mint = configAt(MINT_CONFIG).config;
+    expect(mint.vars?.HOME_WIDGET_GRANT_ENABLED).toBeUndefined();
+    expect(mint.env?.staging?.vars?.HOME_WIDGET_GRANT_ENABLED).toBeUndefined();
+    const edited = (top: Record<string, unknown>, staging: Record<string, unknown>) =>
+      mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const stagingVars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        return {
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), ...top },
+          env: { ...env, staging: { ...env.staging, vars: { ...stagingVars, ...staging } } },
+        };
+      });
+    expect(utsConfigProblems(edited({}, { HOME_WIDGET_GRANT_ENABLED: 'true' }))).toEqual([]);
+    expect(utsConfigProblems(edited({}, { HOME_WIDGET_GRANT_ENABLED: 'on' }))).toEqual([
+      expect.stringContaining(`${MINT_CONFIG} (env.staging): HOME_WIDGET_GRANT_ENABLED is "on"`),
+    ]);
+    expect(utsConfigProblems(edited({ HOME_WIDGET_GRANT_ENABLED: 'true' }, {}))).toEqual([
+      expect.stringContaining(`${MINT_CONFIG} (top level): HOME_WIDGET_GRANT_ENABLED stays off`),
+    ]);
+  });
+
   it('keep the feed logs at a 5 percent head sample in every block, and fail a larger or missing one', () => {
     expect(configAt(FEED_CONFIG).config.observability?.logs?.head_sampling_rate).toBe(
       FEED_MAX_LOG_SAMPLING_RATE

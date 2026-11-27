@@ -704,6 +704,7 @@ describe('functions', () => {
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
       { routine: 'exchange_delegated_token', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
+      { routine: 'exchange_home_widget_grant', grantee: 'uts_app' },
       { routine: 'exchange_web_code', grantee: 'uts_app' },
       { routine: 'exempt_code_attestation', grantee: 'uts_app' },
       { routine: 'extend_third_party_client', grantee: 'uts_app' },

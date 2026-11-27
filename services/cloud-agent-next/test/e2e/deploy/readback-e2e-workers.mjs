@@ -91,7 +91,11 @@ export function namesOnly({ deployments, version, subdomain, schedules, domains 
       )
       .sort(),
     bindings: (version?.resources?.bindings ?? [])
-      .filter(binding => !VARIABLE_TYPES.has(binding.type) && !LATER_SECRETS.has(binding.name))
+      .filter(
+        binding =>
+          !VARIABLE_TYPES.has(binding.type) &&
+          !(binding.type === 'secret_text' && LATER_SECRETS.has(binding.name))
+      )
       .map(bindingName)
       .sort(),
   };
@@ -114,14 +118,23 @@ export function diffReadback(expected, actual) {
 async function readWorker(api, script) {
   const deployments = await api(`/workers/scripts/${script}/deployments`);
   const versionId = deployments?.deployments?.[0]?.versions?.[0]?.version_id;
-  return namesOnly({
-    deployments,
-    version: versionId ? await api(`/workers/scripts/${script}/versions/${versionId}`) : undefined,
-    subdomain: await api(`/workers/scripts/${script}/subdomain`),
-    schedules: await api(`/workers/scripts/${script}/schedules`),
-    domains: await api(`/workers/domains?service=${encodeURIComponent(script)}`),
-  });
+  return {
+    versionId,
+    names: namesOnly({
+      deployments,
+      version: versionId
+        ? await api(`/workers/scripts/${script}/versions/${versionId}`)
+        : undefined,
+      subdomain: await api(`/workers/scripts/${script}/subdomain`),
+      schedules: await api(`/workers/scripts/${script}/schedules`),
+      domains: await api(`/workers/domains?service=${encodeURIComponent(script)}`),
+    }),
+  };
 }
+
+// Each GET has its own bound; a 5xx, a 429 or a timeout is retried twice.
+const READ_TIMEOUT_MS = 30_000;
+const READ_RETRIES = 2;
 
 const isMain = (() => {
   try {
@@ -154,17 +167,39 @@ if (isMain) {
   }
   const base = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}`;
   const api = async path => {
-    const response = await fetch(`${base}${path}`, {
-      headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok || body.success !== true) {
-      const codes = (body.errors ?? []).map(error => error.code).join(',');
-      throw new Error(
-        `GET ${path.split('?')[0]}: HTTP ${response.status}, error codes ${codes || 'none'}`
-      );
+    for (let attempt = 1; ; attempt += 1) {
+      let response;
+      try {
+        response = await fetch(`${base}${path}`, {
+          headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
+          signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+        });
+      } catch (error) {
+        if (attempt <= READ_RETRIES) continue;
+        throw new Error(
+          `GET ${path.split('?')[0]}: ${error instanceof Error ? error.name : 'failed'}`
+        );
+      }
+      if ((response.status === 429 || response.status >= 500) && attempt <= READ_RETRIES) {
+        // Retry-After in seconds when Cloudflare sends it, else 1-2 s.
+        const retryAfter = Number(response.headers.get('Retry-After'));
+        await response.body?.cancel();
+        const waitMs =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter, 30) * 1000
+            : 1000 + Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        continue;
+      }
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body.success !== true) {
+        const codes = (body.errors ?? []).map(error => error.code).join(',');
+        throw new Error(
+          `GET ${path.split('?')[0]}: HTTP ${response.status}, error codes ${codes || 'none'}`
+        );
+      }
+      return body.result;
     }
-    return body.result;
   };
   try {
     const expected = expectedReadback({
@@ -173,10 +208,17 @@ if (isMain) {
       workerHostname: E2E_WORKER_HOSTNAME,
       fakeLlmHostname: E2E_FAKE_LLM_HOSTNAME,
     });
-    const actual = {
+    const reads = {
       [E2E_WORKER]: await readWorker(api, E2E_WORKER),
       [FAKE_LLM_WORKER]: await readWorker(api, FAKE_LLM_WORKER),
     };
+    // Outside the comparison: the version a rollback would leave.
+    for (const [worker, read] of Object.entries(reads)) {
+      console.log(`Active version of ${worker}: ${read.versionId ?? 'none'}`);
+    }
+    const actual = Object.fromEntries(
+      Object.entries(reads).map(([worker, read]) => [worker, read.names])
+    );
     console.log(JSON.stringify(actual, null, 2));
     const differences = diffReadback(expected, actual);
     if (differences.length > 0) {

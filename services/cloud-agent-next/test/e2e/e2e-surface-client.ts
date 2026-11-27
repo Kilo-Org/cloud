@@ -296,9 +296,9 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
       const minted = await mint(signal);
       return {
         callbackUrl: minted.callbackUrl,
-        // Delivery to the Worker's own origin passes the same Access
-        // application; the token never goes to any other origin.
-        callbackHeaders: workerAccessHeaders(minted.callbackUrl),
+        // No callback headers: the e2e Worker's fetch wrapper stamps the
+        // Access token on delivery to its own origin, so it is never stored
+        // with the callback target.
         records: recordsSignal => records(minted.token, recordsSignal ?? signal),
         waitFor: async (predicate, timeoutMs, waitSignal) => {
           const effective = waitSignal ?? signal ?? options.signal;

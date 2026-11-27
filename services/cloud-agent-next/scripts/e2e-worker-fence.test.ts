@@ -282,16 +282,24 @@ describe('deployed e2e Worker fence', () => {
 });
 
 describe('fake-LLM Worker fence', () => {
+  const fakeAccess = { aud: 'f'.repeat(64), teamDomain: 'fence-probe.cloudflareaccess.com' };
+  const renderFake = () =>
+    buildFakeLlmConfig(fakeLlmSource, { hostname: FAKE_HOST, access: fakeAccess });
+
   it('keeps the checked-in config without any public address', () => {
     expect(fakeLlmSource.workers_dev).toBe(false);
     expect(fakeLlmSource.preview_urls).toBe(false);
     expect(fakeLlmViolations(fakeLlmSource, production)).toEqual([]);
   });
 
-  it('renders exactly the one configured Access hostname', () => {
-    const config = buildFakeLlmConfig(fakeLlmSource, { hostname: FAKE_HOST });
+  it('renders exactly the one configured Access hostname and its Access gate', () => {
+    const config = renderFake();
     expect(config.routes).toEqual([{ pattern: FAKE_HOST, custom_domain: true }]);
     expect(config.main).toBe('../fake-llm-worker.ts');
+    expect(config.vars).toEqual({
+      E2E_ACCESS_AUD: fakeAccess.aud,
+      E2E_ACCESS_TEAM_DOMAIN: fakeAccess.teamDomain,
+    });
     expect(fakeLlmViolations(config, production, { hostname: FAKE_HOST })).toEqual([]);
   });
 
@@ -312,7 +320,7 @@ describe('fake-LLM Worker fence', () => {
   });
 
   it('flags any host other than the configured one', () => {
-    const config = buildFakeLlmConfig(fakeLlmSource, { hostname: FAKE_HOST });
+    const config = renderFake();
     expect(fakeLlmViolations(config, production)).toEqual([
       'routes: none allowed without a configured hostname',
     ]);
@@ -338,15 +346,31 @@ describe('fake-LLM Worker fence', () => {
     ).toEqual(['secrets_store_secrets: NEXTAUTH_SECRET']);
   });
 
-  it('refuses to render a public or production hostname', () => {
+  it('refuses to render a public or production hostname, or without its Access gate', () => {
     for (const host of [
       'fake-llm.engineering-e11.workers.dev',
       'https://fake-llm.fence-probe.test',
       undefined,
     ]) {
-      expect(() => buildFakeLlmConfig(fakeLlmSource, { hostname: host }), String(host)).toThrow(
-        /E2E_FAKE_LLM_HOSTNAME/
-      );
+      expect(
+        () => buildFakeLlmConfig(fakeLlmSource, { hostname: host, access: fakeAccess }),
+        String(host)
+      ).toThrow(/E2E_FAKE_LLM_HOSTNAME/);
     }
+    expect(() =>
+      buildFakeLlmConfig(fakeLlmSource, { hostname: FAKE_HOST, access: { ...fakeAccess, aud: '' } })
+    ).toThrow(/E2E_FAKE_LLM_ACCESS_AUD/);
+  });
+
+  it('flags a rendered config without its Access gate or in development', () => {
+    const config = renderFake();
+    const vars: Record<string, unknown> = { ...config.vars, ENVIRONMENT: 'development' };
+    delete vars.E2E_ACCESS_AUD;
+    delete vars.E2E_ACCESS_TEAM_DOMAIN;
+    expect(fakeLlmViolations({ ...config, vars }, production, { hostname: FAKE_HOST })).toEqual([
+      'vars.ENVIRONMENT: must not be development',
+      'vars.E2E_ACCESS_AUD: required with a route',
+      'vars.E2E_ACCESS_TEAM_DOMAIN: required with a route',
+    ]);
   });
 });

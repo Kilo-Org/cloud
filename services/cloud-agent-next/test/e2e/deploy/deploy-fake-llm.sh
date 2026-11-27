@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set +x
+# Wrangler 4 also writes its logger output to log files by default; none here.
+export WRANGLER_WRITE_LOGS=false
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SERVICE_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)
@@ -49,9 +51,14 @@ Commands:
   help      Show this help
 
 Required environment (every command except help):
-  E2E_FAKE_LLM_HOSTNAME  The fake-LLM Worker's only hostname: a custom domain that the e2e
-                         Cloudflare Access application already protects. There is no default;
-                         without it the script refuses before rendering or uploading anything.
+  E2E_FAKE_LLM_HOSTNAME  The fake-LLM Worker's only hostname: a custom domain that its own
+                         Access application (fake-llm-e2e-test) already protects. There is no
+                         default; without it the script refuses before rendering or uploading
+                         anything.
+Required for render, dry-run and deploy:
+  E2E_FAKE_LLM_ACCESS_AUD, E2E_ACCESS_TEAM_DOMAIN
+                       The fake LLM's Access audience tag and <team>.cloudflareaccess.com; the
+                       Worker refuses every request whose assertion does not verify against them.
 Required for deploy and probe:
   ${ADMIN_TOKEN_VAR}  Bearer the Worker requires on every /test/* route. Export the same
                        value for the E2E driver. When unset or empty, the script reads

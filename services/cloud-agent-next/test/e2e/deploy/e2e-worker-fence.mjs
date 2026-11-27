@@ -219,11 +219,13 @@ const FAKE_LLM_ALLOWED_KEYS = new Set([
   'migrations',
   'secrets_store_secrets',
   'routes',
+  'vars',
 ]);
 
 /**
  * Findings for a fake-LLM Worker config: the checked-in file (no hostname, so no
- * route) or its render, whose one route must be exactly `hostname`.
+ * route, and the local `ENVIRONMENT=development`) or its render, whose one route
+ * must be exactly `hostname` and whose Access gate must be configured.
  */
 export function fakeLlmViolations(config, production, { hostname } = {}) {
   const found = [];
@@ -231,7 +233,18 @@ export function fakeLlmViolations(config, production, { hostname } = {}) {
     if (!FAKE_LLM_ALLOWED_KEYS.has(key)) found.push(`${key}: not allowed`);
   }
   found.push(...addressViolations(config));
-  found.push(...routeViolations(routesOf(config), production, hostname));
+  const routes = routesOf(config);
+  found.push(...routeViolations(routes, production, hostname));
+  const vars = config.vars ?? {};
+  if (routes.length > 0) {
+    if (vars.ENVIRONMENT === 'development') found.push('vars.ENVIRONMENT: must not be development');
+    if (!ACCESS_AUD.test(text(vars.E2E_ACCESS_AUD))) {
+      found.push('vars.E2E_ACCESS_AUD: required with a route');
+    }
+    if (!ACCESS_TEAM_DOMAIN.test(text(vars.E2E_ACCESS_TEAM_DOMAIN))) {
+      found.push('vars.E2E_ACCESS_TEAM_DOMAIN: required with a route');
+    }
+  }
   found.push(...secretAndObjectViolations(config));
   return found;
 }

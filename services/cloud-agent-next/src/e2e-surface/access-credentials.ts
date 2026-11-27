@@ -4,8 +4,9 @@
  * (`E2E_FAKE_LLM_URL`). e2e-only: referenced from `src/e2e-entry.ts`, never from
  * production.
  *
- * Neither e2e Worker has a public address; each hostname sits behind the same
- * Cloudflare Access application, whose policy is Service Auth. Requests to those
+ * Neither e2e Worker has a public address; each hostname sits behind its own
+ * Cloudflare Access application whose policy is Service Auth for the same
+ * service token. Requests to those
  * origins come from sandbox egress (`ContainersOutbound`: runtime artifacts, the
  * credential proxy facade, sandbox control, model traffic) and from the Worker
  * itself (callback delivery, model validation). Under

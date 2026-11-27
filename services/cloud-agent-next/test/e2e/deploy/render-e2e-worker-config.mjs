@@ -175,29 +175,38 @@ export function requireE2eWorkerHostname(hostname, sourceConfig) {
 
 /**
  * The fake-LLM Worker for the deployed stack. Its checked-in config has no
- * address; this render adds exactly the one Access-protected custom domain and
- * keeps workers.dev and preview URLs off. The rendered file lives in
+ * address; this render adds exactly the one Access-protected custom domain,
+ * keeps workers.dev and preview URLs off, and replaces the local
+ * `ENVIRONMENT=development` with its own Access application's audience and team
+ * domain, which its gate verifies. The rendered file lives in
  * `test/e2e/.wrangler/`, so `main` and `$schema` move one directory up.
  */
-export function buildFakeLlmConfig(sourceConfig, { hostname }) {
+export function buildFakeLlmConfig(sourceConfig, { hostname, access }) {
   const host = requirePrivateHostname('E2E_FAKE_LLM_HOSTNAME', hostname, sourceConfig);
+  const verified = requireE2eAccess(access, 'E2E_FAKE_LLM_ACCESS_AUD');
   const config = structuredClone(sourceConfig);
   config.$schema = '../../../node_modules/wrangler/config-schema.json';
   config.main = `../${sourceConfig.main}`;
   config.workers_dev = false;
   config.preview_urls = false;
   config.routes = [{ pattern: host, custom_domain: true }];
+  const { ENVIRONMENT: _local, ...vars } = config.vars ?? {};
+  config.vars = {
+    ...vars,
+    E2E_ACCESS_AUD: verified.aud,
+    E2E_ACCESS_TEAM_DOMAIN: verified.teamDomain,
+  };
   return config;
 }
 
 /**
- * The Access application in front of the hostname: its audience tag and team
- * domain. The e2e entry refuses every request whose `Cf-Access-Jwt-Assertion`
- * does not verify against them.
+ * The Access application in front of a hostname: its audience tag and team
+ * domain. Each e2e Worker's gate refuses every request whose
+ * `Cf-Access-Jwt-Assertion` does not verify against them.
  */
-export function requireE2eAccess(access) {
+export function requireE2eAccess(access, audVariable = 'E2E_ACCESS_AUD') {
   if (!/^[a-f0-9]{64}$/.test(access?.aud ?? '')) {
-    throw new Error('E2E_ACCESS_AUD must be the Access application audience tag (64 hex).');
+    throw new Error(`${audVariable} must be the Access application audience tag (64 hex).`);
   }
   if (!/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(access?.teamDomain ?? '')) {
     throw new Error('E2E_ACCESS_TEAM_DOMAIN must be <team>.cloudflareaccess.com.');
@@ -542,6 +551,10 @@ if (isMain) {
     try {
       rendered = buildFakeLlmConfig(parse(readFileSync(fakeLlmSourceConfigPath, 'utf8')), {
         hostname: process.env.E2E_FAKE_LLM_HOSTNAME,
+        access: {
+          aud: process.env.E2E_FAKE_LLM_ACCESS_AUD ?? '',
+          teamDomain: process.env.E2E_ACCESS_TEAM_DOMAIN ?? '',
+        },
       });
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);

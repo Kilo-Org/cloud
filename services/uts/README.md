@@ -1290,6 +1290,55 @@ manager at once:
    after the first login. An isolate of the old version can serve the old set for up to 60
    seconds, and the answer allows HTTP caches the same 60 seconds.
 
+### Login rotation
+
+The rotation job (`src/rotation/`, run by `src/dos/UtsLoginRotationDO.ts`) gives each pool's idle
+login a new password and then switches the pool's Hyperdrive config to it (design 5.2). The pools
+are app (`IDENTITY_STORE`, `uts_app_a/b`), pat (`IDENTITY_STORE_PAT`, `uts_pat_a/b`) and reader
+(`IDENTITY_STORE_REPLICA`, `uts_reader_a/b`).
+
+- **Switch.** `LOGIN_ROTATION` is `off` in every deployed block of `wrangler.jsonc`, and the job has
+  no schedule of its own: the minute cron calls the rotation object only where the var is `on`.
+  Turning it on, and provisioning the secrets below, belong to the later rotation phase; until then
+  the job runs only locally against a local Postgres and stand-ins (`scripts/rotation-e2e.ts`).
+- **State.** One object, `<environment>:login-rotation` in the `eu` jurisdiction, keeps one phase
+  (`idle`, `altering`, `storing`, `awaiting_approval`, `switching`, `lost`) and each login's current
+  password, sealed with AES-256-GCM under a key it generated. A run commits after each step; a
+  result whose base revision is no longer stored is dropped. A second run in the same object returns
+  `busy`.
+- **Cycle.** The due pool that switched longest ago goes first (every 30 days). The job reads the
+  config's login, takes the other login of the pair, seals a new random password as pending,
+  connects as that login over a direct socket to the primary (the host, port and database of the
+  primary config's origin) and runs `ALTER ROLE CURRENT_USER PASSWORD '<SCRAM verifier>'`. After a
+  crash it tries the pending password first, then the current one. If neither logs in, the phase is
+  `lost` and an error is logged each hour until a seed for that login logs in.
+- **Manager.** It creates `<login>_<YYYYMMDD>` in `/admin/identity-store`. Under the change policy
+  it waits in `awaiting_approval`, checks with `describeSecret` every hour, and logs
+  `uts.login_rotation.approval_overdue` once after 24 hours. A retry after a lost create answer
+  describes first, so it never asks twice.
+- **Hyperdrive.** Only from 02:00 to 05:00 UTC and at least 5 minutes after the previous switch, it
+  patches the config's user and password through the Cloudflare API and reads the config back.
+  Hyperdrive keeps its open pool and opens new connections with the new login.
+- **Failures.** A timeout, 429, 5xx or lost connection waits 1 minute and warns
+  (`uts.login_rotation.retry`); a refusal waits 1 hour and logs an error (`uts.login_rotation.refused`).
+
+Secrets, through STS (`services/sts/policy/uts.yaml`, manager folder `/workloads/uts`, binding
+`STS` with caller `uts`):
+
+| Name | Value | Provisioned by |
+|---|---|---|
+| `UTS_HYPERDRIVE_SWITCH_TOKEN` | Cloudflare API token of a dedicated account member, Hyperdrive edit only | A secret admin, per environment |
+| `UTS_IDENTITY_STORE_LOGIN_SEEDS` | JSON `{ "<login>": "<password>" }`, the first password of each of the six logins | Provisioning, per environment; delete it after every login has rotated once |
+
+The object adopts a seed only for a login whose password it does not hold, or for a `lost` login.
+The direct socket uses TLS with the platform's trust store; trial check 9 must show that the
+identity store's direct host passes it.
+
+`pnpm exec tsx scripts/rotation-e2e.ts` runs the full a -> b -> a rotation locally: the mint Worker
+under `wrangler dev`, a stand-in manager and Cloudflare API on loopback (`UTS_E2E_PORT`, default
+9560, and +1 to +3), and a local Postgres (`UTS_E2E_ADMIN_URL`). Clients that loop queries must see
+no failure.
+
 ### Platform roles
 
 The UTS role matrix does not cover the roles the platform brings. `PUBLIC` keeps `CONNECT` on the

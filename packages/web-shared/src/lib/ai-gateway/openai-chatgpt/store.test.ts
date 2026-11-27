@@ -1,7 +1,7 @@
 jest.mock('@kilocode/web-shared/lib/drizzle', () => {
   const db = {
     select: jest.fn(),
-    insert: jest.fn(),
+    execute: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   };
@@ -14,6 +14,8 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type { OpenAiChatGptConnectionEnvelope } from '@kilocode/db/schema-types';
 import {
   testByokEnvelope,
@@ -31,7 +33,7 @@ import type { OpenAiChatGptConnection } from './types';
 
 type MockDb = {
   select: jest.Mock;
-  insert: jest.Mock;
+  execute: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
 };
@@ -96,6 +98,34 @@ function storedRowWithPlaintext(plaintext: string): StoredRow {
   };
 }
 
+const dialect = new PgDialect();
+
+/** Reads the inserted values and the conflict update from the upsert the store sends. */
+function parseUpsert(query: SQL): { values: Partial<StoredRow>; set: Partial<StoredRow> } {
+  const { sql: text, params } = dialect.sqlToQuery(query);
+  const insert = /INSERT INTO "openai_chatgpt_connections" \(([^)]*)\)\s*VALUES \(([^)]*)\)/.exec(
+    text
+  );
+  const update = /DO UPDATE SET ([^]*)$/.exec(text.trim());
+  if (!insert || !update) throw new Error(`unexpected statement: ${text}`);
+  const value = (placeholder: string): unknown => {
+    const param = params[Number(placeholder.trim().slice(1)) - 1];
+    return typeof param === 'string' && param.startsWith('{') ? JSON.parse(param) : param;
+  };
+  const columns = insert[1].split(', ').map(column => column.replaceAll('"', ''));
+  const placeholders = insert[2].split(', ');
+  const values = Object.fromEntries(
+    columns.map((column, index) => [column, value(placeholders[index])])
+  ) as Partial<StoredRow>;
+  const set = Object.fromEntries(
+    update[1].split(', ').map(assignment => {
+      const [column, placeholder] = assignment.split(' = ');
+      return [column.replaceAll('"', ''), value(placeholder)];
+    })
+  ) as Partial<StoredRow>;
+  return { values, set };
+}
+
 describe('openai-chatgpt connection store', () => {
   const mockDb = db as unknown as MockDb;
   const kms = useFakeByokKms();
@@ -124,24 +154,21 @@ describe('openai-chatgpt connection store', () => {
       })),
     }));
 
-    mockDb.insert.mockReset();
-    mockDb.insert.mockImplementation(() => ({
-      values: jest.fn((values: StoredRow) => ({
-        onConflictDoUpdate: jest.fn(({ set }: { set: Partial<StoredRow> }) => {
-          const index = rows.findIndex(
-            row =>
-              row.kilo_user_id === values.kilo_user_id &&
-              row.organization_id === values.organization_id
-          );
-          if (index >= 0) {
-            rows[index] = { ...rows[index], ...set };
-          } else {
-            rows.push({ ...values });
-          }
-          return Promise.resolve(undefined);
-        }),
-      })),
-    }));
+    mockDb.execute.mockReset();
+    mockDb.execute.mockImplementation((query: SQL) => {
+      const upsert = parseUpsert(query);
+      const index = rows.findIndex(
+        row =>
+          row.kilo_user_id === upsert.values.kilo_user_id &&
+          row.organization_id === upsert.values.organization_id
+      );
+      if (index >= 0) {
+        rows[index] = { ...rows[index], ...upsert.set };
+      } else {
+        rows.push(upsert.values as StoredRow);
+      }
+      return Promise.resolve(undefined);
+    });
 
     mockDb.update.mockReset();
     mockDb.update.mockImplementation(() => ({

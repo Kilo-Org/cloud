@@ -3,7 +3,8 @@
 # production, staging STS the custom environment staging, development STS previews (design 6.2);
 # the Vercel development environment is never accepted. The grants below cover the three
 # dual-accept receivers it calls: the LLM and Enkrypt usage publish to usage-ingest, the API-metrics
-# write to o11y, and the provider forward to the AI Gateway Secure Proxy.
+# write to o11y, and the provider forward to the AI Gateway Secure Proxy. Phase 4 activated the
+# gateway for Bouncer: its production grant is below.
 workload: ai-gateway
 environments:
   - development
@@ -28,10 +29,14 @@ scopes:
   - usage-ingest:usage.publish
   - o11y:api-metrics.write
   - ai-gateway-secure-proxy:request.forward
-# The authenticated UTS HTTPS feed transport reads the revocation feed with a uts-feed token.
-# Development only until phase 4's activation go; staging and production get it as an addition to
-# their keys below. INTERNAL_API_SECRET, staging and production only: the internal API secret read
-# under SECRETS_SOURCE=sts (packages/web-shared/src/lib/sts-secret-reader.ts); previews keep `env`.
+# Each grant belongs to one environment. The authenticated UTS HTTPS feed transport reads the
+# revocation feed with a uts-feed token, development only until phase 4's activation go. Bouncer
+# (repo Kilo-Org/bouncer) runs in production only and accepts only production STS tokens: the
+# shared Bouncer client sends a bouncer:decide token with decide and release and a
+# bouncer:usage.write token with usage events, beside the legacy key while Bouncer runs
+# STS_AUTH=dual. The gateway sends no signup call, so it holds neither signup scope.
+# INTERNAL_API_SECRET, staging and production only: the internal API secret read under
+# SECRETS_SOURCE=sts (packages/web-shared/src/lib/sts-secret-reader.ts); previews keep `env`.
 environmentGrants:
   development:
     audiences:
@@ -42,5 +47,10 @@ environmentGrants:
     secrets:
       - INTERNAL_API_SECRET
   production:
+    audiences:
+      - bouncer
+    scopes:
+      - bouncer:decide
+      - bouncer:usage.write
     secrets:
       - INTERNAL_API_SECRET

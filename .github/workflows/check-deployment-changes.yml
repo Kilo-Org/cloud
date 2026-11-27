@@ -22,7 +22,11 @@ permissions:
 jobs:
   check:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # Every deployment waits on this job. The checkout post step must be able to
+    # finish inside the job budget: actions/checkout does no Blacksmith mirror
+    # refresh, and 10 minutes covers a cold partial-clone fetch of main plus the
+    # GitHub API paging below.
+    timeout-minutes: 10
     outputs:
       base_sha: ${{ steps.changes.outputs.base_sha }}
       target_sha: ${{ steps.changes.outputs.target_sha }}
@@ -42,11 +46,19 @@ jobs:
       - name: Verify main branch
         run: test "$GITHUB_REF" = refs/heads/main
 
+      # Full history so the merge-base and the deploy-input diff below resolve
+      # the last deployed sha against the CI-green candidate, and no blobs up
+      # front: both compare trees only.
+      # actions/checkout has no Blacksmith mirror to refresh.
       - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          filter: blob:none
           ref: ${{ github.sha }}
+          # Nothing here pushes, and the repository is public: the lazy blob
+          # fetches below need no token.
+          persist-credentials: false
 
       - name: Check changes since last complete deployment
         id: changes

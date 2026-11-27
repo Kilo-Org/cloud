@@ -23,6 +23,7 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/event-service": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

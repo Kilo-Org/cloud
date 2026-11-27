@@ -102,8 +102,13 @@ describe('policy token grants', () => {
     ).toThrow('audience canary is reserved and no policy may grant it');
     // The shipped web policy, which sends the probe, grants neither.
     expect(policyIndex.get('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'o11y'],
-      scopes: WEB_BASE_SCOPES,
+      audiences: ['usage-ingest', 'o11y', 'bouncer'],
+      scopes: [
+        ...WEB_BASE_SCOPES,
+        'bouncer:decide',
+        'bouncer:usage.write',
+        'bouncer:signup.decide',
+      ],
     });
   });
 
@@ -869,7 +874,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only and the internal key outside it', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key outside it, and two Bouncer scopes in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -883,16 +888,22 @@ secrets: [APP_TWO_SECRET]
         { customEnvironmentId: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV' },
       ],
     });
-    for (const environment of ['staging', 'production'] as const) {
-      expect(policyFor(environment, 'ai-gateway')).toMatchObject({
-        environments: ['development', 'staging', 'production'],
-        audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
-        scopes: GATEWAY_BASE_SCOPES,
-        secrets: ['INTERNAL_API_SECRET'],
-        dynamic: [],
-        environmentGrants: {},
-      });
-    }
+    expect(policyFor('staging', 'ai-gateway')).toMatchObject({
+      environments: ['development', 'staging', 'production'],
+      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
+      scopes: GATEWAY_BASE_SCOPES,
+      secrets: ['INTERNAL_API_SECRET'],
+      dynamic: [],
+      environmentGrants: {},
+    });
+    expect(policyFor('production', 'ai-gateway')).toMatchObject({
+      environments: ['development', 'staging', 'production'],
+      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'bouncer'],
+      scopes: [...GATEWAY_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write'],
+      secrets: ['INTERNAL_API_SECRET'],
+      dynamic: [],
+      environmentGrants: {},
+    });
     expect(policyFor('development', 'ai-gateway')).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'uts-feed'],
       scopes: [...GATEWAY_BASE_SCOPES, 'uts-feed:revocation.read'],
@@ -929,21 +940,33 @@ describe('dual-accept grants of the shipped policies', () => {
   );
 
   it.each(['staging', 'production'] as const)(
-    'grants the callers only these scopes and audiences in %s',
+    'grants the callers only these scopes and audiences in %s, beside the production Bouncer grants',
     environment => {
+      const bouncer = environment === 'production';
       expect(policyFor(environment, 'usage-ingest')).toMatchObject({
         audiences: ['web'],
         scopes: ['web:sts.canary', 'web:usage.record'],
         secrets: [],
       });
       expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y'],
-        scopes: WEB_BASE_SCOPES,
+        audiences: ['usage-ingest', 'o11y', ...(bouncer ? ['bouncer'] : [])],
+        scopes: [
+          ...WEB_BASE_SCOPES,
+          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] : []),
+        ],
         secrets: ['INTERNAL_API_SECRET'],
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
-        scopes: GATEWAY_BASE_SCOPES,
+        audiences: [
+          'usage-ingest',
+          'o11y',
+          'ai-gateway-secure-proxy',
+          ...(bouncer ? ['bouncer'] : []),
+        ],
+        scopes: [
+          ...GATEWAY_BASE_SCOPES,
+          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
+        ],
         secrets: ['INTERNAL_API_SECRET'],
       });
     }
@@ -1300,7 +1323,7 @@ scopes: ['gateway:models.read']
     ).toBe(true);
   });
 
-  it('grants web its UTS audiences, scopes and client keys in development only, and the internal key in staging and production only', () => {
+  it('grants web its UTS audiences, scopes and client keys in development only, the internal key in staging and production only, and the Bouncer scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'uts-feed', 'uts'],
@@ -1313,12 +1336,20 @@ scopes: ['gateway:models.read']
       ],
       secrets: ['UTS_KILO_WEB_CLIENT_KEY', 'UTS_KILO_WEB_CLIENT_KEY_NEXT'],
     });
-    for (const environment of ['staging', 'production'] as const) {
-      expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y'],
-        scopes: WEB_BASE_SCOPES,
-        secrets: ['INTERNAL_API_SECRET'],
-      });
-    }
+    expect(policyFor('staging', 'web')).toMatchObject({
+      audiences: ['usage-ingest', 'o11y'],
+      scopes: WEB_BASE_SCOPES,
+      secrets: ['INTERNAL_API_SECRET'],
+    });
+    expect(policyFor('production', 'web')).toMatchObject({
+      audiences: ['usage-ingest', 'o11y', 'bouncer'],
+      scopes: [
+        ...WEB_BASE_SCOPES,
+        'bouncer:decide',
+        'bouncer:usage.write',
+        'bouncer:signup.decide',
+      ],
+      secrets: ['INTERNAL_API_SECRET'],
+    });
   });
 });

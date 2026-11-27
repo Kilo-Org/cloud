@@ -8,7 +8,7 @@ import {
   type BillingCorrelationContext,
 } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { send as sendEmail } from '@kilocode/web-shared/lib/email';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
@@ -392,7 +392,8 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
 export async function POST(request: NextRequest) {
   const correlation = readBillingCorrelationHeaders(request.headers) ?? undefined;
   const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
+  const expected = secret ? await readInternalApiSecret() : '';
+  if (!expected || !secret || !timingSafeEqual(secret, expected)) {
     logBillingSideEffect('error', 'Rejected billing side effect request', {
       ...correlation,
       event: 'request_rejected',

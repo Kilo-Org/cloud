@@ -1,10 +1,8 @@
 import 'server-only';
 
 import { z } from 'zod';
-import {
-  INTERNAL_API_SECRET,
-  USER_DATA_EXPORT_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { USER_DATA_EXPORT_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import {
   USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
@@ -47,7 +45,10 @@ async function postExportWorker(
   fetchImpl: typeof fetch = fetch
 ): Promise<Response | null> {
   const baseUrl = exportWorkerUrl(USER_DATA_EXPORT_WORKER_URL);
-  if (!baseUrl || !INTERNAL_API_SECRET) return null;
+  if (!baseUrl) return null;
+  // Like a failed request, an unreadable secret answers null: nothing was sent.
+  const internalApiSecret = await readInternalApiSecret().catch(() => '');
+  if (!internalApiSecret) return null;
 
   const url = new URL(path, baseUrl);
   const userAssertion = generateBoundedInternalServiceToken(kiloUserId, {
@@ -61,7 +62,7 @@ async function postExportWorker(
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${userAssertion}`,
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': internalApiSecret,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

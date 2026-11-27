@@ -1,0 +1,21 @@
+# The AI gateway (Vercel project kilocode-ai-gateway, apps/ai-gateway). Its authenticated UTS
+# HTTPS feed transport reads the revocation feed with a uts-feed token minted from the function's
+# own OIDC token, exchanged for the STS audience. Development only until phase 4's activation go:
+# development STS serves the project's previews (design 6.2); staging (custom environment
+# env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV) and production are added to both environment lists then.
+workload: ai-gateway
+environments:
+  - development
+identity:
+  kind: vercel-oidc
+  teamSlug: kilocode
+  teamId: team_ItxRShuUkJaEd9GmXMEEgunb
+  projectId: prj_cFtsRYRBCm4qa8D35LC2j183FohC
+  projectName: kilocode-ai-gateway
+  environments:
+    - preview
+secrets: []
+audiences:
+  - uts-feed
+scopes:
+  - uts-feed:revocation.read

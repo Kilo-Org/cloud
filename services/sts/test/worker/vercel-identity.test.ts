@@ -2,6 +2,7 @@ import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { generateKeyPair, SignJWT, type JWTPayload } from 'jose';
 import { describe, expect, it } from 'vitest';
 import { IdentityVerifier, type VerifyOutcome } from '../../src/identity/verify';
+import { policyIndex } from '../../src/policy';
 import { loadPolicies } from '../../src/policy/load';
 import {
   createProvider,
@@ -372,5 +373,94 @@ describe('Vercel provider outages', () => {
     await verify(token);
     expect(local.calls.get(`${SLUG_ISSUER}/.well-known/openid-configuration`)).toBe(1);
     expect(local.calls.get(`${SLUG_ISSUER}/.well-known/jwks`)).toBe(1);
+  });
+});
+
+describe('Vercel identity of the shipped ai-gateway policy', () => {
+  const TEAM_ID = 'team_ItxRShuUkJaEd9GmXMEEgunb';
+  const GATEWAY_PROJECT_ID = 'prj_cFtsRYRBCm4qa8D35LC2j183FohC';
+
+  /** An exchanged kilocode-ai-gateway function token. */
+  function gatewayClaims(environment: string, overrides: JWTPayload = {}): JWTPayload {
+    return {
+      sub: `owner:kilocode:project:kilocode-ai-gateway:environment:${environment}`,
+      owner: 'kilocode',
+      owner_id: TEAM_ID,
+      project: 'kilocode-ai-gateway',
+      project_id: GATEWAY_PROJECT_ID,
+      environment,
+      act: { iat: nowSeconds() - 60, aud: 'https://vercel.com/kilocode' },
+      ...overrides,
+    };
+  }
+
+  /** STS of one environment under the shipped policies, and a token of team kilocode's issuer. */
+  async function shipped(environment: StsEnvironment) {
+    const kilocode = await createProvider('https://oidc.vercel.com/kilocode', STS_ISSUER);
+    const verifier = new IdentityVerifier({
+      policies: policyIndex.all(),
+      environment,
+      issuer: STS_ISSUER,
+      fetch: providerFetch([kilocode]).fetch,
+    });
+    return async (claims: JWTPayload) => await verifier.verify(await signToken(kilocode, claims));
+  }
+
+  it('verifies a kilocode-ai-gateway preview function on development STS as ai-gateway', async () => {
+    const verify = await shipped('development');
+    expect(await verify(gatewayClaims('preview'))).toMatchObject({
+      status: 'verified',
+      workload: 'ai-gateway',
+      provider: 'vercel',
+    });
+  });
+
+  it('refuses every kilocode-ai-gateway environment on staging and production STS', async () => {
+    const staging = await shipped('staging');
+    expect(await staging(gatewayClaims('preview'))).toMatchObject({
+      status: 'denied',
+      reason: 'environment_mismatch',
+      subject: { actor: 'ai-gateway' },
+    });
+    // The project's custom environment staging, which the policy does not list yet.
+    expect(
+      await staging(
+        gatewayClaims('staging', { custom_environment_id: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV' })
+      )
+    ).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: { actor: 'ai-gateway' },
+    });
+
+    const production = await shipped('production');
+    expect(await production(gatewayClaims('preview'))).toMatchObject({
+      status: 'denied',
+      reason: 'environment_mismatch',
+      subject: { actor: 'ai-gateway' },
+    });
+    expect(await production(gatewayClaims('production'))).toMatchObject({
+      status: 'denied',
+      reason: 'identity_rejected',
+      subject: { actor: 'ai-gateway' },
+    });
+  });
+
+  it('binds the project id and team id, never the names a token carries', async () => {
+    const verify = await shipped('development');
+    expect(await verify(gatewayClaims('preview', { project_id: 'prj_Other1' }))).toMatchObject({
+      status: 'denied',
+      reason: 'unknown_workload',
+      subject: { actor: `vercel:${TEAM_ID}/prj_Other1` },
+    });
+    expect(await verify(gatewayClaims('preview', { owner_id: 'team_Other1' }))).toMatchObject({
+      status: 'denied',
+      reason: 'unknown_workload',
+      subject: { actor: `vercel:team_Other1/${GATEWAY_PROJECT_ID}` },
+    });
+    // The gateway's names on the web app's project id name the web app, not the gateway.
+    expect(
+      await verify(gatewayClaims('preview', { project_id: 'prj_AAnAlIuYPrpU0aDbT1kdm0ymL7hR' }))
+    ).toMatchObject({ status: 'verified', workload: 'web' });
   });
 });

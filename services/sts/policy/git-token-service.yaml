@@ -1,0 +1,4 @@
+# Registration only: services/git-token-service/wrangler.jsonc. No environment, identity or grant.
+workload: git-token-service
+registered: true
+secrets: []

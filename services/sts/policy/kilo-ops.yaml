@@ -1,0 +1,4 @@
+# Registration only: services/kilo-ops/wrangler.jsonc. No environment, identity or grant.
+workload: kilo-ops
+registered: true
+secrets: []

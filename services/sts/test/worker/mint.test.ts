@@ -7,6 +7,9 @@ import {
   STS_SECURE_PROXY_FORWARD,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
+  STS_O11Y_ALERTING_READ,
+  STS_O11Y_ALERTING_WRITE,
+  STS_O11Y_API_METRICS_WRITE,
   isStsDeniedProbe,
   type MintRequest,
   type MintResult,
@@ -522,6 +525,50 @@ describe('HTTP mint', () => {
   });
 });
 
+/**
+ * Team kilocode's slug issuer, which every shipped Vercel policy names. One key for the file: STS's
+ * isolate keeps the verifier, and its key set, per policy index.
+ */
+let kilocode: TestProvider;
+
+beforeAll(async () => {
+  kilocode = await createProvider('https://oidc.vercel.com/kilocode', config.issuer);
+});
+
+/** An exchanged preview function token of a project of team kilocode. */
+async function kilocodePreviewToken(project: string, projectId: string): Promise<string> {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return await signToken(
+    kilocode,
+    {
+      sub: `owner:kilocode:project:${project}:environment:preview`,
+      owner: 'kilocode',
+      owner_id: 'team_ItxRShuUkJaEd9GmXMEEgunb',
+      project,
+      project_id: projectId,
+      environment: 'preview',
+      act: { iat: issuedAt - 60, aud: 'https://vercel.com/kilocode' },
+    },
+    { issuedAt, expiresAt: issuedAt + 3600 }
+  );
+}
+
+/** `POST /v1/token` with a provider token, under the shipped policies and registry. */
+async function postShipped(token: string, request: MintRequest): Promise<Response> {
+  vi.stubGlobal('fetch', providerFetch([kilocode]).fetch);
+  const ctx = { waitUntil, passThroughOnException: () => undefined, props: {} };
+  return await handleRequest(
+    new Request(`${config.issuer}/v1/token`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify(request),
+    }),
+    env,
+    ctx as unknown as ExecutionContext,
+    defaultMintAuthority
+  );
+}
+
 describe('UTS grants of the shipped web policy', () => {
   const UTS_GRANTS = [
     { audience: 'uts-feed', scope: 'uts-feed:revocation.read' },
@@ -566,33 +613,9 @@ describe('UTS grants of the shipped web policy', () => {
   );
 
   it('issues a kilocode-app preview function a UTS feed token over HTTP in development', async () => {
-    const issuer = 'https://oidc.vercel.com/kilocode';
-    const kilocode = await createProvider(issuer, config.issuer);
-    vi.stubGlobal('fetch', providerFetch([kilocode]).fetch);
-    const issuedAt = Math.floor(Date.now() / 1000);
-    const token = await signToken(
-      kilocode,
-      {
-        sub: 'owner:kilocode:project:kilocode-app:environment:preview',
-        owner: 'kilocode',
-        owner_id: 'team_ItxRShuUkJaEd9GmXMEEgunb',
-        project: 'kilocode-app',
-        project_id: 'prj_AAnAlIuYPrpU0aDbT1kdm0ymL7hR',
-        environment: 'preview',
-        act: { iat: issuedAt - 60, aud: 'https://vercel.com/kilocode' },
-      },
-      { issuedAt, expiresAt: issuedAt + 3600 }
-    );
-    const ctx = { waitUntil, passThroughOnException: () => undefined, props: {} };
-    const response = await handleRequest(
-      new Request(`${config.issuer}/v1/token`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
-        body: JSON.stringify({ tokens: [UTS_GRANTS[0]] }),
-      }),
-      env,
-      ctx as unknown as ExecutionContext,
-      defaultMintAuthority
+    const response = await postShipped(
+      await kilocodePreviewToken('kilocode-app', 'prj_AAnAlIuYPrpU0aDbT1kdm0ymL7hR'),
+      { tokens: [UTS_GRANTS[0]] }
     );
     expect(response.status).toBe(200);
     const result = await response.json<MintResult>();
@@ -607,21 +630,136 @@ describe('UTS grants of the shipped web policy', () => {
   });
 });
 
+describe('UTS feed grant of the shipped ai-gateway policy', () => {
+  const FEED = { audience: 'uts-feed', scope: 'uts-feed:revocation.read' };
+  const GATEWAY_PROJECT_ID = 'prj_cFtsRYRBCm4qa8D35LC2j183FohC';
+
+  it('issues a kilocode-ai-gateway preview function a UTS feed token over HTTP in development', async () => {
+    const response = await postShipped(
+      await kilocodePreviewToken('kilocode-ai-gateway', GATEWAY_PROJECT_ID),
+      { tokens: [FEED] }
+    );
+    expect(response.status).toBe(200);
+    const result = await response.json<MintResult>();
+    if (result.status !== 'ok' || result.tokens[0].status !== 'issued') {
+      throw new Error(`expected an issued token, got ${JSON.stringify(result)}`);
+    }
+    expect(decodeJwt(result.tokens[0].token)).toMatchObject({
+      sub: 'service:ai-gateway',
+      client_id: 'ai-gateway',
+      env: 'development',
+      aud: 'uts-feed',
+      scope: 'uts-feed:revocation.read',
+    });
+    expect((await issuedRows())[0].data.attributes).toMatchObject({ identity: 'vercel' });
+  });
+
+  it('denies it every other audience and scope in development', async () => {
+    const token = await kilocodePreviewToken('kilocode-ai-gateway', GATEWAY_PROJECT_ID);
+    // One token per audience in a call, so the second uts and uts-feed entries go in a second call.
+    const calls = [
+      [
+        { audience: 'uts', scope: 'uts:subjects.revoke', reason: 'audience_not_allowed' },
+        {
+          audience: 'usage-ingest',
+          scope: 'usage-ingest:sts.canary',
+          reason: 'audience_not_allowed',
+        },
+        { audience: 'web', scope: 'web:sts.canary', reason: 'audience_not_allowed' },
+        { ...STS_DENIED_PROBE, reason: 'audience_not_allowed' },
+        { audience: 'kilo-gateway', scope: 'kilo-gateway:inference', reason: 'unknown_scope' },
+      ],
+      [
+        { audience: 'uts', scope: 'uts:token-exchange', reason: 'audience_not_allowed' },
+        { audience: 'uts-feed', scope: 'uts-feed:revocation.write', reason: 'unknown_scope' },
+      ],
+    ];
+    for (const denied of calls) {
+      const response = await postShipped(token, {
+        tokens: denied.map(({ audience, scope }) => ({ audience, scope })),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        status: 'ok',
+        tokens: denied.map(entry => ({ status: 'denied', ...entry })),
+      });
+    }
+    expect(await issuedRows()).toEqual([]);
+  });
+
+  it('denies an ai-gateway caller at the staging and production mint as unknown_workload', async () => {
+    const gateway: MintCaller = {
+      channel: 'http',
+      workload: 'ai-gateway',
+      identity: 'vercel',
+      attestationExp: null,
+      claims: { provider: 'vercel' },
+    };
+    for (const environment of ['staging', 'production'] as const) {
+      expect(
+        await serveMint(
+          env,
+          { ...config, environment },
+          {
+            caller: gateway,
+            request: { tokens: [FEED] },
+            waitUntil,
+            authority: defaultMintAuthority,
+          }
+        )
+      ).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...FEED, reason: 'unknown_workload' }],
+      });
+    }
+    expect(await issuedRows()).toEqual([]);
+  });
+
+  it('refuses a kilocode-ai-gateway token from another project id', async () => {
+    const otherProjectId = 'prj_cFtsRYRBCm4qa8D35LC2j183FohD';
+    const token = await kilocodePreviewToken('kilocode-ai-gateway', otherProjectId);
+    const response = await postShipped(token, { tokens: [FEED] });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ status: 'identity_rejected' });
+    expect(await issuedRows()).toEqual([]);
+    const denials = await flushedDenials();
+    expect(denials).toHaveLength(1);
+    expect(denials[0].data.attributes).toMatchObject({
+      channel: 'http',
+      reason: 'unknown_workload',
+      workload: `vercel:team_ItxRShuUkJaEd9GmXMEEgunb/${otherProjectId}`,
+    });
+  });
+});
+
 describe('phase 4 service scopes under the shipped policies (default deny)', () => {
-  const SERVICE_SCOPES = [STS_SECURE_PROXY_FORWARD, STS_USAGE_PUBLISH, STS_USAGE_RECORD];
+  // The O11y scopes share one audience and a mint holds one token per audience, so each scope is
+  // asked for in a request of its own.
+  const SERVICE_SCOPES = [
+    STS_SECURE_PROXY_FORWARD,
+    STS_USAGE_PUBLISH,
+    STS_USAGE_RECORD,
+    STS_O11Y_API_METRICS_WRITE,
+    STS_O11Y_ALERTING_READ,
+    STS_O11Y_ALERTING_WRITE,
+  ];
   const shipped = STS_ENVIRONMENTS.flatMap(environment =>
     defaultMintAuthority.policies
       .forEnvironment(environment)
       .map(policy => ({ environment, workload: policy.workload, policy }))
   );
 
-  async function mintAsShipped(environment: (typeof STS_ENVIRONMENTS)[number], workload: string) {
+  async function mintAsShipped(
+    environment: (typeof STS_ENVIRONMENTS)[number],
+    workload: string,
+    entry: { audience: string; scope: string }
+  ) {
     const result = await serveMint(
       env,
       { ...config, environment },
       {
         caller: { channel: 'http', workload, identity: 'test', attestationExp: null, claims: {} },
-        request: { tokens: SERVICE_SCOPES },
+        request: { tokens: [entry] },
         waitUntil,
         authority: defaultMintAuthority,
       }
@@ -630,45 +768,44 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
     return result;
   }
 
-  it('covers the web and usage-ingest policies in every environment', () => {
+  it('covers the web, usage-ingest and o11y policies in every environment', () => {
     for (const environment of STS_ENVIRONMENTS) {
       const workloads = shipped
         .filter(entry => entry.environment === environment)
         .map(entry => entry.workload);
-      expect(workloads).toEqual(expect.arrayContaining(['web', 'usage-ingest']));
+      expect(workloads).toEqual(expect.arrayContaining(['web', 'usage-ingest', 'o11y']));
     }
   });
 
   it.each(shipped)(
     'refuses $workload in $environment every phase 4 service scope, never as unknown_scope',
     async ({ environment, workload, policy }) => {
-      expect(await mintAsShipped(environment, workload)).toEqual({
-        status: 'ok',
-        tokens: [
-          { status: 'denied', ...STS_SECURE_PROXY_FORWARD, reason: 'audience_not_allowed' },
-          // The policy holding the audience (the canary pair) is refused the scope instead.
-          ...[STS_USAGE_PUBLISH, STS_USAGE_RECORD].map(pair => ({
-            status: 'denied',
-            ...pair,
-            reason: policy.audiences.includes(pair.audience)
-              ? 'scope_not_allowed'
-              : 'audience_not_allowed',
-          })),
-        ],
-      });
+      for (const entry of SERVICE_SCOPES) {
+        // No shipped policy lists the Secure Proxy or O11y audience. A policy holding a usage
+        // audience (the canary pair) is refused the scope instead.
+        const usage = entry === STS_USAGE_PUBLISH || entry === STS_USAGE_RECORD;
+        const reason =
+          usage && policy.audiences.includes(entry.audience)
+            ? 'scope_not_allowed'
+            : 'audience_not_allowed';
+        expect(await mintAsShipped(environment, workload, entry)).toEqual({
+          status: 'ok',
+          tokens: [{ status: 'denied', ...entry, reason }],
+        });
+      }
     }
   );
 
   it.each(STS_ENVIRONMENTS)(
     'refuses the canary pair, which holds the audiences, the usage scopes as not granted in %s',
     async environment => {
-      const web = await mintAsShipped(environment, 'web');
-      expect(web).toMatchObject({
-        tokens: [{}, { ...STS_USAGE_PUBLISH, reason: 'scope_not_allowed' }, {}],
+      expect(await mintAsShipped(environment, 'web', STS_USAGE_PUBLISH)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...STS_USAGE_PUBLISH, reason: 'scope_not_allowed' }],
       });
-      const usageIngest = await mintAsShipped(environment, 'usage-ingest');
-      expect(usageIngest).toMatchObject({
-        tokens: [{}, {}, { ...STS_USAGE_RECORD, reason: 'scope_not_allowed' }],
+      expect(await mintAsShipped(environment, 'usage-ingest', STS_USAGE_RECORD)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...STS_USAGE_RECORD, reason: 'scope_not_allowed' }],
       });
     }
   );

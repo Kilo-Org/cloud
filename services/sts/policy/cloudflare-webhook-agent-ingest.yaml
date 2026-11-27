@@ -1,0 +1,4 @@
+# Registration only: services/webhook-agent-ingest/wrangler.jsonc. No environment, identity or grant.
+workload: cloudflare-webhook-agent-ingest
+registered: true
+secrets: []

@@ -16,7 +16,7 @@ type RouteParams = { params: Promise<{ directoryId: string }> };
 
 /** Binds a WorkOS directory to a parent organization. Idempotent. */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   const { directoryId } = await params;
@@ -36,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
 /** Soft-deletes the organization bound to a directory. Idempotent. */
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   const { directoryId } = await params;

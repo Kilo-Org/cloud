@@ -59,7 +59,7 @@
     // `<host>:<port>/<database>` a ci-migration lease returns; empty returns none.
     "LEASE_CI_MIGRATION_TARGET": "",
     // Cloudflare account STS mints CI deploy tokens in; empty mints none (README "Cloudflare deploy tokens").
-    "CF_DEPLOY_ACCOUNT_ID": "",
+    "CF_DEPLOY_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
@@ -105,7 +105,7 @@
         "DO_JURISDICTION": "eu",
         "TOKEN_SIGNING_KIDS_REVOKED": "",
         "LEASE_CI_MIGRATION_TARGET": "",
-        "CF_DEPLOY_ACCOUNT_ID": "",
+        "CF_DEPLOY_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],

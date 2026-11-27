@@ -19,6 +19,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 jest.mock('@kilocode/web-shared/lib/sts-service-tokens', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/sts-service-tokens'),
   stsServiceToken: jest.fn(),
+  stsServiceTokenIfHeld: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -31,10 +32,11 @@ import { ServiceTokenError } from '@kilocode/service-token-client';
 import type { EnkryptUsageWriteInput, UsageRecordRequest } from '@kilocode/usage-contracts';
 import { getAuthoritativeClaudeBillingState } from './ai-gateway/claude-billing/payer-state';
 import { recordEnkryptUsageInPrimaryRegion } from './ai-gateway/enkrypt-guardrail/usage-primary-region';
-import { recordUsageInPrimaryRegion } from './ai-gateway/usage-record-client';
+import { ATTEMPT_TIMEOUT_MS, recordUsageInPrimaryRegion } from './ai-gateway/usage-record-client';
 import { installInternalApiSecretRead } from './internal-api-secret';
-import { stsServiceToken } from './sts-service-tokens';
+import { stsServiceToken, stsServiceTokenIfHeld } from './sts-service-tokens';
 import {
+  REGION_HANDOFF_TOKEN_WAIT_MS,
   STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ,
   STS_WEB_USAGE_RECORD_REGION_HANDOFF,
   webInternalSenderCredential,
@@ -43,9 +45,36 @@ import {
 
 const mockSenderAuth: { value: string | undefined } = { value: undefined };
 const mintedToken = jest.mocked(stsServiceToken);
+const heldToken = jest.mocked(stsServiceTokenIfHeld);
 const fetchMock = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
 const nativeFetch = globalThis.fetch;
 const secretRead = jest.fn<Promise<string>, []>();
+
+/** A mint that never answers: only the caller's own deadline ends the wait for it. */
+function slowMint(): Promise<string> {
+  return Promise.withResolvers<string>().promise;
+}
+
+/**
+ * Fires the token-wait timer of `delayMs` at once, so a slow-mint test proves the deadline without
+ * waiting it out. Every other timer stays real: the shared Jest worker setup's pg pool arms its own.
+ */
+function expireTokenWait(delayMs: number): jest.SpyInstance {
+  const realSetTimeout = globalThis.setTimeout;
+  return jest
+    .spyOn(globalThis, 'setTimeout')
+    .mockImplementation(((callback: () => void, ms?: number) =>
+      realSetTimeout(callback, ms === delayMs ? 0 : ms)) as unknown as typeof setTimeout);
+}
+
+/** Pins `Date.now`, then moves it by `mintMs` while the mint runs, so a budget check is exact. */
+function mintTaking(mintMs: number): void {
+  const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+  mintedToken.mockImplementation(async () => {
+    now.mockReturnValue(1_000_000 + mintMs);
+    return 'sts-handoff-token';
+  });
+}
 
 function sentHeaders(): Headers {
   return new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
@@ -54,6 +83,7 @@ function sentHeaders(): Headers {
 beforeEach(() => {
   mockSenderAuth.value = undefined;
   mintedToken.mockReset();
+  heldToken.mockReset();
   fetchMock.mockReset();
   secretRead.mockReset().mockResolvedValue('installed-internal-secret');
   installInternalApiSecretRead(secretRead);
@@ -87,7 +117,10 @@ describe('webInternalSenderMode', () => {
 describe('webInternalSenderCredential', () => {
   it('sends the legacy secret while WEB_INTERNAL_SENDER_AUTH is unset, without a mint', async () => {
     await expect(
-      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, { legacySecret: secretRead })
+      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+        legacySecret: secretRead,
+        tokenWait: 1_000,
+      })
     ).resolves.toEqual({
       kind: 'ready',
       header: 'x-internal-api-key',
@@ -100,7 +133,10 @@ describe('webInternalSenderCredential', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     secretRead.mockResolvedValue('');
     await expect(
-      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, { legacySecret: secretRead })
+      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+        legacySecret: secretRead,
+        tokenWait: 1_000,
+      })
     ).resolves.toEqual({ kind: 'unavailable', reason: 'secret_missing' });
   });
 
@@ -110,6 +146,7 @@ describe('webInternalSenderCredential', () => {
       webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
         legacySecret: secretRead,
         auth: 'sts',
+        tokenWait: 1_000,
       })
     ).resolves.toEqual({ kind: 'ready', header: 'authorization', value: 'Bearer sts-token' });
     // Outside Vercel the deployment's STS environment is development.
@@ -120,6 +157,54 @@ describe('webInternalSenderCredential', () => {
     expect(secretRead).not.toHaveBeenCalled();
   });
 
+  it('cuts a slow mint off at the caller deadline as token_unavailable', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mintedToken.mockImplementation(slowMint);
+    const timers = expireTokenWait(60_000);
+    await expect(
+      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+        legacySecret: secretRead,
+        auth: 'sts',
+        tokenWait: 60_000,
+      })
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'token_unavailable' });
+    expect(timers).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    expect(secretRead).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('[web-internal-sts] no credential for a web internal route', {
+      audience: 'web',
+      scope: 'web:usage.region-handoff.record',
+      reason: 'token_unavailable',
+      failure: { errorName: 'TimeoutError' },
+    });
+  });
+
+  it('reads only a held token under tokenWait held, never waiting for a mint', async () => {
+    heldToken.mockResolvedValue({ kind: 'token', token: 'held-token' });
+    await expect(
+      webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
+        legacySecret: secretRead,
+        auth: 'sts',
+        tokenWait: 'held',
+      })
+    ).resolves.toEqual({ kind: 'ready', header: 'authorization', value: 'Bearer held-token' });
+    expect(heldToken).toHaveBeenCalledWith('development', STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ);
+    expect(mintedToken).not.toHaveBeenCalled();
+  });
+
+  it('answers token_not_held at once when the client holds no token', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    heldToken.mockResolvedValue({ kind: 'not_held' });
+    await expect(
+      webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
+        legacySecret: secretRead,
+        auth: 'sts',
+        tokenWait: 'held',
+      })
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'token_not_held' });
+    expect(mintedToken).not.toHaveBeenCalled();
+    expect(secretRead).not.toHaveBeenCalled();
+  });
+
   it('sends nothing under sts outside the ai-gateway build, never asking for a self-audience token', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     delete process.env.KILO_STS_WORKLOAD;
@@ -127,9 +212,11 @@ describe('webInternalSenderCredential', () => {
       webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
         legacySecret: secretRead,
         auth: 'sts',
+        tokenWait: 1_000,
       })
     ).resolves.toEqual({ kind: 'unavailable', reason: 'not_ai_gateway' });
     expect(mintedToken).not.toHaveBeenCalled();
+    expect(heldToken).not.toHaveBeenCalled();
     expect(secretRead).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('[web-internal-sts] no credential for a web internal route', {
       audience: 'web',
@@ -141,7 +228,10 @@ describe('webInternalSenderCredential', () => {
   it('keeps the legacy secret outside the ai-gateway build while the switch is unset', async () => {
     delete process.env.KILO_STS_WORKLOAD;
     await expect(
-      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, { legacySecret: secretRead })
+      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+        legacySecret: secretRead,
+        tokenWait: 1_000,
+      })
     ).resolves.toEqual({
       kind: 'ready',
       header: 'x-internal-api-key',
@@ -156,6 +246,7 @@ describe('webInternalSenderCredential', () => {
       webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
         legacySecret: secretRead,
         auth: 'dual',
+        tokenWait: 1_000,
       })
     ).resolves.toEqual({ kind: 'unavailable', reason: 'auth_misconfigured' });
     expect(secretRead).not.toHaveBeenCalled();
@@ -175,6 +266,7 @@ describe('webInternalSenderCredential', () => {
       webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
         legacySecret: secretRead,
         auth: 'sts',
+        tokenWait: 1_000,
       })
     ).resolves.toEqual({ kind: 'unavailable', reason: 'no_sts_environment' });
     expect(mintedToken).not.toHaveBeenCalled();
@@ -193,6 +285,7 @@ describe('webInternalSenderCredential', () => {
       webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
         legacySecret: secretRead,
         auth: 'sts',
+        tokenWait: 1_000,
       })
     ).resolves.toEqual({ kind: 'unavailable', reason: 'token_unavailable' });
     expect(secretRead).not.toHaveBeenCalled();
@@ -237,6 +330,38 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
     expect(secretRead).not.toHaveBeenCalled();
   });
 
+  it('the usage-record handoff takes the mint wait out of its first attempt', async () => {
+    mintTaking(100);
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    const usageId = randomUUID();
+    fetchMock.mockResolvedValue(
+      Response.json({
+        status: 'recorded',
+        result: { usageId, createdAt: '2026-01-01T00:00:00.000Z', newMicrodollarsUsed: 1 },
+      })
+    );
+    await recordUsageInPrimaryRegion({
+      core: { id: usageId },
+      metadata: {},
+      prior_microdollar_usage: 0,
+      posthog_distinct_id: null,
+    } as unknown as UsageRecordRequest);
+    expect(timeout).toHaveBeenCalledTimes(1);
+    expect(timeout).toHaveBeenCalledWith(ATTEMPT_TIMEOUT_MS - 100);
+  });
+
+  it('the usage-record handoff cuts a slow mint off at its wait and writes locally', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mintedToken.mockImplementation(slowMint);
+    const timers = expireTokenWait(REGION_HANDOFF_TOKEN_WAIT_MS);
+    await expect(
+      recordUsageInPrimaryRegion({ core: { id: randomUUID() } } as unknown as UsageRecordRequest)
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'credential_token_unavailable' });
+    expect(timers).toHaveBeenCalledWith(expect.any(Function), REGION_HANDOFF_TOKEN_WAIT_MS);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(secretRead).not.toHaveBeenCalled();
+  });
+
   it('the usage-record handoff writes locally without a request when no token is had', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     mintedToken.mockRejectedValue(new Error('STS unreachable'));
@@ -262,6 +387,35 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
     expect(secretRead).not.toHaveBeenCalled();
   });
 
+  it('the Enkrypt usage handoff takes the mint wait out of its timeout', async () => {
+    mintTaking(100);
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    const id = randomUUID();
+    fetchMock.mockResolvedValue(Response.json({ status: 'recorded', usageId: id }));
+    await expect(
+      recordEnkryptUsageInPrimaryRegion({ id } as unknown as EnkryptUsageWriteInput)
+    ).resolves.toBe(true);
+    expect(timeout).toHaveBeenCalledTimes(1);
+    expect(timeout).toHaveBeenCalledWith(90_000 - 100);
+  });
+
+  it('the Enkrypt usage handoff cuts a slow mint off at its wait and writes locally', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mintedToken.mockImplementation(slowMint);
+    const timers = expireTokenWait(REGION_HANDOFF_TOKEN_WAIT_MS);
+    const id = randomUUID();
+    await expect(
+      recordEnkryptUsageInPrimaryRegion({ id } as unknown as EnkryptUsageWriteInput)
+    ).resolves.toBe(false);
+    expect(timers).toHaveBeenCalledWith(expect.any(Function), REGION_HANDOFF_TOKEN_WAIT_MS);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] failed to record usage in the primary region; writing locally',
+      { usage_id: id, reason: 'credential_token_unavailable' }
+    );
+  });
+
   it('the Enkrypt usage handoff writes locally without a request when no token is had', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -277,8 +431,8 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
     );
   });
 
-  it('the Claude payer-state read presents a web:claude-billing.payer-state.read token', async () => {
-    mintedToken.mockResolvedValue('sts-payer-state-token');
+  it('the Claude payer-state read presents a held web:claude-billing.payer-state.read token', async () => {
+    heldToken.mockResolvedValue({ kind: 'token', token: 'sts-payer-state-token' });
     fetchMock.mockResolvedValue(Response.json({ connection: null }));
     await expect(
       getAuthoritativeClaudeBillingState({ kind: 'personal', kiloUserId: 'owner' })
@@ -286,21 +440,29 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://app.example.com/api/internal/claude-billing/payer-state'
     );
-    expect(mintedToken).toHaveBeenCalledWith(
-      'development',
-      STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ
-    );
+    expect(heldToken).toHaveBeenCalledWith('development', STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ);
+    expect(mintedToken).not.toHaveBeenCalled();
     expect(sentHeaders().get('authorization')).toBe('Bearer sts-payer-state-token');
     expect(sentHeaders().has('x-internal-api-key')).toBe(false);
     expect(secretRead).not.toHaveBeenCalled();
   });
 
-  it('the Claude payer-state read refuses without a request when no token is had', async () => {
+  it('the Claude payer-state read makes no blocking call without a held token and fails retryably', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mintedToken.mockRejectedValue(new Error('STS unreachable'));
+    heldToken.mockResolvedValue({ kind: 'not_held' });
     await expect(
       getAuthoritativeClaudeBillingState({ kind: 'personal', kiloUserId: 'owner' })
-    ).rejects.toThrow('Claude payer-state authentication is not configured');
+    ).rejects.toThrow('Claude payer-state token is unavailable; retry');
+    expect(mintedToken).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('the Claude payer-state read fails retryably when STS refuses the token', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    heldToken.mockResolvedValue({ kind: 'failed', error: new Error('STS unreachable') });
+    await expect(
+      getAuthoritativeClaudeBillingState({ kind: 'personal', kiloUserId: 'owner' })
+    ).rejects.toThrow('Claude payer-state token is unavailable; retry');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -318,6 +480,7 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
       getAuthoritativeClaudeBillingState({ kind: 'personal', kiloUserId: 'owner' })
     ).rejects.toThrow('Claude payer-state authentication is not configured');
     expect(mintedToken).not.toHaveBeenCalled();
+    expect(heldToken).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(secretRead).not.toHaveBeenCalled();
   });

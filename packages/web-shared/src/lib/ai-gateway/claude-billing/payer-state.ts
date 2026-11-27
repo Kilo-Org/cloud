@@ -90,12 +90,19 @@ export async function getAuthoritativeClaudeBillingState(
     return claudeBillingPayerState(granted ? claudeBillingEffectiveConnection(granted) : null);
   }
   // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
-  // `web:claude-billing.payer-state.read` STS token.
+  // `web:claude-billing.payer-state.read` STS token. This read runs before the LLM call, so it
+  // takes only a token the process already holds and never waits for a mint: without one it
+  // fails retryably while the mint it started serves the retry.
   const credential = await webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
     legacySecret: readInternalApiSecret,
+    tokenWait: 'held',
   });
   if (credential.kind === 'unavailable') {
-    throw new Error('Claude payer-state authentication is not configured');
+    throw new Error(
+      credential.reason === 'token_not_held' || credential.reason === 'token_unavailable'
+        ? 'Claude payer-state token is unavailable; retry'
+        : 'Claude payer-state authentication is not configured'
+    );
   }
   const payerStateUrl = parseInternalServiceEndpoint(
     APP_URL,

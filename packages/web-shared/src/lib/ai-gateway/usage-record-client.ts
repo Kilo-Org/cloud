@@ -5,6 +5,7 @@ import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-sec
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import {
+  REGION_HANDOFF_TOKEN_WAIT_MS,
   STS_WEB_USAGE_RECORD_REGION_HANDOFF,
   webInternalSenderCredential,
   type WebInternalSenderCredential,
@@ -83,11 +84,15 @@ export async function recordUsageInPrimaryRegion(
   payload: UsageRecordRequest
 ): Promise<RemoteUsageRecordOutcome> {
   // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
-  // `web:usage.region-handoff.record` STS token. Without one the caller writes locally.
+  // `web:usage.region-handoff.record` STS token. Without one the caller writes locally. A cold
+  // mint waits at most `REGION_HANDOFF_TOKEN_WAIT_MS`, taken out of the first attempt's budget,
+  // so the whole handoff stays within the attempts' timeouts.
+  const startedAt = Date.now();
   let credential: WebInternalSenderCredential;
   try {
     credential = await webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
       legacySecret: readInternalApiSecret,
+      tokenWait: REGION_HANDOFF_TOKEN_WAIT_MS,
     });
   } catch {
     return { kind: 'unavailable', reason: 'internal_api_secret_unavailable' };
@@ -111,6 +116,7 @@ export async function recordUsageInPrimaryRegion(
   const url = new URL(USAGE_RECORD_PATH, APP_URL).toString();
   const body = JSON.stringify(toUsageRecordWireBody(payload));
   let lastReason = 'unknown';
+  const firstAttemptTimeoutMs = Math.max(1, ATTEMPT_TIMEOUT_MS - (Date.now() - startedAt));
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -122,7 +128,7 @@ export async function recordUsageInPrimaryRegion(
           'x-usage-write-source': 'region_handoff',
         },
         body,
-        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(attempt === 1 ? firstAttemptTimeoutMs : ATTEMPT_TIMEOUT_MS),
         cache: 'no-store',
       });
 

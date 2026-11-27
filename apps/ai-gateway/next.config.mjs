@@ -10,8 +10,10 @@ const nextConfig = {
   // Inlined at build time, so no request or runtime variable can change them:
   // - the gateway authenticates by bearer token only and never reads the NextAuth
   //   session cookie (packages/web-shared/src/lib/user/server.ts);
-  // - its Vercel identity is the STS `ai-gateway` workload, the only one that can
-  //   hold the web internal sender scopes (packages/web-shared/src/lib/web-internal-sts.ts).
+  // - it names the STS `ai-gateway` workload of its Vercel identity. STS grants the web
+  //   internal sender scopes to that workload only, and that grant is the real check; the
+  //   inline only spares other builds a mint STS would refuse
+  //   (packages/web-shared/src/lib/web-internal-sts.ts).
   env: {
     KILO_BROWSER_SESSIONS: 'disabled',
     KILO_STS_WORKLOAD: 'ai-gateway',

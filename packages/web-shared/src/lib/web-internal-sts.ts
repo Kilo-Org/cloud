@@ -34,6 +34,13 @@ export const STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ = {
   scope: 'web:claude-billing.payer-state.read',
 } as const satisfies ServiceTokenRequest;
 
+/**
+ * The longest a region handoff waits for a cold mint. The handoffs count it inside their own
+ * request budget and write locally without a token, so a slow STS cannot push the `after()` work
+ * of an ai-gateway function (`maxDuration` 800 s) past its limit and lose the billing record.
+ */
+export const REGION_HANDOFF_TOKEN_WAIT_MS = 5_000;
+
 export type WebInternalSenderMode = 'sts' | 'legacy';
 
 export function webInternalSenderMode(value: string | undefined): WebInternalSenderMode | null {
@@ -48,8 +55,10 @@ export type WebInternalSenderFailure =
   | 'not_ai_gateway'
   /** This deployment has no STS environment (`stsEnvironmentOfDeployment` refused it). */
   | 'no_sts_environment'
-  /** STS or the Vercel identity gave no token. */
+  /** STS or the Vercel identity gave no token, or none within the caller's `tokenWait`. */
   | 'token_unavailable'
+  /** `tokenWait: 'held'` found no held token; the mint it started serves a later request. */
+  | 'token_not_held'
   /** `legacy` mode with an empty internal secret. */
   | 'secret_missing';
 
@@ -62,11 +71,17 @@ export type WebInternalSenderOptions = {
   legacySecret: () => Promise<string>;
   /** The switch value; `WEB_INTERNAL_SENDER_AUTH` by default. */
   auth?: string;
+  /**
+   * How long a read without a held token may wait under `sts`. `'held'` never waits: it answers
+   * at once and the mint it starts runs on under `waitUntil` for a later request. A number waits
+   * at most that many milliseconds for one mint; the caller counts it inside its own deadline.
+   */
+  tokenWait: 'held' | number;
 };
 
 /**
  * The header of one request to a web `/api/internal/*` route. A held token is a memory read; a
- * cold one waits for one mint within the token client's attempt timeout. Renewals run on under
+ * cold one waits for one mint for at most `tokenWait`. Renewals and abandoned mints run on under
  * the invocation's `waitUntil` (`sts-service-tokens.ts`).
  */
 export async function webInternalSenderCredential(
@@ -92,13 +107,29 @@ export async function webInternalSenderCredential(
   } catch {
     return unavailable(target, 'no_sts_environment');
   }
-  const { stsServiceToken, stsTokenFailure } =
+  const { stsServiceToken, stsServiceTokenIfHeld, stsTokenFailure } =
     await import('@kilocode/web-shared/lib/sts-service-tokens');
+  const { tokenWait } = options;
+  if (tokenWait === 'held') {
+    const read = await stsServiceTokenIfHeld(environment, target);
+    if (read.kind === 'token') {
+      return { kind: 'ready', header: 'authorization', value: `Bearer ${read.token}` };
+    }
+    return read.kind === 'not_held'
+      ? unavailable(target, 'token_not_held')
+      : unavailable(target, 'token_unavailable', { failure: stsTokenFailure(read.error) });
+  }
+  const expired = Promise.withResolvers<null>();
+  const timer = setTimeout(() => expired.resolve(null), tokenWait);
   try {
-    const token = await stsServiceToken(environment, target);
-    return { kind: 'ready', header: 'authorization', value: `Bearer ${token}` };
+    const token = await Promise.race([stsServiceToken(environment, target), expired.promise]);
+    return token === null
+      ? unavailable(target, 'token_unavailable', { failure: { errorName: 'TimeoutError' } })
+      : { kind: 'ready', header: 'authorization', value: `Bearer ${token}` };
   } catch (error) {
     return unavailable(target, 'token_unavailable', { failure: stsTokenFailure(error) });
+  } finally {
+    clearTimeout(timer);
   }
 }
 

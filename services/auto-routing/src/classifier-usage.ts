@@ -1,9 +1,5 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
-import {
-  UsageRecordRequestSchema,
-  toUsageRecordWireBody,
-  type UsageRecordRequest,
-} from '@kilocode/usage-contracts';
+import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
@@ -158,8 +154,7 @@ export async function recordClassifierUsage(
       env.AUTO_ROUTING_DECISION_CACHE.get(
         env.AUTO_ROUTING_DECISION_CACHE.idFromName(`${identity.scope}:${identity.conversationKey}`)
       ),
-    // A new Worker can reach a Durable Object still running the previous version.
-    stub => stub.recordClassifierUsage(toUsageRecordWireBody(usage)),
+    stub => stub.recordClassifierUsage(usage),
     'recordClassifierUsage'
   );
 }

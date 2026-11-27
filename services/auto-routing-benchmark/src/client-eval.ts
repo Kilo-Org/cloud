@@ -22,11 +22,7 @@ import {
   type InternalClientEvalPlanRequest,
   type InternalClientEvalResultRequest,
 } from '@kilocode/auto-routing-contracts';
-import {
-  UsageRecordRequestSchema,
-  toUsageRecordWireBody,
-  type UsageRecordRequest,
-} from '@kilocode/usage-contracts';
+import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import type { LlmUsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Hono } from 'hono';
@@ -319,8 +315,7 @@ export async function gradeClientEvalResult(
       score: grade.score,
       grader_cost_usd: grade.costUsd,
       uploaded_at: nowIso,
-      // Stored with the retired usage keys, so a rolled-back worker can still settle it.
-      pending_grader_usage: usage === null ? null : JSON.stringify(toUsageRecordWireBody(usage)),
+      pending_grader_usage: usage === null ? null : JSON.stringify(usage),
     });
     if (revision === null) {
       await refreshClientProfileRollup(db, profile, plannedResults, nowIso);

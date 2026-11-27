@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import type { Env } from './publish-usage';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 
@@ -161,16 +160,14 @@ describe('usage consumer', () => {
     expect(messages[0].ack).not.toHaveBeenCalled();
     expect(messages[1].ack).not.toHaveBeenCalled();
     expect(processingLogs().filter(log => log.event === 'usage_ingest_processing')).toEqual([]);
-    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual(wireUsage);
+    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual(usage);
     clock.mockReturnValue(375);
     vi.spyOn(Date, 'now').mockReturnValue(timestamp + 2275);
     first.resolve(acknowledgement());
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(messages[0].ack).toHaveBeenCalledExactlyOnceWith();
     expect(messages[1].ack).not.toHaveBeenCalled();
-    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual(
-      toUsageRecordWireBody(secondEvent)
-    );
+    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string)).toEqual(secondEvent);
     clock.mockReturnValue(500);
     vi.spyOn(Date, 'now').mockReturnValue(timestamp + 2400);
     second.resolve(acknowledgement('duplicate', secondEvent.core.id));
@@ -373,7 +370,7 @@ describe('usage consumer', () => {
       expect(input.ackAll).not.toHaveBeenCalled();
       expect(input.retryAll).not.toHaveBeenCalled();
       expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
-        events.map(toUsageRecordWireBody)
+        events
       );
       expect(
         processingLogs().find(
@@ -829,7 +826,7 @@ describe('native retry classification and launch budget', () => {
       for (const index of [2, 3, 4, 5]) expect(messages[index].ack).not.toHaveBeenCalled();
       expect(fetch).toHaveBeenCalledTimes(6);
       expect(fetch.mock.calls.map(([, options]) => JSON.parse(options?.body as string))).toEqual(
-        inputEvents.map(toUsageRecordWireBody)
+        inputEvents
       );
       expect(
         processingLogs().find(
@@ -1113,7 +1110,7 @@ describe('tagged Enkrypt usage messages', () => {
     expect(llm.ack).toHaveBeenCalledOnce();
     expect(enkrypt.ack).toHaveBeenCalledOnce();
     expect(fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init?.body as string)])).toEqual([
-      [env.USAGE_WRITER_URL, wireUsage],
+      [env.USAGE_WRITER_URL, usage],
       [enkryptWriterUrl, enkryptRecord],
     ]);
     const [llmOutcome, enkryptOutcome] = outcomes(processingLogs);
@@ -1346,7 +1343,7 @@ describe('tagged Exa usage messages', () => {
     expect(enkrypt.ack).toHaveBeenCalledOnce();
     expect(exa.ack).toHaveBeenCalledOnce();
     expect(fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init?.body as string)])).toEqual([
-      [env.USAGE_WRITER_URL, wireUsage],
+      [env.USAGE_WRITER_URL, usage],
       [enkryptWriterUrl, enkryptRecord],
       [exaWriterUrl, exaRecord],
     ]);

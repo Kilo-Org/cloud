@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 import worker from './index';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import { type Env } from './publish-usage';
@@ -290,7 +290,7 @@ describe('authenticated rejection diagnostics at the handler boundary', () => {
       return value;
     });
     await vi.waitFor(() =>
-      expect(send).toHaveBeenCalledExactlyOnceWith(wireUsage, { contentType: 'json' })
+      expect(send).toHaveBeenCalledExactlyOnceWith(usage, { contentType: 'json' })
     );
     expect(responded).toBe(false);
     accepted.resolve(queueResult);

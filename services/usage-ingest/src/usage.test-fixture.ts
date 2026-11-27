@@ -1,4 +1,4 @@
-import { toUsageRecordWireBody, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 
 export const usage: UsageRecordRequest = {
   core: {
@@ -62,6 +62,3 @@ export const usage: UsageRecordRequest = {
   prior_microdollar_usage: 0,
   posthog_distinct_id: null,
 };
-
-/** The usage as sent to the queue or the writer: with the retired metadata keys as null. */
-export const wireUsage = toUsageRecordWireBody(usage);

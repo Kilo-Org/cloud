@@ -107,12 +107,7 @@ describe('recordUsageInPrimaryRegion', () => {
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://app.example.com/api/internal/usage/record');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body as string).metadata).toEqual({
-      user_prompt_prefix: null,
-      system_prompt_prefix: null,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
-    });
+    expect(init.body).toBe(JSON.stringify(payload));
     expect((init.headers as Record<string, string>)['x-usage-write-source']).toBe('region_handoff');
     expect((init.headers as Record<string, string>)['x-internal-api-key']).toBe(
       'test-internal-secret'

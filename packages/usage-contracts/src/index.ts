@@ -153,9 +153,10 @@ export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSc
  *   default to null, missing keys are rejected: `JSON.stringify` drops
  *   `undefined`-valued keys, and `null` is load-bearing here.
  *   The retired metadata keys `user_prompt_prefix`, `system_prompt_prefix`,
- *   `abuse_delay`, and `abuse_downgraded_from` are no longer in the schema, so
- *   a record from an older sender that still carries them parses with them
- *   stripped and they are never persisted.
+ *   `abuse_delay`, and `abuse_downgraded_from` are no longer in the schema and
+ *   senders no longer put them on the wire. A record from an older sender that
+ *   still carries them, such as one already queued or stored for retry, parses
+ *   with them stripped and they are never persisted.
  * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
  *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
  *   this holds by construction. It would NOT hold for a value read back out of
@@ -184,22 +185,6 @@ export const UsageRecordRequestSchema = z.object({
 });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;
-
-const RETIRED_USAGE_METADATA = {
-  user_prompt_prefix: null,
-  system_prompt_prefix: null,
-  abuse_delay: null,
-  abuse_downgraded_from: null,
-} as const;
-
-/**
- * The body to put on the wire for an LLM usage record. Older receivers still require the retired
- * metadata keys (as null) and new receivers strip them. Remove once every receiver runs a schema
- * without them.
- */
-export function toUsageRecordWireBody(request: UsageRecordRequest) {
-  return { ...request, metadata: { ...request.metadata, ...RETIRED_USAGE_METADATA } };
-}
 
 export type LlmUsageQueueMessage = UsageRecordRequest;
 

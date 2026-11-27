@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 import worker from './index';
 import { MAX_USAGE_BYTES, type Env } from './publish-usage';
 
@@ -53,33 +52,10 @@ describe('usage publisher', () => {
       responded = true;
       return value;
     });
-    await vi.waitFor(() => expect(send).toHaveBeenCalledWith(wireUsage, { contentType: 'json' }));
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith(usage, { contentType: 'json' }));
     expect(responded).toBe(false);
     accepted.resolve(queueResult);
     expect((await response).status).toBe(202);
-  });
-
-  it('enqueues the retired metadata keys as null, replacing any legacy values', async () => {
-    const { send, env } = setup();
-    const body = JSON.stringify({
-      ...usage,
-      metadata: {
-        ...usage.metadata,
-        user_prompt_prefix: '🙂',
-        system_prompt_prefix: 'legacy system prompt',
-        abuse_delay: 3,
-        abuse_downgraded_from: 'legacy-model',
-      },
-    });
-    expect((await worker.fetch(request(body), env)).status).toBe(202);
-    expect(send.mock.calls[0][0]).toMatchObject({
-      metadata: {
-        user_prompt_prefix: null,
-        system_prompt_prefix: null,
-        abuse_delay: null,
-        abuse_downgraded_from: null,
-      },
-    });
   });
 
   it('strips unknown keys before enqueueing the validated event', async () => {
@@ -91,7 +67,7 @@ describe('usage publisher', () => {
       metadata: { ...usage.metadata, extra: 'discard' },
     });
     expect((await worker.fetch(request(body), env)).status).toBe(202);
-    expect(send).toHaveBeenCalledExactlyOnceWith(wireUsage, { contentType: 'json' });
+    expect(send).toHaveBeenCalledExactlyOnceWith(usage, { contentType: 'json' });
   });
 
   it.each([null, 'Bearer wrong'])('rejects auth %s before accessing the body', async auth => {
@@ -177,9 +153,8 @@ describe('usage publisher', () => {
   it('accepts the serialized boundary but rejects JSON expansion beyond it', async () => {
     const { send, env } = setup();
     const event = { ...usage, posthog_distinct_id: '' };
-    // The queued body carries the retired metadata keys, so the boundary is measured on it.
     event.posthog_distinct_id = 'x'.repeat(
-      MAX_USAGE_BYTES - Buffer.byteLength(JSON.stringify(toUsageRecordWireBody(event)))
+      MAX_USAGE_BYTES - Buffer.byteLength(JSON.stringify(event))
     );
     expect((await worker.fetch(request(JSON.stringify(event)), env)).status).toBe(202);
     send.mockClear();

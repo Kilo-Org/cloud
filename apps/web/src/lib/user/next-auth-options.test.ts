@@ -88,8 +88,7 @@ import {
   insertTestUser,
   insertTestUserAndGoogleAuth,
 } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Account, Profile } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import jwt from 'jsonwebtoken';
@@ -548,42 +547,20 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     expect(rows).toHaveLength(0);
   });
 
-  // Remove with the migration that drops the obsolete column.
-  test('persists the connection once a migration has dropped the obsolete static-key column', async () => {
-    const sub = `subject-${crypto.randomUUID()}`;
-    const { user, email } = await seedOpenAiUser(sub);
-    await db.execute(
-      sql`ALTER TABLE openai_chatgpt_connections RENAME COLUMN encrypted_connection TO encrypted_connection_dropped`
-    );
-    try {
-      await jwtCallback!(openAiSignInArgs(user.id, email, sub));
-      await expect(
-        getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
-      ).resolves.toMatchObject({ access_token: 'signin-access-token', status: 'connected' });
-    } finally {
-      await db.execute(
-        sql`ALTER TABLE openai_chatgpt_connections RENAME COLUMN encrypted_connection_dropped TO encrypted_connection`
-      );
-    }
-  });
-
   test('does not fail the sign-in when storing the connection fails', async () => {
     const sub = `subject-${crypto.randomUUID()}`;
     const { user, email } = await seedOpenAiUser(sub);
-    const originalExecute = db.execute.bind(db);
-    const dialect = new PgDialect();
-    const executeSpy = jest.spyOn(db, 'execute').mockImplementation(((query: SQL) => {
-      if (dialect.sqlToQuery(query).sql.includes('INSERT INTO "openai_chatgpt_connections"')) {
-        throw new Error('simulated storage failure');
-      }
-      return originalExecute(query);
-    }) as typeof db.execute);
+    const originalInsert = (db.insert as unknown as (table: unknown) => unknown).bind(db);
+    const insertSpy = jest.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
+      if (table === openai_chatgpt_connections) throw new Error('simulated storage failure');
+      return originalInsert(table);
+    }) as unknown as typeof db.insert);
 
     try {
       const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
       expect(token.kiloUserId).toBe(user.id);
     } finally {
-      executeSpy.mockRestore();
+      insertSpy.mockRestore();
     }
 
     const rows = await db

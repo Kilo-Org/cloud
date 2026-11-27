@@ -146,8 +146,11 @@ export function rebuiltIndexes(sqlTexts: readonly string[]): Set<string> {
 function failedStatementSqlstate(error: unknown): string | null {
   const sqlstate = sqlstateOf(error);
   if (sqlstate !== null) return sqlstate;
-  const message = error instanceof Error ? error.message : '';
-  if (/Connection terminated|ECONNRESET|EPIPE|ETIMEDOUT|socket/i.test(message)) return '08006';
+  // drizzle wraps the driver's error, so the connection-drop message sits on a cause.
+  for (let current: unknown = error; current instanceof Error; current = current.cause) {
+    if (/Connection terminated|ECONNRESET|EPIPE|ETIMEDOUT|socket/i.test(current.message))
+      return '08006';
+  }
   return null;
 }
 

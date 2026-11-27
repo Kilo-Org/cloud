@@ -424,6 +424,26 @@ describe(`member mode on ${IMAGE}`, () => {
     expect(status.failure).toMatchObject({ code: 'migration_failed', sqlstate: '57014' });
   });
 
+  it('reports a session ended under a migration with a SQLSTATE, not as an unknown failure', async () => {
+    const database = await newDatabase();
+    const container = await proxy();
+    const body = applyBody(
+      LOGIN,
+      database,
+      migrationSet([{ tag: '0001_sleep', sql: 'SELECT pg_sleep(120);' }])
+    );
+    expect((await container.call('POST', '/apply', body)).status).toBe(202);
+    const sleeper = await activePid('SELECT pg_sleep(120)');
+    const admin = await db.admin();
+    await admin.query('SELECT pg_terminate_backend($1)', [sleeper]);
+    await admin.end();
+    const status = await waitDone(container, 30_000);
+    // Found by the local e2e: drizzle wrapped the driver's "Connection terminated" error, so the
+    // failure carried no SQLSTATE and counted as permanent.
+    expect(status.failure).toMatchObject({ code: 'migration_failed', migrationTag: '0001_sleep' });
+    expect(['08006', '57P01']).toContain(status.failure?.sqlstate);
+  });
+
   it('cancels and exits on SIGTERM', async () => {
     const database = await newDatabase();
     const container = await proxy();

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 #
-# Checks the Cloud Agent source map hand-off archive before the Sentry upload job unpacks it
-# (.github/workflows/cloud-agent-sentry-sourcemaps.yml). The archive comes from the deploy job, which
-# runs package code, so it may hold only what stageSentryUploads writes: uploads.json, sentry-cli,
-# and code files with their maps in numbered folders. Anything else is refused, in particular a
-# dotfile, .sentryclirc, .env, sentry.properties, an absolute path, `..`, a link or a device.
+# Checks for the Cloud Agent Sentry upload job (.github/workflows/cloud-agent-sentry-sourcemaps.yml).
 #
-# Usage: check-sentry-handoff.sh <archive.tgz>
+#   check-sentry-handoff.sh <archive.tgz>   The hand-off archive comes from the deploy job, which runs
+#     package code, so it may hold only what stageSentryUploads writes: uploads.json, sentry-cli,
+#     and code files with their maps in numbered folders. Anything else is refused, in particular a
+#     dotfile, .sentryclirc, .env, sentry.properties, an absolute path, `..`, a link or a device.
+#   check-sentry-handoff.sh --artifact <dir>   The downloaded artifact directory must hold exactly
+#     one regular file, cloud-agent-sentry.tgz.
+#   check-sentry-handoff.sh --workdir <dir>   sentry-cli reads .sentryclirc from its working
+#     directory and every ancestor, and sentry.properties from there too: none may exist up to /.
 set -euo pipefail
 export LC_ALL=C
 
@@ -14,6 +17,29 @@ fail() {
   printf '::error title=sentry-handoff::%s\n' "$1" >&2
   exit 1
 }
+
+case ${1-} in
+  --artifact)
+    dir=${2-}
+    [[ -n $dir && -d $dir && ! -L $dir ]] || fail "no artifact directory given"
+    entries=$(find "$dir" -mindepth 1 -printf '%y %P\n')
+    [[ $entries == "f cloud-agent-sentry.tgz" ]] || fail "the artifact must hold exactly one regular file, cloud-agent-sentry.tgz"
+    exit 0
+    ;;
+  --workdir)
+    dir=${2-}
+    [[ -n $dir && -d $dir ]] || fail "no working directory given"
+    dir=$(cd "$dir" && pwd -P)
+    while :; do
+      for name in .sentryclirc sentry.properties; do
+        [[ ! -e $dir/$name && ! -L $dir/$name ]] || fail "$dir/$name exists; sentry-cli would read it"
+      done
+      [[ $dir == / ]] && break
+      dir=$(dirname "$dir")
+    done
+    exit 0
+    ;;
+esac
 
 archive=${1-}
 [[ -n $archive && -f $archive ]] || fail "no hand-off archive given"

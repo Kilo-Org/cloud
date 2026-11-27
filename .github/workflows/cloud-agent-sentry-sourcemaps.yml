@@ -40,6 +40,7 @@ jobs:
       name: ${{ inputs.target_environment }}
       deployment: false
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps:
@@ -75,36 +76,41 @@ jobs:
           workload: ${{ inputs.target_environment == 'production' && 'ci-cloud-agent-sentry' || format('ci-cloud-agent-sentry-{0}', inputs.target_environment) }}
           secrets: SENTRY_AUTH_TOKEN
 
-      # A deploy that failed before staging its maps hands over nothing.
-      - name: Download the staged source maps
-        id: download
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: cloud-agent-sentry-${{ github.run_attempt }}
-          path: ${{ runner.temp }}
-
-      # The archive may hold only uploads.json, sentry-cli and the maps. The
-      # binary the deploy job handed over must equal the one in the lockfile's
-      # platform package, which this job fetches and checks against the lockfile
-      # integrity of the deployed commit; only that verified binary runs. It runs
-      # in an empty directory with the maps by absolute path, with no dotenv
-      # loading and the Sentry host fixed, and each argument list must be a source
-      # map upload that does not redirect the token (--url, --auth-token, --header).
+      # The hand-off has no digest: the archive check, the lockfile-verified
+      # binary and the argument allowlist below are what this job relies on.
+      # A re-run of failed jobs keeps the deploy job's attempt number, so the
+      # newest cloud-agent-sentry-<n> of this run, n = this attempt down to 1, is
+      # the hand-off. It lands in a private directory that must hold exactly one
+      # regular file. sentry-cli then runs with `env -i` and an allowlist: HOME and
+      # its working directory are new empty directories with no .sentryclirc or
+      # sentry.properties up to /, no SENTRY_* variable but the token, the fixed
+      # host and SENTRY_LOAD_DOTENV=0, and each argument list is a source map
+      # upload of fixed flags and map paths under the hand-off only.
       - name: Upload source maps
-        if: steps.download.outcome == 'success'
         env:
+          GH_TOKEN: ${{ github.token }}
           SENTRY_AUTH_TOKEN: ${{ steps.sts.outputs.SENTRY_AUTH_TOKEN }}
-          SENTRY_LOAD_DOTENV: '0'
-          SENTRY_URL: https://sentry.io/
         run: |
           set -euo pipefail
           fail() { echo "::error::$1"; exit 1; }
-          bash scripts/ci/check-sentry-handoff.sh "$RUNNER_TEMP/cloud-agent-sentry.tgz"
-          stage="$RUNNER_TEMP/cloud-agent-sentry"
-          work="$RUNNER_TEMP/sentry-upload"
-          mkdir "$stage" "$work" "$RUNNER_TEMP/sentry-cli-package"
-          tar -xzf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$stage" --no-same-owner
+          handoff=$(mktemp -d "$RUNNER_TEMP/handoff.XXXXXX")
+          artifact_id=""
+          for ((n = GITHUB_RUN_ATTEMPT; n >= 1; n--)); do
+            artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=cloud-agent-sentry-$n" \
+              --jq '.artifacts | map(select(.expired | not)) | .[0].id // empty')
+            [[ -z $artifact_id ]] || break
+          done
+          if [[ -z $artifact_id ]]; then
+            echo "::warning::No Cloud Agent Sentry hand-off in this run (cloud-agent-sentry-1 to -$GITHUB_RUN_ATTEMPT); no source maps uploaded"
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$RUNNER_TEMP/handoff.zip"
+          unzip -q "$RUNNER_TEMP/handoff.zip" -d "$handoff"
+          bash scripts/ci/check-sentry-handoff.sh --artifact "$handoff"
+          bash scripts/ci/check-sentry-handoff.sh "$handoff/cloud-agent-sentry.tgz"
+          stage=$(mktemp -d "$RUNNER_TEMP/stage.XXXXXX")
+          package=$(mktemp -d "$RUNNER_TEMP/sentry-cli-package.XXXXXX")
+          tar -xzf "$handoff/cloud-agent-sentry.tgz" -C "$stage" --no-same-owner
 
           version=$(sed -nE "s/^  '@sentry\/cli': ([0-9]+\.[0-9]+\.[0-9]+)$/\1/p" deployed/pnpm-workspace.yaml | head -n 1)
           case "$RUNNER_ARCH" in
@@ -116,30 +122,46 @@ jobs:
           integrity=$(awk -v key="  '@sentry/cli-$platform@$version':" '$0 == key { getline; print; exit }' deployed/pnpm-lock.yaml |
             sed -nE 's/.*integrity: (sha512-[A-Za-z0-9+\/=]+).*/\1/p')
           [[ -n $integrity ]] || fail "pnpm-lock.yaml has no integrity for @sentry/cli-$platform@$version"
-          curl -fsSL --proto '=https' --max-time 120 -o "$RUNNER_TEMP/sentry-cli.tgz" \
+          curl -fsSL --proto '=https' --max-time 120 -o "$package/sentry-cli.tgz" \
             "https://registry.npmjs.org/@sentry/cli-$platform/-/cli-$platform-$version.tgz"
-          actual="sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/sentry-cli.tgz" | base64 -w0)"
+          actual="sha512-$(openssl dgst -sha512 -binary "$package/sentry-cli.tgz" | base64 -w0)"
           [[ $actual == "$integrity" ]] || fail "@sentry/cli-$platform@$version does not match the lockfile integrity"
-          tar -xzf "$RUNNER_TEMP/sentry-cli.tgz" -C "$RUNNER_TEMP/sentry-cli-package" package/bin/sentry-cli
-          cli="$RUNNER_TEMP/sentry-cli-package/package/bin/sentry-cli"
+          tar -xzf "$package/sentry-cli.tgz" -C "$package" package/bin/sentry-cli
+          cli="$package/package/bin/sentry-cli"
           cmp -s "$cli" "$stage/sentry-cli" || fail "the handed-over sentry-cli is not the lockfile's binary"
           chmod 0755 "$cli"
 
-          cd "$work"
+          work=$(mktemp -d)
+          home=$(mktemp -d)
+          bash scripts/ci/check-sentry-handoff.sh --workdir "$work"
+          bash scripts/ci/check-sentry-handoff.sh --workdir "$home"
           count=$(jq 'length' "$stage/uploads.json")
           for ((i = 0; i < count; i++)); do
-            args=()
-            while IFS= read -r -d '' arg; do
+            raw=()
+            while IFS= read -r -d '' arg; do raw+=("$arg"); done \
+              < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' "$stage/uploads.json")
+            [[ ${raw[0]-} == sourcemaps && ${raw[1]-} == upload ]] || fail "upload $i is not a source map upload"
+            args=(sourcemaps upload)
+            for ((k = 2; k < ${#raw[@]}; k++)); do
+              arg=${raw[k]}
               case "$arg" in
-                --url | --url=* | --auth-token | --auth-token=* | --header | --header=*)
-                  fail "upload $i names $arg" ;;
+                --org | --project | --release | --wait-for)
+                  ((k + 1 < ${#raw[@]})) || fail "upload $i: $arg has no value"
+                  value=${raw[k + 1]}
+                  [[ $value =~ ^[A-Za-z0-9@._-]+$ ]] || fail "upload $i: $arg has an unexpected value"
+                  args+=("$arg" "$value")
+                  k=$((k + 1))
+                  ;;
+                --strict | --validate | --no-rewrite) args+=("$arg") ;;
+                *)
+                  # Any other argument must be a map path relative to the hand-off.
+                  [[ $arg =~ ^[0-9]+/[A-Za-z0-9_][A-Za-z0-9_.-]*$ && $arg != *..* ]] ||
+                    fail "upload $i names an argument that is neither an allowed flag nor a map path"
+                  args+=("$stage/$arg")
+                  ;;
               esac
-              # A map path is relative to the hand-off; it runs by absolute path.
-              if [[ $arg =~ ^[0-9]+/[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
-                arg="$stage/$arg"
-              fi
-              args+=("$arg")
-            done < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' "$stage/uploads.json")
-            [[ ${args[0]-} == sourcemaps && ${args[1]-} == upload ]] || fail "upload $i is not a source map upload"
-            "$cli" "${args[@]}"
+            done
+            (cd "$work" && env -i PATH=/usr/bin:/bin HOME="$home" TMPDIR="$RUNNER_TEMP" \
+              SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" SENTRY_URL=https://sentry.io/ SENTRY_LOAD_DOTENV=0 \
+              "$cli" "${args[@]}")
           done

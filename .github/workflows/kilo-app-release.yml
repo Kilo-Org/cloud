@@ -429,6 +429,9 @@ jobs:
     permissions:
       contents: read
     outputs:
+      # Named for this job's own attempt, so a re-run of failed release jobs
+      # downloads the closure this job uploaded.
+      artifact: kilo-app-node-modules-${{ github.run_attempt }}
       sha256: ${{ steps.pack.outputs.sha256 }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -506,7 +509,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: kilo-app-node-modules-${{ github.run_attempt }}
+          name: ${{ needs.app-workspace.outputs.artifact }}
           path: ${{ runner.temp }}
 
       - name: Unpack the installed closure
@@ -594,7 +597,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: kilo-app-node-modules-${{ github.run_attempt }}
+          name: ${{ needs.app-workspace.outputs.artifact }}
           path: ${{ runner.temp }}
 
       - name: Unpack the installed closure

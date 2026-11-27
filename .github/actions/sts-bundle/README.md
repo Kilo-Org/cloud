@@ -109,16 +109,18 @@ the tool by its path, without a package manager and without adding it to `PATH`.
   job checks out the deployed commit, so it loads this action from a side checkout of the run's
   own commit (`sts-action/`) and reads the bundle before the deployed commit reaches the runner.
 - `cloud-agent-sentry-sourcemaps.yml` `upload`: the maps and the argument lists the deploy job
-  staged (`stageSentryUploads` in `services/cloud-agent-next/scripts/sentry-source-maps.ts`), in a
-  per-attempt artifact. Before unpacking, `scripts/ci/check-sentry-handoff.sh` refuses any member
-  but `uploads.json`, `sentry-cli` and code files with maps in numbered folders (no dotfile,
-  `.sentryclirc`, `.env`, `sentry.properties`, absolute path, `..` or link). The job runs only a
-  `sentry-cli` binary it fetches itself and checks against the integrity `pnpm-lock.yaml` records
-  at the deployed commit (and that equals the handed-over one), from an empty directory with the
-  maps by absolute path, `SENTRY_LOAD_DOTENV=0` and `SENTRY_URL` fixed, and it refuses an argument
-  list that is not a source map upload or that names `--url`, `--auth-token` or `--header`.
-  Exposure: what the staged maps carry, the output of the cloud-agent-next deploy job, which runs
-  the packages its lockfile pins and its build.
+  staged (`stageSentryUploads` in `services/cloud-agent-next/scripts/sentry-source-maps.ts`). The
+  hand-off carries no digest: the job takes the newest `cloud-agent-sentry-<attempt>` of the run
+  into a private directory that must hold exactly one regular file, and
+  `scripts/ci/check-sentry-handoff.sh` refuses any archive member but `uploads.json`, `sentry-cli`
+  and code files with maps in numbered folders. It runs only a `sentry-cli` binary it fetches
+  itself and checks against the integrity `pnpm-lock.yaml` records at the deployed commit (and
+  that equals the handed-over one), under `env -i` with an allowlist (the token,
+  `SENTRY_URL` fixed, `SENTRY_LOAD_DOTENV=0`), with HOME and the working directory new empty
+  directories that have no `.sentryclirc` or `sentry.properties` up to `/`, and with only fixed
+  flags and map paths under the hand-off as arguments. Exposure: what the staged maps carry, the
+  output of the cloud-agent-next deploy job, which runs the packages its lockfile pins and its
+  build.
 - `kilo-app-release.yml` `preflight` and `build-and-submit`: `eas-cli` from the `kilo-app...`
   closure the `app-workspace` job installs. `eas-cli` evaluates `app.config.ts`, so the exposure is
   the runtime code of the packages this lockfile pins for the app, as in the e2e exception.

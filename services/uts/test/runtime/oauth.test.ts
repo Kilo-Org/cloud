@@ -1323,7 +1323,12 @@ describe('mint Worker wiring', () => {
       expect(response.status).toBe(200);
       const document = await metadata(response);
       expect(document.device_authorization_endpoint).toBeUndefined();
-      expect(document.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
+      // The token exchange of this layer stays listed; only the device grant leaves.
+      expect(document.grant_types_supported).toEqual([
+        'authorization_code',
+        'refresh_token',
+        'urn:ietf:params:oauth:grant-type:token-exchange',
+      ]);
       expect(errors.mock.calls).toEqual([]);
       expect(
         (

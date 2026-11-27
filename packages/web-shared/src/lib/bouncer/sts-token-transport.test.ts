@@ -1,10 +1,8 @@
 import { STS_ISSUERS, type MintRequest } from '@kilocode/sts-contracts';
 import { waitUntil } from '@vercel/functions';
 import { decide, deliverUsageEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
-import {
-  BouncerStsConfigError,
-  installBouncerAuth,
-} from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import { installBouncerAuth } from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import { BouncerStsConfigError } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { createBouncerTokenReadFor } from './sts-token-transport';
 
 // The shipped wiring end to end in one process: `installBouncerAuth` loads the real transport on

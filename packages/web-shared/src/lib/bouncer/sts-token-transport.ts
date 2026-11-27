@@ -5,7 +5,7 @@ import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import {
   BouncerStsConfigError,
   type BouncerTokenRead,
-} from '@kilocode/web-shared/lib/bouncer/sts-auth';
+} from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { STS_URL } from '@kilocode/web-shared/lib/config.server';
 import { stsEnvironmentOfDeployment } from '@kilocode/web-shared/lib/sts-secret-transport';
 import { getCache } from '@vercel/functions';

@@ -4,7 +4,8 @@ import { createHash } from 'crypto';
 
 import * as z from 'zod';
 
-import { bouncerAuthHeaders, type BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import { bouncerAuthHeaders } from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import type { BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';

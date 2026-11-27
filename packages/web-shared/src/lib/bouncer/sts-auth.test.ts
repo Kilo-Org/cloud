@@ -9,15 +9,14 @@ import {
   BOUNCER_BREAKER_THRESHOLD,
   BOUNCER_COUNT_LOG_INTERVAL_MS,
   BOUNCER_TOKEN_WAIT_MS,
-  BouncerStsConfigError,
   bouncerAuthHeaders,
   bouncerStsTokensEnabled,
   createBouncerAuth,
   installBouncerAuth,
   type BouncerAuth,
   type BouncerAuthOptions,
-  type BouncerTokenRead,
 } from './sts-auth';
+import { BouncerStsConfigError, type BouncerTokenRead } from './sts-auth-contract';
 
 const TOKEN = 'header.payload.signature';
 

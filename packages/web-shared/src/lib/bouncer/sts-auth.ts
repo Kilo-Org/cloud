@@ -1,4 +1,9 @@
 import 'server-only';
+import {
+  BouncerStsConfigError,
+  type BouncerScope,
+  type BouncerTokenRead,
+} from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { waitUntil } from '@vercel/functions';
 
 /**
@@ -28,9 +33,6 @@ import { waitUntil } from '@vercel/functions';
 /** The `x-kilo-caller` names, the STS workload names of design 5 that Bouncer counts. */
 export type BouncerCaller = 'kilocode-app' | 'kilocode-ai-gateway';
 
-/** The Bouncer scopes the shared client sends; the web app's signup history has no runtime caller. */
-export type BouncerScope = 'bouncer:decide' | 'bouncer:usage.write' | 'bouncer:signup.decide';
-
 /** The headers one Bouncer call adds besides `content-type` and `x-internal-api-key`. */
 export type BouncerAuthHeaders = Readonly<Record<string, string>>;
 
@@ -39,12 +41,6 @@ export type BouncerAuth = (
   scope: BouncerScope,
   signal?: AbortSignal
 ) => Promise<BouncerAuthHeaders>;
-
-/** Reads one token, from memory when the client holds a fresh one (`ServiceTokens.get`). */
-export type BouncerTokenRead = (
-  target: { audience: 'bouncer'; scope: BouncerScope },
-  ctx: { waitUntil(promise: Promise<unknown>): void }
-) => Promise<string>;
 
 /** Design 3.1: a caller reads its token within 250 ms of its own. */
 export const BOUNCER_TOKEN_WAIT_MS = 250;
@@ -76,14 +72,6 @@ export type BouncerTokenMissReason =
   | 'unavailable'
   | 'load'
   | 'config';
-
-/** A deployment whose STS settings cannot mint Bouncer tokens: no STS environment, a wrong issuer. */
-export class BouncerStsConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'BouncerStsConfigError';
-  }
-}
 
 /**
  * `BOUNCER_STS_TOKENS`: `on` sends STS tokens; unset, empty or `off` sends the legacy key alone.

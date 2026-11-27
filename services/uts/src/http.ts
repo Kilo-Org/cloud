@@ -23,7 +23,7 @@ import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
 import { credentialNotices } from './notices/credential';
 import { noticesAccess } from './notices/store';
-import { noticeEmail, platformFetch } from './signin/email/delivery';
+import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
 import type { SignInMailer } from './signin/email/mailer';
 import { signInConfigFor } from './signin/providers/config';
 import { subjectDeps } from './subjects/deps';
@@ -75,7 +75,7 @@ const probeWindows: AddressWindows = new Map();
 function accountDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): AccountDeps | null {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return null;
-  const email = noticeEmail(signInConfigFor(env, config).mail, platformFetch);
+  const email = noticeEmailTransport(signInConfigFor(env, config).mail, platformFetch);
   return {
     config,
     account: work =>

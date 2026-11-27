@@ -8,8 +8,10 @@
 --   (design 5.11). A code entry without a client address counts against no network.
 -- * `uts.verify_email_code` refuses a code entry from a network at its limit before it reads any
 --   code (`network_limited`): nothing is counted, no code moves, and no audit row is written, as
---   for every rate-limited refusal (decision Q56). The email's link still works, so a network
---   that shares the owner's address cannot lock the owner out.
+--   for every rate-limited refusal (decision Q56). A wrong code counts against the network first,
+--   in one conditional upsert that refuses past 30, so concurrent guesses from one network wait on
+--   its row and cannot go over the limit. The email's link still works, so a network that shares
+--   the owner's address cannot lock the owner out.
 -- * `uts.maintain_provider_sign_in_rows` also deletes network counts whose hour has passed.
 -- * The app login reads nothing of the new table; only the two functions above reach it.
 
@@ -25,7 +27,9 @@ CREATE INDEX network_email_code_failures_window_idx
 
 -- `uts.verify_email_code()` (migration 0009) with the per-network limit: a network with 30 wrong
 -- codes in its hour gets `network_limited` (one primary-key probe), and every wrong code counts
--- against the network in the same statement. Everything else is as in 0009; the grant stays.
+-- against the network before it counts against the code, by an upsert that adds one only while
+-- the network is under 30 (its row lock orders concurrent guesses). Everything else is as in 0009;
+-- the grant stays.
 CREATE OR REPLACE FUNCTION uts.verify_email_code(
   p_environment text,
   p_email_hash bytea,
@@ -55,6 +59,7 @@ DECLARE
   code uts.email_codes%ROWTYPE;
   holder record;
   finished record;
+  network_failures smallint;
 BEGIN
   IF EXISTS (
     SELECT 1 FROM uts.network_email_code_failures AS counted
@@ -95,6 +100,26 @@ BEGIN
   END IF;
   code_return_to := code.return_to;
   IF code.code_hash <> p_code_hash THEN
+    IF entry_network IS NOT NULL THEN
+      INSERT INTO uts.network_email_code_failures AS counted (
+        client_network, failures, window_started_at
+      ) VALUES (entry_network, 1, now())
+      ON CONFLICT (client_network) DO UPDATE
+      SET failures = CASE WHEN counted.window_started_at <= now() - interval '1 hour' THEN 1
+          ELSE counted.failures + 1 END,
+        window_started_at = CASE WHEN counted.window_started_at <= now() - interval '1 hour'
+          THEN now() ELSE counted.window_started_at END
+      WHERE counted.window_started_at <= now() - interval '1 hour' OR counted.failures < 30
+      RETURNING counted.failures INTO network_failures;
+      -- No row back: another entry took the network's 30th wrong code since the probe above.
+      IF network_failures IS NULL THEN
+        outcome := 'network_limited';
+        code_return_to := NULL;
+        entries_left := 0;
+        RETURN NEXT;
+        RETURN;
+      END IF;
+    END IF;
     UPDATE uts.email_codes AS stored
     SET attempts = stored.attempts + 1,
       status = CASE WHEN stored.attempts + 1 >= 5 THEN 'exhausted'::uts.email_code_status
@@ -102,16 +127,6 @@ BEGIN
     WHERE stored.id = code.id
     RETURNING 5 - stored.attempts INTO entries_left;
     PERFORM uts.count_email_code_failure(code.email, p_email_hash);
-    IF entry_network IS NOT NULL THEN
-      INSERT INTO uts.network_email_code_failures AS counted (
-        client_network, failures, window_started_at
-      ) VALUES (entry_network, 1, now())
-      ON CONFLICT (client_network) DO UPDATE
-      SET failures = CASE WHEN counted.window_started_at <= now() - interval '1 hour' THEN 1
-          ELSE least(30, counted.failures + 1) END,
-        window_started_at = CASE WHEN counted.window_started_at <= now() - interval '1 hour'
-          THEN now() ELSE counted.window_started_at END;
-    END IF;
     SELECT * INTO holder FROM uts.account_of_email(code.email);
     IF FOUND THEN
       PERFORM uts.write_audit_event(

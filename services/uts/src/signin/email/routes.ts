@@ -19,12 +19,11 @@ import {
   upstreamFailurePage,
 } from '../flows';
 import { escapeHtml, messagePage, page, unavailablePage } from '../pages';
-import { logMisconfigured } from '../providers/config';
-import { normalizeEmail } from '../providers/exchange';
+import { logMisconfigured, recipientAllowed } from '../providers/config';
 import { requestNetwork } from '../network';
 import { isSameOriginPost } from '../requests';
 import { anonymousWriteRetryAfter } from '../limits';
-import { recipientAllowed } from '../providers/config';
+import { mailAddress } from './address';
 import { TURNSTILE_RESPONSE_FIELD } from './turnstile';
 
 /**
@@ -32,9 +31,11 @@ import { TURNSTILE_RESPONSE_FIELD } from './turnstile';
  * address, a six-digit code; both live 10 minutes.
  *
  * * `POST /signin/email/start` (a form of the sign-in page) stores the email's hashes in one
- *   statement, then hands the message to the mail port, and shows the code entry. With the
- *   Mailgun sender it first refuses an address the environment's recipient rule does not allow
- *   and a request whose Turnstile token does not pass, so nothing is stored or sent for them.
+ *   statement, then hands the message to the mail port, and shows the code entry. It takes only a
+ *   plain addr-spec (`mailAddress`), so one mailbox has one spelling and one set of limits. With
+ *   the Mailgun sender it first refuses a request whose Turnstile token does not pass, then an
+ *   address the environment's recipient rule does not allow, so nothing is stored or sent for
+ *   them, and nobody learns the allow-list without passing Turnstile.
  * * `POST /signin/email/code` checks the newest code sent to the address. The fifth wrong entry
  *   exhausts the code; the email's link still works, so wrong entries by someone else cannot lock
  *   the address's owner out (design 5.3). A client network (IPv4 /24, IPv6 /48) may enter 30
@@ -193,7 +194,7 @@ export async function handleEmailRequest(
 
   if (pathname === UTS_EMAIL_START_PATH) {
     const returnTo = returnPathOf(form.get('return_to'));
-    const email = normalizeEmail(form.get('email'));
+    const email = mailAddress(form.get('email'));
     if (email === null) {
       return messagePage('Sign in to Kilo', 'Enter a valid email address.', 400, returnTo);
     }
@@ -201,10 +202,6 @@ export async function handleEmailRequest(
     const retryAfter = anonymousWriteRetryAfter(network.clientIp, 'email_sign_in_start');
     if (retryAfter !== null) return rateLimitedPage(retryAfter, returnTo);
     if (delivery.kind === 'mailgun') {
-      if (!recipientAllowed(delivery.recipients, email)) {
-        console.error(JSON.stringify({ event: 'uts.signin.mail_recipient_refused', environment }));
-        return refusalPage('recipient_not_allowed', returnTo);
-      }
       const checked = await delivery.turnstile(
         form.get(TURNSTILE_RESPONSE_FIELD),
         network.clientIp
@@ -214,6 +211,10 @@ export async function handleEmailRequest(
       if (checked === 'misconfigured') {
         logMisconfigured('email', ['UTS_TURNSTILE_SECRET_KEY']);
         return messagePage('Sign in to Kilo', 'Email sign-in is not available.', 500, returnTo);
+      }
+      if (!recipientAllowed(delivery.recipients, email)) {
+        console.error(JSON.stringify({ event: 'uts.signin.mail_recipient_refused', environment }));
+        return refusalPage('recipient_not_allowed', returnTo);
       }
     }
     const linkToken = randomCredential();
@@ -263,7 +264,7 @@ export async function handleEmailRequest(
   const sessionTokenHash = await sha256(sessionToken);
 
   if (pathname === UTS_EMAIL_CODE_PATH) {
-    const email = normalizeEmail(form.get('email'));
+    const email = mailAddress(form.get('email'));
     const code = form.get('code')?.trim() ?? '';
     if (email === null || !CODE_FORMAT.test(code)) {
       return messagePage('Sign in to Kilo', 'Enter the six-digit code from the email.', 400, null);

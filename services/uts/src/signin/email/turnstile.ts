@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { PROVIDER_TIMEOUT_MS } from '../../notices/transports';
 import type { TurnstileSettings } from '../providers/config';
 
 /**
@@ -23,6 +22,11 @@ export const TURNSTILE_RESPONSE_FIELD = 'cf-turnstile-response';
 /** The widget's `data-action`; siteverify echoes it, so a token from another form is refused. */
 export const TURNSTILE_ACTION = 'email-sign-in';
 const MAX_TOKEN_LENGTH = 2048;
+/**
+ * Siteverify answers in tens of milliseconds; the start waits for it and then for Mailgun (10 s,
+ * `PROVIDER_TIMEOUT_MS`), so it gets 3 s of its own and counts as retryable after that.
+ */
+const TURNSTILE_TIMEOUT_MS = 3_000;
 
 export type TurnstileOutcome = 'passed' | 'refused' | 'retryable' | 'misconfigured';
 export type TurnstileCheck = (
@@ -69,7 +73,7 @@ export function turnstileCheck(
       response = await fetcher(settings.verifyUrl, {
         method: 'POST',
         body,
-        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        signal: AbortSignal.timeout(TURNSTILE_TIMEOUT_MS),
       });
     } catch {
       return settle('retryable', 'unreachable');

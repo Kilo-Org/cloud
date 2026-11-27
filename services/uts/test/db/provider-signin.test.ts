@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { AuditEventSchema } from '@kilocode/sts-contracts';
 import type pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -836,6 +837,43 @@ describe('email sign-in', () => {
       `SELECT failures FROM uts.network_email_code_failures WHERE client_network = '192.0.2.0/24'`
     );
     expect(restarted.rows).toEqual([{ failures: 1 }]);
+  });
+
+  it('refuses a wrong code that would pass 30 while another entry of the network holds the count', async () => {
+    await owner.query(
+      `INSERT INTO uts.network_email_code_failures (client_network, failures, window_started_at)
+       VALUES ('192.0.2.0/24', 29, now())`
+    );
+    const first = address();
+    const second = address();
+    await sendEmail(first);
+    await sendEmail(second);
+    // One entry counts the 30th wrong code in a transaction that stays open, so it holds the row.
+    const holding = await db.connect('uts_app_b');
+    const holdingStore = identityStoreProviderSignIn(new IdentityStore(holding));
+    await holding.query('BEGIN');
+    const held = await holdingStore.verifyEmailCode({
+      environment,
+      emailHash: keyed('kilo-uts-email', first),
+      codeHash: keyed('kilo-uts-email-code', `${first}:000000`),
+      sessionTokenHash: sha256(token()),
+      network,
+      newAccountId: newAccountId(),
+    });
+    expect(held).toMatchObject({ outcome: 'invalid_code' });
+    // The other entry passed the probe (it saw 29) and waits on the row in the upsert.
+    const waiting = enter(second, '000000');
+    await sleep(300);
+    await holding.query('COMMIT');
+    expect((await waiting).result).toEqual({ outcome: 'network_limited' });
+    const counted = await owner.query(
+      `SELECT failures FROM uts.network_email_code_failures WHERE client_network = '192.0.2.0/24'`
+    );
+    expect(counted.rows).toEqual([{ failures: 30 }]);
+    const untouched = await owner.query('SELECT attempts FROM uts.email_codes WHERE email = $1', [
+      second,
+    ]);
+    expect(untouched.rows).toEqual([{ attempts: 0 }]);
   });
 
   it('counts a wrong code without a client address against no network', async () => {

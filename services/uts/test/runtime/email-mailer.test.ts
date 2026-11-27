@@ -2,12 +2,14 @@ import { createExecutionContext } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { UtsConfig } from '../../src/env';
 import { handleRequest } from '../../src/http';
-import { emailSignIn, noticeEmail } from '../../src/signin/email/delivery';
+import { emailSignIn, noticeEmailTransport } from '../../src/signin/email/delivery';
 import { handleEmailRequest } from '../../src/signin/email/routes';
 import { type SignInMethods, signInChoices } from '../../src/signin/flows';
 import { type SignInEnv, readSignInConfig } from '../../src/signin/providers/config';
 import type { ProviderSignInStore } from '../../src/signin/providers/store';
 import { config, env } from './test-env';
+import { noticeStep } from '../../src/scheduled';
+import type { NoticeStore, NoticesAccess } from '../../src/notices/store';
 
 /**
  * The email sign-in through the deployed sender: Cloudflare Turnstile's siteverify and Mailgun's
@@ -265,7 +267,7 @@ describe('email start with Turnstile and Mailgun', () => {
 });
 
 describe('recipient rule', () => {
-  it('refuses an address outside the allow-list without the Turnstile call, a row or a message', async () => {
+  it('refuses an address outside the allow-list after the Turnstile check, without a row or a message', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { calls, fetcher } = standIns();
     const { calls: stored, store } = storeRecording();
@@ -278,11 +280,28 @@ describe('recipient rule', () => {
       expect(response?.status).toBe(403);
       expect(await response?.text()).toContain('only to test addresses');
     }
-    expect(calls).toEqual([]);
+    expect(calls.map(call => call.url)).toEqual([SITEVERIFY, SITEVERIFY, SITEVERIFY]);
     expect(stored).toEqual([]);
     const logged = errors.mock.calls.flat().join('\n');
     expect(logged).toContain('uts.signin.mail_recipient_refused');
     expect(logged).not.toContain('gmail.com');
+  });
+
+  it('tells nobody without a passing Turnstile token whether an address is allowed', async () => {
+    const { fetcher } = standIns({
+      siteverify: () =>
+        Response.json({ success: false, 'error-codes': ['invalid-input-response'] }),
+    });
+    const statuses = [];
+    for (const email of ['person@gmail.com', 'someone@example.com']) {
+      const response = await handleEmailRequest(
+        start({ email, 'cf-turnstile-response': TOKEN }),
+        '/signin/email/start',
+        methods(fetcher, storeRecording().store)
+      );
+      statuses.push(response?.status);
+    }
+    expect(statuses).toEqual([400, 400]);
   });
 
   it('sends to an allowed domain and to an allowed address', async () => {
@@ -298,11 +317,50 @@ describe('recipient rule', () => {
     }
   });
 
+  it.each([
+    'x <someone@example.com>',
+    'someone@example.com, other@example.com',
+    'a,b@example.com',
+    '"a b"@example.com',
+    'someone@example.com;other@example.com',
+    '(comment)someone@example.com',
+    'someone@example..com',
+    'someone@-example.com',
+  ])('refuses the address %j before any call, row or message', async email => {
+    const { calls, fetcher } = standIns();
+    const { calls: stored, store } = storeRecording();
+    const response = await handleEmailRequest(
+      start({ email, 'cf-turnstile-response': TOKEN }),
+      '/signin/email/start',
+      methods(fetcher, store)
+    );
+    expect(response?.status).toBe(400);
+    expect(await response?.text()).toContain('Enter a valid email address');
+    expect(calls).toEqual([]);
+    expect(stored).toEqual([]);
+  });
+
+  it('makes Mailgun refuse a recipient that is not a plain address, as a second layer', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { calls, fetcher } = standIns();
+    const { UTS_MAIL_ALLOWED_RECIPIENTS: _allowList, ...productionVars } = MAIL_ENV;
+    const mail = readSignInConfig(productionVars, { ...config, environment: 'production' }).mail;
+    const transport = noticeEmailTransport(mail, fetcher);
+    if (transport === null) throw new Error('mail settings are on');
+    const notice = { subject: 'New sign-in', text: 'A new sign-in to your account.' };
+    for (const to of [['x <victim@example.net>'], ['owner@example.com', 'a,b@example.net']]) {
+      expect(await transport({ ...notice, to })).toBe('permanent_failure');
+    }
+    expect(calls).toEqual([]);
+    expect(await transport({ ...notice, to: ['Owner@Example.com'] })).toBe('sent');
+    expect(formOf(calls[0]).getAll('to')).toEqual(['Owner@Example.com']);
+  });
+
   it('lets the notice email go only to allowed addresses, and to none answers no_target', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { calls, fetcher } = standIns();
     const mail = readSignInConfig(MAIL_ENV, config).mail;
-    const transport = noticeEmail(mail, fetcher);
+    const transport = noticeEmailTransport(mail, fetcher);
     if (transport === null) throw new Error('mail settings are on');
     const notice = { subject: 'New sign-in', text: 'A new sign-in to your account.' };
     expect(await transport({ ...notice, to: ['owner@example.com', 'old@gmail.com'] })).toBe('sent');
@@ -330,6 +388,52 @@ describe('recipient rule', () => {
     );
     expect(response?.status).toBe(200);
     expect(formOf(calls[1]).getAll('to')).toEqual(['person@gmail.com']);
+  });
+});
+
+describe('notice step of the cron', () => {
+  function noticeStore() {
+    const calls: string[] = [];
+    const unexpected = async () => {
+      throw new Error('unexpected notice store call');
+    };
+    const store: NoticeStore = {
+      claimNotice: unexpected,
+      claimCredentialNotice: unexpected,
+      finishNotice: unexpected,
+      claimDueNotices: async () => {
+        calls.push('claimDueNotices');
+        return [];
+      },
+      maintainNoticeRows: async () => {
+        calls.push('maintainNoticeRows');
+        return [];
+      },
+    };
+    const notices: NoticesAccess = work => work(store);
+    return { calls, notices };
+  }
+
+  it('claims nothing while the mail settings are misconfigured, so email stays unsettled', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { UTS_MAILGUN_SENDING_KEY: _key, ...vars } = MAIL_ENV;
+    const mail = readSignInConfig(vars, config).mail;
+    expect(mail.status).toBe('misconfigured');
+    const { calls, notices } = noticeStore();
+    const { calls: sent, fetcher } = standIns();
+    await noticeStep(mail, notices, fetcher);
+    // No claim, so no round can settle a due notice's email as not_configured; retention runs.
+    expect(calls).toEqual(['maintainNoticeRows']);
+    expect(sent).toEqual([]);
+    expect(errors.mock.calls.flat().join('\n')).toContain('UTS_MAILGUN_SENDING_KEY');
+  });
+
+  it('runs the sweep when mail is off or on', async () => {
+    for (const vars of [{}, MAIL_ENV]) {
+      const { calls, notices } = noticeStore();
+      await noticeStep(readSignInConfig(vars, config).mail, notices, standIns().fetcher);
+      expect(calls).toEqual(['claimDueNotices', 'maintainNoticeRows']);
+    }
   });
 });
 

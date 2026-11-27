@@ -62,7 +62,10 @@ export function guardedEmail(rule: RecipientRule, transport: EmailTransport): Em
 }
 
 /** The notice email transport: Mailgun behind the recipient rule, or null where mail is not on. */
-export function noticeEmail(mail: MailSettings, fetcher: typeof fetch): EmailTransport | null {
+export function noticeEmailTransport(
+  mail: MailSettings,
+  fetcher: typeof fetch
+): EmailTransport | null {
   return mail.status === 'on'
     ? guardedEmail(mail.recipients, mailgunEmail(mail.mailgun, fetcher))
     : null;

@@ -620,11 +620,20 @@ without it says so and signs in only after a second confirmation, so a link some
 for cannot sign the reader into that person's account in one click. The address and the code are
 stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`.
 
-A client network (an IPv4 /24 or an IPv6 /48) may enter 30 wrong sign-in codes an hour over all
-addresses (`uts.network_email_code_failures`, migration 0018), as for wrong device user codes. Past
-that, every code entry from the network is refused before any code is read (`network_limited`,
-429): nothing is counted and no audit row is written (decision Q56), and the email's link still
-works, so a network shared with the owner cannot lock the owner out.
+A client network (an IPv4 /24 or an IPv6 /48; an IPv4-mapped IPv6 address counts as its IPv4
+address) may enter 30 wrong sign-in codes an hour over all addresses
+(`uts.network_email_code_failures`, migration 0018), as for wrong device user codes. Past that,
+every code entry from the network is refused before any code is read (`network_limited`, 429):
+nothing is counted and no audit row is written (decision Q56), and the email's link still works,
+so a network shared with the owner cannot lock the owner out. A wrong code counts against the
+network first, in one upsert that adds one only while the network is under 30, so concurrent
+guesses wait on the network's row and cannot pass the limit.
+
+The start and the code entry take only a plain addr-spec in lower case (`src/signin/email/address.ts`:
+no display name, comment, quoting, comma, semicolon or space; the domain follows the SSO domain
+rule), so one mailbox has one spelling and one set of per-address limits, and Mailgun, which reads
+`to` as an address list, cannot be handed a second address. `mailgunEmail` refuses any other
+recipient again before it calls Mailgun.
 
 **Mail sender.** The email sign-in is offered only where a sender is wired
 (`src/signin/email/delivery.ts`):
@@ -632,14 +641,15 @@ works, so a network shared with the owner cannot lock the owner out.
 - Mailgun, where `SIGNIN_EMAIL_HASH_KEY` and every mail setting are set (Configuration below). The
   sign-in page then carries Cloudflare Turnstile's widget in the email form (its CSP adds
   `https://challenges.cloudflare.com` to `script-src` and `frame-src`), and the start, in this
-  order: takes one anonymous-write slot; outside production refuses an address that
-  `UTS_MAIL_ALLOWED_RECIPIENTS` does not list (403, no siteverify call, no row, no message); checks
-  the form's `cf-turnstile-response` once with siteverify (`src/signin/email/turnstile.ts`: the
-  token must pass for action `email-sign-in` on the issuer's host; a refused token answers 400, an
-  unanswered or failed siteverify 503, a refused secret 500); stores the email; and sends one
-  plain-text message (link, code, expiry; tracking off). A Mailgun 429 or 5xx answers 503, any
-  other refusal 502. Log lines carry outcomes, Cloudflare's error codes and setting names, never
-  the token, the key, the secret or the address.
+  order: takes one anonymous-write slot; checks the form's `cf-turnstile-response` once with
+  siteverify (`src/signin/email/turnstile.ts`: the token must pass for action `email-sign-in` on
+  the issuer's host; a refused token answers 400, a siteverify that fails or does not answer within
+  3 s 503, a refused secret 500); outside production refuses an address that
+  `UTS_MAIL_ALLOWED_RECIPIENTS` does not list (403, no row, no message; after Turnstile, so the
+  allow-list cannot be probed without passing it); stores the email; and sends one plain-text
+  message (link, code, expiry; tracking off; Mailgun gets 10 s). A Mailgun 429 or 5xx answers 503,
+  any other refusal 502. Log lines carry outcomes, Cloudflare's error codes and setting names,
+  never the token, the key, the secret or the address.
 - The development entry's recording port (`GET /__dev/mail?to=`), when no mail setting is set. It
   sends nothing, so it needs no Turnstile check.
 
@@ -648,10 +658,11 @@ mail setting they answer 500 and log `uts.signin.misconfigured` with the names.
 
 Cost per email start with Mailgun: one siteverify call and, once it passed, one
 `uts.start_email_sign_in` statement and one Mailgun `POST /v3/<domain>/messages`; no audit row and
-no queue message (an unauthenticated write names no account). A refusal by the recipient rule or
-the anonymous-write limit makes no network call and no statement. A code entry is still one
-`uts.verify_email_code` statement; the network count adds one primary-key probe, and one upsert
-on a wrong code. Neither route is on a section 3 hot path.
+no queue message (an unauthenticated write names no account). A refusal by the recipient rule
+costs the siteverify call only; a refused address form or the anonymous-write limit makes no
+network call and no statement. A code entry is still one `uts.verify_email_code` statement; the
+network count adds one primary-key probe, and one upsert on a wrong code. Neither route is on a
+section 3 hot path.
 
 Open items before deploy:
 
@@ -683,7 +694,9 @@ not offered and its routes answer 500 (`uts.signin.misconfigured` log line, name
 
 The five mail settings (`UTS_MAILGUN_SENDING_KEY`, `UTS_MAILGUN_DOMAIN`, `UTS_MAIL_FROM`,
 `UTS_TURNSTILE_SITE_KEY`, `UTS_TURNSTILE_SECRET_KEY`) are one switch for the sign-in mail and the
-notice email: mail never leaves without the Turnstile check guarding the form that sends it. The
+notice email: mail never leaves without the Turnstile check guarding the form that sends it.
+`SIGNIN_EMAIL_HASH_KEY` gates only the email sign-in, not notices: with the mail settings on and
+the hash key missing or invalid, the sign-in routes answer 500 while notice email still goes out. The
 sender must sit on the sending domain (SPF and DKIM alignment), and Mailgun is called on its US API
 host. `UTS_MAIL_ALLOWED_RECIPIENTS` is a comma-separated list of exact addresses
 (`tester@example.com`) and whole domains (`@example.com`, no subdomains); staging and development
@@ -780,16 +793,19 @@ due notice and the retries, then runs one retention step (`uts.maintain_notice_r
 rows of each kind): known devices and networks unseen for 90 days, and finished notices with
 their attempts 400 days after they were written.
 
-The minute cron (`src/scheduled.ts`) runs one `sweepNotices` pass after its maintenance steps.
-No deployed environment has a push provider wired yet, so push settles as `not_configured`. Email
-goes through Mailgun where the mail settings are on (Configuration under "Sign-in providers, SSO
-and email"), behind the recipient rule: outside production an address that
+The minute cron (`src/scheduled.ts`, `noticeStep`) runs one `sweepNotices` pass after its
+maintenance steps. No deployed environment has a push provider wired yet, so push settles as
+`not_configured`. Email goes through Mailgun where the mail settings are on (Configuration under
+"Sign-in providers, SSO and email"), behind the recipient rule: outside production an address that
 `UTS_MAIL_ALLOWED_RECIPIENTS` does not list is dropped without sending, and a message left with no
-address is `no_target` (`uts.mail.recipient_refused` log line, a count only). Without the mail
-settings email settles as `not_configured` too; every notice shows in-app, and the retention step
-runs. With the mail settings on, the account API's credential notice port delivers a created
-PAT's or bot key's notice at once (claim, one Mailgun call, finish, in `waitUntil`);
-without them it stays null and the cron delivers the notice.
+address is `no_target` (`uts.mail.recipient_refused` log line, a count only). With no mail setting
+at all email settles as `not_configured` too. With a partial or invalid mail setting (a deploy
+error) the step claims nothing and runs only the retention step: a round then would settle every
+due notice's email as `not_configured` for good, so the notices stay pending, and go out once the
+settings are fixed within their 24 hours. Every notice shows in-app either way. With the mail
+settings on, the account API's credential notice port delivers a created PAT's or bot key's notice
+at once (claim, one Mailgun call, finish, in `waitUntil`); otherwise it stays null and the cron
+delivers the notice.
 
 | Channel | Provider | Adapter |
 |---|---|---|

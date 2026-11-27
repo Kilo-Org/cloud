@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import type { UtsConfig } from '../../env';
 import type { MailgunConfig } from '../../notices/transports';
+import { isMailDomain, isMailLocalPart } from '../email/address';
 import {
   DevEndpointsSchema,
   type DevEndpoints,
@@ -233,9 +234,7 @@ const HashKeySchema = z
   .regex(/^[A-Za-z0-9_-]{43}$/, '32 bytes in base64url')
   .transform(value => new Uint8Array(Buffer.from(value, 'base64url')));
 
-const DomainSchema = z
-  .string()
-  .regex(/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, 'a lower-case domain');
+const DomainSchema = z.string().refine(isMailDomain, 'a lower-case domain');
 
 /** `Name <local@domain>` or `local@domain`; no character that could end a header line. */
 const FROM =
@@ -264,7 +263,7 @@ function recipientRule(value: string): RecipientRule | null {
     const at = entry.lastIndexOf('@');
     if (at < 0 || !DomainSchema.safeParse(entry.slice(at + 1)).success) return null;
     if (at === 0) domains.add(entry.slice(1));
-    else if (/^[a-z0-9._%+-]{1,64}$/.test(entry.slice(0, at))) addresses.add(entry);
+    else if (isMailLocalPart(entry.slice(0, at))) addresses.add(entry);
     else return null;
   }
   return addresses.size + domains.size === 0 ? null : { kind: 'allow_list', addresses, domains };

@@ -74,6 +74,9 @@ jobs:
           MIGRATION_PROXY_URL: https://migration-proxy.kiloapps.io
           MIGRATION_PROXY_AUDIENCE: https://migration-proxy.kiloapps.io
           TARGET_SHA: ${{ needs.check-changes.outputs.target_sha }}
+          # A little under timeout-minutes: the script stops with a message
+          # before the runner kills it.
+          MIGRATION_PROXY_BUDGET_SECONDS: '2580'
         run: bash scripts/migration-proxy-run.sh
 
   stage-app:

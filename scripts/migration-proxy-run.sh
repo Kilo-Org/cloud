@@ -4,13 +4,15 @@
 # OIDC token, with the proxy's audience, is its only credential; a fresh one goes with every
 # request. The script prints only RunView and status fields, never a token.
 #
-# Env: MIGRATION_PROXY_URL, MIGRATION_PROXY_AUDIENCE, TARGET_SHA, and the runner's
-# ACTIONS_ID_TOKEN_REQUEST_URL / ACTIONS_ID_TOKEN_REQUEST_TOKEN (job permission id-token: write).
+# Env: MIGRATION_PROXY_URL, MIGRATION_PROXY_AUDIENCE, TARGET_SHA, MIGRATION_PROXY_BUDGET_SECONDS
+# (how long the script may wait in total, a little under the job's timeout-minutes), and the
+# runner's ACTIONS_ID_TOKEN_REQUEST_URL / ACTIONS_ID_TOKEN_REQUEST_TOKEN (id-token: write).
 set -euo pipefail
 
 : "${MIGRATION_PROXY_URL:?MIGRATION_PROXY_URL is required}"
 : "${MIGRATION_PROXY_AUDIENCE:?MIGRATION_PROXY_AUDIENCE is required}"
 : "${TARGET_SHA:?TARGET_SHA is required}"
+: "${MIGRATION_PROXY_BUDGET_SECONDS:?MIGRATION_PROXY_BUDGET_SECONDS is required}"
 : "${ACTIONS_ID_TOKEN_REQUEST_URL:?ACTIONS_ID_TOKEN_REQUEST_URL is missing: the job needs id-token: write}"
 : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?ACTIONS_ID_TOKEN_REQUEST_TOKEN is missing: the job needs id-token: write}"
 
@@ -18,6 +20,12 @@ if [[ ! $TARGET_SHA =~ ^[0-9a-f]{40}$ ]]; then
   echo "::error::TARGET_SHA must be 40 lowercase hex characters" >&2
   exit 1
 fi
+
+if [[ ! $MIGRATION_PROXY_BUDGET_SECONDS =~ ^[1-9][0-9]{0,5}$ ]]; then
+  echo "::error::MIGRATION_PROXY_BUDGET_SECONDS must be a positive number of seconds" >&2
+  exit 1
+fi
+readonly DEADLINE=$((EPOCHSECONDS + MIGRATION_PROXY_BUDGET_SECONDS))
 
 readonly UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
 readonly BUSY_MIN_SECONDS=30
@@ -100,6 +108,21 @@ print_final() {
   ' <<<"$1"
 }
 
+# Sleeps $1 seconds, unless the wait would pass the job's budget: then the job ends now, saying
+# when to retry ($2 says what the wait was for). A run already started continues on the proxy.
+wait_or_stop() {
+  local seconds=$1 what=$2 retry_at at
+  if ((EPOCHSECONDS + seconds > DEADLINE)); then
+    retry_at=$((EPOCHSECONDS + seconds))
+    at="$(date -u -d "@$retry_at" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null ||
+      date -u -r "$retry_at" +%Y-%m-%dT%H:%M:%SZ)"
+    echo "::error::the job's wait budget ends before $what (${seconds}s); re-run the job at or" \
+      "after $at, or let the next deploy pick it up" >&2
+    exit 1
+  fi
+  sleep "$seconds"
+}
+
 # Polls GET /v1/runs/{id} every pollAfterSeconds until the run is final; prints the final view.
 wait_for_run() {
   local view=$1 id state last=''
@@ -121,16 +144,24 @@ wait_for_run() {
       print_final "$view"
       return
     fi
-    sleep "$(jq -r "$JQ_DEFS .pollAfterSeconds | seconds($DEFAULT_POLL_SECONDS)" <<<"$view")"
-    proxy GET "/v1/runs/$id"
-    case $status in
-      200) view="$(cat "$body_file")" ;;
-      503)
-        echo "migration proxy unavailable ($(body '.reason | clean')); polling again"
-        sleep "$(body ".retryAfterSeconds | seconds($DEFAULT_POLL_SECONDS)")"
-        ;;
-      *) fail_status "GET /v1/runs/$id" ;;
-    esac
+    wait_or_stop "$(jq -r "$JQ_DEFS .pollAfterSeconds | seconds($DEFAULT_POLL_SECONDS)" <<<"$view")" \
+      "the next poll of run $id, which continues on the proxy"
+    # A 503 waits its retryAfterSeconds and reads again, without another poll interval.
+    while :; do
+      proxy GET "/v1/runs/$id"
+      case $status in
+        200)
+          view="$(cat "$body_file")"
+          break
+          ;;
+        503)
+          echo "migration proxy unavailable ($(body '.reason | clean')); polling again"
+          wait_or_stop "$(body ".retryAfterSeconds | seconds($DEFAULT_POLL_SECONDS)")" \
+            "the next poll of run $id, which continues on the proxy"
+          ;;
+        *) fail_status "GET /v1/runs/$id" ;;
+      esac
+    done
   done
 }
 
@@ -156,12 +187,16 @@ fail_status() {
       echo "The proxy refuses its own configuration; fix services/migration-proxy/wrangler.jsonc" \
         "in a reviewed PR." >&2
       ;;
+    *reason=too_many_attempts*)
+      echo "This job attempt has used its runs; re-run the job: a new attempt gets a fresh cap." >&2
+      ;;
   esac
   exit 1
 }
 
-# §8: the first POST plus at most one re-POST after a retryable failure; busy, 429 and 503 waits
-# create no run and re-POST once per retryAfterSeconds until the job's timeout.
+# §8: the first POST plus at most one re-POST after a retryable failure. busy, rate_limited and
+# 503 create no run: each waits retryAfterSeconds and re-POSTs, within the job's wait budget.
+# A 429 too_many_attempts (this attempt's runs are used up) fails at once.
 request_body="$(jq -cn --arg sha "$TARGET_SHA" '{sha: $sha}')"
 reposted=false
 while :; do
@@ -194,17 +229,23 @@ while :; do
       wait_seconds="$(body ".retryAfterSeconds | seconds($BUSY_MIN_SECONDS)")"
       ((wait_seconds < BUSY_MIN_SECONDS)) && wait_seconds=$BUSY_MIN_SECONDS
       echo "migration proxy busy with run $active; retrying in ${wait_seconds}s"
-      sleep "$wait_seconds"
+      wait_or_stop "$wait_seconds" "the proxy's active run $active ends"
       if [[ $active =~ $UUID_RE ]]; then
         proxy GET "/v1/runs/$active"
         if [[ $status == 200 ]]; then
           print_view "$(cat "$body_file")"
+        else
+          echo "could not read run $active: HTTP $status"
         fi
       fi
       ;;
     429 | 503)
+      if [[ $status == 429 && "$(body '.reason | clean')" != rate_limited ]]; then
+        fail_status "POST /v1/runs"
+      fi
       echo "migration proxy $(body '.status | clean') ($(body '.reason | clean')); retrying"
-      sleep "$(body ".retryAfterSeconds | seconds($BUSY_MIN_SECONDS)")"
+      wait_or_stop "$(body ".retryAfterSeconds | seconds($BUSY_MIN_SECONDS)")" \
+        "the proxy accepts a new run"
       ;;
     *) fail_status "POST /v1/runs" ;;
   esac

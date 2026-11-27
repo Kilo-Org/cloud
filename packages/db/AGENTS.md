@@ -83,10 +83,10 @@ To recover a deploy that is already failing on a concurrent-index migration:
 - Check `drizzle.__drizzle_migrations` to confirm the migration is not recorded.
 - Check `pg_index.indisvalid` for each of its indexes.
 - For `invalid_index_present`, the run lists the invalid indexes in
-  `failure.indexes`; a pending migration does not rebuild them with
-  `DROP INDEX CONCURRENTLY IF EXISTS`. Check that no build is running on each
-  one (`SELECT * FROM pg_stat_progress_create_index`), then run
-  `DROP INDEX CONCURRENTLY <name>` in the SQL editor and redeploy.
+  `failure.indexes`: the proxy refuses to migrate while an `INVALID` index
+  exists, so the migration's own `DROP` never runs. Check that no build is
+  running on each one (`SELECT * FROM pg_stat_progress_create_index`), then
+  run `DROP INDEX CONCURRENTLY <name>` in the SQL editor and redeploy.
 - Check `pg_stat_activity` for long-running transactions.
 - Check `pg_stat_activity` for a `CREATE INDEX CONCURRENTLY` left behind by a
   lost run. A blocked index build does not notice that its client

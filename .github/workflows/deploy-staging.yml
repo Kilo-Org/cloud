@@ -71,6 +71,9 @@ jobs:
           MIGRATION_PROXY_URL: https://migration-proxy-staging.kiloapps.io
           MIGRATION_PROXY_AUDIENCE: https://migration-proxy-staging.kiloapps.io
           TARGET_SHA: ${{ needs.check-changes.outputs.target_sha }}
+          # A little under timeout-minutes: the script stops with a message
+          # before the runner kills it.
+          MIGRATION_PROXY_BUDGET_SECONDS: '780'
         run: bash scripts/migration-proxy-run.sh
 
   # Both Vercel staging deploys start as soon as check-changes publishes the

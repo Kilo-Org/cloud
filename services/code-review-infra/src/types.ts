@@ -170,13 +170,15 @@ export interface Env {
   API_URL: string;
   CLOUD_AGENT_NEXT_URL: string;
 
-  // Runtime secrets, read through `src/secrets.ts`: `wrangler types` has not run for the
-  // SecretsBroker binding yet; this is its RPC shape (packages/secrets-client `BundleBinding`).
-  // Absent until the binding deploys.
-  INTERNAL_API_SECRET: string;
-  CALLBACK_TOKEN_SECRET: string;
-  BACKEND_AUTH_TOKEN: string;
+  // Runtime secrets, read only through `src/secrets.ts`, which selects the source with
+  // `SECRETS_SOURCE`. They are optional so a direct `this.env.<secret>` read fails type-checking
+  // instead of silently skipping the flag.
+  INTERNAL_API_SECRET?: string;
+  CALLBACK_TOKEN_SECRET?: string;
+  BACKEND_AUTH_TOKEN?: string;
   SECRETS_SOURCE?: string;
+  // The `STS` SecretsBroker service binding: `packages/secrets-client`'s `BundleBinding`, which is
+  // its RPC shape rather than a generated type. Absent until the binding deploys.
   STS?: BundleBinding;
 
   // Optional Sentry

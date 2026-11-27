@@ -28,7 +28,7 @@ type LegacySecretValue = string | { get(): Promise<string> };
 /**
  * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the binding the deployment
  * holds today, `sts` reads the bundle over the `STS` service binding. An absent value means
- * `secrets-store`, so merging this path changes nothing until secrets-cutover flips the variable.
+ * `secrets-store`, so merging this path changes nothing until `SECRETS_SOURCE` is set to `sts`.
  * The `sts` source never falls back to the legacy binding: a failed bundle read fails the read.
  */
 export type SessionSyncSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {
@@ -53,18 +53,26 @@ const stsClients = new WeakMap<BundleBinding, Secrets>();
 /**
  * One resolved value per binding per isolate, keyed by the binding itself: the `secrets-store`
  * source reads each Secrets Store item once and returns the held value on every later read in the
- * isolate. A failed read is not held, and neither is an empty value, so a misconfigured or
- * not-yet-populated item is retried on the next read instead of being pinned for the isolate's
- * lifetime. The `sts` source needs no cache of its own: the client holds the bundle.
+ * isolate. A value is held only when the caller would accept it, so a failed read, an empty value
+ * and a value under the caller's minimum are all retried on the next read instead of being pinned
+ * for the isolate's lifetime. The `sts` source needs no cache of its own: the client holds the
+ * bundle.
  */
 const resolvedValues = new WeakMap<object, string>();
 
-async function legacyValue(value: LegacySecretValue): Promise<string> {
+/** Whether a value can be held: empty and too-short values are refused by the caller anyway. */
+function holdable(value: string, minBytes: number | undefined): boolean {
+  if (value === '') return false;
+  if (minBytes === undefined) return true;
+  return new TextEncoder().encode(value).byteLength >= minBytes;
+}
+
+async function legacyValue(value: LegacySecretValue, minBytes?: number): Promise<string> {
   if (typeof value === 'string') return value;
   const held = resolvedValues.get(value);
   if (held !== undefined) return held;
   const resolved = await value.get();
-  if (resolved === '') return resolved;
+  if (!holdable(resolved, minBytes)) return resolved;
   resolvedValues.set(value, resolved);
   return resolved;
 }
@@ -73,12 +81,14 @@ async function legacyValue(value: LegacySecretValue): Promise<string> {
  * Reads one secret from the selected source and returns it as stored, empty included, so every
  * caller keeps its own empty-value handling. `ctx` belongs to the invocation doing the read (the
  * Worker request, queue batch or Durable Object): a bundle revalidation it starts runs under that
- * invocation's `waitUntil`.
+ * invocation's `waitUntil`. `minBytes` is the caller's own minimum for this read: it never changes
+ * the returned value, only whether the `secrets-store` source holds it for the isolate.
  */
 export async function readSessionSyncSecret(
   env: SessionSyncSecretsEnv,
   name: SessionSyncSecretName,
-  ctx?: SecretsExecutionContext
+  ctx?: SecretsExecutionContext,
+  minBytes?: number
 ): Promise<string> {
   if (secretsSource(env) === 'sts') {
     const binding = env.STS;
@@ -97,5 +107,5 @@ export async function readSessionSyncSecret(
   if (value === undefined) {
     throw new Error(`${bindingName} is not configured`);
   }
-  return legacyValue(value);
+  return legacyValue(value, minBytes);
 }

@@ -122,12 +122,12 @@ function requireSecret(value: string, minBytes: number): string {
 
 /** Shared signing key; ticket audiences remain distinct from sync grants. */
 export async function syncSigningKey(
-  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET'>,
+  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET' | 'SECRETS_SOURCE' | 'STS'>,
   ctx?: SecretsExecutionContext
 ): Promise<Uint8Array> {
   return new TextEncoder().encode(
     requireSecret(
-      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx),
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
       MIN_GRANT_SECRET_BYTES
     )
   );
@@ -321,11 +321,11 @@ export async function exchange(
 
   try {
     const nextAuthSecret = requireSecret(
-      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx),
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
       MIN_GRANT_SECRET_BYTES
     );
     const grantSecret = requireSecret(
-      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx),
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
       MIN_GRANT_SECRET_BYTES
     );
     const credential = await verifyCredential(token, nextAuthSecret, environment);
@@ -451,7 +451,7 @@ export async function authorizeTranscript(
   let secret: string;
   try {
     secret = requireSecret(
-      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx),
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
       MIN_GRANT_SECRET_BYTES
     );
   } catch (error) {

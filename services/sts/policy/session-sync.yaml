@@ -1,6 +1,6 @@
 # The session-sync Worker (services/session-sync/wrangler.jsonc). Production only: the local env
 # block binds no STS. It reads its runtime secrets over the `STS` SecretsBroker binding;
-# SECRETS_SOURCE stays `secrets-store` (the Secrets Store bindings) until secrets-cutover flips it.
+# SECRETS_SOURCE stays `secrets-store` (the Secrets Store bindings) until it is set to `sts`.
 # NEXTAUTH_SECRET and INTERNAL_API_SECRET resolve from /shared, INTERNAL_API_SECRET under the _PROD
 # name its Secrets Store binding already uses; SESSION_SYNC_SECRET from /workloads/session-sync.
 workload: session-sync

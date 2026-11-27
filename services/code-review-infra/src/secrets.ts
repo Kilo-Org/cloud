@@ -28,7 +28,7 @@ type LegacySecretValue = string | { get(): Promise<string> };
 /**
  * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the binding the deployment
  * holds today, `sts` reads the bundle over the `STS` service binding. An absent value means
- * `secrets-store`, so merging this path changes nothing until secrets-cutover flips the variable.
+ * `secrets-store`, so merging this path changes nothing until `SECRETS_SOURCE` is set to `sts`.
  * The `sts` source never falls back to the legacy binding: a failed bundle read fails the read.
  */
 export type CodeReviewInfraSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {

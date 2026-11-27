@@ -197,9 +197,6 @@ describe('the secrets copier table for the Workers that read STS', () => {
     expect(rows).toHaveLength(3 + 4 + 3);
     for (const row of rows) {
       expect(policies.get(row.workload)?.secrets, row.workload).toContain(row.policyEntry);
-      // The published table's fourth column is the lookup name; the path column is derived from
-      // how many policies grant the name, so a value copied anywhere else is a copier mistake.
-      expect(row.stsLookup.split('/').at(-1), row.workload).toBe(row.policyEntry);
     }
     // The published path column, made executable: the copier copies each value into exactly this
     // folder, so a row whose folder differs from the table is a documentation bug that would

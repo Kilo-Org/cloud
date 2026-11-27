@@ -157,4 +157,17 @@ describe('readSessionSyncSecret', () => {
       await readSessionSyncSecret({ STS: sts.binding, SECRETS_SOURCE: 'sts' }, 'NEXTAUTH_SECRET')
     ).toBe('');
   });
+
+  it('does not hold a value under the caller minimum, so the next read sees the fix', async () => {
+    const fixed = 'a'.repeat(32);
+    const get = vi.fn().mockResolvedValueOnce('short').mockResolvedValue(fixed);
+    const env = { NEXTAUTH_SECRET: { get } };
+
+    // The caller refuses the short value; holding it would pin the misconfiguration.
+    expect(await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', undefined, 32)).toBe('short');
+    expect(await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', undefined, 32)).toBe(fixed);
+    // The valid value is held from then on.
+    expect(await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', undefined, 32)).toBe(fixed);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
 });

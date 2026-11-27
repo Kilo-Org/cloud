@@ -49,13 +49,12 @@ async function authenticatedUserId(
 ): Promise<Authentication> {
   // Both secrets are read before any credential is judged: when the second read fails, answering
   // 401 to a wrong key and 503 to a right one would tell the caller its candidate key is valid.
+  // They are read one after the other so the second waits on the first instead of polling.
   let internalApiSecret: string;
   let nextAuthSecret: string;
   try {
-    [internalApiSecret, nextAuthSecret] = await Promise.all([
-      readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx),
-      readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx),
-    ]);
+    internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
+    nextAuthSecret = await readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx);
   } catch {
     return { status: 'unavailable' };
   }

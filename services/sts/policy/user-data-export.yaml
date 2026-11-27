@@ -1,6 +1,6 @@
 # The user-data-export Worker (services/user-data-export/wrangler.jsonc). It reads its runtime
 # secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the plain
-# Worker secrets) until secrets-cutover flips it. INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve
+# Worker secrets) until it is set to `sts`. INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve
 # from /shared; the R2 key pair resolves from /workloads/user-data-export.
 workload: user-data-export
 environments:

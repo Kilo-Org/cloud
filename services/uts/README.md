@@ -575,9 +575,10 @@ repository secrets. The wire contract is `ci.ts` in `@kilocode/uts-contracts`.
   such a token once its feed copy holds the entries, not at once (design 3, 5.6, 7): the first
   request 10 seconds after its last fetch refreshes the copy in the background, a request waits
   for a refresh once the signed head is over 30 seconds old (about 41 seconds in the worst case),
-  and, because the CI token lives over 10 minutes, the verifier answers 503 rather than accept it
-  once the head is over 60 seconds old. `test/runtime/ci-token.test.ts` proves both with
-  `@kilocode/verify`; `test/db/ci-token.test.ts` proves the block's feed entries.
+  and, for a policy lifetime over 10 minutes, the verifier answers 503 rather than accept it once
+  the head is over 60 seconds old (10 minutes for a shorter lifetime).
+  `test/runtime/ci-token.test.ts` proves both with `@kilocode/verify`; `test/db/ci-token.test.ts`
+  proves the block's feed entries.
 - **Checks.** The OIDC token is `RS256` under GitHub's key set, issuer
   `https://token.actions.githubusercontent.com`, exactly the environment's UTS issuer URL as its
   one audience, `exp` with 60 seconds of skew and no future `iat`. The repository and owner ids,

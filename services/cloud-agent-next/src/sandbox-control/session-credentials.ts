@@ -1,3 +1,5 @@
+import { ScmCapabilityIssueError } from '../scm-broker/failure.js';
+import { assertAwsScmRepositories } from '../scm-broker/aws-policy.js';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { withTimeout } from '@kilocode/worker-utils';
 import jwt from 'jsonwebtoken';
@@ -141,7 +143,7 @@ const capabilitySchema = cachedCapabilitySchema(hasCurrentCapabilityPrefix);
 const legacyKiloCapabilitySchema = cachedCapabilitySchema(credential =>
   credential.startsWith(LEGACY_CAPABILITY_PREFIX.kilo)
 );
-const repositorySchema = z.discriminatedUnion('type', [
+export const repositorySchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('github'),
@@ -177,7 +179,7 @@ const repositorySchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
-const scmSchema = z
+export const scmSchema = z
   .object({
     purpose: z.enum(['github', 'gitlab', 'bitbucket']),
     alias: tokenSchema.optional(),
@@ -876,13 +878,23 @@ async function assertHostedGitHubRepositoryAccess(input: {
     fail(primary.fullName, 'repository_unavailable');
 }
 
-async function refreshScmCapability(
-  env: CredentialEnv,
-  grant: SessionCredentialGrant,
+/** Discard cached authority while preserving the alias and pinned SCM identity. */
+function withoutCachedScmCapability(scm: ScmGrant | undefined): ScmGrant | undefined {
+  return scm ? { ...scm, capability: undefined } : undefined;
+}
+
+/**
+ * Returns `existingScm` unchanged while its cached capability is current for this container
+ * (a GitHub grant must also record its app type).
+ * Otherwise issues a new capability and keeps the existing alias and pinned SCM identity.
+ * To force a renewal, pass the grant without its capability (`withoutCachedScmCapability`).
+ */
+export async function refreshScmCapability(
+  env: Partial<Pick<Env, 'GIT_TOKEN_SERVICE'>>,
+  grant: { userId: string; orgId?: string; sandboxId: string },
   repository: CredentialRepository,
   outboundContainerId: string,
   now: number,
-  refresh = false,
   existingScm: ScmGrant | undefined = undefined,
   diagnostic?: GrantDiagnostic
 ): Promise<ScmGrant> {
@@ -905,11 +917,10 @@ async function refreshScmCapability(
     });
     if (!authorized.success) {
       diagnostic?.record(brokerGrantFailure('broker_authorization', authorized.error.reason));
-      throw new Error('GitHub credential is unavailable');
+      throw new ScmCapabilityIssueError('github', authorized.error.reason);
     }
   }
   if (
-    !refresh &&
     isCapabilityCurrent(existingScm?.capability, outboundContainerId, now) &&
     (repository.type !== 'github' || existingScm?.githubAppType !== undefined)
   )
@@ -944,7 +955,7 @@ async function refreshScmCapability(
           issued.success ? undefined : issued.error.rejectionProvenance
         )
       );
-      throw new Error('GitHub capability issuance is unavailable');
+      throw new ScmCapabilityIssueError('github', issued.success ? 'unknown' : issued.error.reason);
     }
     scm = {
       purpose: 'github',
@@ -968,7 +979,7 @@ async function refreshScmCapability(
     });
     if (!issued.success) {
       diagnostic?.record(brokerGrantFailure('broker_issuance', issued.reason));
-      throw new Error('GitLab capability issuance is unavailable');
+      throw new ScmCapabilityIssueError('gitlab', issued.reason);
     }
     const { capability, gitUrl, ...gitlab } = issued.value;
     if (
@@ -1011,7 +1022,7 @@ async function refreshScmCapability(
     });
     if (!issued.success) {
       diagnostic?.record(brokerGrantFailure('broker_issuance', issued.reason));
-      throw new Error('Bitbucket capability issuance is unavailable');
+      throw new ScmCapabilityIssueError('bitbucket', issued.reason);
     }
     const gitUrl = canonicalRepositoryUrl(issued.value.gitUrl, true, diagnostic);
     if (!parseCanonicalBitbucketCloneUrl(gitUrl)) {
@@ -1391,6 +1402,7 @@ export async function prepareCredentialGrant(
     repository: additionalRepositoryOf(member.source, existing, source, diagnostic),
   }));
   const additionalRepositories = additionalEntries.map(entry => entry.repository);
+  if (provider === 'aws-ec2') assertAwsScmRepositories([repository, ...additionalRepositories]);
   if (
     existing &&
     (!isContainedSessionCredentialGrant(existing) ||
@@ -1498,8 +1510,7 @@ export async function prepareCredentialGrant(
           member,
           outboundContainerId,
           now,
-          input.refreshBacking,
-          existingScm,
+          input.refreshBacking ? withoutCachedScmCapability(existingScm) : existingScm,
           diagnostic
         );
         return hosted === undefined ? scm : { ...scm, hostedRepositoryVerifiedAt: now };
@@ -1865,7 +1876,6 @@ export async function resolveSessionCredential(input: {
       repository,
       input.outboundContainerId,
       now,
-      false,
       entry.scm
     );
     grant = withEntryScm(

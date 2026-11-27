@@ -24,6 +24,7 @@ import {
   runtimeReleaseHarness,
 } from './runtime-release.js';
 import { STARTUP_FAILURES } from './startup-failure.js';
+import { SANDBOX_SNAPSHOT_RESTORE_CONFIRMED_ENV } from '../shared/control-plane-protocol.js';
 
 const exitCodes = Object.fromEntries(
   Object.entries(STARTUP_FAILURES).map(([code, value]) => [code, value.exitCode])
@@ -39,6 +40,7 @@ const aliases = [
 const inheritedEnv = [
   'SANDBOX_CONTROL_URL',
   'SANDBOX_CONTROL_CREDENTIAL',
+  SANDBOX_SNAPSHOT_RESTORE_CONFIRMED_ENV,
   'CONTROL_PLANE_ALLOCATION_ID',
   'PROVIDER_INSTANCE_ID',
   'WRAPPER_LOG_PATH',

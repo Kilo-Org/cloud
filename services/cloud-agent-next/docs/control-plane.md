@@ -769,6 +769,11 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   reflogs, and writes the workspace stamp. Start commands never run in a build. The coordinator records the capture as issued before it
   calls the platform, captures, publishes when the build revision is still current, and stops the
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
+- **AWS builder SCM.** Display progress does not grant or revoke repository access. After setup descendants stop,
+  the builder calls `POST /environment-build/:envId/:buildId/retire-scm` with its runner credential.
+  The coordinator persists retirement before acknowledgement. The builder then cleans the workspace.
+  The EC2 adapter captures the data volume after a clean stop. Publication requires acknowledged retirement.
+  Cancellation and terminal states deny SCM access even when the builder never sends retirement.
 - **Command policy.** The leading `environmentSetupCommandCount` setup commands are the
   environment's build commands. They run only in the environment build, so the wrapper skips them on
   every session start. The remaining setup commands (request-supplied and profile) run as
@@ -834,7 +839,7 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 
 ### Workspace tail snapshots
 
-Workspace snapshots are private full-disk checkpoints for trusted registered `worktree_*`
+Workspace snapshots are private filesystem checkpoints for trusted registered `worktree_*`
 workspaces. `workspace_*` identifies a Cloud Agent session, not the workspace.
 `WORKSPACE_SNAPSHOT_IDS` is a comma-separated allowlist of user or organization IDs;
 matching either enrolls the owner. `*` enrolls everyone; empty or unset enrolls no owners.
@@ -848,9 +853,8 @@ workspace directory. The source allocation only records capture provenance.
 Legacy `session_disk_snapshot:v1` and `session_disk_allocation:v1` records are discarded lazily,
 without converting ownership or stopping the live allocation.
 
-Only isolated native Cloudflare Containers qualify. A sandbox serves one workspace only. A
-workspace can contain several sibling sessions with one shared runtime and HOME. Other providers
-keep environment snapshots and existing history/worktree recovery.
+Isolated Cloudflare Containers and AWS EC2 sandboxes qualify. A sandbox serves one workspace only.
+A workspace can contain several sibling sessions with one shared runtime and HOME.
 
 - **Capture.** Aggregate wrapper compute activity includes preparation, native child executions and pending
   turns. The separate negotiated `heartbeat.workspaceBusy` signal excludes active terminals
@@ -868,9 +872,10 @@ keep environment snapshots and existing history/worktree recovery.
   after restore.
 - **Cold startup.** When a descriptor exists, the workspace tail is the only startup source.
   Selection validates ownership, enrollment, provider, startup mode, image class and the 30-day
-  lifetime. A later base image does not block a tail: the restore uses the captured disk, and the
-  provider receives the current image identity, which is looked up with retries within the
-  deadline. A descriptor that cannot start (malformed, ownership or runtime mismatch, expired,
+  lifetime. Cloudflare requests a restore with the captured handle and current image identity.
+  The published Cloudflare snapshot contract binds a snapshot to its image.
+  EC2 validates the connection and storage layout. The host mounts the restored EBS volume before the wrapper starts.
+  A descriptor that cannot start (malformed, ownership or runtime mismatch, expired,
   provider unsupported, a permanent or repeated provider failure, or a wrapper failure in the
   restore step) fails the route as `workspace_snapshot_start_failed` with a specific detail that
   names the capture time; a possibly transient failure (image lookup, repeated provider error) also
@@ -1806,6 +1811,13 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | Optional egress restriction | Native Containers checks its trusted allowlist before credential handling. Unrestricted native requests without managed carriers retain their original headers and redirect policy. Containment does not require restricted general egress. |
 | Retry and bounds | Only eligible GitHub upload-pack reads retry 429 responses: three retries, 30 seconds per scheduled wait, and 60 seconds of total scheduled waits. An excessive next wait returns the current response. POST replay includes exactly 1 MiB; over-cap or unavailable bodies forward once. This is not a total request deadline. Diagnostics read at most 2 KiB within 100 milliseconds. |
 
+### AWS egress admission
+
+The EC2 host redirects workload HTTP and TLS traffic to its proxy. The proxy requests policy with
+proof tied to the current AWS instance and allocation. The Worker rechecks the owner connection
+and durable allocation before returning policy or allowing managed SCM. The Worker route owns
+credential redemption and request forwarding. See [AWS network access](aws-network-access.md).
+
 **Intentionally denied**
 
 | Case | Existing decision |
@@ -2377,7 +2389,8 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   at the top of its default `fetch`, so no route can forward one into a sandbox DO.
   The `transport` in the coordinates selects the upstream (`src/preview/upstreams.ts`):
   `durable-object` for `cloudflare-containers`, and `wrapper-tunnel` for every other provider that
-  supports preview (Vercel). See [Preview tunnel](#preview-tunnel-wrapper-tunnel).
+  supports preview (Vercel and AWS EC2).
+  See [Preview tunnel](#preview-tunnel-wrapper-tunnel).
 - **No start, no wake.** Preview never starts, resumes or wakes an allocation. A request for a
   session whose sandbox is stopped or asleep fails without creating a generation; the user starts
   the session again.
@@ -2463,16 +2476,16 @@ Request and response bodies stream; there is no body-size cap.
   set the Worker `PREVIEW_HOST_SUFFIX` to `<zone>`; redeploy the Worker. The web app needs no
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
-  image leaves `kilo serve` open to a preview of its port.
+  image leaves `kilo serve` open to a preview of its port. An AWS EC2 stack pins a host AMI. The workload starts the downloaded runtime on that host.
 
 #### Preview tunnel (`wrapper-tunnel`)
 
-A provider without a private network path to its sandbox (today Vercel) reaches the dev server
-through the wrapper. `resolvePreviewTarget` gives such a provider `wrapper-tunnel` coordinates with
-the allocation id as `allocationRef`. The allocation id fences the preview cookie: a cookie for a
-replaced allocation gets 401. All the checks above (host, cookie, access, `Origin`, header caps)
-run first, and the route's response sanitizer runs on every tunnel response, as on the Containers
-path.
+A provider without a private network path to its sandbox (today Vercel and AWS EC2)
+reaches the dev server through the wrapper. `resolvePreviewTarget` gives such a provider
+`wrapper-tunnel` coordinates with the allocation id as `allocationRef`. The allocation id fences
+the preview cookie: a cookie for a replaced allocation gets 401. All the checks above (host,
+cookie, access, `Origin`, header caps) run first, and the route's response sanitizer runs on every
+tunnel response, as on the Containers path.
 
 - **Path.** Browser → Worker preview route → `PreviewTunnel` DO named `<sandboxId>:<allocationId>`
   → one binary WebSocket that the wrapper opened → wrapper → `127.0.0.1:<port>`. The wrapper

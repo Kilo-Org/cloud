@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { awsProviderFixture } from '../../../test/fixtures/aws-provider.js';
+import { createByocAwsEc2ProviderAdapter } from '../../byoc/aws-ec2-provider.js';
+import type { Env } from '../../types.js';
 import { ProviderLifecycleError } from '../../sandbox-control/provider-failure.js';
 import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../shared/control-plane-protocol.js';
 import {
@@ -10,7 +11,16 @@ import {
 
 function admission(validate: () => Promise<void>, deadlineAt: number): ProviderHelloAdmission {
   return {
-    provider: Object.assign(awsProviderFixture().adapter(), { validateWrapperAdmission: validate }),
+    provider: {
+      ...createByocAwsEc2ProviderAdapter({
+        env: {} as Env,
+        source: { userId: 'user-1', credentialId: crypto.randomUUID() },
+        sandboxId: 'sbx-test',
+        storage: { get: async () => undefined, put: async () => {}, delete: async () => {} },
+        captures: { get: async () => undefined, update: async () => {}, delete: async () => {} },
+      }),
+      validateWrapperAdmission: validate,
+    },
     providerRef: 'aws-test-ref',
     connectionId: null,
     credential: 'test-credential',

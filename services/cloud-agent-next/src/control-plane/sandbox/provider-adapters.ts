@@ -17,8 +17,8 @@ import type { SandboxContainers } from '../../sandbox-containers/SandboxContaine
 import type { VercelProviderLocator } from '../../sandbox-control/vercel-provider.js';
 import type { SandboxKind } from '../../sandbox-placement.js';
 import type { AgentSandboxProvider, Env } from '../../types.js';
-import { createByocAwsProviderAdapter } from '../../byoc/aws-provider.js';
-import { awsOperationStorage } from './aws-operation-storage.js';
+import { createByocAwsEc2ProviderAdapter } from '../../byoc/aws-ec2-provider.js';
+import { awsEc2CaptureStorage, awsEc2WorkspaceStorage } from './aws-ec2-storage.js';
 
 /**
  * The provider registry for adapter construction. Provider facts are in
@@ -49,7 +49,7 @@ export type ProviderAdapterDeps = {
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
   readAcceptedRuntimeProxyHandles: () => Promise<ReadonlyMap<string, readonly string[]>>;
   getSandboxContainer: (id: string) => DurableObjectStub<SandboxContainers>;
-  operationStorage: Parameters<typeof awsOperationStorage>[0];
+  operationStorage: Parameters<typeof awsEc2WorkspaceStorage>[0];
 };
 
 export function createProviderAdapter(
@@ -58,13 +58,14 @@ export function createProviderAdapter(
 ): ProviderAdapter {
   const allocationName = pin.allocationName ?? deps.sandboxId;
   switch (pin.provider) {
-    case 'aws': {
+    case 'aws-ec2': {
       if (!pin.byoc) throw new ProviderCreationError('invalid_configuration');
-      return createByocAwsProviderAdapter({
+      return createByocAwsEc2ProviderAdapter({
         env: deps.env,
         source: pin.byoc,
         sandboxId: deps.sandboxId,
-        storage: awsOperationStorage(deps.operationStorage),
+        storage: awsEc2WorkspaceStorage(deps.operationStorage),
+        captures: awsEc2CaptureStorage(deps.operationStorage),
       });
     }
     case 'vercel': {

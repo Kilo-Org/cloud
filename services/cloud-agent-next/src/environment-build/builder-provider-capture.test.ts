@@ -29,16 +29,21 @@ const allocation: VercelBuilderAllocation = {
     instance: 'vercel-small',
   },
 };
-const state = {
+const state: BuilderLifecycleState = {
   get: async () => null,
   set: async () => undefined,
   clear: async () => undefined,
+  update: async transition => transition(undefined),
 };
 
 function memoryState(initial: Record<string, unknown> = {}): BuilderLifecycleState {
   let value: unknown = initial;
   return {
     get: async () => value,
+    update: async transition => {
+      value = transition(value);
+      return value;
+    },
     set: async next => {
       value = next;
     },
@@ -60,7 +65,7 @@ describe('Vercel builder capture credentials', () => {
   it('fails promptly when the pinned credential is gone', async () => {
     openVercelBuilder.mockClear();
     openVercelBuilder.mockRejectedValue(new ByocCredentialMissingError('credential-1'));
-    await expect(provider().capture(allocation, 'capture', state)).resolves.toEqual({
+    await expect(provider().bind(allocation).capture('capture', state)).resolves.toEqual({
       status: 'failed',
       reason: 'snapshot_failed',
     });
@@ -69,7 +74,7 @@ describe('Vercel builder capture credentials', () => {
   it('fails promptly when the credential no longer matches the pinned target', async () => {
     openVercelBuilder.mockClear();
     openVercelBuilder.mockRejectedValue(new BuilderTargetMismatchError());
-    await expect(provider().capture(allocation, 'capture', state)).resolves.toEqual({
+    await expect(provider().bind(allocation).capture('capture', state)).resolves.toEqual({
       status: 'failed',
       reason: 'snapshot_failed',
     });
@@ -78,7 +83,7 @@ describe('Vercel builder capture credentials', () => {
   it('retries a transient credential resolver failure', async () => {
     openVercelBuilder.mockClear();
     openVercelBuilder.mockRejectedValue(new BuilderRetryableError('lookup'));
-    await expect(provider().capture(allocation, 'capture', state)).rejects.toBeInstanceOf(
+    await expect(provider().bind(allocation).capture('capture', state)).rejects.toBeInstanceOf(
       BuilderRetryableError
     );
   });
@@ -88,7 +93,7 @@ describe('Vercel builder stop without a credential', () => {
   it('finalizes a definite pre-create failure without resolving a credential', async () => {
     openVercelBuilder.mockClear();
     const lifecycle = memoryState();
-    await expect(provider().stop(allocation, lifecycle)).resolves.toBe('terminal');
+    await expect(provider().bind(allocation).stop(lifecycle)).resolves.toBe('terminal');
     expect(openVercelBuilder).not.toHaveBeenCalled();
     expect(await lifecycle.get()).toBeUndefined();
   });
@@ -103,18 +108,26 @@ describe('Vercel builder stop without a credential', () => {
       createExpiresAt: expiresAt,
     });
 
-    await expect(provider(() => requestedAt).stop(allocation, lifecycle)).resolves.toBe(
-      'retryable'
-    );
+    await expect(
+      provider(() => requestedAt)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('retryable');
     expect(await lifecycle.get()).toMatchObject({
       createRequestedAt: requestedAt,
       createExpiresAt: expiresAt,
     });
 
-    await expect(provider(() => expiresAt - 1).stop(allocation, lifecycle)).resolves.toBe(
-      'retryable'
-    );
-    await expect(provider(() => expiresAt).stop(allocation, lifecycle)).resolves.toBe('terminal');
+    await expect(
+      provider(() => expiresAt - 1)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('retryable');
+    await expect(
+      provider(() => expiresAt)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('terminal');
     expect(await lifecycle.get()).toBeUndefined();
   });
 
@@ -125,14 +138,22 @@ describe('Vercel builder stop without a credential', () => {
     const requestedAt = 1_000;
     const expiresAt = requestedAt + 45 * 60_000 + DEADLINE_MS.createSettle;
 
-    await expect(provider(() => requestedAt).stop(allocation, lifecycle)).resolves.toBe(
-      'retryable'
-    );
+    await expect(
+      provider(() => requestedAt)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('retryable');
     expect(await lifecycle.get()).toEqual({ sessionId: 'session-1', createExpiresAt: expiresAt });
-    await expect(provider(() => expiresAt - 1).stop(allocation, lifecycle)).resolves.toBe(
-      'retryable'
-    );
-    await expect(provider(() => expiresAt).stop(allocation, lifecycle)).resolves.toBe('terminal');
+    await expect(
+      provider(() => expiresAt - 1)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('retryable');
+    await expect(
+      provider(() => expiresAt)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('terminal');
     expect(await lifecycle.get()).toBeUndefined();
   });
 
@@ -144,7 +165,11 @@ describe('Vercel builder stop without a credential', () => {
       createExpiresAt: 2_000,
     });
 
-    await expect(provider(() => 2_000).stop(allocation, lifecycle)).resolves.toBe('terminal');
+    await expect(
+      provider(() => 2_000)
+        .bind(allocation)
+        .stop(lifecycle)
+    ).resolves.toBe('terminal');
     expect(await lifecycle.get()).toBeUndefined();
   });
 });

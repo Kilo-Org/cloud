@@ -1588,6 +1588,10 @@ jobs:
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next test:aws-runtime-bundle
 
+      - name: Test AWS templates
+        if: matrix.part == 'other'
+        run: pnpm --filter cloud-agent-next test:aws-templates
+
       - name: Test cloud-agent-next checkers
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next test:checkers

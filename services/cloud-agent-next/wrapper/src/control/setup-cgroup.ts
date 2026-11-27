@@ -29,17 +29,21 @@ export type SetupCgroup = { procs: number; procsPath: string };
  */
 export function createSetupSpawn(workload: ControlWorkload): ProcessSpawn {
   let leaf: SetupCgroup | undefined;
+  const recordContainmentLoss = () => {
+    if (workload.placement) workload.placement.writerContainmentLost = true;
+  };
   return (command, args, options) => {
     if (!leaf) {
       const placement = admitControlWorkload(workload);
       if (!placement) return spawn(command, args, options);
       leaf = openSetupCgroup(placement);
       if (!leaf) {
+        recordContainmentLoss();
         console.warn('Setup command cgroup unavailable; running unmanaged');
         return spawn(command, args, options);
       }
     }
-    return spawnInCgroup(leaf, command, args, options);
+    return spawnInCgroup(leaf, command, args, options, recordContainmentLoss);
   };
 }
 
@@ -87,7 +91,8 @@ export function spawnInCgroup(
   leaf: SetupCgroup,
   command: string,
   args: string[],
-  options: SpawnOptions
+  options: SpawnOptions,
+  recordContainmentLoss?: () => void
 ): ChildProcess {
   const [stdin, stdout, stderr] = Array.isArray(options.stdio)
     ? options.stdio
@@ -116,6 +121,7 @@ export function spawnInCgroup(
     child.stdout?.destroy();
     child.stderr?.destroy();
     child.kill('SIGKILL');
+    recordContainmentLoss?.();
     console.warn('Setup command cgroup placement failed; running unmanaged');
     return spawn(command, args, options);
   }

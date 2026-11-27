@@ -2,17 +2,17 @@ import { withTimeout } from '@kilocode/worker-utils';
 import { workspaceFailureUserMessage } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
 import type { SnapshotResolution } from '../../environment-build/coordinator.js';
-import {
-  SNAPSHOT_LOOKUP_BUDGET_MS,
-  type PublishedSnapshot,
-} from '../../environment-build/policy.js';
+import { SNAPSHOT_LOOKUP_BUDGET_MS } from '../../environment-build/policy.js';
 import {
   sameEnvironmentScope,
   type SessionEnvironmentReference,
 } from '../../environment-build/reference.js';
 import type { BuildState } from '../../environment-build/sqlite-schema.js';
-import type { ProviderSnapshotStart } from '../../sandbox-control/provider.js';
-import type { SnapshotStartFailureReason } from '../../sandbox-containers/snapshot-start-failures.js';
+import type {
+  SnapshotProvider,
+  SnapshotRestoreRequest,
+  SnapshotStartFailureReason,
+} from '../../sandbox-control/snapshots.js';
 import {
   environmentWorkspaceDirectory,
   ISOLATED_CONTAINER_WORKSPACE_PATH,
@@ -80,8 +80,6 @@ export function environmentLaunchCandidate(
   return { candidate: { reference, actorUserId, buildCommands } };
 }
 
-export type SnapshotProvider = PublishedSnapshot['provider'];
-
 export type EnvironmentLookup =
   | { kind: 'resolved'; resolution: SnapshotResolution }
   | { kind: 'timeout' }
@@ -129,22 +127,18 @@ export async function lookupEnvironmentSnapshot(input: {
   return { kind: 'unavailable' };
 }
 
-/**
- * The snapshot a session starts from. The coordinator may publish a snapshot
- * from an earlier base image as compatible; the container
- * restore does not use that image, and startup installs the current runtime
- * over the restored disk, so the provider receives the current image identity.
- */
-export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotStart | undefined {
-  if (resolution.snapshot === null) return undefined;
-  const baseImage =
-    resolution.snapshot.stale === 'image'
-      ? (resolution.currentBaseImage ?? resolution.snapshot.baseImage)
-      : resolution.snapshot.baseImage;
+export function snapshotStart(resolution: SnapshotResolution): SnapshotRestoreRequest | undefined {
+  const snapshot = resolution.snapshot;
+  if (snapshot === null) return undefined;
   return {
-    snapshotId: resolution.snapshot.snapshotId,
-    baseImage,
-    ...(resolution.snapshot.provider === 'vercel' ? { provider: 'vercel' as const } : {}),
+    kind: 'environment',
+    buildId: snapshot.buildId,
+    snapshotId: snapshot.snapshotId,
+    provider: snapshot.provider,
+    baseImage: snapshot.baseImage,
+    ...(snapshot.stale === 'image' && resolution.currentBaseImage != null
+      ? { currentBaseImage: resolution.currentBaseImage }
+      : {}),
   };
 }
 
@@ -175,7 +169,7 @@ export type EnvironmentSnapshotBlock = {
 };
 
 export type EnvironmentSnapshotDecision =
-  | { kind: 'start'; snapshot: ProviderSnapshotStart | undefined }
+  | { kind: 'start'; snapshot: SnapshotRestoreRequest | undefined }
   | { kind: 'blocked'; block: EnvironmentSnapshotBlock };
 
 // Keep user-facing recovery instructions consistent while retaining precise

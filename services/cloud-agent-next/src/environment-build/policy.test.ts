@@ -1,3 +1,4 @@
+import { compareBuilderSnapshotBase } from './builder-snapshot-base.js';
 import { describe, expect, it } from 'vitest';
 import {
   SNAPSHOT_ELIGIBLE_LIFETIME_MS,
@@ -12,6 +13,8 @@ import {
   type SnapshotCompatibility,
 } from './policy.js';
 import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
+import { awsEc2FilesystemBase } from '../byoc/aws-ec2-provider.js';
+import { EC2_TEST_CONFIG } from '../../test/fixtures/aws-ec2.js';
 import type { SessionEnvironmentReference } from './reference.js';
 
 const NOW = 1_800_000_000_000;
@@ -19,6 +22,7 @@ const CURRENT = {
   provider: 'cloudflare-containers' as const,
   baseImage: 'registry.example/runtime-free:1',
   runtimeAbi: 'abi',
+  compareBase: compareBuilderSnapshotBase,
 };
 const HOUR = 60 * 60_000;
 
@@ -266,6 +270,29 @@ describe('snapshotEligibility', () => {
     ).toBe(true);
   });
 
+  it('keeps an AWS environment snapshot current across launch template revisions', () => {
+    const connectionId = '33333333-3333-4333-8333-333333333333';
+    const snapshot = published({
+      provider: 'aws-ec2',
+      baseImage: awsEc2FilesystemBase(connectionId, EC2_TEST_CONFIG),
+      builderInstance: 'aws-ec2-8g',
+      runtimeRelease: null,
+    });
+    const current = {
+      ...CURRENT,
+      provider: 'aws-ec2' as const,
+      baseImage: awsEc2FilesystemBase(connectionId, {
+        ...EC2_TEST_CONFIG,
+        launchTemplateVersion: EC2_TEST_CONFIG.launchTemplateVersion + 1,
+      }),
+    };
+    expect(snapshotEligibility(snapshot, REFERENCE, NOW, current)).toEqual({
+      eligible: true,
+      stale: false,
+    });
+    expect(replacementNeeded(snapshot, 2, NOW, current)).toBe(false);
+  });
+
   it('scopes a Vercel snapshot to its provider, credential, team and project', () => {
     const identity = {
       credentialId: 'credential-1',
@@ -279,6 +306,7 @@ describe('snapshotEligibility', () => {
       provider: 'vercel',
       baseImage,
       runtimeAbi: 'abi',
+      compareBase: compareBuilderSnapshotBase,
     };
     const snapshot = published({
       provider: 'vercel',
@@ -338,7 +366,12 @@ describe('snapshotEligibility', () => {
       runtimeRelease: null,
     });
     expect(
-      compatibleWith(snapshot, { provider: 'vercel', baseImage: null, runtimeAbi: 'abi' })
+      compatibleWith(snapshot, {
+        provider: 'vercel',
+        baseImage: null,
+        runtimeAbi: 'abi',
+        compareBase: compareBuilderSnapshotBase,
+      })
     ).toBe(false);
   });
 });

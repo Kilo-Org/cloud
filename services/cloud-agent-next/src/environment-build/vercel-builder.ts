@@ -27,7 +27,7 @@ import type {
   VercelBuilderAllocation,
 } from './builder-provider.js';
 import { vercelBuilderResources } from './target.js';
-import type { NativeCaptureResult } from '../sandbox-containers/SandboxContainers.js';
+import type { SnapshotCaptureResult } from '../sandbox-control/snapshots.js';
 import {
   BuilderCreateUncertainError,
   BuilderRetryableError,
@@ -344,7 +344,7 @@ function snapshotResult(
   snapshot: VercelSandboxSnapshot,
   capturedAt: number,
   durationMs: number
-): NativeCaptureResult {
+): SnapshotCaptureResult {
   return {
     status: 'stored',
     snapshotId: snapshot.id,
@@ -371,7 +371,7 @@ async function storedFromState(
     now: () => number;
   },
   state: LifecycleState
-): Promise<NativeCaptureResult | null> {
+): Promise<SnapshotCaptureResult | null> {
   if (state.snapshotId === undefined) return null;
   let snapshot: VercelSandboxSnapshot | undefined;
   try {
@@ -403,7 +403,7 @@ export async function captureVercelBuilder(input: {
   client: VercelBuilderClient;
   runtime: VercelSandboxRuntime;
   now?: () => number;
-}): Promise<NativeCaptureResult> {
+}): Promise<SnapshotCaptureResult> {
   void input.captureId;
   const now = input.now ?? Date.now;
   let state = await readState(input.state);

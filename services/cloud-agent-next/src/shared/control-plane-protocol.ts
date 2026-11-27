@@ -46,6 +46,7 @@ export type NativeBillingStopRequest = z.infer<typeof nativeBillingStopRequestSc
  * as `hello.allocationId`; the Sandbox DO must read the same name (B6).
  */
 export const CONTROL_PLANE_ALLOCATION_ID_ENV = 'CONTROL_PLANE_ALLOCATION_ID';
+export const SANDBOX_SNAPSHOT_RESTORE_CONFIRMED_ENV = 'SANDBOX_SNAPSHOT_RESTORE_CONFIRMED';
 
 export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
@@ -198,6 +199,8 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'runtime_artifact_invalid',
   'runtime_cli_probe_failed',
   'runtime_supervisor_missing',
+  'environment_restore_failed',
+  'environment_restore_unavailable',
   'connection_lost',
   'sandbox_lost',
   'agent_restarted',
@@ -216,6 +219,11 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'byoc_aws_not_ready',
   'byoc_aws_forbidden',
   'byoc_aws_stack_outdated',
+  'byoc_aws_stack_unavailable',
+  'byoc_aws_proxy_unavailable',
+  'byoc_aws_proxy_expired',
+  'byoc_aws_connection_changed',
+  'byoc_aws_scm_host_unsupported',
   'byoc_vercel_not_ready',
   'byoc_vercel_forbidden',
   'byoc_vercel_capacity',
@@ -1231,6 +1239,7 @@ const controlPlaneHelloFrameSchema = z
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
     workspaceSnapshots: z.literal(true).optional(),
+    snapshotRestoreConfirmed: z.literal(true).optional(),
     /**
      * Retired capability from wrappers built before workspace snapshots. The
      * schema is strict, so it stays accepted until those wrappers retire; the

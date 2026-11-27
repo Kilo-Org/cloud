@@ -3,7 +3,7 @@ import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
 import type { NetworkSecretRouting } from '../network-secrets/substitution.js';
 import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
 import { isAllowedEgressUrl } from '../sandbox-control/egress-policy.js';
-import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
+import { buildEgressAuditRequest } from '@kilocode/worker-utils/egress-audit';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 
@@ -56,18 +56,14 @@ export async function proxySandboxEgress(
     try {
       const credentials =
         networkSecret && networkSecret.type !== 'unmanaged' ? networkSecret.audit : [];
-      const input = EgressAuditRequestSchema.parse({
+      const input = buildEgressAuditRequest({
         requestId: crypto.randomUUID(),
         allocationRef: audit.allocationRef,
         timestamp: new Date().toISOString(),
-        method: request.method.slice(0, 32),
-        hostname: /kcp\d+\./.test(url.hostname)
-          ? 'redacted.invalid'
-          : url.hostname.slice(0, 253).replace(/[^a-zA-Z0-9._:[\]-]/g, '_'),
-        protocol: url.protocol,
-        port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)),
+        method: request.method,
+        url,
         decision: allowed && networkSecret?.type !== 'denied' ? 'allowed' : 'denied',
-        ...(credentials.length > 1 ? { credentialDecisions: credentials } : credentials[0]),
+        credentials,
       });
       await withDORetry(
         audit.store,

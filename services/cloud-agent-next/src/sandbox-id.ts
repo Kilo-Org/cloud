@@ -32,7 +32,7 @@ const SANDBOX_ALLOCATION_ID_PREFIX: Record<SandboxAllocation, 'istd' | 'ses' | u
   'cloudflare-containers-standard-4': 'ses',
   'vercel-small': 'ses',
   'vercel-large': 'ses',
-  'aws-microvm-8g': 'ses',
+  'aws-ec2-8g': 'ses',
 };
 
 export const RETIRED_SHARED_SANDBOX_MESSAGE =

@@ -1,8 +1,10 @@
 import fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 
 const STAMP_FILE = 'kilo-workspace.json';
+const MAX_STAMP_BYTES = 8 * 1024;
 
 const workspaceStampSchema = z
   .object({
@@ -44,9 +46,22 @@ export function workspaceStampPath(directory: string, hasGit: boolean): string {
 export async function readWorkspaceStamp(directory: string): Promise<WorkspaceStamp | null> {
   for (const hasGit of [true, false]) {
     try {
-      const raw = await fs.readFile(workspaceStampPath(directory, hasGit), 'utf8');
-      const parsed = workspaceStampSchema.safeParse(JSON.parse(raw));
-      return parsed.success ? parsed.data : null;
+      const stamp = await fs.open(
+        workspaceStampPath(directory, hasGit),
+        constants.O_RDONLY | constants.O_NONBLOCK
+      );
+      try {
+        if (!(await stamp.stat()).isFile()) return null;
+        const buffer = Buffer.alloc(MAX_STAMP_BYTES + 1);
+        const { bytesRead } = await stamp.read(buffer);
+        if (bytesRead > MAX_STAMP_BYTES) return null;
+        const parsed = workspaceStampSchema.safeParse(
+          JSON.parse(buffer.toString('utf8', 0, bytesRead))
+        );
+        return parsed.success ? parsed.data : null;
+      } finally {
+        await stamp.close();
+      }
     } catch (error) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
         continue;

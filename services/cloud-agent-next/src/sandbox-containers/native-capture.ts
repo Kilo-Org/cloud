@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  snapshotCaptureFailureSchema,
+  type SnapshotCaptureResult,
+} from '../sandbox-control/snapshots.js';
 
 /**
  * Durable capture records (plan "Build admission and execution", steps 8 and 10).
@@ -43,25 +47,12 @@ const captureRecordSchema = z.discriminatedUnion('state', [
     .object({
       state: z.literal('failed'),
       allocationRef: z.string().min(1),
-      reason: z.enum(['not_running', 'abandoned', 'snapshot_failed', 'uncertain']),
+      reason: snapshotCaptureFailureSchema,
     })
     .strict(),
 ]);
 
 export type CaptureRecord = z.infer<typeof captureRecordSchema>;
-
-/** What a capture caller learns. `in_progress` only while this isolate still awaits it. */
-export type NativeCaptureResult =
-  | {
-      status: 'stored';
-      snapshotId: string;
-      size?: number;
-      capturedAt: number;
-      baseImage: string;
-      durationMs: number;
-    }
-  | { status: 'failed'; reason: Extract<CaptureRecord, { state: 'failed' }>['reason'] }
-  | { status: 'in_progress' };
 
 export function captureKey(captureId: string): string {
   if (!CAPTURE_ID_PATTERN.test(captureId)) throw new Error('Invalid capture id');
@@ -78,7 +69,7 @@ export function parseCaptureRecord(value: unknown): CaptureRecord | null {
  * snapshot call is still in flight in this isolate: if not, nobody can learn its
  * outcome any more.
  */
-export function captureResult(record: CaptureRecord, inFlight: boolean): NativeCaptureResult {
+export function captureResult(record: CaptureRecord, inFlight: boolean): SnapshotCaptureResult {
   switch (record.state) {
     case 'stored':
       return {

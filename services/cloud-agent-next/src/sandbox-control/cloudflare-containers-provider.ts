@@ -27,7 +27,7 @@ import type {
   ProviderAllocationIntent,
   ProviderCreateIntent,
 } from './provider.js';
-import { ProviderCreationError } from './provider.js';
+import { ProviderCreationError, ProviderSnapshotCreationError } from './provider.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
@@ -121,10 +121,14 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   return {
-    environmentSnapshots: 'launch',
+    environmentSnapshots: { provider: 'cloudflare-containers', phase: 'launch' },
     workspaceSnapshots: {
-      currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
-      async capture(ref, captureId) {
+      provider: 'cloudflare-containers',
+      async compatibleBase(_capturedBase, image) {
+        const currentBaseImage = await deps.getContainer(deps.logicalSandboxId).currentImage(image);
+        return { currentBaseImage };
+      },
+      async capture(ref, { captureId }) {
         if (decodeOwnedProviderRef(ref) === null)
           throw new ProviderCreationError('invalid_configuration');
         return deps.getContainer(deps.logicalSandboxId).captureSnapshot(ref, captureId);
@@ -158,6 +162,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
       if (owned === null) {
         throw new ProviderCreationError('invalid_configuration');
       }
+      const snapshot = options?.snapshot;
+      if (snapshot !== undefined && snapshot.provider !== 'cloudflare-containers')
+        throw new ProviderSnapshotCreationError('provenance');
       const container = deps.getContainer(deps.logicalSandboxId);
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
@@ -171,7 +178,16 @@ export function createCloudflareContainersProviderAdapter(deps: {
         instance,
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
-        ...(options?.snapshot === undefined ? {} : { snapshot: options.snapshot }),
+        // A native snapshot supplies its own base layers. The container launch
+        // guard compares the target image with the expected image for this request.
+        ...(snapshot === undefined
+          ? {}
+          : {
+              snapshot: {
+                snapshotId: snapshot.snapshotId,
+                baseImage: snapshot.currentBaseImage ?? snapshot.baseImage,
+              },
+            }),
         ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),

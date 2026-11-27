@@ -22,7 +22,7 @@ const deps: ProviderAdapterDeps = {
   getSandboxContainer: () => {
     throw new Error('not used at construction');
   },
-  operationStorage: { get: unused, transaction: unused, list: unused, delete: unused },
+  operationStorage: { get: unused, transaction: unused, delete: unused },
 };
 
 function pin(provider: AgentSandboxProvider, extra: Partial<StoredProviderPin> = {}) {
@@ -39,7 +39,7 @@ function pin(provider: AgentSandboxProvider, extra: Partial<StoredProviderPin> =
 
 /** A configured pin for each provider: Vercel needs a BYOC source. */
 const CONFIGURED_PINS: Record<AgentSandboxProvider, StoredProviderPin> = {
-  aws: pin('aws', {
+  'aws-ec2': pin('aws-ec2', {
     byoc: { userId: 'user-1', credentialId: '22222222-2222-4222-8222-222222222222' },
   }),
   cloudflare: pin('cloudflare'),

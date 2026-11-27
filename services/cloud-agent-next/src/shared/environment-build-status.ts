@@ -27,7 +27,7 @@ export const environmentBuildSummarySchema = z
     state: z.enum(ENVIRONMENT_BUILD_PUBLIC_STATES),
     /** The terminal state a stopping build enters once cleanup is confirmed. */
     outcome: z.enum(['succeeded', 'failed', 'canceled', 'obsolete']).nullable(),
-    step: z.enum(['clone', 'setup', 'cleanup']).nullable(),
+    step: z.enum(['clone', 'setup', 'cleanup', 'archive']).nullable(),
     failureReason: z.string().nullable(),
     failureDetail: z.string().nullable(),
     sourceCommit: z.string().nullable(),

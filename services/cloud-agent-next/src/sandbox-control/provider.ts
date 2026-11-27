@@ -12,11 +12,14 @@ import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { NativeRuntimeImage } from './startup-selection.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
-import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
 import type {
+  SnapshotCaptureResult,
   SnapshotLaunchDiagnosticContext,
+  SnapshotProvider,
+  SnapshotRestoreRequest,
+  WorkspaceSnapshotCaptureRequest,
   SnapshotStartFailureReason,
-} from '../sandbox-containers/snapshot-start-failures.js';
+} from './snapshots.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -78,7 +81,7 @@ export class SandboxNetworkPolicyError extends Error {
 }
 
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
-  z.object({ provider: z.literal('aws') }).strict(),
+  z.object({ provider: z.literal('aws-ec2') }).strict(),
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z
     .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
@@ -124,7 +127,7 @@ export type ProviderAllocationIntent = {
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
-  snapshot?: ProviderSnapshotStart;
+  snapshot?: SnapshotRestoreRequest;
 };
 
 export class ProviderSnapshotCreationError extends Error {
@@ -142,21 +145,9 @@ export type ProviderObservation = {
 /** What a physical start used: the image, or an environment snapshot of it. */
 export type ProviderStartSource = 'image' | 'repository';
 
-/**
- * A published environment snapshot the Sandbox DO selected for this allocation.
- * Only the environment coordinator produces one; no public API accepts it.
- */
-export type ProviderSnapshotStart = {
-  snapshotId: string;
-  /** The image the snapshot was captured from. */
-  baseImage: string;
-  /** The provider that captured it; absent only for callers that predate BYOC. */
-  provider?: 'cloudflare-containers' | 'vercel';
-};
-
 export type ProviderLaunchOptions = {
   /** Start from this snapshot; a provider without snapshot support ignores it. */
-  snapshot?: ProviderSnapshotStart;
+  snapshot?: SnapshotRestoreRequest;
   deadlineAt?: number;
   nativeImage?: NativeRuntimeImage;
   snapshotDiagnostic?: SnapshotLaunchDiagnosticContext;
@@ -164,6 +155,10 @@ export type ProviderLaunchOptions = {
 
 export type ProviderLaunchResult = {
   startSource: ProviderStartSource;
+  /** Compute accepted the request. The authenticated wrapper confirms extraction. */
+  awaitingSnapshotConfirmation?: true;
+  /** Snapshot admission failed before the provider issued a launch request. */
+  snapshotPreflightFailed?: true;
   snapshotFailed?: true;
   /**
    * Why a provider snapshot start failed. The Sandbox DO retries `transient`
@@ -189,13 +184,22 @@ export type ProviderStartupCommand = {
   argv: readonly string[];
   /** Trusted bootstrap needs to install runtime files outside the workspace. */
   user?: 'root';
+  /** Digests of the trusted CLI and control artifacts, in that order. */
+  runtimeArtifactHashes?: readonly [string, string];
+};
+
+export type ProviderStartup = { command: ProviderStartupCommand; env: Record<string, string> };
+
+export type ProviderDeadline = {
+  at: number;
+  reason: 'provider_lifetime_exhausted' | 'byoc_aws_proxy_expired' | 'invalid_configuration';
 };
 
 export type ProviderAdapter = {
   /** Recover an issued launch after coordinator restart. Unlike observe, this may replay provisioning. */
   reconcileLaunch?(ref: string): Promise<ProviderLaunchResult | undefined>;
-  /** Absolute provider lifetime, including a cleanup margin. This is not a renewable lease. */
-  lifetimeDeadlineAt?(ref: string): Promise<number | undefined>;
+  /** Read the earliest nonrenewable compute or access deadline from durable allocation state. */
+  allocationDeadline?(ref: string): Promise<ProviderDeadline | undefined>;
   /** Authenticated wrapper admission can revoke the one-time launch document. */
   confirmAdmission?(ref: string): Promise<void>;
   /** Validate launch-owned runtime configuration before welcoming the authenticated wrapper. */
@@ -217,7 +221,7 @@ export type ProviderAdapter = {
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,
-    startup: { command: ProviderStartupCommand; env: Record<string, string> },
+    startup: ProviderStartup,
     options?: ProviderLaunchOptions
   ): Promise<ProviderLaunchResult>;
   observe(
@@ -227,16 +231,36 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
+  /** A retained workspace supplies its own disk, so snapshot selection is skipped on a wake. */
+  readonly retainedWorkspace?: {
+    available(): Promise<boolean>;
+    generation(): Promise<string | undefined>;
+    destroy(generation: string): Promise<StopResult>;
+  };
   /**
    * Present on a provider that can start a session from an environment snapshot.
    * `create` fixes the snapshot in the create request, so the lookup runs before
    * create and a failed snapshot start retries creation. `launch` restores the
    * snapshot when the created sandbox launches.
    */
-  readonly environmentSnapshots?: 'create' | 'launch';
+  readonly environmentSnapshots?: {
+    provider: SnapshotProvider;
+    phase: 'create' | 'launch';
+  };
   readonly workspaceSnapshots?: {
-    currentImage(image: 'all-in-one' | 'runtime-free'): Promise<string>;
-    capture(ref: string, captureId: string): Promise<NativeCaptureResult>;
+    provider: SnapshotProvider;
+    phase?: 'create' | 'launch';
+    confirmation?: 'hello';
+    compatibleBase(
+      capturedBase: string,
+      image: NativeRuntimeImage
+    ): Promise<{ currentBaseImage: string } | { reason: 'image_mismatch' }>;
+    capture?(ref: string, request: WorkspaceSnapshotCaptureRequest): Promise<SnapshotCaptureResult>;
+    stoppedCapture?: {
+      start(ref: string, captureId: string): Promise<'accepted' | 'uncertain' | 'unavailable'>;
+      poll(captureId: string): Promise<SnapshotCaptureResult>;
+      discard(captureId: string): Promise<'done' | 'pending'>;
+    };
   };
   /**
    * Replace the live sandbox's contained-credential network policy with one
@@ -246,3 +270,12 @@ export type ProviderAdapter = {
    */
   applyContainedCredentials?(ref: string, grants: readonly SessionCredentialGrant[]): Promise<void>;
 };
+
+export function snapshotStartsDuringCreate(
+  adapter: ProviderAdapter,
+  snapshot: SnapshotRestoreRequest
+) {
+  const capability =
+    snapshot.kind === 'workspace' ? adapter.workspaceSnapshots : adapter.environmentSnapshots;
+  return capability?.phase === 'create';
+}

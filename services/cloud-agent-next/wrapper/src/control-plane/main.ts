@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import fsp from 'node:fs/promises';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
+  SANDBOX_SNAPSHOT_RESTORE_CONFIRMED_ENV,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import {
@@ -454,6 +455,8 @@ async function main(
   const url = env.SANDBOX_CONTROL_URL;
   const credential = env.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = env[CONTROL_PLANE_ALLOCATION_ID_ENV];
+  const snapshotRestoreConfirmed = env[SANDBOX_SNAPSHOT_RESTORE_CONFIRMED_ENV] === allocationId;
+  delete env[SANDBOX_SNAPSHOT_RESTORE_CONFIRMED_ENV];
   // The runtime bootstrap exports inherited names as empty strings when the
   // launch did not set them, so an empty transfer configuration is absent.
   const transferUrl = env.SANDBOX_TRANSFER_URL || undefined;
@@ -624,6 +627,7 @@ async function main(
     credential,
     proxyUrl,
     allocationId,
+    ...(snapshotRestoreConfirmed ? { snapshotRestoreConfirmed: true } : {}),
     runtimeHarness: harness.kind,
     runtimeVersions: { kiloCliVersion, wrapperVersion: WRAPPER_VERSION },
     wrapperId: wrapperInstanceId,
@@ -646,7 +650,9 @@ async function main(
       send: frame => connection.send(frame),
       log: logToFile,
     }),
-    onShutdown: reason => shutdownRef.current?.(reason),
+    onShutdown: reason => {
+      shutdownRef.current?.(reason);
+    },
     onConnected: () => {
       const canRenew = connection.supportsTransferGrants();
       transferClientRef.current?.setConnected(canRenew);
@@ -692,6 +698,7 @@ async function main(
   artifactSyncRef.current?.start();
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
+    proxyUrl,
     wrapperId: connection.wrapperId,
     runtimes,
   });

@@ -7585,7 +7585,7 @@ export type CloudAgentSessionRunFailureCode =
 // Runtime container identity for a run. Keep in sync with
 // CloudAgentRunContainerSchema in @kilocode/worker-utils/cloud-agent-queue-report.
 export type CloudAgentRunContainer = {
-  provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' | 'aws';
+  provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' | 'aws-ec2';
   sandboxId: string;
   allocationId?: string;
   instanceId?: string;

@@ -13,7 +13,7 @@ const providerLabels: Record<SandboxDestination['provider']['id'], string> = {
   cloudflare: 'Cloudflare',
   'cloudflare-containers': 'Cloudflare Containers',
   vercel: 'Vercel',
-  aws: 'AWS',
+  'aws-ec2': 'AWS EC2',
 };
 
 const cloudflareServices: Partial<Record<SandboxDestination['instanceType'], string>> = {
@@ -35,7 +35,7 @@ const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
   small: 'Small',
   large: 'Medium',
   default: 'Provider default',
-  'microvm-8g': '8 GiB',
+  'm7i.large': '2 vCPU · 8 GiB',
 };
 
 export function formatSandboxProvider(provider: SandboxDestination['provider']): string {

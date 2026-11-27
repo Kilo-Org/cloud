@@ -33,7 +33,8 @@ describe('CloudAgentNextFetchClient getEgressAudit', () => {
         requestId: '12345678-1234-4234-9234-123456789abc',
         allocationRef: 'allocation:1',
         timestamp: '2026-10-15T12:00:00.000Z',
-        method: 'GET',
+        method: 'CONNECT',
+        scope: 'connection',
         hostname: 'example.com',
         protocol: 'https:',
         port: 443,
@@ -75,6 +76,7 @@ describe('CloudAgentNextFetchClient getEgressAudit', () => {
     { records: [] },
     { records: [], nextCursor: 0 },
     { records: [{ ...audit.records[0], decision: 'unknown' }], nextCursor: null },
+    { records: [{ ...audit.records[0], scope: 'unknown' }], nextCursor: null },
     { records: [{ ...audit.records[0], port: 65536 }], nextCursor: null },
     { records: Array.from({ length: 101 }, () => audit.records[0]), nextCursor: null },
   ])('rejects invalid audit page data: %j', async output => {

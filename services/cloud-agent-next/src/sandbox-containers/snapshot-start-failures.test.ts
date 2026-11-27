@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  classifySnapshotStartFailure,
-  snapshotStartFailureIsPermanent,
-} from './snapshot-start-failures.js';
+import { classifySnapshotStartFailure } from './snapshot-start-failures.js';
+import { snapshotStartFailureIsPermanent } from '../sandbox-control/snapshots.js';
 
 describe('snapshot start failure classification', () => {
   it.each([

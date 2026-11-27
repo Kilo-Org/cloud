@@ -3,6 +3,7 @@ import type { ProviderAdapter, ProviderLaunchOptions } from '../../sandbox-contr
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { CONTROL_PLANE_TIMERS } from '../../shared/control-plane-timers.js';
 import { logger } from '../../logger.js';
+import { initialAllocationState, type AllocationEvent } from './allocation.js';
 
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
 
@@ -25,7 +26,13 @@ const selection = {
   buildId: null,
 };
 const launchOptions: ProviderLaunchOptions = {
-  snapshot: { snapshotId: 'snapshot-test', baseImage: 'image-test' },
+  snapshot: {
+    kind: 'environment',
+    provider: 'vercel',
+    buildId: 'test-build',
+    snapshotId: 'snapshot-test',
+    baseImage: 'image-test',
+  },
 };
 const input = {
   allocationId: ALLOCATION_ID,
@@ -97,6 +104,60 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('stopped workspace snapshot scheduling', () => {
+  it.each([
+    ['alarm', true],
+    ['heartbeat', true],
+    ['explicit stop', false],
+  ] as const)('uses the %s trigger before stopping the provider', async (trigger, expected) => {
+    const at = CONTROL_PLANE_TIMERS.sandbox.idleMs;
+    const connected = {
+      ...initialAllocationState(),
+      kind: 'connected' as const,
+      allocationId: ALLOCATION_ID,
+      connectionId: 'connection-test',
+      providerRef: 'ref-test',
+      lastActivityAt: 0,
+      lastFrameAt: at,
+    };
+    const prepareStoppedSnapshot = vi.fn(async () => {});
+    const runEffect = vi.fn(async () => {});
+    const sandbox = Object.assign(Object.create(SandboxControlV2.prototype), {
+      sandboxId: SANDBOX_ID,
+      env: {},
+      provider: {},
+      readAllocation: async () => connected,
+      writeAllocation: async () => {},
+      armAlarm: async () => {},
+      applyRouteEffects: async () => {},
+      runEffect,
+      prepareStoppedSnapshot,
+    }) as { applyEvent: (event: AllocationEvent) => Promise<unknown> };
+    const event: AllocationEvent =
+      trigger === 'alarm'
+        ? { type: 'tick', at, nextAllocationId: 'next', retryAllowed: false }
+        : {
+            type: 'stop-requested',
+            at,
+            reason: 'sandbox_stopped',
+            ...(trigger === 'heartbeat' ? { trigger: 'idle-heartbeat' } : {}),
+          };
+
+    await sandbox.applyEvent(event);
+
+    expect(runEffect).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'stop' }),
+      expect.objectContaining({ kind: 'stopping' })
+    );
+    if (expected) {
+      expect(prepareStoppedSnapshot).toHaveBeenCalledExactlyOnceWith(connected);
+      expect(prepareStoppedSnapshot).toHaveBeenCalledBefore(runEffect);
+    } else {
+      expect(prepareStoppedSnapshot).not.toHaveBeenCalled();
+    }
+  });
+});
+
 describe('SandboxControlV2 snapshot start diagnostics', () => {
   it('preserves create-time snapshot launch errors without stopping or retrying launch', async () => {
     const error = new TypeError('provider rejected start');
@@ -104,7 +165,7 @@ describe('SandboxControlV2 snapshot start diagnostics', () => {
       throw error;
     });
     const sandbox = unit(launch);
-    sandbox.provider = { launch, environmentSnapshots: 'create' };
+    sandbox.provider = { launch, environmentSnapshots: { provider: 'vercel', phase: 'create' } };
 
     await expect(sandbox.launchWithSnapshotRetry(input)).rejects.toBe(error);
     expect(sandbox.stopRef).not.toHaveBeenCalled();

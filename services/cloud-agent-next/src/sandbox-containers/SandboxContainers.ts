@@ -1,8 +1,9 @@
-import {
-  classifySnapshotStartFailure,
-  type SnapshotStartFailureReason,
-  type SnapshotLaunchDiagnosticContext,
-} from './snapshot-start-failures.js';
+import { classifySnapshotStartFailure } from './snapshot-start-failures.js';
+import type {
+  SnapshotCaptureResult,
+  SnapshotStartFailureReason,
+  SnapshotLaunchDiagnosticContext,
+} from '../sandbox-control/snapshots.js';
 import { billingFailureFromAdmission } from '../billing-failure.js';
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
@@ -66,7 +67,6 @@ import {
   parseCaptureRecord,
   retainCaptureIds,
   type CaptureRecord,
-  type NativeCaptureResult,
 } from './native-capture.js';
 import type { Env } from '../types.js';
 import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
@@ -79,7 +79,6 @@ import { ContainersLaunchInterruptedError } from './launch-interrupted.js';
 import { readSentryIdentity, sentryIdentityFromBilling } from '../sentry-identity.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
-export type { NativeCaptureResult } from './native-capture.js';
 
 export type ContainersState = 'idle' | 'launching' | 'running' | 'stopping';
 
@@ -280,7 +279,7 @@ export class SandboxContainers extends DurableObject<Env> {
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;
   /** Snapshot calls still awaited in this isolate, by capture id. */
-  private readonly inflightCaptures = new Map<string, Promise<NativeCaptureResult>>();
+  private readonly inflightCaptures = new Map<string, Promise<SnapshotCaptureResult>>();
   private readonly egressAuditStore = new EgressAuditStore(this.ctx.storage);
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -1472,7 +1471,7 @@ export class SandboxContainers extends DurableObject<Env> {
    * no longer running in this isolate is `uncertain`. It does not take the
    * operation queue: a capture of unknown duration must not delay a stop.
    */
-  async captureSnapshot(allocationRef: string, captureId: string): Promise<NativeCaptureResult> {
+  async captureSnapshot(allocationRef: string, captureId: string): Promise<SnapshotCaptureResult> {
     const key = captureKey(captureId);
     const inflight = this.inflightCaptures.get(captureId);
     if (inflight) return inflight;
@@ -1493,7 +1492,7 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.containerImage(nativeImage);
   }
 
-  async readCapture(captureId: string): Promise<NativeCaptureResult | null> {
+  async readCapture(captureId: string): Promise<SnapshotCaptureResult | null> {
     const record = parseCaptureRecord(await this.ctx.storage.get(captureKey(captureId)));
     if (record === null) return null;
     return captureResult(record, this.inflightCaptures.has(captureId));
@@ -1503,7 +1502,7 @@ export class SandboxContainers extends DurableObject<Env> {
     allocationRef: string,
     captureId: string,
     key: string
-  ): Promise<NativeCaptureResult> {
+  ): Promise<SnapshotCaptureResult> {
     const container = this.ctx.container;
     if (
       !container ||
@@ -1568,7 +1567,7 @@ export class SandboxContainers extends DurableObject<Env> {
     captureId: string,
     key: string,
     record: CaptureRecord
-  ): Promise<NativeCaptureResult> {
+  ): Promise<SnapshotCaptureResult> {
     const { index, evicted } = retainCaptureIds(
       parseCaptureIndex(await this.ctx.storage.get(CAPTURE_INDEX_KEY)),
       captureId

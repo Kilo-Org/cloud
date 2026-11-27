@@ -1,3 +1,15 @@
+import {
+  resolveBuilderSnapshotBase,
+  type BuilderSnapshotBaseInput,
+} from './builder-snapshot-base.js';
+import type { PublishedSnapshot, SnapshotBase } from './policy.js';
+import { builderAllocationSandboxName } from './builder-identity.js';
+import type { EnvironmentBuildTarget } from './target.js';
+import type { AwsEc2BuilderAllocation } from './aws-ec2-build-target.js';
+import { builderSandboxIdForBuild } from './builder-identity.js';
+import type { AwsEnvironmentBuildServices } from './aws-build.js';
+import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
+export { builderAllocationSandboxName } from './builder-identity.js';
 import type { CloudflareContainersInstance } from '@kilocode/worker-utils/sandbox-allocation';
 import { hashToSandboxId } from '../sandbox-id.js';
 import type { EnvironmentBuildRunner } from '../shared/environment-build-protocol.js';
@@ -9,11 +21,8 @@ import { leaseAtLeastMs } from '../sandbox-control/deadlines.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
 import { SHA256_PATTERN } from '../sandbox-control/runtime-release.js';
 import type { Env } from '../types.js';
-import type {
-  NativeCaptureResult,
-  SandboxContainers,
-} from '../sandbox-containers/SandboxContainers.js';
-import type { ProviderAdapter } from '../sandbox-control/provider.js';
+import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
+import type { SnapshotCaptureResult } from '../sandbox-control/snapshots.js';
 import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
 import { builderInstance, builderRuntimeUnsupportedReason } from './target.js';
 import type { VercelBuildTarget } from './target.js';
@@ -54,14 +63,13 @@ export type VercelBuilderAllocation = {
   target: VercelBuildTarget;
 };
 
-export type BuilderAllocation = NativeBuilderAllocation | VercelBuilderAllocation;
+export type BuilderAllocation =
+  | NativeBuilderAllocation
+  | VercelBuilderAllocation
+  | AwsEc2BuilderAllocation;
 
-/** Mutable, non-secret Vercel lifecycle state kept outside the immutable build input. */
-export type BuilderLifecycleState = {
-  get(): Promise<unknown>;
-  set(value: unknown): Promise<void>;
-  clear(): Promise<void>;
-};
+export type { BuilderLifecycleState } from './builder-state.js';
+import type { BuilderLifecycleState } from './builder-state.js';
 
 export type BuilderLaunch = {
   networkSecretHosts?: string[];
@@ -70,29 +78,29 @@ export type BuilderLaunch = {
   deadlineAt: number;
 };
 
-export type BuilderProvider = {
+type BoundBuilderProvider = {
   /** Container billing admission and attribution; throws `ProviderCreationError` when refused. */
-  admitBilling(allocation: BuilderAllocation, billing: SandboxBillingInput): Promise<void>;
-  /** Start or confirm the builder with the deployment startup selection. */
-  launch(
-    allocation: BuilderAllocation,
-    launch: BuilderLaunch,
-    state: BuilderLifecycleState
-  ): Promise<void>;
-  capture(
-    allocation: BuilderAllocation,
-    captureId: string,
-    state: BuilderLifecycleState
-  ): Promise<NativeCaptureResult>;
-  stop(
-    allocation: BuilderAllocation,
-    state: BuilderLifecycleState
-  ): Promise<'terminal' | 'retryable'>;
-  renewLease(allocation: BuilderAllocation): Promise<void>;
+  admitBilling(billing: SandboxBillingInput): Promise<void>;
+  launch(launch: BuilderLaunch, state: BuilderLifecycleState): Promise<void>;
+  capture(captureId: string, state: BuilderLifecycleState): Promise<SnapshotCaptureResult>;
+  stop(state: BuilderLifecycleState): Promise<'terminal' | 'retryable'>;
+  renewLease(): Promise<void>;
+};
+
+export type BuilderProvider = {
+  bind(allocation: BuilderAllocation): BoundBuilderProvider;
   /** SHA-256 of the runtime release descriptor, or null when unavailable. */
   runtimeReleaseId(): Promise<string | null>;
-  /** The image a native container in `sandboxId` starts from now, or null when unreadable. */
-  currentImage(sandboxId: string): Promise<string | null>;
+  snapshotBase(input: BuilderSnapshotBaseInput): Promise<SnapshotBase>;
+  publishedSnapshotBase(target: EnvironmentBuildTarget, capturedBase: string): string;
+  snapshotCleanup?: {
+    manages(provider: PublishedSnapshot['provider']): boolean;
+    release(
+      snapshot: PublishedSnapshot,
+      allocation: BuilderAllocation,
+      state: BuilderLifecycleState
+    ): Promise<'done' | 'pending'>;
+  };
 };
 
 export { builderInstance, builderRuntimeUnsupportedReason };
@@ -101,11 +109,6 @@ export { BuilderRetryableError };
 /** The one builder container DO name for an environment. */
 export function builderSandboxId(environmentId: string): Promise<string> {
   return hashToSandboxId(`environment-build:v1:${environmentId}`, 'sbx');
-}
-
-/** A deterministic, provider-valid builder sandbox name for one build. */
-export function vercelBuilderSandboxName(buildId: string): string {
-  return `ses-envbuild-${buildId.replaceAll('-', '').slice(0, 40)}`;
 }
 
 function providerRef(allocation: NativeBuilderAllocation): string {
@@ -138,122 +141,126 @@ export function createBuilderProvider(deps: {
   env: BuilderProviderEnv;
   now?: () => number;
   fetch?: typeof fetch;
+  aws?: AwsEnvironmentBuildServices;
 }): BuilderProvider {
-  const adapterFor = (allocation: NativeBuilderAllocation): ProviderAdapter =>
-    createCloudflareContainersProviderAdapter({
-      logicalSandboxId: allocation.sandboxId,
-      allocationName: allocation.sandboxId,
-      instance: allocation.instance,
-      getContainer: id => deps.containers.getByName(id),
+  const skip = async () => {};
+
+  function bind(allocation: BuilderAllocation): BoundBuilderProvider {
+    switch (allocation.provider) {
+      case 'aws-ec2': {
+        const aws = () => {
+          if (!deps.aws) throw new ProviderCreationError('invalid_configuration');
+          return deps.aws;
+        };
+        return {
+          admitBilling: skip,
+          launch: async (launch, state) => aws().launch(allocation, launch, state),
+          capture: async (captureId, state) => aws().capture(allocation, captureId, state),
+          stop: async state => aws().stop(allocation, state),
+          renewLease: skip,
+        };
+      }
+      case 'vercel': {
+        const open = () => openVercelBuilder(deps.env, allocation, deps.fetch);
+        return {
+          admitBilling: skip,
+          async launch(launch, state) {
+            const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
+            if (!descriptor) throw new ProviderCreationError('invalid_configuration');
+            const opened = await open();
+            await launchVercelBuilder({
+              allocation,
+              launch,
+              state,
+              client: opened.client,
+              command: await startup(allocation, launch, descriptor),
+              runtime: opened.runtime,
+              initialTimeoutMs: opened.initialTimeoutMs,
+              now: deps.now,
+            });
+          },
+          async capture(captureId, state) {
+            let opened;
+            try {
+              opened = await open();
+            } catch (error) {
+              if (
+                error instanceof ByocCredentialMissingError ||
+                error instanceof BuilderTargetMismatchError
+              ) {
+                return { status: 'failed', reason: 'snapshot_failed' };
+              }
+              throw error;
+            }
+            try {
+              return await captureVercelBuilder({
+                allocation,
+                captureId,
+                state,
+                client: opened.client,
+                runtime: opened.runtime,
+                now: deps.now,
+              });
+            } catch (error) {
+              if (error instanceof BuilderStateInvalidError) {
+                return { status: 'failed', reason: 'snapshot_failed' };
+              }
+              throw error;
+            }
+          },
+          stop: state => stopVercelBuilder({ allocation, state, open, now: deps.now }),
+          // The initial timeout already covers the build deadline.
+          renewLease: skip,
+        };
+      }
+      case 'cloudflare-containers': {
+        const ref = providerRef(allocation);
+        const stub = () => deps.containers.getByName(allocation.sandboxId);
+        const adapter = createCloudflareContainersProviderAdapter({
+          logicalSandboxId: allocation.sandboxId,
+          allocationName: allocation.sandboxId,
+          instance: allocation.instance,
+          getContainer: id => deps.containers.getByName(id),
+        });
+        return {
+          admitBilling: billing => adapter.ensureBillingAdmission(ref, billing),
+          async launch(launch) {
+            const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
+            if (builderRuntimeUnsupportedReason(deps.env) !== null || !descriptor) {
+              throw new ProviderCreationError('invalid_configuration');
+            }
+            await stub().launchBuilder({
+              allocationRef: ref,
+              runner: launch.runner,
+              instance: allocation.instance,
+              deadlineAt: launch.deadlineAt,
+              command: await startup(allocation, launch, descriptor),
+              ...(launch.networkSecretHosts?.length
+                ? { networkSecretHosts: launch.networkSecretHosts }
+                : {}),
+            });
+            await stub().ensureLeaseAtLeast(ref, leaseAtLeastMs());
+          },
+          capture: captureId => stub().captureSnapshot(ref, captureId),
+          stop: () => adapter.stop(ref),
+          renewLease: () => adapter.ensureLeaseAtLeast(ref, leaseAtLeastMs()),
+        };
+      }
+    }
+  }
+
+  const startup = (allocation: BuilderAllocation, launch: BuilderLaunch, descriptor: string) =>
+    downloadedStartup({
+      env: deps.env,
+      descriptor,
+      sandboxId: allocation.sandboxId,
+      allocationId: allocation.allocationId,
+      deadlineAt: launch.deadlineAt,
+      mainProcess: 'environment-builder',
     });
-  const stub = (allocation: NativeBuilderAllocation) =>
-    deps.containers.getByName(allocation.sandboxId);
 
   return {
-    async admitBilling(allocation, billing) {
-      if (allocation.provider === 'vercel') return;
-      await adapterFor(allocation).ensureBillingAdmission(providerRef(allocation), billing);
-    },
-    async launch(allocation, launch, state) {
-      if (allocation.provider === 'vercel') {
-        const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
-        if (!descriptor) throw new ProviderCreationError('invalid_configuration');
-        const opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
-        const command = await downloadedStartup({
-          env: deps.env,
-          descriptor,
-          sandboxId: allocation.sandboxId,
-          allocationId: allocation.allocationId,
-          deadlineAt: launch.deadlineAt,
-          mainProcess: 'environment-builder',
-        });
-        await launchVercelBuilder({
-          allocation,
-          launch,
-          state,
-          client: opened.client,
-          command,
-          runtime: opened.runtime,
-          initialTimeoutMs: opened.initialTimeoutMs,
-          now: deps.now,
-        });
-        return;
-      }
-      const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
-      if (builderRuntimeUnsupportedReason(deps.env) !== null || !descriptor) {
-        throw new ProviderCreationError('invalid_configuration');
-      }
-      const command = await downloadedStartup({
-        env: deps.env,
-        descriptor,
-        sandboxId: allocation.sandboxId,
-        allocationId: allocation.allocationId,
-        deadlineAt: launch.deadlineAt,
-        mainProcess: 'environment-builder',
-      });
-      const ref = providerRef(allocation);
-      await stub(allocation).launchBuilder({
-        allocationRef: ref,
-        runner: launch.runner,
-        instance: allocation.instance,
-        deadlineAt: launch.deadlineAt,
-        command,
-        ...(launch.networkSecretHosts?.length
-          ? { networkSecretHosts: launch.networkSecretHosts }
-          : {}),
-      });
-      await stub(allocation).ensureLeaseAtLeast(ref, leaseAtLeastMs());
-    },
-    async capture(allocation, captureId, state) {
-      if (allocation.provider === 'vercel') {
-        let opened;
-        try {
-          opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
-        } catch (error) {
-          if (
-            error instanceof ByocCredentialMissingError ||
-            error instanceof BuilderTargetMismatchError
-          ) {
-            return { status: 'failed', reason: 'snapshot_failed' };
-          }
-          throw error;
-        }
-        try {
-          return await captureVercelBuilder({
-            allocation,
-            captureId,
-            state,
-            client: opened.client,
-            runtime: opened.runtime,
-            now: deps.now,
-          });
-        } catch (error) {
-          if (error instanceof BuilderStateInvalidError) {
-            return { status: 'failed', reason: 'snapshot_failed' };
-          }
-          throw error;
-        }
-      }
-      return stub(allocation).captureSnapshot(providerRef(allocation), captureId);
-    },
-    async stop(allocation, state) {
-      if (allocation.provider === 'vercel') {
-        return stopVercelBuilder({
-          allocation,
-          state,
-          open: () => openVercelBuilder(deps.env, allocation, deps.fetch),
-          now: deps.now,
-        });
-      }
-      return adapterFor(allocation).stop(providerRef(allocation));
-    },
-    async renewLease(allocation) {
-      // Native containers need a lease extension. A Vercel builder's initial
-      // timeout already covers the build deadline and extending it would only
-      // outlive the build.
-      if (allocation.provider === 'vercel') return;
-      await adapterFor(allocation).ensureLeaseAtLeast(providerRef(allocation), leaseAtLeastMs());
-    },
+    bind,
     async runtimeReleaseId() {
       const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
       return !descriptor
@@ -262,12 +269,54 @@ export function createBuilderProvider(deps: {
           ? descriptor
           : sha256Hex(descriptor);
     },
-    async currentImage(sandboxId) {
-      try {
-        return await deps.containers.getByName(sandboxId).currentImage('runtime-free');
-      } catch {
-        return null;
-      }
-    },
+    snapshotBase: input =>
+      resolveBuilderSnapshotBase(input, async sandboxId => {
+        try {
+          return await deps.containers.getByName(sandboxId).currentImage('runtime-free');
+        } catch {
+          return null;
+        }
+      }),
+    publishedSnapshotBase: (target, capturedBase) =>
+      target.provider === 'vercel' ? vercelSnapshotBaseImage(target) : capturedBase,
+    ...(deps.aws ? { snapshotCleanup: deps.aws.snapshotCleanup } : {}),
+  };
+}
+
+/** Project the pinned build target into its physical allocation identity. */
+export function builderAllocation(input: {
+  target: EnvironmentBuildTarget;
+  environmentId: string;
+  buildId: string;
+  allocationId: string;
+  owner: EnvironmentReference['owner'];
+  actorUserId: string;
+  nativeSandboxId: string;
+}): BuilderAllocation {
+  const { target, allocationId, owner } = input;
+  if (target.provider === 'aws-ec2')
+    return {
+      provider: target.provider,
+      sandboxId: builderSandboxIdForBuild(input.buildId),
+      target,
+      environmentId: input.environmentId,
+      buildId: input.buildId,
+      allocationId,
+      owner,
+      actorUserId: input.actorUserId,
+    };
+  if (target.provider === 'vercel')
+    return {
+      provider: 'vercel',
+      sandboxId: builderAllocationSandboxName(input.buildId),
+      allocationId,
+      owner,
+      target,
+    };
+  return {
+    provider: 'cloudflare-containers',
+    sandboxId: input.nativeSandboxId,
+    allocationId,
+    instance: target.instance,
   };
 }

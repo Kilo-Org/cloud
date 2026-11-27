@@ -9,7 +9,7 @@ export const sandboxAllocationSchema = z.enum([
   'cloudflare-containers-standard-4',
   'vercel-small',
   'vercel-large',
-  'aws-microvm-8g',
+  'aws-ec2-8g',
 ]);
 
 export type SandboxAllocation = z.infer<typeof sandboxAllocationSchema>;
@@ -34,7 +34,7 @@ export const SELECTABLE_SANDBOX_ALLOCATIONS = [
   'cloudflare-containers-standard-4',
   'vercel-small',
   'vercel-large',
-  'aws-microvm-8g',
+  'aws-ec2-8g',
 ] as const satisfies readonly SandboxAllocation[];
 
 /** Allocation auto-routed containers sessions run when the owner picks nothing. */
@@ -72,15 +72,15 @@ const containersAllocationRequestSchema = z
   })
   .strict();
 
-const awsAllocationRequestSchema = z
+const awsEc2AllocationRequestSchema = z
   .object({
-    provider: z.object({ id: z.literal('aws'), account: z.literal('byoc') }).strict(),
-    instanceType: z.literal('microvm-8g'),
+    provider: z.object({ id: z.literal('aws-ec2'), account: z.literal('byoc') }).strict(),
+    instanceType: z.literal('m7i.large'),
   })
   .strict();
 
 export const sandboxAllocationRequestSchema = z.union([
-  awsAllocationRequestSchema,
+  awsEc2AllocationRequestSchema,
   cloudflareAllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,
@@ -97,7 +97,7 @@ function isContainersAllocationRequest(
 }
 
 const selectableSandboxAllocationRequestSchema = z.union([
-  awsAllocationRequestSchema,
+  awsEc2AllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,
 ]);
@@ -107,7 +107,7 @@ export type SelectableSandboxAllocationRequest = z.infer<
 >;
 
 const allocationRequests = {
-  'aws-microvm-8g': { provider: { id: 'aws', account: 'byoc' }, instanceType: 'microvm-8g' },
+  'aws-ec2-8g': { provider: { id: 'aws-ec2', account: 'byoc' }, instanceType: 'm7i.large' },
   'isolated-standard': {
     provider: { id: 'cloudflare', account: 'kilo' },
     instanceType: 'isolated-standard',
@@ -190,7 +190,7 @@ export const selectableSandboxAllocationInputSchema = z.union([
 ]);
 
 export const sandboxDestinationSchema = z.union([
-  awsAllocationRequestSchema,
+  awsEc2AllocationRequestSchema,
   cloudflareAllocationRequestSchema.extend({
     instanceType: z.enum(['single', 'shared', 'isolated-standard', 'devcontainer']),
   }),

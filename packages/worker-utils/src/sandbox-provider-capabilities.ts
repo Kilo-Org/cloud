@@ -6,17 +6,18 @@ import type { EgressMode } from './egress-allowlist';
  * provider without a table entry. This module imports nothing from
  * the catalog, to keep the dependency one-way.
  */
-export type SandboxProviderId = 'cloudflare' | 'vercel' | 'cloudflare-containers' | 'aws';
+export type SandboxProviderId = 'cloudflare' | 'vercel' | 'cloudflare-containers' | 'aws-ec2';
 
 /**
  * Product features that a sandbox provider can support. Parity between
  * providers is measured on this list, so it holds features only, not
  * provider facts such as labels or credential transport.
  *
- * - `egressProxy`: sandbox egress reaches the Worker egress proxy with a
- *   verified sandbox identity, so the proxy can enforce an allowlist.
- * - `egressProxySeesAll`: the proxy sees all HTTP(S) egress, not only the
- *   listed hosts, so it can audit a session without an allowlist.
+ * - `egressProxy`: sandbox egress is enforced against an allowlist using a
+ *   verified sandbox identity. Enforcement can run in the customer VPC.
+ * - `egressProxySeesAll`: enforcement covers all supported egress destinations,
+ *   so it can audit without an allowlist. Audit scope can be a request or a
+ *   connection; this feature does not imply HTTP inspection or HTTP support.
  */
 export const SANDBOX_PROVIDER_FEATURES = [
   'preview',
@@ -39,12 +40,12 @@ export type SandboxProviderFeature = (typeof SANDBOX_PROVIDER_FEATURES)[number];
 export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
   Record<SandboxProviderId, Readonly<Record<SandboxProviderFeature, boolean>>>
 > = {
-  aws: {
+  'aws-ec2': {
     preview: true,
-    workspaceSnapshots: false,
-    environmentSnapshots: false,
-    egressProxy: false,
-    egressProxySeesAll: false,
+    workspaceSnapshots: true,
+    environmentSnapshots: true,
+    egressProxy: true,
+    egressProxySeesAll: true,
     scmCliTools: true,
     meteredBilling: false,
   },

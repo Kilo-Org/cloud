@@ -1,32 +1,4 @@
-import { z } from 'zod';
-
-/**
- * Why a provider could not start from a snapshot artifact. Permanent reasons
- * fail the route at once; `transient` is retried by the Sandbox DO against the
- * same artifact within the preparation deadline.
- */
-export const SNAPSHOT_START_FAILURE_REASONS = [
-  'transient',
-  'expired',
-  'missing',
-  'image_mismatch',
-  'provenance',
-  'unsupported',
-] as const;
-export type SnapshotStartFailureReason = (typeof SNAPSHOT_START_FAILURE_REASONS)[number];
-
-export type SnapshotLaunchDiagnosticContext = {
-  allocationId: string;
-  source: 'environment' | 'workspace' | 'image';
-  attempt: number;
-  startedAt: number;
-};
-
-export const snapshotStartFailureReasonSchema = z.enum(SNAPSHOT_START_FAILURE_REASONS);
-
-export function snapshotStartFailureIsPermanent(reason: SnapshotStartFailureReason): boolean {
-  return reason !== 'transient';
-}
+import type { SnapshotStartFailureReason } from '../sandbox-control/snapshots.js';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : typeof error === 'string' ? error : '';

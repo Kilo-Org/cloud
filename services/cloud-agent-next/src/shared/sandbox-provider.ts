@@ -8,7 +8,7 @@ export const AGENT_SANDBOX_PROVIDERS = [
   'cloudflare',
   'vercel',
   'cloudflare-containers',
-  'aws',
+  'aws-ec2',
 ] as const;
 
 export type AgentSandboxProvider = (typeof AGENT_SANDBOX_PROVIDERS)[number];
@@ -32,7 +32,11 @@ export function parseAgentSandboxProvider(
  * How contained SCM credentials reach the sandbox: the Worker's outbound
  * proxy injects them, or the provider's network policy forwards them.
  */
-export type CredentialTransport = 'outbound-proxy' | 'network-policy' | 'explicit-proxy';
+export type CredentialTransport =
+  | 'outbound-proxy'
+  | 'network-policy'
+  | 'explicit-proxy'
+  | 'host-proxy';
 
 /**
  * Per-provider facts that are not product features. Feature support is in
@@ -61,13 +65,13 @@ export type ProviderDescriptor = {
 };
 
 export const PROVIDER_DESCRIPTORS = {
-  aws: {
+  'aws-ec2': {
     label: 'AWS',
-    reservedPreviewPorts: [8080],
+    reservedPreviewPorts: [],
     launchEnv: { PATH: '/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin' },
     requiresCustomerCredential: true,
     uniqueAllocationName: true,
-    credentialTransport: 'explicit-proxy',
+    credentialTransport: 'host-proxy',
     retired: false,
   },
   cloudflare: {

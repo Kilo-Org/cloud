@@ -11,16 +11,16 @@ import { z } from 'zod';
 /**
  * The credential switch of each outbound edge that moves from a shared secret to an STS service
  * token (design 6.5, decision D59). The exact lowercase values are `sts` and `legacy`:
- * - unset, empty or `sts`: only an STS token for the receiver's audience and the edge's scope, in
+ * - unset, empty or `legacy`: the shared credential the edge sent before its switch existed;
+ * - `sts`: only an STS token for the receiver's audience and the edge's scope, in
  *   `Authorization: Bearer`, minted over the `STS` binding and sent only to the receiver's
- *   production origin; never the shared credential, and no return to it without a token;
- * - `legacy`: the shared credential the edge sent before its switch existed.
- * Any other value sends nothing. A receiver accepts STS before its senders run on `sts`; rollback
- * is the switch back to `legacy`.
+ *   production origin; never the shared credential, and no return to it without a token.
+ * Any other value sends nothing. A receiver accepts STS before its senders set `sts`; rollback is
+ * unsetting the switch.
  */
 export const SenderAuthSchema = z.preprocess(
   value => (value === '' ? undefined : value),
-  z.enum(['legacy', 'sts']).default('sts')
+  z.enum(['legacy', 'sts']).default('legacy')
 );
 
 export type SenderAuth = z.infer<typeof SenderAuthSchema>;

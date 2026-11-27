@@ -31,11 +31,6 @@
     // absent value means `secrets-store`; any other value refuses every read.
     // The `sts` source never falls back to the Secrets Store.
     "SECRETS_SOURCE": "secrets-store",
-    // The glanceable snapshot request's credential (ENVIRONMENT.md): unset or
-    // `sts` sends only a `web:glanceable-snapshot.read` STS token, `legacy`
-    // the internal secret. Pinned to `legacy` until the web route accepts STS;
-    // switching to `sts` removes this line, and `legacy` is the rollback.
-    "GLANCEABLE_SNAPSHOT_SENDER_AUTH": "legacy",
   },
 
   "routes": [
@@ -154,7 +149,6 @@
         "WORKER_ENV": "staging",
         "NOTIFICATIONS_PUSH_ENABLED": "false",
         "SECRETS_SOURCE": "secrets-store",
-        "GLANCEABLE_SNAPSHOT_SENDER_AUTH": "legacy",
       },
       // The staging database, cache disabled; never the production config.
       "hyperdrive": [

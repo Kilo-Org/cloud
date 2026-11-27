@@ -543,10 +543,11 @@ export type Env = {
   /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
   WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
   /**
-   * Outbound credential switches (sts-service-tokens.ts, ENVIRONMENT.md): unset or `sts` sends only
-   * an STS token for the receiver, `legacy` the shared credential. `BYOC_LOOKUP_SENDER_AUTH` covers
-   * the web BYOC routes, `PR_REFRESH_SENDER_AUTH` the hosted-workspace pull request refresh, and
-   * each `CALLBACK_SENDER_AUTH_*` one callback receiver (callbacks/callback-auth.ts).
+   * Outbound credential switches (sts-service-tokens.ts, ENVIRONMENT.md): unset, empty or `legacy`
+   * sends the shared credential, `sts` only an STS token for the receiver.
+   * `BYOC_LOOKUP_SENDER_AUTH` covers the web BYOC routes, `PR_REFRESH_SENDER_AUTH` the
+   * hosted-workspace pull request refresh, and each `CALLBACK_SENDER_AUTH_*` one callback receiver
+   * (callbacks/callback-auth.ts).
    */
   BYOC_LOOKUP_SENDER_AUTH?: string;
   PR_REFRESH_SENDER_AUTH?: string;

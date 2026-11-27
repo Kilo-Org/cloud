@@ -445,9 +445,6 @@ describe('glanceable delivery secrets source', () => {
       APNS_TOPIC: 'com.example.fixture',
       HYPERDRIVE: { connectionString: 'postgres://unused' },
       KILO_WEB_API_BASE_URL: WEB_ORIGIN,
-      // These cases cover the internal secret's source, which only the
-      // legacy snapshot credential reads (lib/glanceable-snapshot-auth.ts).
-      GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'legacy',
     };
     return { ...sources, env, apnsKey, storeKey, bundleKey };
   }

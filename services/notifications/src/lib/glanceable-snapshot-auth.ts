@@ -27,16 +27,17 @@ export const WEB_PRODUCTION_ORIGIN = 'https://app.kilo.ai';
 
 /**
  * `GLANCEABLE_SNAPSHOT_SENDER_AUTH`, the credential switch of the snapshot request and its rollback:
- * - unset, empty or `sts`: only a `web:glanceable-snapshot.read` STS service token in
- *   `Authorization: Bearer`, minted over the `STS` binding, and only to `WEB_PRODUCTION_ORIGIN`;
- *   never the internal secret, and no return to it when there is no token;
- * - `legacy`: the internal API secret in `X-Internal-Secret`, exactly as before this switch.
- * Any other value sends nothing. The web route must accept STS before a deployment runs on `sts`;
- * rollback is this switch back to `legacy`.
+ * - unset, empty or `legacy`: the internal API secret in `X-Internal-Secret`, exactly as before this
+ *   switch;
+ * - `sts`: only a `web:glanceable-snapshot.read` STS service token in `Authorization: Bearer`,
+ *   minted over the `STS` binding, and only to `WEB_PRODUCTION_ORIGIN`; never the internal secret,
+ *   and no return to it when there is no token.
+ * Any other value sends nothing. The web route must accept STS before a deployment sets `sts`;
+ * rollback is unsetting the switch.
  */
 const SenderAuthSchema = z.preprocess(
   value => (value === '' ? undefined : value),
-  z.enum(['legacy', 'sts']).default('sts')
+  z.enum(['legacy', 'sts']).default('legacy')
 );
 
 export type GlanceableSnapshotAuthEnv = NotificationsSecretsEnv & {

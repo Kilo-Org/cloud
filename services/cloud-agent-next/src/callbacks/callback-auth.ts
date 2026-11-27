@@ -115,9 +115,9 @@ export type CallbackAuth =
 
 /**
  * The headers of one delivery to `target`. A target that is no listed route, or whose receiver's
- * switch is `legacy`, keeps exactly the headers it was registered with. A listed route under `sts`
- * gets its STS token in `Authorization`, without the receiver-issued token or any stored
- * `Authorization`.
+ * switch is unset or `legacy`, keeps exactly the headers it was registered with. A listed route
+ * under `sts` gets its STS token in `Authorization`, without the receiver-issued token or any
+ * stored `Authorization`.
  */
 export async function callbackAuth(
   env: CallbackSenderAuthEnv,

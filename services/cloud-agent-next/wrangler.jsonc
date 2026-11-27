@@ -62,16 +62,6 @@
     // `combined` keeps the earlier multi-audience token as the rollout fallback.
     "RUNTIME_TOKEN_AUDIENCE_MODE": "combined",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
-    // Outbound credential switches (ENVIRONMENT.md, src/sts-service-tokens.ts):
-    // unset or `sts` sends only an STS token for the receiver, `legacy` the
-    // shared credential. Each stays pinned to `legacy` until its receiver
-    // accepts STS; switching to `sts` removes its line, and `legacy` is the
-    // rollback.
-    "BYOC_LOOKUP_SENDER_AUTH": "legacy",
-    "PR_REFRESH_SENDER_AUTH": "legacy",
-    "CALLBACK_SENDER_AUTH_WEB": "legacy",
-    "CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST": "legacy",
-    "CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS": "legacy",
     "GITHUB_APP_SLUG": "kiloconnect",
     "GITHUB_APP_BOT_USER_ID": "240665456",
     "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
@@ -149,8 +139,8 @@
     // STS mints this Worker's outbound service tokens over the account-internal
     // binding. `props.caller` is what STS authorizes on and must equal this
     // Worker's top-level name; services/sts/policy/cloud-agent-next.yaml grants
-    // the audiences and scopes. Nothing calls it while every switch above is
-    // `legacy`.
+    // the audiences and scopes. Nothing calls it while every outbound switch
+    // (ENVIRONMENT.md) is unset.
     {
       "binding": "STS",
       "service": "sts",
@@ -413,12 +403,6 @@
         "ENVIRONMENT": "development",
         "RUNTIME_TOKEN_AUDIENCE_MODE": "per-destination",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
-        // This block binds no STS, so every outbound edge keeps its shared credential.
-        "BYOC_LOOKUP_SENDER_AUTH": "legacy",
-        "PR_REFRESH_SENDER_AUTH": "legacy",
-        "CALLBACK_SENDER_AUTH_WEB": "legacy",
-        "CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST": "legacy",
-        "CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS": "legacy",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
         "GITHUB_APP_SLUG": "kiloconnect-development",
         "GITHUB_APP_BOT_USER_ID": "242397087",

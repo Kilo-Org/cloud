@@ -344,7 +344,6 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const serviceEnv = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
       KILO_WEB_API_BASE_URL: 'https://snapshot.test',
-      GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'legacy',
       INTERNAL_API_SECRET: { get: async () => 'test-internal-secret' },
       EXPO_ACCESS_TOKEN: { get: options.expoAccessToken ?? (async () => 'test-expo-token') },
       APNS_TEAM_ID: 'test-team',
@@ -2006,7 +2005,6 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       const service = new NotificationsService(ctx, {
         HYPERDRIVE: { connectionString: 'postgres://unused' },
         KILO_WEB_API_BASE_URL: 'https://snapshot.test',
-        GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'legacy',
         INTERNAL_API_SECRET: { get: async () => 'test-internal-secret' },
         EXPO_ACCESS_TOKEN: { get: async () => 'test-expo-token' },
         NOTIFICATION_CHANNEL_DO: {

@@ -22,7 +22,6 @@ const env = {
   KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test/',
   AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
   INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
-  BYOC_LOOKUP_SENDER_AUTH: 'legacy',
 } as Env;
 
 function envelope(owner: ByocSource = source, config = AWS_TEST_CONFIGURATION) {
@@ -152,7 +151,7 @@ describe('AWS BYOC connection authority', () => {
       const stsEnv = {
         ...env,
         KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
-        BYOC_LOOKUP_SENDER_AUTH: undefined,
+        BYOC_LOOKUP_SENDER_AUTH: 'sts',
         INTERNAL_API_SECRET_PROD: { get: internal },
         STS,
       } as Env;

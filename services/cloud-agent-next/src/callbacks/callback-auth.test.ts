@@ -97,60 +97,60 @@ describe('callbackAuth', () => {
     expect(STS.mintTokens).not.toHaveBeenCalled();
   });
 
-  it('keeps the receiver-issued token under legacy and never mints', async () => {
-    const STS = mintBinding();
-    const target = { url: BOT_URL, headers: { 'X-Bot-Callback-Token': 'derived' } };
-
-    expect(await callbackAuth({ STS, CALLBACK_SENDER_AUTH_WEB: 'legacy' }, target)).toEqual({
-      kind: 'headers',
-      headers: { 'Content-Type': 'application/json', 'X-Bot-Callback-Token': 'derived' },
-    });
-    expect(STS.mintTokens).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, '', 'sts'])(
-    'sends only the STS token to a listed route (switch %j)',
-    async CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST => {
+  it.each([undefined, '', 'legacy'])(
+    'keeps the receiver-issued token and never mints when the switch is %j',
+    async CALLBACK_SENDER_AUTH_WEB => {
       const STS = mintBinding();
-      const target = {
-        url: WEBHOOK_URL,
-        headers: {
-          'X-Callback-Token': 'derived',
-          authorization: 'stale',
-          'x-webhook-namespace': 'ns',
-          'x-webhook-trigger-id': 'trigger',
-          'x-webhook-request-id': 'request',
-        },
-      };
+      const target = { url: BOT_URL, headers: { 'X-Bot-Callback-Token': 'derived' } };
 
-      expect(
-        await callbackAuth({ STS, CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST }, target)
-      ).toEqual({
+      expect(await callbackAuth({ STS, CALLBACK_SENDER_AUTH_WEB }, target)).toEqual({
         kind: 'headers',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-webhook-namespace': 'ns',
-          'x-webhook-trigger-id': 'trigger',
-          'x-webhook-request-id': 'request',
-          Authorization: `Bearer ${MINTED}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-Bot-Callback-Token': 'derived' },
       });
-      expect(STS.mintTokens).toHaveBeenCalledWith({
-        tokens: [
-          {
-            audience: 'webhook-agent-ingest',
-            scope: 'webhook-agent-ingest:execution.callback',
-          },
-        ],
-      });
+      expect(STS.mintTokens).not.toHaveBeenCalled();
     }
   );
+
+  it('sends only the STS token to a listed route under sts', async () => {
+    const STS = mintBinding();
+    const target = {
+      url: WEBHOOK_URL,
+      headers: {
+        'X-Callback-Token': 'derived',
+        authorization: 'stale',
+        'x-webhook-namespace': 'ns',
+        'x-webhook-trigger-id': 'trigger',
+        'x-webhook-request-id': 'request',
+      },
+    };
+
+    expect(
+      await callbackAuth({ STS, CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST: 'sts' }, target)
+    ).toEqual({
+      kind: 'headers',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-namespace': 'ns',
+        'x-webhook-trigger-id': 'trigger',
+        'x-webhook-request-id': 'request',
+        Authorization: `Bearer ${MINTED}`,
+      },
+    });
+    expect(STS.mintTokens).toHaveBeenCalledWith({
+      tokens: [
+        {
+          audience: 'webhook-agent-ingest',
+          scope: 'webhook-agent-ingest:execution.callback',
+        },
+      ],
+    });
+  });
 
   it('applies each receiver switch only to its own routes', async () => {
     const STS = mintBinding();
     const env = {
       STS,
-      CALLBACK_SENDER_AUTH_WEB: 'legacy',
+      CALLBACK_SENDER_AUTH_WEB: undefined,
       CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS: 'sts',
     };
 
@@ -179,11 +179,16 @@ describe('callbackAuth', () => {
   });
 
   it('reports a missing binding and a denial without a token', async () => {
-    expect(await callbackAuth({}, { url: REVIEW_URL })).toEqual({
+    expect(await callbackAuth({ CALLBACK_SENDER_AUTH_WEB: 'sts' }, { url: REVIEW_URL })).toEqual({
       kind: 'unavailable',
       reason: 'sts_binding_missing',
     });
-    expect(await callbackAuth({ STS: mintBinding(deny) }, { url: REVIEW_URL })).toEqual({
+    expect(
+      await callbackAuth(
+        { STS: mintBinding(deny), CALLBACK_SENDER_AUTH_WEB: 'sts' },
+        { url: REVIEW_URL }
+      )
+    ).toEqual({
       kind: 'unavailable',
       reason: 'token_denied',
       deniedReason: 'scope_not_allowed',
@@ -200,7 +205,7 @@ describe('deliverCallbackJob under sts', () => {
       { url: BOT_URL, headers: { 'X-Bot-Callback-Token': 'derived' } },
       payload,
       1,
-      { env: { STS: mintBinding() }, ctx: { waitUntil: vi.fn() } }
+      { env: { STS: mintBinding(), CALLBACK_SENDER_AUTH_WEB: 'sts' }, ctx: { waitUntil: vi.fn() } }
     );
 
     expect(result).toEqual({ type: 'success' });
@@ -218,7 +223,7 @@ describe('deliverCallbackJob under sts', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await deliverCallbackJob({ url: REVIEW_URL }, payload, 1, {
-      env: { STS: mintBinding(deny) },
+      env: { STS: mintBinding(deny), CALLBACK_SENDER_AUTH_WEB: 'sts' },
     });
 
     expect(result).toEqual({ type: 'retry', delaySeconds: 60 });

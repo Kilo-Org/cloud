@@ -89,7 +89,6 @@ function fixture(
       CLOUD_AGENT_SESSION: { idFromName: durableObjectAccess, get: durableObjectAccess },
       SANDBOX_SESSION: { idFromName: durableObjectAccess, get: durableObjectAccess },
       INTERNAL_API_SECRET: 'internal-secret',
-      PR_REFRESH_SENDER_AUTH: 'legacy',
       KILOCODE_BACKEND_BASE_URL: 'https://api.test',
       ...options.env,
     } as unknown as Env,
@@ -281,8 +280,32 @@ describe('refreshHostedWorkspacePullRequest', () => {
       };
     }
 
-    it.each([undefined, '', 'sts'])(
-      'presents only the refresh token to the web origin (switch %j)',
+    it('presents only the refresh token to the web origin', async () => {
+      fetchMock.mockResolvedValueOnce(backendResponse({ status: 'refreshed', retryAt: null }));
+      const STS = stsBinding('issued');
+      const test = fixture({
+        summary: pullRequest(),
+        env: {
+          PR_REFRESH_SENDER_AUTH: 'sts',
+          STS,
+          KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+        },
+      });
+
+      const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+      expect(result.refresh).toEqual({ status: 'refreshed', retryAt: null });
+      expect(STS.mintTokens).toHaveBeenCalledWith({
+        tokens: [WEB_HOSTED_WORKSPACE_PR_REFRESH],
+      });
+      expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+        'content-type': 'application/json',
+        authorization: `Bearer ${MINTED}`,
+      });
+    });
+
+    it.each(['', 'legacy'])(
+      'keeps the internal secret and never mints when the switch is %j',
       async PR_REFRESH_SENDER_AUTH => {
         fetchMock.mockResolvedValueOnce(backendResponse({ status: 'refreshed', retryAt: null }));
         const STS = stsBinding('issued');
@@ -291,15 +314,12 @@ describe('refreshHostedWorkspacePullRequest', () => {
           env: { PR_REFRESH_SENDER_AUTH, STS, KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai' },
         });
 
-        const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+        await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
 
-        expect(result.refresh).toEqual({ status: 'refreshed', retryAt: null });
-        expect(STS.mintTokens).toHaveBeenCalledWith({
-          tokens: [WEB_HOSTED_WORKSPACE_PR_REFRESH],
-        });
+        expect(STS.mintTokens).not.toHaveBeenCalled();
         expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
           'content-type': 'application/json',
-          authorization: `Bearer ${MINTED}`,
+          'x-internal-api-key': 'internal-secret',
         });
       }
     );

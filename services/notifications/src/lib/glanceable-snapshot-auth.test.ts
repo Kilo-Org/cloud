@@ -62,18 +62,34 @@ function authEnv(vars: Partial<GlanceableSnapshotAuthEnv>): GlanceableSnapshotAu
   return { SECRETS_SOURCE: 'secrets-store', ...vars };
 }
 
+function stsEnv(vars: Partial<GlanceableSnapshotAuthEnv>): GlanceableSnapshotAuthEnv {
+  return authEnv({ GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'sts', ...vars });
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('glanceableSnapshotAuth', () => {
+  it('sends only a web snapshot token under sts', async () => {
+    const STS = mintBinding(issue);
+    const internal = storeSecret(SECRET);
+    const env = stsEnv({ STS, INTERNAL_API_SECRET: internal });
+
+    const auth = await glanceableSnapshotAuth(env, WEB_PRODUCTION_ORIGIN, lifetime());
+
+    expect(auth).toEqual({ kind: 'headers', headers: { authorization: `Bearer ${TOKEN}` } });
+    expect(STS.mintTokens).toHaveBeenCalledWith({ tokens: [GLANCEABLE_SNAPSHOT_READ] });
+    expect(internal.get).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['unset', undefined],
     ['empty', ''],
-    ['sts', 'sts'],
+    ['legacy', 'legacy'],
   ])(
-    'sends only a web snapshot token when the switch is %s',
+    'sends the internal secret and never mints when the switch is %s',
     async (_label, GLANCEABLE_SNAPSHOT_SENDER_AUTH) => {
       const STS = mintBinding(issue);
       const internal = storeSecret(SECRET);
@@ -81,26 +97,10 @@ describe('glanceableSnapshotAuth', () => {
 
       const auth = await glanceableSnapshotAuth(env, WEB_PRODUCTION_ORIGIN, lifetime());
 
-      expect(auth).toEqual({ kind: 'headers', headers: { authorization: `Bearer ${TOKEN}` } });
-      expect(STS.mintTokens).toHaveBeenCalledWith({ tokens: [GLANCEABLE_SNAPSHOT_READ] });
-      expect(internal.get).not.toHaveBeenCalled();
+      expect(auth).toEqual({ kind: 'headers', headers: { 'x-internal-secret': SECRET } });
+      expect(STS.mintTokens).not.toHaveBeenCalled();
     }
   );
-
-  it('sends the internal secret under legacy and never mints', async () => {
-    const STS = mintBinding(issue);
-    const internal = storeSecret(SECRET);
-    const env = authEnv({
-      GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'legacy',
-      STS,
-      INTERNAL_API_SECRET: internal,
-    });
-
-    const auth = await glanceableSnapshotAuth(env, WEB_PRODUCTION_ORIGIN, lifetime());
-
-    expect(auth).toEqual({ kind: 'headers', headers: { 'x-internal-secret': SECRET } });
-    expect(STS.mintTokens).not.toHaveBeenCalled();
-  });
 
   it.each([
     ['empty', storeSecret('')],
@@ -142,7 +142,7 @@ describe('glanceableSnapshotAuth', () => {
     'not a url',
   ])('never mints a token for the base URL %s', async baseUrl => {
     const STS = mintBinding(issue);
-    const env = authEnv({ STS });
+    const env = stsEnv({ STS });
 
     expect(await glanceableSnapshotAuth(env, baseUrl, lifetime())).toEqual({
       kind: 'unavailable',
@@ -152,7 +152,7 @@ describe('glanceableSnapshotAuth', () => {
   });
 
   it('accepts a base URL with a path on the production origin', async () => {
-    const env = authEnv({ STS: mintBinding(issue) });
+    const env = stsEnv({ STS: mintBinding(issue) });
 
     expect(await glanceableSnapshotAuth(env, `${WEB_PRODUCTION_ORIGIN}/`, lifetime())).toEqual({
       kind: 'headers',
@@ -162,7 +162,7 @@ describe('glanceableSnapshotAuth', () => {
 
   it('reports a missing STS binding under sts and never reads the secret', async () => {
     const internal = storeSecret(SECRET);
-    const env = authEnv({ INTERNAL_API_SECRET: internal });
+    const env = stsEnv({ INTERNAL_API_SECRET: internal });
 
     expect(await glanceableSnapshotAuth(env, WEB_PRODUCTION_ORIGIN, lifetime())).toEqual({
       kind: 'unavailable',
@@ -173,7 +173,7 @@ describe('glanceableSnapshotAuth', () => {
 
   it('reports a denied token with its reason and no fallback', async () => {
     const internal = storeSecret(SECRET);
-    const env = authEnv({ STS: mintBinding(deny), INTERNAL_API_SECRET: internal });
+    const env = stsEnv({ STS: mintBinding(deny), INTERNAL_API_SECRET: internal });
 
     expect(await glanceableSnapshotAuth(env, WEB_PRODUCTION_ORIGIN, lifetime())).toEqual({
       kind: 'unavailable',
@@ -184,7 +184,7 @@ describe('glanceableSnapshotAuth', () => {
   });
 
   it('reports an unanswered mint as unavailable', async () => {
-    const env = authEnv({
+    const env = stsEnv({
       STS: mintBinding(() => ({ status: 'unavailable', retryAfterSeconds: 5 })),
     });
 
@@ -200,6 +200,7 @@ describe('glanceable snapshot request under sts', () => {
     return {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
       KILO_WEB_API_BASE_URL: WEB_PRODUCTION_ORIGIN,
+      GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'sts',
       INTERNAL_API_SECRET: storeSecret(SECRET),
       STS,
     };

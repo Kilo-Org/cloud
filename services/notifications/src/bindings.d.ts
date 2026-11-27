@@ -16,7 +16,7 @@ declare global {
     // bundle and the service-token mint.
     STS?: Service & BundleBinding & MintBinding;
     // The glanceable snapshot request's credential switch
-    // (`lib/glanceable-snapshot-auth.ts`, ENVIRONMENT.md): unset means `sts`.
+    // (`lib/glanceable-snapshot-auth.ts`, ENVIRONMENT.md): unset means `legacy`.
     GLANCEABLE_SNAPSHOT_SENDER_AUTH?: string;
     // Local dev / E2E push sink mode. Absent from `wrangler.jsonc` (which
     // is single-config production); supplied via `.dev.vars` by

@@ -48,7 +48,6 @@ const env = {
   KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
   AGENT_ENV_VARS_PRIVATE_KEY: keys.privateKey,
   INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
-  BYOC_LOOKUP_SENDER_AUTH: 'legacy',
 } as Env;
 
 type CredentialOwnerInput = {

@@ -100,15 +100,6 @@ function withStrictlyPublicFetch(config) {
   return config;
 }
 
-/** Every outbound credential switch (src/sts-service-tokens.ts) on its shared credential. */
-const E2E_LEGACY_SENDER_AUTH = {
-  BYOC_LOOKUP_SENDER_AUTH: 'legacy',
-  PR_REFRESH_SENDER_AUTH: 'legacy',
-  CALLBACK_SENDER_AUTH_WEB: 'legacy',
-  CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST: 'legacy',
-  CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS: 'legacy',
-};
-
 export function buildE2eWorkerConfig(sourceConfig, overrides) {
   const { workerUrl, kiloOpenRouterBase } = overrides;
   const config = structuredClone(sourceConfig);
@@ -188,8 +179,7 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);
   // The production config binds production STS as `cloud-agent-next`. An e2e Worker is not that
-  // workload: it binds no STS, so it can mint no production token, and every outbound switch
-  // stays on its shared credential.
+  // workload: it binds no STS, so it can mint no production token.
   config.services = (config.services ?? []).filter(binding => binding.service !== 'sts');
 
   config.vars = {
@@ -208,7 +198,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // The suite runs every scenario through one funded test account, so its own
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
-    ...E2E_LEGACY_SENDER_AUTH,
   };
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];

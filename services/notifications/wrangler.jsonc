@@ -13,7 +13,8 @@
   "observability": { "enabled": true, "traces": { "enabled": false } },
   // Item 9 internal-auth counter (design section 9.4): no Logpush here, so each
   // `kilo_internal_auth` line also becomes one Analytics Engine data point. `o11y` reads this
-  // dataset once a minute and emits the same line to Axiom. Counter rows only.
+  // dataset once a minute and emits the same line to Axiom. At most two writes per bucket per
+  // isolate per minute.
   "analytics_engine_datasets": [
     { "binding": "INTERNAL_AUTH_COUNTER", "dataset": "kilo_internal_auth" },
   ],

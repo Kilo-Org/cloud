@@ -30,10 +30,12 @@ scopes:
   - o11y:api-metrics.write
   - o11y:alerting.read
   - o11y:alerting.write
-# UTS grants, development only until phase 4's activation go; staging and production are each a
-# key added below. The web app reads the UTS revocation feed (uts-feed), ends or revokes a
-# subject's sessions and credentials (uts), and signs its kilo-web client assertion with
+# UTS grants, development only until phase 4's activation go; staging and production get them as
+# additions to their keys below. The web app reads the UTS revocation feed (uts-feed), ends or
+# revokes a subject's sessions and credentials (uts), and signs its kilo-web client assertion with
 # UTS_KILO_WEB_CLIENT_KEY (UTS_KILO_WEB_CLIENT_KEY_NEXT during a rotation).
+# INTERNAL_API_SECRET, staging and production only: the internal API secret read under
+# SECRETS_SOURCE=sts (packages/web-shared/src/lib/sts-secret-reader.ts); previews keep `env`.
 environmentGrants:
   development:
     audiences:
@@ -47,3 +49,9 @@ environmentGrants:
     secrets:
       - UTS_KILO_WEB_CLIENT_KEY
       - UTS_KILO_WEB_CLIENT_KEY_NEXT
+  staging:
+    secrets:
+      - INTERNAL_API_SECRET
+  production:
+    secrets:
+      - INTERNAL_API_SECRET

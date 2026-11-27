@@ -451,9 +451,11 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
+| `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
@@ -481,6 +483,12 @@ Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every `a
 development STS, the same as `web`'s development grants. If fork or outside pull-request previews
 are ever enabled on that project, these grants need a review first.
 
+`web` and `ai-gateway` read `INTERNAL_API_SECRET` from their bundle only when the deployment's
+`SECRETS_SOURCE` is `sts` (`packages/web-shared/src/lib/sts-secret-reader.ts`), from
+`/workloads/web` or `/workloads/ai-gateway` if the name is there, else from `/shared`. The grant is
+in staging and production only: previews read development STS and keep `env`, so no preview build
+can read the key; a preview flip adds a `development` key.
+
 Workloads with a policy, all over `worker-binding`:
 
 | Workload | Environments | Worker config |
@@ -490,6 +498,7 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-webhook-agent-ingest` | production | `services/webhook-agent-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.

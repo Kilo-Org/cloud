@@ -29,11 +29,18 @@ scopes:
   - o11y:api-metrics.write
   - ai-gateway-secure-proxy:request.forward
 # The authenticated UTS HTTPS feed transport reads the revocation feed with a uts-feed token.
-# Development only until phase 4's activation go; staging and production are each a key added
-# below.
+# Development only until phase 4's activation go; staging and production get it as an addition to
+# their keys below. INTERNAL_API_SECRET, staging and production only: the internal API secret read
+# under SECRETS_SOURCE=sts (packages/web-shared/src/lib/sts-secret-reader.ts); previews keep `env`.
 environmentGrants:
   development:
     audiences:
       - uts-feed
     scopes:
       - uts-feed:revocation.read
+  staging:
+    secrets:
+      - INTERNAL_API_SECRET
+  production:
+    secrets:
+      - INTERNAL_API_SECRET

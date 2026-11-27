@@ -84,6 +84,7 @@ import { drainPaidBillingOutbox } from './paid-billing';
 import { STAGE_SLICE_MAX_SLOTS } from './d1-limits';
 import { minimumCaseRevisions } from './measurement-revision';
 import { variantFromStorage } from './reasoning-effort';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 /** How long a displayed quote stays confirmable. */
 export const PAID_QUOTE_TTL_MS = 30 * 60 * 1000;
@@ -1164,7 +1165,7 @@ async function readUsageReceipts(
   const remaining = (limits.deadline ?? Date.now() + 10_000) - Date.now();
   const timeout = AbortSignal.timeout(Math.max(1, Math.min(10_000, remaining)));
   const signal = limits.signal ? AbortSignal.any([limits.signal, timeout]) : timeout;
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
   let response: Response;
   try {
     response = await fetchImpl(new URL(BENCHMARK_USAGE_RECEIPTS_PATH, env.KILO_WEB_API_BASE_URL), {

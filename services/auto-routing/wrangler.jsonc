@@ -20,8 +20,11 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": true,
+    "traces": { "enabled": false },
   },
   "hyperdrive": [
     {
@@ -34,6 +37,10 @@
     "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
     "KILO_AI_GATEWAY_BASE_URL": "https://ai-gateway.kilo.ai",
+    // Where every runtime secret read goes: `env` (the Secrets Store binding below) or `sts` (the
+    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
+    // read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "env",
   },
   "durable_objects": {
     "bindings": [
@@ -63,7 +70,18 @@
       "dataset": "auto_routing_classifier_metrics_v2",
     },
   ],
-  "services": [{ "binding": "BENCHMARK_SERVICE", "service": "auto-routing-benchmark" }],
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // auto-routing.yaml grants its five secrets. Nothing reads it while SECRETS_SOURCE is `env`.
+  "services": [
+    { "binding": "BENCHMARK_SERVICE", "service": "auto-routing-benchmark" },
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "auto-routing" },
+    },
+  ],
 
   "kv_namespaces": [
     {

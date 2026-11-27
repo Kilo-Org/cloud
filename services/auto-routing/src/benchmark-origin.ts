@@ -18,6 +18,7 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import { readAutoRoutingSecret } from './secrets';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 
@@ -26,7 +27,7 @@ async function fetchBenchmark(
   path: string,
   init?: RequestInit
 ): Promise<Response> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET');
   return env.BENCHMARK_SERVICE.fetch(`https://auto-routing-benchmark${path}`, {
     ...init,
     headers: {

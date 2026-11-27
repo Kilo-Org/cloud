@@ -85,6 +85,7 @@ import type {
   TrialInactivityStopCandidateQueueMessage,
 } from './types.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
+import { readKiloclawBillingSecret } from './secrets.js';
 import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowflake.js';
 
 const MS_PER_DAY = 86_400_000;
@@ -1015,10 +1016,10 @@ async function callBillingSideEffect<T extends SideEffectRequest>(
   request: T,
   entityFields: BillingEntityFields = {}
 ): Promise<SideEffectResponse<T>> {
-  if (!env.INTERNAL_API_SECRET) {
+  const internalApiSecret = await readKiloclawBillingSecret(env, 'INTERNAL_API_SECRET');
+  if (!internalApiSecret) {
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
-  const internalApiSecret = env.INTERNAL_API_SECRET;
 
   const billingCallId = crypto.randomUUID();
   const startedAt = performance.now();
@@ -1083,10 +1084,10 @@ async function requestKiloClaw<T>(
   entityFields: BillingEntityFields = {},
   options: { handledErrorStatuses?: readonly number[] } = {}
 ): Promise<T> {
-  if (!env.INTERNAL_API_SECRET) {
+  const internalApiSecret = await readKiloclawBillingSecret(env, 'INTERNAL_API_SECRET');
+  if (!internalApiSecret) {
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
-  const internalApiSecret = env.INTERNAL_API_SECRET;
 
   const billingCallId = crypto.randomUUID();
   const startedAt = performance.now();
@@ -5357,7 +5358,7 @@ async function runTrialInactivityStopSweep(
     return;
   }
 
-  const missingSnowflakeConfig = getMissingSnowflakeConfig(env);
+  const missingSnowflakeConfig = await getMissingSnowflakeConfig(env);
   if (missingSnowflakeConfig.length > 0) {
     summary.errors++;
     log('error', 'Skipping trial inactivity stop due to missing Snowflake config', {

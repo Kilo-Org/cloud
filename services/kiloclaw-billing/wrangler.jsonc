@@ -13,8 +13,11 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": true,
+    "traces": { "enabled": false },
   },
   "limits": {
     "cpu_ms": 120000,
@@ -33,6 +36,10 @@
     "SNOWFLAKE_WAREHOUSE": "WH_KILOCODE",
     "SNOWFLAKE_DATABASE": "KILO_DW",
     "SNOWFLAKE_SCHEMA": "DBT_PROD",
+    // Where every runtime secret read goes: `env` (the plain Worker secrets listed below) or `sts`
+    // (the bundle over the `STS` binding). An absent value means `env`; any other value refuses
+    // every read. The `sts` source never falls back to the Worker secrets.
+    "SECRETS_SOURCE": "env",
   },
   "hyperdrive": [
     {
@@ -76,6 +83,16 @@
       "binding": "KILOCLAW",
       "service": "kiloclaw",
       "environment": "production",
+    },
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // kiloclaw-billing.yaml grants INTERNAL_API_SECRET and the two Snowflake names. Nothing reads
+    // it while SECRETS_SOURCE is `env`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "kiloclaw-billing" },
     },
   ],
   // Secrets:

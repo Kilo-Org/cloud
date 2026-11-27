@@ -1,6 +1,7 @@
 import { importPKCS8, SignJWT } from 'jose';
 
 import type { BillingLogFields } from './logger.js';
+import { readKiloclawBillingSecret } from './secrets.js';
 import type { BillingWorkerEnv } from './types.js';
 
 const SNOWFLAKE_JWT_ALGORITHM = 'RS256';
@@ -290,7 +291,21 @@ async function pollStatement(params: {
   throw new Error('Snowflake statement poll timed out');
 }
 
-export function getMissingSnowflakeConfig(env: BillingWorkerEnv): string[] {
+/** The two Snowflake credentials, read through the STS-flagged reader. */
+async function snowflakeSecretValues(
+  env: BillingWorkerEnv
+): Promise<{ privateKeyPem: string; publicKeyFingerprint: string }> {
+  const [privateKeyPem, publicKeyFingerprint] = await Promise.all([
+    readKiloclawBillingSecret(env, 'SNOWFLAKE_PRIVATE_KEY_PEM'),
+    readKiloclawBillingSecret(env, 'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT'),
+  ]);
+  return { privateKeyPem, publicKeyFingerprint };
+}
+
+function missingSnowflakeConfig(
+  env: BillingWorkerEnv,
+  secrets: { privateKeyPem: string; publicKeyFingerprint: string }
+): string[] {
   const configEntries = [
     ['SNOWFLAKE_ACCOUNT_HOST', env.SNOWFLAKE_ACCOUNT_HOST],
     ['SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER', env.SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER],
@@ -299,8 +314,8 @@ export function getMissingSnowflakeConfig(env: BillingWorkerEnv): string[] {
     ['SNOWFLAKE_WAREHOUSE', env.SNOWFLAKE_WAREHOUSE],
     ['SNOWFLAKE_DATABASE', env.SNOWFLAKE_DATABASE],
     ['SNOWFLAKE_SCHEMA', env.SNOWFLAKE_SCHEMA],
-    ['SNOWFLAKE_PRIVATE_KEY_PEM', env.SNOWFLAKE_PRIVATE_KEY_PEM],
-    ['SNOWFLAKE_PUBLIC_KEY_FINGERPRINT', env.SNOWFLAKE_PUBLIC_KEY_FINGERPRINT],
+    ['SNOWFLAKE_PRIVATE_KEY_PEM', secrets.privateKeyPem],
+    ['SNOWFLAKE_PUBLIC_KEY_FINGERPRINT', secrets.publicKeyFingerprint],
   ] as const;
 
   return configEntries
@@ -308,8 +323,15 @@ export function getMissingSnowflakeConfig(env: BillingWorkerEnv): string[] {
     .map(([key]) => key);
 }
 
-export function resolveSnowflakeConfig(env: BillingWorkerEnv): SnowflakeConfig | null {
-  if (getMissingSnowflakeConfig(env).length > 0) {
+export async function getMissingSnowflakeConfig(env: BillingWorkerEnv): Promise<string[]> {
+  return missingSnowflakeConfig(env, await snowflakeSecretValues(env));
+}
+
+export async function resolveSnowflakeConfig(
+  env: BillingWorkerEnv
+): Promise<SnowflakeConfig | null> {
+  const secrets = await snowflakeSecretValues(env);
+  if (missingSnowflakeConfig(env, secrets).length > 0) {
     return null;
   }
 
@@ -321,8 +343,8 @@ export function resolveSnowflakeConfig(env: BillingWorkerEnv): SnowflakeConfig |
     warehouse: env.SNOWFLAKE_WAREHOUSE ?? '',
     database: env.SNOWFLAKE_DATABASE ?? '',
     schema: env.SNOWFLAKE_SCHEMA ?? '',
-    privateKeyPem: env.SNOWFLAKE_PRIVATE_KEY_PEM ?? '',
-    publicKeyFingerprint: env.SNOWFLAKE_PUBLIC_KEY_FINGERPRINT ?? '',
+    privateKeyPem: secrets.privateKeyPem,
+    publicKeyFingerprint: secrets.publicKeyFingerprint,
   };
 }
 
@@ -335,7 +357,7 @@ export async function queryKiloclawActiveUserIds(params: {
     return new Set();
   }
 
-  const config = resolveSnowflakeConfig(params.env);
+  const config = await resolveSnowflakeConfig(params.env);
   if (!config) {
     throw new Error('Snowflake configuration is incomplete');
   }

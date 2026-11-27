@@ -30,6 +30,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { findEffectiveOrganizationMemberRole } from '@kilocode/worker-utils/organization-membership';
 import * as z from 'zod';
+import { readAutoRoutingSecret } from './secrets';
 
 export class CustomRouterError extends Error {
   readonly code: CustomRouterErrorCode;
@@ -82,7 +83,12 @@ export function clearEmailDomainBlacklistCache(): void {
 }
 
 async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTokenPayload> {
-  const secret = await getCachedSecret(env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
+  // A lazy binding, not an eager read: `getCachedSecret` keeps the resolved value for the
+  // isolate, so one read serves every later request whichever source `SECRETS_SOURCE` selects.
+  const secret = await getCachedSecret(
+    { get: () => readAutoRoutingSecret(env, 'NEXTAUTH_SECRET') },
+    'NEXTAUTH_SECRET'
+  );
   let payload: KiloTokenPayload;
   try {
     // The CLI presents its gateway token, so accept exactly the audiences the gateway accepts.

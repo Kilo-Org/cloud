@@ -1,5 +1,6 @@
 import type { SystemOneClient } from '@kilocode/auto-routing-contracts/classifier';
 import { ttlCached } from '@kilocode/worker-utils';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 type OpenRouterEnv = Pick<Env, 'OPENROUTER_API_KEY'>;
 
@@ -12,7 +13,7 @@ export const OPENROUTER_APP_TITLE = 'Kilo Code';
 const API_KEY_CACHE_TTL_MS = 300_000;
 
 const apiKeyCache = ttlCached(API_KEY_CACHE_TTL_MS, async (env: OpenRouterEnv) => {
-  const apiKey = await env.OPENROUTER_API_KEY.get();
+  const apiKey = await readAutoRoutingBenchmarkSecret(env, 'OPENROUTER_API_KEY');
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured');
   return apiKey;
 });

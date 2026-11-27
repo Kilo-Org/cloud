@@ -7,6 +7,7 @@ import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-po
 import { logger } from './logger';
 import type { HonoContext } from '../ai-attribution.worker';
 import { OrganizationJWTPayload } from '../schemas';
+import { readAiAttributionSecret } from '../secrets';
 import {
   findAttributionIdentityRefusal,
   type AttributionIdentityClaims,
@@ -79,7 +80,7 @@ export async function validateKiloToken(
 export const authMiddleware = createMiddleware<HonoContext>(async (c, next) => {
   const result = await validateKiloToken(
     c.req.header('Authorization') ?? null,
-    await c.env.NEXTAUTH_SECRET.get()
+    await readAiAttributionSecret(c.env, 'NEXTAUTH_SECRET')
   );
 
   if (!result.success) {

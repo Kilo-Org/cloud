@@ -291,12 +291,12 @@ describe('queryKiloclawActiveUserIds', () => {
 });
 
 describe('getMissingSnowflakeConfig', () => {
-  it('reports missing required Snowflake env vars', () => {
+  it('reports missing required Snowflake env vars', async () => {
     const env = createEnv();
     env.SNOWFLAKE_ACCOUNT_HOST = '';
-    env.SNOWFLAKE_PRIVATE_KEY_PEM = undefined;
+    env.SNOWFLAKE_PRIVATE_KEY_PEM = '';
 
-    expect(getMissingSnowflakeConfig(env)).toEqual([
+    await expect(getMissingSnowflakeConfig(env)).resolves.toEqual([
       'SNOWFLAKE_ACCOUNT_HOST',
       'SNOWFLAKE_PRIVATE_KEY_PEM',
     ]);

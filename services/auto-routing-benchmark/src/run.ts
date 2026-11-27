@@ -237,6 +237,7 @@ import { BenchmarkProbeFamilyError, runCancellableProbeCase } from './probe/exec
 import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
 import { pauseUnfundedPaidRequests } from './paid-benchmark';
 import { PaidBenchmarkPlanSchema } from './paid-benchmark-plan';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
 export type RunModelEntry = {
@@ -3146,7 +3147,7 @@ async function caseInferenceProxy(
     kiloApiUrl: string;
   }
 ): Promise<CaseInferenceProxy> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
   if (!secret) throw new Error('benchmark case inference secret is unavailable');
   const issued = await issueCaseInferenceCapability(secret, {
     engineIdentity: input.engineIdentity,

@@ -1,4 +1,5 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   UsageRecordRequestSchema,
   toUsageRecordWireBody,
@@ -12,6 +13,7 @@ import {
 } from '@kilocode/worker-utils/usage-writer-client';
 import { ZodError } from 'zod';
 import type { DecisionScope } from './decision-cache';
+import { readAutoRoutingSecret } from './secrets';
 
 export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
 
@@ -118,12 +120,13 @@ export async function buildClassifierUsage(
 
 export async function writeClassifierUsage(
   env: Pick<ClassifierUsageEnv, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
-  usage: UsageRecordRequest
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
   try {
     return await recordLlmUsage(usage, {
       url: new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href,
-      secret: await env.INTERNAL_API_SECRET_PROD.get(),
+      secret: await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx),
     });
   } catch {
     return { kind: 'unavailable', reason: 'missing_config' };

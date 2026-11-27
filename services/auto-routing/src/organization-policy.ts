@@ -4,6 +4,7 @@ import {
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
+import { readAutoRoutingSecret } from './secrets';
 
 const POLICY_CACHE_TTL_MS = 60_000;
 const POLICY_CACHE_LIMIT = 2_000;
@@ -45,7 +46,7 @@ async function fetchDeniedModelIds(
   const res = await fetch(new URL(AUTO_ROUTING_DENIED_MODELS_PATH, env.KILO_AI_GATEWAY_BASE_URL), {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${await env.INTERNAL_API_SECRET_PROD.get()}`,
+      authorization: `Bearer ${await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET')}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify(request),

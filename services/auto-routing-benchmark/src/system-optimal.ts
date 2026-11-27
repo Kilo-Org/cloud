@@ -28,6 +28,7 @@ import {
 } from './subscriptions';
 import { isGradedSweepResult, summarizeSweep } from './scoreboard/sweep';
 import type { OfflineSweep, OfflineSweepSummary } from './scoreboard/schema';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 export const MIN_ACCURACY_GRID = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9] as const;
 export const ACCURACY_NOISE_BAND_GRID = [0, 0.02, 0.05, 0.08, 0.1] as const;
@@ -270,7 +271,7 @@ export function optimizeThresholdPolicy(params: {
  */
 export async function fetchProductionAutoMetrics(env: Env): Promise<ProductionAutoMetrics | null> {
   try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
+    const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
     const response = await fetch(
       `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/production-profile`,
       {

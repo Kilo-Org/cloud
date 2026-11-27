@@ -30,6 +30,7 @@ import {
   isPinOnlyPlan,
   type PaidBenchmarkPlan,
 } from './paid-benchmark-plan';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 const DELIVERY_TIMEOUT_MS = 10_000;
 
@@ -40,7 +41,7 @@ export type PaidBillingEnv = {
 };
 
 async function internalHeaders(env: PaidBillingEnv): Promise<Record<string, string>> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
   // Both headers carry the same shared secret; the web accepts either spelling.
   return { 'content-type': 'application/json', 'x-internal-api-key': secret };
 }

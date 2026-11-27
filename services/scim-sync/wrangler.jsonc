@@ -24,8 +24,11 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": true,
+    "traces": { "enabled": false },
   },
   "logpush": true,
   // Watchdog only. The Durable Object reschedules its own alarm after every
@@ -58,7 +61,24 @@
     // events. It can only be an event ID: `after` and `range_start` are
     // mutually exclusive in the Events API.
     "WORKOS_EVENT_CURSOR": "",
+    // Where every runtime secret read goes: `env` (the Secrets Store bindings below) or `sts` (the
+    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
+    // read. The `sts` source never falls back to the Secrets Store. `env.staging` deploys no STS
+    // binding, so it keeps the default.
+    "SECRETS_SOURCE": "env",
   },
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // cloudflare-scim-sync.yaml grants WORKOS_API_KEY, WORKOS_CLIENT_ID and INTERNAL_API_SECRET.
+  // Nothing reads it while SECRETS_SOURCE is `env`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloudflare-scim-sync" },
+    },
+  ],
   // One key pair per WorkOS environment. The Events API is scoped to whichever
   // WorkOS environment issued the key, so these names are what decide which
   // directory stream a deployment consumes — not `ENVIRONMENT`.
@@ -117,6 +137,10 @@
     "staging": {
       "name": "cloudflare-scim-sync-staging",
       "workers_dev": false,
+      // A config that binds STS names its schedule in every block
+      // (services/sts/test/repo/worker-configs.ts); staging keeps the same watchdog cron as
+      // production.
+      "triggers": { "crons": ["*/5 * * * *"] },
       "vars": {
         "ENVIRONMENT": "staging",
         "BACKEND_API_URL": "https://staging-app.kilo.ai",

@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@kilocode/scim-contracts": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@workos-inc/node": "catalog:",
     "drizzle-orm": "catalog:",

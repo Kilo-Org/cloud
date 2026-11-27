@@ -6,6 +6,7 @@ import {
 import type { Handler } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
+import { readAutoRoutingSecret } from './secrets';
 
 // The v2 dataset starts at the 2026-06-11 slim-mirror cutover (PR #3975).
 // The original auto_routing_classifier_metrics dataset holds old-schema rows
@@ -223,7 +224,7 @@ export const classifierAnalyticsHandler: Handler<HonoEnv> = async c => {
   let modelRows: ClassifierModelBreakdownRow[];
 
   try {
-    const apiToken = await c.env.O11Y_CF_AE_API_TOKEN.get();
+    const apiToken = await readAutoRoutingSecret(c.env, 'O11Y_CF_AE_API_TOKEN');
     [summaryRows, statusRows, taskRows, subtypeRows, modelRows] = await Promise.all([
       queryAnalyticsEngine(c.env, apiToken, buildSummaryQuery(period), SummaryRowSchema),
       queryAnalyticsEngine(

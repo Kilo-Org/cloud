@@ -29,6 +29,7 @@ import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader'
 import type { Context, Handler } from 'hono';
 import type * as z from 'zod';
 import { customRouterBenchmarkContext, forwardClientEval } from './benchmark-origin';
+import { readAutoRoutingSecret } from './secrets';
 import {
   authenticateCaller,
   CustomRouterError,
@@ -329,7 +330,12 @@ export const publicDecideHandler = publicHandler(async c => {
           }
         : {}),
     },
-    await getCachedSecret(c.env.AUTO_ROUTING_DECISION_SECRET, 'AUTO_ROUTING_DECISION_SECRET')
+    // A lazy binding, not an eager read: `getCachedSecret` keeps the resolved value for the
+    // isolate, so one read serves every later request whichever source `SECRETS_SOURCE` selects.
+    await getCachedSecret(
+      { get: () => readAutoRoutingSecret(c.env, 'AUTO_ROUTING_DECISION_SECRET') },
+      'AUTO_ROUTING_DECISION_SECRET'
+    )
   );
   return c.json({ decision, decisionId } satisfies CustomRouterDecideResponse);
 });

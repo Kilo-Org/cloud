@@ -40,6 +40,7 @@ import type { Context, Hono } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
 import { BENCHMARK_CASE_HEADER, verifyCaseInferenceCapability } from './case-inference-capability';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 import {
   admitPaidModelRequestStatements,
   readPaidCaseRun,
@@ -928,7 +929,7 @@ export async function createCaseInferenceDeps(
   env: CaseInferenceBindings,
   fetchImpl?: typeof fetch
 ): Promise<CaseInferenceDeps> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
   const selectPayer: CaseInferencePayerResolver = async ({ invocation, api, modelRequestId }) => {
     const key = caseKeyFromInvocation(invocation);
     const run = await readPaidCaseRun(env.BENCH_DB, key);
@@ -1301,7 +1302,7 @@ export async function handleCaseAdmit(
   authorization: string | null,
   body: unknown
 ): Promise<Response> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET');
   if (!(await authorizedInternalBearer(authorization, secret)))
     return jsonResponse({ error: { code: 'unauthorized', message: 'Not authorized.' } }, 401);
   const parsed = BenchmarkCaseAdmitRequestSchema.safeParse(body);

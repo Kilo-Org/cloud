@@ -131,7 +131,7 @@ describe('leaderboard usage rollup', () => {
       slices: 288,
       durationMs: expect.any(Number),
       slowestSliceMs: expect.any(Number),
-      replayWaitMs: 0,
+      replayWaitMs: expect.any(Number),
       conflictRetries: 0,
     });
     const shared = {
@@ -349,7 +349,7 @@ describe('leaderboard usage rollup', () => {
       deadline: Date.now(),
     });
 
-    expect(build).toBeNull();
+    expect(build).toEqual({ stopped: 'deadline' });
     expect((await rollupRows()).map(row => row.request_count)).toEqual([1]);
   });
 
@@ -377,7 +377,7 @@ describe('leaderboard usage rollup', () => {
       stage: 'read',
       sliceStart: '2026-11-10T00:00:00.000Z',
       slicesCompleted: 0,
-      replayWaitMs: 0,
+      replayWaitMs: expect.any(Number),
       conflictRetries: 0,
       durationMs: expect.any(Number),
       errorName: 'Error',
@@ -446,14 +446,150 @@ describe('leaderboard usage rollup', () => {
       },
     } as unknown as DrizzleDatabase;
 
-    const waitedMs = await waitForReplayCatchUp(replicaDb);
+    const catchUp = await waitForReplayCatchUp(replicaDb);
 
-    expect(waitedMs).toBeGreaterThanOrEqual(90);
+    expect(catchUp.status).toBe('caught_up');
+    expect(catchUp.waitedMs).toBeGreaterThanOrEqual(90);
     expect(queries).toHaveLength(3);
     expect(replies).toEqual([]);
   });
 
   test('does not wait on a primary', async () => {
-    await expect(waitForReplayCatchUp(db)).resolves.toBe(0);
+    await expect(waitForReplayCatchUp(db)).resolves.toEqual({
+      status: 'caught_up',
+      waitedMs: expect.any(Number),
+    });
+  });
+
+  // Each probe of a replica that never catches up advances the fake clock by
+  // `msPerQuery`, so the waits end on time without sleeping through them.
+  function laggingReplica(clock: ReturnType<typeof fakeClock>, msPerQuery: number) {
+    const transaction = jest.fn(async () => {
+      throw new Error('a slice must not start');
+    });
+    const readDb = {
+      execute: async (query: Parameters<DrizzleDatabase['execute']>[0]) => {
+        clock.advance(msPerQuery);
+        return JSON.stringify(query).includes('receive_lsn')
+          ? { rows: [{ receive_lsn: '3E72/CFDFAC50' }] }
+          : { rows: [{ caught_up: false }] };
+      },
+      transaction,
+    } as unknown as DrizzleDatabase;
+    return { readDb, transaction };
+  }
+
+  function fakeClock() {
+    let now = Date.parse('2026-11-27T15:00:00.000Z');
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    return {
+      now: () => now,
+      advance: (ms: number) => {
+        now += ms;
+      },
+      restore: () => spy.mockRestore(),
+    };
+  }
+
+  test('reports a replica that stays behind instead of waiting forever', async () => {
+    const clock = fakeClock();
+    try {
+      const { readDb } = laggingReplica(clock, 31_000);
+
+      await expect(waitForReplayCatchUp(readDb)).resolves.toEqual({
+        status: 'timed_out',
+        waitedMs: 62_000,
+      });
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('stops waiting for replay at the deadline', async () => {
+    const clock = fakeClock();
+    try {
+      const { readDb } = laggingReplica(clock, 1_000);
+
+      await expect(waitForReplayCatchUp(readDb, clock.now() + 500)).resolves.toEqual({
+        status: 'deadline',
+        waitedMs: 2_000,
+      });
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('does not scan a replica that stayed behind', async () => {
+    await insertUsage({ created_at: '2026-11-10T12:00:00.000Z' });
+    const clock = fakeClock();
+    try {
+      const { readDb, transaction } = laggingReplica(clock, 31_000);
+
+      const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb, db });
+
+      expect(build).toEqual({ stopped: 'replica_behind' });
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      clock.restore();
+    }
+    expect(await rollupRows()).toEqual([]);
+  });
+
+  test('does not start a slice once the deadline passes during the replay wait', async () => {
+    const clock = fakeClock();
+    try {
+      const { readDb, transaction } = laggingReplica(clock, 1_000);
+
+      const build = await rebuildLeaderboardUsageDay('2026-11-10', {
+        readDb,
+        db,
+        deadline: clock.now() + 500,
+      });
+
+      expect(build).toEqual({ stopped: 'deadline' });
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('does not retry a conflicting slice after the deadline', async () => {
+    const clock = fakeClock();
+    try {
+      const deadline = clock.now() + 500_000;
+      const transaction = jest.fn(async () => {
+        clock.advance(600_000);
+        throw replayConflict();
+      });
+      const readDb = {
+        execute: async () => ({ rows: [{ receive_lsn: null }] }),
+        transaction,
+      } as unknown as DrizzleDatabase;
+
+      const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb, db, deadline });
+
+      expect(build).toEqual({ stopped: 'deadline' });
+      expect(transaction).toHaveBeenCalledTimes(1);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('retries a slice when a replay probe is cancelled by a replay conflict', async () => {
+    await insertUsage({ created_at: '2026-11-10T12:00:00.000Z' });
+    let probes = 0;
+    const readDb = {
+      execute: ((query: Parameters<DrizzleDatabase['execute']>[0]) => {
+        probes++;
+        if (probes === 1) throw replayConflict();
+        return db.execute(query);
+      }) as DrizzleDatabase['execute'],
+      transaction: db.transaction.bind(db),
+    } as unknown as DrizzleDatabase;
+
+    const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb, db });
+
+    expect(build).toMatchObject({ rows: 1, slices: 288, conflictRetries: 1 });
+    expect((await rollupRows()).map(row => row.request_count)).toEqual([1]);
   });
 });

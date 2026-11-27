@@ -1117,9 +1117,6 @@ importers:
       '@kilocode/scim-contracts':
         specifier: workspace:*
         version: link:../../packages/scim-contracts
-      '@kilocode/secrets-client':
-        specifier: workspace:*
-        version: link:../../packages/secrets-client
       '@kilocode/service-token-client':
         specifier: workspace:*
         version: link:../../packages/service-token-client
@@ -2257,6 +2254,15 @@ importers:
       '@kilocode/organization-entitlement':
         specifier: workspace:*
         version: link:../organization-entitlement
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../secrets-client
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../service-token-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../sts-contracts
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts

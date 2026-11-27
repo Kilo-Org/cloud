@@ -1,6 +1,6 @@
 import { installInternalApiSecretRead } from '@kilocode/web-shared/lib/internal-api-secret';
+import { createSelectedInternalApiSecretRead } from '@kilocode/web-shared/lib/sts-secret-reader';
 import { authorizeInternalApiRequest } from './internal-api-auth';
-import { createWebInternalApiSecretRead } from './sts-secret-reader';
 
 let mockEnvSecret = 'env-only-secret';
 
@@ -33,7 +33,7 @@ beforeEach(() => {
   // The web app's own selection with a stand-in STS read; the shipped wiring is covered in
   // sts-secret-reader.test.ts and installed by instrumentation in the HTTP fixture.
   installInternalApiSecretRead(
-    createWebInternalApiSecretRead({
+    createSelectedInternalApiSecretRead({
       source: () => process.env.SECRETS_SOURCE,
       env: () => mockEnvSecret,
       readSts,

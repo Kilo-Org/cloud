@@ -24,7 +24,7 @@ afterEach(() => {
   globalThis.__kilocodeInternalApiSecretRead = undefined;
 });
 
-describe('readInternalApiSecret without an installed read (AI gateway, scripts)', () => {
+describe('readInternalApiSecret without an installed read (scripts, tests)', () => {
   it.each([undefined, 'env', 'sts', '', 'secrets-store'])(
     'returns the configured value whatever SECRETS_SOURCE says (%j)',
     async source => {

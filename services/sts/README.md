@@ -495,23 +495,29 @@ A Worker's workload is its top-level config `name`, because STS authorizes on `p
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
 
 GitHub Actions workloads (`github-oidc`, production only, `refs/heads/main`, each workflow file
-pinned to `@refs/heads/main`; see [GitHub Actions callers](#github-actions-callers)). All are in
-`Kilo-Org/kilocode` (repository id `946087422`, owner id `201822503`) and grant no token, lease or
-deploy token; their bundles are `/ci/<workload>`:
+pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2` on `refs/heads/v2`; see
+[GitHub Actions callers](#github-actions-callers)). All are in `Kilo-Org/kilocode` (repository id
+`946087422`, owner id `201822503`) and grant no token, lease or deploy token; their bundles are
+`/ci/<workload>`:
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
 | `ci-kilocode-release` | `release-keys` | `publish.yml` | `workflow_dispatch` |
 | `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
 | `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
+| `ci-kilocode-app-key-v2` | `automation` | `kilo-v2.yml` at `refs/heads/v2` (its `progress-commit` job) | `push` |
 | `ci-kilocode-scan-notify` | `automation` | `security-findings-notify.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-community` | `automation` | `community-sweep.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-notify` | `automation` | `outdated-kilo-deps.yml`, `stale-alerts-report.yml`, `stale-bot-pr-notify.yml`, `v2-upstream-release-notify.yml` | `schedule`, `workflow_dispatch` |
 | `ci-kilocode-opencode-watch` | `automation` | `watch-opencode-releases.yml` | `schedule`, `workflow_dispatch` |
 
-`Kilo-Org/kilocode` predates GitHub's immutable subjects and cannot opt in yet, so its seven
-policies set `legacySubject: true` (see "Legacy subject" below). No policy admits the `v2` branch
-or `release-v2`.
+`Kilo-Org/kilocode` predates GitHub's immutable subjects and cannot opt in yet, so its eight
+policies set `legacySubject: true` (see "Legacy subject" below). Only `ci-kilocode-app-key-v2`
+admits the `v2` branch (manager ruling M76): it accepts `refs/heads/v2` alone, with
+`kilo-v2.yml@refs/heads/v2` as its one workflow file and `push` as its one event, and grants only
+`KILOCODE_MAINTAINER_APP_KEY`. The loader refuses a production policy off `main` unless it equals a
+`GITHUB_PRODUCTION_REF_EXCEPTIONS` entry in every field (`src/policy/schema.ts`). No policy admits
+`release-v2`.
 
 Three kilocode-side rules hold these policies to what they name:
 
@@ -519,8 +525,10 @@ Three kilocode-side rules hold these policies to what they name:
   carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
   `main` that called it with a listed event would get the bundle.
 - The GitHub environments `automation`, `release-keys` and `release-jetbrains` admit deployments
-  from `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch
-  rule is what makes it mean `main`.
+  from `main` only, except `automation`, which admits `main` and `v2` (a deployment branch policy;
+  `automation` read back on 2026-11-27). STS trusts the `environment` claim; the branch rule is
+  what makes it mean those branches, and the policy's ref and workflow pins hold each policy to its
+  own branch.
 - `publish.yml`'s `release-push`, `package-managers` and `jetbrains-pin` jobs are the only jobs
   that may declare `environment: release-keys`, and they may run only SHA-pinned GitHub-org actions,
   repository code and runtimes pinned by version and digest: STS cannot tell the jobs of one
@@ -783,8 +791,9 @@ Rules the loader enforces:
   lists `workflow_run` lists no other event, binds an `environment`, and does not grant
   `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
   pull request started the upstream run, and STS cannot see that run.
-- A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`; a
-  policy with token grants binds an `environment`.
+- A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`,
+  unless it equals an entry of `GITHUB_PRODUCTION_REF_EXCEPTIONS` in every field (today only
+  `ci-kilocode-app-key-v2`); a policy with token grants binds an `environment`.
 - The workload is named `ci-<job>`, and its secrets live in `/ci/<workload>` (then `/shared`). No
   other kind of policy may use a `ci-` name, so a workload's name alone fixes its folder and a
   stored bundle never moves between `/workloads` and `/ci`.
@@ -809,7 +818,11 @@ Preconditions on the GitHub side, which STS cannot check:
   subject: `...:environment:<env>` instead if that job runs in a GitHub environment; the kilocode
   CI owner checks this at upgrade time.
 - **Protected environment.** STS trusts the `environment` claim; the GitHub environment's branch
-  rule (`main`) and its required reviewers are what make that claim mean something.
+  rule (`main`, plus `v2` for `automation`) is what makes that claim mean something. `automation`
+  has no required reviewers, so the branch rulesets carry the review: `v2` requires an approved
+  pull request with no bypass actor, the same bar as `main`. `ci-kilocode-app-key-v2` pins the
+  whole `kilo-v2.yml` file, so a job added to that file later with `environment: automation`
+  would also receive the key; such a change needs an approved pull request on `v2`.
 - **Environment names** use only letters, digits, `.`, `_` and `-`, and the workflow spells them
   exactly as the policy does.
 
@@ -831,8 +844,8 @@ copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,0
 a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
 cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
 has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
-push per GitHub policy per refresh: with the 7 kilocode policies, 7 `BundleDO` calls every 4
-minutes, or 2,520 a day in production.
+push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
+minutes, or 2,880 a day in production.
 
 ## Migration run attestation
 

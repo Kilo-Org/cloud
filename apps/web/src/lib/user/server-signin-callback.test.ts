@@ -476,16 +476,63 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     });
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: owner.id,
+      targetProvider: 'github',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+    } as never);
+    await setOwnerSessionCookie(owner);
+
+    const result = await signIn({
+      user: { id: 'x', email: 'sso-link@example.net', name: 'Link', image: '' },
+      account: { provider: 'github', providerAccountId: 'github-sso-id', type: 'oauth' },
+      profile: { login: 'ssolink' },
+    } as never);
+
+    expect(result).toBe('/connected-accounts?error=SIGN-IN-METHOD-SSO-REQUIRED');
+    expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('links ChatGPT for an SSO domain whose organization does not allow other methods', async () => {
+    const owner = await insertLinkOwner();
+    const organization = await insertSsoOrganization(owner.id, false);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: organization.id,
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: owner } as never);
+    await setOwnerSessionCookie(owner);
+
+    const result = await signIn(openAiLinkCallback('sso-link@example.net', 'openai-sso-sub'));
+
+    expect(result).toBe('/connected-accounts?linked=openai');
+    expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a ChatGPT link for a domain whose SSO authority is misconfigured', async () => {
+    const owner = await insertLinkOwner();
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'misconfigured',
+      domain: 'example.com',
+      reason: 'ambiguous_domain',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
       targetProvider: 'openai',
       webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
     } as never);
     await setOwnerSessionCookie(owner);
 
-    const result = await signIn(openAiLinkCallback('sso-link@example.net', 'openai-sso-sub'));
+    const result = await signIn(openAiLinkCallback('sso-link@example.net', 'openai-bad-sub'));
 
     expect(result).toBe('/connected-accounts?error=SIGN-IN-METHOD-SSO-REQUIRED');
     expect(mockLinkAccountToExistingUser).not.toHaveBeenCalled();
-    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
   });
 
   it('links for an SSO domain whose organization allows other methods, without a new session', async () => {

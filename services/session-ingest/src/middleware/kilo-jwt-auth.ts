@@ -21,9 +21,22 @@ export type KiloJwtAuthVariables = {
 };
 
 const SESSION_LEAF_DELETE_PATH = /^\/api\/session\/[^/]+$/;
+const CLI_WEBSOCKET_PATH = '/api/user/cli';
 
 function isSessionLeafDelete(method: string, path: string): boolean {
   return method === 'DELETE' && SESSION_LEAF_DELETE_PATH.test(path);
+}
+
+// The CLI client (kilocode packages/opencode/src/kilo-sessions/remote-ws.ts)
+// treats close codes 4401, 4403 and 4409 as permanent, but an HTTP status before
+// the upgrade only reaches it as an abnormal close (1006), which it retries with
+// backoff forever. A websocket that fails authentication is therefore accepted
+// and immediately closed with 4401 so a stale token stops retrying.
+function rejectCliWebsocket(): Response {
+  const pair = new WebSocketPair();
+  pair[1].accept();
+  pair[1].close(4401, 'unauthorized');
+  return new Response(null, { status: 101, webSocket: pair[0] });
 }
 
 export const kiloJwtAuthMiddleware = createMiddleware<{
@@ -55,7 +68,13 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     token = c.req.query('token') ?? null;
   }
 
+  const cliWebsocketUpgrade =
+    c.req.method === 'GET' &&
+    c.req.path === CLI_WEBSOCKET_PATH &&
+    c.req.header('Upgrade') === 'websocket';
+
   if (!token) {
+    if (cliWebsocketUpgrade) return rejectCliWebsocket();
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }
 
@@ -98,6 +117,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   if (!auth) {
+    if (cliWebsocketUpgrade) return rejectCliWebsocket();
     return c.json({ success: false, error: 'Invalid or expired token' }, 401);
   }
 

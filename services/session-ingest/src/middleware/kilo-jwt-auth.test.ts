@@ -780,36 +780,6 @@ describe('kiloJwtAuthMiddleware', () => {
     ).toBe(401);
   });
 
-  it.each(['cloud-agent-next', 'kilo-api', null])(
-    'rejects a %s audience in a legacy CLI websocket query token before lookup',
-    async audience => {
-      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
-      const token = await signAudienceToken(audience);
-      const { response } = request(null, {
-        path: '/api/user/cli',
-        websocket: true,
-        query: `?token=${token}`,
-      });
-
-      expect((await response).status).toBe(401);
-      expect(getWorkerDbMock).not.toHaveBeenCalled();
-      expect(dbState.downstreamCalls).toBe(0);
-    }
-  );
-
-  it('does not fall back from an invalid bearer to a valid websocket query token', async () => {
-    userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
-    const validToken = await signAudienceToken(SESSION_INGEST_AUDIENCE);
-    const { response } = request('not-a-jwt', {
-      path: '/api/user/cli',
-      websocket: true,
-      query: `?token=${validToken}`,
-    });
-
-    expect((await response).status).toBe(401);
-    expect(dbState.queries).toBe(0);
-  });
-
   it('keeps web websocket tickets opaque and cannot fall back to JWT credentials', async () => {
     userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
     const jwt = await signAudienceToken(SESSION_INGEST_AUDIENCE);

@@ -410,7 +410,18 @@ export class LeaseDO extends DurableObject<Env> {
     await this.#scheduleAlarm(Date.now(), false);
   }
 
+  /**
+   * The replica sweep starts first and runs beside the rest, timed from when the alarm fired, so a
+   * slow or failing relay, Infisical call or row write never delays it; neither can a throw in that
+   * upkeep skip the sweep or the next alarm.
+   */
   async alarm(): Promise<void> {
+    const firedAt = Date.now();
+    const sweep = this.#sweepReplicas(firedAt).catch((error: unknown) => {
+      console.error('sts: replica sweep did not run; the next alarm retries it', {
+        reason: errorName(error),
+      });
+    });
     let failed = false;
     try {
       await this.#audit.relay(this.#stream);
@@ -420,23 +431,29 @@ export class LeaseDO extends DurableObject<Env> {
         reason: errorName(error),
       });
     }
-    await this.#retryOwedRevocations();
-    const now = Date.now();
-    await this.#stopUnconfirmedRevocations(now);
-    this.#audit.pruneIfDue(now);
-    this.#db
-      .delete(schema.lease)
-      .where(
-        and(
-          isNull(schema.lease.revokeCause),
-          lt(
-            sql`coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt})`,
-            now - LEASE_ROW_RETENTION_MS
+    try {
+      await this.#retryOwedRevocations();
+      const now = Date.now();
+      await this.#stopUnconfirmedRevocations(now);
+      this.#audit.pruneIfDue(now);
+      this.#db
+        .delete(schema.lease)
+        .where(
+          and(
+            isNull(schema.lease.revokeCause),
+            lt(
+              sql`coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt})`,
+              now - LEASE_ROW_RETENTION_MS
+            )
           )
         )
-      )
-      .run();
-    await this.#sweepReplicas(Date.now());
+        .run();
+    } catch (error) {
+      console.error('sts: lease alarm upkeep failed; the next alarm retries it', {
+        reason: errorName(error),
+      });
+    }
+    await sweep;
     await this.#scheduleAlarm(Date.now(), failed);
   }
 
@@ -697,7 +714,7 @@ export class LeaseDO extends DurableObject<Env> {
    * replicas no longer configured. Each replica gets one attempt per interval; a failure waits for
    * the next one (README "Replica sessions").
    */
-  async #sweepReplicas(now: number): Promise<void> {
+  async #sweepReplicas(firedAt: number): Promise<void> {
     const replicas = this.#config.replicaSweepBindings;
     this.#db
       .delete(schema.leaseReplicaSweep)
@@ -717,18 +734,26 @@ export class LeaseDO extends DurableObject<Env> {
     );
     await Promise.all(
       replicas
-        .filter(replica => (rows.get(replica)?.nextAt ?? now) <= now)
-        .map(replica => this.#sweepReplica(replica, rows.get(replica)?.failures ?? 0, now))
+        .filter(replica => (rows.get(replica)?.nextAt ?? firedAt) <= firedAt)
+        .map(replica => this.#sweepReplica(replica, rows.get(replica)?.failures ?? 0, firedAt))
     );
   }
 
   /**
-   * One sweep of one replica. A sweep that ended sessions, or the first to succeed after failures,
-   * writes `lease.replica_swept` with result `ended`; the first failure of a streak and the
+   * One sweep of one replica. Its next sweep is due one interval after `firedAt`, the time the
+   * alarm fired, written before the attempt, so the interval does not grow by the sweep's own time.
+   * A sweep that ended sessions, or the first to succeed after failures, writes
+   * `lease.replica_swept` with result `ended`; the first failure of a streak and the
    * `LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR`th write it with result `failed`. Failures are
    * warnings until that one, which is logged as an error once per streak.
    */
-  async #sweepReplica(replica: string, failuresBefore: number, now: number): Promise<void> {
+  async #sweepReplica(replica: string, failuresBefore: number, firedAt: number): Promise<void> {
+    const nextAt = firedAt + LEASE_REPLICA_SWEEP_INTERVAL_MS;
+    this.#db
+      .insert(schema.leaseReplicaSweep)
+      .values({ replica, nextAt, failures: failuresBefore })
+      .onConflictDoUpdate({ target: schema.leaseReplicaSweep.replica, set: { nextAt } })
+      .run();
     let failures = 0;
     let sweep: ReplicaSweepResult | null = null;
     try {
@@ -757,11 +782,10 @@ export class LeaseDO extends DurableObject<Env> {
         sweep = { result: 'failed', consecutiveFailures: failures, detail };
       }
     }
-    const nextAt = now + LEASE_REPLICA_SWEEP_INTERVAL_MS;
     this.#db
-      .insert(schema.leaseReplicaSweep)
-      .values({ replica, nextAt, failures })
-      .onConflictDoUpdate({ target: schema.leaseReplicaSweep.replica, set: { nextAt, failures } })
+      .update(schema.leaseReplicaSweep)
+      .set({ failures })
+      .where(eq(schema.leaseReplicaSweep.replica, replica))
       .run();
     if (sweep === null) return;
     try {

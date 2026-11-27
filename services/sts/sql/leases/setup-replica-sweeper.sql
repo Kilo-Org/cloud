@@ -8,6 +8,10 @@
 -- The password goes into the Hyperdrive configuration of each replica and into Infisical `/admin`,
 -- by hand, and nowhere else. Everything here reaches each replica through replication.
 --
+-- Where an earlier setup-ci-migration.sql (one without sweep_sessions) already ran, `postgres` no
+-- longer owns the schema: a superuser runs this file instead, then
+-- `ALTER FUNCTION kilo_lease.sweep_sessions() OWNER TO kilo_lease_owner;` (README).
+--
 -- Why: a revocation and an expiry run on the primary and end the lease role's sessions there only.
 -- A session already open on a replica stays connected after its role is dropped (its next
 -- statement fails with "invalid role OID", the idle session lingers), and a session can change its
@@ -105,9 +109,10 @@ REVOKE ALL ON FUNCTION kilo_lease.sweep_sessions() FROM PUBLIC;
 -- sweep_sessions, nothing else beyond what PUBLIC holds. It can end only sessions whose lease
 -- already ended, never a live lease's, an application's or another login's. It logs in on the
 -- primary too (Supabase gives no per-role host rule); sweep_sessions does the same there. Its
--- connection limit covers Hyperdrive's origin pool for this login (one connection a minute in
--- use). `postgres` created it and so administers it: a `ci-migration` lease acting as `postgres`
--- could reset its password, which gives nothing that lease does not already hold.
+-- connection limit caps Hyperdrive's origin pool for this login: one connection in use a minute,
+-- but Hyperdrive may keep up to 5 open and idle on each replica, and they count against that
+-- replica's max_connections. `postgres` created it and so administers it: a `ci-migration` lease
+-- acting as `postgres` could reset its password, which gives nothing that lease does not hold.
 --
 -- The password reaches the CREATE ROLE as in setup.sql (a transaction-local setting and EXECUTE),
 -- so `log_statement = 'ddl'` does not log it (check.sh).

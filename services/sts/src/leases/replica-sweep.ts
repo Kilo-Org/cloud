@@ -13,7 +13,9 @@ const SweepRowSchema = z.object({ ended: z.number().int().nonnegative() });
 /**
  * One connection through the replica's Hyperdrive binding, one statement, then the close. The
  * connection and the statement each give up after `LEASE_REPLICA_SWEEP_STEP_TIMEOUT_MS`, and the
- * sweeper login's `statement_timeout` (5 s) bounds the statement at the server too.
+ * sweeper login's `statement_timeout` (5 s) bounds the statement at the server too. The Hyperdrive
+ * configuration must have caching disabled: the statement reads like a query, and a cached answer
+ * would end no session.
  * https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-drivers-and-libraries/node-postgres/
  */
 export const sweepReplica: ReplicaSweep = async connectionString => {
@@ -22,8 +24,8 @@ export const sweepReplica: ReplicaSweep = async connectionString => {
     connectionTimeoutMillis: LEASE_REPLICA_SWEEP_STEP_TIMEOUT_MS,
     query_timeout: LEASE_REPLICA_SWEEP_STEP_TIMEOUT_MS,
   });
-  await client.connect();
   try {
+    await client.connect();
     const result = await client.query('SELECT kilo_lease.sweep_sessions() AS ended');
     return SweepRowSchema.parse(result.rows[0]).ended;
   } finally {

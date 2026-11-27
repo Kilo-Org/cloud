@@ -8,6 +8,7 @@ import { LeaseDO } from '../../src/dos/LeaseDO';
 import { getLeaseStub } from '../../src/dos/stubs';
 import type { Env } from '../../src/env';
 import worker from '../../src/index';
+import { InfisicalClient } from '../../src/infisical/client';
 import type { ReplicaSweep } from '../../src/leases/replica-sweep';
 import { stubOfflineNetwork } from './manager';
 import { resetLeaseObject } from './reset';
@@ -86,6 +87,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   LeaseDO.replicaSweep = realSweep;
+  vi.useRealTimers();
   stubOfflineNetwork();
   vi.restoreAllMocks();
 });
@@ -291,6 +293,70 @@ describe('replica sweep', () => {
     expect(alarm).not.toBeNull();
     expect(alarm).toBeGreaterThanOrEqual(before + 1_000);
     expect(alarm).toBeLessThanOrEqual(Date.now() + 1_000);
+  });
+
+  it('sweeps first, timed from when the alarm fired, while an owed revocation hangs and then throws, and still schedules the next alarm', async () => {
+    const sweeps = fakeSweeps();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const leaseId = crypto.randomUUID();
+    await runInDurableObject(getLeaseStub(env, config), (_instance, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO lease (lease_id, workload, caller, lease_grant, state, created_at, expires_at, revoke_cause)
+         VALUES (?, 'bouncer-watch', ?, 'replica-read', 'active', ?, ?, 'caller')`,
+        leaseId,
+        JSON.stringify({
+          workload: 'bouncer-watch',
+          identity: 'worker-binding',
+          channel: 'worker-binding',
+          run: null,
+        }),
+        Date.now(),
+        Date.now() + 60 * 60 * 1000
+      );
+    });
+    const hang = Promise.withResolvers<void>();
+    const revokes: string[] = [];
+    vi.spyOn(InfisicalClient.prototype, 'revokeLease').mockImplementation(async (_secret, id) => {
+      revokes.push(id);
+      await hang.promise;
+      throw new Error('manager exploded');
+    });
+    // Only Date is faked: the clock stands still until the test moves it.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const firedBefore = Date.now();
+    const alarm = withObject(sweepEnv, async (object, state) => {
+      await object.alarm();
+      return await state.storage.getAlarm();
+    });
+    await vi.waitFor(() => expect(revokes).toEqual([leaseId]));
+    // The revocation hangs, and both replicas were swept already.
+    expect(sweeps.calls.sort()).toEqual([A, B]);
+    // The revocation holds the alarm for 30 s of the object's clock before it throws.
+    vi.setSystemTime(firedBefore + 30_000);
+    hang.resolve();
+    const next = await alarm;
+    expect(error).toHaveBeenCalledWith(
+      'sts: lease alarm upkeep failed; the next alarm retries it',
+      {
+        reason: 'Error',
+      }
+    );
+    expect(next).not.toBeNull();
+    const due = await runInDurableObject(getLeaseStub(env, config), (_instance, state) =>
+      state.storage.sql
+        .exec<{ next_at: number }>('SELECT next_at FROM lease_replica_sweep')
+        .toArray()
+        .map(row => row.next_at)
+    );
+    // Due one interval after the alarm fired, not after the 30 s the revocation held it (vi.waitFor
+    // steps the fake clock by its 50 ms poll interval, so the fire time is within a second of
+    // firedBefore).
+    expect(due).toHaveLength(2);
+    for (const nextAt of due) {
+      expect(nextAt).toBeGreaterThanOrEqual(firedBefore + LEASE_REPLICA_SWEEP_INTERVAL_MS);
+      expect(nextAt).toBeLessThan(firedBefore + LEASE_REPLICA_SWEEP_INTERVAL_MS + 1_000);
+    }
+    expect(next).toBeLessThanOrEqual(Math.max(...due));
   });
 });
 

@@ -72,10 +72,8 @@ describe('the real wrangler.jsonc', () => {
     });
   });
 
-  it('loads env.staging as staging, direct, postgres, pid, sample 0', () => {
-    const vars = stagingVars();
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    const loaded = readConfig({ ...vars, ...rest });
+  it('loads env.staging alone as staging, direct, postgres, pid, sample 0', () => {
+    const loaded = readConfig(stagingVars());
     expect(loaded.ok && loaded.config).toMatchObject({
       environment: 'staging',
       loginMode: 'direct',
@@ -83,6 +81,8 @@ describe('the real wrangler.jsonc', () => {
       sessionKey: 'pid',
       sampleMinutes: 0,
       target: { host: 'db.xrcpuwfztrhiazsslhuu.supabase.co', port: 5432, database: 'postgres' },
+      github: { appId: '5952011', installationId: '186479258' },
+      reviewBaselineSha: 'dd05d644626ca17bacb80a8b43384622f87a0605',
     });
   });
 
@@ -113,8 +113,7 @@ describe('the real wrangler.jsonc', () => {
     ['label', { MIGRATION_SESSION_KEY: 'label' }],
     ['a sample', { MIGRATION_SESSION_SAMPLE_MINUTES: '60' }],
   ])('refuses staging direct mode with %s', (_label, change) => {
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    expect(readConfig({ ...stagingVars(), ...rest, ...change })).toMatchObject({ ok: false });
+    expect(readConfig({ ...stagingVars(), ...change })).toMatchObject({ ok: false });
   });
 
   it('accepts a fake GitHub only in the development stack', () => {

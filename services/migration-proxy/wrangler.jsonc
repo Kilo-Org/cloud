@@ -119,9 +119,12 @@
         "MIGRATION_SESSION_KEY": "pid",
         "MIGRATION_SESSION_SAMPLE_MINUTES": "0",
         "MIGRATION_RUN_DEADLINE_SECONDS": "21600",
-        "MIGRATION_PROXY_GITHUB_APP_ID": "",
-        "MIGRATION_PROXY_GITHUB_INSTALLATION_ID": "",
-        "MIGRATION_REVIEW_BASELINE_SHA": "",
+        "MIGRATION_PROXY_GITHUB_APP_ID": "5952011",
+        "MIGRATION_PROXY_GITHUB_INSTALLATION_ID": "186479258",
+        // Proof step (contract §10 step 4): the parent of #13020, the newest migration PR on main,
+        // so the first run reviews one real migration change. Afterwards it goes back to the last
+        // staging-migrated commit.
+        "MIGRATION_REVIEW_BASELINE_SHA": "dd05d644626ca17bacb80a8b43384622f87a0605",
       },
     },
   },

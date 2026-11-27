@@ -1083,12 +1083,10 @@ jobs:
 
   # Four shards run the web Jest suite in parallel; the `test` job below
   # reports the combined result under the required check name. It also runs
-  # when a web test reads changed data, including a `packages/web-shared` test
-  # (that package has no test script; its suites run in the web Jest config),
-  # for example the Bouncer scope check that reads `services/sts/policy`.
+  # when a web test reads changed data.
   web-test:
     needs: changes
-    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web') || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, '@kilocode/web-shared')
+    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).test_only_packages, 'web')
     name: web-test (${{ matrix.shard }}/4)
     strategy:
       fail-fast: false

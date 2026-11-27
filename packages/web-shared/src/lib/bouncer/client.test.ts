@@ -13,7 +13,15 @@ import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
 import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { BOUNCER_TOKEN_WAIT_MS, createBouncerAuth, type BouncerAuth } from './sts-auth';
+import {
+  BOUNCER_ADMISSION_WAIT,
+  BOUNCER_AFTER_RESPONSE_WAIT,
+  BOUNCER_NO_WAIT,
+  BOUNCER_SIGNUP_WAIT,
+  BOUNCER_TOKEN_WAIT_MS,
+  createBouncerAuth,
+  type BouncerAuth,
+} from './sts-auth';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id, so the client
 // is loaded after the config mock is registered (same convention as the store-completion tests).
@@ -26,6 +34,7 @@ let normalizeJa4: typeof BouncerClient.normalizeJa4;
 let signupDecide: typeof BouncerClient.signupDecide;
 let chargeDecide: typeof BouncerClient.chargeDecide;
 let releaseDecideLease: typeof BouncerClient.releaseDecideLease;
+let deliverUsageEventWireBody: typeof BouncerClient.deliverUsageEventWireBody;
 
 beforeAll(() => {
   ({
@@ -38,6 +47,7 @@ beforeAll(() => {
     signupDecide,
     chargeDecide,
     releaseDecideLease,
+    deliverUsageEventWireBody,
   } = jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
@@ -790,7 +800,7 @@ describe('STS headers from the installed Bouncer auth', () => {
       () => decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 }),
       '/api/v1/decide',
       'bouncer:decide',
-      true,
+      BOUNCER_ADMISSION_WAIT,
     ],
     [
       'charge-decide',
@@ -804,14 +814,14 @@ describe('STS headers from the installed Bouncer auth', () => {
         }),
       '/api/v1/charge-decide',
       'bouncer:decide',
-      true,
+      BOUNCER_ADMISSION_WAIT,
     ],
     [
       'release',
       () => releaseDecideLease({ requestId: 'r', accountId: 'user:u' }),
       '/api/v1/release',
       'bouncer:decide',
-      false,
+      BOUNCER_AFTER_RESPONSE_WAIT,
     ],
     [
       'usage-event',
@@ -828,24 +838,31 @@ describe('STS headers from the installed Bouncer auth', () => {
         }),
       '/api/v1/usage-event',
       'bouncer:usage.write',
-      false,
+      BOUNCER_AFTER_RESPONSE_WAIT,
+    ],
+    [
+      'usage-event outbox delivery',
+      () => deliverUsageEventWireBody({ requestId: 'r' }),
+      '/api/v1/usage-event',
+      'bouncer:usage.write',
+      BOUNCER_NO_WAIT,
     ],
     [
       'credit-event',
       () => deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-sts', userId: 'user-1' }),
       '/api/v2/credit-event',
       'bouncer:usage.write',
-      false,
+      BOUNCER_NO_WAIT,
     ],
     [
       'signup-decide',
       () => signupDecide({ operationId: 'signup:operation-1', ip: '203.0.113.7' }),
       '/api/v1/signup-decide',
       'bouncer:signup.decide',
-      true,
+      BOUNCER_SIGNUP_WAIT,
     ],
   ] as const)(
-    '%s asks for %s (waits: %s) and sends it with the legacy key',
+    '%s asks for its scope with its route token wait and sends it with the legacy key',
     async (_name, call, path, scope, wait) => {
       await call();
       expect(headersOf).toHaveBeenCalledWith({

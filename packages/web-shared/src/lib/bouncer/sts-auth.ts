@@ -26,15 +26,21 @@ import { waitUntil } from '@vercel/functions';
  * route's own, plus the others in the background), one read per scope at a time, so a rarely used
  * scope is renewed by the traffic of the others.
  *
- * Budgets: a call whose route waits (decide, charge-decide, signup-decide) waits at most
- * `BOUNCER_TOKEN_WAIT_MS` for a token it does not hold, out of the call's own deadline, and only
- * when the deployment's exchanged Vercel token is already held, so the mint is one STS call. A
- * deployment's first calls, while its exchange (and the jitter before its first mint) runs, wait
- * 0 (`exchange_pending`). Every other route never waits. A call without a token proceeds with the
- * legacy key alone. While the breaker is closed, waits that run out count at most once per
- * `BOUNCER_TOKEN_WAIT_MS`, so `BOUNCER_BREAKER_THRESHOLD` counts take about 2.5 s of continuous
- * timeouts; a token that arrives within a wait resets the count. An open breaker sets the wait to
- * 0 until any mint succeeds. In `dual`, after Bouncer refuses a scope's token as the token's fault
+ * Budgets (`BouncerTokenWait`, per call): an admission call (decide, charge-decide, signup-decide)
+ * waits for a token it does not hold out of the call's own deadline, at most
+ * `BOUNCER_TOKEN_WAIT_MS`, except signup-decide in `sts` (`BOUNCER_STS_SIGNUP_WAIT_MS`), which has
+ * no fallback and is not latency-critical. In `sts` release and the inline usage event also wait
+ * 250 ms (after the response, never counted toward the breaker); outbox deliveries never wait. In
+ * `dual` a call waits only when the deployment's exchanged Vercel token is already held, so the
+ * mint is one STS call; a deployment's first calls, while its exchange (and the jitter before its
+ * first mint) runs, wait 0 (`exchange_pending`). In `sts` it waits on a cold instance too, and a
+ * wait that runs out before the exchange is held counts as `exchange_pending`, not as a timeout. A
+ * call without a token proceeds with the legacy key alone in `dual`. While the breaker is closed,
+ * admission waits that run out with the exchange held count at most once per budget, so
+ * `BOUNCER_BREAKER_THRESHOLD` counts take about 2.5 s of continuous decide timeouts; a token that
+ * arrives within a wait resets the
+ * count. An open breaker sets the wait to 0 until any mint succeeds. In `dual`, after Bouncer
+ * refuses a scope's token as the token's fault
  * (401 `invalid_token` or 403 `insufficient_scope`, `bouncerRefusalBlamesToken`), that scope's
  * token is held back for `BOUNCER_REJECTED_HOLD_MS`; a 401 that names no token error is the legacy
  * key's failure (Bouncer's `legacy` mode ignores the bearer) and holds nothing back. In `sts`
@@ -50,12 +56,16 @@ import { waitUntil } from '@vercel/functions';
 export type BouncerAuthHeaders = Readonly<Record<string, string>>;
 
 /**
- * One call: its scope, whether its route waits for a token it does not hold, the origin of the
- * endpoint it goes to, and the call's deadline, which also ends the wait.
+ * How long a call may wait for a token it does not hold, in ms by mode (0 never waits), and whether
+ * it is an admission call: an admission call's timeouts move the breaker, its `dual` refusal of
+ * the token itself is resent without it, and in `sts` its mint skips the first-mint jitter.
  */
+export type BouncerTokenWait = { dual: number; sts: number; admission: boolean };
+
+/** One call: its scope, its token wait, the origin of the endpoint it goes to, and its deadline. */
 export type BouncerAuthCall = {
   scope: BouncerScope;
-  wait: boolean;
+  wait: BouncerTokenWait;
   origin: string;
   signal?: AbortSignal;
 };
@@ -95,8 +105,38 @@ export const BOUNCER_STS_ORIGIN = 'https://bouncer.kiloapps.io';
 /** Design 3.1: a caller reads its token within 250 ms of its own. */
 export const BOUNCER_TOKEN_WAIT_MS = 250;
 /**
- * Design 3.1: counted timeouts before the breaker opens. A count is taken at most once per
- * `BOUNCER_TOKEN_WAIT_MS`, so the breaker opens after about 2.5 s of continuous timeouts.
+ * Signup-decide's token wait in `sts`: signup has no legacy fallback there and fails closed without
+ * a token, and is not latency-critical, so it waits for a cold instance's whole first mint (an
+ * exchange and one STS call) inside its own 3 s deadline.
+ */
+export const BOUNCER_STS_SIGNUP_WAIT_MS = 1_500;
+/** Decide and charge-decide: they fail open without a verdict, so they wait 250 ms in either mode. */
+export const BOUNCER_ADMISSION_WAIT: BouncerTokenWait = {
+  dual: BOUNCER_TOKEN_WAIT_MS,
+  sts: BOUNCER_TOKEN_WAIT_MS,
+  admission: true,
+};
+/** Signup-decide: 250 ms in `dual`, where the legacy key carries it; 1.5 s in `sts`. */
+export const BOUNCER_SIGNUP_WAIT: BouncerTokenWait = {
+  dual: BOUNCER_TOKEN_WAIT_MS,
+  sts: BOUNCER_STS_SIGNUP_WAIT_MS,
+  admission: true,
+};
+/**
+ * Release and the inline best-effort usage event, both sent after the response: in `sts` a call
+ * without its token is refused and nothing retries it, so they wait 250 ms there; never in `dual`.
+ */
+export const BOUNCER_AFTER_RESPONSE_WAIT: BouncerTokenWait = {
+  dual: 0,
+  sts: BOUNCER_TOKEN_WAIT_MS,
+  admission: false,
+};
+/** Outbox deliveries: a refused row is retried by the drainer, and a per-row wait would starve it. */
+export const BOUNCER_NO_WAIT: BouncerTokenWait = { dual: 0, sts: 0, admission: false };
+/**
+ * Design 3.1: counted timeouts before the breaker opens. A count is taken at most once per route
+ * budget (`BOUNCER_TOKEN_WAIT_MS` for decide), so the breaker opens after about 2.5 s of continuous
+ * timeouts.
  */
 export const BOUNCER_BREAKER_THRESHOLD = 10;
 /**
@@ -209,12 +249,6 @@ export type BouncerAuthOptions = {
   waitUntil: (promise: Promise<unknown>) => void;
   /** Starts loading the transport now (no network call), so the first call does not import it. */
   preload?: boolean;
-  /**
-   * Starts one read per granted scope now, so the exchange, the first-mint jitter and the mint run
-   * at startup instead of on the first calls. Used in `sts`, where a call without its token has no
-   * legacy fallback. Each read's outcome is counted under `prewarm`; nothing is thrown.
-   */
-  prewarm?: boolean;
   now?: () => number;
   log?: (line: string, level: 'info' | 'warn') => void;
 };
@@ -235,7 +269,6 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
   let countedAt: number | null = null;
   const rejectedUntil = new Map<BouncerScope, number>();
   let refused: Record<string, Record<string, number>> = {};
-  let prewarm: Record<string, Record<string, number>> = {};
   let attached: Record<string, number> = {};
   let missed: Record<string, Record<string, number>> = {};
   let mints = { ok: 0, failed: 0 };
@@ -281,7 +314,6 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
         attached,
         missed,
         refused,
-        prewarm,
         mint: mints,
         last_mint_age_s: lastMintAgeSeconds,
       }),
@@ -290,7 +322,6 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     attached = {};
     missed = {};
     refused = {};
-    prewarm = {};
     mints = { ok: 0, failed: 0 };
     flushedAt = at;
   }
@@ -332,29 +363,14 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     }
   }
 
-  /** Counts a wait that ran out toward the breaker, at most once per `BOUNCER_TOKEN_WAIT_MS`. */
-  function countTimeout(): void {
+  /** Counts a wait that ran out toward the breaker, at most once per `windowMs` (its budget). */
+  function countTimeout(windowMs: number): void {
     if (breakerOpen()) return;
     const at = now();
-    if (countedAt !== null && at - countedAt < BOUNCER_TOKEN_WAIT_MS) return;
+    if (countedAt !== null && at - countedAt < windowMs) return;
     countedAt = at;
     timeouts += 1;
     if (breakerOpen()) log(line('bouncer_sts_breaker_open'), 'warn');
-  }
-
-  if (options.prewarm) {
-    const transport = load();
-    for (const scope of options.scopes) {
-      const count = (outcome: string) => {
-        const byOutcome = (prewarm[scope] ??= {});
-        byOutcome[outcome] = (byOutcome[outcome] ?? 0) + 1;
-        flushIfDue();
-      };
-      void readScope(transport, scope).then(
-        () => count('ok'),
-        (error: unknown) => count(missReasonOf(error))
-      );
-    }
   }
 
   return {
@@ -405,33 +421,45 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
       }
 
       // No fresh token: a mint is running.
-      if (!wait) return miss('not_held', scope);
+      const budget = mode === 'sts' ? wait.sts : wait.dual;
+      if (budget <= 0) return miss('not_held', scope);
       if (breakerOpen()) return miss('breaker_open', scope);
 
       // In `dual` a call waits only when the mint is one STS call away; without a wait it still
       // carries the legacy key. `sts` has no such fallback (a call without the token is refused),
-      // so there an admission call waits for the mint even on a cold instance, within the same
-      // budget and deadline, and its mint skips the 0 to 2 s first-mint jitter, which would
-      // outlast the wait.
-      if (mode === 'sts') void transport.then(t => t.skipJitter(), () => undefined);
-      if (mode === 'dual') {
+      // so there a call waits for the mint even on a cold instance, within its budget and deadline,
+      // and an admission call's mint skips the 0 to 2 s first-mint jitter, which would outlast the
+      // wait. Readiness runs beside that wait only to tell a cold start from a slow mint.
+      let exchangeHeld: boolean | null = null;
+      if (mode === 'sts') {
+        if (wait.admission) void transport.then(t => t.skipJitter(), () => undefined);
+        void transport
+          .then(t => t.exchangeReady())
+          .then(
+            found => (exchangeHeld = found),
+            () => (exchangeHeld = false)
+          );
+      } else {
         const ready = await race(
           transport.then(t => t.exchangeReady()),
-          BOUNCER_TOKEN_WAIT_MS - (now() - started),
+          budget - (now() - started),
           signal
         );
         if (ready === 'aborted') return miss('aborted', scope);
         if (ready === 'waited') {
-          countTimeout();
+          if (wait.admission) countTimeout(budget);
           return miss('readiness_timeout', scope);
         }
         if (!('value' in ready) || !ready.value) return miss('exchange_pending', scope);
       }
 
-      const minted = await race(reading, BOUNCER_TOKEN_WAIT_MS - (now() - started), signal);
+      const minted = await race(reading, budget - (now() - started), signal);
       if (minted === 'aborted') return miss('aborted', scope);
       if (minted === 'waited') {
-        countTimeout();
+        // A cold start (exchange not held yet, or its check unanswered) is not a slow mint path,
+        // and a call after the response is not on the admission path: neither moves the breaker.
+        if (mode === 'sts' && exchangeHeld !== true) return miss('exchange_pending', scope);
+        if (wait.admission) countTimeout(budget);
         return miss('timeout', scope);
       }
       if (!('value' in minted)) return miss(missReasonOf(minted.error), scope);
@@ -452,9 +480,7 @@ declare global {
  * Installs the auth for `caller` with the Bouncer scopes its STS policy grants
  * (`BOUNCER_APP_SCOPES`); called once from the `instrumentation.ts` of `apps/web` and
  * `apps/ai-gateway`. In `dual` or `sts` it starts importing the transport (no network call); in
- * `sts` it also starts reading every granted scope when the function has its OIDC token outside a
- * request, so the first mint runs at startup. In `legacy` nothing loads, and the flag is still read
- * on every call.
+ * `legacy` nothing loads, and the flag is still read on every call.
  */
 export function installBouncerAuth(caller: BouncerCaller): void {
   globalThis.__kilocodeBouncerAuth = createBouncerAuth({
@@ -470,13 +496,6 @@ export function installBouncerAuth(caller: BouncerCaller): void {
     },
     waitUntil,
     preload: ['dual', 'sts'].includes(bouncerClientAuthMode(process.env.BOUNCER_CLIENT_AUTH)),
-    // At startup there is no request, so no `x-vercel-oidc-token` header: the identity comes from
-    // `VERCEL_OIDC_TOKEN_FILE` or `VERCEL_OIDC_TOKEN` (`@vercel/oidc`). Without either, a startup
-    // read would fail and put the scope into the token client's backoff, so it is skipped and the
-    // first calls mint within their own wait.
-    prewarm:
-      bouncerClientAuthMode(process.env.BOUNCER_CLIENT_AUTH) === 'sts' &&
-      Boolean(process.env.VERCEL_OIDC_TOKEN_FILE || process.env.VERCEL_OIDC_TOKEN),
   });
 }
 

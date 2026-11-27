@@ -44,7 +44,7 @@ jest.mock('@kilocode/service-token-client/vercel', () => ({
     get = mockReadinessGet;
   },
 }));
-jest.mock('@vercel/functions/oidc', () => ({
+jest.mock('@vercel/oidc', () => ({
   getVercelOidcToken: jest.fn(async () => 'base-oidc-token'),
 }));
 
@@ -55,7 +55,6 @@ const runtimeNames = [
   'VERCEL_TARGET_ENV',
   'BOUNCER_CLIENT_AUTH',
   'VERCEL_OIDC_TOKEN',
-  'VERCEL_OIDC_TOKEN_FILE',
 ] as const;
 const savedRuntime = Object.fromEntries(runtimeNames.map(name => [name, process.env[name]]));
 
@@ -217,7 +216,7 @@ describe('the installed Bouncer auth with the real transport', () => {
     }
   );
 
-  it('mints every granted scope at install in sts, before any call, and sends no legacy key', async () => {
+  it('reads no token at install in sts, even with an OIDC token in the environment', async () => {
     setRuntime({
       VERCEL_ENV: 'production',
       VERCEL_TARGET_ENV: 'production',
@@ -226,29 +225,34 @@ describe('the installed Bouncer auth with the real transport', () => {
     });
     installBouncerAuth('kilocode-ai-gateway');
     await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
-    expect(
-      stsCalls()
-        .flatMap(call => call.tokens.map(token => token.scope))
-        .sort()
-    ).toEqual(['bouncer:decide', 'bouncer:usage.write']);
-    expect(bouncerCalls()).toEqual([]);
-
-    await decide({ requestId: 'r-9', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
-    expect(stsCalls()).toHaveLength(2);
-    const [headers] = bouncerCalls();
-    expect(headers.get('authorization')).toBe('Bearer sts-decide-token');
-    expect(headers.get('x-internal-api-key')).toBeNull();
+    expect(stsCalls()).toEqual([]);
+    expect(mockIdentity).not.toHaveBeenCalled();
   });
 
-  it('reads nothing at install in sts without a startup OIDC token', async () => {
+  it('adds no per-row token wait to an outbox drain in sts while the token is being minted', async () => {
     setRuntime({
       VERCEL_ENV: 'production',
       VERCEL_TARGET_ENV: 'production',
       BOUNCER_CLIENT_AUTH: 'sts',
     });
     installBouncerAuth('kilocode-ai-gateway');
-    await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
-    expect(stsCalls()).toEqual([]);
+    const stsAnswers = mockFetch.getMockImplementation();
+    if (stsAnswers === undefined) throw new Error('no fetch stand-in');
+    // STS answers only after 400 ms, longer than any token wait.
+    mockFetch.mockImplementation(async (input, init) => {
+      if (urlOf(input) === `${STS_ISSUERS.production}/v1/token`) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
+      return await stsAnswers(input, init);
+    });
+    const started = Date.now();
+    for (let row = 0; row < 3; row += 1) {
+      await deliverUsageEventWireBody({ requestId: `r-outbox-${row}` });
+    }
+    // Three rows, each sent at once: well under one 250 ms token wait in total.
+    expect(Date.now() - started).toBeLessThan(200);
+    expect(bouncerCalls()).toHaveLength(3);
+    for (const headers of bouncerCalls()) expect(headers.get('authorization')).toBeNull();
   });
 
   it('delivers a usage event with the legacy key alone while its token is not held yet', async () => {

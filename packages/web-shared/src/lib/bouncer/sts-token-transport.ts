@@ -15,7 +15,7 @@ import {
 import { STS_URL } from '@kilocode/web-shared/lib/config.server';
 import { stsEnvironmentOfDeployment } from '@kilocode/web-shared/lib/sts-secret-transport';
 import { getCache } from '@vercel/functions';
-import { getVercelOidcToken } from '@vercel/functions/oidc';
+import { getVercelOidcToken } from '@vercel/oidc';
 
 /**
  * The token client of the shared Bouncer client, loaded by `sts-auth.ts` on the first call with
@@ -88,7 +88,9 @@ export function createBouncerTransportFor(options: {
  *   deployment's first one; the mint then waits a random 0 to `BOUNCER_FIRST_MINT_JITTER_MS`
  *   before it goes to STS, so a deployment's instances spread out. `skipJitter` ends a running
  *   jitter and skips one that starts within `BOUNCER_JITTER_SKIP_MS`; only an `sts` admission call
- *   asks for it, so `dual`, background renewals and the `sts` startup reads keep the jitter.
+ *   asks for it, so `dual` and background renewals keep the jitter. A deployment's first `sts`
+ *   mints are then spread only by the exchange step itself (one instance exchanges, the others
+ *   poll the Runtime Cache with backoff for its token).
  * - Counter: every STS answer reaches `hooks.mint`: `true` only for an answer that issued a token,
  *   `false` for a denial, any other answer, or a request that failed.
  */
@@ -225,7 +227,8 @@ const NO_EXCHANGE: Exchange = async () => ({ kind: 'failed', detail: 'readiness 
  * purpose: each module loads only when its own flag is on, so neither pulls the other's token
  * client into a deployment that does not use it. Both read and write the same `sts-exchange`
  * Runtime Cache entry, so a deployment still exchanges once per issuer; the cost of keeping them
- * apart is one extra exchanged token held in memory per process.
+ * apart is one extra exchanged token held in memory per process. The readiness check reads its base
+ * token from `@vercel/oidc` too, the source `vercelIdentity` uses, so both see the same identity.
  */
 export function createBouncerTransport(hooks: BouncerTransportHooks): BouncerTransport {
   return createBouncerTransportFor({

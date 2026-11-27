@@ -2,10 +2,11 @@
  * Operator script that imports completed signup history into Bouncer's signup-history route.
  *
  * It authenticates with the shared `INTERNAL_API_SECRET` (`x-internal-api-key`), and that
- * legacy-key path stops working once Bouncer runs `STS_AUTH=sts`. From then on the only route is
- * the `ci-bouncer-signup-import` GitHub OIDC workflow (owner: kc-ci-sts), which calls Bouncer with
- * an STS token for `bouncer:signup.history`. Until then an operator must pass
- * `--bouncer-legacy-auth`, confirming Bouncer still runs `STS_AUTH` `legacy` or `dual`; without it
+ * legacy-key path stops working once Bouncer runs `STS_AUTH=sts`. From then on the only route will
+ * be the planned `ci-bouncer-signup-import` GitHub OIDC workflow (owner: kc-ci-sts; it does not
+ * exist yet), which calls Bouncer with an STS token for `bouncer:signup.history`. Until then an
+ * operator must pass `--bouncer-legacy-auth`, confirming Bouncer still runs `STS_AUTH` `legacy`,
+ * `shadow` or `dual`; without it
  * the script refuses before reading the database or sending any request.
  *
  * Usage: `pnpm --filter web script:run db import-signup-history --bouncer-legacy-auth [since]`.
@@ -46,9 +47,9 @@ export const LEGACY_AUTH_FLAG = '--bouncer-legacy-auth';
 
 export const LEGACY_AUTH_REQUIRED =
   `import-signup-history sends Bouncer the legacy INTERNAL_API_SECRET (x-internal-api-key), which ` +
-  `stops working once Bouncer runs STS_AUTH=sts; from then on the route is the ` +
-  `ci-bouncer-signup-import GitHub OIDC workflow (owner: kc-ci-sts). Pass ${LEGACY_AUTH_FLAG} ` +
-  `only while Bouncer still runs STS_AUTH legacy or dual.`;
+  `stops working once Bouncer runs STS_AUTH=sts; from then on the route will be the planned ` +
+  `ci-bouncer-signup-import GitHub OIDC workflow (owner: kc-ci-sts), which does not exist yet. ` +
+  `Pass ${LEGACY_AUTH_FLAG} only while Bouncer still runs STS_AUTH legacy, shadow or dual.`;
 
 /** Imports completed signup history without changing Cloud users or enforcement switches. */
 export async function run(...args: string[]): Promise<void> {

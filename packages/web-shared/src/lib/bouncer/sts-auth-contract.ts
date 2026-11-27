@@ -29,8 +29,9 @@ export type BouncerCaller = 'kilocode-app' | 'kilocode-ai-gateway';
 
 /**
  * The Bouncer scopes each app's STS policy grants in production (`services/sts/policy/web.yaml`
- * and `ai-gateway.yaml`, `environmentGrants.production`); `sts-auth-scopes.test.ts` checks the two
- * stay equal. The auth reads no other scope.
+ * and `ai-gateway.yaml`, `environmentGrants.production`);
+ * `services/sts/test/repo/bouncer-app-scopes.test.ts` reads this table as text and checks the two
+ * stay equal, so keep its one-line-per-app shape. The auth reads no other scope.
  */
 export const BOUNCER_APP_SCOPES: Readonly<Record<BouncerCaller, readonly BouncerScope[]>> = {
   'kilocode-app': ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'],

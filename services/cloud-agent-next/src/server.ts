@@ -736,8 +736,14 @@ async function forwardRuntimeCredentialProxy(
   if (!upstream) return rejectRoute(credential.organizationId);
   try {
     // The route allowlist is resolved above before a proof is issued.
+    const nextAuthSecret = await readCloudAgentNextSecret(
+      c.env,
+      'NEXTAUTH_SECRET',
+      requestContext(c)
+    );
+    if (!nextAuthSecret) throw new Error('Authentication unavailable');
     const proof = await issueRuntimeProxyAttestation({
-      secret: await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET', requestContext(c)),
+      secret: nextAuthSecret,
       audience: destination,
       bearer: credential.token,
       ...credential.runtimeAuthorization,

@@ -856,7 +856,11 @@ merged per minute like every denial. The proxy's own events (`ai.kilo.migration_
 `migration-proxy:<environment>:` streams with source `kilo:migration-proxy:<environment>`.
 
 **Cost.** One RPC per proxy POST or poll: one JWKS-cached verify in the Worker, no Durable Object
-hop, and a denial hop only for a refusal.
+hop, and a denial hop only for a refusal. The attestation verifier is its own per-isolate instance
+(`src/migration/attest.ts`), apart from the routes' verifier, because it verifies with another
+audience and over every policy. So an isolate that serves both may fetch GitHub's discovery
+document and key set once more (two small fetches, then cached like the routes' copy), and keeps
+one more cached key set in memory, a few kilobytes.
 
 ## Database leases
 
@@ -1189,6 +1193,26 @@ and administers the replica login, so whoever holds `postgres` could change them
 `setup-replica-sweeper.sql` adds the `gone_since` column (the 7-day row retention), replaces
 `kilo_lease.end_sessions` with the version that keeps those rows, and creates
 `kilo_lease.sweep_sessions` and the sweeper login.
+
+**Removing the ci-migration trial.** The `ci-migration` grant is gone (design Q64a), but an
+environment where the trial's `setup-ci-migration.sql` ran still holds its roles, and
+`report.sql` lists each as a `leftover` (`role of the removed ci-migration trial`) until they are
+dropped. `sql/leases/remove-ci-migration-trial.sql` does it, in this order (`check.sh` runs it):
+
+1. Read-only listing of `kilo_lease_migration_admin`, `kilo_lease_migration`, the `lease_cm_*`
+   roles and `kilo_lease_owner`:
+   `psql "<primary direct URL>" -v ON_ERROR_STOP=1 -v list_only=1 -f services/sts/sql/leases/remove-ci-migration-trial.sql`.
+   Nothing listed: stop here.
+2. Run it again without `list_only`, as a superuser while `kilo_lease_owner` exists (else as
+   `postgres`), in one transaction: `REASSIGN OWNED BY kilo_lease_owner TO postgres`; then for each
+   `lease_cm_*` role, `kilo_lease_migration_admin`, `kilo_lease_migration` and last
+   `kilo_lease_owner`: `DROP OWNED BY` and `DROP ROLE`.
+3. Before it commits, it checks that `postgres` owns the `kilo_lease` schema, its table and every
+   function again, and rolls back otherwise; then it runs `report.sql`, whose summary must show
+   `leftover=0`.
+
+Then remove the Infisical side: the `ci-migration` dynamic secret and `/dynamic/ci-migration`, and
+the STS role's `lease` rule for that folder.
 
 **Infisical setup, per environment (staging first).**
 

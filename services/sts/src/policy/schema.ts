@@ -440,10 +440,19 @@ function migrationRunProblems(policy: Policy): string[] {
   const { identity } = policy;
   if (identity.kind !== 'github-oidc') {
     problems.push(`dynamic ${MIGRATION_RUN_GRANT} is only for a github-oidc policy`);
-  } else if (identity.environment === undefined) {
-    problems.push(
-      `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} must bind identity.environment`
-    );
+  } else {
+    if (identity.environment === undefined) {
+      problems.push(
+        `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} must bind identity.environment`
+      );
+    }
+    // In every environment: the job only triggers a run of what is on `main`, so no other ref has
+    // a reason to trigger one.
+    if (identity.refs.length !== 1 || identity.refs[0] !== GITHUB_PRODUCTION_REF) {
+      problems.push(
+        `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} accepts only ${GITHUB_PRODUCTION_REF}`
+      );
+    }
   }
   if (
     policy.secrets.length > 0 ||

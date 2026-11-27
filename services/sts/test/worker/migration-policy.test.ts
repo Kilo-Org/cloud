@@ -158,4 +158,26 @@ describe('migration-run policies', () => {
       'workload ci-deploy-staging names a workflow file of the trigger-only workload ci-db-migrate'
     );
   });
+
+  it('refuses migration-run on any ref but main, in staging too', () => {
+    for (const refs of ['[refs/heads/main, refs/heads/release]', '[refs/heads/release]']) {
+      expectThrow(
+        {
+          'ci-db-migrate-staging.yaml': triggerOnly({
+            workload: 'ci-db-migrate-staging',
+            environments: '[staging]',
+            identity: `  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: staging
+  refs: ${refs}
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/deploy-staging.yml@refs/heads/release]
+  events: [schedule, workflow_dispatch]`,
+          }),
+        },
+        'a github-oidc policy with dynamic migration-run accepts only refs/heads/main'
+      );
+    }
+  });
 });

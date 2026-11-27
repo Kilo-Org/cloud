@@ -20,6 +20,7 @@ const PROXY_AUDIENCE = 'https://migration-proxy.sts-test.invalid';
 const DEPLOY_WORKFLOW = 'acme/repo/.github/workflows/deploy.yml@refs/heads/main';
 const OTHER_WORKFLOW = 'acme/repo/.github/workflows/other.yml@refs/heads/main';
 const STAGING_WORKFLOW = 'acme/repo/.github/workflows/staging.yml@refs/heads/main';
+const PROD_WORKFLOW = 'acme/repo/.github/workflows/deploy-production.yml@refs/heads/main';
 const SHA = '0123456789abcdef0123456789abcdef01234567';
 
 const githubPolicy = (workload: string, fields: string) => `
@@ -66,6 +67,19 @@ dynamic:
   - grant: migration-run
 `
     ),
+    // As shipped: a trigger-only production policy, with workflow_run next to the other events
+    // (the Q71 carve-out the loader allows only here).
+    'ci-prod-migrate.yaml': githubPolicy(
+      'ci-prod-migrate',
+      `  environment: production
+  jobWorkflowRefs: [${PROD_WORKFLOW}]
+  events: [workflow_run, schedule, workflow_dispatch]
+environments: [production]
+secrets: []
+dynamic:
+  - grant: migration-run
+`
+    ),
   }),
 };
 
@@ -83,6 +97,19 @@ const waitUntil = (promise: Promise<unknown>) => {
 function broker(caller: string): TestBroker {
   const ctx = { props: { caller }, waitUntil, passThroughOnException: () => undefined };
   return new TestBroker(ctx as unknown as ExecutionContext, env);
+}
+
+/** The broker as production STS runs it (the test pool's own environment is development). */
+function productionBroker(): TestBroker {
+  const ctx = {
+    props: { caller: 'migration-proxy' },
+    waitUntil,
+    passThroughOnException: () => undefined,
+  };
+  return new TestBroker(ctx as unknown as ExecutionContext, {
+    ...env,
+    STS_ENVIRONMENT: 'production',
+  });
 }
 
 const jobClaims = {
@@ -152,6 +179,19 @@ afterEach(() => {
 });
 
 describe('attestGithubRun', () => {
+  it('attests a workflow_run job of a production trigger-only policy on production STS', async () => {
+    const token = await proxyToken({ job_workflow_ref: PROD_WORKFLOW, event_name: 'workflow_run' });
+    expect(await productionBroker().attestGithubRun({ token })).toMatchObject({
+      status: 'ok',
+      workload: 'ci-prod-migrate',
+      github: {
+        environment: 'production',
+        eventName: 'workflow_run',
+        jobWorkflowRef: PROD_WORKFLOW,
+      },
+    });
+  });
+
   it('attests a matching job token with the proxy audience and writes no row', async () => {
     const result = await attest(await proxyToken());
     expect(result).toEqual({

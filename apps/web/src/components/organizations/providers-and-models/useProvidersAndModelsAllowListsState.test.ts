@@ -122,7 +122,7 @@ describe('providersAndModelsAllowListsReducer', () => {
       nextEnabled: false,
     });
 
-    state = providersAndModelsAllowListsReducer(state, { type: 'MARK_SAVED' });
+    state = providersAndModelsAllowListsReducer(state, { type: 'MARK_SAVED', modelDenyList: [] });
 
     if (state.status !== 'ready') {
       throw new Error('expected ready state');
@@ -130,6 +130,27 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     expect(state.initialProviderAllowList).toEqual(state.draftProviderAllowList);
     expect(state.initialModelDenyList).toEqual(state.draftModelDenyList);
+  });
+
+  test('mark saved rebases draft and initial deny list onto the server list', () => {
+    let state: ProvidersAndModelsAllowListsState = createProvidersAndModelsAllowListsInitialState();
+
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'INIT_FROM_SERVER',
+      modelDenyList: ['anthropic/claude-3-opus'],
+      providerAllowList: ['openai'],
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'MARK_SAVED',
+      modelDenyList: ['anthropic/claude-3-opus', 'openai/new-model'],
+    });
+
+    if (state.status !== 'ready') {
+      throw new Error('expected ready state');
+    }
+
+    expect(state.initialModelDenyList).toEqual(['anthropic/claude-3-opus', 'openai/new-model']);
+    expect(state.draftModelDenyList).toEqual(state.initialModelDenyList);
   });
 
   test('bulk model action updates the draft in one dispatch and reset restores it', () => {

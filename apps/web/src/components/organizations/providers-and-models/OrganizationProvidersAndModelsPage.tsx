@@ -222,13 +222,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     if (state.status !== 'ready') return;
 
     try {
-      await updateOrganizationSettings.mutateAsync({
+      const { settings } = await updateOrganizationSettings.mutateAsync({
         organizationId,
         model_deny_list: state.draftModelDenyList,
+        model_deny_list_base: state.initialModelDenyList,
         provider_allow_list: state.draftProviderAllowList,
       });
 
-      actions.markSaved();
+      actions.markSaved({ modelDenyList: settings.model_deny_list ?? state.draftModelDenyList });
       toast.success('Success! The providers and models have been updated for your organization.');
     } catch {
       toast.error('Failed to save settings. Please try again.');

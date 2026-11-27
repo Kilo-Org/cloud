@@ -16,6 +16,15 @@ export type FormState = Readonly<{
   providerRowsProvisional: boolean;
   /** Whether the provider list on screen is a choice of its own, not the server's. */
   providerListEdited: boolean;
+  /**
+   * The deny list the draft started from: the server's list when the draft was
+   * last clean. A save sends it as `model_deny_list_base`, so the server applies
+   * only the admin's own edits and keeps denies added since, such as the ones
+   * provider sync adds automatically. `baseline` cannot serve: a refetch rebases
+   * it under a dirty draft, which would make the draft look like it removed every
+   * deny that arrived.
+   */
+  denyListBase: readonly string[];
 }>;
 
 /**
@@ -114,5 +123,6 @@ export function syncedFormState(params: {
     providerRowsProvisional: params.providerRowsIncomplete,
     // A draft that just took the server's list holds no choice of its own.
     providerListEdited: savedListsMoved && clean ? false : state.providerListEdited,
+    denyListBase: savedListsMoved && clean ? params.serverDraft.modelDenyList : state.denyListBase,
   };
 }

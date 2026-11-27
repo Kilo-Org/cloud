@@ -82,6 +82,7 @@ export type ProvidersAndModelsAllowListsAction =
     }
   | {
       type: 'MARK_SAVED';
+      modelDenyList: ReadonlyArray<string>;
     }
   | {
       type: 'SET_MODEL_SEARCH';
@@ -222,9 +223,12 @@ export function providersAndModelsAllowListsReducer(
 
     case 'MARK_SAVED': {
       if (state.status !== 'ready') return state;
+      // The server list is authoritative: it can include automatic denies merged in on save.
+      const savedModelDenyList = canonicalizeDenyList(action.modelDenyList);
       return {
         ...state,
-        initialModelDenyList: state.draftModelDenyList,
+        draftModelDenyList: savedModelDenyList,
+        initialModelDenyList: savedModelDenyList,
         initialProviderAllowList: state.draftProviderAllowList,
       };
     }
@@ -275,7 +279,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
     setModelsAllowed: (params: { modelIds: ReadonlyArray<string>; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
-    markSaved: () => void;
+    markSaved: (params: { modelDenyList: ReadonlyArray<string> }) => void;
     setModelSearch: (value: string) => void;
     setModelSelectedOnly: (value: boolean) => void;
     setInfoModelId: (value: string | null) => void;
@@ -401,7 +405,8 @@ export function useProvidersAndModelsAllowListsState(params: {
       toggleModel,
       setModelsAllowed,
       resetToInitial: () => dispatch({ type: 'RESET_TO_INITIAL' }),
-      markSaved: () => dispatch({ type: 'MARK_SAVED' }),
+      markSaved: (saved: { modelDenyList: ReadonlyArray<string> }) =>
+        dispatch({ type: 'MARK_SAVED', modelDenyList: saved.modelDenyList }),
       setModelSearch: (value: string) => dispatch({ type: 'SET_MODEL_SEARCH', value }),
       setModelSelectedOnly: (value: boolean) =>
         dispatch({ type: 'SET_MODEL_SELECTED_ONLY', value }),

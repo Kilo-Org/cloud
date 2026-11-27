@@ -140,6 +140,7 @@ export function ModelAccessForm({
     draft: serverDraft,
     providerRowsProvisional: providerRowsIncomplete,
     providerListEdited: false,
+    denyListBase: serverDraft.modelDenyList,
   }));
   const synced = syncedFormState({ state: form, serverKey, serverDraft, providerRowsIncomplete });
   if (synced !== form) {
@@ -270,6 +271,7 @@ export function ModelAccessForm({
           ? {}
           : { provider_allow_list: [...savePayload.providerAllowList] }),
         model_deny_list: [...savePayload.modelDenyList],
+        model_deny_list_base: [...form.denyListBase],
       });
       if (!attempt.owns()) {
         return;
@@ -278,6 +280,7 @@ export function ModelAccessForm({
         ...previous,
         syncedKey: serverKey,
         baseline: previous.draft,
+        denyListBase: previous.draft.modelDenyList,
       }));
       // The draft became the saved policy; nothing is left to restore.
       restoredRef.current = true;

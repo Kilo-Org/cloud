@@ -4,7 +4,11 @@ import { createHash } from 'crypto';
 
 import * as z from 'zod';
 
-import { bouncerAuthHeaders, bouncerAuthRejected } from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import {
+  bouncerAuthHeaders,
+  bouncerAuthRejected,
+  type BouncerAuthHeaders,
+} from '@kilocode/web-shared/lib/bouncer/sts-auth';
 import type { BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
@@ -470,8 +474,10 @@ type PostResult =
  * missing key, is `unconfigured` and sends nothing. The STS headers are read within the call's
  * own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`, `sts-auth.ts`,
  * and only on a route that waits) and the request, so the call never takes longer than
- * `timeoutMs`; that read never fails. A 401 to a call that carried a token is reported, so the
- * auth holds that scope's token back for a while.
+ * `timeoutMs`; that read never fails, and a token goes only to `BOUNCER_STS_ORIGIN`. A 401 to a
+ * call that carried a token is reported, so the auth holds that scope's token back for a while,
+ * and a route that waits sends the call once more without the token, within the same deadline.
+ * That retry and the hold-back go away with the legacy key (main design 9.5).
  */
 async function postWithResult(
   path: BouncerApiPath,
@@ -491,12 +497,17 @@ async function postWithResult(
   const timeout = AbortSignal.timeout(timeoutMs);
   const deadline = signal ? AbortSignal.any([timeout, signal]) : timeout;
   const { scope, wait } = BOUNCER_ROUTES[path];
-  const auth = await bouncerAuthHeaders({ scope, wait, signal: deadline });
-  try {
-    const response = await fetch(endpoint, {
+  const auth = await bouncerAuthHeaders({
+    scope,
+    wait,
+    origin: endpoint.origin,
+    signal: deadline,
+  }).catch((): BouncerAuthHeaders => ({}));
+  const send = async (headers: BouncerAuthHeaders) =>
+    await fetch(endpoint, {
       method: 'POST',
       headers: {
-        ...auth,
+        ...headers,
         'content-type': 'application/json',
         'x-internal-api-key': internalApiSecret,
       },
@@ -507,8 +518,19 @@ async function postWithResult(
       // 3xx is a failed call.
       redirect: 'manual',
     });
+  try {
+    let response = await send(auth);
+    if (response.status === 401 && auth.authorization !== undefined) {
+      bouncerAuthRejected(scope);
+      if (wait) {
+        await response.body?.cancel();
+        response = await send(
+          Object.fromEntries(Object.entries(auth).filter(([name]) => name !== 'authorization'))
+        );
+      }
+    }
     if (!response.ok) {
-      if (response.status === 401 && auth.authorization !== undefined) bouncerAuthRejected(scope);
+      if (response.status >= 300 && response.status < 400) await response.body?.cancel();
       return {
         ok: false,
         kind: 'failed',

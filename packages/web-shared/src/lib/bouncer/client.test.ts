@@ -845,7 +845,12 @@ describe('STS headers from the installed Bouncer auth', () => {
     '%s asks for %s (waits: %s) and sends it with the legacy key',
     async (_name, call, path, scope, wait) => {
       await call();
-      expect(headersOf).toHaveBeenCalledWith({ scope, wait, signal: expect.any(AbortSignal) });
+      expect(headersOf).toHaveBeenCalledWith({
+        scope,
+        wait,
+        origin: 'https://bouncer.example.com',
+        signal: expect.any(AbortSignal),
+      });
       const { path: sentPath, headers } = sent();
       expect(sentPath).toBe(path);
       expect(headers.get('authorization')).toBe(`Bearer token-for-${scope}`);
@@ -864,23 +869,64 @@ describe('STS headers from the installed Bouncer auth', () => {
     expect(headers.get('x-internal-api-key')).toBe('test-internal-secret');
   });
 
-  it('reports a 401 to a call that carried a token, and only then', async () => {
+  function authorizationOf(index: number): string | null {
+    return new Headers(mockFetch.mock.calls[index]?.[1]?.headers).get('authorization');
+  }
+
+  it('reports a 401 to a decide that carried a token and sends it once more without the token', async () => {
+    const verdict = { enforced: false, spendWatch: false, flags: [] };
+    mockFetch
+      .mockResolvedValueOnce(new Response('refused', { status: 401 }))
+      .mockResolvedValueOnce(Response.json(verdict));
+    await expect(
+      decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
+    ).resolves.toEqual(verdict);
+    expect(rejected).toHaveBeenCalledWith('bouncer:decide');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(authorizationOf(0)).toBe('Bearer token-for-bouncer:decide');
+    expect(authorizationOf(1)).toBeNull();
+    const retried = new Headers(mockFetch.mock.calls[1]?.[1]?.headers);
+    expect(retried.get('x-internal-api-key')).toBe('test-internal-secret');
+    expect(retried.get('x-kilo-caller')).toBe('kilocode-app');
+    // Both sends share the call's one deadline.
+    expect(mockFetch.mock.calls[1]?.[1]?.signal).toBe(mockFetch.mock.calls[0]?.[1]?.signal);
+  });
+
+  it('reports a 401 to a release but never resends it, and retries a decide at most once', async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+    await releaseDecideLease({ requestId: 'r', accountId: 'user:u' });
+    expect(rejected).toHaveBeenCalledWith('bouncer:decide');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    mockFetch.mockClear();
+    mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
     await expect(
       decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
     ).resolves.toBeNull();
-    expect(rejected).toHaveBeenCalledWith('bouncer:decide');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
 
-    rejected.mockClear();
+  it('neither reports nor resends a 401 to a call without a token, or a 403', async () => {
     headersOf.mockResolvedValue({ 'x-kilo-caller': 'kilocode-app' });
-    mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+    mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
     expect(rejected).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    mockFetch.mockResolvedValue(new Response(null, { status: 403 }));
+    mockFetch.mockClear();
+    mockFetch.mockImplementation(async () => new Response(null, { status: 403 }));
     headersOf.mockResolvedValue({ authorization: 'Bearer t' });
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
     expect(rejected).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the legacy key alone when the token headers cannot be read', async () => {
+    headersOf.mockRejectedValue(new Error('auth failed'));
+    await deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-auth', userId: 'user-1' });
+    const { headers } = sent();
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-internal-api-key')).toBe('test-internal-secret');
   });
 
   it('asks for no token when the endpoint is unconfigured', async () => {
@@ -901,6 +947,7 @@ describe('a decide whose STS mint hangs', () => {
       setTimeout(() => controller.abort(new DOMException('timed out', 'TimeoutError')), ms);
       return controller.signal;
     });
+    mockConfigState.bouncerUrl = 'https://bouncer.kiloapps.io';
     globalThis.__kilocodeBouncerAuth = createBouncerAuth({
       caller: 'kilocode-ai-gateway',
       scopes: ['bouncer:decide', 'bouncer:usage.write'],

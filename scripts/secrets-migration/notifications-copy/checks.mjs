@@ -101,10 +101,46 @@ const storeRows = bindings =>
   (bindings ?? [])
     .filter(b => b.type === 'secrets_store_secret')
     .map(b => ({ binding: b.name, storeId: b.store_id, secretName: b.secret_name }));
-const batchRows = batch =>
-  batch.rows.map(r => ({ binding: r.binding, storeId: r.storeId, secretName: r.secretName }));
+const bindingRows = rows =>
+  rows.map(r => ({ binding: r.binding, storeId: r.storeId, secretName: r.secretName }));
+const nameRow = r => ({
+  binding: r.binding,
+  storeId: r.storeId,
+  secretName: r.secretName,
+  secretPath: r.secretPath,
+  secretKey: r.secretKey,
+});
+
+/**
+ * M89b: all four Notifications Secrets Store bindings with their STS lookup name (= Infisical
+ * target key) and folder. This is the name proof for every target, including the three that
+ * secrets-cutover writes from 1Password (M108); the copy batch (manifest.mjs) is the one row of
+ * it this copier creates. It must equal the production Wrangler config, the reader map and the
+ * STS policy exactly (`checkSource`).
+ */
+export const NAME_MAP = Object.freeze(
+  [
+    [
+      'APNS_PRIVATE_KEY',
+      'APNS_PRIVATE_KEY_PROD',
+      '/workloads/notifications',
+      'NOTIFICATIONS_APNS_PRIVATE_KEY',
+    ],
+    [
+      'EXPO_ACCESS_TOKEN',
+      'EXPO_ACCESS_TOKEN',
+      '/workloads/notifications',
+      'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+    ],
+    ['NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared', 'NEXTAUTH_SECRET'],
+    ['INTERNAL_API_SECRET', 'INTERNAL_API_SECRET_PROD', '/shared', 'INTERNAL_API_SECRET'],
+  ].map(([binding, secretName, secretPath, secretKey]) =>
+    Object.freeze({ binding, storeId: ALLOWED_STORE_ID, secretName, secretPath, secretKey })
+  )
+);
 
 // The two intentional design 4.7 aliases: the STS lookup name differs from the legacy binding.
+// NEXTAUTH_SECRET and INTERNAL_API_SECRET keep their binding name as their lookup name.
 export const EXPECTED_ALIASES = Object.freeze({
   NOTIFICATIONS_APNS_PRIVATE_KEY: 'APNS_PRIVATE_KEY',
   NOTIFICATIONS_EXPO_ACCESS_TOKEN: 'EXPO_ACCESS_TOKEN',
@@ -128,15 +164,21 @@ export function parseReaderBindings(readerText) {
 }
 
 /**
- * The batch must equal the tracked production Notifications config (binding -> store name), the
+ * The name map must equal the tracked production Notifications config (binding -> store name), the
  * Notifications reader (target key = the STS lookup name that indexes that binding) and its STS
  * policy (exactly these keys). A target is never a store name and never carries an environment
- * suffix; the only key/binding differences are the two expected aliases.
+ * suffix; the only key/binding differences are the two expected aliases. Every copy batch row must
+ * be exactly one name map row.
  */
-export function checkSource(wranglerText, policyText, readerText, batch = BATCH) {
+export function checkSource(wranglerText, policyText, readerText, batch = BATCH, names = NAME_MAP) {
   const f = [];
   const bv = validateBatch(batch);
   if (bv) f.push(`batch_${bv}`);
+  for (const r of Array.isArray(batch?.rows) ? batch.rows : []) {
+    if (names.filter(n => same(nameRow(n), nameRow(r ?? {}))).length !== 1) {
+      f.push(`batch_row_not_in_name_map_${r?.secretKey}`);
+    }
+  }
   const cfg = parseJsonc(wranglerText);
   if (
     cfg.name !== batch.sourceScript ||
@@ -150,7 +192,7 @@ export function checkSource(wranglerText, policyText, readerText, batch = BATCH)
     storeId: s.store_id,
     secretName: s.secret_name,
   }));
-  if (!same(live, batchRows(batch))) f.push('source_bindings_differ');
+  if (!same(live, bindingRows(names))) f.push('source_bindings_differ');
   if (!same(cfg.env?.staging?.secrets_store_secrets, [])) f.push('source_staging_binds_store');
   let reader = null;
   try {
@@ -159,10 +201,10 @@ export function checkSource(wranglerText, policyText, readerText, batch = BATCH)
     f.push('reader_map_unreadable');
   }
   if (reader) {
-    if (!same(Object.keys(reader).sort(), batch.rows.map(r => r.secretKey).sort())) {
+    if (!same(Object.keys(reader).sort(), names.map(r => r.secretKey).sort())) {
       f.push('reader_keys_differ');
     }
-    for (const r of batch.rows) {
+    for (const r of names) {
       if (reader[r.secretKey] !== r.binding) f.push(`reader_lookup_differs_${r.secretKey}`);
     }
     const aliases = Object.fromEntries(Object.entries(reader).filter(([k, b]) => k !== b));
@@ -176,12 +218,12 @@ export function checkSource(wranglerText, policyText, readerText, batch = BATCH)
   ) {
     f.push('policy_identity');
   }
-  if (!same([...(pol.lists.secrets ?? [])].sort(), batch.rows.map(r => r.secretKey).sort())) {
+  if (!same([...(pol.lists.secrets ?? [])].sort(), names.map(r => r.secretKey).sort())) {
     f.push('policy_targets_differ');
   }
-  for (const r of batch.rows) {
+  for (const r of names) {
     if (folderFor(r.secretKey) !== r.secretPath) f.push(`target_folder_${r.secretKey}`);
-    if (batch.rows.some(x => x.secretName === r.secretKey))
+    if (names.some(x => x.secretName === r.secretKey))
       f.push(`target_is_store_name_${r.secretKey}`);
     if (/_(PROD|DEV|STAGING)$/.test(r.secretKey))
       f.push(`target_environment_suffix_${r.secretKey}`);
@@ -198,17 +240,17 @@ export function readTrackedSource(root = REPO_ROOT) {
 }
 
 /**
- * One row per batch row, each column read from its own tracked source: the old binding and its
+ * One row per name map row, each column read from its own tracked source: the old binding and its
  * backing store name from the production Wrangler config, the STS lookup name from the reader map
  * (the key whose binding it is), and the matching policy entry. `checkSource` proves they agree.
  */
-export function mappingRows({ wranglerText, policyText, readerText }, batch = BATCH) {
+export function mappingRows({ wranglerText, policyText, readerText }, names = NAME_MAP) {
   const store = Object.fromEntries(
     (parseJsonc(wranglerText).secrets_store_secrets ?? []).map(s => [s.binding, s.secret_name])
   );
   const reader = parseReaderBindings(readerText);
   const policy = parsePolicy(policyText).lists.secrets ?? [];
-  return batch.rows.map(r => {
+  return names.map(r => {
     const lookups = Object.keys(reader).filter(k => reader[k] === r.binding);
     const lookup = lookups.length === 1 ? lookups[0] : null;
     return {
@@ -240,15 +282,21 @@ export function mappingTable(rows) {
 
 /**
  * Reads the tracked sources under `root`, validates them (`checkSource`) and returns the names-only
- * table: {gate:"table", ok, failures, rows:[{binding, storeSecretName, lookup, target,
- * policyEntry}], table}. Callers must refuse to proceed when `ok` is false.
+ * table of all four lookup names: {gate:"table", ok, failures, rows:[{binding, storeSecretName,
+ * lookup, target, policyEntry}], table}. Callers must refuse to proceed when `ok` is false.
  */
-export function validatedNameTable(root = REPO_ROOT, batch = BATCH) {
+export function validatedNameTable(root = REPO_ROOT, batch = BATCH, names = NAME_MAP) {
   const sources = readTrackedSource(root);
-  const failures = checkSource(sources.wranglerText, sources.policyText, sources.readerText, batch);
+  const failures = checkSource(
+    sources.wranglerText,
+    sources.policyText,
+    sources.readerText,
+    batch,
+    names
+  );
   let rows = [];
   try {
-    rows = mappingRows(sources, batch);
+    rows = mappingRows(sources, names);
   } catch {
     failures.push('mapping_rows_unreadable');
   }
@@ -257,20 +305,12 @@ export function validatedNameTable(root = REPO_ROOT, batch = BATCH) {
   }
   if (
     rows.some(
-      r => r.target !== `${batch.rows.find(x => x.binding === r.binding)?.secretPath}/${r.lookup}`
+      r => r.target !== `${names.find(x => x.binding === r.binding)?.secretPath}/${r.lookup}`
     )
   ) {
     failures.push('mapping_target_not_lookup');
   }
   return { gate: 'table', ok: failures.length === 0, failures, rows, table: mappingTable(rows) };
-}
-
-/** Shared targets: workloads granted each /shared key at the point of use. Only Notifications. */
-export function checkSharedConsumers(grantsByKey, batch = BATCH) {
-  return batch.rows
-    .filter(r => r.secretPath === '/shared')
-    .filter(r => !same(grantsByKey?.[r.secretKey], [batch.sourceScript]))
-    .map(r => `shared_consumers_${r.secretKey}`);
 }
 
 /** A rendered config file must equal `buildConfig(pins)` exactly. */
@@ -517,7 +557,7 @@ const WRITER_BINDING = Object.freeze({ name: WRITER_SECRET, type: 'secret_text' 
 /** The unarmed copier's exact bindings for `pins`: everything except the writer secret. */
 const unarmedCopierBindings = (pins, batch) =>
   [
-    ...batchRows(batch).map(m => ({
+    ...bindingRows(batch.rows).map(m => ({
       name: m.binding,
       type: 'secrets_store_secret',
       store_id: m.storeId,
@@ -609,7 +649,7 @@ function preflightOf(input, batch) {
 
   const source = servingVersion(meta.notifications);
   if (!source) f.push('source_serving_version_not_single');
-  else if (!same(storeRows(source.bindings), batchRows(batch))) {
+  else if (!same(storeRows(source.bindings), bindingRows(NAME_MAP))) {
     f.push('source_live_bindings_differ');
   }
   const store = isRecord(meta.store) ? meta.store : {};
@@ -691,15 +731,7 @@ function preflightOf(input, batch) {
     if (!Array.isArray(here) || here.includes(r.secretKey)) {
       f.push(`target_present_or_unread_${r.secretKey}`);
     }
-    const workload = names['/workloads/notifications'];
-    if (
-      r.secretPath === '/shared' &&
-      (!Array.isArray(workload) || workload.includes(r.secretKey))
-    ) {
-      f.push(`target_shadow_${r.secretKey}`);
-    }
   }
-  f.push(...checkSharedConsumers(meta.grantsByKey, batch));
   const targets = batch.rows.map(r => `${r.secretPath}/${r.secretKey}`);
   const coversAny = p => targets.some(t => pathCovers(p, t));
   for (const k of ['syncs', 'imports', 'readers', 'approvalPolicies']) {
@@ -721,13 +753,13 @@ function preflightOf(input, batch) {
   const readerNotAllowed = list(inf.readers).some(rd => {
     if (!isRecord(rd)) return true;
     const ps = Array.isArray(rd.paths) && rd.paths.length > 0 ? rd.paths : [undefined];
-    return (
-      isProd(rd.environment) && ps.some(coversAny) && !(allowed ?? []).includes(rd.principal)
-    );
+    return isProd(rd.environment) && ps.some(coversAny) && !(allowed ?? []).includes(rd.principal);
   });
   if (readerNotAllowed) f.push('infisical_reader_not_allowed');
 
-  // The Worker-only writer exactly as configured at the issuer (names-only readback).
+  // The Worker-only writer exactly as configured at the issuer (names-only readback): one create
+  // permission per batch row (M108: the Expo target only) and an access token with exactly one use
+  // per create plus one for the denial probe (2). Login and revoke do not spend a token use.
   const w = isRecord(meta.writer) ? meta.writer : {};
   const key = p =>
     isRecord(p) ? `${p.action}|${p.environment}|${p.secretPath}|${p.secretName}` : '';
@@ -870,7 +902,7 @@ export function evaluatePostRunCloudflare(input, batch = BATCH) {
   const source = servingVersion(meta?.notifications);
   if (
     !source ||
-    !same(storeRows(source.bindings), batchRows(batch)) ||
+    !same(storeRows(source.bindings), bindingRows(NAME_MAP)) ||
     !same(meta.notifications.deployments, pre?.pins?.sourceDeployments)
   ) {
     f.push('source_changed_during_run');

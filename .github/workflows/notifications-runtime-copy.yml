@@ -1,7 +1,9 @@
 name: Notifications runtime copy (M84, temporary)
 
-# One-shot copy of the four Notifications Secrets Store values into Infisical through a
-# temporary cron-only copier Worker (scripts/secrets-migration/m84-notifications-run.mjs).
+# One-shot copy of one Notifications Secrets Store value, the Expo token, into Infisical production
+# /workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN (Create-only, M108) through a temporary
+# cron-only copier Worker (scripts/secrets-migration/m84-notifications-run.mjs). The other three
+# Notifications values come from 1Password through secrets-cutover, never from this workflow.
 # Removed after the run. It takes no input except the exact commit the dispatcher approved,
 # and it runs only from Kilo-Org/cloud main in the protected `notifications-runtime-copy`
 # environment. That environment must already exist with main as its only deployment branch
@@ -83,6 +85,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
+          cache: 'pnpm'
 
       - name: Install the pinned Wrangler
         working-directory: services/notifications

@@ -33,7 +33,7 @@ import {
   runChild,
   stopChild,
 } from '../m84-notifications-run.mjs';
-import { moduleHashes } from './checks.mjs';
+import { NAME_MAP, moduleHashes } from './checks.mjs';
 import {
   CLIENT_ID,
   CLIENT_SECRET,
@@ -65,9 +65,8 @@ function operatorMeta(overrides = {}) {
     targets: [...BATCH_TARGETS],
     readAt: iso(T0 - 5 * 60_000),
     allowedReaders: [PRINCIPAL],
-    grantsByKey: { NEXTAUTH_SECRET: ['notifications'], INTERNAL_API_SECRET: ['notifications'] },
     infisical: {
-      names: { '/workloads/notifications': [], '/shared': [] },
+      names: { '/workloads/notifications': [] },
       syncs: [],
       imports: [],
       readers: [{ principal: PRINCIPAL, environment: 'production', paths: ['/shared'] }],
@@ -115,7 +114,7 @@ function baseEnv(overrides = {}) {
 }
 
 const sourceBindings = () => [
-  ...BATCH.rows.map(r => ({
+  ...NAME_MAP.map(r => ({
     name: r.binding,
     type: 'secrets_store_secret',
     store_id: r.storeId,
@@ -158,7 +157,7 @@ function makeWorld(o = {}) {
       bindings: [],
     });
   o.setup?.(scripts);
-  const storeSecrets = BATCH.rows.map(r => ({
+  const storeSecrets = NAME_MAP.map(r => ({
     id: ns(),
     name: r.secretName,
     status: 'active',
@@ -310,7 +309,10 @@ function makeWorld(o = {}) {
   /** `o.deploy` / `o.put`: `{code, lands, bindings}`; defaults are a clean landed write. */
   world.wrangler = async (args, opts = {}) => {
     calls.push(['wrangler', ...args]);
-    world.writes = [...(world.writes ?? []), { verb: args[0], at: clock.t, ...opts, stdin: undefined }];
+    world.writes = [
+      ...(world.writes ?? []),
+      { verb: args[0], at: clock.t, ...opts, stdin: undefined },
+    ];
     clock.t += 20_000;
     if (args[0] === 'deploy') {
       const { code = 0, lands = true, pins = world.pins } = o.deploy ?? {};
@@ -450,7 +452,11 @@ test('happy path: unarmed preflight, then arm, one copy, cleanup; Cloudflare hal
   assert.equal(env[WRITER_SECRET], undefined);
   assert.equal(env[OPERATOR_META], undefined);
   assert.equal(world.infisical.clientSecretUses, 1);
-  assert.equal(world.infisical.creates, BATCH.rows.length);
+  assert.equal(world.infisical.creates, 1);
+  assert.deepEqual([...world.infisical.store.keys()], [...BATCH_TARGETS]);
+  assert.deepEqual(report.batchTargets, [
+    '/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+  ]);
   assert.equal(world.gate.state.outcome, 'complete');
   assert.equal(report.finalReceipt.schema, RECEIPT_SCHEMA);
   assert.equal(report.finalReceipt.gate, 'consumed_now');
@@ -511,7 +517,7 @@ test('happy path: unarmed preflight, then arm, one copy, cleanup; Cloudflare hal
     lines[0],
     'old binding name | store secret_name (if any) | STS lookup name (= Infisical target) | policy entry'
   );
-  assert.equal(lines.length, BATCH.rows.length + 1);
+  assert.equal(lines.length, NAME_MAP.length + 1, 'all four lookup names are proved and printed');
   assert.ok(lines.slice(1).every(l => l.split(' | ').length === 4));
   assert.deepEqual(leaked, []);
 });
@@ -736,13 +742,20 @@ test('every unarmed preflight refusal stops before `secret put` and deletes the 
     [
       'sync covers a target',
       {},
-      meta(m => m.infisical.syncs.push({ environment: 'production', path: '/shared' })),
+      meta(m =>
+        m.infisical.syncs.push({ environment: 'production', path: '/workloads/notifications' })
+      ),
       f => f.includes('infisical_sync_covers_target'),
     ],
     [
       'import covers a target',
       {},
-      meta(m => m.infisical.imports.push({ environment: 'production', importPath: '/shared' })),
+      meta(m =>
+        m.infisical.imports.push({
+          environment: 'production',
+          importPath: '/workloads/notifications',
+        })
+      ),
       f => f.includes('infisical_import_covers_target'),
     ],
     [
@@ -760,9 +773,7 @@ test('every unarmed preflight refusal stops before `secret put` and deletes the 
     [
       'target already present',
       {},
-      meta(m =>
-        m.infisical.names['/shared'].push(BATCH.rows.find(r => r.secretPath === '/shared').secretKey)
-      ),
+      meta(m => m.infisical.names['/workloads/notifications'].push(BATCH.rows[0].secretKey)),
       f => f.some(x => x.startsWith('target_present_or_unread_')),
     ],
     [
@@ -810,7 +821,7 @@ test('every unarmed preflight refusal stops before `secret put` and deletes the 
 
 test('a preflight refusal never arms, even when the cleanup delete is refused', async () => {
   const meta = operatorMeta();
-  meta.infisical.syncs = [{ environment: 'production', path: '/shared' }];
+  meta.infisical.syncs = [{ environment: 'production', path: '/workloads/notifications' }];
   const { world, report } = await drive(
     { cfFail: { deleteScript: 'cloudflare_api_error' } },
     { [OPERATOR_META]: JSON.stringify(meta) }
@@ -1193,7 +1204,29 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
   const json = (result, info) =>
     new Response(JSON.stringify({ success: true, result, result_info: info }), { status: 200 });
   const versionId = randomUUID();
-  const coreText = 'export const synthetic = "ü";\n';
+  // Raw multipart bytes as the provider sends them: file parts and a part without a filename,
+  // with LF, CRLF and non-ASCII bytes. (A FormData built here would normalize a string part's LF
+  // to CRLF when serialized, which is the round-2 fixture defect, not provider behaviour.)
+  const parts = {
+    'worker.mjs': ['file', 'export default {};\n// lf only\n'],
+    'core.mjs': ['field', 'export const synthetic = "ü";\nexport const two = 2;\n'],
+    'manifest.mjs': ['file', 'export const mixed = 1;\r\n// crlf then lf\n'],
+    metadata: ['field', '{"synthetic":true}'],
+  };
+  const boundary = 'm84-synthetic-boundary';
+  const multipart = Buffer.concat([
+    ...Object.entries(parts).map(([name, [kind, text]]) =>
+      Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="${name}"${kind === 'file' ? `; filename="${name}"\r\nContent-Type: application/javascript+module` : ''}\r\n\r\n`
+        ),
+        Buffer.from(text, 'utf8'),
+        Buffer.from('\r\n'),
+      ])
+    ),
+    Buffer.from(`--${boundary}--\r\n`),
+  ]);
+  const sha = text => createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
   const fetchImpl = async (url, init) => {
     seen.push(`${init.method} ${url}`);
     const u = new URL(url);
@@ -1215,9 +1248,14 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
         ],
       });
     }
-    if (u.pathname.endsWith('/bad/deployments')) return json({ deployments: [{ versions: [null] }] });
+    if (u.pathname.endsWith('/bad/deployments'))
+      return json({ deployments: [{ versions: [null] }] });
     if (u.pathname.endsWith(`/x/versions/${versionId}`)) {
-      return json({ id: versionId, number: 3, resources: { bindings: [{ name: 'A', type: 'plain_text', text: 'a' }] } });
+      return json({
+        id: versionId,
+        number: 3,
+        resources: { bindings: [{ name: 'A', type: 'plain_text', text: 'a' }] },
+      });
     }
     if (u.pathname.endsWith('/durable_objects/namespaces')) {
       const page = Number(u.searchParams.get('page'));
@@ -1226,11 +1264,10 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
       });
     }
     if (u.pathname.endsWith('/content/v2')) {
-      const form = new FormData();
-      form.append('worker.mjs', new File(['export default {}'], 'worker.mjs'));
-      form.append('core.mjs', coreText);
-      form.append('metadata', '{"synthetic":true}');
-      return new Response(form, { status: 200 });
+      return new Response(multipart, {
+        status: 200,
+        headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      });
     }
     if (u.pathname.endsWith('/denied/settings')) return new Response('{}', { status: 403 });
     return new Response('{}', { status: 500 });
@@ -1249,12 +1286,34 @@ test('Cloudflare client: denials, absence, versions, pages, module hashes and an
   });
   assert.deepEqual(await cf.doNamespaces(COPIER), [{ id: 'n2', script: COPIER, class: 'M65Gate' }]);
   const hashes = await cf.moduleHashes(COPIER);
-  assert.deepEqual(Object.keys(hashes).sort(), ['core.mjs', 'metadata', 'worker.mjs']);
-  assert.equal(
-    hashes['core.mjs'],
-    createHash('sha256').update(Buffer.from(coreText, 'utf8')).digest('hex')
-  );
+  assert.deepEqual(Object.keys(hashes).sort(), [
+    'core.mjs',
+    'manifest.mjs',
+    'metadata',
+    'worker.mjs',
+  ]);
+  for (const m of ['worker.mjs', 'core.mjs', 'manifest.mjs']) {
+    assert.equal(hashes[m], sha(parts[m][1]), `${m}: digest of the exact uploaded bytes`);
+  }
   assert.equal(hashes.metadata, 'unexpected');
+  // The tracked modules hash the same way: the module check compares like with like.
+  const tracked = moduleHashes();
+  const form = new FormData();
+  for (const m of Object.keys(tracked)) {
+    form.append(m, new File([readFileSync(new URL(`./src/${m}`, import.meta.url))], m));
+  }
+  const roundTrip = cloudflare({
+    token: 'synthetic',
+    accountId: BATCH.accountId,
+    fetchImpl: async () => new Response(form, { status: 200 }),
+  });
+  assert.deepEqual(await roundTrip.moduleHashes(COPIER), tracked);
+  // Why the fixture is raw bytes: a FormData string part is CRLF-normalized on serialization.
+  const normalized = new FormData();
+  normalized.append('core.mjs', parts['core.mjs'][1]);
+  const echoed = (await new Response(normalized).formData()).get('core.mjs');
+  assert.notEqual(sha(echoed), sha(parts['core.mjs'][1]));
+  assert.equal(echoed, parts['core.mjs'][1].replaceAll('\n', '\r\n'));
   await assert.rejects(cf.scriptSettings('denied'), e => e.reason === 'cloudflare_unauthorized');
   await cf.deleteScript(COPIER);
   assert.ok(
@@ -1312,7 +1371,8 @@ test('GitHub client: a missing rollout workflow is unreadable, never zero; run l
 });
 
 test('a child that ignores its stop signal is killed within the bound', async () => {
-  const stubborn = "process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});setInterval(()=>{},1000);process.stdout.write('ready')";
+  const stubborn =
+    "process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});setInterval(()=>{},1000);process.stdout.write('ready')";
   const child = spawn(process.execPath, ['-e', stubborn], { stdio: ['ignore', 'pipe', 'ignore'] });
   await new Promise(r => child.stdout.once('data', r));
   assert.equal(await stopChild(child, 300), 'killed');
@@ -1385,6 +1445,12 @@ test('workflow: dispatch-only, exact guards, pinned actions, secrets only in the
     if (step.run) assert.ok(!step.run.includes('${{'), `${step.name} interpolates into run`);
   }
   assert.equal(job.steps[0].with['persist-credentials'], false);
+  // The install restores setup-node's pnpm cache first (scripts/typecheck-ci.test.mjs rule).
+  const install = job.steps.findIndex(s => /\bpnpm\b.*\binstall\b/.test(s.run ?? ''));
+  const warm = job.steps.findIndex(
+    s => String(s.uses).startsWith('actions/setup-node@') && s.with?.cache === 'pnpm'
+  );
+  assert.ok(warm >= 0 && warm < install, 'pnpm cache restored before the install');
   const withSecrets = job.steps.filter(s => JSON.stringify(s).includes('secrets.'));
   assert.deepEqual(
     withSecrets.map(s => s.name),

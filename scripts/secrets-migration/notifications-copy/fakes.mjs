@@ -12,17 +12,9 @@ export const CLIENT_SECRET = `synthetic-client-secret-${randomBytes(12).toString
 export const VERSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 export const RUN_ID = 'm65-synthetic-run-0001';
 
-const label = (...w) => w.join(' ');
-
+// One synthetic value per batch binding, keyed by binding (M108: the Expo token only).
 export function syntheticValues() {
-  const r = () => randomBytes(24).toString('base64url');
-  return {
-    // One-line synthetic PEM shape with a random body, like the stored APNs entry.
-    APNS_PRIVATE_KEY: `-----${label('BEGIN', 'PRIVATE', 'KEY')}-----${randomBytes(96).toString('base64')}-----${label('END', 'PRIVATE', 'KEY')}-----`,
-    EXPO_ACCESS_TOKEN: `synthetic-expo-ünïcødé-${r()}`,
-    NEXTAUTH_SECRET: `synthetic-nextauth-${r()}`,
-    INTERNAL_API_SECRET: `synthetic-internal-${r()}\n`,
-  };
+  return { EXPO_ACCESS_TOKEN: `synthetic-expo-ünïcødé-${randomBytes(24).toString('base64url')}` };
 }
 
 // Values plus their trimmed, base64, hex and SHA-256 forms, the client secret, and any extra

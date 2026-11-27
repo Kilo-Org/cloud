@@ -81,7 +81,8 @@ export const SOURCE = BATCH.sourceScript;
 export const REPOSITORY = 'Kilo-Org/cloud';
 export const REF = 'refs/heads/main';
 export const OPERATOR_META = 'M65_OPERATOR_PREFLIGHT';
-export const OPERATOR_SCHEMA = 'm84-operator-preflight/1';
+// /2: M108 batch (Expo only); the readback no longer carries the /shared consumer grants.
+export const OPERATOR_SCHEMA = 'm84-operator-preflight/2';
 export const CF_API = 'https://api.cloudflare.com/client/v4';
 export const ENVIRONMENT = 'notifications-runtime-copy';
 /** Workflows that deploy Workers into this account; none may be queued or running beside the copy. */
@@ -190,7 +191,6 @@ export function parseOperatorMeta(text, env, nowMs) {
     'targets',
     'readAt',
     'allowedReaders',
-    'grantsByKey',
     'infisical',
     'writer',
   ];
@@ -212,7 +212,6 @@ export function parseOperatorMeta(text, env, nowMs) {
     !Array.isArray(o.allowedReaders) ||
     o.allowedReaders.length === 0 ||
     !o.allowedReaders.every(r => typeof r === 'string' && r !== '') ||
-    !isRecord(o.grantsByKey) ||
     !exactKeys(o.infisical, ['names', 'syncs', 'imports', 'readers', 'approvalPolicies']) ||
     !isRecord(o.infisical.names) ||
     !['syncs', 'imports', 'readers', 'approvalPolicies'].every(k =>
@@ -357,9 +356,7 @@ export function cloudflare({
       if (!isRecord(result)) throw new StopError('cloudflare_unreadable');
       const latest = records(result.deployments)[0];
       const versions = latest === undefined ? [] : records(latest.versions);
-      if (
-        !versions.every(v => typeof v.version_id === 'string' && Number.isFinite(v.percentage))
-      ) {
+      if (!versions.every(v => typeof v.version_id === 'string' && Number.isFinite(v.percentage))) {
         throw new StopError('cloudflare_unreadable');
       }
       return versions
@@ -385,8 +382,11 @@ export function cloudflare({
     },
     subdomain: name => get(`${script(name)}/subdomain`),
     /**
-     * SHA-256 of each known module part (string parts as UTF-8). Any other part is listed as
-     * `unexpected` without hashing, so the module check fails closed and nothing else is digested.
+     * SHA-256 of each known module part. A file part is hashed as its bytes; a part without a
+     * filename is re-encoded as UTF-8, which equals the uploaded bytes because parsing keeps line
+     * endings (only FormData serialization normalizes them; m84-run.test.mjs proves both on raw
+     * multipart bytes). Any other part is listed as `unexpected` without hashing, so the module
+     * check fails closed and nothing else is digested.
      */
     async moduleHashes(name) {
       const res = await request(`${account}${script(name)}/content/v2`, { raw: true });
@@ -635,7 +635,11 @@ export async function cloudflareMeta(cf) {
   };
 }
 
-const TRANSIENT = new Set(['cloudflare_transport', 'cloudflare_api_error', 'cloudflare_unreadable']);
+const TRANSIENT = new Set([
+  'cloudflare_transport',
+  'cloudflare_api_error',
+  'cloudflare_unreadable',
+]);
 
 /** A read that hits a transient failure is read once more. Never used for a mutation. */
 export async function readBack(io, read) {
@@ -955,7 +959,13 @@ function writeFailed(reason, output) {
  */
 export async function run(io) {
   const { env, clock, cf, log, signal } = io;
-  const report = { schema: 'm84-notifications-run/1', status: 'started', phases: [], gates: [] };
+  const report = {
+    schema: 'm84-notifications-run/1',
+    status: 'started',
+    batchTargets: [...BATCH_TARGETS],
+    phases: [],
+    gates: [],
+  };
   const phase = (name, { stoppable = true } = {}) => {
     if (stoppable && signal?.aborted) throw new StopError('stopped_by_signal');
     report.phases.push({ name, at: isoSeconds(clock.now()) });
@@ -1195,7 +1205,6 @@ export async function run(io) {
 export function operatorPreflightMeta(operator) {
   return {
     infisical: operator.infisical,
-    grantsByKey: operator.grantsByKey,
     writer: operator.writer,
   };
 }
@@ -1209,7 +1218,13 @@ export async function cleanup(io, { created, recorded, before, plan, since }) {
   const { cf, clock } = io;
   const result = { attempted: false, deleted: false, scriptStatus: null, drift: null, errors: [] };
   if (!created) {
-    return { attempted: false, deleted: false, scriptStatus: 404, drift: null, note: 'not_created' };
+    return {
+      attempted: false,
+      deleted: false,
+      scriptStatus: 404,
+      drift: null,
+      note: 'not_created',
+    };
   }
   const step = async (name, fn) => {
     try {

@@ -179,7 +179,7 @@ test('lifecycle: unarmed readiness, one armed copy, idle repeats, no fetch path,
     const copy = await tick(armed.mf, armed.stdio);
     assert.deepEqual(
       [copy.outcome, copy.gate, copy.logins, copy.reads, copy.posts],
-      ['complete', 'consumed_now', 1, 4, 4]
+      ['complete', 'consumed_now', 1, 1, 1]
     );
     assert.deepEqual([copy.revoked, copy.denialProved], [true, true]);
     assert.ok(
@@ -196,7 +196,11 @@ test('lifecycle: unarmed readiness, one armed copy, idle repeats, no fetch path,
       [repeat.outcome, repeat.reason, repeat.prior, repeat.reads],
       ['idle', 'already_consumed', 'complete', 0]
     );
-    assert.equal(fake.calls.length, 7, 'no new provider call');
+    assert.equal(fake.calls.length, 4, 'no new provider call');
+    assert.deepEqual(
+      [...fake.store.keys()],
+      ['/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN']
+    );
     noLeak(armed.stdio, values, fake);
   } finally {
     await armed.mf.dispose();
@@ -255,26 +259,26 @@ test('eight racing ticks: exactly one admitted by the Durable Object gate', asyn
     assert.equal(rs.length, 8);
     assert.equal(rs.filter(r => r.gate === 'consumed_now').length, 1);
     assert.equal(rs.filter(r => r.reason === 'already_consumed').length, 7);
-    assert.deepEqual([fake.clientSecretUses, fake.creates], [1, 4]);
+    assert.deepEqual([fake.clientSecretUses, fake.creates], [1, 1]);
     noLeak(stdio, values, fake);
   } finally {
     await mf.dispose();
   }
 });
 
-test('existing target: 400, kept, and the next row is not attempted', async () => {
-  const fake = fakeInfisical({ preexisting: ['/shared/NEXTAUTH_SECRET'] });
+test('existing target: 400, kept, nothing overwritten', async () => {
+  const target = `${BATCH.rows[0].secretPath}/${BATCH.rows[0].secretKey}`;
+  const fake = fakeInfisical({ preexisting: [target] });
   const { mf, stdio } = await start({ fake });
   try {
     await seed(mf, syntheticValues());
     const r = await tick(mf, stdio);
-    assert.deepEqual([r.reason, r.reads, r.posts], ['create_http_400', 3, 3]);
+    assert.deepEqual([r.reason, r.reads, r.posts], ['create_http_400', 1, 1]);
     assert.deepEqual(
       r.rows.map(x => x.created),
-      ['yes', 'yes', 'no']
+      ['no']
     );
-    assert.equal(fake.store.get('/shared/NEXTAUTH_SECRET'), 'pre-existing-synthetic');
-    assert.equal(fake.store.has('/shared/INTERNAL_API_SECRET'), false);
+    assert.equal(fake.store.get(target), 'pre-existing-synthetic');
     assert.deepEqual([r.revoked, r.denialProved], [true, true]);
   } finally {
     await mf.dispose();
@@ -285,11 +289,11 @@ test('a value Infisical would normalize stops before its POST', async () => {
   const fake = fakeInfisical();
   const { mf, stdio } = await start({ fake });
   try {
-    await seed(mf, { ...syntheticValues(), NEXTAUTH_SECRET: 'synthetic-nextauth-value ' });
+    await seed(mf, { EXPO_ACCESS_TOKEN: 'synthetic-expo-value ' });
     const r = await tick(mf, stdio);
     assert.deepEqual(
-      [r.reason, r.reads, r.posts, fake.store.has('/shared/NEXTAUTH_SECRET')],
-      ['value_not_storable_losslessly', 3, 2, false]
+      [r.reason, r.reads, r.posts, fake.store.size],
+      ['value_not_storable_losslessly', 1, 0, 0]
     );
   } finally {
     await mf.dispose();
@@ -335,7 +339,13 @@ test('the rendered config parses with the pinned Wrangler and dry-runs to exactl
     [[], [], [], []]
   );
   assert.equal(cfg.observability.traces.enabled, false);
-  assert.equal(cfg.secrets_store_secrets.length, 4);
+  assert.deepEqual(cfg.secrets_store_secrets, [
+    {
+      binding: 'EXPO_ACCESS_TOKEN',
+      store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
+      secret_name: 'EXPO_ACCESS_TOKEN',
+    },
+  ]);
 
   const out = join(dir, 'out');
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false' };

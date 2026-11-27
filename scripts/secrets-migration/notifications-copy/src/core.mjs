@@ -3,6 +3,8 @@
 //   window closed (idle receipt) -> durable one-time gate (Durable Object insert) -> one Universal
 //   Auth login -> per row: one binding read, storable and parity checks, one Create-only POST ->
 //   after the last row or the first stop: one revoke and one denial probe.
+// M108: the batch is exactly one reviewed target (REVIEWED_TARGETS), the Expo token. The writer's
+// access token has two uses: the one create and the denial probe.
 // Nothing reads a binding or calls Infisical before the gate admits this run once. Receipts carry
 // names, booleans and fixed flags only: no value, digest, credential, id or provider response.
 
@@ -10,9 +12,13 @@ export const API_BASE = 'https://eu.infisical.com';
 export const PROJECT_ID = '8cf601df-1c5a-4c8f-9e21-7e9af6728b06'; // EU project "kilo"
 export const RECEIPT_SCHEMA = 'm65-copy-receipt/1';
 export const CRON = '* * * * *';
-export const REVIEWED_BATCH_ID = 'm65-notifications-production-1';
+export const REVIEWED_BATCH_ID = 'm65-notifications-expo-production-1';
 export const ALLOWED_STORE_ID = '342a86d9e3a94da698e82d0c6e2a36f0';
-export const ALLOWED_PATHS = Object.freeze(['/workloads/notifications', '/shared']);
+// The only Infisical targets this copier may create (M108). The other three Notifications values
+// come from 1Password through secrets-cutover and would collide on Create-only.
+export const REVIEWED_TARGETS = Object.freeze([
+  '/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+]);
 export const RUN_VARS = Object.freeze([
   'M65_RUN_ID',
   'M65_NOT_BEFORE',
@@ -67,14 +73,14 @@ export function windowOf(pins) {
 }
 
 // Structural closure of a batch. Exact equality with the tracked source is checked offline and at
-// live preflight (checks.mjs); this keeps any other batch shape out of the deployed module.
+// live preflight (checks.mjs); this keeps any other batch shape or target out of the deployed module.
 export function validateBatch(batch) {
   if (own(batch, 'id') !== REVIEWED_BATCH_ID || own(batch, 'environment') !== 'production') {
     return 'batch_not_reviewed';
   }
   const rows = own(batch, 'rows');
-  if (!Array.isArray(rows) || rows.length !== 4) return 'batch_row_count';
-  const seen = new Set();
+  if (!Array.isArray(rows) || rows.length !== REVIEWED_TARGETS.length) return 'batch_row_count';
+  const targets = new Set();
   for (const r of rows) {
     if (own(r, 'kind') === 'secret_text') return 'secret_text_not_cross_script';
     if (own(r, 'kind') !== 'secrets_store') return 'row_kind_unsupported';
@@ -86,19 +92,12 @@ export function validateBatch(batch) {
     if (!KEY.test(String(own(r, 'secretName'))) || !KEY.test(String(own(r, 'secretKey')))) {
       return 'row_name_invalid';
     }
-    if (!ALLOWED_PATHS.includes(own(r, 'secretPath'))) return 'row_path_not_allowed';
     // A target is the STS lookup name: never a store name, never an environment-suffixed name.
     if (rows.some(x => own(x, 'secretName') === r.secretKey)) return 'row_target_is_store_name';
     if (/_(PROD|DEV|STAGING)$/.test(r.secretKey)) return 'row_target_environment_suffix';
-    for (const k of [
-      `b:${r.binding}`,
-      `s:${r.secretName}`,
-      `t:${r.secretPath}/${r.secretKey}`,
-      `k:${r.secretKey}`,
-    ]) {
-      if (seen.has(k)) return 'row_duplicate';
-      seen.add(k);
-    }
+    const target = `${own(r, 'secretPath')}/${r.secretKey}`;
+    if (!REVIEWED_TARGETS.includes(target) || targets.has(target)) return 'row_target_not_reviewed';
+    targets.add(target);
   }
   return null;
 }
@@ -172,7 +171,9 @@ async function readBounded(res) {
   } catch {
     try {
       await reader?.cancel();
-    } catch {}
+    } catch {
+      // A failed cancel leaves nothing to read; the caller already gets null.
+    }
     return null;
   } finally {
     for (const c of chunks) c.fill(0);
@@ -193,7 +194,9 @@ function parseJson(bytes) {
 async function discard(res) {
   try {
     await res.body?.cancel();
-  } catch {}
+  } catch {
+    // The body is dropped either way; a failed cancel changes no verdict.
+  }
 }
 
 const call = (fetchImpl, path, init) =>
@@ -328,8 +331,8 @@ async function createRow(fetchImpl, accessToken, batch, row, value) {
   return out.echo === 'differs' ? { out, stop: 'stored_echo_mismatch' } : { out, stop: null };
 }
 
-// One revoke, then one probe with the same token. With accessTokenNumUsesLimit = rows + 1, a
-// revoked token answers 401 and an unrevoked create-only token answers 403.
+// One revoke, then one probe with the same token. With accessTokenNumUsesLimit = 2 (the one create
+// and this probe), a revoked token answers 401 and an unrevoked create-only token answers 403.
 async function revokeAndProve(fetchImpl, accessToken, batch) {
   const r = { revoked: false, denialProved: false };
   try {
@@ -340,12 +343,14 @@ async function revokeAndProve(fetchImpl, accessToken, batch) {
     });
     r.revoked = res.status === 200;
     await discard(res);
-  } catch {}
+  } catch {
+    // Transport failure: `revoked` stays false, so the run cannot be complete.
+  }
   try {
     const q = new URLSearchParams({
       projectId: PROJECT_ID,
       environment: batch.environment,
-      secretPath: '/shared',
+      secretPath: batch.rows[0].secretPath,
       viewSecretValue: 'false',
     });
     const res = await call(fetchImpl, `/api/v4/secrets?${q}`, {
@@ -354,7 +359,9 @@ async function revokeAndProve(fetchImpl, accessToken, batch) {
     });
     r.denialProved = res.status === 401;
     await discard(res);
-  } catch {}
+  } catch {
+    // Transport failure: `denialProved` stays false, so the run cannot be complete.
+  }
   return r;
 }
 
@@ -522,6 +529,8 @@ export async function runTick({ env, cron, scheduledTime, now, fetchImpl, batch 
   }
   try {
     await stub.finish(receipt.outcome);
-  } catch {}
+  } catch {
+    // The gate row already blocks a replay; a lost final outcome only blanks `prior` later.
+  }
   return receipt;
 }

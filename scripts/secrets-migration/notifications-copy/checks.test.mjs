@@ -10,8 +10,8 @@ import { RUN_VARS, newReceipt } from './src/core.mjs';
 import { BATCH } from './src/manifest.mjs';
 import {
   EXPECTED_ALIASES,
+  NAME_MAP,
   checkRenderedConfig,
-  checkSharedConsumers,
   checkSource,
   evaluateCleanup,
   evaluateCleanupCloudflare,
@@ -50,7 +50,7 @@ const PINS = {
 const expect = (failures, code) =>
   assert.ok(failures.includes(code), `${code} in ${JSON.stringify(failures)}`);
 
-test('the batch equals the tracked Notifications config, reader map and STS policy', () => {
+test('the four-name map equals the tracked Notifications config, reader map and STS policy', () => {
   const { wranglerText, policyText, readerText } = readTrackedSource();
   assert.deepEqual(checkSource(wranglerText, policyText, readerText), []);
   expect(
@@ -74,29 +74,40 @@ test('the batch equals the tracked Notifications config, reader map and STS poli
     'reader_lookup_differs_NEXTAUTH_SECRET'
   );
   expect(checkSource(wranglerText, policyText, 'no map here'), 'reader_map_unreadable');
-  assert.deepEqual(
-    checkSharedConsumers({
-      NEXTAUTH_SECRET: ['notifications'],
-      INTERNAL_API_SECRET: ['notifications'],
-    }),
-    []
-  );
-  assert.deepEqual(
-    checkSharedConsumers({
-      NEXTAUTH_SECRET: ['notifications', 'web'],
-      INTERNAL_API_SECRET: ['notifications'],
-    }),
-    ['shared_consumers_NEXTAUTH_SECRET']
-  );
   assert.equal(parseJsonc('{"a": "//x", /* c */ "b": [1,],}').a, '//x');
 });
 
-test('row proposals targeting a store name, a *_PROD name or the unprefixed APNs/Expo name refuse', () => {
+test('M108: the copy batch is exactly the Expo row of the four-name map', () => {
   const { wranglerText, policyText, readerText } = readTrackedSource();
-  const propose = (i, secretKey, secretPath = BATCH.rows[i].secretPath) => ({
-    ...BATCH,
-    rows: BATCH.rows.map((r, j) => (j === i ? { ...r, secretKey, secretPath } : r)),
-  });
+  assert.equal(NAME_MAP.length, 4);
+  assert.deepEqual(
+    BATCH.rows.map(
+      r => NAME_MAP.filter(n => n.binding === r.binding && n.secretKey === r.secretKey).length
+    ),
+    [1]
+  );
+  const swap = patch => ({ ...BATCH, rows: [{ ...BATCH.rows[0], ...patch }] });
+  // A batch row that differs from its name map row in any column refuses.
+  for (const [patch, code] of [
+    [
+      { secretName: 'EXPO_ACCESS_TOKEN_PROD' },
+      'batch_row_not_in_name_map_NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+    ],
+    [{ binding: 'EXPO_TOKEN' }, 'batch_row_not_in_name_map_NOTIFICATIONS_EXPO_ACCESS_TOKEN'],
+  ]) {
+    expect(checkSource(wranglerText, policyText, readerText, swap(patch)), code);
+  }
+  // Another name map row (a 1Password-sourced target) is not a reviewed copy target.
+  for (const n of NAME_MAP.filter(x => x.binding !== 'EXPO_ACCESS_TOKEN')) {
+    const failures = checkSource(wranglerText, policyText, readerText, swap(n));
+    assert.deepEqual(failures, ['batch_row_target_not_reviewed'], n.secretKey);
+  }
+});
+
+test('name map proposals targeting a store name, a *_PROD name or the unprefixed APNs/Expo name refuse', () => {
+  const { wranglerText, policyText, readerText } = readTrackedSource();
+  const propose = (i, secretKey, secretPath = NAME_MAP[i].secretPath) =>
+    NAME_MAP.map((r, j) => (j === i ? { ...r, secretKey, secretPath } : r));
   const cases = [
     [propose(0, 'APNS_PRIVATE_KEY_PROD', '/shared'), 'target_is_store_name_APNS_PRIVATE_KEY_PROD'],
     [propose(2, 'NEXTAUTH_SECRET_PROD'), 'target_environment_suffix_NEXTAUTH_SECRET_PROD'],
@@ -104,10 +115,16 @@ test('row proposals targeting a store name, a *_PROD name or the unprefixed APNs
     [propose(0, 'APNS_PRIVATE_KEY', '/shared'), 'reader_lookup_differs_APNS_PRIVATE_KEY'],
     [propose(1, 'EXPO_ACCESS_TOKEN', '/shared'), 'target_is_store_name_EXPO_ACCESS_TOKEN'],
   ];
-  for (const [batch, code] of cases) {
-    const failures = checkSource(wranglerText, policyText, readerText, batch);
+  for (const [names, code] of cases) {
+    const failures = checkSource(wranglerText, policyText, readerText, BATCH, names);
     expect(failures, code);
     expect(failures, 'policy_targets_differ');
+  }
+  // Dropping a 1Password-sourced name from the map breaks the source, reader and policy match.
+  const three = NAME_MAP.filter(r => r.binding !== 'INTERNAL_API_SECRET');
+  const failures = checkSource(wranglerText, policyText, readerText, BATCH, three);
+  for (const code of ['source_bindings_differ', 'reader_keys_differ', 'policy_targets_differ']) {
+    expect(failures, code);
   }
 });
 
@@ -278,7 +295,7 @@ test('receipt parser accepts exactly the receipt contract', () => {
         {
           binding: 'EXPO_ACCESS_TOKEN',
           sourceSecretName: 'EXPO_ACCESS_TOKEN',
-          secretPath: '/workloads/notifications',
+          secretPath: '/shared',
           secretKey: 'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
           read: true,
         },
@@ -286,6 +303,16 @@ test('receipt parser accepts exactly the receipt contract', () => {
     }),
     'receipt_row_0'
   );
+  const row = {
+    binding: 'EXPO_ACCESS_TOKEN',
+    sourceSecretName: 'EXPO_ACCESS_TOKEN',
+    secretPath: '/workloads/notifications',
+    secretKey: 'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
+    read: true,
+  };
+  assert.deepEqual(bad({ rows: [row], reads: 1 }), []);
+  expect(bad({ rows: [row, row] }), 'receipt_rows');
+  expect(bad({ posts: 2 }), 'receipt_counts');
   assert.deepEqual(parseReceipt('not json').failures, ['receipt_unparsable']);
 });
 
@@ -294,7 +321,7 @@ const ARMED_VERSION = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
 const OTHER_VERSION = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 function preflightFixture() {
-  const storeSecrets = BATCH.rows.map((r, i) => ({
+  const storeSecrets = NAME_MAP.map((r, i) => ({
     id: String(i).repeat(32),
     name: r.secretName,
     scopes: ['workers'],
@@ -302,7 +329,7 @@ function preflightFixture() {
   }));
   const srcBindings = [
     { name: 'HYPERDRIVE', type: 'hyperdrive' },
-    ...BATCH.rows.map(r => ({
+    ...NAME_MAP.map(r => ({
       name: r.binding,
       type: 'secrets_store_secret',
       store_id: r.storeId,
@@ -340,7 +367,7 @@ function preflightFixture() {
       modules: moduleHashes(),
     },
     infisical: {
-      names: { '/workloads/notifications': [], '/shared': [] },
+      names: { '/workloads/notifications': [] },
       syncs: [],
       imports: [],
       approvalPolicies: [],
@@ -352,7 +379,6 @@ function preflightFixture() {
         },
       ],
     },
-    grantsByKey: { NEXTAUTH_SECRET: ['notifications'], INTERNAL_API_SECRET: ['notifications'] },
     writer: {
       clientId: CLIENT_ID,
       permissions: BATCH.rows.map(r => ({
@@ -364,7 +390,7 @@ function preflightFixture() {
       auth: {
         accessTokenTTL: 300,
         accessTokenMaxTTL: 300,
-        accessTokenNumUsesLimit: 5,
+        accessTokenNumUsesLimit: 2,
         clientSecretNumUsesLimit: 1,
         clientSecretExpiresAt: iso(Date.parse(PINS.M65_NOT_AFTER) + 5 * 60_000),
       },
@@ -394,7 +420,7 @@ function preflightFixture() {
 }
 
 test('preflight passes the closed unarmed copier and catches each open path', () => {
-  const { meta, input, srcBindings, copierBindings, readiness } = preflightFixture();
+  const { meta, input, srcBindings, copierBindings, readiness, storeSecrets } = preflightFixture();
   const pre = evaluatePreflight(input);
   assert.deepEqual(pre, {
     gate: 'preflight',
@@ -403,9 +429,7 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
     pins: {
       runId: RUN_ID,
       versionId: VERSION_ID,
-      storeIds: Object.fromEntries(
-        BATCH.rows.map((r, i) => [r.secretName, String(i).repeat(32)])
-      ),
+      storeIds: { EXPO_ACCESS_TOKEN: storeSecrets.find(s => s.name === 'EXPO_ACCESS_TOKEN').id },
       sourceDeployments: [{ version_id: SOURCE_VERSION, percentage: 100 }],
     },
   });
@@ -458,10 +482,7 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
     bad(withBindings(copierBindings.filter(b => b.name !== 'CF_VERSION_METADATA'))),
     'copier_bindings_not_closed'
   );
-  expect(
-    bad(withBindings([...copierBindings, null])),
-    'copier_deployment_not_the_unarmed_version'
-  );
+  expect(bad(withBindings([...copierBindings, null])), 'copier_deployment_not_the_unarmed_version');
 
   // Already armed: the serving version carries the writer secret binding.
   for (const failures of [
@@ -558,17 +579,42 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
     bad(withSource({ version: { id: SOURCE_VERSION, bindings: srcBindings.slice(0, 3) } })),
     'source_live_bindings_differ'
   );
+  // The source must still carry all four bindings, not only the copied one.
+  expect(
+    bad(
+      withSource({
+        version: {
+          id: SOURCE_VERSION,
+          bindings: srcBindings.filter(b => b.name === 'EXPO_ACCESS_TOKEN'),
+        },
+      })
+    ),
+    'source_live_bindings_differ'
+  );
 
+  const target = `${BATCH.rows[0].secretPath}/${BATCH.rows[0].secretKey}`;
   expect(
-    bad(withInf({ names: { '/workloads/notifications': [], '/shared': ['NEXTAUTH_SECRET'] } })),
-    'target_present_or_unread_NEXTAUTH_SECRET'
+    bad(withInf({ names: { '/workloads/notifications': [BATCH.rows[0].secretKey] } })),
+    `target_present_or_unread_${BATCH.rows[0].secretKey}`
   );
   expect(
-    bad(withInf({ names: { '/workloads/notifications': ['INTERNAL_API_SECRET'], '/shared': [] } })),
-    'target_shadow_INTERNAL_API_SECRET'
+    bad(withInf({ names: { '/shared': [] } })),
+    `target_present_or_unread_${BATCH.rows[0].secretKey}`
+  );
+  // Names outside the copy batch (a 1Password-sourced target already present) never block it.
+  assert.deepEqual(
+    bad(
+      withInf({
+        names: {
+          '/workloads/notifications': ['NOTIFICATIONS_APNS_PRIVATE_KEY'],
+          '/shared': ['NEXTAUTH_SECRET', 'INTERNAL_API_SECRET'],
+        },
+      })
+    ),
+    []
   );
   expect(
-    bad(withInf({ syncs: [{ environment: 'production', path: '/shared' }] })),
+    bad(withInf({ syncs: [{ environment: 'production', path: '/workloads/notifications' }] })),
     'infisical_sync_covers_target'
   );
   expect(
@@ -580,15 +626,18 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
     bad(
       withInf({
         syncs: [
-          { environment: 'staging', path: '/shared' },
+          { environment: 'staging', path: '/workloads/notifications' },
           { environment: 'production', path: '/ci' },
+          { environment: 'production', path: '/shared' },
         ],
       })
     ),
     []
   );
   expect(
-    bad(withInf({ imports: [{ environment: 'production', importPath: '/shared' }] })),
+    bad(
+      withInf({ imports: [{ environment: 'production', importPath: '/workloads/notifications' }] })
+    ),
     'infisical_import_covers_target'
   );
   expect(
@@ -596,10 +645,10 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
     'infisical_approval_policy_covers_target'
   );
   for (const [principal, environment, paths] of [
-    ['web-reader', 'production', ['/shared/**']],
+    ['workload-reader', 'production', ['/workloads/**']],
     ['glob-reader', 'production', ['/*']],
-    ['multi-env', ['production'], ['/shared/**']],
-    ['glob-env', 'prod*', ['/shared/**']],
+    ['multi-env', ['production'], ['/workloads/notifications']],
+    ['glob-env', 'prod*', ['/workloads/**']],
     ['unconditioned', 'production', []],
   ]) {
     const readers = [...meta.infisical.readers, { principal, environment, paths }];
@@ -607,53 +656,72 @@ test('preflight passes the closed unarmed copier and catches each open path', ()
     assert.deepEqual(v.failures, ['infisical_reader_not_allowed'], principal);
     assert.ok(!JSON.stringify(v).includes(principal), `verdict never names ${principal}`);
   }
+  // A reader of /shared only does not reach the copy target.
+  assert.deepEqual(
+    bad(
+      withInf({
+        readers: [
+          ...meta.infisical.readers,
+          { principal: 'web-reader', environment: 'production', paths: ['/shared/**'] },
+        ],
+      })
+    ),
+    []
+  );
   expect(bad(withInf({ readers: [null] })), 'infisical_reader_not_allowed');
   expect(bad(withInf({ syncs: undefined })), 'infisical_syncs_unread');
   expect(bad({}, { allowedReaders: [] }), 'allowed_readers_unset');
   expect(bad({}, { allowedReaders: [''] }), 'allowed_readers_unset');
-  expect(
-    bad({
-      grantsByKey: {
-        NEXTAUTH_SECRET: ['notifications', 'web'],
-        INTERNAL_API_SECRET: ['notifications'],
-      },
-    }),
-    'shared_consumers_NEXTAUTH_SECRET'
-  );
   const withAuth = p => ({ writer: { ...meta.writer, auth: { ...meta.writer.auth, ...p } } });
+  const withPermission = extra => ({
+    writer: { ...meta.writer, permissions: [...meta.writer.permissions, extra] },
+  });
+  // M108: a writer that could also create a 1Password-sourced target is refused.
+  for (const [secretPath, secretName] of [
+    ['/workloads/notifications', 'NOTIFICATIONS_APNS_PRIVATE_KEY'],
+    ['/shared', 'NEXTAUTH_SECRET'],
+    ['/shared', 'INTERNAL_API_SECRET'],
+  ]) {
+    expect(
+      bad(withPermission({ action: 'create', environment: 'production', secretPath, secretName })),
+      'writer_permissions_not_exact'
+    );
+  }
   expect(
-    bad({
-      writer: {
-        ...meta.writer,
-        permissions: [
-          ...meta.writer.permissions,
-          {
-            action: 'read',
-            environment: 'production',
-            secretPath: '/shared',
-            secretName: 'NEXTAUTH_SECRET',
-          },
-        ],
-      },
-    }),
+    bad(
+      withPermission({
+        action: 'read',
+        environment: 'production',
+        secretPath: BATCH.rows[0].secretPath,
+        secretName: BATCH.rows[0].secretKey,
+      })
+    ),
     'writer_permissions_not_exact'
   );
+  expect(bad({ writer: { ...meta.writer, permissions: [] } }), 'writer_permissions_not_exact');
   for (const p of [
     { accessTokenTTL: 600 },
     { accessTokenMaxTTL: 900 },
-    { accessTokenNumUsesLimit: 4 },
+    { accessTokenNumUsesLimit: 1 },
+    { accessTokenNumUsesLimit: 3 },
+    { accessTokenNumUsesLimit: 5 },
     { clientSecretNumUsesLimit: 2 },
     { clientSecretExpiresAt: iso(Date.parse(PINS.M65_NOT_AFTER) - 60_000) },
     { clientSecretExpiresAt: iso(Date.parse(PINS.M65_NOT_AFTER) + 20 * 60_000) },
   ]) {
     expect(bad(withAuth(p)), 'writer_auth_not_bounded');
   }
-  for (const glob of ['/*', '/s*', '/shared/*', '/{shared,ci}', '/sha?ed', '/shared/', '', null]) {
-    assert.equal(
-      pathCovers(glob, '/shared/NEXTAUTH_SECRET'),
-      true,
-      `fails closed on ${JSON.stringify(glob)}`
-    );
+  for (const glob of [
+    '/*',
+    '/w*',
+    '/workloads/*',
+    '/{workloads,ci}',
+    '/work?oads',
+    '/workloads/',
+    '',
+    null,
+  ]) {
+    assert.equal(pathCovers(glob, target), true, `fails closed on ${JSON.stringify(glob)}`);
   }
   assert.equal(pathCovers('/workloads/other', '/workloads/notifications/X'), false);
 });
@@ -727,7 +795,10 @@ test('preflight judges the raw copier settings by their safety fields, not by eq
     [logs({ sink: 'x' }), 'copier_setting_observability'],
     [obs({ traces: { enabled: true } }), 'copier_setting_observability'],
     [obs({ traces: {} }), 'copier_setting_observability'],
-    [obs({ traces: { enabled: false, destinations: ['external'] } }), 'copier_setting_observability'],
+    [
+      obs({ traces: { enabled: false, destinations: ['external'] } }),
+      'copier_setting_observability',
+    ],
     [obs({ agents: { enabled: true } }), 'copier_setting_observability'],
   ]) {
     expect(failures(s), code);
@@ -822,7 +893,10 @@ test('bindArmedPreflight moves only a verified preflight to the observed armed v
   // The binding delta is exactly the writer secret.
   for (const bindings of [
     copierBindings,
-    [...armedObserved.version.bindings, { name: 'NOTIF', type: 'service', service: 'notifications' }],
+    [
+      ...armedObserved.version.bindings,
+      { name: 'NOTIF', type: 'service', service: 'notifications' },
+    ],
     armedObserved.version.bindings.map(b =>
       b.name === 'M65_NOT_AFTER' ? { ...b, text: iso(T0) } : b
     ),
@@ -851,8 +925,8 @@ test('post-run and cleanup gates', () => {
     ready: { pins: true, envClosed: true, bindings: true, gate: true, cron: true },
     gate: 'consumed_now',
     logins: 1,
-    reads: 4,
-    posts: 4,
+    reads: 1,
+    posts: 1,
     rows: BATCH.rows.map(r => ({
       binding: r.binding,
       sourceSecretName: r.secretName,
@@ -871,15 +945,7 @@ test('post-run and cleanup gates', () => {
   };
   const post = {
     ...meta,
-    infisical: {
-      names: {
-        '/workloads/notifications': [
-          'NOTIFICATIONS_APNS_PRIVATE_KEY',
-          'NOTIFICATIONS_EXPO_ACCESS_TOKEN',
-        ],
-        '/shared': ['NEXTAUTH_SECRET', 'INTERNAL_API_SECRET'],
-      },
-    },
+    infisical: { names: { '/workloads/notifications': [BATCH.rows[0].secretKey] } },
   };
   assert.deepEqual(evaluatePostRun({ pre, meta: post, receipt: JSON.stringify(complete) }), {
     gate: 'postrun',
@@ -914,12 +980,19 @@ test('post-run and cleanup gates', () => {
     ...post,
     store: {
       ...meta.store,
-      secrets: storeSecrets.map((s, i) => (i === 2 ? { ...s, id: 'f'.repeat(32) } : s)),
+      secrets: storeSecrets.map(s =>
+        s.name === 'EXPO_ACCESS_TOKEN' ? { ...s, id: 'f'.repeat(32) } : s
+      ),
     },
   };
   expect(
     evaluatePostRun({ pre, meta: replaced, receipt: JSON.stringify(complete) }).failures,
-    'store_secret_replaced_NEXTAUTH_SECRET_PROD'
+    'store_secret_replaced_EXPO_ACCESS_TOKEN'
+  );
+  expect(
+    evaluatePostRun({ pre, meta: post, receipt: JSON.stringify({ ...complete, posts: 0 }) })
+      .failures,
+    'receipt_not_complete'
   );
   // The unarmed verdict or a failed bind never authorizes the armed run.
   for (const p of [unarmed, bindArmedPreflight(unarmed, ARMED_VERSION, undefined)]) {
@@ -968,11 +1041,11 @@ test('post-run and cleanup gates', () => {
   expect(
     evaluatePostRunInfisical({ meta: { infisical: { names: { '/shared': ['NEXTAUTH_SECRET'] } } } })
       .failures,
-    'target_absent_INTERNAL_API_SECRET'
+    `target_absent_${BATCH.rows[0].secretKey}`
   );
   expect(
     evaluatePostRun({ pre, meta: cloudOnly, receipt: JSON.stringify(complete) }).failures,
-    'target_absent_NEXTAUTH_SECRET'
+    `target_absent_${BATCH.rows[0].secretKey}`
   );
 
   const baseline = { identities: 5, roles: 9 };

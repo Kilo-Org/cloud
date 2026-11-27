@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  REVIEWED_TARGETS,
   infisicalStoredForm,
   runTick,
   serializationParity,
@@ -77,40 +78,55 @@ async function tick(o = {}) {
   return { receipt, fake, readLog, gate, values, env };
 }
 
-test('first armed in-window tick: one gate, one login, 4 reads, 4 creates, exact bytes, revoke, 401', async () => {
+test('first armed in-window tick: one gate, one login, 1 read, 1 create, exact bytes, revoke, 401', async () => {
   const { receipt, fake, readLog, values, gate } = await tick();
   assert.deepEqual(
     [receipt.outcome, receipt.reason, receipt.gate, receipt.armed, receipt.window],
     ['complete', null, 'consumed_now', true, 'open']
   );
-  assert.deepEqual([receipt.logins, receipt.reads, receipt.posts], [1, 4, 4]);
+  assert.deepEqual([receipt.logins, receipt.reads, receipt.posts], [1, 1, 1]);
+  assert.deepEqual(readLog, ['EXPO_ACCESS_TOKEN']);
+  assert.equal(receipt.rows.length, 1);
+  const [r] = receipt.rows;
   assert.deepEqual(
-    readLog,
-    BATCH.rows.map(r => r.binding)
+    [r.binding, r.sourceSecretName, `${r.secretPath}/${r.secretKey}`],
+    ['EXPO_ACCESS_TOKEN', 'EXPO_ACCESS_TOKEN', REVIEWED_TARGETS[0]]
   );
-  for (const [i, r] of receipt.rows.entries()) {
-    const row = BATCH.rows[i];
-    assert.equal(r.secretKey, row.secretKey);
-    assert.deepEqual(
-      [r.created, r.bytesParity, r.serializationParity, r.storable, r.referenceFree, r.echo],
-      ['yes', true, true, true, true, 'equal']
-    );
-    assert.equal(fake.store.get(`${row.secretPath}/${row.secretKey}`), values[row.binding]);
-  }
+  assert.deepEqual(
+    [r.created, r.bytesParity, r.serializationParity, r.storable, r.referenceFree, r.echo],
+    ['yes', true, true, true, true, 'equal']
+  );
+  assert.deepEqual([...fake.store.keys()], [REVIEWED_TARGETS[0]]);
+  assert.equal(fake.store.get(REVIEWED_TARGETS[0]), values.EXPO_ACCESS_TOKEN);
   assert.deepEqual([receipt.revoked, receipt.denialProved], [true, true]);
   assert.equal(gate.state.outcome, 'complete', 'final outcome recorded');
   assert.deepEqual(
     fake.calls.map(c => `${c.method} ${c.path}`),
     [
       'POST /api/v1/auth/universal-auth/login',
-      'POST /api/v4/secrets/NOTIFICATIONS_APNS_PRIVATE_KEY',
-      'POST /api/v4/secrets/NOTIFICATIONS_EXPO_ACCESS_TOKEN',
-      'POST /api/v4/secrets/NEXTAUTH_SECRET',
-      'POST /api/v4/secrets/INTERNAL_API_SECRET',
+      `POST /api/v4/secrets/${BATCH.rows[0].secretKey}`,
       'POST /api/v1/auth/token/revoke',
       'GET /api/v4/secrets',
     ]
   );
+  // The denial probe lists the target folder, where the writer may only create.
+  assert.equal(
+    new URLSearchParams(fake.calls.at(-1).search).get('secretPath'),
+    BATCH.rows[0].secretPath
+  );
+});
+
+test('the access token has exactly two uses: the create and the denial probe', async () => {
+  const fake = fakeInfisical({ revokeStatus: 500 });
+  const { receipt } = await tick({ fake });
+  const [token] = fake.issued;
+  assert.deepEqual([fake.tokens.get(token).uses, fake.tokens.get(token).limit], [2, 2]);
+  assert.deepEqual([receipt.revoked, receipt.denialProved], [false, false]);
+  // A third use (any replay of the token) is refused as exhausted.
+  const replay = await fake.fetch(`https://eu.infisical.com/api/v4/secrets?x=1`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(replay.status, 401);
 });
 
 test('second tick: idle already_consumed with the prior outcome, no login, read or write', async () => {
@@ -125,7 +141,7 @@ test('second tick: idle already_consumed with the prior outcome, no login, read 
     [again.receipt.outcome, again.receipt.reason, again.receipt.prior, again.receipt.logins],
     ['idle', 'already_consumed', 'complete', 0]
   );
-  assert.deepEqual([first.fake.calls.length, first.readLog.length], [7, 4]);
+  assert.deepEqual([first.fake.calls.length, first.readLog.length], [4, 1]);
 });
 
 test('eight racing ticks: exactly one is admitted', async () => {
@@ -153,7 +169,7 @@ test('eight racing ticks: exactly one is admitted', async () => {
   );
   assert.equal(rs.filter(r => r.gate === 'consumed_now').length, 1);
   assert.equal(rs.filter(r => r.reason === 'already_consumed').length, 7);
-  assert.deepEqual([readLog.length, fake.creates, fake.clientSecretUses], [4, 4, 1]);
+  assert.deepEqual([readLog.length, fake.creates, fake.clientSecretUses], [1, 1, 1]);
 });
 
 test('unarmed tick (writer not installed): readiness receipt only, no gate, auth or read', async () => {
@@ -208,31 +224,64 @@ test('refusals before the gate: no gate, auth or read', async t => {
   }
 });
 
-test('batch closure: secret_text rows and other batch shapes are refused before anything', async () => {
+test('batch closure: secret_text rows, other targets and other batch shapes are refused before anything', async () => {
   const withRow = patch => ({
     ...BATCH,
     rows: BATCH.rows.map((r, i) => (i === 0 ? { ...r, ...patch } : r)),
   });
+  assert.equal(validateBatch(BATCH), null);
   assert.equal(validateBatch(withRow({ kind: 'secret_text' })), 'secret_text_not_cross_script');
   assert.equal(validateBatch(withRow({ storeId: '0'.repeat(32) })), 'row_store_not_allowed');
-  assert.equal(validateBatch(withRow({ secretPath: '/ci' })), 'row_path_not_allowed');
+  assert.equal(validateBatch(withRow({ secretPath: '/ci' })), 'row_target_not_reviewed');
   assert.equal(
-    validateBatch(withRow({ secretKey: 'APNS_PRIVATE_KEY_PROD' })),
+    validateBatch(withRow({ secretKey: 'EXPO_ACCESS_TOKEN' })),
     'row_target_is_store_name'
   );
   assert.equal(
-    validateBatch(withRow({ secretKey: 'NOTIFICATIONS_APNS_PRIVATE_KEY_DEV' })),
+    validateBatch(withRow({ secretKey: `${BATCH.rows[0].secretKey}_DEV` })),
     'row_target_environment_suffix'
   );
-  assert.equal(validateBatch(withRow({ secretKey: 'NEXTAUTH_SECRET' })), 'row_duplicate');
   assert.equal(validateBatch(withRow({ binding: 'M65_GATE' })), 'row_binding_invalid');
   assert.equal(validateBatch({ ...BATCH, id: 'other' }), 'batch_not_reviewed');
-  assert.equal(validateBatch({ ...BATCH, rows: BATCH.rows.slice(1) }), 'batch_row_count');
-  const { receipt, readLog, fake } = await tick({ batch: withRow({ kind: 'secret_text' }) });
+  assert.equal(validateBatch({ ...BATCH, rows: [] }), 'batch_row_count');
+  const tick0 = await tick({ batch: withRow({ kind: 'secret_text' }) });
   assert.deepEqual(
-    [receipt.reason, readLog.length, fake.calls.length],
+    [tick0.receipt.reason, tick0.readLog.length, tick0.fake.calls.length],
     ['secret_text_not_cross_script', 0, 0]
   );
+});
+
+test('M108: the three 1Password-sourced targets can never join the copy batch', () => {
+  assert.deepEqual(REVIEWED_TARGETS, ['/workloads/notifications/NOTIFICATIONS_EXPO_ACCESS_TOKEN']);
+  const excluded = [
+    {
+      binding: 'APNS_PRIVATE_KEY',
+      secretName: 'APNS_PRIVATE_KEY_PROD',
+      secretPath: '/workloads/notifications',
+      secretKey: 'NOTIFICATIONS_APNS_PRIVATE_KEY',
+    },
+    {
+      binding: 'NEXTAUTH_SECRET',
+      secretName: 'NEXTAUTH_SECRET_PROD',
+      secretPath: '/shared',
+      secretKey: 'NEXTAUTH_SECRET',
+    },
+    {
+      binding: 'INTERNAL_API_SECRET',
+      secretName: 'INTERNAL_API_SECRET_PROD',
+      secretPath: '/shared',
+      secretKey: 'INTERNAL_API_SECRET',
+    },
+  ].map(r => ({ ...BATCH.rows[0], ...r }));
+  for (const row of excluded) {
+    assert.equal(
+      validateBatch({ ...BATCH, rows: [row] }),
+      'row_target_not_reviewed',
+      row.secretKey
+    );
+    assert.equal(validateBatch({ ...BATCH, rows: [...BATCH.rows, row] }), 'batch_row_count');
+  }
+  assert.equal(validateBatch({ ...BATCH, rows: [BATCH.rows[0], ...excluded] }), 'batch_row_count');
 });
 
 test('byte and serialization parity: true and false paths', () => {
@@ -263,7 +312,7 @@ test('values Infisical would change stop before their POST', async t => {
   for (const [name, v] of Object.entries(cases)) {
     await t.test(name, async () => {
       const { receipt, fake } = await tick({
-        values: { ...syntheticValues(), APNS_PRIVATE_KEY: v },
+        values: { EXPO_ACCESS_TOKEN: v },
       });
       assert.ok(name.startsWith(receipt.reason), `${name} -> ${receipt.reason}`);
       assert.deepEqual([receipt.reads, receipt.posts, fake.creates], [1, 0, 0]);
@@ -277,19 +326,26 @@ test('values Infisical would change stop before their POST', async t => {
   );
 });
 
-test('existing target: 400, created=no, no overwrite, no further row', async () => {
-  const { receipt, fake } = await tick({ fakeOpts: { preexisting: ['/shared/NEXTAUTH_SECRET'] } });
+test('a value with one final LF is stored byte for byte', async () => {
+  const v = 'synthetic-expo-final-lf-ünï\n';
+  const { receipt, fake } = await tick({ values: { EXPO_ACCESS_TOKEN: v } });
+  assert.deepEqual([receipt.outcome, receipt.rows[0].echo], ['complete', 'equal']);
+  assert.equal(fake.store.get(REVIEWED_TARGETS[0]), v);
+});
+
+test('existing target: 400, created=no, no overwrite', async () => {
+  const { receipt, fake } = await tick({ fakeOpts: { preexisting: [REVIEWED_TARGETS[0]] } });
   assert.equal(receipt.reason, 'create_http_400');
   assert.deepEqual(
     receipt.rows.map(r => r.created),
-    ['yes', 'yes', 'no']
+    ['no']
   );
-  assert.equal(fake.store.get('/shared/NEXTAUTH_SECRET'), 'pre-existing-synthetic');
-  assert.equal(fake.store.has('/shared/INTERNAL_API_SECRET'), false);
-  assert.deepEqual([receipt.reads, receipt.posts, receipt.outcome], [3, 3, 'stopped']);
+  assert.equal(fake.store.get(REVIEWED_TARGETS[0]), 'pre-existing-synthetic');
+  assert.deepEqual([receipt.reads, receipt.posts, receipt.outcome], [1, 1, 'stopped']);
+  assert.deepEqual([receipt.revoked, receipt.denialProved], [true, true]);
 });
 
-test('stored echo differs: stop and report, no further row', async () => {
+test('stored echo differs: stop and report', async () => {
   const { receipt } = await tick({ fakeOpts: { normalize: v => v.toUpperCase() } });
   assert.deepEqual(
     [receipt.reason, receipt.rows.length, receipt.rows[0].echo],
@@ -400,7 +456,7 @@ test('restart with a fresh gate after a consumed run: the one-use client secret 
     fetchImpl: first.fake.fetch,
     batch: BATCH,
   });
-  assert.deepEqual([r.reason, readLog.length, first.fake.creates], ['login_http_401', 0, 4]);
+  assert.deepEqual([r.reason, readLog.length, first.fake.creates], ['login_http_401', 0, 1]);
 });
 
 // Clock that returns the queued instants in order, then repeats the last one.
@@ -411,11 +467,11 @@ const clock =
 
 test('mid-run stops before that row write: read failure, window end, token expiry, unexpected error', async () => {
   const rf = await tick({
-    values: { ...syntheticValues(), EXPO_ACCESS_TOKEN: new Error('synthetic read failure') },
+    values: { EXPO_ACCESS_TOKEN: new Error('synthetic read failure') },
   });
   assert.deepEqual(
     [rf.receipt.reason, rf.receipt.reads, rf.fake.creates],
-    ['source_read_failed', 2, 1]
+    ['source_read_failed', 1, 0]
   );
 
   const end = Date.parse(NOT_AFTER);
@@ -431,15 +487,20 @@ test('mid-run stops before that row write: read failure, window end, token expir
     ['token_expiring_before_create', 1, 0, true]
   );
 
+  // now() calls: window, login, two pre-read checks, then the post-read check (#5) throws.
   let n = 0;
   const boom = await tick({
     now: () => {
-      if (++n === 6) throw new Error('synthetic internal failure');
+      if (++n === 5) throw new Error('synthetic internal failure');
       return T0;
     },
   });
   assert.equal(boom.receipt.reason, 'internal_error');
-  assert.equal(boom.receipt.rows[0].created, 'yes', 'partial rows kept');
+  assert.deepEqual(
+    [boom.receipt.rows.length, boom.receipt.rows[0].read, boom.receipt.posts],
+    [1, true, 0],
+    'partial row kept, nothing posted'
+  );
   assert.deepEqual(
     [boom.receipt.revoked, boom.receipt.denialProved, boom.receipt.outcome],
     [true, true, 'stopped']

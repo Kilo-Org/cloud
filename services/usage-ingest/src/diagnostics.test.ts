@@ -169,11 +169,12 @@ it('keeps an enqueue failure a safe 503 even when its diagnostic sink throws', a
 
 it('emits the full unavailable enqueue fields without a flag', async () => {
   const { env, send, logs } = setup();
-  // The first `Date.now()` may belong to the item-9 counter rather than to these timestamps, so the
-  // two expected readings are queued and every later call reads the completion time.
+  // With the item-9 counter on, the three readings are the publisher entry, the counter's own
+  // minute, and the pre-send stamp; every later call reads the completion time.
   vi.spyOn(Date, 'now')
     .mockReturnValue(1250)
     .mockReturnValueOnce(1000)
+    .mockReturnValueOnce(1250)
     .mockReturnValueOnce(1000);
   vi.spyOn(performance, 'now').mockReturnValueOnce(10).mockReturnValueOnce(47);
   send.mockRejectedValue(new Error('sensitive-queue-error'));

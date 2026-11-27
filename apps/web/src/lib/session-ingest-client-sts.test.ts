@@ -82,10 +82,10 @@ afterEach(() => {
 });
 
 describe('invalidateOrganizationSessionAccess, sts', () => {
-  test('Vercel production sends only the invalidate token by default, never the secret', async () => {
+  test('Vercel production under sts sends only the invalidate token, never the secret', async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
     mockTokenGet.mockResolvedValue(TOKEN);
-    const client = await loadClient({});
+    const client = await loadClient({ auth: 'sts' });
     await client.invalidateOrganizationSessionAccess(USER_ID, ORGANIZATION_ID);
 
     expect(mockCreateHttpServiceTokens.mock.calls[0]?.[0].stsUrl).toBe(STS_ISSUERS.production);
@@ -102,7 +102,9 @@ describe('invalidateOrganizationSessionAccess, sts', () => {
     expect(headers.has('x-internal-secret')).toBe(false);
     expect(JSON.stringify(init)).not.toContain(SECRET);
     expect(init?.redirect).toBe('error');
-    expect(init?.body).toBe(JSON.stringify({ kiloUserId: USER_ID, organizationId: ORGANIZATION_ID }));
+    expect(init?.body).toBe(
+      JSON.stringify({ kiloUserId: USER_ID, organizationId: ORGANIZATION_ID })
+    );
   });
 
   test('no token fails the call and sends nothing', async () => {
@@ -120,9 +122,12 @@ describe('invalidateOrganizationSessionAccess, sts', () => {
 });
 
 describe('invalidateOrganizationSessionAccess, legacy and refused', () => {
-  test('staging keeps the internal secret when the switch is unset', async () => {
+  test.each([
+    ['Vercel production', PRODUCTION],
+    ['staging', STAGING],
+  ])('%s keeps the internal secret when the switch is unset', async (_name, runtime) => {
     mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
-    const client = await loadClient({ runtime: STAGING });
+    const client = await loadClient({ runtime });
     await client.invalidateOrganizationSessionAccess(USER_ID, ORGANIZATION_ID);
     const init = mockFetch.mock.calls[0]?.[1];
     expect(new Headers(init?.headers).get('x-internal-secret')).toBe(SECRET);
@@ -133,7 +138,11 @@ describe('invalidateOrganizationSessionAccess, legacy and refused', () => {
   test.each([
     ['an invalid switch', { auth: 'dual' }, 'must be legacy or sts'],
     ['sts on staging', { auth: 'sts', runtime: STAGING }, 'production'],
-    ['sts to a plaintext URL', { url: 'http://ingest.test.example.com' }, 'https receiver URL'],
+    [
+      'sts to a plaintext URL',
+      { auth: 'sts', url: 'http://ingest.test.example.com' },
+      'https receiver URL',
+    ],
   ] as const)('%s fails the call; nothing is sent', async (_name, config, message) => {
     const client = await loadClient(config);
     await expect(

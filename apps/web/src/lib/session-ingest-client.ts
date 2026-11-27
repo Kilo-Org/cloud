@@ -83,8 +83,8 @@ export const SESSION_INGEST_INVALIDATE_SCOPE = {
 /**
  * `SESSION_INGEST_SENDER_AUTH` (`service-sender-auth.ts`), the credential of
  * web's service-only calls to Session Ingest: `legacy` sends the internal API
- * secret in `X-Internal-Secret`, as before; `sts` (the Vercel production
- * default) sends only a `SESSION_INGEST_INVALIDATE_SCOPE` token.
+ * secret in `X-Internal-Secret`, as before (also when unset); explicit `sts`
+ * sends only a `SESSION_INGEST_INVALIDATE_SCOPE` token.
  */
 const sessionIngestSender = resolveServiceSenderAuth({
   auth: SESSION_INGEST_SENDER_AUTH,

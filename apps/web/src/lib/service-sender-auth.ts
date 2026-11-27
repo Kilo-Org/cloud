@@ -4,22 +4,20 @@ import type { ServiceSenderToken } from './service-sender-sts';
 
 /**
  * The credential switch of a web sender to a Kilo service whose receiver has no staging STS
- * deployment (D59: sender STS by default, rollback is the switch back to `legacy`). Exact
- * lowercase values:
- * - `legacy`: the edge's shared credential, exactly as before the switch existed;
+ * deployment (D59; rollback is the switch back to `legacy`). Exact lowercase values:
+ * - unset, empty or `legacy`: the edge's shared credential, exactly as before the switch existed;
  * - `sts`: only an STS service token in `Authorization: Bearer`, never the shared credential and no
- *   return to it when the mint or the request fails.
- * Unset or empty is `sts` on Vercel production and `legacy` everywhere else: the staging custom
- * environment and previews keep the shared credential, since no receiver verifies staging STS
- * tokens. Explicit `sts` is refused there. A process outside Vercel (local development) may set
- * `sts` and then mints from development STS. Any other value is refused.
+ *   return to it when the mint or the request fails. Vercel production mints from production STS
+ *   and a process outside Vercel (local development) from development STS. The staging custom
+ *   environment and previews refuse `sts`, since no receiver verifies staging STS tokens.
+ * Any other value is refused: nothing is sent.
  *
  * This module imports no STS code, so a `legacy` deployment never loads the token client or the
  * Vercel OIDC exchange; `service-sender-sts.ts` holds them and is imported only for an STS send.
  */
 const ServiceSenderAuthSchema = z.preprocess(
   value => (value === '' ? undefined : value),
-  z.enum(['legacy', 'sts']).optional()
+  z.enum(['legacy', 'sts']).default('legacy')
 );
 
 /** The deployment's runtime variables; `process.env` itself in production. */
@@ -71,16 +69,18 @@ export function resolveServiceSenderAuth(config: {
 }): ServiceSenderAuth {
   const auth = ServiceSenderAuthSchema.safeParse(config.auth);
   if (!auth.success) return { kind: 'refused', reason: 'invalid_auth' };
+  if (auth.data === 'legacy') return { kind: 'legacy' };
   const environment = stsEnvironmentOf(config.runtime);
-  const mode = auth.data ?? (environment === 'production' ? 'sts' : 'legacy');
-  if (mode === 'legacy') return { kind: 'legacy' };
   if (environment === null) return { kind: 'refused', reason: 'sts_production_only' };
   if (!urlCarriesToken(config.url, environment)) return { kind: 'refused', reason: 'insecure_url' };
   return { kind: 'sts', environment };
 }
 
 /** The message an operator sees for a refused switch; names the variable, never a credential. */
-export function serviceSenderRefusalMessage(variable: string, reason: ServiceSenderRefusal): string {
+export function serviceSenderRefusalMessage(
+  variable: string,
+  reason: ServiceSenderRefusal
+): string {
   switch (reason) {
     case 'invalid_auth':
       return `${variable} must be legacy or sts`;

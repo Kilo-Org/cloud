@@ -91,7 +91,9 @@ export async function statusCallbackCredential(
   const mode = StatusCallbackAuthSchema.safeParse(env.CODE_REVIEW_STATUS_CALLBACK_AUTH);
   if (!mode.success) throw new StatusCallbackCredentialError('invalid_auth');
   if (mode.data === 'legacy') {
-    return { headers: await derivedCallbackHeaders(env.CALLBACK_TOKEN_SECRET, reviewId, attemptId) };
+    return {
+      headers: await derivedCallbackHeaders(env.CALLBACK_TOKEN_SECRET, reviewId, attemptId),
+    };
   }
   if (env.STS === undefined) throw new StatusCallbackCredentialError('sts_binding_missing');
   let token: string;

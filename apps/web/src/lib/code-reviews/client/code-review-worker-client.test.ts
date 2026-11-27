@@ -141,9 +141,12 @@ describe('code review worker client, legacy', () => {
     expect(mockCreateHttpServiceTokens).not.toHaveBeenCalled();
   });
 
-  test('staging keeps the worker token when the switch is unset', async () => {
+  test.each([
+    ['Vercel production', PRODUCTION],
+    ['staging', STAGING],
+  ])('%s keeps the worker token when the switch is unset', async (_name, runtime) => {
     answer('statusRead');
-    const { client } = await loadClient({ runtime: STAGING });
+    const { client } = await loadClient({ runtime });
     await client.codeReviewWorkerClient.getReviewStatus(REVIEW_ID);
     expect(new Headers(mockFetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
       `Bearer ${SECRET}`
@@ -160,11 +163,11 @@ describe('code review worker client, legacy', () => {
 
 describe('code review worker client, sts', () => {
   test.each(ACTION_NAMES)(
-    '%s sends only its own scope from production STS by default, never the worker token',
+    '%s under sts sends only its own scope from production STS, never the worker token',
     async action => {
       answer(action);
       mockTokenGet.mockResolvedValue(TOKEN);
-      const { client } = await loadClient({});
+      const { client } = await loadClient({ auth: 'sts' });
       await expect(ACTIONS[action].call(client)).resolves.toBeTruthy();
 
       expect(mockCreateHttpServiceTokens).toHaveBeenCalledTimes(1);
@@ -212,7 +215,7 @@ describe('code review worker client, sts', () => {
     ['an unavailable STS', 'unavailable'],
     ['a failed Vercel identity', 'identity'],
   ] as const)('%s fails the call; nothing is sent', async (_name, kind) => {
-    const { client, ServiceTokenError } = await loadClient({});
+    const { client, ServiceTokenError } = await loadClient({ auth: 'sts' });
     const scope = client.CODE_REVIEW_WORKER_SCOPES.dispatch;
     mockTokenGet.mockRejectedValue(
       kind === 'denied'
@@ -244,7 +247,7 @@ describe('code review worker client, refused', () => {
     ['sts on staging', { auth: 'sts', runtime: STAGING }, 'sts_production_only', 'production'],
     [
       'sts to a plaintext worker URL',
-      { url: 'http://code-review.example.test' },
+      { auth: 'sts', url: 'http://code-review.example.test' },
       'insecure_url',
       'needs an https receiver URL',
     ],

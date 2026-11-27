@@ -3154,12 +3154,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       hydration = (async () => {
         // SESSION_INGEST_CALLER_AUTH: the internal secret under `legacy` (empty when unreadable,
         // as before), nothing under `binding`, where the binding's props.caller identifies us.
-        const ingestCredential =
+        const ingestCredential: Record<string, string> =
           sessionIngestCallerAuth(this.env) === 'binding'
             ? {}
             : {
-                'X-Internal-Secret':
-                  (await resolveSecret(this.env.INTERNAL_API_SECRET_PROD)) ?? '',
+                'X-Internal-Secret': (await resolveSecret(this.env.INTERNAL_API_SECRET_PROD)) ?? '',
               };
         if (this.registration !== registration) return;
         await hydrateSessionHistory({

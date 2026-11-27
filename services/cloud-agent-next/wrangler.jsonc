@@ -76,9 +76,8 @@
     // deployment of its own.
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai,https://staging-app.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
-    // D59: Session Ingest identifies this Worker by the SESSION_INGEST binding's props.caller;
-    // rollback is `legacy` (X-Internal-Secret). src/session-ingest-caller-auth.ts.
-    "SESSION_INGEST_CALLER_AUTH": "binding",
+    // SESSION_INGEST_CALLER_AUTH is unset (legacy, X-Internal-Secret): set `binding` only once
+    // Session Ingest authorizes the SESSION_INGEST binding's props.caller. src/session-ingest-caller-auth.ts.
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
     "TOOL_CGROUP_SERVER_CPU_WEIGHT": "75",

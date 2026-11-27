@@ -13,21 +13,15 @@ const resolve = (auth: string | undefined, runtime: VercelRuntime, url = HTTPS_U
   resolveServiceSenderAuth({ auth, url, runtime });
 
 describe('resolveServiceSenderAuth', () => {
-  test.each([undefined, ''])('%j defaults to sts on Vercel production', auth => {
-    expect(resolve(auth, PRODUCTION)).toEqual({ kind: 'sts', environment: 'production' });
-  });
-
   test.each([
+    ['Vercel production', PRODUCTION],
     ['staging', STAGING],
     ['a preview', PREVIEW],
     ['Vercel development', VERCEL_DEVELOPMENT],
     ['a process outside Vercel', LOCAL],
-  ])('unset defaults to legacy on %s', (_name, runtime) => {
+  ])('unset, empty or legacy is legacy on %s', (_name, runtime) => {
     expect(resolve(undefined, runtime)).toEqual({ kind: 'legacy' });
     expect(resolve('', runtime)).toEqual({ kind: 'legacy' });
-  });
-
-  test.each([PRODUCTION, STAGING, PREVIEW, LOCAL])('legacy is legacy everywhere', runtime => {
     expect(resolve('legacy', runtime)).toEqual({ kind: 'legacy' });
   });
 
@@ -50,10 +44,6 @@ describe('resolveServiceSenderAuth', () => {
     expect(resolve('sts', PRODUCTION)).toEqual({ kind: 'sts', environment: 'production' });
     for (const url of ['http://receiver.example.test', LOCAL_URL, '', 'not a url']) {
       expect(resolve('sts', PRODUCTION, url)).toEqual({ kind: 'refused', reason: 'insecure_url' });
-      expect(resolve(undefined, PRODUCTION, url)).toEqual({
-        kind: 'refused',
-        reason: 'insecure_url',
-      });
     }
   });
 

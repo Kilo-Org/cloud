@@ -79,7 +79,7 @@ export type ReviewStatusResponse = z.infer<typeof ReviewStatusResponseSchema>;
  * Handles all communication with the Cloudflare Worker for code reviews.
  *
  * `CODE_REVIEW_WORKER_SENDER_AUTH` (`service-sender-auth.ts`) picks the credential: `legacy` sends
- * `CODE_REVIEW_WORKER_AUTH_TOKEN` as the bearer, as before; `sts` (the Vercel production default)
+ * `CODE_REVIEW_WORKER_AUTH_TOKEN` as the bearer, as before (also when unset); explicit `sts`
  * sends only a `code-review` STS service token scoped to the route's action.
  */
 class CodeReviewWorkerClient {

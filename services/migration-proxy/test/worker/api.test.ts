@@ -279,7 +279,7 @@ describe('POST /v1/runs', () => {
   it("503 github_unavailable for a GitHub answer that is not GitHub's shape", async () => {
     await withProxy({}, async proxy => {
       const { head } = await readyRun(proxy);
-      proxy.github.malformedCompare = true;
+      proxy.github.malformed = /^\/compare\//;
       const answer = await post(proxy, head);
       expect(answer.status).toBe(503);
       expect(answer.body).toMatchObject({ status: 'unavailable', reason: 'github_unavailable' });

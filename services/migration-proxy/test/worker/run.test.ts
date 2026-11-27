@@ -453,6 +453,40 @@ describe('late results and silent containers (§6)', () => {
   });
 });
 
+describe('malformed GitHub answers', () => {
+  it('stall the fetch like any GitHub failure and end github_unavailable after 5 alarms', async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      await post(proxy, head);
+      proxy.github.malformed = /^\/git\/trees\//;
+      for (let alarm = 0; alarm < 4; alarm += 1) await proxy.object.alarm();
+      expect(run(proxy)).toMatchObject({ state: 'pending', phase: 'fetching', stalled_alarms: 4 });
+      await proxy.object.alarm();
+      expect(failureOf(proxy)).toEqual({
+        code: 'github_unavailable',
+        retryable: true,
+        sqlstate: null,
+        migrationTag: null,
+      });
+    });
+  });
+
+  it('stall the review like any GitHub failure and end github_unavailable after 30 minutes', async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      await post(proxy, head);
+      await proxy.object.alarm();
+      expect(run(proxy)?.phase).toBe('reviewing');
+      proxy.github.malformed = /\/reviews$/;
+      await proxy.object.alarm();
+      expect(run(proxy)).toMatchObject({ state: 'pending', phase: 'reviewing' });
+      proxy.sql(`UPDATE runs SET progress_at = ${Date.now() - 31 * 60_000}`);
+      await proxy.object.alarm();
+      expect(failureOf(proxy)?.code).toBe('github_unavailable');
+    });
+  });
+});
+
 describe('the owner-approval phase (§5 step 5)', () => {
   it('fails migration_not_approved, listing files, writing review_check_failed, starting nothing', async () => {
     await withProxy({}, async proxy => {

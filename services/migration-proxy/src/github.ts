@@ -181,6 +181,16 @@ function segments(path: string): string {
 /** Each GitHub call, body included, gets this long before it counts as a network failure. */
 export const GITHUB_REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * A GitHub answer in the shape GitHub documents, else GitHub counts as unavailable: a malformed
+ * tree, blob, review or compare body stalls the step like a 5xx, and is never a server error.
+ */
+function answer<T>(schema: z.ZodType<T>, value: unknown): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new GithubUnavailableError('malformed answer');
+  return parsed.data;
+}
+
 export function createGithubClient(
   credentials: GithubAppCredentials,
   fetcher: GithubFetch,
@@ -241,7 +251,7 @@ export function createGithubClient(
       }
     );
     if (response.status !== 201) throw new GithubUnavailableError(`token ${response.status}`);
-    const parsed = TokenSchema.parse(await body(response));
+    const parsed = answer(TokenSchema, await body(response));
     cached = { token: parsed.token, expiresAt: Date.parse(parsed.expires_at) };
     return parsed.token;
   };
@@ -260,29 +270,29 @@ export function createGithubClient(
   return {
     async compare(base, head) {
       const body = await get(`${REPO}/compare/${base}...${head}?per_page=1`, [404, 422]);
-      return body === null ? 'not_found' : CompareSchema.parse(body).status;
+      return body === null ? 'not_found' : answer(CompareSchema, body).status;
     },
     async tree(sha) {
       const body = await get(`${REPO}/git/trees/${sha}`, [404, 422]);
       if (body === null) return null;
-      const parsed = TreeSchema.parse(body);
+      const parsed = answer(TreeSchema, body);
       if (parsed.truncated) throw new GithubUnavailableError('tree truncated');
       return parsed.tree.map(entry => ({ name: entry.path, type: entry.type, sha: entry.sha }));
     },
     async blob(sha) {
       const body = await get(`${REPO}/git/blobs/${sha}`, []);
-      const parsed = BlobSchema.parse(body);
+      const parsed = answer(BlobSchema, body);
       return Uint8Array.from(atob(parsed.content.replace(/\s+/g, '')), char => char.charCodeAt(0));
     },
     async lastCommitTouching(sha, path) {
       const query = new URLSearchParams({ sha, path, per_page: '1' });
       const body = await get(`${REPO}/commits?${query.toString()}`, [404, 422]);
-      return body === null ? null : (CommitListSchema.parse(body)[0]?.sha ?? null);
+      return body === null ? null : (answer(CommitListSchema, body)[0]?.sha ?? null);
     },
     async pullsOfCommit(commit) {
       const body = await get(`${REPO}/commits/${commit}/pulls?per_page=${PAGE_SIZE}`, [404, 422]);
       if (body === null) return [];
-      return PullListSchema.parse(body).map(pull => ({
+      return answer(PullListSchema, body).map(pull => ({
         number: pull.number,
         mergedAt: pull.merged_at,
         baseRef: pull.base.ref,
@@ -296,7 +306,7 @@ export function createGithubClient(
           `${REPO}/pulls/${pr}/reviews?per_page=${PAGE_SIZE}&page=${page}`,
           []
         );
-        const batch = ReviewListSchema.parse(body);
+        const batch = answer(ReviewListSchema, body);
         for (const review of batch) {
           if (review.user === null) continue;
           reviews.push({ userId: review.user.id, state: review.state, commitId: review.commit_id });
@@ -308,7 +318,7 @@ export function createGithubClient(
     async blobAt(ref, path) {
       const body = await get(`${REPO}/contents/${segments(path)}?ref=${ref}`);
       if (body === null) return null;
-      const parsed = ContentsSchema.parse(body);
+      const parsed = answer(ContentsSchema, body);
       return Array.isArray(parsed) || parsed.type !== 'file' ? null : parsed.sha;
     },
   };

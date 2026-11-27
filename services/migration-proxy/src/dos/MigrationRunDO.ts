@@ -344,13 +344,11 @@ export class MigrationRunDO extends DurableObject<Env> {
         }
       }
     } catch (error) {
-      // A malformed GitHub answer is GitHub being unavailable too, not a server error.
-      if (!(error instanceof GithubUnavailableError) && !(error instanceof z.ZodError)) throw error;
+      if (!(error instanceof GithubUnavailableError)) throw error;
       return {
         kind: 'unavailable',
         reason: 'github_unavailable',
-        retryAfterSeconds:
-          error instanceof GithubUnavailableError ? retryAfter(error, now) : GITHUB_RETRY_SECONDS,
+        retryAfterSeconds: retryAfter(error, now),
       };
     }
 
@@ -996,12 +994,13 @@ export class MigrationRunDO extends DurableObject<Env> {
    * another step moved it first: the caller holds a late result, which is dropped.
    */
   private transition(run: ActiveRun, to: Stage | null, values: RunValues): Run | null {
-    const row = this.db
-      .update(runs)
-      .set({ ...values, ...(to ?? {}) })
-      .where(and(eq(runs.id, run.id), eq(runs.state, run.state), eq(runs.phase, run.phase)))
-      .returning()
-      .get();
+    const atStage = and(eq(runs.id, run.id), eq(runs.state, run.state), eq(runs.phase, run.phase));
+    const changes = { ...values, ...(to ?? {}) };
+    // Nothing to write (a deferred step with no news): only check the run is still there.
+    const row =
+      Object.keys(changes).length === 0
+        ? this.db.select().from(runs).where(atStage).get()
+        : this.db.update(runs).set(changes).where(atStage).returning().get();
     if (row === undefined) {
       console.warn(
         `migration-proxy: dropped a late result for run ${run.id} at ${run.state}/${run.phase}`

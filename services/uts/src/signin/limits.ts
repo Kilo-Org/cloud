@@ -4,15 +4,18 @@ import { anonymousWriter } from './network';
 /**
  * The limit on anonymous sign-in writes (design 3, "Anonymous sign-in writes"): a passkey sign-in
  * challenge, a device authorization, and a provider, SSO or email sign-in start each store a row
- * (the email start also sends mail) before anyone is signed in. Each isolate allows one anonymous
- * writer (`anonymousWriter`: an IPv4 address or an IPv6 /48) a number of such writes per minute,
- * counted before the statement runs: 10 shared by every write but the SSO start, and 60 SSO starts
- * in their own window, because the staff of an org that requires SSO often share one egress
- * address. The count is plain data in the isolate, like the PAT miss limit: a caller spread over
- * many isolates gets more, which the rows' short lives and the store's per-writer cap on pending
- * device codes bound.
+ * (the email start also sends mail) before anyone is signed in, and so does a third-party client
+ * metadata fetch of GET /authorize (an outbound fetch, then a client row). Each isolate allows one
+ * anonymous writer (`anonymousWriter`: an IPv4 address or an IPv6 /48) a number of such writes per
+ * minute, counted before the statement or fetch runs: 10 shared by every sign-in write but the SSO
+ * start; 60 SSO starts in their own window, because the staff of an org that requires SSO often
+ * share one egress address; and 10 metadata fetches in their own window, so client lookups never
+ * use up a sign-in. The count is plain data in the isolate, like the PAT miss limit: a caller
+ * spread over many isolates gets more, which the rows' short lives, the store's per-writer cap on
+ * pending device codes and the pruning of unconsented clients
+ * (`uts.maintain_third_party_client_rows`) bound.
  */
-const ALLOWANCES = { shared: 10, sso: 60 } as const;
+const ALLOWANCES = { shared: 10, sso: 60, client_metadata: 10 } as const;
 const WINDOW_MS = 60_000;
 /** The map holds at most this many windows; past it, the oldest window is dropped first. */
 const MAX_WRITERS = 10_000;
@@ -25,7 +28,8 @@ export type AnonymousWrite =
   | 'device_authorization'
   | 'provider_sign_in_start'
   | 'sso_sign_in_start'
-  | 'email_sign_in_start';
+  | 'email_sign_in_start'
+  | 'client_metadata_fetch';
 
 /**
  * Null when the writer of `address` may write now (and counts the write); otherwise the seconds
@@ -37,7 +41,12 @@ export function anonymousWriteRetryAfter(
   action: AnonymousWrite,
   now = Date.now()
 ): number | null {
-  const allowance = action === 'sso_sign_in_start' ? 'sso' : 'shared';
+  const allowance =
+    action === 'sso_sign_in_start'
+      ? 'sso'
+      : action === 'client_metadata_fetch'
+        ? 'client_metadata'
+        : 'shared';
   const key = `${allowance}:${anonymousWriter(address) ?? 'unknown'}`;
   const current = windows.get(key);
   if (current === undefined || now - current.startedAt >= WINDOW_MS) {

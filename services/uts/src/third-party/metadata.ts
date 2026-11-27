@@ -65,20 +65,13 @@ export function clientIdUrlProblem(clientId: string): string | null {
   return null;
 }
 
-/** Schemes a redirect URI never uses: they run code, read local data or leave the browser. */
-const REFUSED_SCHEMES = new Set([
-  'javascript:',
-  'data:',
-  'file:',
-  'blob:',
-  'about:',
-  'vbscript:',
-  'filesystem:',
-  'ftp:',
-  'ws:',
-  'wss:',
-  'mailto:',
-]);
+/**
+ * A private-use URI scheme as RFC 8252 section 7.1 requires it: a domain name the app's publisher
+ * controls, in reverse order (`com.example.app`), so at least two labels. A scheme without a
+ * period (`javascript`, `data`, `file`, or any short name another app may claim) never matches.
+ * `URL` reports the scheme lower-cased, with its colon.
+ */
+const REVERSE_DOMAIN_SCHEME = /^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+:$/;
 /**
  * IPv4 and name loopback only: the confirm page's `form-action` cannot name an IPv6 literal
  * origin (CSP host sources have no IPv6 form), so a `[::1]` redirect could never complete.
@@ -87,8 +80,8 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 
 /**
  * A redirect URI a third-party client may register: an exact HTTPS URL, an HTTP loopback URL on
- * `127.0.0.1` or `localhost` (RFC 8252 section 7.3), or a private-use scheme of a native app
- * (section 7.1); never a fragment or credentials. The authorization endpoint matches the
+ * `127.0.0.1` or `localhost` (RFC 8252 section 7.3), or a reverse-domain private-use scheme of a
+ * native app (section 7.1); never a fragment or credentials. The authorization endpoint matches the
  * registered string exactly.
  */
 export function isAllowedThirdPartyRedirect(uri: string): boolean {
@@ -103,7 +96,7 @@ export function isAllowedThirdPartyRedirect(uri: string): boolean {
   }
   if (url.protocol === 'https:') return true;
   if (url.protocol === 'http:') return LOOPBACK_HOSTS.has(url.hostname);
-  return /^[a-z][a-z0-9+.-]*:$/.test(url.protocol) && !REFUSED_SCHEMES.has(url.protocol);
+  return REVERSE_DOMAIN_SCHEME.test(url.protocol);
 }
 
 /** How a registered third-party redirect URI receives the code. */

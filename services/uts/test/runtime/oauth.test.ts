@@ -885,6 +885,100 @@ describe('authorization endpoint', () => {
   });
 
   it.each([
+    ['an unsupported response type', { response_type: 'token' }, 'unsupported_response_type'],
+    ['no PKCE', { code_challenge_method: 'plain' }, 'invalid_request'],
+    ['a repeated state', { state: ['one', 'two'] }, 'invalid_request'],
+    ['an unknown scope', { scope: 'gateway:unknown.read' }, 'invalid_scope'],
+    ['a DPoP key', { dpop_jkt: jkt }, 'invalid_request'],
+  ])(
+    'shows a third-party error before the hand-off for %s, never a redirect to the URI its own document lists',
+    async (_name, change, error) => {
+      let handedOff = false;
+      const response = await call(
+        authorizeUrl({
+          ...base,
+          client_id: THIRD_PARTY,
+          redirect_uri: 'https://client.example.com/callback',
+          dpop_jkt: '',
+          ...change,
+        }),
+        oauthDeps(fakeGrants().access, {
+          clients: knownClient,
+          handoff: async () => {
+            handedOff = true;
+            return { status: 'denied' };
+          },
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe(error);
+      expect(handedOff).toBe(false);
+    }
+  );
+
+  it('redirects a third-party denial once the user acted in the hand-off', async () => {
+    const response = await call(
+      authorizeUrl({
+        ...base,
+        client_id: THIRD_PARTY,
+        redirect_uri: 'https://client.example.com/callback',
+        dpop_jkt: '',
+      }),
+      oauthDeps(fakeGrants().access, {
+        clients: knownClient,
+        handoff: async () => ({ status: 'denied' }),
+      })
+    );
+    expect(response.status).toBe(302);
+    expect(redirectOf(response).origin).toBe('https://client.example.com');
+    expect(redirectOf(response).searchParams.get('error')).toBe('access_denied');
+  });
+
+  it('refuses a cached redirect URI that is not a reverse-domain private-use scheme', async () => {
+    const response = await call(
+      authorizeUrl({
+        ...base,
+        client_id: THIRD_PARTY,
+        redirect_uri: 'myapp:/callback',
+        dpop_jkt: '',
+      }),
+      oauthDeps(fakeGrants().access, {
+        clients: async clientId => ({
+          kind: 'client',
+          client: { clientId, name: 'Example', redirectUris: ['myapp:/callback'] },
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Location')).toBeNull();
+    expect(await errorOf(response)).toBe('invalid_request');
+  });
+
+  it('answers 429 with Retry-After when the network used its metadata fetch allowance', async () => {
+    let address: string | null = 'unset';
+    const request = authorizeUrl({
+      ...base,
+      client_id: THIRD_PARTY,
+      redirect_uri: 'https://client.example.com/callback',
+    });
+    const response = await call(
+      new Request(request, { headers: { 'CF-Connecting-IP': '203.0.113.9' } }),
+      oauthDeps(fakeGrants().access, {
+        clients: async (_clientId, from) => {
+          address = from;
+          return { kind: 'rate_limited', retryAfterSeconds: 17 };
+        },
+      })
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('17');
+    expect(response.headers.get('Location')).toBeNull();
+    expect(await errorOf(response)).toBe('temporarily_unavailable');
+    expect(address).toBe('203.0.113.9');
+  });
+
+  it.each([
     ['an unregistered scope', 'kilo-cli', 'gateway:unknown.read'],
     ['a scope of another first-party client', 'kilo-cli', 'user-data-export:exports.dispatch'],
     ['a scope for the web app only', 'kilo-cli', 'uts:security.read'],
@@ -915,8 +1009,14 @@ describe('authorization endpoint', () => {
         },
       })
     );
-    expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
-    expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    if (thirdParty) {
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe('invalid_scope');
+    } else {
+      expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
+      expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    }
     expect(handedOff).toBe(false);
     expect(grants.calls.filter(item => item.method === 'issueCode')).toEqual([]);
   });

@@ -125,4 +125,15 @@ describe('anonymous sign-in write limit', () => {
     }
     expect(anonymousWriteRetryAfter(office, 'email_sign_in_start', start + 100)).toBe(60);
   });
+
+  it('gives client metadata fetches their own 10 a minute, apart from the sign-in writes', () => {
+    const start = 4_000_000;
+    const network = '198.51.10.10';
+    for (let lookup = 0; lookup < 10; lookup++) {
+      expect(anonymousWriteRetryAfter(network, 'client_metadata_fetch', start + lookup)).toBeNull();
+    }
+    expect(anonymousWriteRetryAfter(network, 'client_metadata_fetch', start + 15_000)).toBe(45);
+    // Client lookups never use up a sign-in of the same network.
+    expect(anonymousWriteRetryAfter(network, 'passkey_sign_in_challenge', start + 100)).toBeNull();
+  });
 });

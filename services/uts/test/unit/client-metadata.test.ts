@@ -76,8 +76,8 @@ describe('third-party redirect URIs', () => {
     'https://client.example.com/callback',
     'http://127.0.0.1:33418/callback',
     'http://localhost:6274/oauth/callback',
-    'cursor://anysphere.cursor-mcp/oauth/callback',
     'com.example.app:/oauth/callback',
+    'io.example.mcp-client://oauth/callback',
   ])('allows %s', uri => {
     expect(isAllowedThirdPartyRedirect(uri)).toBe(true);
   });
@@ -87,6 +87,13 @@ describe('third-party redirect URIs', () => {
     'javascript:alert(1)',
     'data:text/html,hi',
     'file:///etc/passwd',
+    // RFC 8252 section 7.1: a private-use scheme is a reverse domain name, never a short name.
+    'cursor://anysphere.cursor-mcp/oauth/callback',
+    'myapp:/oauth/callback',
+    'blob:https://client.example.com/id',
+    'chrome-extension://abcdefghijklmnop/callback',
+    '.example.com:/callback',
+    'com.example.:/callback',
     'https://client.example.com/callback#fragment',
     'https://user@client.example.com/callback',
     'HTTPS://client.example.com/callback',

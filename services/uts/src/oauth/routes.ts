@@ -37,6 +37,7 @@ import { handleDeviceDecision, handleDevicePage } from '../signin/device/verific
 import { handleEmailRequest } from '../signin/email/routes';
 import { signInChoices } from '../signin/flows';
 import { requestSession, signInHandoff } from '../signin/handoff';
+import { anonymousWriteRetryAfter } from '../signin/limits';
 import { messagePage, passkeysPage, signInPage, unavailablePage } from '../signin/pages';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../signin/passkey/ceremonies';
 import { signInConfigFor } from '../signin/providers/config';
@@ -191,6 +192,7 @@ export function oauthService(
         now: Date.now,
         failures: metadataFailures,
         inFlight: metadataFetches,
+        fetchRetryAfter: address => anonymousWriteRetryAfter(address, 'client_metadata_fetch'),
       }),
       thirdParty,
       exchange:

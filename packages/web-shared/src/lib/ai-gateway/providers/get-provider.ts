@@ -10,7 +10,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   byokOwner,
-  getByokCredentials,
   getByokKeyStates,
   getStoredByokKeys,
   type ByokOwner,
@@ -232,14 +231,16 @@ async function directByokRoute(
 async function resolveDirectByokModel(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
-  { user, organizationId, request }: GetProviderInput,
+  { request }: GetProviderInput,
+  loadStoredKeys: (() => Promise<StoredByokKeys>) | null,
   decision: RoutingDecisionRecorder
 ): Promise<GetProviderProviderResult | DirectByokCatalogOnlyResult | null> {
   const providerId = directByok.id;
-  const [credential] = await getByokCredentials(readDb, byokOwner(user.id, organizationId), [
-    providerId,
-  ]);
-  if (!credential) {
+  const storedKeys = loadStoredKeys ? await loadStoredKeys() : null;
+  const key = storedKeys?.keys.find(
+    candidate => candidate.providerId === providerId && candidate.isEnabled
+  );
+  if (!storedKeys || !key) {
     decision.step({
       step: 'direct-byok-model',
       outcome: 'skipped',
@@ -248,7 +249,7 @@ async function resolveDirectByokModel(
     });
     return null;
   }
-  if (credential.serveCatalogModels && supportsCatalogMode(providerId)) {
+  if (key.serveCatalogModels && supportsCatalogMode(providerId)) {
     const catalogModelId = await getDirectByokCatalogModelId(directByokModel);
     decision.step({
       step: 'direct-byok-model',
@@ -259,6 +260,7 @@ async function resolveDirectByokModel(
     });
     return { kind: 'direct-byok-catalog-only', providerId, catalogModelId };
   }
+  const credential = await storedKeys.decrypt(providerId);
   decision.step({ step: 'direct-byok-model', outcome: 'selected', provider_id: providerId });
   return servedBy(await directByokRoute(directByok, directByokModel, credential, request, false));
 }
@@ -672,8 +674,19 @@ async function selectProvider(
     // own route, whose organization policy still applies.
     return kiloRouteFor(input, requestedModel, isFree);
   }
+  let storedKeys: Promise<StoredByokKeys> | undefined;
+  const loadStoredKeys = () =>
+    (storedKeys ??=
+      input.loadStoredByokKeys?.() ??
+      getStoredByokKeys(readDb, byokOwner(user.id, organizationId)));
   if (model.kind === 'direct-byok-model') {
-    const result = await resolveDirectByokModel(model.provider, model.model, input, decision);
+    const result = await resolveDirectByokModel(
+      model.provider,
+      model.model,
+      input,
+      isAnonymousContext(user) ? null : loadStoredKeys,
+      decision
+    );
     if (result) return result;
   } else {
     decision.step({ step: 'direct-byok-model', outcome: 'skipped', reason: 'no-match' });
@@ -708,11 +721,6 @@ async function selectProvider(
     });
   }
 
-  let storedKeys: Promise<StoredByokKeys> | undefined;
-  const loadStoredKeys = () =>
-    (storedKeys ??=
-      input.loadStoredByokKeys?.() ??
-      getStoredByokKeys(readDb, byokOwner(user.id, organizationId)));
   const planInputs = {
     requestedModel,
     apiKind: request.kind,

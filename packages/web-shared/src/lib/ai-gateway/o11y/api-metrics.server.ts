@@ -1,11 +1,15 @@
 import { after } from 'next/server';
 import {
+  O11Y_API_METRICS_SENDER_AUTH,
   O11Y_KILO_GATEWAY_CLIENT_SECRET,
   O11Y_SERVICE_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import { resolveApiMetricsSender } from './api-metrics-sender';
+import type { StsEnvironment } from '@kilocode/sts-contracts';
+import type { ApiMetricsTokenRead } from './api-metrics-sts';
 
 export type ApiMetricsTokens = {
   inputTokens?: number;
@@ -139,30 +143,133 @@ export function getToolsUsed(request: GatewayRequest): string[] {
   return used;
 }
 
-const apiMetricsUrl = (() => {
+const apiMetricsSender = (() => {
   const baseUrl = parseInternalServiceUrl(O11Y_SERVICE_URL);
-  return baseUrl ? new URL('/ingest/api-metrics', baseUrl) : null;
+  return resolveApiMetricsSender({
+    auth: O11Y_API_METRICS_SENDER_AUTH,
+    url: baseUrl ? new URL('/ingest/api-metrics', baseUrl) : null,
+    secret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+    runtime: process.env,
+  });
 })();
 
-async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
-  if (!apiMetricsUrl) return;
-  const clientSecret = O11Y_KILO_GATEWAY_CLIENT_SECRET;
-  if (!clientSecret) return;
+const sends = apiMetricsSender.kind === 'legacy' || apiMetricsSender.kind === 'sts';
 
-  await fetch(apiMetricsUrl, {
+let senderStateReported = false;
+
+/**
+ * Says once per process, on its first metric rather than at load, why it sends nothing: an error
+ * for an invalid configuration, a note for `sts` on a deployment o11y does not serve.
+ */
+function reportSenderStateOnce(): void {
+  if (senderStateReported) return;
+  senderStateReported = true;
+  const sender = apiMetricsSender;
+  if (sender.kind === 'misconfigured') {
+    console.error('o11y api metrics: invalid sender configuration; sending nothing', {
+      reason: sender.reason,
+    });
+  } else if (sender.kind === 'off' && sender.reason === 'sts_production_only') {
+    console.info('o11y api metrics: sts is production only; sending nothing on this deployment');
+  }
+}
+
+/**
+ * This process's STS token health. Metrics dropped for want of a token are counted. The process
+ * logs once when it holds its first token (with the metrics dropped before it), once when it
+ * enters `failing` and once when a token is held again, never per metric.
+ */
+type TokenHealth =
+  | { state: 'cold'; dropped: number }
+  | { state: 'healthy'; dropped: number }
+  | { state: 'failing'; since: number; dropped: number };
+
+let tokenHealth: TokenHealth = { state: 'cold', dropped: 0 };
+
+function tokenOf(read: ApiMetricsTokenRead): string | null {
+  switch (read.kind) {
+    case 'token':
+      if (tokenHealth.state === 'cold') {
+        console.info('o11y api metrics: first STS token held; sending metrics', {
+          droppedBeforeFirstToken: tokenHealth.dropped,
+        });
+      } else if (tokenHealth.state === 'failing') {
+        console.info('o11y api metrics: STS token held again; sending metrics', {
+          dropped: tokenHealth.dropped,
+          failingMs: Date.now() - tokenHealth.since,
+        });
+      }
+      tokenHealth = { state: 'healthy', dropped: 0 };
+      return read.token;
+    case 'not_held':
+      tokenHealth = { ...tokenHealth, dropped: tokenHealth.dropped + 1 };
+      return null;
+    case 'failed':
+      if (tokenHealth.state === 'failing') {
+        tokenHealth = { ...tokenHealth, dropped: tokenHealth.dropped + 1 };
+      } else {
+        console.error('o11y api metrics: no STS token; dropping metrics until one is held', {
+          ...read.failure,
+          droppedBefore: tokenHealth.dropped,
+        });
+        tokenHealth = { state: 'failing', since: Date.now(), dropped: 1 };
+      }
+      return null;
+  }
+}
+
+/**
+ * The `Authorization` header of one STS send, or null when the process holds no token. It never
+ * waits for a mint: the metric is dropped and the token client renews in the background. It never
+ * falls back to the shared secret.
+ */
+async function stsAuthorization(
+  environment: StsEnvironment
+): Promise<{ authorization: string } | null> {
+  let read: ApiMetricsTokenRead;
+  try {
+    // Loaded only under `sts`, so a `legacy` deployment never evaluates the token client, the
+    // Vercel OIDC exchange or the STS contracts on this hot path.
+    const { apiMetricsToken } = await import('./api-metrics-sts');
+    read = await apiMetricsToken(environment);
+  } catch (error) {
+    read = {
+      kind: 'failed',
+      failure: { errorName: error instanceof Error ? error.name : typeof error },
+    };
+  }
+  const token = tokenOf(read);
+  return token === null ? null : { authorization: `Bearer ${token}` };
+}
+
+async function sendApiMetrics(params: ApiMetricsParams): Promise<void> {
+  const sender = apiMetricsSender;
+  if (sender.kind !== 'legacy' && sender.kind !== 'sts') return;
+  const credential =
+    sender.kind === 'legacy'
+      ? { 'X-O11Y-ADMIN-TOKEN': sender.secret }
+      : await stsAuthorization(sender.environment);
+  if (credential === null) return;
+
+  await fetch(sender.url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'X-O11Y-ADMIN-TOKEN': clientSecret,
+      ...credential,
     },
     body: JSON.stringify(params),
+    // The credential is for this origin only; a redirect never carries it elsewhere.
+    redirect: 'error',
   }).catch(() => {
     // Best-effort only; never fail the caller request.
   });
 }
 
 export function emitApiMetrics(params: ApiMetricsParams) {
-  if (!apiMetricsUrl) return;
+  if (!sends) {
+    reportSenderStateOnce();
+    return;
+  }
 
   after(async () => {
     await sendApiMetrics(params);
@@ -170,7 +277,6 @@ export function emitApiMetrics(params: ApiMetricsParams) {
 }
 
 export function emitGatewayApiMetrics(params: ApiMetricsParams) {
-  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
   emitApiMetrics(params);
 }
 
@@ -179,8 +285,10 @@ export function emitApiMetricsForResponse(
   statsPromise: Promise<Pick<MicrodollarUsageStats, 'inference_provider'> | null>,
   requestStartedAt: number
 ) {
-  if (!apiMetricsUrl) return;
-  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
+  if (!sends) {
+    reportSenderStateOnce();
+    return;
+  }
 
   // Accounting reports a usage parse failure; metrics still record the request without a provider.
   after(

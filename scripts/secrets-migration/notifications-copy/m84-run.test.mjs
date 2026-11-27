@@ -19,6 +19,7 @@ import {
   RENDER_CONFIG,
   ROLLOUT_WORKFLOWS,
   StopError,
+  TIMING,
   activeRollouts,
   childEnv,
   cleanup,
@@ -336,6 +337,7 @@ function makeWorld(o = {}) {
     }
     if (args[0] === 'secret') {
       world.secretInputs.push(opts.stdin);
+      o.onPut?.(world);
       const { code = 0, lands = true, extra = [] } = o.put ?? {};
       if (lands) {
         copier.armedAt = clock.t;
@@ -1102,16 +1104,58 @@ test('a stop signal ends the readiness wait, refuses arming, and cleans up befor
   assertNeverArmed(world);
   assert.ok(callIndex(world, 'cf', 'deleteScript') < callIndex(world, 'tail', 'stop'));
   assert.equal(report.tail.stop, 'killed');
-  assert.equal(report.cleanup.scriptStatus, 404);
-  // Only read, delete and status after the signal: no namespace read, snapshot or rollout list.
+  // After the signal: one read and one delete, no status read, so deletion is left unproved.
+  assert.deepEqual([report.cleanup.deleted, report.cleanup.scriptStatus], [true, null]);
   assert.equal(report.cleanup.aborted, true);
   assert.deepEqual([report.cleanup.drift, report.cleanup.gateNamespacePresent], [null, undefined]);
   const afterDelete = world.calls.slice(callIndex(world, 'cf', 'deleteScript') + 1);
   assert.ok(!afterDelete.some(c => c[1] === 'scriptNames' || c[1] === 'runsCreated'));
   assert.equal(report.cleanup.gate.ok, false, 'an aborted cleanup never passes the gate');
-  assert.deepEqual(report.unresolved, ['stopped_by_signal']);
+  assert.deepEqual(report.unresolved, ['copier_not_proved_deleted', 'stopped_by_signal']);
   assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
   assert.equal(exitCode(report), 1);
+});
+
+/** Wraps a fake Cloudflare client to record each call and its per-call timeout, in order. */
+function traced(cf, log) {
+  return Object.fromEntries(
+    Object.entries(cf).map(([k, f]) => [
+      k,
+      (...a) => {
+        const o = a.find(x => x !== null && typeof x === 'object' && 'timeoutMs' in x);
+        log.push([k, o?.timeoutMs]);
+        return f(...a);
+      },
+    ])
+  );
+}
+
+test('a stop during secret put reads the put result once with the short timeout, then deletes', async () => {
+  const controller = new AbortController();
+  const log = [];
+  const world = makeWorld({
+    onPut: () => {
+      controller.abort();
+      log.push(['put']);
+    },
+  });
+  world.cf = traced(world.cf, log);
+  const report = await run(ioOf(world, { signal: controller.signal }));
+  assert.equal(report.stopReason, 'stopped_by_signal');
+  assert.equal(report.armWrite, 'proved');
+  assert.ok(report.armedVersion, 'the landed put is attributed');
+  assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
+  const q = TIMING.abortCallTimeoutMs;
+  assert.deepEqual(log.slice(log.findIndex(e => e[0] === 'put') + 1), [
+    ['deploymentVersions', q],
+    ['version', q],
+    ['moduleHashes', q],
+    ['deploymentVersions', q],
+    ['deleteScript', q],
+  ]);
+  assert.equal(world.readLog.length, 0);
+  assert.deepEqual(report.unresolved, ['copier_not_proved_deleted', 'stopped_by_signal']);
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
 });
 
 test('a stop signal before the first phase admits nothing', async () => {
@@ -1122,6 +1166,73 @@ test('a stop signal before the first phase admits nothing', async () => {
   assert.equal(report.stopReason, 'stopped_by_signal');
   assert.deepEqual(world.calls, []);
   assert.equal(report.cleanup.note, 'not_created');
+  assert.equal(report.cleanup.beforeNotBefore, true);
+  assert.equal(report.operatorAction, 'REVOKE THE WRITER NOW');
+});
+
+test('an aborted cleanup reads once with the short timeout, never retries, and skips status', async () => {
+  const id = randomUUID();
+  const q = TIMING.abortCallTimeoutMs;
+  const seen = [];
+  const io = cf => ({
+    cf,
+    gh: {},
+    clock: { now: () => T0 },
+    sleep: async () => seen.push(['sleep']),
+  });
+  const state = { created: true, recorded: new Set([id]), before: {}, since: T0, aborted: true };
+  const flaky = await cleanup(
+    io({
+      async deploymentVersions(_name, opts) {
+        seen.push(['read', opts?.timeoutMs]);
+        throw new StopError('cloudflare_transport');
+      },
+      async deleteScript() {
+        seen.push(['delete']);
+      },
+    }),
+    { ...state, plan: { notBefore: T0 + 60_000 } }
+  );
+  assert.deepEqual(seen, [['read', q]], 'one read, no retry sleep, no delete');
+  assert.deepEqual(flaky.errors, ['read:cloudflare_transport']);
+  seen.length = 0;
+  const deleted = await cleanup(
+    io({
+      async deploymentVersions(_name, opts) {
+        seen.push(['read', opts?.timeoutMs]);
+        return [{ version_id: id, percentage: 100 }];
+      },
+      async deleteScript(_name, opts) {
+        seen.push(['delete', opts?.timeoutMs]);
+      },
+      async scriptStatus() {
+        seen.push(['status']);
+        return 404;
+      },
+      async doNamespaces() {
+        seen.push(['namespaces']);
+        return [];
+      },
+      async scriptNames() {
+        seen.push(['snapshot']);
+        return [];
+      },
+    }),
+    { ...state, plan: { notBefore: T0 + 60_000 } }
+  );
+  assert.deepEqual(seen, [
+    ['read', q],
+    ['delete', q],
+  ]);
+  assert.deepEqual([deleted.deleted, deleted.scriptStatus, deleted.gate.ok], [true, null, false]);
+  assert.equal(deleted.beforeNotBefore, true);
+  // Not created: the timing comes from the plan; an unknown plan counts as before not-before.
+  const late = await cleanup(io({}), { created: false, plan: { notBefore: T0 - 1 } });
+  const unknown = await cleanup(io({}), { created: false });
+  assert.deepEqual(
+    [late.note, late.beforeNotBefore, unknown.beforeNotBefore],
+    ['not_created', false, true]
+  );
 });
 
 test('cleanup survives malformed provider data, reports it, and never deletes on a failed read', async () => {

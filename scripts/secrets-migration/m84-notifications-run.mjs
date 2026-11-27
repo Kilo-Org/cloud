@@ -50,9 +50,12 @@
 //  13. Stop the tail: SIGINT, then SIGKILL, each bounded.
 //
 // SIGINT and SIGTERM (job cancel or timeout) stop further phases, unblock any wait and stop a
-// running child within about one second, then cleanup runs only read, delete and status (no
-// namespace read, snapshot or rollout listing) and the tail is stopped. GitHub follows with SIGKILL
-// a few seconds later, so cancel and timeout can still act like SIGKILL: cleanup may not finish.
+// running child within about one second. A signal during `secret put` still runs the arm readback,
+// each read once with the short abort timeout, so a landed put can be attributed. Then cleanup
+// runs one read and one delete, each once with the short timeout (no retry, no status read, no
+// namespace read, snapshot or rollout listing), and the tail is stopped. GitHub follows with
+// SIGKILL a few seconds later, so cancel and timeout can still act like SIGKILL: cleanup may not
+// finish.
 // After any run that does not end with a passing cleanup gate, the operator revokes the writer
 // and reads the copier back privately before anything else; `operatorAction` reads
 // `REVOKE THE WRITER NOW` while not-before has not passed.
@@ -125,8 +128,10 @@ export const TIMING = Object.freeze({
   processTimeoutMs: 5 * 60_000,
   killGraceMs: 5_000,
   // After a stop signal: GitHub sends SIGINT, then SIGTERM, then SIGKILL within seconds, so each
-  // child gets about one second before SIGKILL and cleanup runs only read, delete and status.
+  // child gets about one second before SIGKILL.
   abortGraceMs: 1_000,
+  // After a stop signal each Cloudflare read or delete gets this long, once, with no retry.
+  abortCallTimeoutMs: 2_500,
   rolloutRunsPerWorkflow: 20,
 });
 
@@ -304,14 +309,17 @@ export function cloudflare({
   timeoutMs = TIMING.cfTimeoutMs,
 }) {
   const account = `${CF_API}/accounts/${accountId}`;
-  async function request(url, { allow404 = false, raw = false, method = 'GET' } = {}) {
+  async function request(
+    url,
+    { allow404 = false, raw = false, method = 'GET', timeoutMs: callTimeoutMs = timeoutMs } = {}
+  ) {
     let res;
     try {
       res = await fetchImpl(url, {
         method,
         headers: { authorization: `Bearer ${token}` },
         redirect: 'manual',
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(callTimeoutMs),
       });
     } catch {
       throw new StopError('cloudflare_transport');
@@ -362,8 +370,8 @@ export function cloudflare({
       return ids.sort();
     },
     /** Current deployment's versions as the API returns them, or null when the script is absent. */
-    async deploymentVersions(name) {
-      const result = await get(`${script(name)}/deployments`, { allow404: true });
+    async deploymentVersions(name, { timeoutMs: t } = {}) {
+      const result = await get(`${script(name)}/deployments`, { allow404: true, timeoutMs: t });
       if (result === null) return null;
       if (!isRecord(result)) throw new StopError('cloudflare_unreadable');
       const latest = records(result.deployments)[0];
@@ -376,8 +384,10 @@ export function cloudflare({
         .sort((a, b) => a.version_id.localeCompare(b.version_id));
     },
     /** One version's identity and its own bindings (`resources.bindings`), as returned. */
-    async version(name, versionId) {
-      const result = await get(`${script(name)}/versions/${encodeURIComponent(versionId)}`);
+    async version(name, versionId, { timeoutMs: t } = {}) {
+      const result = await get(`${script(name)}/versions/${encodeURIComponent(versionId)}`, {
+        timeoutMs: t,
+      });
       return {
         id: isRecord(result) ? (result.id ?? null) : null,
         bindings: isRecord(result) ? (result.resources?.bindings ?? null) : null,
@@ -400,8 +410,11 @@ export function cloudflare({
      * multipart bytes). Any other part is listed as `unexpected` without hashing, so the module
      * check fails closed and nothing else is digested.
      */
-    async moduleHashes(name) {
-      const res = await request(`${account}${script(name)}/content/v2`, { raw: true });
+    async moduleHashes(name, { timeoutMs: t } = {}) {
+      const res = await request(`${account}${script(name)}/content/v2`, {
+        raw: true,
+        timeoutMs: t,
+      });
       let form;
       try {
         form = await res.formData();
@@ -457,8 +470,12 @@ export function cloudflare({
       const all = await pages(`${account}/secrets_store/stores/${storeId}/secrets`);
       return all.map(s => ({ id: s.id, name: s.name, status: s.status, scopes: s.scopes }));
     },
-    async deleteScript(name) {
-      await request(`${account}${script(name)}?force=false`, { method: 'DELETE', allow404: true });
+    async deleteScript(name, { timeoutMs: t } = {}) {
+      await request(`${account}${script(name)}?force=false`, {
+        method: 'DELETE',
+        allow404: true,
+        timeoutMs: t,
+      });
     },
   };
 }
@@ -623,15 +640,15 @@ export function drift(before, after, ignore = [COPIER]) {
  * A script's current deployment and, when exactly one version serves 100%, that version's own
  * identity and bindings. The core gates require that single serving version.
  */
-export async function servingVersion(cf, name) {
-  const deployments = (await cf.deploymentVersions(name)) ?? [];
+export async function servingVersion(cf, name, opts) {
+  const deployments = (await cf.deploymentVersions(name, opts)) ?? [];
   const only =
     deployments.length === 1 &&
     deployments[0].percentage === 100 &&
     UUID.test(deployments[0].version_id)
       ? deployments[0].version_id
       : null;
-  return { deployments, version: only === null ? null : await cf.version(name, only) };
+  return { deployments, version: only === null ? null : await cf.version(name, only, opts) };
 }
 
 const storeMeta = async cf => ({
@@ -1161,14 +1178,17 @@ export async function run(io) {
       timeoutMs: putTimeout,
     });
 
-    // Runs even after a stop signal: an unread put result is never left unattributed.
+    // Runs even after a stop signal: an unread put result is never left unattributed. A signal
+    // that landed during the put makes each read run once with the short abort timeout.
     phase('arm_readback', { stoppable: false });
-    const observed = await readBack(io, () => servingVersion(cf, COPIER));
+    const quick = signal?.aborted ? { timeoutMs: TIMING.abortCallTimeoutMs } : undefined;
+    const readOnce = read => (quick ? read() : readBack(io, read));
+    const observed = await readOnce(() => servingVersion(cf, COPIER, quick));
     const armedId = observed.deployments.length === 1 ? observed.deployments[0].version_id : null;
     const armed = bindArmedPreflight(preflight, armedId, observed);
     report.gates.push(verdictOf(armed));
     const modulesKept = sameHashes(
-      await readBack(io, () => cf.moduleHashes(COPIER)),
+      await readOnce(() => cf.moduleHashes(COPIER, quick)),
       moduleHashes()
     );
     if (armed.ok && modulesKept) {
@@ -1273,13 +1293,17 @@ export function operatorPreflightMeta(operator) {
 /**
  * Deletes the copier only when every version it serves was attributed by this run. Every step
  * catches its own failure and records it by name, so a malformed response never skips the report;
- * a failed read never leads to a delete. After a stop signal only read, delete and status run (no
- * namespace read, snapshot or rollout listing), so the cleanup gate stays failed and the job's
- * last seconds go to the delete; a SIGKILL can still land first.
+ * a failed read never leads to a delete. After a stop signal only one read and one delete run, each
+ * once with the short abort timeout (no retry, status, namespace read, snapshot or rollout
+ * listing), so the cleanup gate stays failed and the job's last seconds go to the delete; a
+ * SIGKILL can still land first.
  */
 export async function cleanup(io, { created, recorded, before, plan, since, aborted = false }) {
   const { cf, clock } = io;
   const result = { attempted: false, deleted: false, scriptStatus: null, drift: null, errors: [] };
+  // Unknown timing counts as before not-before, so the report asks for the urgent revoke.
+  const beforeNotBefore = () =>
+    Number.isFinite(plan?.notBefore) ? clock.now() < plan.notBefore : true;
   if (!created) {
     return {
       attempted: false,
@@ -1287,6 +1311,7 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
       scriptStatus: 404,
       drift: null,
       note: 'not_created',
+      beforeNotBefore: beforeNotBefore(),
     };
   }
   const step = async (name, fn) => {
@@ -1297,15 +1322,25 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
       return null;
     }
   };
-  const read = await step('read', () => readBack(io, () => cf.deploymentVersions(COPIER)));
+  // After a stop signal: one read and one delete, each with the short timeout and no retry, and
+  // no status read (the operator reads the copier back).
+  const quick = { timeoutMs: TIMING.abortCallTimeoutMs };
+  const read = await step('read', () =>
+    aborted
+      ? cf.deploymentVersions(COPIER, quick)
+      : readBack(io, () => cf.deploymentVersions(COPIER))
+  );
   const versions = read?.value;
   if (read && versions === null) {
     result.scriptStatus = 404;
   } else if (read && versions.length > 0 && versions.every(v => recorded.has(v.version_id))) {
     result.attempted = true;
-    result.deleted = (await step('delete', () => cf.deleteScript(COPIER))) !== null;
-    const status = await step('status', () => readBack(io, () => cf.scriptStatus(COPIER)));
-    if (status) result.scriptStatus = status.value;
+    result.deleted =
+      (await step('delete', () => cf.deleteScript(COPIER, aborted ? quick : undefined))) !== null;
+    if (!aborted) {
+      const status = await step('status', () => readBack(io, () => cf.scriptStatus(COPIER)));
+      if (status) result.scriptStatus = status.value;
+    }
   } else if (read) {
     result.scriptStatus = 200;
     result.note = 'unattributable_versions';
@@ -1343,7 +1378,7 @@ export async function cleanup(io, { created, recorded, before, plan, since, abor
   }
   if (result.errors.length === 0) delete result.errors;
   result.at = isoSeconds(clock.now());
-  result.beforeNotBefore = clock.now() < plan.notBefore;
+  result.beforeNotBefore = beforeNotBefore();
   return result;
 }
 

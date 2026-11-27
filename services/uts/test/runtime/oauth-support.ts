@@ -73,17 +73,13 @@ function recorded<Input, Output>(
 export function fakeGrants(implementation: Partial<GrantStore> = {}) {
   const calls: Call[] = [];
   const store: GrantStore = {
-    findThirdPartyClient: recorded(
-      'findThirdPartyClient',
-      calls,
-      implementation.findThirdPartyClient
-    ),
     issueCode: recorded('issueCode', calls, implementation.issueCode),
     exchangeCode: recorded('exchangeCode', calls, implementation.exchangeCode),
     refreshFirstParty: recorded('refreshFirstParty', calls, implementation.refreshFirstParty),
     refreshThirdParty: recorded('refreshThirdParty', calls, implementation.refreshThirdParty),
     revoke: recorded('revoke', calls, implementation.revoke),
     introspect: recorded('introspect', calls, implementation.introspect),
+    exchangeDelegated: recorded('exchangeDelegated', calls, implementation.exchangeDelegated),
   };
   const access: GrantsAccess = work => work(store);
   return { access, calls };
@@ -124,6 +120,9 @@ const fixtureScope = (audience: string): UtsScopeEntry => ({
   requiresSession: false,
   requiresOrgClaim: false,
   delegable: false,
+  issuance: 'grant',
+  delegatesTo: [],
+  consentText: `Use the ${audience} fixture`,
 });
 
 const FIXTURE_SCOPES: Readonly<Record<string, UtsScopeEntry>> = {
@@ -178,6 +177,22 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     device: { status: 'off' },
     signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
     tickets: { config, tickets: unexpectedStore },
+    clients: async () => {
+      throw new Error('unexpected client lookup');
+    },
+    thirdParty: unexpectedStore,
+    exchange: null,
+    web: {
+      config,
+      keys: async () => ({ status: 'unconfigured' }),
+      sessions: unexpectedStore,
+      sign: signerAccess(env, config),
+      scopes: testScopes,
+      publish: recordingPublisher().publish,
+      bridge: { status: 'off' },
+      windows: new Map(),
+      now: Date.now,
+    },
     ...overrides,
   };
 }

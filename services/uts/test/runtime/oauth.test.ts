@@ -22,6 +22,7 @@ import { signerForGrant } from '../../src/keys/signer-choice';
 import type { AuthorizationHandoff, PendingAuthorization } from '../../src/oauth/authorize';
 import { type OAuthDeps, handleOAuthRequest } from '../../src/oauth/routes';
 import { s256Challenge } from '../../src/oauth/pkce';
+import type { ThirdPartyClients } from '../../src/third-party/clients';
 import {
   firstPartyRefreshToken,
   firstPartyRefreshTokenOfExchange,
@@ -696,13 +697,15 @@ describe('authorization endpoint', () => {
   });
 
   it('shows an error without redirecting for a bad client or redirect URI', async () => {
-    const deps = oauthDeps(fakeGrants({ findThirdPartyClient: async () => null }).access, {
+    const deps = oauthDeps(fakeGrants().access, {
       handoff: approve,
+      clients: async () => ({ kind: 'refused', reason: 'document missing' }),
     });
     // An empty parameter counts as absent (RFC 6749 section 3.1).
     for (const [params, status, error] of [
       [{ ...base, client_id: 'nobody' }, 401, 'invalid_client'],
       [{ ...base, redirect_uri: 'http://localhost:4100/callback' }, 400, 'invalid_request'],
+      [{ ...base, redirect_uri: 'http://[::1]:4100/callback' }, 400, 'invalid_request'],
       [{ ...base, redirect_uri: '' }, 400, 'invalid_request'],
       [{ ...base, client_id: THIRD_PARTY }, 401, 'invalid_client'],
     ] as const) {
@@ -841,13 +844,14 @@ describe('authorization endpoint', () => {
     }
   });
 
-  it('authorizes a third-party client from its cached metadata with the consent the hand-off names', async () => {
+  /** A third-party client whose metadata names one redirect URI. */
+  const knownClient: ThirdPartyClients = async clientId => ({
+    kind: 'client',
+    client: { clientId, name: 'Example', redirectUris: ['https://client.example.com/callback'] },
+  });
+
+  it('authorizes a third-party client from its metadata with the consent the hand-off names', async () => {
     const grants = fakeGrants({
-      findThirdPartyClient: async clientId => ({
-        clientId,
-        name: 'Example',
-        redirectUris: ['https://client.example.com/callback'],
-      }),
       issueCode: async () => ({ outcome: 'issued', orgRole: null }),
     });
     const response = await call(
@@ -857,10 +861,10 @@ describe('authorization endpoint', () => {
         redirect_uri: 'https://client.example.com/callback',
         dpop_jkt: '',
       }),
-      oauthDeps(grants.access, { handoff: approve })
+      oauthDeps(grants.access, { handoff: approve, clients: knownClient })
     );
     expect(redirectOf(response).searchParams.get('code')).not.toBeNull();
-    expect((grants.calls[1].input as IssueCodeInput).client).toMatchObject({
+    expect((grants.calls[0].input as IssueCodeInput).client).toMatchObject({
       kind: 'third_party',
       clientId: THIRD_PARTY,
     });
@@ -871,17 +875,124 @@ describe('authorization endpoint', () => {
         client_id: THIRD_PARTY,
         redirect_uri: 'https://client.example.com/callback',
       }),
-      oauthDeps(
-        fakeGrants({
-          findThirdPartyClient: async () => {
-            throw storeFailure('retryable');
-          },
-        }).access,
-        { handoff: approve }
-      )
+      oauthDeps(fakeGrants().access, {
+        handoff: approve,
+        clients: async () => ({ kind: 'unavailable' }),
+      })
     );
     expect(lookupFailure.status).toBe(503);
+    expect(lookupFailure.headers.get('Retry-After')).not.toBeNull();
     expect(lookupFailure.headers.get('Location')).toBeNull();
+  });
+
+  it.each([
+    ['an unsupported response type', { response_type: 'token' }, 'unsupported_response_type'],
+    ['no PKCE', { code_challenge_method: 'plain' }, 'invalid_request'],
+    ['a repeated state', { state: ['one', 'two'] }, 'invalid_request'],
+    ['an unknown scope', { scope: 'gateway:unknown.read' }, 'invalid_scope'],
+    ['a DPoP key', { dpop_jkt: jkt }, 'invalid_request'],
+  ])(
+    'shows a third-party error before the hand-off for %s, never a redirect to the URI its own document lists',
+    async (_name, change, error) => {
+      let handedOff = false;
+      const response = await call(
+        authorizeUrl({
+          ...base,
+          client_id: THIRD_PARTY,
+          redirect_uri: 'https://client.example.com/callback',
+          dpop_jkt: '',
+          ...change,
+        }),
+        oauthDeps(fakeGrants().access, {
+          clients: knownClient,
+          handoff: async () => {
+            handedOff = true;
+            return { status: 'denied' };
+          },
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe(error);
+      expect(handedOff).toBe(false);
+    }
+  );
+
+  it('redirects a third-party denial once the user acted in the hand-off', async () => {
+    const response = await call(
+      authorizeUrl({
+        ...base,
+        client_id: THIRD_PARTY,
+        redirect_uri: 'https://client.example.com/callback',
+        dpop_jkt: '',
+      }),
+      oauthDeps(fakeGrants().access, {
+        clients: knownClient,
+        handoff: async () => ({ status: 'denied' }),
+      })
+    );
+    expect(response.status).toBe(302);
+    expect(redirectOf(response).origin).toBe('https://client.example.com');
+    expect(redirectOf(response).searchParams.get('error')).toBe('access_denied');
+  });
+
+  it.each(['data:text/html,hi', 'javascript:alert(1)'])(
+    'refuses a cached redirect URI %s the blocklist refuses',
+    async uri => {
+      const response = await call(
+        authorizeUrl({ ...base, client_id: THIRD_PARTY, redirect_uri: uri, dpop_jkt: '' }),
+        oauthDeps(fakeGrants().access, {
+          clients: async clientId => ({
+            kind: 'client',
+            client: { clientId, name: 'Example', redirectUris: [uri] },
+          }),
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe('invalid_request');
+    }
+  );
+
+  it.each([
+    'cursor://anysphere.cursor-retrieval/oauth/callback',
+    'vscode://vscode.github-authentication/did-authenticate',
+  ])('accepts the private-use redirect %s of a real MCP client', async uri => {
+    const response = await call(
+      authorizeUrl({ ...base, client_id: THIRD_PARTY, redirect_uri: uri, dpop_jkt: '' }),
+      oauthDeps(fakeGrants().access, {
+        clients: async clientId => ({
+          kind: 'client',
+          client: { clientId, name: 'Example', redirectUris: [uri] },
+        }),
+        handoff: async () => ({ status: 'denied' }),
+      })
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')?.startsWith(uri)).toBe(true);
+  });
+
+  it('answers 429 with Retry-After when the network used its metadata fetch allowance', async () => {
+    let address: string | null = 'unset';
+    const request = authorizeUrl({
+      ...base,
+      client_id: THIRD_PARTY,
+      redirect_uri: 'https://client.example.com/callback',
+    });
+    const response = await call(
+      new Request(request, { headers: { 'CF-Connecting-IP': '203.0.113.9' } }),
+      oauthDeps(fakeGrants().access, {
+        clients: async (_clientId, from) => {
+          address = from;
+          return { kind: 'rate_limited', retryAfterSeconds: 17 };
+        },
+      })
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('17');
+    expect(response.headers.get('Location')).toBeNull();
+    expect(await errorOf(response)).toBe('temporarily_unavailable');
+    expect(address).toBe('203.0.113.9');
   });
 
   it.each([
@@ -890,13 +1001,10 @@ describe('authorization endpoint', () => {
     ['a scope for the web app only', 'kilo-cli', 'uts:security.read'],
     ['a scope that is not third-party-safe', THIRD_PARTY, 'kilo-api:profile.read'],
     ['a first-party-only service scope', THIRD_PARTY, 'event-service:events.subscribe'],
+    ['an exchange-only scope for a third-party client', THIRD_PARTY, 'kilo-api:mcp.read'],
+    ['an exchange-only scope for the CLI', 'kilo-cli', 'kilo-api:mcp.read'],
   ])('refuses %s before the hand-off and stores nothing', async (_name, clientId, scope) => {
     const grants = fakeGrants({
-      findThirdPartyClient: async id => ({
-        clientId: id,
-        name: 'Example',
-        redirectUris: ['https://client.example.com/callback'],
-      }),
       issueCode: async () => ({ outcome: 'issued', orgRole: null }),
     });
     let handedOff = false;
@@ -911,14 +1019,21 @@ describe('authorization endpoint', () => {
           : {}),
       }),
       oauthDeps(grants.access, {
+        clients: knownClient,
         handoff: async (request, next) => {
           handedOff = true;
           return await approve(request, next);
         },
       })
     );
-    expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
-    expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    if (thirdParty) {
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe('invalid_scope');
+    } else {
+      expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
+      expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    }
     expect(handedOff).toBe(false);
     expect(grants.calls.filter(item => item.method === 'issueCode')).toEqual([]);
   });

@@ -147,17 +147,17 @@ configs (names, `eu` jurisdiction, placement, traces, the development config's d
 ### Revocation feed
 
 Design 5.6. Every revoking statement (`/revoke`, a second use of a code, a reused third-party
-token, a PAT or org bot key revoke on the account API) writes its `uts.revocations` rows and
-returns them in the same statement (`uts.feed_entries_of_statement()`, migration 0006; one index
-probe, skipped on the issued path). After the commit the Worker writes them to both feed objects
-in parallel (`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2
-seconds. `/revoke` and the account API's revokes answer 503 when neither confirms (the revocation
-stands, and the backfill adds it); the reuse paths answer as before. A retry finds the credential
-revoked and gets its feed entry back while the entry lives (`uts.live_feed_entries`,
-`uts.live_feed_entries_of_refresh_token`, migration 0019), so it answers success only once a feed
-object confirmed the entry. A
-failed publish logs kinds and counts, never ids. `uts.remove_org_member` has no Worker caller in
-this package, so the entries it writes reach the feed objects through the backfill.
+token, a PAT or org bot key revoke on the account API, a subject operation or a membership
+removal on the `/internal/` routes) writes its `uts.revocations` rows and returns them in the same
+statement (`uts.feed_entries_of_statement()`, migration 0006; one index probe, skipped on the
+issued path). After the commit the Worker writes them to both feed objects in parallel
+(`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2 seconds.
+`/revoke`, the account API's revokes and the `/internal/` routes answer 503 when neither confirms
+(the revocation stands, and the backfill adds it); the reuse paths answer as before. A retried
+`/revoke` or account API revoke finds the credential revoked and gets its feed entry back while
+the entry lives (`uts.live_feed_entries`, `uts.live_feed_entries_of_refresh_token`, migration
+0019), so it answers success only once a feed object confirmed the entry. A failed publish logs
+kinds and counts, never ids.
 
 The two feed objects (`src/feed/UtsFeedDO.ts`) are named `<environment>:feed:<0|1>`, in the `eu`
 jurisdiction, feed 0 with the `weur` hint and feed 1 with `eeur`; only this Worker binds them, so
@@ -188,9 +188,11 @@ only it writes entries. Each one:
 
 The list is canonical JSON: subject → `revoked_before` (whole seconds, rounded down); grant, third-party
 family, session and sandbox grant → `revoked_sids`; PAT and bot key → `revoked_pat_ids`; `kid` →
-`revoked_kids`; `blocked_account` → `blocked_accounts`. A PAT entry stays 15 minutes; a grant or
-family entry 20 minutes. The feed objects' public keys reach the key set through the key-set
-shards, beside the signers'. The feed Worker reads heads and lists through the `FeedReads`
+`revoked_kids`; `blocked_account` → `blocked_accounts`. An `unblocked_account` entry feeds no field:
+it removes the account's `blocked_account` entry unless that block is newer, and keeps an older
+copy of the block out while it lasts (`mergeEntry`, migration 0014). A PAT entry stays 15 minutes;
+a grant or family entry 20 minutes. The feed objects' public keys reach the key set through the
+key-set shards, beside the signers'. The feed Worker reads heads and lists through the `FeedReads`
 entrypoint, which answers only the feed Worker's `props.caller` and gives each object call 800 ms.
 Without an `IDENTITY_STORE` binding (staging and production today) no backfill runs, so the objects
 sign no head and the feed answers `unavailable`.
@@ -211,6 +213,37 @@ backfill adds an entry no publish carried, that the feed serves from feed object
 `POST /__dev/feed/stop` (development only, `src/dev-feed.ts`) stops feed object 0 for 90 seconds,
 that the head stays under 20 seconds old, and that every head verifies under a feed key of the key
 set, over HTTPS and over the `FeedReader` binding.
+
+Two runs bring up their own Workers and a fresh identity-store database, so neither needs a
+`wrangler dev` server running: `scripts/keyset-e2e.ts` and `scripts/relay-e2e.ts`. Both take
+`UTS_E2E_ADMIN_URL`, the admin login of `scripts/local-db.sh up`, on a loopback host and without
+query parameters, and `UTS_E2E_PORT`, the first of the run's ports (9300 and 9310 by default). Each
+drops and recreates its own database (`uts_keyset_e2e`, `uts_relay_e2e`), applies the migrations,
+and gives `uts_app_a`, `uts_pat_a` and `uts_reader_a` a random password for the run. Roles are
+cluster-wide and the database names and ports are fixed, so run one of them at a time. Each prints
+a `PASS` line per check, a final pass line and the path of its log directory, and exits nonzero
+when a check fails. Both stop their Workers when they end, also on SIGINT (exit 130) or SIGTERM
+(exit 143).
+
+`scripts/keyset-e2e.ts` starts the mint and feed Workers under `wrangler dev`, in one persisted
+state directory, and runs the key-set proof: 36 keys with `Age` and `Kilo-Key-Set-Oldest-Age`
+under 17 seconds and cache windows that end with the 24-hour hold, no private key part, RFC 8414
+metadata, a token signed through `/__dev/sign` that verifies with jose while a tampered one does
+not, a restart that keeps the same kids without bootstrapping a signer, an intruder Worker whose
+binding carries another caller that gets no keys, the held set while the mint Worker is down,
+signer 03's rotated keys standing beside signer 07's held ones from a restarted shard, and a cold
+start of both Workers over a shard that stored signer 07's keys.
+
+`scripts/relay-e2e.ts` runs the mint Worker and the audit relay consumer in one `wrangler dev`
+over two configs (`--env local`) with the local queue and the consumer's R2 archive, and runs the
+outbox proof: a transaction held open for 7 seconds holds every shard's watermark, 600 rows
+inserted while the app login cannot move a watermark move nothing, 6,000 rows follow once it can,
+terminated relay sessions resend rather than skip, every shard relays, and the archive holds every
+row once, contiguous, in transaction order. A cron run after the drain logs no lag alert. The run
+writes a synthetic Axiom token, Slack webhook and loopback Axiom URL to
+`services/audit-relay/.dev.vars` and deletes the file when it ends. It refuses to run (exit 2) when
+`services/audit-relay/.dev.vars` or `.dev.vars.local` (which wrangler reads in its place) already
+exists; move your own file away for the run.
 
 Development only: `POST http://localhost:8800/__dev/sign` with `{ "grantId": "...", "claims": {...} }`
 signs a claim set through the signer the grant picks. The route lives in `src/dev-index.ts`, which
@@ -313,6 +346,86 @@ blocked_client_families 0". At 5,000 families per call a client with N families 
 about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries on that refusal
 rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
 no audit row; the operator action that blocks or unblocks the client writes it.
+
+## Third-party clients, consent and the broker exchange
+
+Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata Document
+(`src/third-party/`); dynamic client registration stays off.
+
+- **Metadata** (`metadata.ts`, `clients.ts`): `/authorize` resolves the client from the
+  identity-store copy (`uts.third_party_clients`). A missing or stale copy is fetched first, a
+  stale one with `If-None-Match`. The fetch guards:
+  - HTTPS on the default port only; no IP literal, single label, `localhost` or private name space;
+  - no redirect; 200 or 304 only; a JSON body of at most 8 KiB; 5 seconds in all;
+  - a cache time of `max-age` bounded to 5 minutes to 24 hours (1 hour without one).
+
+  The document must name the same client id. It must not carry a client secret, and every
+  redirect URI must be HTTPS, HTTP loopback on `127.0.0.1` or `localhost` (never `[::1]`: the
+  confirm page's `form-action` cannot name an IPv6 literal), or a private-use scheme of a native
+  app, short ones included (`cursor://`, `vscode://`; RFC 8252 section 7.1's reverse-domain form is
+  a SHOULD), except a scheme that runs code, reads local data or leaves the browser (`javascript`,
+  `data`, `file`, `blob`, `about`, `vbscript`, `filesystem`, `ftp`, `ws`, `wss`, `mailto`); the
+  consent and confirm pages show the whole redirect URI, and `/authorize` checks a cached URI
+  against the same rule again. A blocked client is never served and keeps its
+  status through a refresh. Each isolate runs one fetch per client id at a time, and after a
+  failure it waits 60 seconds before it fetches that id again. Every fetch also counts against the
+  requesting network's anonymous-write allowance (10 a minute per network per isolate, its own
+  window, `src/signin/limits.ts`); past it `/authorize` answers `429 temporarily_unavailable` with
+  `Retry-After`, and a cached client costs nothing. The minute cron deletes an active client that
+  no consent names one day after its cache time ended (`uts.maintain_third_party_client_rows`,
+  migration 0021). Only `uts.save_third_party_client` and `uts.extend_third_party_client` write a
+  client; the app login has no DML on the table. A Worker cannot see the address a name resolves
+  to, so a public name that resolves to a private address relies on Workers not reaching private
+  networks.
+- **Errors before consent**: a third-party client listed its own redirect URIs, so every
+  `/authorize` error before the user acts in the hand-off is shown (400 JSON), never redirected;
+  a denial or a later error, once the user signed in and consented or denied, goes back to the
+  redirect URI.
+- **Consent** (`consent.ts`): the sign-in hand-off sends a third-party request with a browser
+  session to the consent screen. An active consent of the account, client and organization that
+  covers the scopes approves at once. Otherwise the page shows the client name, the metadata URL,
+  the redirect, the organization and one tick box per consent line (`consentText` in
+  `UTS_SCOPE_REGISTRY`). Its form posts the authorization URL back from this origin.
+  `uts.grant_third_party_consent` writes the consumed tier B pass, the consent, the
+  `third_party_client_approved` notice and the audit row in one statement. A sign-in older than 10
+  minutes needs the passkey step-up, which the page runs before it submits. A request whose
+  redirect is not HTTPS (loopback or private-use scheme) never completes on a plain GET, even
+  under an existing consent: it shows the confirm page, whose same-origin POST approves (RFC 8252
+  section 8.6). The sign-in hand-off applies the same rule to the first-party clients, the CLI's
+  loopback redirect included.
+- **Apps page** (`GET`/`POST /signin/apps`): it lists the account's consents, and a same-origin
+  form POST withdraws one. `uts.withdraw_third_party_consent` revokes the consent and ends each
+  live family with a `third_party_family` feed entry. It never writes `revoked_before`. The page
+  publishes the entries before it answers, and a page answered 202 means only the backfill will
+  add them.
+- **Broker exchange** (`src/exchange/`, `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`
+  at `/token`): Kilo MCP authenticates with an STS bearer (audience `uts`, workload `kilo-mcp`,
+  scope `uts:token-exchange`). The STS token is checked through the `StsCallerVerifier` port. The
+  deployed entry wires none until `@kilocode/verify` is on this branch, so the grant answers
+  `unsupported_grant_type` there and the metadata does not list it. The development entry checks
+  tokens of a local fake STS key set (`DEV_STS_JWKS_URL`, `src/dev-clients.ts`).
+
+  The subject token is verified against signer keys held in isolate memory (`keys.ts`): a 5-minute
+  copy, a re-read for an unknown `kid` at most every 10 seconds, and a copy under 1 hour old kept
+  through failed reads. Its scope must list the requested scope in `delegatesTo`.
+
+  The result has `exp = min(now + 300, subject exp)`, refused with `invalid_grant` under 30 seconds
+  left. It carries `act: { sub: "kilo-mcp" }`, `req`, the subject's `sid` and `client_id`, and its
+  `org` only when present.
+
+  Cost per request: one statement (`uts.exchange_delegated_token`: grant or family, consent,
+  subject and `kid` revocations, `token.exchanged` audit row), then one `signMany` call. The
+  limits are attempt budgets, not success budgets. Each isolate allows 600 attempts a minute per
+  caller workload, counted once the STS token is verified, and 60 per subject `sid`, counted once
+  the subject token is verified. Both count refused attempts too, so a caller that retries a
+  refused subject spends the same budget. Above that it answers
+  `429 { error: "slow_down", limit: "subject" | "caller" }` with `Retry-After` of 1 to 60 seconds,
+  and a 429 itself counts nothing.
+
+The local run is `scripts/clients-e2e.ts`. Start the mint Worker with
+`--var DEV_CLIENT_METADATA_ORIGIN:http://127.0.0.1:9132 --var DEV_STS_JWKS_URL:http://127.0.0.1:9131/jwks.json`
+and set `track_functions = 'all'` on the local server, so the run can count the exchange
+statements. The run serves the metadata document and the fake STS key set itself.
 
 ## Account API, PATs and org bot keys
 
@@ -428,9 +541,22 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
 - First-party clients are `UTS_FIRST_PARTY_CLIENTS` in `@kilocode/uts-contracts`: `kilo-cli` (public
   native, loopback `/callback`), `kilo-web`, the web BFF (confidential, `private_key_jwt`, redirect
   URIs `<app origin>/api/auth/uts/callback` per environment), and `kilo-mobile` (public native,
-  private-use redirect, device attestation required). The authorization endpoint serves only the
-  clients in `src/oauth/clients.ts`: every OAuth endpoint treats `kilo-web` as unknown until the
-  token endpoint verifies a private-key JWT. `test/repo` holds each confidential client to
+  private-use redirect, device attestation required). `kilo-web` authenticates with a private-key
+  JWT under one of the at most two Ed25519 keys of the var `KILO_WEB_CLIENT_JWKS` (`src/bff/`);
+  while the var is unset or invalid, every `kilo-web` request answers 503 with `Retry-After: 60`.
+  Its code names the browser session it was approved in and has no DPoP key; the code exchange
+  returns that session and an opaque handle (migration 0013), and the BFF then calls
+  `POST /account/browser-sessions/{read,token,end,end-all}` and `/account/devices/revoke`
+  (`@kilocode/uts-contracts` `browser-sessions.ts`). The legacy bridge (RFC 8693, subject token
+  `typ` `kilo-legacy-session+jwt`) is a high-risk switch: its subject token vouches for a legacy
+  session of any app user. It runs only where `LEGACY_BRIDGE_ENABLED` is `true`, and verifies the
+  token only under its own one or two Ed25519 keys in `KILO_WEB_BRIDGE_JWKS` (kid prefix
+  `kilo-bridge-`), never under a client assertion key: while that var is unset, invalid, or shares a
+  key with `KILO_WEB_CLIENT_JWKS` (`uts.legacy_bridge.key_reused`), the bridge answers 503, so
+  removing the bridge key turns the bridge off; its SSO
+  authority check confirms nothing until UTS holds the SSO authority data, so a bridged session
+  carries no SSO provenance. `scripts/bff-e2e.ts` runs the whole surface locally with a stand-in
+  signer. `test/repo` holds each confidential client to
   `private_key_jwt` and exact HTTPS redirect URIs with a path (a loopback origin in development
   only), each desktop client to a loopback path, and each mobile client to one reverse-domain
   private-use URI and attestation.
@@ -686,6 +812,116 @@ entry serves it with a caller check from the `Kilo-Dev-Account` and `Kilo-Dev-Gr
 exchanges (baseline, new device on a new network, a second new device, the first one again),
 every notice kind through the development routes, a retried email through the background pass,
 and the security view before and after `/revoke`.
+
+## Subject operations and identity import
+
+Design 5.2 and 5.6, migration 0014. The web app keeps owning some account authority until its
+cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
+enqueues each write in the same transaction as the app's own write, and its outbox sends it to UTS.
+Each call is one statement with its audit row (actor: the calling workload; the app's own actor
+string in `requestedBy`). It answers 200 only once a vouching feed object took the entries the
+statement wrote.
+
+**Callers.** Workers bind the mint Worker's named entrypoint `SubjectRevocation` with
+`props.caller` (`SUBJECT_REVOCATION_CALLERS`, empty in staging and production until a caller
+proof names one). The web app calls `POST <issuer>/internal/...` with an STS token for audience
+`uts`, workload `web` (`UTS_INTERNAL_WORKLOADS`), and the route's one scope:
+
+- `/internal/subjects/revoke` and `/unblock`: `uts:subjects.revoke`;
+- `/internal/subjects/end-browser-sessions`: `uts:browser-sessions.end`;
+- `/internal/subjects/end-device-sessions`: `uts:device-sessions.end`;
+- `/internal/subjects/revoke-api-credentials`: `uts:api-credentials.revoke`;
+- `/internal/accounts/import`: `uts:accounts.import`;
+- `/internal/authority/email`, `/membership`, `/sso-organization`: `uts:authority.sync`;
+- `/internal/app-events/read` and `/ack`: `uts:app-events.read`.
+
+The token check is a port (`src/subjects/service-tokens.ts`). The deployed entry has none until
+the mint Worker carries `@kilocode/verify`, so every `/internal/` route answers
+`503 temporarily_unavailable` with `Retry-After: 60` and writes nothing; so does every route while
+`IDENTITY_STORE` is unbound. The development entry takes a stand-in bearer,
+`uts-dev-sts:<workload>:<scope>`, for the local run only.
+
+**Operations** (`@kilocode/uts-contracts` `UTS_SUBJECT_OPERATIONS`). The body is
+`{ operation_id, subject, reason, actor, source_version }`; `actor` is `user:<id>` or `admin:<id>`
+(no whitespace, 1-255 characters) or `system:<source>` (`[a-z0-9_.-]`, 1-64); `source_version` is
+0 to 2^53 - 1. An `operation_id` is kept 7 days; a repeat answers `already_applied` and hands the
+entries of the first run to the feed again.
+
+- `revoke` with `access_block`, `account_recovery` or `account_reset`: `revoked_before = now` (70
+  minutes in the feed), every browser session, device grant, third-party family, PAT, CI trust
+  policy and sandbox grant revoked, each grant and session with its `revoked_sids` entry and each
+  PAT with its `revoked_pat_ids` entry; an approved device code becomes denied, an authorization
+  code not yet exchanged is deleted and every third-party consent is revoked (migration 0021), so
+  neither code becomes a grant and the consent screen comes back; the active org bot keys the
+  subject created are flagged (audit rows and org admin notices), not revoked, because a key
+  belongs to its organization. `access_block` also blocks the account and lists it in
+  `blocked_accounts` for 70 minutes.
+- `revoke` with `account_deleted`: the same, with `revoked_before` and `blocked_accounts` kept 24
+  hours; the active bot keys the account created are flagged (audit rows and org admin notices);
+  then the row and everything it holds are deleted, and a deletion tombstone stays for good.
+- `unblock` with `access_unblock`: `409 retry_later unblock_too_soon` with `Retry-After` (1-60)
+  while the block is under 60 seconds old; then the account is active again, and an
+  `unblocked_account` entry takes it out of `blocked_accounts`. Nothing revoked comes back: a
+  revoked session, grant, family, PAT or CI trust policy, or an ended sandbox grant, keeps its
+  status (triggers, migrations 0001 and 0014).
+- `end-browser-sessions` (`staff_signout`, `workos_relink`, `scim_mailbox_move`,
+  `apple_consent_revoked`): browser sessions only. `end-device-sessions`
+  (`apple_consent_revoked`): CLI, IDE, extension and mobile grants only.
+  `revoke-api-credentials` (`staff_api_reset`): PATs only. None writes `revoked_before`.
+
+Outcomes: `200 applied | already_applied | no_subject`; `409 retry_later` (with `Retry-After`);
+`409 refused` with `account_deleted` (an unblock of a deleted subject) or `reason_not_allowed`;
+`400 invalid_request` (a malformed body, or an `operation_id` reused for another operation);
+`401`/`403` for the token; `503 temporarily_unavailable` with `Retry-After`. The outbox retries
+only `503`, `retry_later` and network errors.
+
+**Source versions and tombstones.** Each kind of authority has its own high-water mark:
+`uts.accounts.status_version` for block and unblock, `email_version` for the primary email, and
+each membership row's `event_version`. A block, unblock, email sync or membership change older
+than its own mark is superseded (`already_applied`, nothing changes); revocations and session ends
+neither read nor raise a mark. An operation for a subject UTS does not hold answers `no_subject`
+and writes a tombstone. `uts.import_account` reads them first: a deletion refuses the import for
+good, a block imports the account blocked (unless a later unblock), a revoke sets
+`revoked_before`, and an import older than any tombstone is `stale`. `uts.subject_revoked_since`
+reads the account's `revoked_before` too, so a legacy session issued before a revocation stays
+refused after the 70-minute feed row expired.
+
+**Import** (`AccountImportRequestSchema`): the app user id (never `uts_`), the primary email, the
+status, the verified provider identities with their link times, the SSO tie
+`{ app_organization_id, workos_organization_id, workos_connection_id, role }`, the passkeys (each
+with the WebAuthn user handle it was created under; the relying-party id is the Worker's), and the
+source version. Every check runs before the first write: `imported` or `already_imported`;
+`409 retry_later sso_connection_unknown` until the organization's SSO sync arrives; `409 refused`
+with `deleted`, `stale`, `identity_taken`, `email_taken`, `passkey_taken` or
+`sso_authority_mismatch` (also for a WorkOS identity without an SSO tie, on a connection of
+another organization, or on an inactive connection).
+
+**Authority sync.** `email` moves the primary email forward by version (the audit row names no
+address) and deletes the subject's `email` sign-in methods of other addresses; an address another
+account still holds as its primary email or `email` method answers `409 retry_later email_taken`
+(`Retry-After: 30`, nothing written), so two subjects' syncs may arrive in either order;
+`membership` adds, changes or (with `role: null`) removes a membership through
+`uts.remove_org_member`, ordered by the subject's version, and a newer sync that changes nothing
+still raises the row's version; `sso-organization` writes the SSO policy,
+the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
+by the organization's own version; a connection active in another organization never moves
+(`409 retry_later connection_conflict`, `Retry-After: 30`, nothing written, also when another
+organization's sync takes it during this one). The authority check behind the legacy bridge and
+`sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
+only when the connection is active, belongs to that WorkOS organization, maps to the app
+organization, and the active account holds an active membership there.
+
+**The user-created event.** Inserting an account with a `uts_` id writes one `uts.app_account_events`
+row in the same statement (trigger `accounts_user_created`). The app reads the oldest with
+`/internal/app-events/read` `{ limit }` and acknowledges with `/internal/app-events/ack`
+`{ event_ids }`, which deletes them; a deleted account takes its unread event along. Each event is
+`{ event_id, type: "user.created", occurred_at, account: { id, primary_email } }`; the app creates
+its user row with `account.id` as the user id, idempotently.
+
+`scripts/subjects-e2e.ts` (`UTS_E2E_BASE_URL`, `UTS_E2E_FEED_URL`, `UTS_E2E_ADMIN_URL`) plays the
+outbox against the mint and feed Workers: the import cases, each operation's effect on a CLI grant,
+a mobile grant, a PAT and a browser session with its feed entries, the unblock wait, a 503 while no
+feed object answers, terminal deletion, the user-created event and the audit rows.
 
 ## Tests
 

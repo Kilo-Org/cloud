@@ -82,6 +82,40 @@ describe('mergeEntry', () => {
     mergeEntry(entries, entry({ kind: 'session', id: 'same' }));
     expect(entries.size).toBe(2);
   });
+
+  it('takes a block away on an unblock that is not older, and keeps it out until the unblock expires', () => {
+    const entries: FeedEntries = new Map();
+    const block = entry({ kind: 'blocked_account', id: 'user-b', expiresAt: T0 + 70 * MINUTE });
+    const unblockAt = T0 + 2 * MINUTE;
+    const unblock = entry({
+      kind: 'unblocked_account',
+      id: 'user-b',
+      revokedAt: unblockAt,
+      expiresAt: unblockAt + 20 * MINUTE,
+    });
+    expect(mergeEntry(entries, block)).toBe(true);
+    expect(mergeEntry(entries, unblock)).toBe(true);
+    const blockedOf = (held: FeedEntries) =>
+      RevocationListWireSchema.parse(JSON.parse(serializeList(held.values()).text))
+        .blocked_accounts;
+    expect(blockedOf(entries)).toEqual([]);
+    // A backfill that started before the unblock brings the old block, or the block the unblock
+    // statement dated at its own time: neither comes back.
+    expect(mergeEntry(entries, block)).toBe(false);
+    const redated = { ...block, revokedAt: unblockAt, expiresAt: unblockAt + 10 * MINUTE };
+    expect(mergeEntry(entries, redated)).toBe(false);
+    expect(entries.has('blocked_account\u0000user-b')).toBe(false);
+    // A block again, after the unblock, wins whichever arrives first.
+    const again = entry({ kind: 'blocked_account', id: 'user-b', revokedAt: unblockAt + MINUTE });
+    expect(mergeEntry(entries, again)).toBe(true);
+    expect(mergeEntry(entries, unblock)).toBe(false);
+    expect(blockedOf(entries)).toEqual(['user-b']);
+    const otherOrder: FeedEntries = new Map();
+    mergeEntry(otherOrder, unblock);
+    mergeEntry(otherOrder, again);
+    mergeEntry(otherOrder, block);
+    expect(serializeList(otherOrder.values()).hash).toBe(serializeList(entries.values()).hash);
+  });
 });
 
 describe('dropExpired', () => {

@@ -120,6 +120,7 @@ async function complete(flow: Flow, identity: Partial<ProviderIdentity>, binder 
       email: null,
       emailProven: false,
       workosConnectionId: null,
+      workosOrganizationId: null,
       ...identity,
     },
     sessionTokenHash: sha256(sessionToken),
@@ -138,6 +139,16 @@ async function signIn(provider: FlowProvider, identity: Partial<ProviderIdentity
 async function sessionRow(tokenValue: string) {
   const result = await owner.query(
     `SELECT account_id, amr::text[] AS amr, status, host(client_ip) AS client_ip, country
+     FROM uts.browser_sessions WHERE token_hash = $1`,
+    [sha256(tokenValue)]
+  );
+  return result.rows[0];
+}
+
+/** The WorkOS ids a session recorded from its verified profile (migration 0013). */
+async function sessionSso(tokenValue: string) {
+  const result = await owner.query(
+    `SELECT amr::text[] AS amr, sso_connection_id, sso_organization_id
      FROM uts.browser_sessions WHERE token_hash = $1`,
     [sha256(tokenValue)]
   );
@@ -169,6 +180,12 @@ describe('provider sign-in', () => {
     expect(methods.rows).toEqual([
       { provider: 'google', provider_subject: subject, verified_email: email, gate_pass_id: null },
     ]);
+    // The sign-up statement writes the app's user-created event (migration 0014).
+    const events = await owner.query(
+      'SELECT event_type, primary_email FROM uts.app_account_events WHERE account_id = $1',
+      [accountId]
+    );
+    expect(events.rows).toEqual([{ event_type: 'user.created', primary_email: email }]);
     const rows = await auditRows(accountId);
     expect(rows.map(row => row.type)).toEqual([
       'ai.kilo.uts.account.created',
@@ -458,14 +475,42 @@ describe('WorkOS SSO', () => {
     await ssoFlow();
   });
 
-  it('creates an SSO account for a new address of the verified domain', async () => {
+  it('creates an SSO account for a new address of the verified domain, with the profile ids', async () => {
     const flow = await ssoFlow();
     const { result, sessionToken } = await complete(flow, {
       email: `new-${randomBytes(3).toString('hex')}@${domain}`,
       workosConnectionId: connection,
+      workosOrganizationId: 'org_profile',
     });
     expect(result).toMatchObject({ outcome: 'signed_in', signedIn: { accountCreated: true } });
-    expect((await sessionRow(sessionToken)).amr).toEqual(['sso']);
+    // The web BFF reads the WorkOS ids from the verified profile only (migration 0013).
+    expect(await sessionSso(sessionToken)).toMatchObject({
+      amr: ['sso'],
+      sso_connection_id: connection,
+      sso_organization_id: 'org_profile',
+    });
+  });
+
+  it('records no WorkOS organization for a connection without one, and none for other providers', async () => {
+    const sso = await complete(await ssoFlow(), {
+      email: `new-${randomBytes(3).toString('hex')}@${domain}`,
+      workosConnectionId: connection,
+    });
+    expect(await sessionSso(sso.sessionToken)).toMatchObject({
+      sso_connection_id: connection,
+      sso_organization_id: null,
+    });
+    const { flow } = await startFlow('github');
+    const github = await complete(flow, {
+      email: address(),
+      emailProven: true,
+      workosOrganizationId: 'org_ignored',
+    });
+    expect(await sessionSso(github.sessionToken)).toMatchObject({
+      amr: ['oauth'],
+      sso_connection_id: null,
+      sso_organization_id: null,
+    });
   });
 
   it('refuses a profile of another connection or another domain', async () => {
@@ -779,7 +824,13 @@ describe('concurrent sign-ins', () => {
         stateHash: sha256(flow.state),
         binderHash: sha256(flow.binder),
         provider: flow.provider,
-        identity: { subject: randomUUID(), email, emailProven: true, workosConnectionId: null },
+        identity: {
+          subject: randomUUID(),
+          email,
+          emailProven: true,
+          workosConnectionId: null,
+          workosOrganizationId: null,
+        },
         sessionTokenHash: sha256(token()),
         network,
         newAccountId: newAccountId(),
@@ -883,9 +934,11 @@ describe('required inputs (migration 0020)', () => {
       network.city,
       newAccountId(),
     ];
+    // Migration 0013 takes this signature away from the app login and calls it from the browser
+    // session wrapper, so the owner calls it here.
     expect(
       await sqlStateOf(() =>
-        app.query(
+        owner.query(
           `SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
              $12, $13, $14, $15)`,
           values

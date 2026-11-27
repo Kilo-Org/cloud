@@ -1,4 +1,5 @@
 import {
+  UTS_APPS_PAGE_PATH,
   UTS_DEVICE_VERIFICATION_PATH,
   UTS_EMAIL_START_PATH,
   UTS_SIGNIN_SCRIPT_PATH,
@@ -291,22 +292,24 @@ export function deviceMessagePage(message: string, status: number): Response {
 }
 
 /**
- * The confirm page of an app that receives its code on a private-use URI scheme: the form posts
- * the same authorization URL back from this origin, which the hand-off approves and redirects to
- * `redirectUri`, so the page's `form-action` allows that URI's scheme.
+ * The confirm page of a native app, which receives its code on a loopback address or a
+ * private-use URI scheme (RFC 8252 section 8.6): the form posts the same authorization URL back
+ * from this origin, which the hand-off approves and redirects to `redirectUri`, so the page's
+ * `form-action` allows that redirect's origin (loopback) or scheme (private use).
  */
 export function confirmAppPage(appName: string, redirectUri: string): Response {
   const response = page(
     'Continue to the app',
     'confirm-app',
     `<p>Open ${escapeHtml(appName)} signed in as you? Only continue if you started this sign-in in the app yourself.</p>
+<p>The app receives the sign-in at <code>${escapeHtml(redirectUri)}</code>.</p>
 <form method="post">
 <button type="submit" id="confirm-app">Continue</button>
 </form>`
   );
   response.headers.set(
     'Content-Security-Policy',
-    contentSecurityPolicy(`'self' ${new URL(redirectUri).protocol}`, null)
+    contentSecurityPolicy(formActionFor(redirectUri), null)
   );
   return response;
 }
@@ -321,4 +324,130 @@ export function unavailablePage(retryable: boolean): Response {
   );
   if (retryable) response.headers.set('Retry-After', '2');
   return response;
+}
+
+/**
+ * Where a form whose answer redirects to `redirectUri` may go: this origin and that URI's origin,
+ * or its scheme for a private-use scheme. Browsers apply `form-action` to every redirect of a form
+ * submission, so the consent form needs the client's redirect target too.
+ */
+function formActionFor(redirectUri: string): string {
+  const url = new URL(redirectUri);
+  const target = url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : url.protocol;
+  return `'self' ${target}`;
+}
+
+/** What the consent screen shows (design 5.9): the client, its metadata URL, the access, the org. */
+export type ConsentView = {
+  clientName: string;
+  /** The client id: the URL of its Client ID Metadata Document. */
+  clientId: string;
+  /** One line per requested scope, in the order of `scopes`: the registry's consent text. */
+  lines: readonly { scope: string; text: string }[];
+  orgId: string | null;
+  redirectUri: string;
+  rpId: string;
+  /**
+   * `ask`: the first view. `untick`: the form came back without every box ticked. `gate`: the
+   * session's sign-in is older than 10 minutes, so allowing needs a passkey check first.
+   */
+  state: 'ask' | 'untick' | 'gate';
+};
+
+/**
+ * The consent screen of a third-party client. The form posts the same authorization URL back from
+ * this origin with one ticked box per line; allowing writes the consent and redirects to the
+ * client with the code, denying redirects with `access_denied`. A tier B check stands before the
+ * consent (design 5.11): when the sign-in is older than 10 minutes, the Allow button first runs a
+ * passkey step-up (`data-step-up`, src/signin/script.ts) and then submits.
+ */
+export function consentPage(view: ConsentView): Response {
+  const notices = {
+    ask: '',
+    untick: '<p role="alert">Tick each box to allow this access, or deny it.</p>\n',
+    gate: '<p role="alert">You signed in more than 10 minutes ago. Confirm with your passkey to allow this app.</p>\n',
+  } as const;
+  const org =
+    view.orgId === null
+      ? ''
+      : `\n<dt>Organization</dt><dd><code>${escapeHtml(view.orgId)}</code></dd>`;
+  const boxes = view.lines
+    .map(
+      (line, index) =>
+        `<p><input type="checkbox" id="consent-${index}" name="consent" value="${escapeHtml(line.scope)}" required> <label for="consent-${index}">${escapeHtml(line.text)}</label></p>`
+    )
+    .join('\n');
+  const stepUp = view.state === 'gate' ? ' data-step-up data-passkey' : '';
+  const response = render(
+    `Allow ${view.clientName}?`,
+    'consent',
+    `${notices[view.state]}<p><strong>${escapeHtml(view.clientName)}</strong> asks for access to your Kilo account. Only allow apps you trust.</p>
+<dl>
+<dt>App</dt><dd>${escapeHtml(view.clientName)}</dd>
+<dt>Registered at</dt><dd><code>${escapeHtml(view.clientId)}</code></dd>${org}
+<dt>Returns to</dt><dd><code>${escapeHtml(view.redirectUri)}</code></dd>
+</dl>
+<form method="post" id="consent-form">
+${boxes}
+<button type="submit" name="decision" value="allow" id="consent-allow"${stepUp}>Allow</button>
+<button type="submit" name="decision" value="deny" id="consent-deny" formnovalidate>Deny</button>
+</form>`,
+    view.state === 'ask' ? 200 : view.state === 'untick' ? 400 : 403,
+    {
+      rpId: view.rpId,
+      unavailable:
+        'This browser cannot use your passkey on this page, and allowing an app needs one when you signed in more than 10 minutes ago. Sign in again in a private window, then allow the app.',
+    }
+  );
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicy(formActionFor(view.redirectUri), view.rpId)
+  );
+  return response;
+}
+
+/** One app on the apps page. */
+export type AppListing = {
+  consentId: string;
+  clientName: string;
+  clientId: string;
+  lines: readonly string[];
+  orgId: string | null;
+  grantedAt: Date;
+};
+
+/**
+ * The apps page (design 5.9): every third-party app that holds a consent of the signed-in account,
+ * each with a Withdraw button. Withdrawing posts the consent id to the same path from this origin.
+ */
+export function appsPage(
+  apps: readonly AppListing[],
+  message: string | null,
+  status = 200
+): Response {
+  const notice = message === null ? '' : `<p role="status">${escapeHtml(message)}</p>\n`;
+  const items = apps
+    .map(app => {
+      const org =
+        app.orgId === null ? '' : ` for organization <code>${escapeHtml(app.orgId)}</code>`;
+      const lines = app.lines.map(line => `<li>${escapeHtml(line)}</li>`).join('');
+      return `<li>
+<p><strong>${escapeHtml(app.clientName)}</strong>${org}, allowed ${escapeHtml(app.grantedAt.toISOString())}</p>
+<p><code>${escapeHtml(app.clientId)}</code></p>
+<ul>${lines}</ul>
+<form method="post" action="${UTS_APPS_PAGE_PATH}">
+<input type="hidden" name="consent_id" value="${escapeHtml(app.consentId)}">
+<button type="submit">Withdraw access</button>
+</form>
+</li>`;
+    })
+    .join('\n');
+  const body =
+    apps.length === 0
+      ? '<p>No app has access to your Kilo account.</p>'
+      : `<p>These apps can act for you within the access you allowed. Withdrawing ends their access within a minute.</p>
+<ul>
+${items}
+</ul>`;
+  return page('Apps with access', 'apps', `${notice}${body}`, status);
 }

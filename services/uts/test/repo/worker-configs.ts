@@ -157,6 +157,8 @@ const EnvironmentSchema = z.looseObject({
   ...BindingsShape,
   name: z.string().optional(),
   main: z.string().optional(),
+  compatibility_date: z.string().optional(),
+  compatibility_flags: z.array(z.string()).optional(),
   build: z.looseObject({ command: z.string().optional() }).optional(),
   workers_dev: z.boolean().optional(),
   route: RouteSchema.optional(),
@@ -517,13 +519,65 @@ function devConfigProblems(dev: WorkerConfig): string[] {
 }
 
 /**
+ * The mint Worker's configs, every one of which runs the jose verification path. The rule below
+ * covers only these: asserted repo-wide it would fail Workers that reach jose through a package
+ * with an older date, such as services/ai-attribution, which is not this rule's subject.
+ */
+const JOSE_CONFIGS: ReadonlySet<string> = new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]);
+
+/**
+ * The first compatibility date that carries workerd's fix for jose's verification path: jose's
+ * `verifyCompact` returns a promise it does not await, so a verification error is briefly
+ * unhandled and workerd reported it as a duplicate unhandled rejection although the caller caught
+ * it (panva/jose#892). The flag below is the default from this date on.
+ */
+export const JOSE_UNHANDLED_REJECTION_DATE = '2026-03-03';
+
+/** The flag that fixes that report; workerd refuses it at or above `JOSE_UNHANDLED_REJECTION_DATE`. */
+export const JOSE_UNHANDLED_REJECTION_FLAG = 'unhandled_rejection_after_microtask_checkpoint';
+
+/**
+ * A jose-verifying config lists the flag exactly when its date is before the fix, so the Worker
+ * behaves the same whether or not the date carries it: before `JOSE_UNHANDLED_REJECTION_DATE` the
+ * flag is what keeps a caught verification failure from surfacing as an unhandled rejection, and
+ * from that date on the flag is the default, listed or not, and workerd refuses an explicit listing.
+ * Dates and flags are inherited from the top level, as Wrangler inherits them into an env block.
+ */
+function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
+  const problems: string[] = [];
+  for (const block of blocksOf({ path, config })) {
+    const date = block.block?.compatibility_date ?? config.compatibility_date;
+    const flags = block.block?.compatibility_flags ?? config.compatibility_flags ?? [];
+    const listed = flags.includes(JOSE_UNHANDLED_REJECTION_FLAG);
+    if (date === undefined) {
+      problems.push(
+        `${block.where}: compatibility_date resolves to undefined; set one, so the ${JOSE_UNHANDLED_REJECTION_FLAG} rule for jose's verification errors applies (panva/jose#892)`
+      );
+    } else if (date < JOSE_UNHANDLED_REJECTION_DATE) {
+      if (!listed) {
+        problems.push(
+          `${block.where}: compatibility_date ${date} is before ${JOSE_UNHANDLED_REJECTION_DATE}, so compatibility_flags must list ${JOSE_UNHANDLED_REJECTION_FLAG} (panva/jose#892)`
+        );
+      }
+    } else if (listed) {
+      problems.push(
+        `${block.where}: compatibility_date ${date} is ${JOSE_UNHANDLED_REJECTION_DATE} or later, where ${JOSE_UNHANDLED_REJECTION_FLAG} is the default and workerd refuses the listing; drop it (panva/jose#892)`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
  * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
  * its objects in the `eu` jurisdiction, and places its fetch handler next to the identity store;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
- * without placement, binds no Durable Object, and binds each mint entrypoint once.
+ * without placement, binds no Durable Object, and binds each mint entrypoint once; and every
+ * jose-verifying config lists `unhandled_rejection_after_microtask_checkpoint` exactly when its
+ * compatibility date is before 2026-03-03, the date the flag became workerd's default (jose#892).
  */
 export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -534,6 +588,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       problems.push(`${path} is missing`);
       continue;
     }
+    if (JOSE_CONFIGS.has(path)) problems.push(...joseCompatibilityProblems(worker));
     for (const block of blocksOf(worker)) {
       if (block.tracesEnabled !== false) {
         problems.push(

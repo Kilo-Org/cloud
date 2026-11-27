@@ -28,6 +28,8 @@ export const AuthorizationServerMetadataSchema = z.looseObject({
   dpop_signing_alg_values_supported: z.array(z.string().min(1)).optional(),
   /** RFC 9207, section 3. */
   authorization_response_iss_parameter_supported: z.boolean().optional(),
+  /** OAuth Client ID Metadata Document: a client id may be the HTTPS URL of its metadata. */
+  client_id_metadata_document_supported: z.boolean().optional(),
 });
 export type AuthorizationServerMetadata = z.infer<typeof AuthorizationServerMetadataSchema>;
 
@@ -59,8 +61,9 @@ export function protectedResourceMetadataFor(
   return {
     resource,
     authorization_servers: [UTS_ENDPOINTS[environment].issuer],
+    // A scope that only the broker exchange mints cannot be asked for at `/authorize`.
     scopes_supported: Object.entries(UTS_SCOPE_REGISTRY)
-      .filter(([, entry]) => entry.audience === audience)
+      .filter(([, entry]) => entry.audience === audience && entry.issuance === 'grant')
       .map(([scope]) => scope),
     bearer_methods_supported: ['header'],
     resource_name: resourceName,

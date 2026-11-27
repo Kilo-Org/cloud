@@ -13,15 +13,19 @@ import {
 export type ScopeRegistry = (scope: string) => UtsScopeEntry | null;
 
 /** The client of an OAuth request, as the registry's `allowedClients` names it. */
-export type MintClient = { kind: 'first_party' | 'third_party'; clientId: string };
+export type MintClient = {
+  kind: 'first_party' | 'confidential_web' | 'third_party';
+  clientId: string;
+};
 
 /**
- * The first of `scopes` that `client` may not hold, or null when it may hold every one (design
- * 5.3, 5.9): a scope the registry does not list; for a first-party client, a scope whose
- * `allowedClients` does not name it; for a third-party client, a scope that is not third-party-safe
- * or does not allow `third_party`. The authorization endpoint answers `invalid_scope` before the
- * hand-off, so a code or grant only ever holds scopes its client may hold; the token endpoint
- * checks the requested scopes before its statement and the minted scopes before signing.
+ * The first of `scopes` that `client` may not hold through a grant, or null when it may hold every
+ * one (design 5.3, 5.9): a scope the registry does not list; a scope only the broker exchange
+ * mints (`issuance: 'token_exchange'`); for a first-party client, a scope whose `allowedClients`
+ * does not name it; for a third-party client, a scope that is not third-party-safe or does not
+ * allow `third_party`. The authorization endpoint answers `invalid_scope` before the hand-off, so
+ * a code or grant only ever holds scopes its client may hold; the token endpoint checks the
+ * requested scopes before its statement and the minted scopes before signing.
  */
 export function clientScopeRefusal(
   scopes: readonly string[],
@@ -30,7 +34,7 @@ export function clientScopeRefusal(
 ): string | null {
   for (const scope of scopes) {
     const entry = registry(scope);
-    if (entry === null) return scope;
+    if (entry === null || entry.issuance !== 'grant') return scope;
     const allowed =
       client.kind === 'third_party'
         ? entry.thirdPartySafe && entry.allowedClients.includes(THIRD_PARTY_CLIENTS)
@@ -38,6 +42,16 @@ export function clientScopeRefusal(
     if (!allowed) return scope;
   }
   return null;
+}
+
+/**
+ * Whether any of `scopes` needs a passkey step-up (`stepUp`, design 5.3). A web BFF session mints
+ * such a scope only through `POST /account/browser-sessions/token`, which checks the session's
+ * passkey; `/authorize`, the code exchange and the legacy bridge refuse it for `kilo-web`
+ * (`uts.scopes_need_step_up` mirrors this in the identity store).
+ */
+export function needsStepUp(scopes: readonly string[], registry: ScopeRegistry): boolean {
+  return scopes.some(scope => registry(scope)?.stepUp === true);
 }
 
 /**

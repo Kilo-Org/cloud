@@ -17,12 +17,14 @@ import { renderNotice } from './kinds';
 /**
  * `GET /account/security`: the user security view (design 5.13 and 8.4). One SQL statement on the
  * read replica (login `uts_reader`, views in `uts_read` without client addresses or key material)
- * checks the caller's grant and its session and, only when both are live, reads the newest 50
- * sign-ins, the live sessions, the credentials and the newest 50 notices with their channel
- * attempts. A grant revoked on the primary fails here once the replica has applied the revoke.
+ * checks the caller's session and, only when it is live, reads the newest 50 sign-ins, the live
+ * sessions, the credentials and the newest 50 notices with their channel attempts. The caller's
+ * `sid` names a first-party grant and its device session, or a browser session of the web BFF
+ * (`kilo-web`, whose tokens carry the browser session id). A grant or session revoked on the
+ * primary fails here once the replica has applied the revoke.
  */
 
-/** The caller as the account API's bearer check names it: the token's subject and its grant. */
+/** The caller as the account API's bearer check names it: the token's subject and its `sid`. */
 export type SecurityCaller = { accountId: string; grantId: string };
 
 export type CallerCheck =
@@ -44,7 +46,7 @@ export type SecurityViewRead = (caller: SecurityCaller) => Promise<SecurityViewR
 
 export type SecurityViewDeps = { authenticate: SecurityAuthenticator; read: SecurityViewRead };
 
-/** Grant check first; the lists run only for a live session (a CASE branch is evaluated lazily). */
+/** Session check first; the lists run only for a live session (a CASE branch is evaluated lazily). */
 export const SECURITY_VIEW_STATEMENT = `
 WITH caller AS (
   SELECT EXISTS (
@@ -56,6 +58,14 @@ WITH caller AS (
       AND grant_row.status = 'active'
       AND grant_row.expires_at > now() AND grant_row.idle_expires_at > now()
       AND session.status = 'active' AND account.status = 'active'
+  ) OR EXISTS (
+    SELECT 1
+    FROM uts_read.browser_sessions AS browser
+    JOIN uts_read.accounts AS account ON account.id = browser.account_id
+    WHERE browser.id = $2 AND browser.account_id = $1
+      AND browser.status = 'active'
+      AND browser.expires_at > now() AND browser.idle_expires_at > now()
+      AND account.status = 'active'
   ) AS live
 )
 SELECT caller.live, CASE WHEN caller.live THEN json_build_object(

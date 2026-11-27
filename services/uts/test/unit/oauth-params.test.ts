@@ -201,6 +201,8 @@ describe('request parameters', () => {
         'https://user-data-export.kilosessions.ai': 'user-data-export',
         'https://git-token-service.kilosessions.ai': 'git-token-service',
         'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
+        'https://mcp.kiloapps.io/mcp': 'kilo-mcp',
+        'https://pages-dev.kiloapps.io': 'pages-dev',
       },
       staging: {
         'https://staging-app.kilo.ai': 'kilo-api',
@@ -218,15 +220,17 @@ describe('request parameters', () => {
         'http://localhost:8818': 'user-data-export',
         'http://localhost:8802': 'git-token-service',
         'http://localhost:8794': 'cloud-agent-next',
+        'http://localhost:8815/mcp': 'kilo-mcp',
       },
     });
+    // Kilo MCP's resource is the one entry with a path: its MCP endpoint, matched exactly.
     for (const environment of ['production', 'staging'] as const) {
       for (const origin of Object.keys(UTS_RESOURCE_ORIGINS[environment])) {
-        expect(origin).toMatch(/^https:\/\/[a-z0-9.-]+$/);
+        expect(origin).toMatch(/^https:\/\/[a-z0-9.-]+(\/mcp)?$/);
       }
     }
     for (const origin of Object.keys(UTS_RESOURCE_ORIGINS.development)) {
-      expect(origin).toMatch(/^http:\/\/localhost:\d+$/);
+      expect(origin).toMatch(/^http:\/\/localhost:\d+(\/mcp)?$/);
     }
   });
 
@@ -250,9 +254,9 @@ describe('request parameters', () => {
     expect(protectedResourceMetadataFor('staging', 'kilo-api', 'Kilo API')).toEqual({
       resource: 'https://staging-app.kilo.ai',
       authorization_servers: ['https://uts-staging.kiloapps.io'],
-      scopes_supported: Object.keys(UTS_SCOPE_REGISTRY).filter(scope =>
-        scope.startsWith('kilo-api:')
-      ),
+      scopes_supported: Object.entries(UTS_SCOPE_REGISTRY)
+        .filter(([scope, entry]) => scope.startsWith('kilo-api:') && entry.issuance === 'grant')
+        .map(([scope]) => scope),
       bearer_methods_supported: ['header'],
       resource_name: 'Kilo API',
     });
@@ -268,6 +272,22 @@ describe('request parameters', () => {
     });
     expect(protectedResourceMetadataFor('staging', 'event-service', 'Kilo events')).toBeNull();
     expect(protectedResourceMetadataFor('production', 'gateway', 'Kilo gateway')).toBeNull();
+    expect(protectedResourceMetadataFor('production', 'kilo-mcp', 'Kilo MCP')).toEqual({
+      resource: 'https://mcp.kiloapps.io/mcp',
+      authorization_servers: ['https://uts.kiloapps.io'],
+      scopes_supported: ['kilo-mcp:catalog.read'],
+      bearer_methods_supported: ['header'],
+      resource_name: 'Kilo MCP',
+    });
+    for (const near of [
+      'https://mcp.kiloapps.io',
+      'https://mcp.kiloapps.io/mcp/',
+      'https://mcp.kiloapps.io/mcp/tools',
+      'https://mcp.kiloapps.io/mcpx',
+    ]) {
+      expect(audienceOfResource(near, 'production')).toBeNull();
+    }
+    expect(audienceOfResource('https://mcp.kiloapps.io/mcp', 'staging')).toBeNull();
   });
 });
 
@@ -295,7 +315,8 @@ describe('clients', () => {
     if (identity.kind !== 'first_party') throw new Error('kilo-cli is first-party');
     const allowed = (uri: string) => isRegisteredRedirect(identity.client, uri);
     expect(allowed('http://127.0.0.1:4100/callback')).toBe(true);
-    expect(allowed('http://[::1]:61000/callback')).toBe(true);
+    // The confirm page's `form-action` cannot name an IPv6 literal, so `[::1]` is refused.
+    expect(allowed('http://[::1]:61000/callback')).toBe(false);
     expect(allowed('http://localhost:4100/callback')).toBe(false);
     expect(allowed('http://127.0.0.1/callback')).toBe(false);
     expect(allowed('https://127.0.0.1:4100/callback')).toBe(false);

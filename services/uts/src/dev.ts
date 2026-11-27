@@ -1,6 +1,7 @@
 import { UtsFeedIndexSchema } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { devMetadataFetcher, devStsCallers } from './dev-clients';
 import { handleDevNoticeRequest } from './dev-notices';
 import type { DevUtsFeedDO } from './dev-feed';
 import { getFeedStub, getSignerStub } from './dos/stubs';
@@ -13,6 +14,7 @@ import type { AuthorizationHandoff } from './oauth/authorize';
 import { jsonResponse } from './responses';
 import { developmentScopes } from './scopes/development-fixtures';
 import type { SignInEmail, SignInMailer } from './signin/email/mailer';
+import type { ServiceTokenVerifier } from './subjects/service-tokens';
 import { redeemTicket } from './tickets/routes';
 import { ticketAccess } from './tickets/store';
 import type { SignerAccess } from './token/mint';
@@ -43,6 +45,10 @@ import type { SignerAccess } from './token/mint';
  *   are synthetic local values), for the email end-to-end run.
  * * The notice routes under `/__dev/notices/` and the security view with a development caller
  *   check (`src/dev-notices.ts`).
+ * * The `/internal/` routes take a stand-in STS token, `uts-dev-sts:<workload>:<scope>`, for the
+ *   subject-operation end-to-end run (`developmentServiceTokens`).
+ * * The client metadata fetch of test domains and the stand-in STS token verifier of the broker
+ *   exchange, each when its var is set (`src/dev-clients.ts`).
  */
 export const DEV_SIGN_PATH = '/__dev/sign';
 export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
@@ -118,6 +124,21 @@ async function stopFeedObject(request: Request, env: Env, config: UtsConfig): Pr
   return jsonResponse({ feed: body.data.feed, result, until }, result === 'stopped' ? 200 : 400);
 }
 
+const DEV_STS_TOKEN = /^Bearer uts-dev-sts:([a-z0-9-]{1,64}):([a-z][a-z0-9-]*:[a-z][a-z0-9_.-]*)$/;
+
+/**
+ * The development stand-in for the STS token check of the `/internal/` routes: the bearer names
+ * its workload and its one scope in clear, and proves nothing. Only this module, which no deploy
+ * bundles, passes it; the deployed check refuses every call until `@kilocode/verify` lands.
+ */
+export const developmentServiceTokens: ServiceTokenVerifier = async (authorization, scope) => {
+  if (authorization === null) return { status: 'missing' };
+  const match = DEV_STS_TOKEN.exec(authorization);
+  if (match === null) return { status: 'invalid' };
+  if (match[2] !== scope) return { status: 'insufficient_scope' };
+  return { status: 'verified', workload: match[1] };
+};
+
 export const developmentHandoff: AuthorizationHandoff = async (request, pending) => {
   const params = new URL(request.url).searchParams;
   if (params.get('dev_decision') === 'deny') return { status: 'denied' };
@@ -128,7 +149,9 @@ export const developmentHandoff: AuthorizationHandoff = async (request, pending)
     amr: ['passkey'] as const,
     orgId: pending.orgHint,
   };
-  if (pending.client.kind === 'first_party') {
+  // The synthetic account has no browser session, so a `kilo-web` request ends `access_denied`;
+  // the web BFF's run signs in through the sign-in pages (`dev_handoff=signin`).
+  if (pending.client.kind !== 'third_party') {
     return { status: 'approved', approval: { ...subject, clientKind: 'first_party' } };
   }
   const consentId = z.uuid().safeParse(params.get('dev_consent_id'));
@@ -177,6 +200,9 @@ export async function handleDevRequest(
       signer,
       scopes: developmentScopes,
       mailer: recordingMailer,
+      serviceTokens: developmentServiceTokens,
+      metadataFetcher: devMetadataFetcher(env) ?? ((url, init) => fetch(url, init)),
+      stsCallers: devStsCallers(env),
     });
   }
   if (request.method !== 'POST') {

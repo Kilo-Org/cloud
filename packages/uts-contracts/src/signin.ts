@@ -18,6 +18,11 @@ export const UTS_PASSKEY_OPTIONS_PATH = '/signin/passkey/options';
 export const UTS_PASSKEY_VERIFY_PATH = '/signin/passkey/verify';
 /** The page where a signed-in user adds a passkey. */
 export const UTS_PASSKEYS_PAGE_PATH = '/signin/passkeys';
+/**
+ * The page where a signed-in user sees the third-party apps holding a consent and withdraws one
+ * (design 5.9); the withdrawal is a same-origin form POST to the same path.
+ */
+export const UTS_APPS_PAGE_PATH = '/signin/apps';
 /** The one script of the sign-in pages. */
 export const UTS_SIGNIN_SCRIPT_PATH = '/signin/assets/signin.js';
 

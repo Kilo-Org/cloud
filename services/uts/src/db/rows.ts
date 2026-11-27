@@ -45,6 +45,10 @@ export const AccountRowSchema = z.strictObject({
   created_at: timestamp,
   updated_at: timestamp,
   sign_in_denied_audited_at: timestamp.nullable(),
+  imported_at: timestamp.nullable(),
+  revoked_before: timestamp.nullable(),
+  status_version: z.bigint(),
+  email_version: z.bigint(),
 });
 
 export const SsoConnectionRowSchema = z.strictObject({
@@ -54,6 +58,7 @@ export const SsoConnectionRowSchema = z.strictObject({
   status: z.enum(enums.SSO_CONNECTION_STATUSES),
   created_at: timestamp,
   updated_at: timestamp,
+  workos_organization_id: z.string().nullable(),
 });
 
 export const SsoDomainRowSchema = z.strictObject({
@@ -111,15 +116,17 @@ export const PasskeyCredentialRowSchema = z.strictObject({
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
   user_handle: bytes,
-  gate_pass_id: uuid,
+  gate_pass_id: uuid.nullable(),
   gate_pass_action: z.enum(enums.GATED_ACTIONS),
   denied_audited_at: timestamp.nullable(),
+  imported_at: timestamp.nullable(),
 });
 
 export const BrowserSessionRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
-  token_hash: sha256,
+  /** Null for a session the legacy bridge created, which has no sign-in cookie. */
+  token_hash: sha256.nullable(),
   auth_time: timestamp,
   amr,
   created_at: timestamp,
@@ -134,6 +141,13 @@ export const BrowserSessionRowSchema = z.strictObject({
   denied_audited_at: timestamp.nullable(),
   cleanup_kept_at: timestamp.nullable(),
   device_key_hash: sha256.nullable(),
+  /** The web BFF's handle (migration 0013): its hash, issue time and the sign-in it carries. */
+  handle_hash: sha256.nullable(),
+  handle_issued_at: timestamp.nullable(),
+  handle_auth_time: timestamp.nullable(),
+  handle_amr: amr.nullable(),
+  sso_connection_id: z.string().nullable(),
+  sso_organization_id: z.string().nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({
@@ -471,6 +485,34 @@ export const RevocationRowSchema = z.strictObject({
   feed_expires_at: timestamp,
 });
 
+export const SubjectOperationRowSchema = z.strictObject({
+  operation_id: uuid,
+  operation: z.enum(enums.SUBJECT_OPERATIONS),
+  target: z.string(),
+  source_version: z.bigint(),
+  feed_entries: z.array(z.unknown()),
+  created_at: timestamp,
+  expires_at: timestamp,
+});
+
+export const SubjectTombstoneRowSchema = z.strictObject({
+  id: z.bigint(),
+  subject: z.string(),
+  operation: z.enum(enums.SUBJECT_OPERATIONS),
+  reason: z.string().nullable(),
+  source_version: z.bigint(),
+  operation_id: uuid,
+  created_at: timestamp,
+});
+
+export const AppAccountEventRowSchema = z.strictObject({
+  event_id: uuid,
+  event_type: z.literal('user.created'),
+  account_id: z.string(),
+  primary_email: z.string(),
+  occurred_at: timestamp,
+});
+
 export const DpopProofRowSchema = z.strictObject({
   jkt: sha256,
   jti: z.string(),
@@ -593,6 +635,9 @@ export const IDENTITY_STORE_TABLES = {
   known_devices: KnownDeviceRowSchema,
   known_networks: KnownNetworkRowSchema,
   sign_ins: SignInRowSchema,
+  subject_operations: SubjectOperationRowSchema,
+  subject_tombstones: SubjectTombstoneRowSchema,
+  app_account_events: AppAccountEventRowSchema,
   audit_events: AuditEventRowSchema,
   audit_relay_watermarks: AuditRelayWatermarkRowSchema,
 } as const;

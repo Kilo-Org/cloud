@@ -19,7 +19,8 @@ const INSUFFICIENT_PRIVILEGE = '42501';
 /**
  * Tables the app login writes only through security-definer functions: the OAuth grant functions
  * (migration 0004), the account functions (migration 0005), the sign-in functions (migration
- * 0008) and the notice and sign-in functions and triggers (migration 0010).
+ * 0008), the notice and sign-in functions and triggers (migration 0010) and the third-party
+ * client functions (migration 0021).
  */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
@@ -48,6 +49,8 @@ const FUNCTION_WRITTEN_TABLES = [
   'known_devices',
   'known_networks',
   'sign_ins',
+  'third_party_clients',
+  'third_party_consents',
   'notices',
   'accounts',
   'sso_connections',
@@ -56,8 +59,16 @@ const FUNCTION_WRITTEN_TABLES = [
   'org_memberships',
 ];
 
-/** Tables the app login cannot even read: only the sign-in functions reach them. */
-const FUNCTION_ONLY_TABLES = ['sign_in_flows'];
+/**
+ * Tables the app login cannot even read: only the sign-in functions reach the flows, and only the
+ * subject operation, import and app-event functions (migration 0014) reach the rest.
+ */
+const FUNCTION_ONLY_TABLES = [
+  'sign_in_flows',
+  'subject_operations',
+  'subject_tombstones',
+  'app_account_events',
+];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
 const UPDATE_COLUMN: Partial<Record<string, string>> = {
@@ -602,11 +613,10 @@ describe('table privileges', () => {
     );
 
     // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns. PATs and org
-    // bot keys lose even those in 0005, like gate passes, and device codes in 0008: only the
-    // account and sign-in functions write them.
+    // bot keys lose even those in 0005, like gate passes, device codes in 0008 and third-party
+    // consents in 0021: only the account, sign-in and consent functions write them.
     const gatedUpdates: Record<string, string[]> = {
       ci_trust_policies: ['revoked_at', 'status', 'updated_at'],
-      third_party_consents: ['revoked_at', 'status'],
     };
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
       table =>
@@ -666,7 +676,10 @@ describe('functions', () => {
        ORDER BY 1, 2`
     );
     expect(result.rows).toEqual([
+      { routine: 'ack_app_account_events', grantee: 'uts_app' },
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
+      { routine: 'apply_subject_operation', grantee: 'uts_app' },
+      { routine: 'bridge_legacy_session', grantee: 'uts_app' },
       { routine: 'claim_credential_notice', grantee: 'uts_app' },
       { routine: 'claim_due_notices', grantee: 'uts_app' },
       { routine: 'claim_notice', grantee: 'uts_app' },
@@ -679,11 +692,18 @@ describe('functions', () => {
       { routine: 'create_pat', grantee: 'uts_app' },
       { routine: 'create_webauthn_challenge', grantee: 'uts_app' },
       { routine: 'decide_device_code', grantee: 'uts_app' },
+      { routine: 'end_all_web_sessions', grantee: 'uts_app' },
       { routine: 'end_long_transactions', grantee: 'uts_app' },
+      { routine: 'end_web_session', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'exchange_delegated_token', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
+      { routine: 'exchange_web_code', grantee: 'uts_app' },
+      { routine: 'extend_third_party_client', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'finish_notice', grantee: 'uts_app' },
+      { routine: 'grant_third_party_consent', grantee: 'uts_app' },
+      { routine: 'import_account', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
@@ -693,6 +713,7 @@ describe('functions', () => {
       { routine: 'keep_bot_key', grantee: 'uts_app' },
       { routine: 'list_bot_keys', grantee: 'uts_app' },
       { routine: 'list_pats', grantee: 'uts_app' },
+      { routine: 'list_third_party_consents', grantee: 'uts_app' },
       { routine: 'live_feed_entries', grantee: 'uts_app' },
       { routine: 'live_feed_entries_of_refresh_token', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
@@ -702,11 +723,16 @@ describe('functions', () => {
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
       { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
+      { routine: 'maintain_subject_operation_rows', grantee: 'uts_app' },
+      { routine: 'maintain_third_party_client_rows', grantee: 'uts_app' },
+      { routine: 'mint_web_session_token', grantee: 'uts_app' },
       { routine: 'open_browser_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
+      { routine: 'read_app_account_events', grantee: 'uts_app' },
       { routine: 'read_browser_session', grantee: 'uts_app' },
       { routine: 'read_device_code', grantee: 'uts_app' },
       { routine: 'read_passkey_assertion', grantee: 'uts_app' },
+      { routine: 'read_web_session', grantee: 'uts_app' },
       { routine: 'record_passkey_failure', grantee: 'uts_app' },
       { routine: 'redeem_ticket', grantee: 'uts_app' },
       { routine: 'refresh_first_party', grantee: 'uts_app' },
@@ -716,9 +742,16 @@ describe('functions', () => {
       { routine: 'revoke_bot_key', grantee: 'uts_app' },
       { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
+      { routine: 'revoke_web_device', grantee: 'uts_app' },
+      { routine: 'save_third_party_client', grantee: 'uts_app' },
+      { routine: 'sso_app_organization', grantee: 'uts_app' },
       { routine: 'start_email_sign_in', grantee: 'uts_app' },
       { routine: 'start_sign_in_flow', grantee: 'uts_app' },
+      { routine: 'sync_org_membership', grantee: 'uts_app' },
+      { routine: 'sync_primary_email', grantee: 'uts_app' },
+      { routine: 'sync_sso_organization', grantee: 'uts_app' },
       { routine: 'verify_email_code', grantee: 'uts_app' },
+      { routine: 'withdraw_third_party_consent', grantee: 'uts_app' },
     ]);
   });
 });

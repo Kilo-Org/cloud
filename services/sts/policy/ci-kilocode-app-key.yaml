@@ -1,0 +1,21 @@
+# kilocode automation jobs that push with a Kilo Maintainer app installation token (kilocode CI
+# design 6, as the kilocode CI session confirmed on 2026-11-26: beta.yml is disabled, and smoke-test
+# and docs-sync do not use the app key).
+# Kilo-Org/kilocode issues immutable subjects only after its opt-in; until then STS refuses its tokens.
+workload: ci-kilocode-app-key
+environments:
+  - production
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  environment: automation
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/nix-hashes.yml@refs/heads/main
+    - Kilo-Org/kilocode/.github/workflows/prepare-jetbrains-release.yml@refs/heads/main
+  events:
+    - push
+    - workflow_dispatch
+secrets:
+  - KILOCODE_MAINTAINER_APP_KEY

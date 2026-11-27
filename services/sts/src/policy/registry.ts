@@ -10,6 +10,7 @@ export const POLICY_FILES = [
   'notifications.yaml',
   'usage-ingest.yaml',
   'web.yaml',
+  'ci-deploy-bouncer.yaml',
   'ci-kilocode-release.yaml',
   'ci-kilocode-release-jetbrains.yaml',
   'ci-kilocode-app-key.yaml',

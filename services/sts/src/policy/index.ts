@@ -4,6 +4,7 @@ import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import autoRoutingBenchmarkPolicy from '../../policy/auto-routing-benchmark.yaml';
 import autoRoutingPolicy from '../../policy/auto-routing.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
 import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
 import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
 import ciKilocodeNotifyPolicy from '../../policy/ci-kilocode-notify.yaml';
@@ -51,6 +52,7 @@ const sources: Record<PolicyFile, string> = {
   'auto-routing.yaml': autoRoutingPolicy,
   'auto-routing-benchmark.yaml': autoRoutingBenchmarkPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,
   'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
   'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,
   'ci-kilocode-notify.yaml': ciKilocodeNotifyPolicy,

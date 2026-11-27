@@ -185,7 +185,7 @@ describe('session creation preflight', () => {
     };
     const resolved = await preflightSessionCreation(creation, scopedContext, 'prepareSession');
     expect(parentSpawnContextMock).toHaveBeenCalledWith(authority);
-    expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env);
+    expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env, undefined);
     expect(assertRepositoryAccessMock).toHaveBeenCalled();
     expect(mergeProfileConfigurationMock).toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
@@ -257,7 +257,8 @@ describe('session creation preflight', () => {
       expect(balanceMock).toHaveBeenCalledWith(
         'trusted-parent-model-token',
         undefined,
-        context.env
+        context.env,
+        undefined
       );
     }
   );
@@ -291,7 +292,7 @@ describe('session creation preflight', () => {
       environment,
     });
 
-    expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env);
+    expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env, undefined);
     expect(assertRepositoryAccessMock).toHaveBeenCalled();
     expect(assertEnvironmentRepositoriesAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ environment })

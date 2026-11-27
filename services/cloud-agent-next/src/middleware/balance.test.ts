@@ -189,7 +189,7 @@ describe('balanceMiddleware', () => {
     expect(response.status).toBe(200);
     expect(calls).toEqual(['sendMessageV2']);
     expect(getToken).toHaveBeenCalledWith(scoped);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('parent-runtime-token', undefined, requestEnv);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('parent-runtime-token', undefined, requestEnv, undefined);
   });
 
   it('uses the exact organization and parent token for an organization follow-up', async () => {
@@ -219,7 +219,8 @@ describe('balanceMiddleware', () => {
     expect(validateBalanceOnly).toHaveBeenCalledWith(
       'parent-runtime-token',
       'org-scoped',
-      requestEnv
+      requestEnv,
+      undefined
     );
   });
 
@@ -379,8 +380,8 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(402);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env, undefined);
     expect(calls).toEqual([]);
   });
 
@@ -406,8 +407,8 @@ describe('balanceMiddleware', () => {
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ cloudAgentSessionId: 'agent-unfunded' })
     );
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
-    expect(validateBalanceOnly).not.toHaveBeenCalledWith('token-123', 'org-funded', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env, undefined);
+    expect(validateBalanceOnly).not.toHaveBeenCalledWith('token-123', 'org-funded', env, undefined);
     expect(calls).toEqual([]);
   });
 
@@ -447,7 +448,7 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(207);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env, undefined);
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ cloudAgentSessionId: 'agent-executed' })
@@ -464,7 +465,7 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(207);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env, undefined);
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ cloudAgentSessionId: 'agent-executed' })
     );
@@ -486,8 +487,8 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(402);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-unfunded', env, undefined);
     expect(calls).toEqual([]);
   });
 
@@ -505,8 +506,8 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(402);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-funded', env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env, undefined);
     expect(calls).toEqual([]);
   });
 
@@ -519,7 +520,7 @@ describe('balanceMiddleware', () => {
     });
 
     expect(validateBalanceOnly).toHaveBeenCalledTimes(1);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env, undefined);
   });
 
   it('uses each session organization in a batch of session mutations', async () => {
@@ -540,8 +541,8 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(402);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-a', env);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-b', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-a', env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-b', env, undefined);
     expect(calls).toEqual([]);
   });
 
@@ -568,7 +569,7 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(200);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', undefined, env, undefined);
   });
 
   it('does not apply balance to a read with the header present', async () => {
@@ -724,7 +725,7 @@ describe('balanceMiddleware', () => {
     });
 
     expect(response.status).toBe(200);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', orgId, env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', orgId, env, undefined);
   });
 
   it('validates caller-supplied organization context against the stored session scope', async () => {
@@ -740,7 +741,7 @@ describe('balanceMiddleware', () => {
       cloudAgentSessionId: 'agent-existing',
       expectedOrganizationId: 'org-requested',
     });
-    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env, undefined);
     await expect(response.json()).resolves.toMatchObject({
       validatedSessionAccess: {
         kiloUserId: 'user-123',

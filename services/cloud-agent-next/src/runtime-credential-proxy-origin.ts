@@ -3,7 +3,11 @@ import {
   CLOUD_AGENT_SESSION_SYNC_ORIGIN,
   RUNTIME_PROXY_ORIGIN_HEADER,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
-import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
+import {
+  readCloudAgentNextSecret,
+  secretsSource,
+  type CloudAgentNextSecretsEnv,
+} from './secrets.js';
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { logger } from './logger.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
@@ -44,11 +48,15 @@ export async function runtimeProxyOriginProof(
 ): Promise<string | null> {
   const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) {
-    // Egress then sends no proof; make that visible before readers require it.
+    // Egress then sends no proof; make that visible before readers require it. A source that is not
+    // deployed at all is a different alert from one that is deployed and failing: `secrets-store`
+    // holds the binding, `sts` holds the service binding.
+    const configured =
+      secretsSource(env) === 'sts' ? env.STS !== undefined : env.NEXTAUTH_SECRET !== undefined;
     logger
       .withFields({
         logTag: 'runtime_proxy_origin_proof_unavailable',
-        reason: 'secret_unavailable',
+        reason: configured ? 'secret_unavailable' : 'secret_not_configured',
       })
       .warn('Runtime proxy origin proof unavailable');
     return null;

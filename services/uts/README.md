@@ -1252,6 +1252,8 @@ An unreadable STS key set answers 503, never an admission.
 | `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
+| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID` | var | The OAuth client ids of the GitHub and Google sign-in registrations; staging sets both, production sets neither, so production offers neither provider (Sign-in providers, "Configuration") |
+| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET` | Worker secret | The client secrets of those registrations, set only where the matching client id is set. Copy each from the environment's `/workloads/uts` folder in the secrets manager with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
 
 ## Identity store
 

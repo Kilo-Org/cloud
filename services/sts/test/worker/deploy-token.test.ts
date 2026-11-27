@@ -2198,7 +2198,7 @@ secrets: [${CLOUDFLARE_MINTING_TOKEN_SECRET}]
         { cloudflareDeployPins: { ...TEST_PINS, forbiddenGroupIds: [SCRIPTS_GROUP] } }
       )
     ).toThrow('is a forbidden group');
-    // Empty until setup step 3; every pinned value is a permission-group or zone id.
+    // Filled at setup step 3; every pinned value is a permission-group or zone id.
     const pinned = [
       ...CLOUDFLARE_DEPLOY_PINS.forbiddenGroupIds,
       ...CLOUDFLARE_DEPLOY_PINS.allowedGroups.map(group => group.id),

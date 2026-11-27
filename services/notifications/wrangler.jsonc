@@ -7,7 +7,10 @@
   "compatibility_flags": ["nodejs_compat", "unhandled_rejection_after_microtask_checkpoint"],
   "dev": { "port": 8804 },
   "placement": { "mode": "smart" },
-  "observability": { "enabled": true },
+  // Traces stay off: a trace records outbound URLs and Durable Object SQL
+  // bindings, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
+  "observability": { "enabled": true, "traces": { "enabled": false } },
   // Notification history retention. `NotificationsService.scheduled` prunes rows
   // older than the 90-day history window; see
   // src/lib/notification-history-prune.ts.
@@ -23,6 +26,11 @@
     "APNS_TOPIC": "com.kilocode.kiloapp",
     "APNS_TEAM_ID": "X96D76J65Z",
     "APNS_KEY_ID": "KRYMZL626P",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store
+    // bindings below) or `sts` (the STS bundle over the `STS` binding). An
+    // absent value means `secrets-store`; any other value refuses every read.
+    // The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
 
   "routes": [
@@ -72,8 +80,22 @@
       "binding": "EVENT_SERVICE",
       "service": "event-service",
     },
+    // STS serves the runtime secret bundle over the account-internal binding.
+    // `props.caller` is what STS authorizes on and must equal this Worker's
+    // top-level name. This config deploys only production, so it binds the
+    // production `sts`; services/sts/policy/notifications.yaml grants the four
+    // names. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "notifications" },
+    },
   ],
 
+  // Secrets Store bindings: the `secrets-store` source reads these. They stay
+  // bound while STS reads are proven, so a rollback is one redeploy with
+  // SECRETS_SOURCE set to `secrets-store`.
   "secrets_store_secrets": [
     {
       // The APNs .p8 auth key, stored as one line: `pemToDer()` strips every
@@ -105,4 +127,53 @@
       "new_classes": ["NotificationChannelDO"],
     },
   ],
+
+  // The one named environment. Wrangler refuses any other `--env` instead of
+  // resolving it to this production config and its bindings.
+  //
+  // `staging` is closed: push stays off (src/lib/push-gate.ts), it binds no
+  // signer, provider credential, internal secret, STS, queue or service, and it
+  // has no route or schedule. A request that needs a signer or the internal
+  // secret is refused before any database read. Bindings are not inherited, so
+  // only the ones listed here exist; the empty lists record that on purpose.
+  // The `workers.dev` and preview URL flags pin the script's current settings
+  // and add no ingress. src/wrangler-config.node.test.ts asserts both blocks.
+  "env": {
+    "staging": {
+      "name": "notifications-staging",
+      "workers_dev": true,
+      "preview_urls": true,
+      "routes": [],
+      "triggers": { "crons": [] },
+      "vars": {
+        "WORKER_ENV": "staging",
+        "NOTIFICATIONS_PUSH_ENABLED": "false",
+        "SECRETS_SOURCE": "secrets-store",
+      },
+      // The staging database, cache disabled; never the production config.
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "c9c9b6b68684471ba0fcc69fff3673cf",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "NOTIFICATION_CHANNEL_DO",
+            "class_name": "NotificationChannelDO",
+          },
+        ],
+      },
+      "migrations": [
+        {
+          "tag": "v1",
+          "new_classes": ["NotificationChannelDO"],
+        },
+      ],
+      "queues": { "producers": [], "consumers": [] },
+      "services": [],
+      "secrets_store_secrets": [],
+    },
+  },
 }

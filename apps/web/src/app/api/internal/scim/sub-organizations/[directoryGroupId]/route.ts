@@ -19,7 +19,7 @@ type RouteParams = { params: Promise<{ directoryGroupId: string }> };
  * that owns the directory. Idempotent, and applies renames on repeat.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   const { directoryGroupId } = await params;
@@ -39,7 +39,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
 /** Soft-deletes the sub-organization bound to a directory group. Idempotent. */
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   const { directoryGroupId } = await params;

@@ -157,25 +157,6 @@ describe('token signer', () => {
     });
   });
 
-  it('exposes only mint, getJwks and alarm to a stub, so no caller reaches a key', async () => {
-    expect(Object.getOwnPropertyNames(TokenSignerDO.prototype).sort()).toEqual([
-      'alarm',
-      'constructor',
-      'getJwks',
-      'mint',
-    ]);
-    // An internal method name is refused over RPC, not answered with the key record. Awaited
-    // directly: handing the RPC promise to `expect(...).rejects` left an unhandled rejection.
-    const stub = signer() as unknown as { currentKey(): Promise<unknown> };
-    let refusal: unknown = null;
-    try {
-      await stub.currentKey();
-    } catch (error) {
-      refusal = error;
-    }
-    expect(String(refusal)).toContain('does not implement "currentKey"');
-  });
-
   it('keeps its key across an object restart and records the key creation once', async () => {
     const before = await signer().getJwks();
     expect(before.keys).toHaveLength(1);

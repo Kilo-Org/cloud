@@ -1,0 +1,27 @@
+# Kilo-Org/bouncer's production deploy job (deploy.yml on main, GitHub environment production): one
+# Cloudflare deploy token per run (README "Cloudflare deploy tokens"; bouncer integration design §4).
+workload: ci-deploy-bouncer
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/bouncer
+  repositoryId: '1395255492'
+  repositoryOwnerId: '201822503'
+  environment: production
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/bouncer/.github/workflows/deploy.yml@refs/heads/main]
+  events: [push] # bouncer-sts, 2026-11-27: deploy.yml deploys only on push; no manual dispatch
+secrets: []
+dynamic:
+  - grant: cloudflare-deploy
+    permissionSet: bouncer-deploy
+    permissionGroups: # ids from GET /accounts/<account>/tokens/permission_groups (setup step 3)
+      - { id: e086da7e2179491d91ee5f35b3ca210a, name: Workers Scripts Write, scope: account }
+      - { id: bdbcd690c763475a985e8641dddc09f7, name: Workers Containers Write, scope: account }
+      - { id: 28f4b596e7d643029c524985477ae49a, name: Workers Routes Write, scope: zone }
+    zones: ['9f7103cbcadbe93a052c120f231e8507'] # kiloapps.io
+    intendedScripts: [bouncer, bouncer-watch]
+    intendedRoutes: [] # bouncer uses a Custom Domain
+    ttlSeconds: 3600
+    maxActive: 2
+    maxPerHour: 4

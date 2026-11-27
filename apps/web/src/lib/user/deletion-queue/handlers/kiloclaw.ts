@@ -1,4 +1,5 @@
-import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import {
   listAllActiveInstanceRows,
   markActiveInstanceBatchDestroyedForGdpr,
@@ -44,7 +45,7 @@ export const handleKiloclawDestroy: DeletionHandler = async ({ request, step, co
   const userId = request.user_id;
   if (!userId) return { kind: 'needs_attention', errorCode: 'legacy_identity_unresolved' };
 
-  if (!KILOCLAW_API_URL || !INTERNAL_API_SECRET) {
+  if (!KILOCLAW_API_URL || !(await readInternalApiSecret())) {
     return configurationMissing();
   }
 

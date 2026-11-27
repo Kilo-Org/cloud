@@ -1,5 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 
 import {
@@ -11,8 +11,10 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { legacyCiphertextDigest } from '@kilocode/web-shared/lib/ai-gateway/byok/dual-write';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import {
+  CredentialKmsError,
+  OBSOLETE_STATIC_KEY_PLACEHOLDER,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import {
@@ -23,9 +25,13 @@ import {
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   CodingPlanInventoryUploadError,
+  getAssignedCodingPlanApiKey,
+  getAvailableCodingPlanIds,
+  getAssignedCodingPlanUsageContext,
   queueAvailableInventoryForRevocation,
   reassignSubscriptionCredential,
   replaceInventoryCredential,
+  requestCodingPlanAvailabilityNotification,
   subscribeToCodingPlan,
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
@@ -37,10 +43,10 @@ import {
   requeueManualCredentialRevocation,
 } from '@/lib/coding-plans/revocation';
 import {
-  dualWrittenInventoryColumns,
   insertInventoryRow,
-  inventoryEnvelope,
-  legacyInventoryCredential,
+  sealedInventoryColumns,
+  sealedInventoryColumnsWithStaticKeyCopy,
+  staticKeyInventoryCredential,
 } from '@/tests/helpers/coding-plan-inventory.helper';
 
 const ADMIN_USER_ID = 'admin-user-id';
@@ -86,14 +92,13 @@ function expectClearedCredential(row: {
 }
 
 function expectSealedForRow(row: Awaited<ReturnType<typeof selectInventory>>, plaintext: string) {
-  expect(row.encrypted_api_key).not.toBeNull();
+  expect(row.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
   expect(row.encrypted_api_key_envelope).not.toBeNull();
-  expect(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY)).toBe(plaintext);
   expect(decryptApiKey(row.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)).toBe(
     plaintext
   );
   expect(row.encrypted_api_key_envelope!.legacy_digest).toBe(
-    legacyCiphertextDigest(row.encrypted_api_key!)
+    createHash('sha256').update('..').digest('hex')
   );
   const serialized = JSON.stringify([row.encrypted_api_key, row.encrypted_api_key_envelope]);
   expect(serialized).not.toContain(plaintext);
@@ -114,7 +119,7 @@ async function installedByokPlaintext(userId: string) {
 describe('uploadKeysToInventory', () => {
   const validateCredential = async () => ({ valid: true });
 
-  it('writes the static-key copy and a KMS envelope bound to each inserted row', async () => {
+  it('writes the placeholder and a KMS envelope bound to each inserted row', async () => {
     await uploadKeysToInventory(
       'minimax',
       MINIMAX_PLAN_ID,
@@ -160,9 +165,9 @@ describe('uploadKeysToInventory', () => {
 });
 
 describe('openCodingPlanInventoryCredential', () => {
-  it('prefers the current envelope over the static-key copy', async () => {
+  it('opens the envelope with the row id as the decrypt context', async () => {
     const id = crypto.randomUUID();
-    const columns = dualWrittenInventoryColumns('legacy-value', 'envelope-value');
+    const columns = sealedInventoryColumns('envelope-value');
 
     await expect(openCodingPlanInventoryCredential({ id, ...columns })).resolves.toBe(
       'envelope-value'
@@ -173,35 +178,23 @@ describe('openCodingPlanInventoryCredential', () => {
     expect(decryptRequests[0].body).toMatchObject(inventoryContext(id));
   });
 
-  it('uses the static-key copy when the row has no envelope', async () => {
+  it('reads the envelope, not a real static-key copy in the obsolete column', async () => {
     const result = await openCodingPlanInventoryCredential({
       id: crypto.randomUUID(),
-      encrypted_api_key: legacyInventoryCredential('legacy-only-value'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('envelope-value', 'static-key-value'),
+    });
+
+    expect(result).toBe('envelope-value');
+  });
+
+  it('reads no credential for a row without an envelope, even if the obsolete column holds a static-key ciphertext', async () => {
+    const row = {
+      id: crypto.randomUUID(),
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-value'),
       encrypted_api_key_envelope: null,
-    });
+    };
 
-    expect(result).toBe('legacy-only-value');
-    expect(kms.requests).toHaveLength(0);
-  });
-
-  it('ignores a stale envelope and uses the static-key copy', async () => {
-    const result = await openCodingPlanInventoryCredential({
-      id: crypto.randomUUID(),
-      encrypted_api_key: legacyInventoryCredential('rewritten-by-rollback'),
-      encrypted_api_key_envelope: inventoryEnvelope('stale-envelope-value', 'not-the-digest'),
-    });
-
-    expect(result).toBe('rewritten-by-rollback');
-    expect(kms.requests).toHaveLength(0);
-  });
-
-  it('reads a cleared static-key column as no credential even if an envelope remains', async () => {
-    const result = await openCodingPlanInventoryCredential({
-      id: crypto.randomUUID(),
-      encrypted_api_key: null,
-      encrypted_api_key_envelope:
-        dualWrittenInventoryColumns('revoked-value').encrypted_api_key_envelope,
-    });
+    const result = await openCodingPlanInventoryCredential(row);
 
     expect(result).toBeNull();
     expect(kms.requests).toHaveLength(0);
@@ -213,7 +206,7 @@ describe('openCodingPlanInventoryCredential', () => {
     await expect(
       openCodingPlanInventoryCredential({
         id: crypto.randomUUID(),
-        ...dualWrittenInventoryColumns('legacy-value', 'envelope-value'),
+        ...sealedInventoryColumnsWithStaticKeyCopy('envelope-value', 'static-key-value'),
       })
     ).rejects.toBeInstanceOf(CredentialKmsError);
   });
@@ -221,7 +214,7 @@ describe('openCodingPlanInventoryCredential', () => {
   it("decrypts an envelope copied from another row with the reading row's context", async () => {
     const sourceId = crypto.randomUUID();
     const readingId = crypto.randomUUID();
-    const columns = dualWrittenInventoryColumns('copied-value');
+    const columns = sealedInventoryColumns('copied-value');
 
     await openCodingPlanInventoryCredential({ id: readingId, ...columns });
 
@@ -232,11 +225,77 @@ describe('openCodingPlanInventoryCredential', () => {
   });
 });
 
+describe('reading an assigned inventory credential', () => {
+  async function insertAssignedMinimaxRow(
+    userId: string,
+    columns: Pick<
+      typeof coding_plan_key_inventory.$inferInsert,
+      'encrypted_api_key' | 'encrypted_api_key_envelope'
+    >
+  ) {
+    return await insertInventoryRow({
+      plan_id: MINIMAX_PLAN_ID,
+      provider_id: 'minimax',
+      status: 'assigned',
+      assigned_to_user_id: userId,
+      ...columns,
+    });
+  }
+
+  function assignmentOf(row: { id: string }, userId: string) {
+    return {
+      inventoryId: row.id,
+      userId,
+      planId: MINIMAX_PLAN_ID,
+      providerId: 'minimax',
+    };
+  }
+
+  it('returns the envelope credential, not a static-key copy', async () => {
+    const user = await insertTestUser();
+    const row = await insertAssignedMinimaxRow(
+      user.id,
+      sealedInventoryColumnsWithStaticKeyCopy('envelope-secret', 'static-key-secret')
+    );
+
+    await expect(getAssignedCodingPlanUsageContext(assignmentOf(row, user.id))).resolves.toEqual({
+      providerId: 'minimax',
+      apiKey: 'envelope-secret',
+    });
+    await expect(getAssignedCodingPlanApiKey(assignmentOf(row, user.id))).resolves.toBe(
+      'envelope-secret'
+    );
+  });
+
+  it('returns no credential for a row whose envelope is null, even with a static-key ciphertext', async () => {
+    const user = await insertTestUser();
+    const row = await insertAssignedMinimaxRow(user.id, {
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
+      encrypted_api_key_envelope: null,
+    });
+
+    await expect(getAssignedCodingPlanUsageContext(assignmentOf(row, user.id))).resolves.toBeNull();
+    await expect(getAssignedCodingPlanApiKey(assignmentOf(row, user.id))).resolves.toBeNull();
+    expect(kms.requests).toHaveLength(0);
+  });
+
+  it('returns no credential, without using the static-key copy, when the KMS decrypt fails', async () => {
+    const user = await insertTestUser();
+    const row = await insertAssignedMinimaxRow(
+      user.id,
+      sealedInventoryColumnsWithStaticKeyCopy('envelope-secret', 'static-key-secret')
+    );
+    kms.fail('/decrypt', 403);
+
+    await expect(getAssignedCodingPlanUsageContext(assignmentOf(row, user.id))).resolves.toBeNull();
+  });
+});
+
 describe('claiming an inventory credential', () => {
-  it('subscribe installs the credential from a current envelope', async () => {
+  it('subscribe installs the credential from the envelope, not the static-key copy', async () => {
     const user = await insertSubscribableUser();
     const inventory = await insertInventoryRow({
-      ...dualWrittenInventoryColumns('legacy-decoy', 'envelope-secret'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('envelope-secret', 'static-key-decoy'),
     });
     kms.requests.length = 0;
 
@@ -249,24 +308,53 @@ describe('claiming an inventory credential', () => {
     expect((await selectInventory(inventory.id)).status).toBe('assigned');
   });
 
-  it('subscribe installs the credential from a legacy-only row', async () => {
+  it('subscribe does not claim a row whose envelope is null, even with a static-key ciphertext', async () => {
     const user = await insertSubscribableUser();
     const inventory = await insertInventoryRow({
-      encrypted_api_key: legacyInventoryCredential('legacy-only-secret'),
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
     });
     kms.requests.length = 0;
 
-    await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'legacy-subscribe');
+    await expect(
+      subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'static-only-subscribe')
+    ).rejects.toThrow('No managed credential is available');
 
-    expect(await installedByokPlaintext(user.id)).toBe('legacy-only-secret');
     expect(kms.requests.filter(request => request.path === '/decrypt')).toHaveLength(0);
-    expect((await selectInventory(inventory.id)).status).toBe('assigned');
+    expect((await selectInventory(inventory.id)).status).toBe('available');
+  });
+
+  it('does not count a row without an envelope as stock for availability or the waitlist', async () => {
+    const user = await insertSubscribableUser();
+    await insertInventoryRow({
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
+    });
+
+    await expect(getAvailableCodingPlanIds()).resolves.not.toContain(BYTEPLUS_PLAN_ID);
+    await expect(
+      requestCodingPlanAvailabilityNotification(user.id, BYTEPLUS_PLAN_ID)
+    ).resolves.toEqual({ requested: true });
+
+    await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
+    await expect(getAvailableCodingPlanIds()).resolves.toContain(BYTEPLUS_PLAN_ID);
+  });
+
+  it('subscribe claims sealed stock past a row without an envelope', async () => {
+    const user = await insertSubscribableUser();
+    const unsealed = await insertInventoryRow({
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
+    });
+    await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
+
+    await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'past-unsealed-subscribe');
+
+    expect(await installedByokPlaintext(user.id)).toBe('healthy-secret');
+    expect((await selectInventory(unsealed.id)).status).toBe('available');
   });
 
   it('subscribe opens another row under the lock when its prepared candidate was claimed', async () => {
     const user = await insertSubscribableUser();
-    await insertInventoryRow({ ...dualWrittenInventoryColumns('first-secret') });
-    await insertInventoryRow({ ...dualWrittenInventoryColumns('second-secret') });
+    await insertInventoryRow({ ...sealedInventoryColumns('first-secret') });
+    await insertInventoryRow({ ...sealedInventoryColumns('second-secret') });
     const fakeFetch = global.fetch;
     let candidateId: string | undefined;
     global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -300,9 +388,9 @@ describe('claiming an inventory credential', () => {
   it('subscribe skips a row whose envelope KMS refuses and installs healthy stock', async () => {
     const user = await insertSubscribableUser();
     const refused = await insertInventoryRow({
-      ...dualWrittenInventoryColumns('refused-legacy', 'refused-envelope'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('refused-envelope', 'refused-static-key'),
     });
-    await insertInventoryRow({ ...dualWrittenInventoryColumns('healthy-secret') });
+    await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
     kms.refuseDecryptFor(refused.id);
 
     await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'refused-row-subscribe');
@@ -314,12 +402,12 @@ describe('claiming an inventory credential', () => {
 
   it('reassign skips a row whose envelope KMS refuses and installs healthy stock', async () => {
     const { user, subscription } = await insertAssignedSubscription(
-      dualWrittenInventoryColumns('previous-secret')
+      sealedInventoryColumns('previous-secret')
     );
     const refused = await insertInventoryRow({
-      ...dualWrittenInventoryColumns('refused-legacy', 'refused-envelope'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('refused-envelope', 'refused-static-key'),
     });
-    const healthy = await insertInventoryRow({ ...dualWrittenInventoryColumns('healthy-secret') });
+    const healthy = await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
     kms.refuseDecryptFor(refused.id);
 
     await expect(reassignSubscriptionCredential(subscription.id, ADMIN_USER_ID)).resolves.toEqual({
@@ -334,7 +422,7 @@ describe('claiming an inventory credential', () => {
     const user = await insertSubscribableUser();
     await insertInventoryRow({
       encrypted_api_key: null,
-      encrypted_api_key_envelope: dualWrittenInventoryColumns('cleared').encrypted_api_key_envelope,
+      encrypted_api_key_envelope: null,
     });
 
     await expect(
@@ -383,12 +471,12 @@ describe('claiming an inventory credential', () => {
     return { user, previous, subscription };
   }
 
-  it('reassign installs the credential from a current envelope and clears the previous row', async () => {
+  it('reassign installs the credential from the envelope and clears the previous row', async () => {
     const { user, previous, subscription } = await insertAssignedSubscription(
-      dualWrittenInventoryColumns('previous-secret')
+      sealedInventoryColumns('previous-secret')
     );
     const pooled = await insertInventoryRow({
-      ...dualWrittenInventoryColumns('legacy-decoy', 'pooled-envelope-secret'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('pooled-envelope-secret', 'static-key-decoy'),
     });
     kms.requests.length = 0;
 
@@ -405,31 +493,29 @@ describe('claiming an inventory credential', () => {
     expect((await selectInventory(pooled.id)).status).toBe('assigned');
   });
 
-  it('reassign installs the credential from a legacy-only row', async () => {
-    const { user, previous, subscription } = await insertAssignedSubscription({
-      encrypted_api_key: legacyInventoryCredential('previous-secret'),
-      encrypted_api_key_envelope: null,
-    });
-    await insertInventoryRow({
-      encrypted_api_key: legacyInventoryCredential('pooled-legacy-secret'),
+  it('reassign does not claim a row whose envelope is null, even with a static-key ciphertext', async () => {
+    const { subscription } = await insertAssignedSubscription(
+      sealedInventoryColumns('previous-secret')
+    );
+    const staticOnly = await insertInventoryRow({
+      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
     });
     kms.requests.length = 0;
 
-    await reassignSubscriptionCredential(subscription.id, ADMIN_USER_ID);
+    await expect(reassignSubscriptionCredential(subscription.id, ADMIN_USER_ID)).rejects.toThrow();
 
-    expect(await installedByokPlaintext(user.id)).toBe('pooled-legacy-secret');
     expect(kms.requests.filter(request => request.path === '/decrypt')).toHaveLength(0);
-    expectClearedCredential(await selectInventory(previous.id));
+    expect((await selectInventory(staticOnly.id)).status).toBe('available');
   });
 });
 
 describe('replacing an inventory credential', () => {
-  it('replaceInventoryCredential writes both forms bound to the row id', async () => {
+  it('replaceInventoryCredential writes the placeholder and an envelope bound to the row id', async () => {
     const row = await insertInventoryRow({
       plan_id: MINIMAX_PLAN_ID,
       provider_id: 'minimax',
       upstream_usage_id: null,
-      ...dualWrittenInventoryColumns('old-secret'),
+      ...sealedInventoryColumns('old-secret'),
     });
 
     await replaceInventoryCredential(row.id, ' replacement-secret ', ADMIN_USER_ID, {
@@ -454,7 +540,7 @@ describe('replacing an inventory credential', () => {
               plan_id: MINIMAX_PLAN_ID,
               provider_id: 'minimax',
               upstream_usage_id: null,
-              ...dualWrittenInventoryColumns('old-secret'),
+              ...sealedInventoryColumns('old-secret'),
             }
           : { status: 'revocation_pending' }
       );
@@ -486,13 +572,12 @@ describe('replacing an inventory credential', () => {
     }
   );
 
-  it('replaceInventoryCredential replaces a stale envelope', async () => {
+  it('replaceInventoryCredential replaces a static-key copy left in the obsolete column with the placeholder', async () => {
     const row = await insertInventoryRow({
       plan_id: MINIMAX_PLAN_ID,
       provider_id: 'minimax',
       upstream_usage_id: null,
-      encrypted_api_key: legacyInventoryCredential('rolled-back-secret'),
-      encrypted_api_key_envelope: inventoryEnvelope('stale-secret', 'not-the-digest'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('old-secret', 'static-key-old-secret'),
     });
 
     await replaceInventoryCredential(row.id, 'fresh-secret', ADMIN_USER_ID, {
@@ -504,7 +589,7 @@ describe('replacing an inventory credential', () => {
     await expect(openCodingPlanInventoryCredential(after)).resolves.toBe('fresh-secret');
   });
 
-  it('replaceManualCredentialRevocation writes both forms bound to the row id', async () => {
+  it('replaceManualCredentialRevocation writes the placeholder and an envelope bound to the row id', async () => {
     const row = await insertInventoryRow({ status: 'revocation_pending' });
 
     await replaceManualCredentialRevocation(row.id, ' manual-replacement ', ADMIN_USER_ID, {
@@ -539,10 +624,10 @@ describe('replacing an inventory credential', () => {
 });
 
 describe('clearing an inventory credential', () => {
-  it('markCredentialManuallyRevoked clears both forms', async () => {
+  it('markCredentialManuallyRevoked clears the envelope and a static-key copy', async () => {
     const row = await insertInventoryRow({
       status: 'revocation_pending',
-      ...dualWrittenInventoryColumns('revoke-me'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('revoke-me', 'static-key-revoke-me'),
     });
 
     await markCredentialManuallyRevoked(row.id);
@@ -552,10 +637,10 @@ describe('clearing an inventory credential', () => {
     expectClearedCredential(after);
   });
 
-  it('markCredentialManualRevocationFailed clears both forms', async () => {
+  it('markCredentialManualRevocationFailed clears the envelope and a static-key copy', async () => {
     const row = await insertInventoryRow({
       status: 'revocation_pending',
-      ...dualWrittenInventoryColumns('fail-me'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('fail-me', 'static-key-fail-me'),
     });
 
     await markCredentialManualRevocationFailed(row.id, 'upstream said no');
@@ -565,10 +650,10 @@ describe('clearing an inventory credential', () => {
     expectClearedCredential(after);
   });
 
-  it('requeueManualCredentialRevocation clears both forms', async () => {
+  it('requeueManualCredentialRevocation clears the envelope and a static-key copy', async () => {
     const row = await insertInventoryRow({
       status: 'revocation_failed',
-      ...dualWrittenInventoryColumns('requeue-me'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('requeue-me', 'static-key-requeue-me'),
     });
 
     await requeueManualCredentialRevocation(row.id);
@@ -578,10 +663,10 @@ describe('clearing an inventory credential', () => {
     expectClearedCredential(after);
   });
 
-  it('queueAvailableInventoryForRevocation clears both forms', async () => {
+  it('queueAvailableInventoryForRevocation clears the envelope and a static-key copy', async () => {
     const row = await insertInventoryRow({
       status: 'available',
-      ...dualWrittenInventoryColumns('reduce-me'),
+      ...sealedInventoryColumnsWithStaticKeyCopy('reduce-me', 'static-key-reduce-me'),
     });
 
     const result = await queueAvailableInventoryForRevocation(BYTEPLUS_PLAN_ID, 1, ADMIN_USER_ID);

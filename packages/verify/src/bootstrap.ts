@@ -7,7 +7,13 @@ import {
   type CallScope,
   type Liveness,
 } from './flight';
-import { importKeySet, type KeySetCache } from './jwks';
+import {
+  JWKS_MAX_STALE_MS,
+  importKeySet,
+  parseKeySetAges,
+  type KeySetAges,
+  type KeySetCache,
+} from './jwks';
 import { parseRevocationList, verifyFeedHead, type RevocationFeed } from './revocation';
 
 /** A bootstrap call that has not answered by then counts as a failure. */
@@ -15,10 +21,18 @@ export const BOOTSTRAP_FETCH_TIMEOUT_MS = 5_000;
 /** After a failed bootstrap call, the next one waits this long; cold requests meanwhile get 503. */
 export const BOOTSTRAP_RETRY_MS = 5_000;
 
-/** One UTS bootstrap answer (design 7, cold start): the UTS key set, a signed feed head and its list. */
+/**
+ * One UTS bootstrap answer (design 7, cold start): the UTS key set with its ages, a signed feed
+ * head and its list.
+ */
 export type UtsBootstrapAnswer = {
   /** The UTS key-set body, as `JwksSource` returns it. */
   jwks: unknown;
+  /**
+   * The key set's ages when the feed Worker answered, as `JwksSource` returns them. Required: an
+   * answer without valid ages is a failed call, so a bootstrap never restarts a key's age.
+   */
+  keyAges: KeySetAges;
   /** The current head: a compact JWS, as `RevocationFeedSource.head` returns it. */
   head: string;
   /** The list bytes that head covers, as `RevocationFeedSource.list` returns them. */
@@ -47,8 +61,8 @@ type Failure = { attemptId: number; retryAt: number };
 
 /**
  * The cold-start loader for one isolate. A bootstrap answer applies whole or not at all: the key
- * set must parse, the head must verify under a feed key of that set and count (design 5.6), and
- * the list must match the head's hash.
+ * set must parse and carry valid ages, the head must verify under a feed key of that set and count
+ * (design 5.6), and the list must match the head's hash.
  */
 export function createBootstrap(
   source: UtsBootstrapSource,
@@ -73,14 +87,24 @@ export function createBootstrap(
     startOwned(scope, started, BOOTSTRAP_FETCH_TIMEOUT_MS, async answered => {
       try {
         const answer = await source(AbortSignal.timeout(BOOTSTRAP_FETCH_TIMEOUT_MS));
+        const keyAges = parseKeySetAges(answer.keyAges);
+        if (keyAges === null) throw new Error('bootstrap answer without valid key ages');
         const keys = await importKeySet(answer.jwks, 'uts');
         const head = await verifyFeedHead(answer.head, kid => keys.feedKeys.get(kid) ?? null);
         const list = await parseRevocationList(head.listHash, answer.list);
+        // Applies whole or not at all: a key set already past its 24-hour limit, counted from the
+        // call start, would not be held, so nothing of the answer is installed.
         const now = Date.now();
-        if (!feed.install({ head, list }, now)) throw new Error('bootstrap head does not count');
-        keySet.install(keys, now);
+        if (started.startedAt - keyAges.oldest * 1000 + JWKS_MAX_STALE_MS <= now) {
+          throw new Error('bootstrap key set past its 24-hour limit');
+        }
+        if (!feed.install({ head, list }, now)) {
+          throw new Error('bootstrap head does not count');
+        }
+        keySet.install(keys, keyAges, started.startedAt, now);
         if (attempt?.id === started.id) attempt = null;
-        failure = null;
+        // Clears only this attempt's failure or an older one, never a later attempt's.
+        if (failure !== null && failure.attemptId <= started.id) failure = null;
       } catch {
         fail(started, Date.now());
       }

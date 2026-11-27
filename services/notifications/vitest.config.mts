@@ -1,5 +1,5 @@
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 const kCurrentWorker = Symbol.for('miniflare.kCurrentWorker');
 
@@ -15,8 +15,17 @@ export default defineConfig({
         // production default-off value here; the sink tests opt in explicitly
         // through `setPushSinkModeForTesting`.
         bindings: { PUSH_SINK_MODE: '' },
+        // Worker unit tests resolve the STS binding to a local stub, never the
+        // deployed broker. The binding mirrors wrangler.jsonc: the named
+        // `SecretsBroker` entrypoint with `props.caller`. The stub refuses every
+        // bundle; a test of the `sts` source injects its own synthetic binding.
         serviceBindings: {
           EVENT_SERVICE: 'event-service-stub',
+          STS: {
+            name: 'sts-stub',
+            entrypoint: 'SecretsBroker',
+            props: { caller: 'notifications' },
+          },
           SELF: kCurrentWorker,
         },
         workers: [
@@ -31,6 +40,18 @@ export default defineConfig({
               }
             `,
           },
+          {
+            name: 'sts-stub',
+            modules: true,
+            script: `
+              import { WorkerEntrypoint } from 'cloudflare:workers';
+              export class SecretsBroker extends WorkerEntrypoint {
+                async getBundle() {
+                  return { status: 'denied', reason: 'unknown_workload' };
+                }
+              }
+            `,
+          },
         ],
       },
     }),
@@ -38,5 +59,7 @@ export default defineConfig({
   test: {
     passWithNoTests: true,
     setupFiles: ['./src/__tests__/setup.ts'],
+    // Node-only suites (Wrangler's config reader) run in vitest.node.config.ts.
+    exclude: [...configDefaults.exclude, 'src/**/*.node.test.ts'],
   },
 });

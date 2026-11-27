@@ -77,22 +77,24 @@ function deniedEvent(
  * tokens, leases, deploy tokens and revokes from identified callers arrive here, at most one call
  * per request; identical denials merge per minute into one event with a count, written by the
  * alarm after the minute ends (`ai.kilo.sts.bundle.denied`, `ai.kilo.sts.token.denied`,
- * `ai.kilo.sts.lease.denied` or `ai.kilo.sts.deploy_token.denied`).
+ * `ai.kilo.sts.lease.denied` or `ai.kilo.sts.deploy_token.denied`). A stub can call every prototype
+ * method, so everything but `record` and `alarm` is ECMAScript-private: no caller writes a count
+ * past `record`'s validation.
  */
 export class DenialDO extends DurableObject<Env> {
-  private readonly config: StsConfig;
-  private readonly db: DenialDatabase;
-  private readonly audit: AuditLog;
-  private readonly stream: string;
+  readonly #config: StsConfig;
+  readonly #db: DenialDatabase;
+  readonly #audit: AuditLog;
+  readonly #stream: string;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.config = readConfig(env);
-    this.db = drizzle(ctx.storage, { schema });
-    this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
-    this.stream = `sts:${this.config.environment}:denials`;
+    this.#config = readConfig(env);
+    this.#db = drizzle(ctx.storage, { schema });
+    this.#audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
+    this.#stream = `sts:${this.#config.environment}:denials`;
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+      await migrate(this.#db, migrations);
     });
   }
 
@@ -103,20 +105,20 @@ export class DenialDO extends DurableObject<Env> {
     for (const { denial, count, overflow, minute: claimed } of counts) {
       const minute = acceptedMinute(claimed, now);
       const key = denialKey(denial);
-      if (!overflow && this.has(minute, key)) {
-        this.increment(minute, key, count);
-      } else if (!overflow && this.distinctIn(minute) < MAX_DISTINCT_PER_MINUTE) {
-        this.db.insert(schema.denialWindow).values({ minute, key, count, denial }).run();
+      if (!overflow && this.#has(minute, key)) {
+        this.#increment(minute, key, count);
+      } else if (!overflow && this.#distinctIn(minute) < MAX_DISTINCT_PER_MINUTE) {
+        this.#db.insert(schema.denialWindow).values({ minute, key, count, denial }).run();
       } else {
-        this.addOverflow(minute, denial, count);
+        this.#addOverflow(minute, denial, count);
       }
     }
-    await this.scheduleAlarm(now, false);
+    await this.#scheduleAlarm(now, false);
   }
 
-  private has(minute: string, key: string): boolean {
+  #has(minute: string, key: string): boolean {
     return (
-      this.db
+      this.#db
         .select({ count: schema.denialWindow.count })
         .from(schema.denialWindow)
         .where(and(eq(schema.denialWindow.minute, minute), eq(schema.denialWindow.key, key)))
@@ -124,8 +126,8 @@ export class DenialDO extends DurableObject<Env> {
     );
   }
 
-  private addOverflow(minute: string, denial: Denial, count: number): void {
-    this.db
+  #addOverflow(minute: string, denial: Denial, count: number): void {
+    this.#db
       .insert(schema.denialWindow)
       .values({ minute, key: overflowKey(denial), count, denial: overflowDenial(denial) })
       .onConflictDoUpdate({
@@ -137,40 +139,40 @@ export class DenialDO extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     const now = Date.now();
-    let failed = !(await this.flushClosedWindows(now));
+    let failed = !(await this.#flushClosedWindows(now));
     try {
-      await this.audit.relay(this.stream);
+      await this.#audit.relay(this.#stream);
     } catch (error) {
       failed = true;
       console.warn('sts: denial audit relay failed; rows stay for the next alarm', {
         reason: errorName(error),
       });
     }
-    this.audit.pruneIfDue(now);
-    await this.scheduleAlarm(Date.now(), failed);
+    this.#audit.pruneIfDue(now);
+    await this.#scheduleAlarm(Date.now(), failed);
   }
 
   /**
    * Writes one event per merged row of every minute that has ended. Returns false when an append
    * failed; that row stays for the next alarm.
    */
-  private async flushClosedWindows(now: number): Promise<boolean> {
+  async #flushClosedWindows(now: number): Promise<boolean> {
     let flushed = true;
-    const closed = this.db
+    const closed = this.#db
       .select()
       .from(schema.denialWindow)
       .where(lt(schema.denialWindow.minute, utcMinute(now)))
       .all();
     for (const row of closed) {
       const window = {
-        environment: this.config.environment,
+        environment: this.#config.environment,
         count: row.count,
         windowStart: `${row.minute}:00.000Z`,
         overflow: row.key.startsWith('overflow:'),
       };
       const denial = row.denial;
       try {
-        await this.audit.append(this.stream, deniedEvent(window, denial));
+        await this.#audit.append(this.#stream, deniedEvent(window, denial));
       } catch (error) {
         console.error('sts: denial audit append failed; the row stays for the next alarm', {
           reason: errorName(error),
@@ -178,7 +180,7 @@ export class DenialDO extends DurableObject<Env> {
         flushed = false;
         continue;
       }
-      this.db
+      this.#db
         .delete(schema.denialWindow)
         .where(
           and(eq(schema.denialWindow.minute, row.minute), eq(schema.denialWindow.key, row.key))
@@ -188,17 +190,17 @@ export class DenialDO extends DurableObject<Env> {
     return flushed;
   }
 
-  private increment(minute: string, key: string, count: number): void {
-    this.db
+  #increment(minute: string, key: string, count: number): void {
+    this.#db
       .update(schema.denialWindow)
       .set({ count: sql`${schema.denialWindow.count} + ${count}` })
       .where(and(eq(schema.denialWindow.minute, minute), eq(schema.denialWindow.key, key)))
       .run();
   }
 
-  private distinctIn(minute: string): number {
+  #distinctIn(minute: string): number {
     return (
-      this.db
+      this.#db
         .select({ count: sql<number>`count(*)` })
         .from(schema.denialWindow)
         .where(eq(schema.denialWindow.minute, minute))
@@ -207,9 +209,9 @@ export class DenialDO extends DurableObject<Env> {
   }
 
   /** The oldest minute with an open window, or null when none is open. */
-  private oldestWindow(): string | null {
+  #oldestWindow(): string | null {
     return (
-      this.db
+      this.#db
         .select({ minute: schema.denialWindow.minute })
         .from(schema.denialWindow)
         .orderBy(asc(schema.denialWindow.minute))
@@ -218,17 +220,17 @@ export class DenialDO extends DurableObject<Env> {
     );
   }
 
-  private async scheduleAlarm(now: number, failed: boolean): Promise<void> {
+  async #scheduleAlarm(now: number, failed: boolean): Promise<void> {
     let target = Number.POSITIVE_INFINITY;
-    const oldest = this.oldestWindow();
+    const oldest = this.#oldestWindow();
     if (oldest !== null) {
       const windowEnd = Date.parse(`${oldest}:00.000Z`) + MINUTE_MS + 1_000;
       target = windowEnd > now ? windowEnd : now + (failed ? RELAY_RETRY_MS : 1_000);
     }
-    if (this.audit.hasUnrelayed()) {
+    if (this.#audit.hasUnrelayed()) {
       target = Math.min(target, now + (failed ? RELAY_RETRY_MS : RELAY_DELAY_MS));
-    } else if (this.audit.hasRows()) {
-      target = Math.min(target, Math.max(now + 1_000, this.audit.nextPruneAt()));
+    } else if (this.#audit.hasRows()) {
+      target = Math.min(target, Math.max(now + 1_000, this.#audit.nextPruneAt()));
     }
     if (target === Number.POSITIVE_INFINITY) return;
     target = Math.max(target, now + 1_000);

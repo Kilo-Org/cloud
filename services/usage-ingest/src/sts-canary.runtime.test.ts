@@ -58,6 +58,7 @@ async function webRoute(request: IncomingMessage, response: ServerResponse): Pro
       wrongAudience: { result: wrongAudience === 403 ? 'ok' : 'failed', status: wrongAudience },
       forged: { result: 'ok', status: 401 },
       expired: 'skipped',
+      stsDenied: { result: 'ok', status: null },
     },
   };
   response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(report));

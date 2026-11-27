@@ -25,8 +25,11 @@ The wire schema comes from `@kilocode/usage-contracts` through its package expor
 That package depends only on Zod at runtime; the Worker does not depend on
 web-shared or database modules in its bundle.
 
-Send `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`. Authentication runs
-before body reads; a missing/empty configured secret returns 503, and missing/wrong
+Send `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`, or, once
+`USAGE_INGEST_PUBLISH_AUTH` allows it, an STS service token
+([STS service tokens for publish and write](#sts-service-tokens-for-publish-and-write)).
+Authentication runs before body reads; under the default a missing/empty configured
+secret returns 503, and missing/wrong
 auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
@@ -167,6 +170,7 @@ settings, comparable aggregates and read-only database snapshots.
 | `USAGE_INGEST_PARALLELISM` | `2` for two processing slots; all other or absent values use one |
 | `USAGE_WRITER_URL` | Full Frankfurt writer URL ending in `/api/internal/usage/record` |
 | `USAGE_WRITER_SECRET` | Writer's existing `INTERNAL_API_SECRET`, sent as `x-internal-api-key` |
+| `USAGE_WRITER_AUTH` | Absent or `legacy` sends the secret; `sts` sends only an STS token ([STS service tokens](#sts-service-tokens-for-publish-and-write)) |
 | `USAGE_WRITER_PROTECTION_BYPASS` | Optional Vercel automation bypass secret |
 
 At activation, commit `USAGE_WRITER_URL` in the target environment’s `vars` or store
@@ -773,30 +777,45 @@ deployments; no usage publish or consume code, queue or credential takes part in
 
 One run (`scheduled`, cron `*/5 * * * *` at the top level and in `env.staging`):
 
-1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (default `"false"` in both
-   environments).
+1. Skipped entirely unless `STS_CANARY_ENABLED` is exactly `"true"` (on in both environments;
+   set any other value to stop it).
 2. Gets a `web:sts.canary` token from `@kilocode/service-token-client` over the `STS` service
    binding (`SecretsBroker`, `props.caller: "usage-ingest"`; `sts` in production, `sts-staging` in
    staging). The token lives 300 s and renews at 240 s, so a warm isolate mints at most about once
    per run.
 3. Posts to `WEB_STS_CANARY_URL` with `Authorization: Bearer <token>` and `x-sts-canary-run:
-   <run id>`; staging adds `x-vercel-protection-bypass` from the optional
-   `USAGE_WRITER_PROTECTION_BYPASS` secret. The web route verifies the token (`web:sts.canary`),
+   <run id>`; it adds `x-vercel-protection-bypass` whenever the optional
+   `USAGE_WRITER_PROTECTION_BYPASS` secret is set, which only staging needs (production must leave
+   it unset). The web route verifies the token (`web:sts.canary`),
    mints `usage-ingest:sts.canary` with its Vercel identity, calls `POST /sts-canary/verify` here
    (expect 204), presents the `web` token it received (expect 403 `insufficient_scope`), the same
-   claims signed by a key STS never held (expect 401) and, when the instance holds one, an earlier
-   token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
+   claims signed by a key STS never held (expect 401) and, when the deployment holds one, an
+   earlier token past `exp` plus 60 s (expect 401, else `skipped`), and answers a report
    (`StsCanaryReportSchema` in `@kilocode/sts-contracts`; each `detail` at most 200 characters).
    Every call that carries a token or the bypass secret uses `redirect: 'manual'`: a 3xx fails
    the check (web side) or the run (`StsCanaryWebRefused` here), and is never followed.
+   After its own mint, the route also asks STS, with the same Vercel identity, for the denied probe
+   `canary:denied-probe` (audience `canary`; `STS_DENIED_PROBE` in `@kilocode/sts-contracts`), a
+   reserved scope that no policy can grant: the scope registry lists it, and the STS policy loader
+   refuses any policy that grants it or its audience. STS identifies the function and refuses that
+   token with `audience_not_allowed` (`decide` in `services/sts/src/tokens/mint.ts`), which it
+   records as an `ai.kilo.sts.token.denied` row through `DenialDO`. The check
+   (`negatives.stsDenied`) is `ok` only for that answer; an unavailable STS, an issued token or
+   any other reason fails it, and with it the run. It never skips. Its request is a separate STS
+   call from a client made for that run, over the instance's identity: the run's own mint never
+   shares it, a client answers a denial from memory for 60 s (`DENIED_RECHECK_MS`) so a shared
+   client could skip STS, and no denial or backoff state outlives the run.
    usage-ingest waits 80 s for the answer: the route's slowest run is a 5 s key-set fetch, a
-   30 s mint attempt (both tries after an identity refusal end within it) and four 10 s calls
-   here, 75 s, and its `maxDuration` is 90 s.
+   30 s mint attempt (both tries after an identity refusal end within it), then four 10 s calls
+   here with the 30 s denied mint running alongside them, then a 2 s write of the held tokens
+   (their read runs alongside the mint), 77 s, and its `maxDuration` is 90 s.
 4. Writes one `scheduled_job.completed` line (job `usage_ingest.sts_canary`): `outcome`
    `succeeded` only when every check passed, with `mint_result`, `web_status`, and
-   `<check>_result`/`_status` for `outbound`, `negative_wrong_audience`, `negative_forged` and
-   `negative_expired`. The report's `detail` text is never copied: it comes from another service,
-   and the web route's own line carries it. A failure carries `exception_name`:
+   `<check>_result`/`_status` for `outbound`, `negative_wrong_audience`, `negative_forged`,
+   `negative_expired` and `negative_sts_denied` (result only: the route sees no HTTP status of
+   that STS call, so its status is null and not logged). The report's `detail` text is never
+   copied: it comes from another service, and the web route's own line carries it. A failure
+   carries `exception_name`:
    `ServiceTokenError` (STS refused or failed the mint; `mint_detail` names the reason),
    `StsCanaryWebRefused` (the web route answered other than 200), `StsCanaryReportInvalid`,
    `StsCanaryCheckFailed` or `StsCanaryNotConfigured`. No token appears in any log line.
@@ -814,7 +833,7 @@ the run id), never the token. The route works whether or not the flag is on.
 
 | Var | Production | Staging |
 |---|---|---|
-| `STS_CANARY_ENABLED` | `"false"` | `"false"` |
+| `STS_CANARY_ENABLED` | `"true"` | `"true"` |
 | `STS_URL` | `https://sts.kiloapps.io` | `https://sts-staging.kiloapps.io` |
 | `STS_ENVIRONMENT` | `"production"` | `"staging"` |
 | `WEB_STS_CANARY_URL` | `https://app.kilo.ai/api/internal/sts-canary` | `https://staging-app.kilo.ai/api/internal/sts-canary` |
@@ -838,37 +857,84 @@ environment on `sts_canary` lines, notifying the existing alert route:
 - no line with `outcome` `succeeded` in 15 minutes;
 - any line with `outcome` `failed` in 15 minutes.
 
+Both cover the denied mint: a run whose `negatives.stsDenied.result` is `failed` logs `outcome`
+`failed`.
+
 A run whose call never reaches the web route (usage-ingest down, usage-ingest's own mint denied
 or failed, a network failure, a redirect) writes no web line, and a run the route refuses writes
 only `sts_canary_refused`; both show as a missing success.
 
-The expired-token check runs only when a run reaches a web instance that still holds a token
-from at least two runs earlier (past `exp` plus 60 s); a run on a fresh instance reports it
-`skipped` and still succeeds. A third monitor per environment tracks that the check still runs,
-and alerts the same route without paging: no `sts_canary` line whose `negatives.expired.result`
-is `ok` in 24 hours.
+The expired-token check reads the deployment's held tokens from the Vercel Runtime Cache
+(namespace `sts-canary`, key `held:<VERCEL_TARGET_ENV or VERCEL_ENV>:<VERCEL_DEPLOYMENT_ID>`): at
+most the two latest `usage-ingest` tokens that usage-ingest accepted with 204, oldest first,
+written with a 15-minute TTL (a little over two runs). A token that failed any check is never
+kept. The read runs alongside the route's own mint. Each entry must be genuine: its own `exp`
+claim equals the `exp` it is held under, it names audience `usage-ingest` and scope
+`usage-ingest:sts.canary`, and the route's verifier finds a signature STS made for this
+environment (the verifier checks signature, issuer and environment before `exp` and audience, so
+a genuine held token ends in `expired` or `audience`). An entry that is not genuine is dropped,
+never presented, and fails the check (`held token not genuine`). Each run presents the oldest
+genuine token past `exp` plus 60 s (expect 401) and drops it, then adds its own. Because every
+instance of the deployment shares the entry, the check runs on every run from a deployment's third
+on, whichever instance serves it. It reports `skipped` only while no held token is that old: a
+deployment's first two runs, runs less than about 360 s apart (manual runs), or after runs
+stopped for longer than 15 minutes. A read or write that fails or takes more than 2 s fails the
+check, and so does a Vercel runtime without `VERCEL_DEPLOYMENT_ID`; a failed presentation is
+reported even when the write after it fails too. A third monitor per environment tracks that the
+check still runs, and alerts the same route without paging: no `sts_canary` line whose
+`negatives.expired.result` is `ok` in 24 hours.
+
+The shared entry assumes one region: the Runtime Cache is regional, and `kilocode-app` runs its
+functions in Frankfurt only (a Vercel project setting; the repository pins no region). A second
+region would keep its own entry, so each region's check would need two runs on that region first.
+
+The entry holds live tokens for up to their 300 s. Each is a `usage-ingest:sts.canary` token,
+which only the verify route above accepts, and only to answer 204. Staging is a custom
+environment, which may share the preview Runtime Cache partition, so code of a preview deployment
+could read staging's entry, or plant one; a planted entry fails the genuineness check, and the
+key's environment and deployment id keep deployments from overwriting each other.
+
+The route sees STS's refusal, not the audit row STS writes after its answer. A fourth monitor per
+environment tracks that the row lands, and alerts the same route without paging when this query
+over `kilo-audit` (staging `kilo-audit-staging`) counts 0 in 1 hour (the audit relay retries a
+message for up to 24 minutes, so a shorter window would alert on a slow relay):
+
+```kusto
+['kilo-audit']
+| where type == 'ai.kilo.sts.token.denied'
+| where tostring(column_ifexists('data.attributes.workload', '')) == 'web'
+    and tostring(column_ifexists('data.attributes.scope', '')) == 'canary:denied-probe'
+    and tostring(column_ifexists('data.attributes.reason', '')) == 'audience_not_allowed'
+| summarize probes = count()
+```
+
+Every other rule over `token.denied` rows leaves exactly these rows out, through the shared
+exclusion (`isStsDeniedProbe` and `STS_DENIED_PROBE_APL_EXCLUSION` in `@kilocode/sts-contracts`;
+services/sts README, "Alerts on token denials").
 
 ### Cost
 
 A token lives 300 s and renews at 240 s, and a held token stops being served 30 s before `exp`,
-so with a run every 300 s each side mints once per run, warm or cold. Per run and environment:
+so with a run every 300 s each side mints once per run, warm or cold; the web route's denied mint
+reaches STS every run. Per run and environment:
 
 | Item | Per run | Per day (288 runs) |
 |---|---|---|
-| usage-ingest invocations | 1 scheduled + 3 verify-route calls (4 once the web instance holds a token past `exp` + 60 s) | 288 + 864 to 1,152 |
+| usage-ingest invocations | 1 scheduled + 4 verify-route calls (3 on a deployment's first two runs) | 288 + about 1,152 |
 | Web function invocations | 1 | 288 |
-| STS mint calls | 2: one RPC over the binding (usage-ingest), one `POST /v1/token` (web); each one signer Durable Object request | 576 |
-| STS audit rows | 2 `token.issued` (a denial adds one `token.denied`) | 576 |
-| Audit queue messages | at most 2; the signer relays up to 500 events per message, so usually they share one with other rows | at most 576 |
+| STS mint calls | 3: one RPC over the binding (usage-ingest), two `POST /v1/token` (web: its own mint and the denied mint). The two issuing calls each make one signer Durable Object request; the denied mint makes none, and one `DenialDO` request instead | 864 (576 signer and 288 `DenialDO` requests) |
+| STS audit rows | 2 `token.issued` and 1 `token.denied`; `DenialDO` merges identical denials per minute, so each run's refusal is one row with `count` 1 (a refusal of either side's own mint adds another) | 576 issued and 288 denied |
+| Audit queue messages | at most 3; the signers relay up to 500 events per message, so usually they share one with other rows, and `DenialDO`'s alarm relays the minute's merged denials of its own stream together | at most 864 |
 | STS key-set fetches | one per verifier isolate per 5 minutes: each usage-ingest isolate that serves a verify-route call and each web instance that serves the route fetches once when its copy is older than 5 minutes. The 3 or 4 verify calls and the scheduled run can land on different isolates, so a run can cost several. The forged token keeps a real `kid`, so it causes no unknown-`kid` refresh | at most (usage-ingest isolates + web instances) x 288 |
 | Vercel token exchanges | at most 1; 0 while the Runtime Cache holds the exchanged token (until 60 s before its `exp`, which is the base token's). When STS refuses (`identity_rejected`) a token the instance took from the cache, the client drops it and exchanges once more, with one more mint, in the same attempt. When STS refuses that fresh token too, the client writes a refusal marker for the deployment and audience that lives 60 s (`DENIED_RECHECK_MS`): until it expires no instance of the deployment drops a cached token or exchanges, each answers from its denied state. A deployment STS keeps refusing (a `web.yaml` naming the wrong project or environment) so costs at most 1 exchange per 60 s per audience and region, however many instances it runs; 17 such deployments spend about 17 of the project's roughly 100 exchanges a minute, a limit previews share with production, where without the marker each could spend about 6 | at most 288; in practice one per base-token renewal or new deployment |
-| Vercel Runtime Cache | 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal | at most about 1,700 operations |
+| Vercel Runtime Cache | at most 1 read and 1 write for the held tokens of the expired-token check (the write is skipped when nothing changed), each bounded by 2 s. For the exchange: 0 reads on an instance memory hit, 1 on a cache hit, 4 reads and 1 write on a miss (5 reads and 2 writes for the exchanger), 1 write or up to 2 reads and 1 delete per refusal. The denied mint shares the instance's identity source and starts after the run's own mint, so its identity token is normally an instance memory hit and adds no exchange or cache operation; only when the run's own exchange failed does the probe try one more exchange, so a run makes at most 2 | at most 576 for the held tokens, plus at most about 1,700 for the exchange |
 | Log lines | usage-ingest (Workers Logs only): 1 `scheduled_job.completed`, 3 or 4 `sts_canary_verify_*`; web (Vercel drain to Axiom): 1 `sts_canary` | about 1,400 in Workers Logs and 288 Axiom rows |
 
 Both environments together double each daily figure, except the Vercel rows: the web app's
 staging is a custom environment, whose client keeps the exchanged token in instance memory only
 (it may share the preview Runtime Cache partition). Staging therefore makes no Runtime Cache
-operation and one Vercel exchange per web instance per base-token renewal.
+operation for the exchange, only the held-token read and write, and one Vercel exchange per web
+instance per base-token renewal.
 
 The client's cost on a real caller does not grow with its request rate. A request that finds a
 usable token reads an in-memory entry and makes no network call. Each caller instance makes one
@@ -891,6 +957,82 @@ production (proof run 3: the budget is per project or team, not per deployment).
 custom environment exchanges once per instance, custom-environment use must stay well below 100
 exchanging instances per minute; before any staging hot path adopts the client, either that
 holds or encrypted shared entries (design 4.4) come first.
+
+## STS service tokens for publish and write
+
+Design section 6.5 replaces `USAGE_INGEST_PUBLISH_SECRET` and `USAGE_WRITER_SECRET` with STS
+service tokens. Each leg has its own switch, so each rolls back on its own. Both switches are
+absent from `wrangler.jsonc`, which selects `legacy`: the Worker then behaves exactly as before
+them. The scopes come from `@kilocode/sts-contracts`; the canary scopes are not reused.
+
+| Leg | Caller (STS workload) | Receiver | Scope (audience) |
+|---|---|---|---|
+| Publish `/usage`, `/enkrypt-usage` | AI gateway (`ai-gateway`), Vercel OIDC | this Worker | `STS_USAGE_PUBLISH`: `usage-ingest:usage.publish` (`usage-ingest`) |
+| Publish `/exa-usage` | web app (`web`), Vercel OIDC | this Worker | the same |
+| Write `/api/internal/{usage,enkrypt-usage,exa-usage}/record` | this Worker's queue consumer (`usage-ingest`), `STS` binding | web app | `STS_USAGE_RECORD`: `web:usage.record` (`web`) |
+
+STS mints either token only where an STS policy grants it to that workload; until then the
+caller gets a denial and the receiver refuses every token for the scope. The publish routes
+also pin the workload per path (`PUBLISH_WORKLOADS` in `src/publish-auth.ts`): a valid token of
+any other workload gets 403 `{"error":"insufficient_scope"}` before the body is read.
+
+### `USAGE_INGEST_PUBLISH_AUTH` (receiver)
+
+- Absent or `legacy`: only the publish secret. STS is never called, and the
+  `usage_ingest_enqueue_start` line keeps its shape.
+- `dual`: an exact match of the publish secret is accepted first. Otherwise a compact JWS
+  bearer goes to the STS verifier for `usage-ingest:usage.publish`, and its refusal is final
+  (design section 7 status and `WWW-Authenticate`; no fallback to the secret). Any other
+  credential gets the secret's answers: 503 without a configured secret, else 401.
+- `sts`: only an STS token. The secret gets the verifier's 401.
+- Any other value: 503 for every publish, logged as `usage_ingest_publish_auth_misconfigured`.
+
+Under `dual` and `sts` the `usage_ingest_enqueue_start` line adds `auth` (`legacy` or `sts`) and,
+for STS, `auth_caller` (the workload). That counts the publishes the secret still
+authenticates, per caller, path and minute (design section 9.4, item 9). A refusal logs
+`usage_ingest_publish_auth_refused` with status, error and reason, never the token. STS
+verification needs `STS_URL` and `STS_ENVIRONMENT` as for the canary; without them an STS
+token gets 503 (`usage_ingest_publish_auth_sts_unconfigured`).
+
+The publish routes have their own verifier per isolate, keyed only by the verified issuer and
+environment. Its challenges name a fixed origin per environment
+(`USAGE_INGEST_RESOURCE_ORIGINS` in `src/sts.ts`: each script's `workers.dev` address, and
+`http://localhost:8787` for development), never the request's host. The STS canary keeps its
+own verifier and token client. A legacy publish does no STS work. A warm STS publish verifies
+from the held key set, with no network call; the verifier fetches the key set once per 5
+minutes per isolate.
+
+`GET /.well-known/oauth-protected-resource`, the URL those challenges name, answers the RFC 9728
+metadata only while the switch is `dual` or `sts` and the issuer and environment are valid:
+`resource` is that fixed origin, `authorization_servers` the STS issuer, `scopes_supported` only
+`usage-ingest:usage.publish`, `bearer_methods_supported` `["header"]`. Otherwise it is the
+ordinary 404, with no I/O; other methods on it get 405 while it is served.
+
+### `USAGE_WRITER_AUTH` (sender)
+
+Each write carries exactly one credential.
+
+- Absent or `legacy`: only `x-internal-api-key: <USAGE_WRITER_SECRET>`, as before.
+- `sts`: only a `web:usage.record` token (the writer client's `serviceToken`), minted over the
+  `STS` binding by this sender's own per-isolate token client; never the secret. The token comes
+  first; when the mint used up the invocation's launch budget, no write starts
+  (`invocation_budget`). Without a token (denied, STS unavailable, no binding) nothing is sent
+  and the delivery retries under the normal policy with reason `writer_token_unavailable`;
+  `usage_ingest_writer_credential_unavailable` logs why, once per batch. A read with no token
+  held waits for one binding attempt; renewals run under `waitUntil`, and a warm read makes no
+  call.
+- Any other value: nothing is sent and the delivery retries (`writer_auth_misconfigured`).
+
+`x-usage-write-source: queue`, the message kinds and the bypass header do not change, so the
+writer's admission and route provenance stay the same.
+
+### Rollout and rollback
+
+Order per environment, staging first, then production: STS contract and grants; publish
+callers mint and the Worker runs `dual`; the receiver moves to `sts` once its counts show no
+secret-authenticated publish. The writer moves to `sts` only after the web record routes accept
+`web:usage.record`. Roll back one leg by setting its switch to `legacy` and deploying; the
+secrets stay in place until the kill date.
 
 ## Deploy
 

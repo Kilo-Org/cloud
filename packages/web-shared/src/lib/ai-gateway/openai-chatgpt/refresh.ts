@@ -104,7 +104,16 @@ const KMS_UNAVAILABLE_ERROR_CODE = 'kms_unavailable';
  * place.
  */
 export type OpenAiChatGptAccessTokenOutcome =
-  | { kind: 'access_token'; accessToken: string }
+  | {
+      kind: 'access_token';
+      accessToken: string;
+      /**
+       * The key id of the envelope that holds `accessToken`. Every write seals a new one, so
+       * it names this exact stored credential: a refusal can disable it without decrypting
+       * the row again.
+       */
+      credentialKeyId: string;
+    }
   | { kind: 'no_connection' }
   | { kind: 'terminal' }
   | { kind: 'failed' };
@@ -331,7 +340,7 @@ async function attemptRefresh(
 
       await writeOpenAiChatGptConnection(tx, owner, updated, sealingKey);
 
-      return { kind: 'access_token', accessToken };
+      return { kind: 'access_token', accessToken, credentialKeyId: sealingKey.keyId };
     }
   }
 
@@ -396,10 +405,14 @@ async function resolveInsideLock(
   if (!row || !row.is_enabled) return { kind: 'no_connection' };
 
   const connection = await decryptOpenAiChatGptConnection(row);
-  if (!connection) return { kind: 'no_connection' };
+  if (!connection || !row.encrypted_connection_envelope) return { kind: 'no_connection' };
 
   if (isUsableWithoutRefresh(connection, nowSeconds())) {
-    return { kind: 'access_token', accessToken: connection.access_token };
+    return {
+      kind: 'access_token',
+      accessToken: connection.access_token,
+      credentialKeyId: row.encrypted_connection_envelope.key_id,
+    };
   }
 
   // Usually already created before the lock was taken; a row the replica had not shown
@@ -443,8 +456,13 @@ async function resolveOpenAiChatGptAccessTokenUncached(
     // and the refresh below re-reads the row on the primary under the lock.
     const row = await readOpenAiChatGptConnectionRow(readDb, owner);
     const current = row?.is_enabled === true ? await decryptOpenAiChatGptConnection(row) : null;
-    if (current && isUsableWithoutRefresh(current, nowSeconds())) {
-      return { kind: 'access_token', accessToken: current.access_token };
+    const currentKeyId = row?.encrypted_connection_envelope?.key_id;
+    if (current && currentKeyId && isUsableWithoutRefresh(current, nowSeconds())) {
+      return {
+        kind: 'access_token',
+        accessToken: current.access_token,
+        credentialKeyId: currentKeyId,
+      };
     }
 
     // A live row needs a refresh, so its data key is created now, before the row lock,

@@ -62,7 +62,7 @@ choose; pass `null` when the header is absent, and the library refuses any PAT w
 
 ## API
 
-`createVerifier(config) -> { verify(input, route, ctx), warm(ctx) }`
+`createVerifier(config) -> { verify(input, route, ctx), warm(ctx), checkBrowserSession(record, ctx), checkUtsTokenRecord(record, ctx) }`
 
 | Input | Meaning |
 |---|---|
@@ -97,18 +97,52 @@ UTS key set when no bootstrap is configured) and the STS key set, in parallel, u
 `ctx.waitUntil`. A later `verify` joins the fetches in flight. It does nothing once the caches hold
 data.
 
+### Record checks
+
+Two narrow checks of a record the caller already authenticated against the verifier's held
+revocation feed. They read the same copy as `verify`, with its refresh and the 60 s head-age limit
+of a long-lived credential (as for a PAT), so they apply to the environment the verifier's UTS
+issuer and feed serve. Neither grants anything: `{ ok: true }` only says the feed revokes nothing
+about the record. Both take `ctx = { waitUntil }`, under which a background feed refresh runs.
+
+| Method | Record | Refusals |
+|---|---|---|
+| `checkBrowserSession(record, ctx)` | `{ sub, sid, issuedAt }` from the UTS `kilo-web` reply (`read` or the code exchange): `sid` = `session_id`, `issuedAt` = `issued_at`. No `kid`, so `revoked_kids` does not apply | 401 `invalid_session_record`, `revoked_session`, `account_blocked` |
+| `checkUtsTokenRecord(record, ctx)` | `{ sub, sid, issuedAt, kid }` of a UTS access token the caller verified and kept in a capability it authenticates itself: `issuedAt` = the token's `iat`, `kid` = its header `kid`. Never a value read from a URL | 401 `invalid_record`, `revoked_key`, `revoked_session`, `account_blocked` |
+
+Both answer `RecordCheckResult`: `{ ok: true }`, `{ ok: false, status: 401, reason }`, or
+`{ ok: false, status: 503, reason: 'revocation_unavailable', retryAfterSeconds? }`, where
+`retryAfterSeconds` is the retry time the key set, bootstrap or feed reported (the caller's
+`Retry-After`). The checks run in this order:
+
+1. Validation, before any fetch: `sub` 1 to 255 characters; `sid` a lowercase UUID; `issuedAt`
+   integer Unix seconds, positive and at most `RECORD_FUTURE_SKEW_SECONDS` (60) in the future; for
+   a token record, `kid` under `uts-token-` and at most 255 characters. Anything else is 401
+   `invalid_session_record` (session) or `invalid_record` (token).
+2. The feed: unavailable (cold and unreachable, or the held head over 60 s old) is 503
+   `revocation_unavailable`.
+3. Token record only: `kid` in `revoked_kids` is 401 `revoked_key`.
+4. `sid` in `revoked_sids`, or `revoked_before[sub] >= issuedAt`, is 401 `revoked_session`, even
+   for a blocked account.
+5. `sub` in `blocked_accounts` is 401 `account_blocked`.
+
+They reject only when the config has no `uts` (a programming error). Step-up strength
+(`auth_time`) and a capability's own expiry, audience and scope are the caller's checks.
+
 ## Ports
 
 | Port | Who implements it | Contract |
 |---|---|---|
-| `JwksSource` `(signal) => Promise<unknown>` | `httpJwksSource(issuer, fetcher?)` here; a service binding on Workers | Returns the key-set body; the cache validates it (`keys[]`, Ed25519 OKP entries with a `kid`; other entries are skipped; a duplicate `kid` refuses the set) |
+| `JwksSource` `(signal) => Promise<{ body, age, oldestAge }>` | `httpJwksSource(issuer, fetcher?)` here; a service binding on Workers | `body` is the key-set JSON; the cache validates it (`keys[]`, Ed25519 OKP entries with a `kid`; other entries are skipped; a duplicate `kid` refuses the set). `age` and `oldestAge` are the response's `Age` and `Kilo-Key-Set-Oldest-Age` (`KEY_SET_OLDEST_AGE_HEADER`) in whole seconds, `null` when absent; `httpJwksSource` fails the fetch on a header that is not digits. A UTS set needs both, `age <= oldestAge`, or the refresh fails. An STS set counts a missing `age` as 0 and ignores `oldestAge`. Do not put a generic HTTP cache in front of the UTS key set. `httpJwksSource` never follows a redirect: it asks with `redirect: 'manual'` (a custom `fetcher` must honour it), and a 3xx, an opaque redirect or a response that followed one anyway is a failed fetch whose error names only the status, so the key set comes only from the issuer's origin and the held set keeps serving within its limits. It is the package's only built-in HTTP fetch; a source you write must also refuse redirects |
 | UTS key classes | Phase 3 (UTS publishes) | Token keys under `UTS_TOKEN_KID_PREFIX` (`uts-token-`), revocation-feed keys under `UTS_FEED_KID_PREFIX` (`uts-feed-`), both exported from this package. A feed-prefixed key never verifies a token from any issuer; a UTS token under any other `kid` is refused before any fetch; the feed accepts only feed-prefixed keys of the UTS set |
 | `UtsScopeRegistry` `(audience, scope) => { requiresSession, patEligible } \| null` | Phase 3 | `null` for an unregistered scope |
 | `RevocationFeedSource` `{ head(signal), list(listHash, signal) }` | Phase 3 (service binding on Workers, HTTPS on Vercel and Fly) | `head` returns the signed head as a compact JWS string; `list` returns the list bytes for that hash. The transport verifies nothing: the library verifies the head under a feed key and the list against the head hash (format below). Any rejection is a failed fetch |
-| `UtsBootstrapSource` `(signal) => Promise<{ jwks, head, list }>` | Phase 3 (the bootstrap endpoint) | One call: the UTS key-set body, a head and its list bytes, in the same formats. Used only while neither the UTS key set nor the feed holds data; it applies whole or not at all |
+| `UtsBootstrapSource` `(signal) => Promise<{ jwks, keyAges, head, list }>` | Phase 3 (the bootstrap endpoint) | One call: the UTS key-set body, its ages `keyAges: KeySetAges` = `{ newest, oldest }` (whole seconds at the feed Worker, `0 <= newest <= oldest`; the HTTPS JSON `key_ages`), a head and its list bytes, in the same formats. Used only while neither the UTS key set nor the feed holds data; it applies whole or not at all, and an answer without valid `keyAges` is a failed call. The keys count their age from `keyAges` and the start of the call, and never replace a held set that has newer keys |
 | `PatLookup` `(hash, signal)` | Phase 3 | `hash` is the lowercase-hex SHA-256 of the PAT. Answers `found` (a `PatRecordSchema` record), `not_found` (unknown, revoked or expired), `rate_limited` or `unavailable` with `retryAfterSeconds` |
 | `SharedPatCache` `{ get, put }` | The service: Workers Cache API or Vercel Runtime Cache | Opaque strings; errors count as a miss, and so does a read (with its key provider) that has not answered within `PAT_SHARED_CACHE_TIMEOUT_MS` (1 s) |
 | `PatConfig.cacheKeys` `(ctx) => Promise<{ current, previous? }>` | The service: two `Secrets.get` calls on its own bundle | Read on each shared-cache read and write, so a rotation reaches a running instance; `current` signs, `current` and `previous` verify; a rejection is a miss or a skipped write |
+| `BrowserSessionRecord` `{ sub, sid, issuedAt }` | The web app (BFF), from the UTS `kilo-web` reply that phase 3 authenticates (slice 3.12) | Passed to `checkBrowserSession` only after the `kilo-web` transport authenticated the reply; `issued_at` moves only at sign-in, a legacy-bridge exchange or a step-up rotation |
+| `UtsTokenRecord` `{ sub, sid, issuedAt, kid }` | The Pages capability verifier, from the UTS token it verified at issue time | Passed to `checkUtsTokenRecord` only from a capability the caller authenticated; the raw token is never kept |
 
 ### Revocation feed format
 
@@ -172,9 +206,10 @@ Fail-closed and caching rules:
 
 | Rule | Code | Tests |
 |---|---|---|
-| JWKS: 5-min set, background refresh after 4 min, synchronous after expiry or cold | `jwks.ts` | `jwks.test.ts` key-set lifetime |
-| JWKS: the last good UTS set serves only while UTS is unreachable, up to 24 h, then 503. Unreachable means the refresh failed, or has not answered in 1 s (`JWKS_STALE_WAIT_MS`) and the last good set holds the `kid`; a `kid` it lacks waits for the whole 5 s fetch. An STS set never serves past its 5-minute lifetime | `jwks.ts` | the last good set while the issuer is unreachable |
-| JWKS: retry wait 5 s, doubling per failure up to 60 s while the held set still serves; 5 s once none does | `jwks.ts` | the last good set while the issuer is unreachable; missing key set |
+| JWKS: 5-min set, background refresh after 4 min (±20 %), synchronous after expiry or cold. Both count from the newest keys' read: the fetch (or the bootstrap call) start minus `Age`; an STS set without `Age` counts from its fetch | `jwks.ts` | `jwks.test.ts` key-set lifetime; `key-ages.test.ts` a UTS set counts its lifetime and refresh from Age; an STS set |
+| JWKS: the last good UTS set serves only while UTS is unreachable, up to 24 h after its oldest keys' read (`Kilo-Key-Set-Oldest-Age`), then 503. That limit is a refresh point: the first request past it refreshes at once, even inside a retry wait, and refuses only if that refresh fails. Unreachable means the refresh failed, or has not answered in 1 s (`JWKS_STALE_WAIT_MS`) and the last good set holds the `kid`; a `kid` it lacks waits for the whole 5 s fetch. An STS set never serves past its 5-minute lifetime | `jwks.ts` | the last good set while the issuer is unreachable; `key-ages.test.ts` the 24-hour limit |
+| JWKS: a fetched set already past its refresh point, or with missing or malformed ages (UTS) or a malformed `Age` (STS), is a failed refresh; a stale set that still serves becomes the last good set. A set never replaces one with newer keys, so a late answer or a bootstrap never restarts an age | `jwks.ts` `answered`, `hold` | `key-ages.test.ts` |
+| JWKS: retry wait 5 s, doubling per failure up to 60 s while the held set still serves, and for UTS also once a held set passed its 24-hour limit (the count restarts only after a success), so after an outage longer than 24 h the first fetch comes at most about 60 s (72 s with jitter) after UTS recovers; 5 s on a cold cache and once an STS set expired; ±20 % jitter on each. The 24-hour refresh itself is not jittered: every warm isolate fetches within about 1 s of it, and the feed Worker answers that burst from its per-data-centre cache (`COST.md` section 3) | `jwks.ts` `fail` | the last good set while the issuer is unreachable; missing key set; `key-ages.test.ts` jitter, the 24-hour limit is a refresh point |
 | JWKS: missing set is 503 with `Retry-After` | `jwks.ts` | missing key set |
 | JWKS: unknown `kid` refreshes at most once per 5 min per set, also when the requests are cancelled | `jwks.ts` | unknown kid |
 | Feed: background refresh 10 s after the last fetch, wait once the head is over 30 s old; 1 s fetch timeout | `revocation.ts` | `revocation.test.ts` request-driven revalidation |
@@ -191,6 +226,7 @@ Fail-closed and caching rules:
 | PAT: lookup failure is 503; an expired entry serves stale up to 10 min, refreshed by at most one background lookup at a time, only with a head under 60 s | `pat.ts`, `verifyPat` | fail-closed lookups |
 | PAT: one lookup per hash; 429 above 20 uncached lookups/s per address, before the lookup; 503 above 1,000 pending lookups per instance, before the lookup; a 429 or 503 never evicts | `pat.ts` | merging and the per-address limit; fail-closed lookups; bounded bookkeeping |
 | PAT: bounded bookkeeping (10,000 instance entries and failure records, oldest first; 1,000 pending lookups; 10,000 tracked addresses, oldest first) | `pat.ts` | bounded bookkeeping |
+| Record checks: validation before any fetch; the held feed with its refresh and the 60 s head-age limit (503 when unavailable); token record `kid` first, then `revoked_sids`, `revoked_before >= issuedAt`, `blocked_accounts`; no grant | `checkBrowserSession`, `checkUtsTokenRecord`, `checkRecord` | `records.test.ts` |
 | No promise shared across requests: owner + pollers, `waitUntil` hand-off | `flight.ts` | `runtime.test.ts` (real workerd: concurrent cold requests, one call each; `warm`) |
 | A request cancelled mid-call does not stall others: after 1 s without its heartbeat, a key-set, feed or bootstrap call counts as failed (with its retry wait); a PAT lookup lets the next request make its own | `flight.ts` `abandoned` | `runtime.test.ts` races; the cancellation tests in each test file |
 

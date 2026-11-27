@@ -1,12 +1,13 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
-import type { DispatchPushInput, PushData } from '@kilocode/notifications';
+import { GLANCEABLE_SNAPSHOT_EXPIRY_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import type { DispatchPushInput, DispatchPushOutcome, PushData } from '@kilocode/notifications';
 
 import { sendPushNotifications } from '../lib/expo-push';
 import { setPushSinkModeForTesting } from '../lib/push-sink';
 import * as dbClient from '@kilocode/db/client';
-import type { NotificationChannelDO } from '../dos/NotificationChannelDO';
+import { NotificationChannelDO } from '../dos/NotificationChannelDO';
 
 vi.mock('../lib/expo-push', () => ({
   sendPushNotifications: vi.fn(async () => ({
@@ -2126,5 +2127,510 @@ describe('NotificationChannelDO.dispatchPush — notification history', () => {
     expect(result.kind).toBe('delivered');
     expect(state.historyInserts).toHaveLength(1);
     log.mockRestore();
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — secrets source', () => {
+  // Synthetic values; each source holds a different one, so a read of the
+  // wrong source, or a fallback to it, cannot pass.
+  const STORE_TOKEN = 'store-expo-fixture';
+  const BUNDLE_TOKEN = 'bundle-expo-fixture';
+
+  function stsBinding(secrets: Record<string, string>, missing: string[] = []) {
+    const getBundle = vi.fn(async () => ({
+      status: 'ok' as const,
+      workload: 'notifications',
+      environment: 'production' as const,
+      etag: '"0123456789abcdef"',
+      stale: false,
+      fetchedAt: '2026-11-26T00:00:00.000Z',
+      secrets: Object.fromEntries(
+        Object.entries(secrets).map(([name, value]) => [name, { value, version: 1 }])
+      ),
+      missing,
+    }));
+    return { getBundle };
+  }
+
+  /** Runs a fresh object on the real storage with the given source and STS binding. */
+  function dispatchWith(
+    source: string,
+    sts: { getBundle(): Promise<unknown> },
+    userId: string
+  ): Promise<DispatchPushOutcome> {
+    const objectEnv = {
+      HYPERDRIVE: env.HYPERDRIVE,
+      EVENT_SERVICE: env.EVENT_SERVICE,
+      RECEIPTS_QUEUE: env.RECEIPTS_QUEUE,
+      PUSH_SINK_MODE: '',
+      EXPO_ACCESS_TOKEN: env.EXPO_ACCESS_TOKEN,
+      SECRETS_SOURCE: source,
+      STS: sts,
+    };
+    return runInDurableObject(getDO(userId), (_instance, state) =>
+      new NotificationChannelDO(state, objectEnv as never).dispatchPush(
+        baseInput({ userId, idempotencyKey: `k-${userId}`, presenceContext: null })
+      )
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ['secrets-store', STORE_TOKEN],
+    ['sts', BUNDLE_TOKEN],
+  ])('sends with the Expo token of the selected source (%s)', async (source, expected) => {
+    const userId = `user-source-${source}`;
+    installDbMock({ tokens: [{ user_id: userId, token: 'tok1' }] });
+    const storeRead = vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue(STORE_TOKEN);
+    const sts = stsBinding({ NOTIFICATIONS_EXPO_ACCESS_TOKEN: BUNDLE_TOKEN });
+
+    const result = await dispatchWith(source, sts, userId);
+
+    expect(result.kind).toBe('delivered');
+    expect(vi.mocked(sendPushNotifications).mock.calls[0]?.[1]).toBe(expected);
+    expect(storeRead).toHaveBeenCalledTimes(source === 'sts' ? 0 : 1);
+    expect(sts.getBundle).toHaveBeenCalledTimes(source === 'sts' ? 1 : 0);
+  });
+
+  it('fails under sts when the bundle lacks the token, without reading the store', async () => {
+    const userId = 'user-source-missing';
+    installDbMock({ tokens: [{ user_id: userId, token: 'tok1' }] });
+    const storeRead = vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue(STORE_TOKEN);
+    const sts = stsBinding({}, ['NOTIFICATIONS_EXPO_ACCESS_TOKEN']);
+
+    await expect(dispatchWith('sts', sts, userId)).rejects.toThrow(
+      /NOTIFICATIONS_EXPO_ACCESS_TOKEN/
+    );
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    expect(storeRead).not.toHaveBeenCalled();
+  });
+});
+
+const OPEN_GATES: [string, { WORKER_ENV: string; NOTIFICATIONS_PUSH_ENABLED: string }][] = [
+  ['staging, switch true', { WORKER_ENV: 'staging', NOTIFICATIONS_PUSH_ENABLED: 'true' }],
+  ['production, switch false', { WORKER_ENV: 'production', NOTIFICATIONS_PUSH_ENABLED: 'false' }],
+];
+
+describe('NotificationChannelDO — staging push gate', () => {
+  type ChannelStub = DurableObjectStub<NotificationChannelDO>;
+  const restores: (() => void)[] = [];
+
+  // The DO and the test can share one env object, so every value set on the
+  // instance env, bindings included, is put back after each test. `env` is
+  // protected on the DO class; the test reaches it as a plain record.
+  async function setPushGate(stub: ChannelStub, vars: Record<string, unknown>) {
+    await runInDurableObject(stub, instance => {
+      const instanceEnv = (instance as unknown as { env: Record<string, unknown> }).env;
+      const previous = Object.fromEntries(Object.keys(vars).map(key => [key, instanceEnv[key]]));
+      restores.push(() => Object.assign(instanceEnv, previous));
+      Object.assign(instanceEnv, vars);
+    });
+  }
+
+  async function closeStagingGate(stub: ChannelStub, vars = {}) {
+    await setPushGate(stub, { WORKER_ENV: 'staging', ...vars });
+  }
+
+  // An acceptance an earlier deployment recorded: Expo took the push and
+  // reported one stale token, and the receipt bookkeeping is still owed.
+  async function seedAcceptedRecord(stub: ChannelStub, idempotencyKey: string) {
+    await runInDurableObject(stub, async (_inst, state) => {
+      await state.storage.put(`idem:${idempotencyKey}`, {
+        stage: 'accepted',
+        ts: Date.now(),
+        ticketTokenPairs: [{ ticketId: 'ticket-1', token: 'tok1' }],
+        staleTokens: ['tok-stale'],
+        finalStage: 'delivered',
+      });
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+  }
+
+  async function readIdem(stub: ChannelStub, idempotencyKey: string) {
+    return runInDurableObject(stub, async (_inst, state) => ({
+      idem: await state.storage.get<{ stage: string; ts: number }>(`idem:${idempotencyKey}`),
+      alarm: await state.storage.getAlarm(),
+    }));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    for (const restore of restores.splice(0).reverse()) restore();
+    setPushSinkModeForTesting(undefined);
+  });
+
+  it.each([
+    ['absent', {}],
+    ['empty', { NOTIFICATIONS_PUSH_ENABLED: '' }],
+    ['false', { NOTIFICATIONS_PUSH_ENABLED: 'false' }],
+    ['TRUE', { NOTIFICATIONS_PUSH_ENABLED: 'TRUE' }],
+    ['a JSON boolean', { NOTIFICATIONS_PUSH_ENABLED: true }],
+  ])('stops a staging dispatch before Expo when the switch is %s', async (label, vars) => {
+    const userId = `staging-off-${label}`;
+    const state: DbState = { tokens: [{ user_id: userId, token: 'tok1' }] };
+    installDbMock(state);
+    const receiptSpy = vi.spyOn(env.RECEIPTS_QUEUE, 'send');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO(userId);
+    await closeStagingGate(stub, vars);
+    const input = baseInput({ userId, idempotencyKey: `k-${userId}` });
+
+    const first = await stub.dispatchPush(input);
+    const replay = await stub.dispatchPush(input);
+
+    expect(first).toEqual({ kind: 'no_tokens' });
+    expect(replay).toEqual({ kind: 'duplicate' });
+    expect(env.EXPO_ACCESS_TOKEN.get).not.toHaveBeenCalled();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    expect(receiptSpy).not.toHaveBeenCalled();
+    expect(state.historyInserts).toBeUndefined();
+    expect(log).toHaveBeenCalledWith('notifications_push_disabled', { surface: 'expo_push' });
+    // The badge is in-app state, not a provider send, so it still counts.
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+    const stored = await readIdem(stub, `k-${userId}`);
+    expect(stored.idem).toMatchObject({ stage: 'push_disabled' });
+    expect(stored.alarm).not.toBeNull();
+  });
+
+  it('stops the retry of a dispatch left pending before the gate closed', async () => {
+    installDbMock({ tokens: [{ user_id: 'staging-pending', token: 'tok1' }] });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('expo unavailable'));
+    const stub = getDO('staging-pending');
+    const input = baseInput({ userId: 'staging-pending', idempotencyKey: 'k-staging-pending' });
+
+    const beforeGate = await stub.dispatchPush(input);
+    await closeStagingGate(stub);
+    const retry = await stub.dispatchPush(input);
+
+    expect(beforeGate).toEqual({ kind: 'failed', error: 'expo unavailable' });
+    expect(retry).toEqual({ kind: 'no_tokens' });
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(env.EXPO_ACCESS_TOKEN.get).toHaveBeenCalledOnce();
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+    expect((await readIdem(stub, 'k-staging-pending')).idem).toMatchObject({
+      stage: 'push_disabled',
+    });
+  });
+
+  it('settles an earlier accepted push on replay without a receipt check', async () => {
+    installDbMock({ tokens: [{ user_id: 'staging-accepted-replay', token: 'tok1' }] });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const receiptSpy = vi
+      .spyOn(env.RECEIPTS_QUEUE, 'send')
+      .mockRejectedValueOnce(new Error('receipt queue unavailable'));
+    const stub = getDO('staging-accepted-replay');
+    const input = baseInput({
+      userId: 'staging-accepted-replay',
+      badge: null,
+      idempotencyKey: 'k-staging-accepted-replay',
+    });
+
+    const beforeGate = await stub.dispatchPush(input);
+    await closeStagingGate(stub);
+    const replay = await stub.dispatchPush(input);
+
+    expect(beforeGate.kind).toBe('failed');
+    expect(replay).toEqual({ kind: 'duplicate' });
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(receiptSpy).toHaveBeenCalledOnce();
+    expect((await readIdem(stub, 'k-staging-accepted-replay')).idem).toMatchObject({
+      stage: 'delivered',
+    });
+  });
+
+  it('settles an earlier accepted push from the alarm without a receipt check', async () => {
+    installDbMock({ tokens: [{ user_id: 'staging-accepted-alarm', token: 'tok1' }] });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const receiptSpy = vi
+      .spyOn(env.RECEIPTS_QUEUE, 'send')
+      .mockRejectedValueOnce(new Error('receipt queue unavailable'));
+    const stub = getDO('staging-accepted-alarm');
+
+    const beforeGate = await stub.dispatchPush(
+      baseInput({
+        userId: 'staging-accepted-alarm',
+        badge: null,
+        idempotencyKey: 'k-staging-accepted-alarm',
+      })
+    );
+    await closeStagingGate(stub);
+    await runInDurableObject(stub, async instance => {
+      await (instance as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+
+    expect(beforeGate.kind).toBe('failed');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(receiptSpy).toHaveBeenCalledOnce();
+    const stored = await readIdem(stub, 'k-staging-accepted-alarm');
+    expect(stored.idem).toMatchObject({ stage: 'delivered' });
+    // Settled, so the alarm does not come back for a bookkeeping repair.
+    expect(stored.alarm ?? Infinity).toBeGreaterThan(Date.now() + 60_000);
+  });
+
+  it.each(OPEN_GATES)('sends and publishes the receipt check in %s', async (label, vars) => {
+    const userId = `push-open-${label}`;
+    installDbMock({ tokens: [{ user_id: userId, token: 'tok1' }] });
+    const receiptSpy = vi.spyOn(env.RECEIPTS_QUEUE, 'send');
+    const stub = getDO(userId);
+    await setPushGate(stub, vars);
+
+    const result = await stub.dispatchPush(baseInput({ userId, idempotencyKey: `k-${userId}` }));
+
+    expect(result).toEqual({ kind: 'delivered', tokenCount: 1 });
+    expect(env.EXPO_ACCESS_TOKEN.get).toHaveBeenCalledOnce();
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(receiptSpy).toHaveBeenCalledOnce();
+    expect((await readIdem(stub, `k-${userId}`)).idem).toMatchObject({ stage: 'delivered' });
+  });
+
+  it.each([
+    ['absent', {}],
+    ['false', { NOTIFICATIONS_PUSH_ENABLED: 'false' }],
+  ])('keeps the sink off a gated dispatch when the switch is %s', async (label, vars) => {
+    setPushSinkModeForTesting('log');
+    const userId = `staging-sink-${label}`;
+    const state: DbState = { tokens: [{ user_id: userId, token: 'tok1' }] };
+    installDbMock(state);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO(userId);
+    await closeStagingGate(stub, vars);
+    const input = baseInput({ userId, idempotencyKey: `k-${userId}` });
+
+    const first = await stub.dispatchPush(input);
+    const replay = await stub.dispatchPush(input);
+
+    expect(first).toEqual({ kind: 'no_tokens' });
+    expect(replay).toEqual({ kind: 'duplicate' });
+    expect(log).toHaveBeenCalledWith('notifications_push_disabled', { surface: 'expo_push' });
+    expect(log.mock.calls.some(([event]) => event === 'agent_push_sink_payload')).toBe(false);
+    expect(state.historyInserts).toBeUndefined();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    expect((await readIdem(stub, `k-${userId}`)).idem).toMatchObject({ stage: 'push_disabled' });
+  });
+
+  it('lets the local sink record a staging dispatch when the switch is exactly true', async () => {
+    setPushSinkModeForTesting('log');
+    const state: DbState = { tokens: [{ user_id: 'staging-sink-open', token: 'tok1' }] };
+    installDbMock(state);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO('staging-sink-open');
+    await closeStagingGate(stub, { NOTIFICATIONS_PUSH_ENABLED: 'true' });
+
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'staging-sink-open', idempotencyKey: 'k-staging-sink-open' })
+    );
+
+    expect(result).toEqual({ kind: 'delivered', tokenCount: 1 });
+    expect(log.mock.calls.some(([event]) => event === 'agent_push_sink_payload')).toBe(true);
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    expect(state.historyInserts).toHaveLength(1);
+  });
+
+  it.each(['replay', 'alarm'])('settles unbound stale-token bookkeeping on %s', async path => {
+    const userId = `staging-accepted-unbound-${path}`;
+    const key = `k-${userId}`;
+    const dbSpy = vi.spyOn(dbClient, 'getWorkerDb').mockImplementation(() => {
+      throw new Error('the gated bookkeeping must not create a database client');
+    });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO(userId);
+    await seedAcceptedRecord(stub, key);
+    // A staging deployment without the database or receipt queue bindings:
+    // any read of either throws, and the bookkeeping would report it.
+    await closeStagingGate(stub, { HYPERDRIVE: undefined, RECEIPTS_QUEUE: undefined });
+
+    if (path === 'replay') {
+      const replay = await stub.dispatchPush(baseInput({ userId, idempotencyKey: key }));
+      expect(replay).toEqual({ kind: 'duplicate' });
+    } else {
+      await runInDurableObject(stub, async instance => {
+        await (instance as unknown as { alarm: () => Promise<void> }).alarm();
+      });
+    }
+
+    expect(dbSpy).not.toHaveBeenCalled();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    expect(env.EXPO_ACCESS_TOKEN.get).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('notifications_push_disabled', {
+      surface: 'accepted_bookkeeping',
+    });
+    const stored = await readIdem(stub, key);
+    expect(stored.idem).toMatchObject({ stage: 'delivered' });
+    if (path === 'alarm') {
+      // Settled, so no bookkeeping repair alarm comes back.
+      expect(stored.alarm ?? Infinity).toBeGreaterThan(Date.now() + 60_000);
+    }
+  });
+
+  it('refuses a staging dispatch before presence, rate limit and any database client', async () => {
+    const dbSpy = vi.spyOn(dbClient, 'getWorkerDb').mockImplementation(() => {
+      throw new Error('the gated dispatch must not create a database client');
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO('staging-unbound-dispatch');
+    await closeStagingGate(stub, { HYPERDRIVE: undefined, RECEIPTS_QUEUE: undefined });
+    const input = baseInput({
+      userId: 'staging-unbound-dispatch',
+      idempotencyKey: 'k-staging-unbound-dispatch',
+      rateLimit: { key: 'agent:staging-unbound', limit: 5, windowSeconds: 600 },
+    });
+
+    const first = await stub.dispatchPush(input);
+    const replay = await stub.dispatchPush(input);
+
+    expect(first).toEqual({ kind: 'no_tokens' });
+    expect(replay).toEqual({ kind: 'duplicate' });
+    expect(dbSpy).not.toHaveBeenCalled();
+    expect(env.EVENT_SERVICE.isUserInContext).not.toHaveBeenCalled();
+    expect(env.EXPO_ACCESS_TOKEN.get).not.toHaveBeenCalled();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    // The optional badge applies exactly once; the replay does not repeat it.
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+    const stored = await runInDurableObject(stub, async (_inst, state) => ({
+      idem: await state.storage.get<{ stage: string }>('idem:k-staging-unbound-dispatch'),
+      rateLimits: [...(await state.storage.list({ prefix: 'rl:' })).keys()],
+    }));
+    expect(stored).toMatchObject({ idem: { stage: 'push_disabled' }, rateLimits: [] });
+  });
+
+  it('refuses a staging glanceable refresh before any state, snapshot or database read', async () => {
+    const dbSpy = vi.spyOn(dbClient, 'getWorkerDb').mockImplementation(() => {
+      throw new Error('the gated refresh must not create a database client');
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('the gated refresh must not fetch'));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO('staging-refresh');
+    await closeStagingGate(stub, { HYPERDRIVE: undefined });
+
+    await stub.refreshGlanceableSnapshot({ userId: 'staging-refresh', organizationId: null });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(dbSpy).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('notifications_push_disabled', {
+      surface: 'glanceable_refresh',
+    });
+    const events = log.mock.calls.map(([entry]) => (entry as { event?: unknown }).event);
+    expect(events).not.toContain('glanceable_delivery');
+    expect(events).not.toContain('glanceable_snapshot_build');
+    const written = await runInDurableObject(stub, async (_inst, state) => [
+      ...(await state.storage.list({ prefix: 'glanceable' })).keys(),
+    ]);
+    expect(written).toEqual([]);
+  });
+
+  it('keeps or reclaims refused pending refreshes from the alarm and still runs idem GC', async () => {
+    const dbSpy = vi.spyOn(dbClient, 'getWorkerDb').mockImplementation(() => {
+      throw new Error('the gated alarm must not create a database client');
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('the gated alarm must not fetch'));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO('staging-alarm');
+    const now = Date.now();
+    const liveKey = `glanceable-pending:${JSON.stringify(['staging-alarm', null])}`;
+    const live = {
+      userId: 'staging-alarm',
+      organizationId: null,
+      dueAt: now - 1_000,
+      deferredAt: now - 60_000,
+    };
+    const expiredKey = `glanceable-pending:${JSON.stringify(['staging-alarm', 'org_old'])}`;
+    await runInDurableObject(stub, async (_inst, state) => {
+      await state.storage.put(liveKey, live);
+      await state.storage.put(expiredKey, {
+        userId: 'staging-alarm',
+        organizationId: 'org_old',
+        dueAt: now - GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+        deferredAt: now - GLANCEABLE_SNAPSHOT_EXPIRY_MS - 10_000,
+      });
+      await state.storage.put('idem:k-staging-alarm-old', {
+        stage: 'delivered',
+        ts: now - 2 * 60 * 60 * 1000,
+      });
+      await state.storage.put('rl:agent:staging-alarm-old', {
+        expiresAt: now - 1_000,
+        timestamps: [now - 700_000],
+      });
+    });
+    await closeStagingGate(stub, { HYPERDRIVE: undefined });
+
+    await runInDurableObject(stub, async instance => {
+      await (instance as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(dbSpy).not.toHaveBeenCalled();
+    const events = log.mock.calls.map(([entry]) => (entry as { event?: unknown }).event);
+    expect(events).not.toContain('glanceable_delivery');
+    const stored = await runInDurableObject(stub, async (_inst, state) => ({
+      pending: Object.fromEntries(await state.storage.list({ prefix: 'glanceable-pending:' })),
+      idem: await state.storage.get('idem:k-staging-alarm-old'),
+      rateLimit: await state.storage.get('rl:agent:staging-alarm-old'),
+      alarm: await state.storage.getAlarm(),
+    }));
+    // The due record is neither delivered nor rescheduled for its due time:
+    // it stays, and the alarm returns once, at its expiry, to reclaim it.
+    expect(stored.pending).toEqual({ [liveKey]: live });
+    expect(stored.idem).toBeUndefined();
+    expect(stored.rateLimit).toBeUndefined();
+    expect(stored.alarm).toBe(live.deferredAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS);
+  });
+
+  it('opens no STS bundle on any gated path under the STS source', async () => {
+    const getBundle = vi.fn(async () => {
+      throw new Error('a gated path must not open the STS bundle');
+    });
+    const dbSpy = vi.spyOn(dbClient, 'getWorkerDb').mockImplementation(() => {
+      throw new Error('a gated path must not create a database client');
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('a gated path must not fetch'));
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const stub = getDO('staging-sts');
+    await seedAcceptedRecord(stub, 'k-staging-sts-accepted');
+    await closeStagingGate(stub, {
+      SECRETS_SOURCE: 'sts',
+      STS: { getBundle },
+      HYPERDRIVE: undefined,
+      RECEIPTS_QUEUE: undefined,
+    });
+
+    const dispatch = await stub.dispatchPush(
+      baseInput({ userId: 'staging-sts', idempotencyKey: 'k-staging-sts' })
+    );
+    const replay = await stub.dispatchPush(
+      baseInput({ userId: 'staging-sts', idempotencyKey: 'k-staging-sts-accepted' })
+    );
+    await stub.refreshGlanceableSnapshot({ userId: 'staging-sts', organizationId: null });
+    await runInDurableObject(stub, async instance => {
+      await (instance as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+
+    expect(dispatch).toEqual({ kind: 'no_tokens' });
+    expect(replay).toEqual({ kind: 'duplicate' });
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(dbSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(env.EXPO_ACCESS_TOKEN.get).not.toHaveBeenCalled();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
   });
 });

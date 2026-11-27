@@ -27,6 +27,7 @@ share one call (owner and pollers).
 | STS token | 0 | Set older than 5 min: 1 key-set fetch, merged; the request waits for it, up to the 5 s timeout (an STS set never serves past its 5-minute lifetime). Unknown `kid`: at most 1 fetch per 5 min per set, cancelled requests included | 1 STS key-set fetch, in parallel with the UTS bootstrap when the service calls `warm` |
 | UTS token | 0 | UTS set older than 5 min: 1 key-set fetch, merged; the request waits at most 1 s when it holds a last good set with the `kid`, else up to the 5 s timeout. Unknown `kid` as for STS. Feed: when the signed head is over 30 s old, the request waits for one merged refresh (head, plus the list only when its hash changed), at most 1 s | 1 bootstrap call (UTS key set, head and list in one answer), merged, in parallel with the STS key set. Without a bootstrap port: key set, then head, then list, in series |
 | PAT | 0 on an in-instance hit | Instance miss: 1 shared-cache read, started in parallel with the key-set and feed reads; on a shared miss, 1 UTS lookup (merged per hash), then 1 shared-cache write after the response | Bootstrap (as above) in parallel with the hash and the shared-cache read, then the lookup path |
+| Record check (`checkBrowserSession`, `checkUtsTokenRecord`) | 0: validation, then set and map lookups on the held feed copy; no SQL, no signer call | Only the refreshes the PAT path already makes, merged with `verify`'s: the UTS key set as for a known `kid` (the feed head verifies under its keys), and the feed (a background head fetch 10 s after the last fetch; once the head is over 30 s old, one merged refresh the check waits for, at most 1 s). A malformed record makes none | As for a UTS token: the bootstrap call, or the UTS key set, then head and list |
 
 ## 3. Background fetches per isolate, and totals
 
@@ -36,8 +37,8 @@ While an isolate serves traffic, under the request's `waitUntil`; an idle isolat
 |---|---|---|---|
 | Feed head (UTS-token or PAT traffic) | at most 1 per 10 s = 6/min | 13,200/min = 220/s | 30,000/min = 500/s |
 | Feed list | only when the head names a new hash; at most 6/min | at most 220/s | at most 500/s |
-| UTS key set | at most 1 per 4 min = 0.25/min | 550/min = 9.2/s | 1,250/min = 21/s |
-| STS key set (STS-token traffic) | at most 1 per 4 min = 0.25/min | 550/min = 9.2/s | 1,250/min = 21/s |
+| UTS key set | 1 per 4 min ±20 % minus the response's `Age` (at most 17 s while every signer read succeeds) ≈ 0.25/min; at most 1 per 2.9 min | 550/min = 9.2/s | 1,250/min = 21/s |
+| STS key set (STS-token traffic) | 1 per 4 min ±20 % ≈ 0.25/min; at most 1 per 3.2 min | 550/min = 9.2/s | 1,250/min = 21/s |
 
 - The feed Worker keeps the head in each data center's cache for 5 s, so the feed objects see at
   most one head read per data center per 5 s, whatever the isolate count; design 5.7 sets the proof
@@ -45,6 +46,17 @@ While an isolate serves traffic, under the request's `waitUntil`; an idle isolat
 - These totals depend on the number of warm instances, not on the client count: 10,000, 50,000 or
   200,000 clients only change how many instances are warm. The table is the upper bound for all
   three, at the peak instance counts above.
+- The ±20 % jitter keeps the mean interval at 4 minutes (minus `Age`), so the totals stand; it
+  spreads the background refreshes and the retry waits, but not the 24-hour limit below. When every
+  UTS signer read fails, `Age` grows past the refresh point and each fetch counts as failed: the
+  isolate moves to the first row of the table in section 4 (5 s doubling to 60 s), and stays on
+  it past the 24-hour limit.
+- **The 24-hour burst.** A held UTS set stops serving 24 hours after its oldest keys were read,
+  and the library refreshes at once at that point (design 5.7). Every warm isolate holds the same
+  oldest-read time (to the second), so each one makes one fetch within about 1 s: about 7,200 at
+  5,000 Worker isolates plus 2,200 Vercel instances. The feed Worker must answer that burst from
+  its per-data-centre cache, not with one signer read per request. A failed refresh then backs off
+  as in section 4, each wait jittered.
 
 **Releases.** A release cold-starts the instances of the released service. With `warm` and the
 bootstrap port, a cold instance makes 2 fetches in parallel (UTS bootstrap, STS key set), down from
@@ -65,11 +77,16 @@ so cancelling requests cannot raise any rate below.
 
 | Dependency down | Retry waits per isolate | Steady rate per isolate | 5,000 isolates | 2,200 instances |
 |---|---|---|---|---|
-| UTS key set, last good set serving (up to 24 h) | 5, 10, 20, 40, 60, 60 … s | 1/min, after about 2 min | 83/s | 37/s |
-| STS key set, set expired (it never serves past 5 min, so STS routes get 503) | 5 s fixed | 12/min | 1,000/s | 440/s |
-| Either key set, cold isolate (no set) | 5 s fixed | 12/min | only cold isolates | only cold instances |
+| UTS key set, last good set serving (up to 24 h), every answer past the refresh point, or a held set past its 24-hour limit | 5, 10, 20, 40, 60, 60 … s, each ±20 %; the count restarts only after a success | 1/min, after about 2 min | 83/s | 37/s |
+| STS key set, set expired (it never serves past 5 min, so STS routes get 503) | 5 s ±20 % | 12/min | 1,000/s | 440/s |
+| Either key set, cold isolate (no set) | 5 s ±20 % | 12/min | only cold isolates | only cold instances |
 | Revocation feed, copy serving short tokens (head up to 10 min) | 5, 10, 20, 30, 30 … s | 2/min, after about 1 min | 167/s | 73/s |
 | Bootstrap, cold isolate | 5 s fixed | 12/min | only cold isolates | only cold instances |
+
+A UTS outage longer than 24 hours keeps the 60 s cadence: once the held set passes its limit,
+requests get 503, and the first fetch after UTS recovers comes at most about 60 s later (72 s with
+the jitter). That is the cost of not raising the feed load to the 5 s rate of a cold isolate
+(1,000/s at 5,000 isolates) for the rest of the outage.
 
 First minute of a UTS key-set outage: fetches at 0, 5, 15 and 35 s, so 4 per isolate (333/s at
 5,000 isolates, falling to 83/s). An STS outage keeps the 5 s wait, because no STS copy serves and
@@ -181,9 +198,16 @@ Total under 8 MB, against the 128 MB Worker isolate limit.
   shared-cache read adds one HMAC verify, two JSON parses and one zod parse.
 - Per key-set refresh: about 34 Ed25519 key imports. Per changed list: one SHA-256 and one JSON
   parse of the list (about 1 ms at 140 KB), at most once per 10 s.
+- Record check: one zod parse of three or four fields, then at most three set lookups and one map
+  lookup. It holds no state of its own, so it adds no memory.
 
 ## 9. What this PR does not add
 
 No SQL statement, Durable Object hop, database connection, audit row, queue message or deploy.
 The library has no caller yet: the network calls above start when a service adopts it, through the
 ports phase 3 implements.
+
+The record checks add no I/O of their own: a warm check reads only the held feed copy, and its
+refreshes are the ones the feed and key-set caches already make for `verify`, merged with them.
+A cold handle `read` by the web app (1 SQL statement, no signer call) is phase 3's cost, not this
+library's.

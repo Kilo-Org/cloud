@@ -72,29 +72,30 @@ function utcMinute(time: number): string {
 /**
  * One object per environment and workload. It holds the workload's bundle sealed with a key it
  * generated itself, and it appends the delivery audit row in the same call that hands the bundle
- * out. Callers do not retry a delivery: a retry after a committed append would audit twice.
+ * out. Callers do not retry a delivery: a retry after a committed append would audit twice. A stub
+ * can call every prototype method, so everything but `getBundle`, `putBundle` and `alarm` is
+ * ECMAScript-private: no caller reaches the seal or ETag key.
  */
 export class BundleDO extends DurableObject<Env> {
   /** The policies this object serves; a test fixture's subclass sets its own. */
   static readonly policies: PolicyIndex = policyIndex;
 
-  private readonly config: StsConfig;
-  private readonly db: BundleDatabase;
-  private readonly audit: AuditLog;
-  // An instance field, not a method: RPC exposes prototype methods, never instance fields.
-  private readonly policies: PolicyIndex;
-  private keys: Promise<BundleKeys> | null = null;
-  private pendingFill: Promise<BundleRow | null> | null = null;
-  private refresherCheckedAt = 0;
+  readonly #config: StsConfig;
+  readonly #db: BundleDatabase;
+  readonly #audit: AuditLog;
+  readonly #policies: PolicyIndex;
+  #keys: Promise<BundleKeys> | null = null;
+  #pendingFill: Promise<BundleRow | null> | null = null;
+  #refresherCheckedAt = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.config = readConfig(env);
-    this.policies = new.target.policies;
-    this.db = drizzle(ctx.storage, { schema });
-    this.audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
+    this.#config = readConfig(env);
+    this.#policies = new.target.policies;
+    this.#db = drizzle(ctx.storage, { schema });
+    this.#audit = new AuditLog(ctx.storage, env.AUDIT_QUEUE);
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+      await migrate(this.#db, migrations);
     });
   }
 
@@ -120,10 +121,10 @@ export class BundleDO extends DurableObject<Env> {
       };
     }
 
-    if (target.environment !== this.config.environment) {
+    if (target.environment !== this.#config.environment) {
       return { status: 'denied', reason: 'environment_mismatch' };
     }
-    if (!this.ctx.id.equals(getBundleStub(this.env, this.config, target.workload).id)) {
+    if (!this.ctx.id.equals(getBundleStub(this.env, this.#config, target.workload).id)) {
       // Addressed by a name that is not this workload's: refuse rather than serve another bundle.
       return {
         status: 'unavailable',
@@ -131,16 +132,16 @@ export class BundleDO extends DurableObject<Env> {
         retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
       };
     }
-    const policy = this.policies.get(this.config.environment, target.workload);
+    const policy = this.#policies.get(this.#config.environment, target.workload);
     if (policy === null) {
       return {
         status: 'denied',
-        reason: this.policies.has(target.workload) ? 'environment_mismatch' : 'unknown_workload',
+        reason: this.#policies.has(target.workload) ? 'environment_mismatch' : 'unknown_workload',
       };
     }
-    this.checkRefresher();
+    this.#checkRefresher();
 
-    const row = this.readBundle() ?? (await this.fill(target.workload));
+    const row = this.#readBundle() ?? (await this.#fill(target.workload));
     if (row === null) {
       return {
         status: 'unavailable',
@@ -149,7 +150,7 @@ export class BundleDO extends DurableObject<Env> {
       };
     }
 
-    const served = await this.serve(row, policy);
+    const served = await this.#serve(row, policy);
     if (served === null) {
       return {
         status: 'unavailable',
@@ -161,11 +162,11 @@ export class BundleDO extends DurableObject<Env> {
     // A copy whose pushes keep failing is stale even though no failed read marked it.
     const stale = row.stale || Date.now() - Date.parse(row.fetchedAt) > STALE_AFTER_MS;
     if (ifNoneMatch === etag) {
-      this.recordNotModified();
+      this.#recordNotModified();
       return { status: 'not_modified', etag, stale, fetchedAt: row.fetchedAt };
     }
 
-    const secrets = served.kind === 'stored' ? await this.open(row) : served.secrets;
+    const secrets = served.kind === 'stored' ? await this.#open(row) : served.secrets;
     if (secrets === null) {
       return {
         status: 'unavailable',
@@ -175,10 +176,10 @@ export class BundleDO extends DurableObject<Env> {
     }
     const missing = served.kind === 'stored' ? row.missing : served.missing;
     try {
-      await this.audit.append(
-        this.stream(target.workload),
+      await this.#audit.append(
+        this.#stream(target.workload),
         bundleDeliveredEvent({
-          environment: this.config.environment,
+          environment: this.#config.environment,
           workload: target.workload,
           etag,
           stale,
@@ -201,7 +202,7 @@ export class BundleDO extends DurableObject<Env> {
         retryAfterSeconds: AUDIT_RETRY_AFTER_SECONDS,
       };
     }
-    await this.scheduleRelay();
+    await this.#scheduleRelay();
 
     const delivered: Record<string, BundleSecret> = {};
     for (const [name, secret] of Object.entries(secrets)) {
@@ -210,7 +211,7 @@ export class BundleDO extends DurableObject<Env> {
     return {
       status: 'ok',
       workload: target.workload,
-      environment: this.config.environment,
+      environment: this.#config.environment,
       etag,
       stale,
       fetchedAt: row.fetchedAt,
@@ -222,20 +223,20 @@ export class BundleDO extends DurableObject<Env> {
   /** Called by the refresher. An unchanged ETag rewrites freshness and the stale flag only. */
   async putBundle(raw: WorkloadBundle): Promise<PutBundleResult> {
     const bundle = WorkloadBundleSchema.parse(raw);
-    if (!this.ctx.id.equals(getBundleStub(this.env, this.config, bundle.workload).id)) {
+    if (!this.ctx.id.equals(getBundleStub(this.env, this.#config, bundle.workload).id)) {
       // Addressed by a name that is not this workload's: refuse rather than store another bundle.
       return { status: 'mismatch' };
     }
-    const { row, changed } = await this.writeBundle(bundle);
+    const { row, changed } = await this.#writeBundle(bundle);
     return { status: 'stored', changed, etag: row.etag };
   }
 
   async alarm(): Promise<void> {
-    const row = this.readBundle();
+    const row = this.#readBundle();
     let relayFailed = false;
     if (row !== null) {
       try {
-        await this.audit.relay(this.stream(row.workload));
+        await this.#audit.relay(this.#stream(row.workload));
       } catch (error) {
         relayFailed = true;
         console.warn('sts: bundle audit relay failed; rows stay for the next alarm', {
@@ -245,27 +246,27 @@ export class BundleDO extends DurableObject<Env> {
       }
     }
     const now = Date.now();
-    if (now >= this.audit.nextPruneAt()) {
-      this.db
+    if (now >= this.#audit.nextPruneAt()) {
+      this.#db
         .delete(schema.deliveryCounter)
         .where(lt(schema.deliveryCounter.minute, utcMinute(now - DELIVERY_COUNTER_RETENTION_MS)))
         .run();
     }
-    this.audit.pruneIfDue(now);
-    await this.scheduleNextAlarm(Date.now(), relayFailed);
+    this.#audit.pruneIfDue(now);
+    await this.#scheduleNextAlarm(Date.now(), relayFailed);
   }
 
   /**
    * Asks the refresher to confirm its alarm loop, at most once a minute and off the read path, so
    * a refresher that lost its alarm restarts within a minute of the next read.
    */
-  private checkRefresher(): void {
+  #checkRefresher(): void {
     const now = Date.now();
-    if (now - this.refresherCheckedAt < REFRESHER_CHECK_INTERVAL_MS) return;
-    this.refresherCheckedAt = now;
+    if (now - this.#refresherCheckedAt < REFRESHER_CHECK_INTERVAL_MS) return;
+    this.#refresherCheckedAt = now;
     this.ctx.waitUntil(
       withDORetry(
-        () => getRefresherStub(this.env, this.config),
+        () => getRefresherStub(this.env, this.#config),
         stub => stub.ensureStarted(),
         'sts.ensureStarted'
       ).catch((error: unknown) => {
@@ -275,24 +276,24 @@ export class BundleDO extends DurableObject<Env> {
   }
 
   /** Concurrent reads of an empty object share one fill. */
-  private fill(workload: string): Promise<BundleRow | null> {
-    if (this.pendingFill !== null) return this.pendingFill;
-    const pending = this.performFill(workload).finally(() => {
-      this.pendingFill = null;
+  #fill(workload: string): Promise<BundleRow | null> {
+    if (this.#pendingFill !== null) return this.#pendingFill;
+    const pending = this.#performFill(workload).finally(() => {
+      this.#pendingFill = null;
     });
-    this.pendingFill = pending;
+    this.#pendingFill = pending;
     return pending;
   }
 
-  private async performFill(workload: string): Promise<BundleRow | null> {
+  async #performFill(workload: string): Promise<BundleRow | null> {
     try {
       const result = await withDORetry(
-        () => getRefresherStub(this.env, this.config),
+        () => getRefresherStub(this.env, this.#config),
         async stub => await stub.buildBundle(workload),
         'sts.bundle.fill'
       );
       if (result.status !== 'built') return null;
-      return (await this.writeBundle(result.bundle)).row;
+      return (await this.#writeBundle(result.bundle)).row;
     } catch (error) {
       console.warn('sts: bundle fill failed', { workload, reason: errorName(error) });
       return null;
@@ -304,10 +305,10 @@ export class BundleDO extends DurableObject<Env> {
    * example during a manager outage after a deploy, is cut down to the current grants first, so a
    * removed grant is never served (design 4.4: STS refuses any read the policy does not list).
    */
-  private async serve(row: BundleRow, policy: Policy): Promise<ServedBundle | null> {
-    const policyHash = await this.policies.workloadHash(policy.workload);
+  async #serve(row: BundleRow, policy: Policy): Promise<ServedBundle | null> {
+    const policyHash = await this.#policies.workloadHash(this.#config.environment, policy.workload);
     if (row.policyHash === policyHash) return { kind: 'stored', row };
-    const stored = await this.open(row);
+    const stored = await this.#open(row);
     if (stored === null) return null;
     const secrets: BundleSecrets = {};
     const missing: string[] = [];
@@ -317,7 +318,7 @@ export class BundleDO extends DurableObject<Env> {
       else secrets[name] = secret;
     }
     const etag = await computeBundleEtag(
-      (await this.bundleKeys()).etagKey,
+      (await this.#bundleKeys()).etagKey,
       policyHash,
       secrets,
       missing
@@ -325,21 +326,21 @@ export class BundleDO extends DurableObject<Env> {
     return { kind: 'narrowed', row, etag, secrets, missing };
   }
 
-  private readBundle(): BundleRow | null {
-    return this.db.select().from(schema.bundle).where(eq(schema.bundle.id, 1)).get() ?? null;
+  #readBundle(): BundleRow | null {
+    return this.#db.select().from(schema.bundle).where(eq(schema.bundle.id, 1)).get() ?? null;
   }
 
-  private async writeBundle(bundle: WorkloadBundle): Promise<{ row: BundleRow; changed: boolean }> {
-    const keys = await this.bundleKeys();
+  async #writeBundle(bundle: WorkloadBundle): Promise<{ row: BundleRow; changed: boolean }> {
+    const keys = await this.#bundleKeys();
     const etag = await computeBundleEtag(
       keys.etagKey,
       bundle.policyHash,
       bundle.secrets,
       bundle.missing
     );
-    const existing = this.readBundle();
+    const existing = this.#readBundle();
     if (existing !== null && existing.etag === etag) {
-      this.db
+      this.#db
         .update(schema.bundle)
         .set({ fetchedAt: bundle.fetchedAt, stale: bundle.stale })
         .where(eq(schema.bundle.id, 1))
@@ -354,7 +355,7 @@ export class BundleDO extends DurableObject<Env> {
     const values: BundleRow = {
       id: 1,
       workload: bundle.workload,
-      environment: this.config.environment,
+      environment: this.#config.environment,
       etag,
       policyHash: bundle.policyHash,
       fetchedAt: bundle.fetchedAt,
@@ -363,7 +364,7 @@ export class BundleDO extends DurableObject<Env> {
       iv: sealed.iv,
       ciphertext: sealed.ciphertext,
     };
-    this.db
+    this.#db
       .insert(schema.bundle)
       .values(values)
       .onConflictDoUpdate({
@@ -384,10 +385,10 @@ export class BundleDO extends DurableObject<Env> {
     return { row: values, changed: true };
   }
 
-  private async open(row: BundleRow): Promise<BundleSecrets | null> {
+  async #open(row: BundleRow): Promise<BundleSecrets | null> {
     try {
       const parsed = BundleSecretsSchema.safeParse(
-        await openJson((await this.bundleKeys()).sealKey, {
+        await openJson((await this.#bundleKeys()).sealKey, {
           iv: row.iv,
           ciphertext: row.ciphertext,
         })
@@ -400,28 +401,28 @@ export class BundleDO extends DurableObject<Env> {
     return null;
   }
 
-  private bundleKeys(): Promise<BundleKeys> {
-    if (this.keys === null) {
+  #bundleKeys(): Promise<BundleKeys> {
+    if (this.#keys === null) {
       const pending = loadOrCreateKey({
         storage: this.ctx.storage,
         name: BUNDLE_KEYS_NAME,
         schema: BundleKeysSchema,
         create: () => ({ sealKey: createEncryptionKey(), etagKey: createEncryptionKey() }),
       });
-      this.keys = pending;
+      this.#keys = pending;
       pending.catch(() => {
-        if (this.keys === pending) this.keys = null;
+        if (this.#keys === pending) this.#keys = null;
       });
     }
-    return this.keys;
+    return this.#keys;
   }
 
-  private stream(workload: string): string {
-    return `sts:${this.config.environment}:bundle:${workload}`;
+  #stream(workload: string): string {
+    return `sts:${this.#config.environment}:bundle:${workload}`;
   }
 
-  private recordNotModified(): void {
-    this.db
+  #recordNotModified(): void {
+    this.#db
       .insert(schema.deliveryCounter)
       .values({ minute: utcMinute(Date.now()), count: 1 })
       .onConflictDoUpdate({
@@ -431,7 +432,7 @@ export class BundleDO extends DurableObject<Env> {
       .run();
   }
 
-  private async scheduleRelay(): Promise<void> {
+  async #scheduleRelay(): Promise<void> {
     try {
       const now = Date.now();
       const alarm = await this.ctx.storage.getAlarm();
@@ -444,14 +445,14 @@ export class BundleDO extends DurableObject<Env> {
     }
   }
 
-  private async scheduleNextAlarm(now: number, relayFailed: boolean): Promise<void> {
-    const audit = this.audit;
+  async #scheduleNextAlarm(now: number, relayFailed: boolean): Promise<void> {
+    const audit = this.#audit;
     if (audit.hasUnrelayed()) {
       await this.ctx.storage.setAlarm(now + (relayFailed ? RELAY_RETRY_MS : RELAY_DELAY_MS));
       return;
     }
     const counters =
-      this.db
+      this.#db
         .select({ minute: schema.deliveryCounter.minute })
         .from(schema.deliveryCounter)
         .limit(1)

@@ -73,10 +73,18 @@ const LeaseRevokedSchema = z.object({
   lease: z.object({ id: z.string(), status: z.string().nullish() }),
 });
 
-/** The 404 Infisical answers for a lease it does not have; other 404s are a misconfiguration. */
-const LeaseNotFoundSchema = z.object({
-  message: z.string().regex(/^Dynamic secret lease with ID '[^']*' not found$/),
-});
+/**
+ * The 404 Infisical answers for the lease asked for, naming exactly that id; a 404 naming another
+ * lease, or any other 404 (a missing folder or project), is a misconfiguration.
+ */
+const LeaseNotFoundSchema = z.object({ message: z.string() });
+
+function isLeaseNotFound(body: unknown, leaseId: string): boolean {
+  const parsed = LeaseNotFoundSchema.safeParse(body);
+  return (
+    parsed.success && parsed.data.message === `Dynamic secret lease with ID '${leaseId}' not found`
+  );
+}
 
 /**
  * `revoked`: Infisical ran the revocation statement and deleted the lease. `gone`: Infisical no
@@ -332,7 +340,7 @@ export class InfisicalClient {
       );
       const body: unknown = await response.json().catch(() => null);
       if (response.status === 404) {
-        if (LeaseNotFoundSchema.safeParse(body).success) return { status: 'gone' };
+        if (isLeaseNotFound(body, leaseId)) return { status: 'gone' };
         throw unreachableFor(response, 'lease revoke');
       }
       if (!response.ok) throw unreachableFor(response, 'lease revoke');

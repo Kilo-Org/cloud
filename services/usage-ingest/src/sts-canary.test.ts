@@ -1,4 +1,5 @@
 import {
+  STS_CANARY_HELD_STORE_TIMEOUT_MS,
   STS_CANARY_ROUTE_MAX_DURATION_SECONDS,
   STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
   STS_CANARY_VERIFY_CALLS_MAX,
@@ -163,6 +164,7 @@ const PASSING_REPORT: StsCanaryReport = {
     wrongAudience: { result: 'ok', status: 403 },
     forged: { result: 'ok', status: 401 },
     expired: 'skipped',
+    stsDenied: { result: 'ok', status: null },
   },
 };
 
@@ -254,7 +256,9 @@ describe('scheduled STS canary', () => {
       negative_wrong_audience_status: 403,
       negative_forged_status: 401,
       negative_expired_result: 'skipped',
+      negative_sts_denied_result: 'ok',
     });
+    expect(event).not.toHaveProperty('negative_sts_denied_status');
     expect(JSON.stringify(event)).not.toContain('minted.web.token');
   });
 
@@ -282,6 +286,16 @@ describe('scheduled STS canary', () => {
     await runStsCanary(CONTROLLER, env(binding(issue)), context());
     stubFetch(() => Response.json({ error: 'invalid_token' }, { status: 401 }));
     await runStsCanary(CONTROLLER, env(binding(issue)), context());
+    stubFetch(() =>
+      Response.json({
+        ...PASSING_REPORT,
+        negatives: {
+          ...PASSING_REPORT.negatives,
+          stsDenied: { result: 'failed', status: null, detail: 'mint unavailable: retry in 10 s' },
+        },
+      })
+    );
+    await runStsCanary(CONTROLLER, env(binding(issue)), context());
     await runStsCanary(
       CONTROLLER,
       env(
@@ -308,6 +322,11 @@ describe('scheduled STS canary', () => {
         outcome: 'failed',
         exception_name: 'StsCanaryWebRefused',
         web_status: 401,
+      }),
+      expect.objectContaining({
+        outcome: 'failed',
+        exception_name: 'StsCanaryCheckFailed',
+        negative_sts_denied_result: 'failed',
       }),
       expect.objectContaining({
         outcome: 'failed',
@@ -351,10 +370,18 @@ describe('scheduled STS canary', () => {
   });
 
   it('waits for the web route longer than its slowest run and less than its maxDuration', () => {
+    // The denied mint (one more HTTP attempt) runs alongside the calls to this Worker; the write
+    // of the held tokens comes after them.
     const slowestRunMs =
       JWKS_FETCH_TIMEOUT_MS +
       HTTP_ATTEMPT_TIMEOUT_MS +
-      STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS;
+      Math.max(
+        STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
+        HTTP_ATTEMPT_TIMEOUT_MS
+      ) +
+      STS_CANARY_HELD_STORE_TIMEOUT_MS;
+    expect(slowestRunMs).toBe(77_000);
+    expect(WEB_CALL_TIMEOUT_MS).toBe(80_000);
     expect(WEB_CALL_TIMEOUT_MS).toBeGreaterThan(slowestRunMs);
     expect(WEB_CALL_TIMEOUT_MS).toBeLessThan(STS_CANARY_ROUTE_MAX_DURATION_SECONDS * 1000);
   });

@@ -1,0 +1,4 @@
+# Registration only: services/kiloclaw-billing/wrangler.jsonc. No environment, identity or grant.
+workload: kiloclaw-billing
+registered: true
+secrets: []

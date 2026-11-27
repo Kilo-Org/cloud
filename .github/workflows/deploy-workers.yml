@@ -103,6 +103,22 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      - name: Require the named Worker environment
+        # Runs before any dependency hook, runtime publication, provisioning or
+        # Wrangler call. Without its own `env.<target>` object Wrangler warns and
+        # deploys the top-level (production) configuration, so a nonproduction
+        # deploy stops here. This does not prove the environment's bindings are
+        # isolated from production.
+        if: inputs.target_environment != 'production'
+        env:
+          WORKER: ${{ inputs.worker }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: |
+          if ! node scripts/has-named-environment.mjs "$WORKER/wrangler.jsonc" "$TARGET_ENVIRONMENT"; then
+            echo "::error::$WORKER/wrangler.jsonc does not define env.$TARGET_ENVIRONMENT; refusing to deploy" >&2
+            exit 1
+          fi
+
       - name: Setup Bun
         if: inputs.worker == 'services/cloud-agent-next'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
@@ -278,65 +294,12 @@ jobs:
           TARGET_ENVIRONMENT="${{ inputs.target_environment }}"
 
           has_named_environment() {
-            node - "$1" "$TARGET_ENVIRONMENT" <<'NODE'
-          const fs = require('node:fs');
-
-          const [file, targetEnvironment] = process.argv.slice(2);
-
-          function stripJsonComments(value) {
-            let output = '';
-            let inString = false;
-            let escaped = false;
-
-            for (let index = 0; index < value.length; index += 1) {
-              const current = value[index];
-              const next = value[index + 1];
-
-              if (inString) {
-                output += current;
-                if (escaped) escaped = false;
-                else if (current === '\\') escaped = true;
-                else if (current === '"') inString = false;
-                continue;
-              }
-
-              if (current === '"') {
-                inString = true;
-                output += current;
-                continue;
-              }
-
-              if (current === '/' && next === '/') {
-                while (index < value.length && value[index] !== '\n') index += 1;
-                output += '\n';
-                continue;
-              }
-
-              if (current === '/' && next === '*') {
-                index += 2;
-                while (index < value.length && !(value[index] === '*' && value[index + 1] === '/')) {
-                  if (value[index] === '\n') output += '\n';
-                  index += 1;
-                }
-                index += 1;
-                continue;
-              }
-
-              output += current;
-            }
-
-            return output;
-          }
-
-          const rawConfig = fs.readFileSync(file, 'utf8');
-          const config = JSON.parse(stripJsonComments(rawConfig).replace(/,\s*([}\]])/g, '$1'));
-          process.exit(config.env && Object.hasOwn(config.env, targetEnvironment) ? 0 : 1);
-          NODE
+            node scripts/has-named-environment.mjs "$1" "$TARGET_ENVIRONMENT"
           }
 
           # Workers excluded from automatic deployment:
           EXCLUDED=(
-            services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
+            services/kiloclaw  # No CI deploy: its image-and-worker workflow was removed
             services/user-data-export # Automatic deploy suspended
           )
 

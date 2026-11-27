@@ -138,4 +138,71 @@
       "secret_name": "SESSION_SHARE_JWT_SECRET_PROD",
     },
   ],
+
+  // The one named environment. Wrangler refuses any other `--env` instead of
+  // resolving it to this production config and its bindings.
+  //
+  // `staging` is closed until its own database, bucket, queue, signer and
+  // internal secret exist. It binds only the three Durable Object classes the
+  // live staging script already has: no Hyperdrive, KV, R2, queue producer or
+  // consumer, service, O11Y sink or Secrets Store entry. Bindings are not
+  // inherited, so only the ones listed here exist; the empty lists record that
+  // on purpose. Those Durable Objects and their alarms can still run against
+  // their own storage, but no request, RPC or alarm can reach a database,
+  // bucket, queue, service or secret: there is no binding for one.
+  // It has no route, no workers.dev or preview URL, no schedule, no Logpush and
+  // no Workers Logs, so the old objects' alarm logs (which carry identifiers
+  // from the production data they once saw) are not kept while it is closed.
+  // The migrations are the live staging lineage, v1-v2, so a deploy applies no
+  // Durable Object class change. `ConnectionTicketDO` (v3) is left out: its
+  // class is exported but has no namespace or binding here, and the ticket
+  // routes refuse without it. src/wrangler-config.test.ts asserts both blocks.
+  "env": {
+    "staging": {
+      "name": "session-ingest-staging",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [],
+      "triggers": { "crons": [] },
+      "logpush": false,
+      "observability": { "enabled": false },
+      "vars": {
+        "DIRECT_INGEST_PERCENT": "100",
+        "DIRECT_INGEST_MAX_BYTES": "4194304",
+        "SESSION_SHARE_TOKEN_MIN_IAT": "0",
+      },
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SESSION_INGEST_DO",
+            "class_name": "SessionIngestDO",
+          },
+          {
+            "name": "SESSION_ACCESS_CACHE_DO",
+            "class_name": "SessionAccessCacheDO",
+          },
+          {
+            "name": "USER_CONNECTION_DO",
+            "class_name": "UserConnectionDO",
+          },
+        ],
+      },
+      "migrations": [
+        {
+          "tag": "v1",
+          "new_sqlite_classes": ["SessionIngestDO", "SessionAccessCacheDO"],
+        },
+        {
+          "tag": "v2",
+          "new_sqlite_classes": ["UserConnectionDO"],
+        },
+      ],
+      "kv_namespaces": [],
+      "hyperdrive": [],
+      "r2_buckets": [],
+      "queues": { "producers": [], "consumers": [] },
+      "services": [],
+      "secrets_store_secrets": [],
+    },
+  },
 }

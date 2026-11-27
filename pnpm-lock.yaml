@@ -399,6 +399,12 @@ importers:
       '@kilocode/ai-gateway-secure-proxy-contracts':
         specifier: workspace:*
         version: link:../../packages/ai-gateway-secure-proxy-contracts
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       next:
         specifier: 16.4.5
         version: 16.4.5(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.65.0)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -2254,6 +2260,15 @@ importers:
       '@kilocode/organization-entitlement':
         specifier: workspace:*
         version: link:../organization-entitlement
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../secrets-client
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../service-token-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../sts-contracts
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts
@@ -3387,6 +3402,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3439,6 +3457,9 @@ importers:
       '@kilocode/sts-contracts':
         specifier: workspace:*
         version: link:../../packages/sts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

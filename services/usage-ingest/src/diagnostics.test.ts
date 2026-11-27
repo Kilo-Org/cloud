@@ -199,9 +199,13 @@ it('logs entry before writer completion, retains batch/message identity and only
   const { env, logs } = setup();
   vi.spyOn(Date, 'now').mockReturnValue(1000);
   const response = Promise.withResolvers<Response>();
-  const fetch = vi.fn().mockReturnValue(response.promise);
+  const fetchEntered = Promise.withResolvers<ReturnType<typeof logs>>();
+  const fetch = vi.fn().mockImplementationOnce(() => {
+    fetchEntered.resolve(logs());
+    return response.promise;
+  });
   vi.stubGlobal('fetch', fetch);
-  const messages = [message(), message()];
+  const messages = [message(), { ...message(), id: 'synthetic-message-2' }];
   const work = worker.queue(
     {
       queue: 'usage-eu',
@@ -212,9 +216,13 @@ it('logs entry before writer completion, retains batch/message identity and only
     },
     env
   );
+  const logsAtFetchEntry = await fetchEntered.promise;
   expect(fetch).toHaveBeenCalledTimes(1);
-  expect(messages[0].ack).not.toHaveBeenCalled();
-  expect(logs()).toEqual([
+  for (const msg of messages) {
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).not.toHaveBeenCalled();
+  }
+  expect(logsAtFetchEntry).toEqual([
     expect.objectContaining({
       event: 'usage_ingest_handler_entry',
       queue: 'usage-eu',
@@ -236,7 +244,15 @@ it('logs entry before writer completion, retains batch/message identity and only
   response.resolve(acknowledgement());
   await work;
   expect(fetch).toHaveBeenCalledTimes(2);
-  for (const msg of messages) expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+  for (const msg of messages) {
+    expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+    expect(msg.retry).not.toHaveBeenCalled();
+  }
+  const [firstAck] = messages[0].ack.mock.invocationCallOrder;
+  const [, secondFetch] = fetch.mock.invocationCallOrder;
+  const [secondAck] = messages[1].ack.mock.invocationCallOrder;
+  expect(firstAck).toBeLessThan(secondFetch);
+  expect(secondFetch).toBeLessThan(secondAck);
   expect(new Set(logs().map(log => log.batch_id)).size).toBe(1);
   expect(logs().filter(log => log.event === 'usage_ingest_processing')).toHaveLength(2);
   for (const log of logs()) expect(log.queue).toBe('usage-eu');

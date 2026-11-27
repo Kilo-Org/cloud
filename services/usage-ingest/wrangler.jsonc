@@ -37,7 +37,7 @@
     // Tagged cutover switch: README.md#cutover-switch. Must not also exist as a Worker secret.
     "USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED": "true",
     // STS canary switch: exactly "true" runs the 5-minute canary; anything else skips it.
-    "STS_CANARY_ENABLED": "false",
+    "STS_CANARY_ENABLED": "true",
     "STS_URL": "https://sts.kiloapps.io",
     // The one `env` claim the STS canary verify route accepts; matches STS_URL's environment.
     "STS_ENVIRONMENT": "production",
@@ -101,7 +101,7 @@
         "USAGE_INGEST_HEDGE_DELAY_MS": "1000",
         "USAGE_INGEST_HEDGE_PERCENT": "100",
         "USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED": "true",
-        "STS_CANARY_ENABLED": "false",
+        "STS_CANARY_ENABLED": "true",
         "STS_URL": "https://sts-staging.kiloapps.io",
         "STS_ENVIRONMENT": "staging",
         "WEB_STS_CANARY_URL": "https://staging-app.kilo.ai/api/internal/sts-canary",

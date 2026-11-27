@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { NOTIFICATIONS_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { readNotificationsSecret, secretsSource } from './secrets';
 import { logger } from './util/logger';
 
 export type AuthContext = {
@@ -11,7 +12,7 @@ export type AuthContext = {
 
 /**
  * Public HTTP auth for the notifications worker — humans only. The bearer is
- * a Kilo JWT verified with NEXTAUTH_SECRET.
+ * a Kilo JWT verified with NEXTAUTH_SECRET from the selected secrets source.
  *
  * The worker also exposes RPC methods to other workers (e.g. kilo-chat). RPC
  * callers don't go through this middleware; HTTP traffic is JWT-only.
@@ -26,9 +27,21 @@ export const authMiddleware = createMiddleware<{
   }
 
   try {
+    // The Secrets Store source hands the verifier its binding, which keeps the verifier's
+    // per-isolate cache and its refusal of an empty value. The STS source hands it the bundle
+    // value, refused here when empty. A failed read on either source answers 401, and so does a
+    // deployment that binds no signer (the closed staging environment), before the verifier or
+    // any database read.
+    const nextAuthSecret =
+      secretsSource(c.env) === 'sts'
+        ? await readNotificationsSecret(c.env, 'NEXTAUTH_SECRET', c.executionCtx)
+        : c.env.NEXTAUTH_SECRET;
+    if (nextAuthSecret === undefined || nextAuthSecret === '') {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
     const auth = await verifyKiloBearerAgainstCurrentPepper({
       token,
-      nextAuthSecret: c.env.NEXTAUTH_SECRET,
+      nextAuthSecret,
       workerEnv: c.env.WORKER_ENV,
       connectionString: c.env.HYPERDRIVE.connectionString,
       resourceAudience: { audience: NOTIFICATIONS_AUDIENCE, mode: 'allow-legacy' },

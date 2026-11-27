@@ -392,10 +392,11 @@ describe('getProvider ChatGPT connection routing order', () => {
     jest.mocked(getModelInferenceUserByokProviders).mockReset().mockResolvedValue(['openai']);
     storeKeys();
     jest.mocked(getOpenAiChatGptStoredConnection).mockReset().mockResolvedValue(null);
-    jest
-      .mocked(resolveOpenAiChatGptAccessToken)
-      .mockReset()
-      .mockResolvedValue({ kind: 'access_token', accessToken: 'delegated-access-token' });
+    jest.mocked(resolveOpenAiChatGptAccessToken).mockReset().mockResolvedValue({
+      kind: 'access_token',
+      accessToken: 'delegated-access-token',
+      credentialKeyId: 'delegated-credential-key-id',
+    });
   });
 
   afterEach(() => {

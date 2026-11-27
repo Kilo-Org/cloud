@@ -1,18 +1,32 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_push_tokens } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 import type { TicketTokenPair } from './lib/expo-push';
 import { checkPushReceipts } from './lib/expo-push';
+import { skipProviderPush } from './lib/push-gate';
+import { readNotificationsSecret } from './secrets';
 
 type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
 };
 
-export async function queue(batch: MessageBatch<ReceiptCheckMessage>, env: Env): Promise<void> {
+export async function queue(
+  batch: MessageBatch<ReceiptCheckMessage>,
+  env: Env,
+  ctx: SecretsExecutionContext
+): Promise<void> {
+  // Receipt work published before the staging push gate closed is
+  // acknowledged, not retried: checking it would read the Expo credential and
+  // call Expo.
+  if (skipProviderPush(env, 'expo_receipts')) {
+    for (const msg of batch.messages) msg.ack();
+    return;
+  }
   for (const msg of batch.messages) {
     try {
-      await processReceiptCheck(env, msg.body);
+      await processReceiptCheck(env, msg.body, ctx);
       msg.ack();
     } catch (err) {
       console.error('Receipt check failed, will retry', {
@@ -24,8 +38,12 @@ export async function queue(batch: MessageBatch<ReceiptCheckMessage>, env: Env):
   }
 }
 
-async function processReceiptCheck(env: Env, message: ReceiptCheckMessage): Promise<void> {
-  const accessToken = await env.EXPO_ACCESS_TOKEN.get();
+async function processReceiptCheck(
+  env: Env,
+  message: ReceiptCheckMessage,
+  ctx: SecretsExecutionContext
+): Promise<void> {
+  const accessToken = await readNotificationsSecret(env, 'NOTIFICATIONS_EXPO_ACCESS_TOKEN', ctx);
   const { staleTokens, receiptErrors } = await checkPushReceipts(
     message.ticketTokenPairs,
     accessToken

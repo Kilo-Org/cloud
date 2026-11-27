@@ -23,7 +23,7 @@ async function renderChatGptUsageLink(
     import('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
     import('@/components/chatgpt/ChatGptUsageLink'),
     import('react-dom/server'),
-    import('@kilocode/web-shared/lib/ai-gateway/byok/dual-write'),
+    import('@kilocode/web-shared/lib/ai-gateway/byok/kms-credential'),
   ]);
 
   const readConnection = jest.mocked(store.getOpenAiChatGptConnection);

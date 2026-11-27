@@ -4,6 +4,8 @@ import { vi } from 'vitest';
 import {
   FEED_HEAD_TYPE,
   createVerifier,
+  type JwksSource,
+  type KeySetAges,
   type PatConfig,
   type RevocationFeedSource,
   type RevocationList,
@@ -152,18 +154,25 @@ export function gate(): Gate {
 /** A source answer that never arrives. */
 const never = <T>(): Promise<T> => Promise.withResolvers<T>().promise;
 
-/** A scripted key-set source: counts fetches; `mode` decides the answer, `gate` holds it. */
+/**
+ * A scripted key-set source: counts fetches; `mode` decides the answer, `gate` holds it, `age`
+ * and `oldestAge` are the ages it answers with (any number, to test validation).
+ */
 export type FakeJwks = {
   keys: unknown[];
+  age: number | null;
+  oldestAge: number | null;
   mode: SourceMode;
   gate: Gate | null;
   calls: number;
-  source: (signal: AbortSignal) => Promise<unknown>;
+  source: JwksSource;
 };
 
 export function fakeJwks(keys: unknown[]): FakeJwks {
   const fake: FakeJwks = {
     keys,
+    age: 0,
+    oldestAge: 0,
     mode: 'ok',
     gate: null,
     calls: 0,
@@ -172,7 +181,7 @@ export function fakeJwks(keys: unknown[]): FakeJwks {
       if (fake.gate !== null) await fake.gate.promise;
       if (fake.mode === 'fail') throw new Error('issuer unreachable');
       if (fake.mode === 'hang') return await never();
-      return { keys: fake.keys };
+      return { body: { keys: fake.keys }, age: fake.age, oldestAge: fake.oldestAge };
     },
   };
   return fake;
@@ -273,8 +282,12 @@ export function fakeFeed(signer: Issuer): FakeFeed {
   return fake;
 }
 
-/** A scripted bootstrap endpoint answering the fake UTS key set, head and list in one call. */
+/**
+ * A scripted bootstrap endpoint answering the fake UTS key set, head and list in one call, with
+ * `ages` as its `keyAges`.
+ */
 export type FakeBootstrap = {
+  ages: KeySetAges | null;
   mode: SourceMode;
   gate: Gate | null;
   calls: number;
@@ -283,6 +296,7 @@ export type FakeBootstrap = {
 
 export function fakeBootstrap(jwks: FakeJwks, feed: FakeFeed): FakeBootstrap {
   const fake: FakeBootstrap = {
+    ages: { newest: 0, oldest: 0 },
     mode: 'ok',
     gate: null,
     calls: 0,
@@ -292,7 +306,8 @@ export function fakeBootstrap(jwks: FakeJwks, feed: FakeFeed): FakeBootstrap {
       if (fake.mode === 'fail') throw new Error('bootstrap unreachable');
       if (fake.mode === 'hang') return await never();
       const { head, list } = await feed.current();
-      return { jwks: { keys: jwks.keys }, head, list };
+      // A port typed `KeySetAges` can still answer null at runtime; the library must refuse it.
+      return { jwks: { keys: jwks.keys }, keyAges: fake.ages as KeySetAges, head, list };
     },
   };
   return fake;
@@ -311,9 +326,18 @@ export type Harness = {
   ctx: VerifyContext;
 };
 
+/**
+ * Pins the key-set jitter at its midpoint, so every refresh point and retry wait is exact; a
+ * jitter test sets its own value.
+ */
+export function noJitter(): void {
+  vi.spyOn(Math, 'random').mockReturnValue(0.5);
+}
+
 export async function harness(
   options: { pat?: PatConfig; bootstrap?: boolean } = {}
 ): Promise<Harness> {
+  noJitter();
   const sts = await createIssuer(STS_ISSUER);
   const uts = await createIssuer(UTS_ISSUER, UTS_TOKEN_KID);
   const feedSigner = await createIssuer(UTS_ISSUER, UTS_FEED_KID);

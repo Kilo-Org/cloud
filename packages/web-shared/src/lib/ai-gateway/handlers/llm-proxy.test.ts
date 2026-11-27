@@ -5143,6 +5143,7 @@ describe('auto routing with an organization inference region', () => {
     mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
     mockedFindCustomRouter.mockResolvedValue(routerPool);
+    mockedFindDecisionPool.mockResolvedValue({ router: routerPool, aliasTargets: new Map() });
     mockedFetchCustomRouterDecision.mockResolvedValue({
       kind: 'ok',
       decision: routedDecision,

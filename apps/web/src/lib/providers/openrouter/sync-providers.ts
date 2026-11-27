@@ -27,13 +27,21 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { fetchModelsForProvider } from '@/lib/providers/openrouter/fetch-provider-models';
-import { modelsByProvider, ai_gateway_config } from '@kilocode/db/schema';
+import {
+  modelsByProvider,
+  ai_gateway_config,
+  organization_new_models_baselines,
+} from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import { desc, eq, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, notInArray } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
+import {
+  applyNewModelsPolicyForPublication,
+  logAutoModelChangesForAllOrgs,
+} from '@/lib/organizations/auto-model-change-log';
+import { lockSnapshotPublication } from '@/lib/providers/openrouter/snapshot-lock';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   LatestAliasTargetsConfigSchema,
@@ -79,14 +87,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { buildPublicCustomLlmSnapshotModels } from '@/lib/providers/openrouter/public-custom-llm-snapshot';
 import { injectDirectByokProviders } from '@/lib/providers/openrouter/inject-direct-byok-providers';
-
-/**
- * Advisory lock key hashed from a stable identifier. Serializes concurrent
- * calls to `applySnapshotChangesAndAudit` so two overlapping syncs cannot
- * both read the same "previous" snapshot and emit duplicate system audit
- * logs for the same diff. Auto-releases on transaction commit/rollback.
- */
-const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
 export const openRouterProvidersSource: MetadataSource<OpenRouterProvider[]> = {
   url: 'https://openrouter.ai/api/frontend/v1/all-providers',
@@ -439,10 +439,16 @@ function assertPlausibleSnapshot(snapshot: NormalizedOpenRouterResponse) {
  * `organization_audit_logs`.
  *
  * Concurrency safety: a transaction-scoped Postgres advisory lock
- * (`pg_advisory_xact_lock`) is taken before the previous-snapshot read so
+ * (`lockSnapshotPublication`) is taken before the previous-snapshot read so
  * two overlapping sync runs cannot both observe the same "previous" row
  * and emit duplicate system audit logs for the same diff. The lock is
  * released automatically on commit/rollback.
+ *
+ * Organizations with the `disable_new_models` policy are reconciled in the same transaction, so
+ * the snapshot that makes a model usable commits together with their deny lists. Snapshots their
+ * baselines still point at, and the previous snapshot, are kept; see
+ * `applyNewModelsPolicyForPublication`. The other
+ * organizations' audit rows are written after the commit, on a best-effort basis.
  *
  * `aliasTargets` are the targets the snapshot was rendered from. A later promotion can commit
  * between that render and this write, so when given, the stored targets are compared under the
@@ -459,10 +465,8 @@ export async function applySnapshotChangesAndAudit(params: {
 }> {
   const { providers, aliasTargets } = params;
 
-  const { row, previousSnapshot } = await db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY}))`
-    );
+  const { row, previousSnapshot, handledOrganizationIds } = await db.transaction(async tx => {
+    await lockSnapshotPublication(tx);
 
     if (aliasTargets) {
       // A promotion takes the same key exclusively, so no promotion can commit between this
@@ -483,7 +487,7 @@ export async function applySnapshotChangesAndAudit(params: {
     }
 
     const [previousSnapshotRow] = await tx
-      .select({ data: modelsByProvider.data })
+      .select({ id: modelsByProvider.id, data: modelsByProvider.data })
       .from(modelsByProvider)
       .orderBy(desc(modelsByProvider.id))
       .limit(1);
@@ -493,12 +497,32 @@ export async function applySnapshotChangesAndAudit(params: {
       .insert(modelsByProvider)
       .values({ data: providers })
       .returning({ id: modelsByProvider.id, data: modelsByProvider.data });
-    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
-    return { row: results[0], previousSnapshot };
+    const { handledOrganizationIds } = await applyNewModelsPolicyForPublication(tx, {
+      previousSnapshot,
+      previousSnapshotId: previousSnapshotRow?.id ?? null,
+      newSnapshot: providers,
+      newSnapshotId: results[0].id,
+    });
+    // The previous snapshot is kept for one more cycle: a request that read an organization's
+    // baseline just before this commit may still look it up.
+    await tx
+      .delete(modelsByProvider)
+      .where(
+        and(
+          lt(modelsByProvider.id, previousSnapshotRow?.id ?? results[0].id),
+          notInArray(
+            modelsByProvider.id,
+            tx
+              .select({ id: organization_new_models_baselines.snapshot_id })
+              .from(organization_new_models_baselines)
+          )
+        )
+      );
+    return { row: results[0], previousSnapshot, handledOrganizationIds };
   });
 
   try {
-    await logAutoModelChangesForAllOrgs(previousSnapshot, providers);
+    await logAutoModelChangesForAllOrgs(previousSnapshot, providers, handledOrganizationIds);
   } catch (err) {
     console.error('[sync-providers] auto-change audit logging failed', err);
     captureException(err, { tags: { component: 'sync-providers-auto-audit' } });

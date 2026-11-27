@@ -198,6 +198,19 @@ describe('serving definition read', () => {
     expect(await findServingCustomRouter(env, OWNER, 'mine')).toBeNull();
   });
 
+  it('gives each concurrent request its own read instead of joining a pending one', async () => {
+    state.rows = [storedRow([concreteEntry])];
+    const [first, second] = await Promise.all([
+      findServingCustomRouter(env, OWNER, 'mine'),
+      findServingCustomRouter(env, OWNER, 'mine'),
+    ]);
+    expect(first?.router.slug).toBe('mine');
+    expect(second?.router.slug).toBe('mine');
+    // A pending read belongs to the request that started it, so two requests read twice and only
+    // the resolved definitions are cached.
+    expect(state.reads).toBe(2);
+  });
+
   it('keeps a cached null without reading the database', async () => {
     expect(await findServingCustomRouter(env, OWNER, 'mine')).toBeNull();
     expect(await findServingCustomRouter(env, OWNER, 'mine')).toBeNull();

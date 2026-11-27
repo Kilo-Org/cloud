@@ -22,7 +22,7 @@ export type CustomRouterOwner = { type: OwnerType; id: string };
 
 type CacheEntry = {
   expiresAt: number;
-  value: Promise<CustomRouterDefinition | null>;
+  value: CustomRouterDefinition | null;
   /** Database time of the read that proved this value, or null for a TTL-only read. */
   observedAtMs: number | null;
 };
@@ -94,28 +94,27 @@ export function hasGatewayAlias(router: CustomRouterDefinition): boolean {
 
 function entryCached(
   key: string,
-  value: Promise<CustomRouterDefinition | null>,
+  value: CustomRouterDefinition | null,
   observedAtMs: number | null
 ): void {
   cache.delete(key);
   cache.set(key, { expiresAt: Date.now() + CUSTOM_ROUTER_CACHE_TTL_MS, value, observedAtMs });
-  value.catch(() => {
-    if (cache.get(key)?.value === value) cache.delete(key);
-  });
   if (cache.size > CUSTOM_ROUTER_CACHE_LIMIT) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) cache.delete(oldest);
   }
 }
 
-function cached(
+async function cached(
   key: string,
   load: () => Promise<CustomRouterDefinition | null>
 ): Promise<CustomRouterDefinition | null> {
   const now = Date.now();
   const hit = cache.get(key);
   if (hit && hit.expiresAt > now) return hit.value;
-  const value = load();
+  // Only a resolved read is cached: workerd binds a promise's I/O to the request that created it,
+  // so a request that awaited another request's pending read would fail when that one was cancelled.
+  const value = await load();
   entryCached(key, value, null);
   return value;
 }
@@ -185,7 +184,7 @@ function rememberObservation(
 ): void {
   const hit = cache.get(key);
   if (hit && hit.observedAtMs !== null && hit.observedAtMs > observedAtMs) return;
-  entryCached(key, Promise.resolve(router), observedAtMs);
+  entryCached(key, router, observedAtMs);
 }
 
 export function findCustomRouter(

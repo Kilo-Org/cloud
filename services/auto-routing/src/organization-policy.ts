@@ -13,7 +13,7 @@ const DENIED_MODELS_ATTEMPTS = 2;
 
 type GatewayPolicyEnv = Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_AI_GATEWAY_BASE_URL'>;
 
-const deniedModelsCache = new Map<string, { expiresAt: number; value: Promise<string[] | null> }>();
+const deniedModelsCache = new Map<string, { expiresAt: number; value: string[] }>();
 
 export function clearOrganizationPolicyCache(): void {
   deniedModelsCache.clear();
@@ -88,20 +88,18 @@ export async function deniedOrganizationModelIds(
   const now = Date.now();
   const hit = deniedModelsCache.get(key);
   if (hit && hit.expiresAt > now) return hit.value;
-  const value: Promise<string[] | null> = fetchDeniedModelIdsWithRetry(env, {
-    ...request,
-    modelIds,
-  }).then(deniedModelIds => {
-    if (deniedModelIds === null && deniedModelsCache.get(key)?.value === value) {
-      deniedModelsCache.delete(key);
-    }
-    return deniedModelIds;
-  });
+  // Only a resolved answer is cached: a pending lookup belongs to the request that started it, so
+  // a request that joined it would fail when that request was cancelled.
+  const deniedModelIds = await fetchDeniedModelIdsWithRetry(env, { ...request, modelIds });
+  if (deniedModelIds === null) return null;
   deniedModelsCache.delete(key);
-  deniedModelsCache.set(key, { expiresAt: now + POLICY_CACHE_TTL_MS, value });
+  deniedModelsCache.set(key, {
+    expiresAt: Date.now() + POLICY_CACHE_TTL_MS,
+    value: deniedModelIds,
+  });
   if (deniedModelsCache.size > POLICY_CACHE_LIMIT) {
     const oldest = deniedModelsCache.keys().next().value;
     if (oldest !== undefined) deniedModelsCache.delete(oldest);
   }
-  return value;
+  return deniedModelIds;
 }

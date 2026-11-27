@@ -1006,6 +1006,60 @@ describe('public custom router decide', () => {
     expect(tableFetches()).toBe(2);
   });
 
+  it('serves a resolved table from cache without another read', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const paths = () => benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
+    // The build reads the fingerprint once and the table once.
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH)).toHaveLength(1);
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_VERSION_PATH)).toHaveLength(1);
+
+    // Same epoch and same readiness fingerprint: the resolved table is served as it stands.
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision.tableVersion).toBe('custom-table-1');
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH)).toHaveLength(1);
+    expect(paths().filter(path => path === CUSTOM_ROUTER_TABLE_VERSION_PATH)).toHaveLength(1);
+  });
+
+  it('loads its own table when the request that started the refresh was cancelled', async () => {
+    const firstTableRead = Promise.withResolvers<void>();
+    const endFirstRequest = Promise.withResolvers<void>();
+    let tableReads = 0;
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        tableReads += 1;
+        if (tableReads > 1) return Response.json({ table: rankedTable });
+        firstTableRead.resolve();
+        // The request that started this read is cancelled while it is pending: workerd tears the
+        // I/O down and rejects it. The bound only keeps this test terminating when a later request
+        // is still waiting on that read; how the first request ends is not what is under test.
+        await Promise.race([
+          endFirstRequest.promise,
+          new Promise(resolve => setTimeout(resolve, 2_000)),
+        ]);
+        throw new Error('This promise was created by a request that has since ended.');
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+    const cancelled = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    await firstTableRead.promise;
+    // Arrives while the first rebuild is still pending. It must start its own read rather than
+    // wait on the one that dies with the request that started it.
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: false });
+
+    endFirstRequest.resolve();
+    const cancelledRes = await cancelled;
+    expect(cancelledRes.status).toBe(500);
+    expect(await errorCode(cancelledRes)).toBe('internal_error');
+    expect(tableReads).toBe(2);
+  });
+
   it('never answers a post-settlement request from a build started before it', async () => {
     // Epoch 1's table ranks only the stale client entry, so a leaked pre-settlement build is
     // visible as a fallback/wrong pick rather than just a call count.

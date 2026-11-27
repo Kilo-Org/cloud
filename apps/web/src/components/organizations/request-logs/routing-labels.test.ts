@@ -1,6 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import type { RequestLogRoutingResult } from '@/lib/request-logs/routing-details';
-import { describeResult, describeStep, describeUnsentResult, gatewayName } from './routing-labels';
+import {
+  byokSkipReasonLabel,
+  describeResult,
+  describeStep,
+  describeUnsentResult,
+  gatewayName,
+  rejectedResultLabel,
+} from './routing-labels';
 
 describe('describeStep', () => {
   test('shows the key that served over another API as selected', () => {
@@ -133,7 +140,114 @@ describe('describeStep', () => {
   });
 });
 
+describe('private provider steps', () => {
+  const privateProvider = 'private-a1b2c3d4e5';
+
+  test('names the private provider that served the private provider model ID', () => {
+    expect(
+      describeStep({ step: 'direct-byok-model', outcome: 'selected', provider_id: privateProvider })
+    ).toEqual({
+      title: 'Private provider model ID',
+      detail: 'Served with the Private provider a1b2c3d4e5.',
+      tone: 'selected',
+    });
+  });
+
+  test.each([
+    ['no-organization', 'Private providers are only available to organizations.'],
+    ['no-key', 'This organization has no Private provider a1b2c3d4e5.'],
+    ['disabled', 'The Private provider a1b2c3d4e5 is disabled.'],
+    ['unknown-model', 'The Private provider a1b2c3d4e5 does not offer the requested model.'],
+    ['invalid-credentials', "The Private provider a1b2c3d4e5's credentials could not be used."],
+  ])('explains the %s rejection', (reason, detail) => {
+    expect(
+      describeStep({
+        step: 'direct-byok-model',
+        outcome: 'rejected',
+        provider_id: privateProvider,
+        reason,
+      })
+    ).toEqual({ title: 'Private provider model ID', detail, tone: 'rejected' });
+  });
+
+  test('tells which catalog model ID a private provider that only serves catalog IDs needs', () => {
+    expect(
+      describeStep({
+        step: 'direct-byok-model',
+        outcome: 'rejected',
+        provider_id: privateProvider,
+        reason: 'catalog-only',
+        catalog_model_id: 'openai/gpt-5',
+      }).detail
+    ).toBe(
+      'The Private provider a1b2c3d4e5 only serves Kilo catalog model IDs; request openai/gpt-5 instead.'
+    );
+    expect(
+      describeStep({
+        step: 'direct-byok-model',
+        outcome: 'rejected',
+        provider_id: privateProvider,
+        reason: 'catalog-only',
+        catalog_model_id: null,
+      }).detail
+    ).toBe('The Private provider a1b2c3d4e5 only serves Kilo catalog model IDs.');
+  });
+
+  test('does not call a private provider a key in the BYOK key step', () => {
+    expect(
+      describeStep({
+        step: 'byok-key',
+        outcome: 'selected',
+        route: 'direct-byok',
+        provider_id: privateProvider,
+      }).detail
+    ).toBe('Served with the Private provider a1b2c3d4e5.');
+  });
+
+  test('says a private provider candidate is disabled rather than its key', () => {
+    expect(byokSkipReasonLabel('disabled', privateProvider)).toBe('Private provider disabled');
+    expect(byokSkipReasonLabel('not-catalog-mode', privateProvider)).toBe(
+      'Private provider uses its own model IDs'
+    );
+    expect(byokSkipReasonLabel('disabled', 'synthetic')).toBe('Key disabled');
+    expect(byokSkipReasonLabel('unsupported-api-kind', privateProvider)).toBe(
+      'Does not support this API'
+    );
+  });
+
+  test('labels an unusable credential for a key and a private provider alike', () => {
+    expect(byokSkipReasonLabel('unusable-credential', 'synthetic')).toBe('Credential unusable');
+    expect(byokSkipReasonLabel('unusable-credential', privateProvider)).toBe('Credential unusable');
+  });
+
+  test.each([
+    ['byok-private-provider-unavailable', 'Rejected: the private provider is unavailable'],
+    [
+      'direct-byok-catalog-only',
+      'Rejected: the key or private provider only serves Kilo catalog model IDs',
+    ],
+  ])('labels the %s result', (kind, label) => {
+    expect(rejectedResultLabel({ kind })).toBe(label);
+  });
+});
+
 describe('describeResult', () => {
+  test('names the private provider and its payer', () => {
+    expect(
+      describeResult({
+        kind: 'provider',
+        route: 'direct-byok-model',
+        provider_type: 'direct-byok',
+        byok_provider_ids: ['private-a1b2c3d4e5'],
+        payer: 'owner-byok-key',
+        is_free: false,
+      })
+    ).toEqual({
+      title: 'Sent to Private provider a1b2c3d4e5',
+      paidBy: 'Private provider a1b2c3d4e5',
+    });
+  });
+
   test('names the direct BYOK provider and its key as payer', () => {
     expect(
       describeResult({
@@ -227,6 +341,22 @@ describe('describeUnsentResult', () => {
         'enkrypt-block'
       ).detail
     ).toBe('Would have been sent to Amazon Bedrock (direct).');
+  });
+
+  test('names the private provider that would have served', () => {
+    expect(
+      describeUnsentResult(
+        {
+          kind: 'provider',
+          route: 'direct-byok',
+          provider_type: 'direct-byok',
+          byok_provider_ids: ['private-a1b2c3d4e5'],
+          payer: 'owner-byok-key',
+          is_free: false,
+        },
+        'enkrypt-block'
+      ).detail
+    ).toBe('Would have been sent to Private provider a1b2c3d4e5.');
   });
 
   test('omits the detail when the provider was not recorded', () => {

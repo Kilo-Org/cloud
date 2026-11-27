@@ -22,6 +22,7 @@ import {
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { API_KIND_LABELS, isApiKind, type ApiKind } from '@/lib/api-kind-labels';
 import { byokKeyLabel } from '@/lib/byok/provider-names';
+import { isByokPrivateProviderId } from '@kilocode/db/schema-types';
 import { cn } from '@/lib/utils';
 
 type ByokRoutingPreview = inferRouterOutputs<RootRouter>['byok']['previewRouting'];
@@ -34,11 +35,23 @@ const GATEWAY_NAMES = { vercel: 'Vercel AI Gateway', openrouter: 'OpenRouter' } 
 // Provider model IDs such as `synthetic/...` route straight to their provider, not through this list.
 const DIRECT_BYOK_MODEL_PREFIXES = Object.keys(DIRECT_BYOK_PROVIDERS_META).map(id => `${id}/`);
 
+/** Whether the preview can route `modelId`; direct provider and private provider ids are not routed by it. */
+export function isRoutingPreviewModelId(modelId: string) {
+  if (DIRECT_BYOK_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix))) return false;
+  return !isByokPrivateProviderId(modelId.slice(0, Math.max(0, modelId.indexOf('/'))));
+}
+
 function formatApiKinds(apiKinds: readonly ApiKind[]) {
   return apiKinds.map(apiKind => API_KIND_LABELS[apiKind]).join(' and ');
 }
 
 type StepDescription = { title: string; detail: string };
+
+/** A provider key, or an organization's private provider, which is named by its own name. */
+function keyTitle(providerId: string, getProviderName: (providerId: string) => string) {
+  const name = getProviderName(providerId);
+  return isByokPrivateProviderId(providerId) ? `${name} private provider` : byokKeyLabel([name]);
+}
 
 export function describeRouteStep(
   step: RouteStep,
@@ -58,22 +71,23 @@ function describeStepReason(
 ): StepDescription {
   switch (step.route) {
     case 'direct-byok': {
-      const title = byokKeyLabel([getProviderName(step.providerId)]);
+      const isPrivateProvider = isByokPrivateProviderId(step.providerId);
+      const title = keyTitle(step.providerId, getProviderName);
+      const holder = isPrivateProvider ? 'private provider' : 'key';
       switch (step.reason) {
         case 'serves':
           return { title, detail: 'Serves this model with Kilo catalog model IDs.' };
         case 'unsupported-api-kind':
           return {
             title,
-            detail: `Skipped: the provider serves this model over ${formatApiKinds(step.supportedApiKinds)} only.`,
+            detail: `Skipped: the ${isPrivateProvider ? 'private provider' : 'provider'} serves this model over ${formatApiKinds(step.supportedApiKinds)} only.`,
           };
         case 'disabled':
-          return { title, detail: 'Skipped: the key is disabled.' };
+          return { title, detail: `Skipped: the ${holder} is disabled.` };
         case 'not-catalog-mode':
           return {
             title,
-            detail:
-              'Skipped: the key uses provider model IDs. Turn on Kilo catalog model IDs to use it for this model.',
+            detail: `Skipped: the ${holder} uses ${isPrivateProvider ? 'its own' : 'provider'} model IDs. Turn on Kilo catalog model IDs to use it for this model.`,
           };
       }
       break;
@@ -107,7 +121,7 @@ function describeStepReason(
     case 'unsupported-api-kind':
       return {
         title: 'Request fails',
-        detail: `The ${byokKeyLabel([getProviderName(step.providerId)])} serves this model over ${formatApiKinds(step.supportedApiKinds)} only. Requests for a model your keys serve never fall back to Kilo credits.`,
+        detail: `The ${keyTitle(step.providerId, getProviderName)} serves this model over ${formatApiKinds(step.supportedApiKinds)} only. Requests for a model your keys serve never fall back to Kilo credits.`,
       };
     case 'kilo':
       return {
@@ -201,7 +215,7 @@ export function BYOKRoutingPreview({
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       models?.data
-        .filter(model => !DIRECT_BYOK_MODEL_PREFIXES.some(prefix => model.id.startsWith(prefix)))
+        .filter(model => isRoutingPreviewModelId(model.id))
         .map(model => ({
           id: model.id,
           name: modelNameWithRetirement(model),

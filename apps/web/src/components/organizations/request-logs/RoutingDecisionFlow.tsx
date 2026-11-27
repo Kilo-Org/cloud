@@ -115,7 +115,9 @@ function ByokCandidates({ candidates }: { candidates: RequestLogByokCandidate[] 
             {byokOutcomeLabel(candidate.outcome)}
           </ToneBadge>
           {candidate.reason && (
-            <span className="text-muted-foreground">{byokSkipReasonLabel(candidate.reason)}</span>
+            <span className="text-muted-foreground">
+              {byokSkipReasonLabel(candidate.reason, candidate.provider_id)}
+            </span>
           )}
         </li>
       ))}

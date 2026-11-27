@@ -25,6 +25,10 @@ const INSERT_BATCH_SIZE = 1_000;
 // A busy hour is ~800k usage rows, so a 5-minute slice reads ~70k and takes
 // about 0.2s warm. Slicing keeps each statement short on the primary.
 const SLICE_MS = 5 * 60 * 1000;
+// A warm hour takes a few seconds. Capping each hour at half the run's budget
+// keeps one slow hour, which a later run would restart from scratch, from
+// using the whole run and starving the newer, warmer hours after it.
+export const HOUR_BUDGET_MS = 100_000;
 const SLICE_STATEMENT_TIMEOUT_MS = 60_000;
 // The default 32MB spills the usage-side hash join to disk at a busy hour.
 const SLICE_WORK_MEM = '128MB';
@@ -312,7 +316,9 @@ export type LeaderboardUsageBuildSummary = {
   built: ({ hourStart: string } & LeaderboardUsageHourBuild)[];
   /** Hours whose build threw; each is logged and retried by the next run. */
   failed: string[];
-  /** Eligible hours not attempted, left for the next run. */
+  /** Hours that ran out of `HOUR_BUDGET_MS`; each is retried by the next run. */
+  overBudget: string[];
+  /** Eligible hours not attempted, or cut off by `deadline`, left for the next run. */
   remaining: string[];
   stoppedBy: 'deadline' | null;
   durationMs: number;
@@ -322,8 +328,9 @@ export type LeaderboardUsageBuildSummary = {
  * Builds the eligible hours that are not recorded in `leaderboard_usage_hours`
  * yet, oldest first, stopping at `deadline`, even partway through an hour.
  * Each hour is built once and written whole, so readers never see a partly
- * built hour. A failed hour does not stop the run, so one hour that keeps
- * failing cannot keep newer hours from being built while they are warm.
+ * built hour. Neither a failed hour nor one that runs out of `HOUR_BUDGET_MS`
+ * stops the run, so one bad hour cannot keep newer hours from being built
+ * while they are warm.
  * Reads and writes go to `db`, the primary, where recent usage is warm.
  */
 export async function buildLeaderboardUsageHours({
@@ -354,31 +361,41 @@ export async function buildLeaderboardUsageHours({
 
   const built: LeaderboardUsageBuildSummary['built'] = [];
   const failed: string[] = [];
+  const overBudget: string[] = [];
+  let attempted = 0;
   let stoppedBy: LeaderboardUsageBuildSummary['stoppedBy'] = null;
   for (const hourStart of toBuild) {
     if (Date.now() >= deadline) {
       stoppedBy = 'deadline';
       break;
     }
+    const hourDeadline = Math.min(deadline, Date.now() + HOUR_BUDGET_MS);
     let build: LeaderboardUsageHourBuild | LeaderboardUsageHourStop;
     try {
-      build = await rebuildLeaderboardUsageHour(hourStart, { db, deadline });
+      build = await rebuildLeaderboardUsageHour(hourStart, { db, deadline: hourDeadline });
     } catch {
       // Already logged with its slice and Postgres code.
       failed.push(hourStart);
+      attempted++;
       continue;
     }
     if ('stopped' in build) {
-      stoppedBy = build.stopped;
-      break;
+      if (Date.now() >= deadline) {
+        stoppedBy = 'deadline';
+        break;
+      }
+      overBudget.push(hourStart);
+    } else {
+      built.push({ hourStart, ...build });
     }
-    built.push({ hourStart, ...build });
+    attempted++;
   }
 
   return {
     built,
     failed,
-    remaining: toBuild.slice(built.length + failed.length),
+    overBudget,
+    remaining: toBuild.slice(attempted),
     stoppedBy,
     durationMs: Date.now() - startedAt,
   };

@@ -1,5 +1,5 @@
 {
-  "id": "08d72499-1eb2-4428-8e96-c35473947473",
+  "id": "afb2139c-4b8a-430d-8e48-945c06ee2ab6",
   "prevId": "23e9dbbe-3def-431c-91d1-716348601b0d",
   "version": "7",
   "dialect": "postgresql",
@@ -25260,24 +25260,26 @@
           "notNull": true
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_leaderboard_usage_hourly_hour_dimensions": {
-          "name": "UQ_leaderboard_usage_hourly_hour_dimensions",
-          "nullsNotDistinct": true,
+      "indexes": {
+        "IDX_leaderboard_usage_hourly_hour_start": {
+          "name": "IDX_leaderboard_usage_hourly_hour_start",
           "columns": [
-            "hour_start",
-            "provider",
-            "requested_model",
-            "model",
-            "inference_provider",
-            "mode",
-            "is_user_byok"
-          ]
+            {
+              "expression": "hour_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

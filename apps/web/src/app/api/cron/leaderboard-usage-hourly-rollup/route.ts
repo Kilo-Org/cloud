@@ -45,7 +45,10 @@ export async function GET(request: Request) {
   });
 
   // Console only: these logs are for investigating, not alerting.
-  const log = summary.failed.length > 0 || summary.stoppedBy ? warnExceptInTest : logExceptInTest;
+  const log =
+    summary.failed.length > 0 || summary.overBudget.length > 0 || summary.stoppedBy
+      ? warnExceptInTest
+      : logExceptInTest;
   log(JSON.stringify({ type: 'leaderboard_usage_rollup', ...summary }));
 
   return NextResponse.json({

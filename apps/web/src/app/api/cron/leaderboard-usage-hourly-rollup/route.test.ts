@@ -37,6 +37,7 @@ function summary(overrides: Partial<LeaderboardUsageBuildSummary> = {}) {
       },
     ],
     failed: [],
+    overBudget: [],
     remaining: [],
     stoppedBy: null,
     durationMs: 2_600,

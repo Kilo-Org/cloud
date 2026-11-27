@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { asc } from 'drizzle-orm';
 
 import {
@@ -14,6 +14,7 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   buildLeaderboardUsageHours,
   eligibleLeaderboardUsageHours,
+  HOUR_BUDGET_MS,
   rebuildLeaderboardUsageHour,
 } from '@/lib/leaderboard-usage-hourly-rollup';
 
@@ -275,6 +276,7 @@ describe('leaderboard usage hourly rollup', () => {
         expect.objectContaining({ hourStart: '2026-11-10T08:00:00.000Z', rows: 0, slices: 12 }),
       ],
       failed: [],
+      overBudget: [],
       remaining: [],
       stoppedBy: null,
       durationMs: expect.any(Number),
@@ -306,6 +308,7 @@ describe('leaderboard usage hourly rollup', () => {
     expect(summary).toEqual({
       built: [],
       failed: [],
+      overBudget: [],
       remaining: [
         '2026-11-10T06:00:00.000Z',
         '2026-11-10T07:00:00.000Z',
@@ -399,6 +402,37 @@ describe('leaderboard usage hourly rollup', () => {
     expect(await recordedHours()).toEqual([]);
   });
 
+  test('an hour that runs out of its own budget does not stop newer hours from being built', async () => {
+    await insertUsage({ created_at: '2026-11-10T07:30:00.000Z' });
+    let transactions = 0;
+    const slowDb = {
+      select: db.select.bind(db),
+      transaction: ((callback: Parameters<DrizzleDatabase['transaction']>[0]) => {
+        transactions++;
+        if (transactions === 1) jumpClockForward(HOUR_BUDGET_MS + 1_000);
+        return db.transaction(callback);
+      }) as DrizzleDatabase['transaction'],
+    } as unknown as DrizzleDatabase;
+
+    const summary = await buildLeaderboardUsageHours({
+      db: slowDb,
+      now: new Date('2026-11-10T10:15:00.000Z'),
+      deadline: Date.now() + 2 * HOUR_BUDGET_MS + 60_000,
+    });
+
+    expect(summary.overBudget).toEqual(['2026-11-10T06:00:00.000Z']);
+    expect(summary.built.map(hour => hour.hourStart)).toEqual([
+      '2026-11-10T07:00:00.000Z',
+      '2026-11-10T08:00:00.000Z',
+    ]);
+    expect(summary.remaining).toEqual([]);
+    expect(summary.stoppedBy).toBeNull();
+    expect(await recordedHours()).toEqual([
+      { hour_start: '2026-11-10T07:00:00.000Z', rows: 1 },
+      { hour_start: '2026-11-10T08:00:00.000Z', rows: 0 },
+    ]);
+  });
+
   test('a failed hour is reported and does not stop newer hours from being built', async () => {
     await insertUsage({ created_at: '2026-11-10T08:30:00.000Z' });
     let transactions = 0;
@@ -428,6 +462,16 @@ describe('leaderboard usage hourly rollup', () => {
       { hour_start: '2026-11-10T07:00:00.000Z', rows: 0 },
       { hour_start: '2026-11-10T08:00:00.000Z', rows: 1 },
     ]);
+  });
+
+  test('builds an hour with a dimension too wide for a B-tree index entry', async () => {
+    const wideModel = randomBytes(4_800).toString('hex');
+    await insertUsage({ created_at: '2026-11-10T08:30:00.000Z', requested_model: wideModel });
+
+    await rebuildLeaderboardUsageHour('2026-11-10T08:00:00.000Z', { db });
+
+    expect((await rollupRows()).map(row => row.requested_model)).toEqual([wideModel]);
+    expect(await recordedHours()).toEqual([{ hour_start: '2026-11-10T08:00:00.000Z', rows: 1 }]);
   });
 
   test('concurrent rebuilds of the same hour leave one copy of its rows', async () => {

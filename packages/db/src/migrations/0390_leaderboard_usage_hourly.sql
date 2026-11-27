@@ -12,8 +12,7 @@ CREATE TABLE "leaderboard_usage_hourly" (
 	"cache_hit_tokens" bigint NOT NULL,
 	"cost_microdollars" bigint NOT NULL,
 	"request_count" bigint NOT NULL,
-	"error_count" bigint NOT NULL,
-	CONSTRAINT "UQ_leaderboard_usage_hourly_hour_dimensions" UNIQUE NULLS NOT DISTINCT("hour_start","provider","requested_model","model","inference_provider","mode","is_user_byok")
+	"error_count" bigint NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "leaderboard_usage_hours" (
@@ -21,3 +20,5 @@ CREATE TABLE "leaderboard_usage_hours" (
 	"rows" integer NOT NULL,
 	"built_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+--> statement-breakpoint
+CREATE INDEX "IDX_leaderboard_usage_hourly_hour_start" ON "leaderboard_usage_hourly" USING btree ("hour_start");

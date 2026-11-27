@@ -2959,21 +2959,10 @@ export const leaderboard_usage_hourly = pgTable(
     request_count: bigint({ mode: 'number' }).notNull(),
     error_count: bigint({ mode: 'number' }).notNull(),
   },
-  table => [
-    // Drizzle's `uniqueIndex` has no `nullsNotDistinct`, so this is a unique
-    // constraint; its index leads with `hour_start` and serves range reads too.
-    unique('UQ_leaderboard_usage_hourly_hour_dimensions')
-      .on(
-        table.hour_start,
-        table.provider,
-        table.requested_model,
-        table.model,
-        table.inference_provider,
-        table.mode,
-        table.is_user_byok
-      )
-      .nullsNotDistinct(),
-  ]
+  // No unique index over the dimensions: they are unbounded text, and one value
+  // too wide for a B-tree entry would fail the hour's write and drop its day.
+  // The rollup merges each hour in memory and replaces it under a lock instead.
+  table => [index('IDX_leaderboard_usage_hourly_hour_start').on(table.hour_start)]
 );
 
 export type LeaderboardUsageHourly = typeof leaderboard_usage_hourly.$inferSelect;

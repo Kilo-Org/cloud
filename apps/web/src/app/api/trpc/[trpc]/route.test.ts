@@ -1,12 +1,23 @@
 import { afterEach, expect, it, jest } from '@jest/globals';
 import { initTRPC, TRPCError } from '@trpc/server';
+import type { SessionCheckUnavailableError as SessionCheckUnavailableErrorClass } from '@kilocode/web-shared/lib/uts-bff/browser-session-config';
 
 jest.mock('@kilocode/web-shared/lib/trpc/init', () => ({
   createTRPCContext: () => ({}),
 }));
 
 jest.mock('@/routers/root-router', () => {
+  const { SessionCheckUnavailableError } = jest.requireActual<{
+    SessionCheckUnavailableError: typeof SessionCheckUnavailableErrorClass;
+  }>('@kilocode/web-shared/lib/uts-bff/browser-session-config');
   const t = initTRPC.create();
+  const unavailable = (retryAfterSeconds: number | null) =>
+    t.procedure.query(() => {
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        cause: new SessionCheckUnavailableError(retryAfterSeconds),
+      });
+    });
   return {
     rootRouter: t.router({
       ok: t.procedure.query(() => 'ok'),
@@ -16,6 +27,8 @@ jest.mock('@/routers/root-router', () => {
           message: 'SYNTHETIC_SENSITIVE_TOKEN',
         });
       }),
+      unavailable: unavailable(7),
+      unavailableWithoutHint: unavailable(null),
     }),
   };
 });
@@ -41,3 +54,23 @@ it.each(['development', 'production', 'test'] as const)(
     }
   }
 );
+
+it('an unchecked UTS browser session answers 503 with its Retry-After; nothing else carries one', async () => {
+  const { GET } = await import('./route');
+
+  const unavailable = await GET(new Request('http://localhost/api/trpc/unavailable'));
+  expect(unavailable.status).toBe(503);
+  expect(unavailable.headers.get('Retry-After')).toBe('7');
+
+  const batched = await GET(new Request('http://localhost/api/trpc/ok,unavailable?batch=1'));
+  expect(batched.status).toBe(207);
+  expect(batched.headers.get('Retry-After')).toBe('7');
+
+  const withoutHint = await GET(new Request('http://localhost/api/trpc/unavailableWithoutHint'));
+  expect(withoutHint.status).toBe(503);
+  expect(withoutHint.headers.get('Retry-After')).toBeNull();
+
+  const other = await GET(new Request('http://localhost/api/trpc/ok,fail?batch=1'));
+  expect(other.status).toBe(207);
+  expect(other.headers.get('Retry-After')).toBeNull();
+});

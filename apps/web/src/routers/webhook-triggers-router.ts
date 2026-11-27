@@ -73,6 +73,8 @@ import {
   invokeWorkerScheduledTrigger,
   listWorkerRequests,
   buildInboundUrl,
+  isWebhookAgentConfigured,
+  webhookTriggersUnavailable,
   type EnrichedCapturedRequest,
 } from '@/lib/webhook-agent/webhook-agent-client';
 
@@ -976,6 +978,9 @@ export const webhookTriggersRouter = createTRPCRouter({
       }
     }
 
+    // Without a worker the insert below could only be rolled back, so nothing is written.
+    if (!isWebhookAgentConfigured()) throw webhookTriggersUnavailable();
+
     // Insert into PostgreSQL first - unique constraint is source of truth
     let dbRecord: typeof cloud_agent_webhook_triggers.$inferSelect;
     try {
@@ -1320,6 +1325,9 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
       assertCanRunAsExecutionUser(executionUserId, userId);
     }
+
+    // Nothing is sent without a worker, so this is not the ambiguous "unable to confirm" failure.
+    if (!isWebhookAgentConfigured()) throw webhookTriggersUnavailable();
 
     const result = await invokeWorkerScheduledTrigger(
       input.organizationId ? undefined : userId,

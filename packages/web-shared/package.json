@@ -26,6 +26,7 @@
     "@kilocode/service-token-client": "workspace:*",
     "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
+    "@kilocode/uts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/api-logs": "catalog:",

@@ -2731,6 +2731,13 @@
       "when": 1795788704193,
       "tag": "0389_leaderboard_usage_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 390,
+      "version": "7",
+      "when": 1795808309444,
+      "tag": "0390_leaderboard_usage_hourly",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,8 @@
 # `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets Store bindings) until
 # secrets-cutover flips it. NEXTAUTH_SECRET and INTERNAL_API_SECRET resolve from /shared; the R2
 # media credentials resolve from /workloads/kilo-chat (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY).
+# GATEWAY_TOKEN_SECRET is the cross-service bot HMAC key and also resolves from /workloads/kilo-chat;
+# a second workload that checks the same tokens must read this copy, not keep another one.
 workload: kilo-chat
 environments:
   - production

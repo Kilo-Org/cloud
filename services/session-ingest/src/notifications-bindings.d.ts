@@ -14,9 +14,9 @@ declare global {
     NEXTAUTH_SECRET: SecretsStoreSecret;
     INTERNAL_API_SECRET: SecretsStoreSecret;
     EXPO_ACCESS_TOKEN: SecretsStoreSecret;
-    // Absent from session-ingest's own config, so the notifications modules compiled here read the
-    // Secrets Store bindings above. Declared as the flag's two values, which is what
-    // `services/notifications/src/secrets.ts` accepts.
+    // session-ingest's own config sets this to `secrets-store`, so the notifications modules
+    // compiled here read the Secrets Store bindings above. Declared as the flag's two values,
+    // which is what `services/notifications/src/secrets.ts` accepts.
     SECRETS_SOURCE?: 'secrets-store' | 'sts';
     RECEIPTS_QUEUE: Queue;
     NOTIFICATION_CHANNEL_DO: DurableObjectNamespace<NotificationChannelDO>;

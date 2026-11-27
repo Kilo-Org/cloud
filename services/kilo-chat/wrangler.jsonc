@@ -65,7 +65,7 @@
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
     // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
     // kilo-chat.yaml grants the five secrets below. Nothing reads it while SECRETS_SOURCE is
-    // `env`.
+    // `secrets-store`.
     {
       "binding": "STS",
       "service": "sts",

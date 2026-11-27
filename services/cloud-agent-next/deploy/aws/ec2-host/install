@@ -13,7 +13,12 @@ cd "$work"
 sha256sum -c manifest.sha256
 test "$(uname -m)" = x86_64
 test -x /usr/bin/node
-command -v dockerd nft dnsmasq openssl mkfs.ext4 >/dev/null
+for program in docker dockerd nft dnsmasq openssl mkfs.ext4; do
+  command -v "$program" >/dev/null || {
+    printf 'Missing EC2 host dependency: %s\n' "$program" >&2
+    exit 1
+  }
+done
 systemctl disable --now docker.service docker.socket containerd.service 2>/dev/null || true
 
 install -d -m 0700 /opt/kilo/ec2 /etc/kilo-ec2 /var/lib/kilo-ec2

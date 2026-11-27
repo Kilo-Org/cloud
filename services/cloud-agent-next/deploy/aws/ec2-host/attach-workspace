@@ -29,9 +29,11 @@ else
 fi
 
 mount -t ext4 -o nodev,nosuid,noatime "$device" "$mountpoint"
+trap 'umount "$mountpoint"' EXIT
 [ "$(findmnt -no SOURCE --mountpoint "$mountpoint")" = "$device" ]
 if [ "$action" = initialize ] && [ ! -e "$mountpoint/.layout" ]; then
   printf '%s\n' kilo-ec2-overlay2-v1 > "$mountpoint/.layout"
 fi
 [ "$(cat "$mountpoint/.layout")" = kilo-ec2-overlay2-v1 ]
 rm -f "$mountpoint/.clean-stop"
+trap - EXIT

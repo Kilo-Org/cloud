@@ -27,6 +27,21 @@ const GATEWAY_BASE_SCOPES = [
   'ai-gateway-secure-proxy:request.forward',
 ];
 
+/**
+ * The four database URLs web and ai-gateway read from their own bundles in staging and production
+ * (decision D67): the primary of packages/db/src/database-url.ts, then the read replicas of
+ * packages/web-shared/src/lib/read-replicas.ts.
+ */
+const DATABASE_URL_SECRETS = [
+  'POSTGRES_URL',
+  'POSTGRES_REPLICA_US_URL',
+  'POSTGRES_REPLICA_EU_URL',
+  'POSTGRES_REPLICA_EU_URL_2',
+];
+
+/** The secrets web and ai-gateway hold in staging and production. */
+const APP_SECRETS = ['INTERNAL_API_SECRET', ...DATABASE_URL_SECRETS];
+
 function withGrants(grants: string): string {
   return `${valid}${grants}`;
 }
@@ -874,7 +889,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key outside it, and two Bouncer scopes in production only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key and database URLs outside it, and two Bouncer scopes in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -892,7 +907,7 @@ secrets: [APP_TWO_SECRET]
       environments: ['development', 'staging', 'production'],
       audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
       scopes: GATEWAY_BASE_SCOPES,
-      secrets: ['INTERNAL_API_SECRET'],
+      secrets: APP_SECRETS,
       dynamic: [],
       environmentGrants: {},
     });
@@ -900,7 +915,7 @@ secrets: [APP_TWO_SECRET]
       environments: ['development', 'staging', 'production'],
       audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'bouncer'],
       scopes: [...GATEWAY_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write'],
-      secrets: ['INTERNAL_API_SECRET'],
+      secrets: APP_SECRETS,
       dynamic: [],
       environmentGrants: {},
     });
@@ -954,7 +969,7 @@ describe('dual-accept grants of the shipped policies', () => {
           ...WEB_BASE_SCOPES,
           ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] : []),
         ],
-        secrets: ['INTERNAL_API_SECRET'],
+        secrets: APP_SECRETS,
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
         audiences: [
@@ -967,10 +982,36 @@ describe('dual-accept grants of the shipped policies', () => {
           ...GATEWAY_BASE_SCOPES,
           ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
         ],
-        secrets: ['INTERNAL_API_SECRET'],
+        secrets: APP_SECRETS,
       });
     }
   );
+});
+
+describe('database URL grants of the shipped policies (decision D67)', () => {
+  it.each(['staging', 'production'] as const)(
+    'grants exactly the four database URLs to web and ai-gateway and to no other policy in %s',
+    environment => {
+      for (const workload of ['web', 'ai-gateway']) {
+        expect(
+          policyFor(environment, workload)?.secrets.filter(name => name.startsWith('POSTGRES_'))
+        ).toEqual(DATABASE_URL_SECRETS);
+      }
+      expect(
+        policyIndex
+          .forEnvironment(environment)
+          .filter(policy => policy.secrets.some(name => DATABASE_URL_SECRETS.includes(name)))
+          .map(policy => policy.workload)
+          .sort()
+      ).toEqual(['ai-gateway', 'web']);
+    }
+  );
+
+  it('grants no database URL in development, so no preview build can read one', () => {
+    for (const policy of policyIndex.forEnvironment('development')) {
+      expect(policy.secrets.filter(name => DATABASE_URL_SECRETS.includes(name))).toEqual([]);
+    }
+  });
 });
 
 describe('policy registrations', () => {
@@ -1323,7 +1364,7 @@ scopes: ['gateway:models.read']
     ).toBe(true);
   });
 
-  it('grants web its UTS audiences, scopes and client keys in development only, the internal key in staging and production only, and the Bouncer scopes in production only', () => {
+  it('grants web its UTS audiences, scopes and client keys in development only, the internal key and database URLs in staging and production only, and the Bouncer scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'uts-feed', 'uts'],
@@ -1339,7 +1380,7 @@ scopes: ['gateway:models.read']
     expect(policyFor('staging', 'web')).toMatchObject({
       audiences: ['usage-ingest', 'o11y'],
       scopes: WEB_BASE_SCOPES,
-      secrets: ['INTERNAL_API_SECRET'],
+      secrets: APP_SECRETS,
     });
     expect(policyFor('production', 'web')).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'bouncer'],
@@ -1349,7 +1390,7 @@ scopes: ['gateway:models.read']
         'bouncer:usage.write',
         'bouncer:signup.decide',
       ],
-      secrets: ['INTERNAL_API_SECRET'],
+      secrets: APP_SECRETS,
     });
   });
 });

@@ -41,6 +41,12 @@ scopes:
 # STS_AUTH=dual. The web app makes no signup-history call, so it holds no bouncer:signup.history.
 # INTERNAL_API_SECRET, staging and production only: the internal API secret read under
 # SECRETS_SOURCE=sts (packages/web-shared/src/lib/sts-secret-reader.ts); previews keep `env`.
+# The four database URLs, staging and production only (decision D67): POSTGRES_URL, the primary
+# (packages/db/src/database-url.ts), and the three read replica URLs of
+# packages/web-shared/src/lib/read-replicas.ts, which packages/web-shared/src/lib/drizzle.ts
+# connects with. Granted for their read under SECRETS_SOURCE=sts; until that read lands, drizzle.ts
+# reads the environment. A replica the environment has no URL for comes back `missing`, not
+# `not_granted`; previews keep `env`.
 environmentGrants:
   development:
     audiences:
@@ -57,6 +63,10 @@ environmentGrants:
   staging:
     secrets:
       - INTERNAL_API_SECRET
+      - POSTGRES_URL
+      - POSTGRES_REPLICA_US_URL
+      - POSTGRES_REPLICA_EU_URL
+      - POSTGRES_REPLICA_EU_URL_2
   production:
     audiences:
       - bouncer
@@ -66,3 +76,7 @@ environmentGrants:
       - bouncer:signup.decide
     secrets:
       - INTERNAL_API_SECRET
+      - POSTGRES_URL
+      - POSTGRES_REPLICA_US_URL
+      - POSTGRES_REPLICA_EU_URL
+      - POSTGRES_REPLICA_EU_URL_2

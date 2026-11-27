@@ -1546,10 +1546,10 @@ first; the production deploy policy (step 5) follows the staging proof.
    [Infisical setup](#infisical-setup-per-environment)) covers it. No other identity, role or
    person except the break-glass owner may read `/ci/minting`; the STS deploy job's identity reads
    `/sts-deploy` only.
-5. **STS.** `CF_DEPLOY_ACCOUNT_ID` and the pins went in with step 3, in one change with the two
-   throwaway proof policies (`ci-sts-deploy-proof-staging` and `-production`). After the staging
-   proof passes, the production deploy policy (`ci-deploy-bouncer`) lands in its own change and
-   deploys; the proof policies are removed right after the production proof.
+5. **STS.** `CF_DEPLOY_ACCOUNT_ID` and the pins went in with step 3, in one change with two
+   throwaway proof policies. After the staging proof passed, the production deploy policy
+   (`ci-deploy-bouncer`) lands in its own change and deploys. The proof policies were removed
+   after the production proof (2026-11-27), and the proof repository is archived.
 6. **Checks in staging.** A staging deploy job gets a token and deploys with it. Try to create a
    token scoped to one Worker ("Specified Workers", `Individual Workers Editor`), once in the
    dashboard and once through `POST /accounts/<account>/tokens` with the minting token; record
@@ -1594,12 +1594,8 @@ first; the production deploy policy (step 5) follows the staging proof.
    `include_expired=true` list, and the monitor live test (step 7: the first scheduled watch run
    reports no unexpected deployment; a deployment of `sts-staging` made with a minted staging token
    outside any deploy job is posted; the health workflow's first run is green). GitHub
-   environments: the only staging `cloudflare-deploy` policy is the throwaway proof policy
-   (`ci-sts-deploy-proof-staging`); its environment `sts-proof-staging` in
-   `iscekic/sts-deploy-token-proof` carries the same rules as `sts-proof-production` (deployment
-   branch `main` only, no required reviewers, in a repository whose only writer is Igor), and both
-   policies are removed right after the production proof. `ci-deploy-bouncer` will bind production
-   only.
+   environments: no staging `cloudflare-deploy` policy remains (the throwaway proof policies are
+   removed); `ci-deploy-bouncer` binds production only.
 7. **Monitor of the STS Worker, outside STS.** The window check runs inside STS, so it cannot
    report a change to the STS Worker of its own environment.
    `.github/workflows/sts-deployment-watch.yml` runs every 15 minutes on `main`

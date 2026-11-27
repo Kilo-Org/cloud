@@ -21,8 +21,6 @@ export const POLICY_FILES = [
   'ai-gateway-secure-proxy.yaml',
   'auto-routing.yaml',
   'auto-routing-benchmark.yaml',
-  'ci-sts-deploy-proof-production.yaml',
-  'ci-sts-deploy-proof-staging.yaml',
   'cloud-agent-next.yaml',
   'cloudflare-gmail-push.yaml',
   'cloudflare-scim-sync.yaml',

@@ -8,9 +8,9 @@ import {
 /**
  * Every secret this Worker reads, by its STS bundle name (design 4.7: canonical names, no
  * environment suffix) mapped to the binding it reads today. `NEXTAUTH_SECRET` and
- * `INTERNAL_API_SECRET` resolve from `/shared` (the internal API secret keeps the `_PROD` name its
- * Secrets Store binding already uses); `SESSION_SYNC_SECRET` from `/workloads/session-sync`.
- * services/sts/policy/session-sync.yaml grants them.
+ * `INTERNAL_API_SECRET` resolve from `/shared` — the internal API secret under its plain name even
+ * though the binding it reads today is `INTERNAL_API_SECRET_PROD`; `SESSION_SYNC_SECRET` resolves
+ * from `/workloads/session-sync`. services/sts/policy/session-sync.yaml grants them.
  */
 const BINDINGS = {
   NEXTAUTH_SECRET: 'NEXTAUTH_SECRET',
@@ -21,6 +21,13 @@ const BINDINGS = {
 export type SessionSyncSecretName = keyof typeof BINDINGS;
 
 type BindingName = (typeof BINDINGS)[SessionSyncSecretName];
+
+/**
+ * Names not held for the isolate. `INTERNAL_API_SECRET` authorizes the destructive user-erasure
+ * route, and it was read on every request before this switch, so a rotated value takes effect on the
+ * next request instead of when every isolate has recycled.
+ */
+const UNCACHED: Partial<Record<SessionSyncSecretName, true>> = { INTERNAL_API_SECRET: true };
 
 /** A Secrets Store binding, or the plain Worker secret, which arrives as its own string. */
 type LegacySecretValue = string | { get(): Promise<string> };
@@ -107,5 +114,6 @@ export async function readSessionSyncSecret(
   if (value === undefined) {
     throw new Error(`${bindingName} is not configured`);
   }
+  if (UNCACHED[name] === true) return typeof value === 'string' ? value : value.get();
   return legacyValue(value, minBytes);
 }

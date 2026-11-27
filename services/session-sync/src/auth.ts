@@ -32,13 +32,13 @@ import { exchangeCloudAgentUpload, type CloudAgentUploadEnv } from './cloud-agen
 
 export type { Principal };
 
-/** A Secrets Store binding in deployment, or a plain string from local vars. */
-export type SecretBinding = string | { get(): Promise<string> };
-
+/**
+ * The runtime secrets are read only through `src/secrets.ts`, which selects the source with
+ * `SECRETS_SOURCE`; `SessionSyncSecretsEnv` types them all as optional so a direct read fails
+ * type-checking instead of silently skipping the flag.
+ */
 export type AuthEnv = CloudAgentUploadEnv &
   SessionSyncSecretsEnv & {
-    NEXTAUTH_SECRET: SecretBinding;
-    SESSION_SYNC_SECRET: SecretBinding;
     HYPERDRIVE: Hyperdrive;
     ENVIRONMENT?: string;
     EXCHANGE_IP_LIMITER?: RateLimit;

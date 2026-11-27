@@ -22,6 +22,9 @@ Copy `.dev.vars.example` to `.dev.vars` for local development. Required values a
 - `CLOUD_AGENT_NEXT_URL`: Cloud Agent Next service URL.
 
 Production secrets are set with `wrangler secret put`; public URLs are configured in `wrangler.jsonc`.
+`SECRETS_SOURCE` selects where the runtime reads them: `secrets-store` (the bindings above) or `sts`
+(the bundle over the `STS` SecretsBroker binding). An unrecognised value refuses every read, and the
+`sts` source never falls back to the legacy binding.
 
 ## Development
 

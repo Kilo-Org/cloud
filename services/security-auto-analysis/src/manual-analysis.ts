@@ -130,6 +130,7 @@ export async function processManualAnalysisStart(params: {
    * message until then, and settled as failed on the final delivery.
    */
   isFinalAttempt: boolean;
+  ctx?: ExecutionContext;
 }): Promise<{
   status:
     | 'started'
@@ -272,9 +273,9 @@ export async function processManualAnalysisStart(params: {
             : {}),
         }),
         getSecurityAgentConfigForOwner(params.db, owner),
-        readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
-        readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
-        readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
+        readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET', params.ctx),
+        readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET', params.ctx),
+        readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET', params.ctx),
       ]);
     if (!tokenResult.success) return { status: 'token-missing' };
 
@@ -334,9 +335,9 @@ export async function processManualAnalysisStart(params: {
 
     config = await getSecurityAgentConfigForOwner(params.db, owner);
     [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-      readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
-      readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
-      readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
+      readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET', params.ctx),
+      readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET', params.ctx),
+      readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET', params.ctx),
     ]);
   }
 
@@ -516,7 +517,8 @@ function manualAnalysisCommandTerminalState(result: {
 
 export async function consumeManualAnalysisBatch(
   batch: MessageBatch<unknown>,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   for (const message of batch.messages) {
@@ -549,6 +551,7 @@ export async function consumeManualAnalysisBatch(
         env,
         command: parsed.data,
         isFinalAttempt: message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS,
+        ctx,
       });
       const terminal = manualAnalysisCommandTerminalState(result);
       const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {

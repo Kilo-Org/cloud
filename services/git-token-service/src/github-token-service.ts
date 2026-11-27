@@ -100,18 +100,6 @@ export class GitHubRepositoryPermissionsUnavailableError extends Error {
 export class GitHubTokenService {
   constructor(private env: CloudflareEnv) {}
 
-  async isConfigured(appType: GitHubAppType = 'standard'): Promise<boolean> {
-    if (appType === 'lite') {
-      const privateKey = await readGitTokenServiceSecret(
-        this.env,
-        'GITHUB_LITE_APP_PRIVATE_KEY'
-      );
-      return Boolean(this.env.GITHUB_LITE_APP_ID && privateKey);
-    }
-    const privateKey = await readGitTokenServiceSecret(this.env, 'GITHUB_APP_PRIVATE_KEY');
-    return Boolean(this.env.GITHUB_APP_ID && privateKey);
-  }
-
   /**
    * Get a token scoped to a specific repository.
    * @param installationId - GitHub App installation ID

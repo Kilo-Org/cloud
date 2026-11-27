@@ -33,7 +33,11 @@ import {
   startManualRemediation,
 } from './remediation.js';
 
-async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
+async function handleFetch(
+  request: Request,
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
+): Promise<Response> {
   const url = new URL(request.url);
 
   if (request.method === 'GET' && url.pathname === '/health') {
@@ -45,7 +49,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/dispatch') {
-    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET', ctx);
     const authHeader = request.headers.get('x-internal-api-key');
 
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
@@ -66,7 +70,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
         { status: 503 }
       );
     }
-    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET', ctx);
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -107,7 +111,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/start') {
-    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET', ctx);
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -127,7 +131,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
       );
     }
 
-    const result = await startManualRemediation({ env, request: parsedPayload.data });
+    const result = await startManualRemediation({ env, request: parsedPayload.data, ctx });
     if (!result.admitted) {
       return Response.json(
         { success: false, accepted: false, admitted: false, reason: result.reason },
@@ -148,7 +152,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/cancel') {
-    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET', ctx);
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -168,12 +172,12 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
       );
     }
 
-    const result = await cancelRemediation({ env, request: parsedPayload.data });
+    const result = await cancelRemediation({ env, request: parsedPayload.data, ctx });
     return Response.json(result, { status: 202 });
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/apply-auto-remediation') {
-    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET');
+    const internalSecret = await readSecurityAutoAnalysisSecret(env, 'INTERNAL_API_SECRET', ctx);
     const authHeader = request.headers.get('x-internal-api-key');
     if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -230,7 +234,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     if (!attemptToken) {
       return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
     }
-    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET');
+    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET', ctx);
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!callbackTokenSecret &&
@@ -286,7 +290,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     if (!attemptToken) {
       return Response.json({ error: 'Missing callback attempt token' }, { status: 400 });
     }
-    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET');
+    const callbackTokenSecret = await readSecurityAutoAnalysisSecret(env, 'CALLBACK_TOKEN_SECRET', ctx);
     const callbackToken = request.headers.get('X-Callback-Token');
     const validCallbackToken =
       !!callbackTokenSecret &&
@@ -328,11 +332,15 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
 }
 
 export default {
-  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
-    return handleFetch(request, env);
+  async fetch(request: Request, env: CloudflareEnv, ctx?: ExecutionContext): Promise<Response> {
+    return handleFetch(request, env, ctx);
   },
 
-  async scheduled(controller: ScheduledController, env: CloudflareEnv): Promise<void> {
+  async scheduled(
+    controller: ScheduledController,
+    env: CloudflareEnv,
+    ctx?: ExecutionContext
+  ): Promise<void> {
     const dispatchId = randomUUID();
     const run = createScheduledJobRun({
       jobName: 'security_auto_analysis.dispatch',
@@ -346,7 +354,7 @@ export default {
     };
 
     try {
-      const result = await dispatchDueOwners(env, dispatchId);
+      const result = await dispatchDueOwners(env, dispatchId, ctx);
       emitScheduledJobEvent(
         buildScheduledJobSuccessEvent(run, {
           ...scheduleMetadata,
@@ -365,27 +373,31 @@ export default {
     }
   },
 
-  async queue(batch: MessageBatch<unknown>, env: CloudflareEnv): Promise<void> {
+  async queue(
+    batch: MessageBatch<unknown>,
+    env: CloudflareEnv,
+    ctx?: ExecutionContext
+  ): Promise<void> {
     if (batch.queue.startsWith('security-remediation-attempt-queue')) {
-      await consumeRemediationAttemptBatch(batch, env);
+      await consumeRemediationAttemptBatch(batch, env, ctx);
       return;
     }
     if (batch.queue.startsWith('security-remediation-command-queue')) {
-      await consumeApplyAutoRemediationBatch(batch, env);
+      await consumeApplyAutoRemediationBatch(batch, env, ctx);
       return;
     }
     if (batch.queue.startsWith('security-remediation-callback-queue')) {
-      await consumeRemediationCallbackBatch(batch, env);
+      await consumeRemediationCallbackBatch(batch, env, ctx);
       return;
     }
     if (batch.queue.startsWith('security-auto-analysis-callback-queue')) {
-      await consumeAnalysisCallbackBatch(batch, env);
+      await consumeAnalysisCallbackBatch(batch, env, undefined, ctx);
       return;
     }
     if (batch.queue.startsWith('security-manual-analysis-command-queue')) {
-      await consumeManualAnalysisBatch(batch, env);
+      await consumeManualAnalysisBatch(batch, env, ctx);
       return;
     }
-    await consumeOwnerBatch(batch, env);
+    await consumeOwnerBatch(batch, env, ctx);
   },
 };

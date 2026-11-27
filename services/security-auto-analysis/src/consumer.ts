@@ -262,6 +262,7 @@ async function processOwnerMessage(params: {
   env: CloudflareEnv;
   owner: QueueOwner;
   dispatchId: string;
+  ctx?: ExecutionContext;
 }): Promise<ProcessCounters> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const jobId = randomUUID();
@@ -298,9 +299,9 @@ async function processOwnerMessage(params: {
   }
 
   const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-    readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET'),
-    readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET'),
-    readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET'),
+    readSecurityAutoAnalysisSecret(params.env, 'NEXTAUTH_SECRET', params.ctx),
+    readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET', params.ctx),
+    readSecurityAutoAnalysisSecret(params.env, 'CALLBACK_TOKEN_SECRET', params.ctx),
   ]);
 
   ownerLoop: for (const [rowIndex, row] of claim.rows.entries()) {
@@ -695,7 +696,8 @@ async function processOwnerMessage(params: {
 
 export async function consumeOwnerBatch(
   batch: MessageBatch<unknown>,
-  env: CloudflareEnv
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   for (const message of batch.messages) {
     const parsedMessage = AutoAnalysisOwnerMessageSchema.safeParse(message.body);
@@ -718,6 +720,7 @@ export async function consumeOwnerBatch(
         env,
         owner,
         dispatchId: parsedMessage.data.dispatchId,
+        ctx,
       });
 
       message.ack();

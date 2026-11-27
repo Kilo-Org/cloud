@@ -12,6 +12,7 @@ import ciDeployCloudRuntimePolicy from '../../policy/ci-deploy-cloud-runtime.yam
 import ciDeployCloudStagingPolicy from '../../policy/ci-deploy-cloud-staging.yaml';
 import ciDeployCloudPolicy from '../../policy/ci-deploy-cloud.yaml';
 import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
+import ciKilocodeAppKeyV2Policy from '../../policy/ci-kilocode-app-key-v2.yaml';
 import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
 import ciKilocodeNotifyPolicy from '../../policy/ci-kilocode-notify.yaml';
 import ciKilocodeOpencodeWatchPolicy from '../../policy/ci-kilocode-opencode-watch.yaml';
@@ -65,6 +66,7 @@ const sources: Record<PolicyFile, string> = {
   'ci-deploy-cloud-runtime.yaml': ciDeployCloudRuntimePolicy,
   'ci-deploy-cloud-mcp-catalog.yaml': ciDeployCloudMcpCatalogPolicy,
   'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
+  'ci-kilocode-app-key-v2.yaml': ciKilocodeAppKeyV2Policy,
   'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,
   'ci-kilocode-notify.yaml': ciKilocodeNotifyPolicy,
   'ci-kilocode-opencode-watch.yaml': ciKilocodeOpencodeWatchPolicy,

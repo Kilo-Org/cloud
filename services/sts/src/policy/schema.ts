@@ -60,6 +60,38 @@ export const GITHUB_EVENTS = ['push', 'schedule', 'workflow_dispatch', 'workflow
 /** A production GitHub policy accepts only jobs that run on this ref (design 4.2). */
 export const GITHUB_PRODUCTION_REF = 'refs/heads/main';
 
+/**
+ * The production GitHub policies that may accept a ref other than `GITHUB_PRODUCTION_REF`, each
+ * pinned to the whole policy: its workload, repository and ids, GitHub environment, one ref, one
+ * workflow file at that ref, events, and exactly its secrets, with no token, dynamic or
+ * environment grant. A policy that differs in any field is refused like any other production
+ * policy off `main`. Today it holds one entry:
+ *
+ * - `ci-kilocode-app-key-v2` (manager ruling M76, the pattern of M62's v2 publish rule): the
+ *   `progress-commit` job of kilocode's `kilo-v2.yml` on `v2`, which opens the progress-map pull
+ *   request with the Kilo Maintainer app. The job runs only on a push to `v2`; the `automation`
+ *   environment admits deployments from `main` and `v2` alone.
+ */
+export const GITHUB_PRODUCTION_REF_EXCEPTIONS = [
+  {
+    workload: 'ci-kilocode-app-key-v2',
+    repository: 'Kilo-Org/kilocode',
+    repositoryId: '946087422',
+    repositoryOwnerId: '201822503',
+    environment: 'automation',
+    refs: ['refs/heads/v2'],
+    jobWorkflowRefs: ['Kilo-Org/kilocode/.github/workflows/kilo-v2.yml@refs/heads/v2'],
+    events: ['push'],
+    environments: ['production'],
+    secrets: ['KILOCODE_MAINTAINER_APP_KEY'],
+  },
+] as const;
+
+/** Equal lists in the same order; the exception pins each list exactly as written. */
+function sameList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 /** The bundle folder of a GitHub policy is `/ci/<workload>`, so its name starts with this. */
 export const GITHUB_WORKLOAD_PREFIX = 'ci-';
 
@@ -117,7 +149,7 @@ export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
  * HOW TO UPGRADE: when npm fixes #9969 -> add the Azure federated credential for
  * `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main` -> turn on use_immutable_subject
  * for kilocode -> prove oidc_check on main and v2 -> delete this exception (this constant, the
- * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the seven
+ * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the eight
  * `ci-kilocode-*` policies).
  */
 export const GITHUB_LEGACY_SUBJECT_REPOSITORY = {
@@ -768,7 +800,24 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
     if (identity.environment === undefined) {
       problems.push('a github-oidc policy that grants production must bind identity.environment');
     }
-    if (identity.refs.some(ref => ref !== GITHUB_PRODUCTION_REF)) {
+    const pinnedException = GITHUB_PRODUCTION_REF_EXCEPTIONS.some(
+      exception =>
+        policy.workload === exception.workload &&
+        identity.repository === exception.repository &&
+        identity.repositoryId === exception.repositoryId &&
+        identity.repositoryOwnerId === exception.repositoryOwnerId &&
+        identity.environment === exception.environment &&
+        sameList(identity.refs, exception.refs) &&
+        sameList(identity.jobWorkflowRefs, exception.jobWorkflowRefs) &&
+        sameList(identity.events, exception.events) &&
+        sameList(policy.environments, exception.environments) &&
+        sameList(policy.secrets, exception.secrets) &&
+        policy.audiences.length === 0 &&
+        policy.scopes.length === 0 &&
+        policy.dynamic.length === 0 &&
+        Object.keys(policy.environmentGrants).length === 0
+    );
+    if (identity.refs.some(ref => ref !== GITHUB_PRODUCTION_REF) && !pinnedException) {
       problems.push(
         `a github-oidc policy that grants production accepts only ${GITHUB_PRODUCTION_REF}`
       );

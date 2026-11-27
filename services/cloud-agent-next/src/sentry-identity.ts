@@ -2,6 +2,12 @@ import type { UsageContext } from '@kilocode/container-usage';
 import { computeMemberId } from '@kilocode/worker-utils/compute-member';
 import type { CloudAgentSentryIdentity } from './shared/sentry.js';
 
+/**
+ * Reads the identity for each Sentry event of a Durable Object. The reader runs with `this` set to
+ * the Sentry proxy (`instrumentCloudAgentDurableObject`). That proxy captures a failed
+ * prototype-method call before the caller can catch it, and each capture runs the reader again.
+ * Thus a reader must not call instance methods. Read fields, and use free functions for storage.
+ */
 export const readSentryIdentity = Symbol('readSentryIdentity');
 
 type SentryIdentityResult = CloudAgentSentryIdentity | undefined;

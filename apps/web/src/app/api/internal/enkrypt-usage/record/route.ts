@@ -1,11 +1,12 @@
 import { taggedWriterDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeUsageRecordRequest } from '@/lib/usage-record-auth';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { taggedWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { recordEnkryptUsageLocally } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
+  ENKRYPT_USAGE_WRITE_PATH,
   USAGE_CLASS_LIMIT_HEADER,
   EnkryptUsageWriteSchema,
   type EnkryptUsageWriteResponse,
@@ -19,8 +20,8 @@ export const maxDuration = 150;
 
 const QUEUE_ADMISSION_MAX_WAIT_MS = 250;
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request);
+export async function POST(request: NextRequest): Promise<Response> {
+  const unauthorized = await authorizeUsageRecordRequest(request, ENKRYPT_USAGE_WRITE_PATH);
   if (unauthorized) return unauthorized;
 
   let body: unknown;

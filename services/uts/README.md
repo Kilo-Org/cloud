@@ -525,7 +525,12 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   returns that session and an opaque handle (migration 0013), and the BFF then calls
   `POST /account/browser-sessions/{read,token,end,end-all}` and `/account/devices/revoke`
   (`@kilocode/uts-contracts` `browser-sessions.ts`). The legacy bridge (RFC 8693, subject token
-  `typ` `kilo-legacy-session+jwt`) runs only where `LEGACY_BRIDGE_ENABLED` is `true`; its SSO
+  `typ` `kilo-legacy-session+jwt`) is a high-risk switch: its subject token vouches for a legacy
+  session of any app user. It runs only where `LEGACY_BRIDGE_ENABLED` is `true`, and verifies the
+  token only under its own one or two Ed25519 keys in `KILO_WEB_BRIDGE_JWKS` (kid prefix
+  `kilo-bridge-`), never under a client assertion key: while that var is unset, invalid, or shares a
+  key with `KILO_WEB_CLIENT_JWKS` (`uts.legacy_bridge.key_reused`), the bridge answers 503, so
+  removing the bridge key turns the bridge off; its SSO
   authority check confirms nothing until UTS holds the SSO authority data, so a bridged session
   carries no SSO provenance. `scripts/bff-e2e.ts` runs the whole surface locally with a stand-in
   signer. `test/repo` holds each confidential client to

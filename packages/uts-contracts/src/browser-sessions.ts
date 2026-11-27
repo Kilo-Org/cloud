@@ -42,6 +42,13 @@ export const KILO_WEB_ASSERTION_MAX_LIFETIME_SECONDS = 300;
 export const KILO_LEGACY_SESSION_TOKEN_TYP = 'kilo-legacy-session+jwt';
 /** The legacy bridge's subject token lives at most this long (`exp - iat`). */
 export const KILO_LEGACY_SESSION_MAX_LIFETIME_SECONDS = 60;
+/**
+ * A legacy bridge key id: the prefix and the RFC 7638 SHA-256 thumbprint of the public key. The
+ * bridge's subject token is signed under a key of its own (`KILO_WEB_BRIDGE_JWKS`), never under a
+ * client assertion key, so the key that authenticates the BFF on every call cannot also vouch for
+ * a legacy session of any user, and removing the bridge key turns the bridge off.
+ */
+export const KILO_BRIDGE_KID_PREFIX = 'kilo-bridge-';
 /** RFC 8693 section 3: the `subject_token_type` of the legacy bridge (a JWT). */
 export const UTS_JWT_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:jwt';
 /** RFC 8693 section 3: the `issued_token_type` of the legacy bridge (an access token). */
@@ -71,6 +78,23 @@ export const KiloWebClientJwksSchema = z
     'each kid appears once'
   );
 export type KiloWebClientJwks = z.infer<typeof KiloWebClientJwksSchema>;
+
+/** The value of the UTS var `KILO_WEB_BRIDGE_JWKS`: one or two bridge public keys, distinct kids. */
+export const KiloBridgeJwksSchema = z
+  .strictObject({
+    keys: z
+      .array(
+        KiloWebPublicJwkSchema.extend({
+          kid: z.string().regex(/^kilo-bridge-[A-Za-z0-9_-]{43}$/),
+        })
+      )
+      .min(1)
+      .max(KILO_WEB_CLIENT_MAX_KEYS),
+  })
+  .refine(
+    jwks => new Set(jwks.keys.map(key => key.kid)).size === jwks.keys.length,
+    'each kid appears once'
+  );
 
 /** The opaque browser-session handle: 32 bytes in base64url. */
 export const SessionHandleSchema = Base64urlKey;

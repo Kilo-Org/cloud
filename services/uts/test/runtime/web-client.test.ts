@@ -20,7 +20,7 @@ import {
   generateKeyPair,
 } from 'jose';
 import { describe, expect, it } from 'vitest';
-import { webClientKeys } from '../../src/bff/client-auth';
+import { legacyBridgeKeys, webClientKeys } from '../../src/bff/client-auth';
 import type { LegacySsoAuthority, WebClientDeps } from '../../src/bff/deps';
 import type { WebSession, WebSessionAccess, WebSessionStore } from '../../src/bff/store';
 import type { PendingAuthorization } from '../../src/oauth/authorize';
@@ -49,21 +49,23 @@ const SESSION_ID = '4f1c3a52-8f0e-4d7e-9c4b-2a1e6b5d7c90';
 const SUBJECT = 'app-user-42';
 const REDIRECT = 'http://localhost:3000/api/auth/uts/callback';
 
-type WebKey = { privateKey: CryptoKey; kid: string; jwks: string };
+type WebKey = { privateKey: CryptoKey; kid: string; jwks: string; jwk: Record<string, string> };
 
-async function webKey(): Promise<WebKey> {
+async function webKey(kidPrefix = 'kilo-web-'): Promise<WebKey> {
   const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
   const { x } = await exportJWK(publicKey);
   if (x === undefined) throw new Error('no public key');
-  const kid = `kilo-web-${await calculateJwkThumbprint({ kty: 'OKP', crv: 'Ed25519', x })}`;
-  const jwks = JSON.stringify({
-    keys: [{ kty: 'OKP', crv: 'Ed25519', alg: 'EdDSA', use: 'sig', kid, x }],
-  });
-  return { privateKey, kid, jwks };
+  const kid = `${kidPrefix}${await calculateJwkThumbprint({ kty: 'OKP', crv: 'Ed25519', x })}`;
+  const jwk = { kty: 'OKP', crv: 'Ed25519', alg: 'EdDSA', use: 'sig', kid, x };
+  return { privateKey, kid, jwks: JSON.stringify({ keys: [jwk] }), jwk };
 }
 
 const KEY = await webKey();
 const OTHER_KEY = await webKey();
+/** The legacy bridge's own key, never a client assertion key. */
+const BRIDGE_KEY = await webKey('kilo-bridge-');
+const bridgeKeys = () =>
+  legacyBridgeKeys({ KILO_WEB_BRIDGE_JWKS: BRIDGE_KEY.jwks, KILO_WEB_CLIENT_JWKS: KEY.jwks });
 
 async function signed(
   key: WebKey,
@@ -404,7 +406,11 @@ describe('kilo-web code exchange', () => {
 });
 
 describe('legacy bridge', () => {
-  const legacyToken = async (claims: JWTPayload = {}, key = KEY, typ = 'kilo-legacy-session+jwt') =>
+  const legacyToken = async (
+    claims: JWTPayload = {},
+    key = BRIDGE_KEY,
+    typ = 'kilo-legacy-session+jwt'
+  ) =>
     await signed(
       key,
       {
@@ -451,7 +457,7 @@ describe('legacy bridge', () => {
           await legacyToken({ sso_connection: 'conn_1', sso_organization: 'org_1' })
         )
       ),
-      webDeps(sessions, { bridge: { status: 'on', authority } })
+      webDeps(sessions, { bridge: { status: 'on', authority, keys: bridgeKeys } })
     );
     expect(response.status).toBe(200);
     const body = LegacyBridgeGrantSchema.parse(await response.json());
@@ -485,7 +491,7 @@ describe('legacy bridge', () => {
           await legacyToken({ sso_connection: 'conn_1', sso_organization: 'org_1' })
         )
       ),
-      webDeps(sessions, { bridge: { status: 'on', authority } })
+      webDeps(sessions, { bridge: { status: 'on', authority, keys: bridgeKeys } })
     );
     expect(claims).toEqual([{ subject: SUBJECT, connection: 'conn_1', organization: 'org_1' }]);
     expect(sessions.calls[0].input).toMatchObject({
@@ -514,20 +520,56 @@ describe('legacy bridge', () => {
               jti: `legacy-${crypto.randomUUID()}`,
               auth_time: now(),
             },
-            { typ: 'kilo-legacy-session+jwt', kid: KEY.kid }
+            { typ: 'kilo-legacy-session+jwt', kid: BRIDGE_KEY.kid }
           )
         : await legacyToken(
             'claims' in variant ? variant.claims : {},
-            KEY,
+            BRIDGE_KEY,
             'typ' in variant ? variant.typ : undefined
           );
     const response = await call(
       formRequest('/token', await bridgeFields(subjectToken)),
-      webDeps(sessions, { bridge: { status: 'on', authority: async () => 'unverified' } })
+      webDeps(sessions, {
+        bridge: { status: 'on', authority: async () => 'unverified', keys: bridgeKeys },
+      })
     );
     expect(response.status).toBe(400);
     expect(await errorOf(response)).toBe('invalid_grant');
     expect(sessions.calls).toEqual([]);
+  });
+
+  it('refuses a subject token signed by the client assertion key', async () => {
+    const sessions = fakeSessions();
+    const response = await call(
+      formRequest('/token', await bridgeFields(await legacyToken({}, KEY))),
+      webDeps(sessions, {
+        bridge: { status: 'on', authority: async () => 'unverified', keys: bridgeKeys },
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe('invalid_grant');
+    expect(sessions.calls).toEqual([]);
+  });
+
+  it('answers 503 without its own key set, and when that set reuses a client key', async () => {
+    const reused = JSON.stringify({
+      keys: [{ ...KEY.jwk, kid: KEY.kid.replace('kilo-web-', 'kilo-bridge-') }],
+    });
+    for (const KILO_WEB_BRIDGE_JWKS of [undefined, reused]) {
+      const sessions = fakeSessions();
+      const response = await call(
+        formRequest('/token', await bridgeFields(await legacyToken())),
+        webDeps(sessions, {
+          bridge: {
+            status: 'on',
+            authority: async () => 'unverified',
+            keys: () => legacyBridgeKeys({ KILO_WEB_BRIDGE_JWKS, KILO_WEB_CLIENT_JWKS: KEY.jwks }),
+          },
+        })
+      );
+      expect(response.status).toBe(503);
+      expect(sessions.calls).toEqual([]);
+    }
   });
 });
 
@@ -858,7 +900,7 @@ describe('authorization-server metadata for kilo-web', () => {
     );
 
     const authority: LegacySsoAuthority = async () => 'unverified';
-    const bridge: WebClientDeps['bridge'] = { status: 'on', authority };
+    const bridge: WebClientDeps['bridge'] = { status: 'on', authority, keys: bridgeKeys };
     expect(metadata({ bridge }, true).grant_types_supported).toContain(
       'urn:ietf:params:oauth:grant-type:token-exchange'
     );
@@ -948,7 +990,7 @@ describe('a kilo-web scope that needs a step-up', () => {
       formRequest('/token', {
         grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
         subject_token: await signed(
-          KEY,
+          BRIDGE_KEY,
           {
             iss: 'kilo-web',
             sub: SUBJECT,
@@ -964,7 +1006,10 @@ describe('a kilo-web scope that needs a step-up', () => {
         scope: STEP_UP,
         ...(await assertionFields(TOKEN_URL)),
       }),
-      webDeps(bridge, { scopes, bridge: { status: 'on', authority: unverified } })
+      webDeps(bridge, {
+        scopes,
+        bridge: { status: 'on', authority: unverified, keys: bridgeKeys },
+      })
     );
     expect(await errorOf(bridged)).toBe('invalid_scope');
     expect(bridge.calls).toEqual([]);

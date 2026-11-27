@@ -42,27 +42,21 @@ function shippedPolicies(): Map<string, Policy> {
   );
 }
 
-/** Which shipped policies grant each name: several holders means the value is a shared one. */
-function holdersBySecretName(): Map<string, string[]> {
-  const holders = new Map<string, string[]>();
-  for (const policy of shippedPolicies().values()) {
-    for (const name of policy.secrets) {
-      holders.set(name, [...(holders.get(name) ?? []), policy.workload]);
-    }
-  }
-  return holders;
-}
-
-const HOLDERS = holdersBySecretName();
-
 /**
- * Names whose value is shared beyond the policies that grant it today. `apps/web` verifies the
- * Worker's callbacks with the same `CALLBACK_TOKEN_SECRET` (`apps/web/src/lib/web-config.server.ts`),
- * so the value lives in `/shared` rather than the Workload's own folder. STS resolves a Workload
- * folder before `/shared`, so a `/workloads/<workload>` copy would shadow the shared value for that
- * Worker alone, silently.
+ * The names whose value is the same one across Workloads, so the copier keeps a single copy in
+ * `/shared`. Everything else is a credential of one Workload and lives in its own folder: a pool of
+ * same-named credentials is a normal layout (`R2_ACCESS_KEY_ID` is this Worker's bucket token and,
+ * separately, kilo-chat's media token), so counting granting policies cannot decide the folder.
+ *
+ * `INTERNAL_API_SECRET` and `NEXTAUTH_SECRET` are read by apps/web; `CALLBACK_TOKEN_SECRET` is the
+ * HMAC key apps/web verifies this Worker's callbacks with
+ * (`apps/web/src/lib/web-config.server.ts`).
  */
-const SHARED_ELSEWHERE: Record<string, true> = { CALLBACK_TOKEN_SECRET: true };
+const SHARED_NAMES: Record<string, true> = {
+  INTERNAL_API_SECRET: true,
+  NEXTAUTH_SECRET: true,
+  CALLBACK_TOKEN_SECRET: true,
+};
 
 /** The published table's path column: where the copier copies each value. */
 const PUBLISHED_PATHS: Record<string, string> = {
@@ -136,9 +130,8 @@ async function proveWorker<N extends string>(worker: {
       // would mean the copier copies a name the deployment does not hold.
       expect(binding, `${worker.workload}: ${name}`).toBe(name);
     }
-    // Folder: a name several policies grant cannot live in one Workload's folder, and a name only
-    // this Workload grants stays in its own unless its value is shared outside STS.
-    const shared = (HOLDERS.get(name)?.length ?? 0) > 1 || SHARED_ELSEWHERE[name] === true;
+    // Folder: a shared value lives in `/shared`, a Workload's own credential in its own folder.
+    const shared = SHARED_NAMES[name] === true;
     rows.push({
       workload: worker.workload,
       oldBinding: binding,

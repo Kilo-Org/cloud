@@ -401,8 +401,10 @@ that alarm removes the remaining index entry.
 `X-Internal-Secret` against `INTERNAL_API_SECRET` through `src/secrets.ts`, which reads the
 `INTERNAL_API_SECRET_PROD` Secrets Store binding unless `SECRETS_SOURCE` is `sts` (the bundle over
 the `STS` SecretsBroker binding; there is no fallback), using the same convention as session-ingest.
-This route's value is read per request, not held for the isolate, so a rotation takes effect at
-once. It returns `202` only after durably
+With `secrets-store` this route's value is read per request, not held for the isolate, so a rotation
+takes effect at once; under `sts` it arrives in the isolate's bundle, so a rotation reaches an
+isolate within the bundle window (240 s revalidation, 300 s cache, up to the 24 h stale limit while
+STS is unreachable). It returns `202` only after durably
 recording a permanent user admission fence and the cleanup work. Repeated requests
 are safe. User-facing sync grants cannot invoke this route.
 Non-production web stacks must explicitly configure `SESSION_SYNC_WORKER_URL` to

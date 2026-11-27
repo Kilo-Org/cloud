@@ -24,8 +24,11 @@ type BindingName = (typeof BINDINGS)[SessionSyncSecretName];
 
 /**
  * Names not held for the isolate. `INTERNAL_API_SECRET` authorizes the destructive user-erasure
- * route, and it was read on every request before this switch, so a rotated value takes effect on the
- * next request instead of when every isolate has recycled.
+ * route, and it was read on every request before this switch, so under `secrets-store` a rotated
+ * value takes effect on the next request instead of when every isolate has recycled. The `sts`
+ * source cannot offer that: the value arrives in the isolate's bundle, so a rotation reaches it
+ * within the bundle window (revalidate 240 s, cache 300 s, and up to the 24 h stale limit while STS
+ * is unreachable).
  */
 const UNCACHED: Partial<Record<SessionSyncSecretName, true>> = { INTERNAL_API_SECRET: true };
 

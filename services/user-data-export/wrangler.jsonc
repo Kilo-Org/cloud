@@ -47,7 +47,7 @@
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
     // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
     // user-data-export.yaml grants INTERNAL_API_SECRET, NEXTAUTH_SECRET and the R2 key pair.
-    // Nothing reads it while SECRETS_SOURCE is `env`.
+    // Nothing reads it while SECRETS_SOURCE is `secrets-store`.
     {
       "binding": "STS",
       "service": "sts",

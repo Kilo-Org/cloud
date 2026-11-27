@@ -31,7 +31,7 @@
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
     // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
     // kilo-code-review-worker.yaml grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
-    // BACKEND_AUTH_TOKEN. Nothing reads it while SECRETS_SOURCE is `env`.
+    // BACKEND_AUTH_TOKEN. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
     {
       "binding": "STS",
       "service": "sts",

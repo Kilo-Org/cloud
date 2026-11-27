@@ -170,4 +170,13 @@ describe('readSessionSyncSecret', () => {
     expect(await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', undefined, 32)).toBe(fixed);
     expect(get).toHaveBeenCalledTimes(2);
   });
+
+  it('reads the erase route secret on every call, so a rotation takes effect at once', async () => {
+    const get = vi.fn().mockResolvedValue('internal-value');
+    const env = { INTERNAL_API_SECRET_PROD: { get } };
+
+    expect(await readSessionSyncSecret(env, 'INTERNAL_API_SECRET')).toBe('internal-value');
+    expect(await readSessionSyncSecret(env, 'INTERNAL_API_SECRET')).toBe('internal-value');
+    expect(get).toHaveBeenCalledTimes(2);
+  });
 });

@@ -398,8 +398,11 @@ that alarm removes the remaining index entry.
 ### Account erasure and idle retention
 
 `POST /internal/users/:userID/erase` takes no body and authenticates
-`X-Internal-Secret` against the `INTERNAL_API_SECRET_PROD` Secrets Store binding,
-using the same convention as session-ingest. It returns `202` only after durably
+`X-Internal-Secret` against `INTERNAL_API_SECRET` through `src/secrets.ts`, which reads the
+`INTERNAL_API_SECRET_PROD` Secrets Store binding unless `SECRETS_SOURCE` is `sts` (the bundle over
+the `STS` SecretsBroker binding; there is no fallback), using the same convention as session-ingest.
+This route's value is read per request, not held for the isolate, so a rotation takes effect at
+once. It returns `202` only after durably
 recording a permanent user admission fence and the cleanup work. Repeated requests
 are safe. User-facing sync grants cannot invoke this route.
 Non-production web stacks must explicitly configure `SESSION_SYNC_WORKER_URL` to
@@ -1395,6 +1398,10 @@ Production uses the private R2 bucket `session-sync`, the Hyperdrive configurati
 `session-sync-production`, and the Secrets Store entries `NEXTAUTH_SECRET_PROD`,
 `SESSION_SYNC_SECRET_PROD`, and `INTERNAL_API_SECRET_PROD`. Shared secrets live in
 the shared engineering vault.
+`SECRETS_SOURCE` selects where every runtime secret read goes: `secrets-store` (those entries) or
+`sts` (the bundle over the `STS` SecretsBroker binding, granted by
+`services/sts/policy/session-sync.yaml`). An unrecognised value refuses every read, and the `sts`
+source never falls back to the legacy bindings.
 The Hyperdrive configuration connects as `session_sync_reader`, a read-only role with
 column grants on only the account, device-session, and membership columns that exchange reads.
 Set `ENVIRONMENT=production` explicitly; exchange fails closed if it is absent or

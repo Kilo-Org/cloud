@@ -50,7 +50,7 @@ async function expectDenied(response: Response) {
 it('accepts a session-scoped web transcript credential for reads only and checks the creator ACL', async () => {
   const { owner, other, id, hash } = await setup();
   const binding = testEnv.NEXTAUTH_SECRET;
-  const secret = typeof binding === 'string' ? binding : await binding.get();
+  const secret = typeof binding === 'string' ? binding : await binding?.get();
   if (!secret) throw new Error('Missing test signing secret');
   const token = (user: Principal, ttl = 60, iat = Math.floor(Date.now() / 1000)) =>
     new SignJWT({ sessionID: id, organizationID: user.tenant.id, env: testEnv.ENVIRONMENT })

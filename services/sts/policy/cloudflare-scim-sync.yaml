@@ -1,0 +1,4 @@
+# Registration only: services/scim-sync/wrangler.jsonc. No environment, identity or grant.
+workload: cloudflare-scim-sync
+registered: true
+secrets: []

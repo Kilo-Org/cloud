@@ -1,7 +1,7 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { and, eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -20,7 +20,8 @@ const headers = { 'Cache-Control': 'no-store' };
 /** The Worker receives only the selected owner's encrypted connection. */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const presented = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !presented || !timingSafeEqual(presented, INTERNAL_API_SECRET))
+  const expected = presented ? await readInternalApiSecret() : '';
+  if (!expected || !presented || !timingSafeEqual(presented, expected))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
   const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success)

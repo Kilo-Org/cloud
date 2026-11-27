@@ -3,10 +3,8 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import {
-  INTERNAL_API_SECRET,
-  SESSION_INGEST_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import {
   toSharedTranscriptMessages,
@@ -658,7 +656,8 @@ export async function invalidateOrganizationSessionAccess(
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
-  if (!INTERNAL_API_SECRET) {
+  const internalApiSecret = await readInternalApiSecret();
+  if (!internalApiSecret) {
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
 
@@ -668,7 +667,7 @@ export async function invalidateOrganizationSessionAccess(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'X-Internal-Secret': INTERNAL_API_SECRET,
+        'X-Internal-Secret': internalApiSecret,
       },
       body: JSON.stringify({ kiloUserId, organizationId }),
       // Caller deadline, composed with the shared upstream budget by

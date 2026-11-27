@@ -1,9 +1,7 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import {
-  INTERNAL_API_SECRET,
-  SECURITY_AUTO_ANALYSIS_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import {
   SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS,
   type SecurityRemediationAdmissionRejectionReason,
@@ -124,13 +122,15 @@ function definitiveRejectionError(status: number): TRPCError {
   });
 }
 
-function requireWorkerConfig() {
-  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
+async function requireWorkerConfig(): Promise<{ workerUrl: string; internalApiSecret: string }> {
+  const internalApiSecret = SECURITY_AUTO_ANALYSIS_WORKER_URL ? await readInternalApiSecret() : '';
+  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !internalApiSecret) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
     });
   }
+  return { workerUrl: SECURITY_AUTO_ANALYSIS_WORKER_URL, internalApiSecret };
 }
 
 /**
@@ -146,11 +146,12 @@ function ambiguousTransportError(message: string): TRPCError {
 export async function submitManualRemediationStart(
   params: ManualRemediationStartParams
 ): Promise<ManualRemediationStartResult> {
-  requireWorkerConfig();
+  const { workerUrl, internalApiSecret } = await requireWorkerConfig();
 
   const { response, body } = await postSecurityWorkerJson({
-    url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/start`,
+    url: `${workerUrl}/internal/remediation/start`,
     service: 'remediation',
+    internalApiSecret,
     body: {
       schemaVersion: 1,
       findingId: params.findingId,
@@ -189,11 +190,12 @@ export async function submitManualRemediationStart(
 export async function submitRemediationCancellation(
   params: RemediationCancellationParams
 ): Promise<{ success: true; status: 'cancelled' | 'cancellation_requested' }> {
-  requireWorkerConfig();
+  const { workerUrl, internalApiSecret } = await requireWorkerConfig();
 
   const { response, body } = await postSecurityWorkerJson({
-    url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/remediation/cancel`,
+    url: `${workerUrl}/internal/remediation/cancel`,
     service: 'remediation',
+    internalApiSecret,
     body: {
       schemaVersion: 1,
       attemptId: params.attemptId,
@@ -218,11 +220,12 @@ export async function submitRemediationCancellation(
 export async function submitApplyAutoRemediation(
   params: ApplyAutoRemediationParams
 ): Promise<{ queued: true; commandId: string }> {
-  requireWorkerConfig();
+  const { workerUrl, internalApiSecret } = await requireWorkerConfig();
 
   const { response, body } = await postSecurityWorkerJson({
-    url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/apply-auto-remediation`,
+    url: `${workerUrl}/internal/apply-auto-remediation`,
     service: 'remediation',
+    internalApiSecret,
     body: {
       schemaVersion: 1,
       commandId: params.commandId,

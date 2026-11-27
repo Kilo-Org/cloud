@@ -1,0 +1,4 @@
+# Registration only: services/session-ingest/wrangler.jsonc. No environment, identity or grant.
+workload: session-ingest
+registered: true
+secrets: []

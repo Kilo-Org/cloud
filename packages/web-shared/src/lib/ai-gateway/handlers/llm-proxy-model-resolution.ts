@@ -38,9 +38,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import {
-  inferenceRegionIneligibleCandidates,
-  type InferenceRegionRouting,
-} from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+  gatewaySettingsIneligibleCandidates,
+  type GatewaySettingsRouting,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates';
 import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -158,22 +158,23 @@ async function authenticatedRoutingCaller(
 }
 
 /**
- * How the request routes under the organization's inference region, or null when its gateway
- * settings set none.
+ * How the request routes under the organization's gateway settings, or null when they leave
+ * OpenRouter on, so every Kilo route stays open.
  */
-async function resolveInferenceRegionRouting(
+async function resolveGatewaySettingsRouting(
   ctx: ModelResolutionContext
-): Promise<InferenceRegionRouting | null> {
+): Promise<GatewaySettingsRouting | null> {
   const caller = await ctx.callerPromise;
   if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
   const organizationId = caller.organizationId;
   const { plan, settings } = await ctx.balanceAndSettingsPromise;
-  const { dataRegion } = await resolveOrganizationGatewaySettings({
+  const { openRouterDisabled, dataRegion } = await resolveOrganizationGatewaySettings({
     organizationId,
     plan,
     settings,
   });
-  if (!dataRegion) return null;
+  // An inference region always turns OpenRouter off.
+  if (!openRouterDisabled) return null;
   let isNonTrialEnterprise: Promise<boolean> | undefined;
   return {
     region: dataRegion,
@@ -196,25 +197,25 @@ async function autoRoutingDenials(
   ctx: ModelResolutionContext,
   fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
   fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>,
-  fromRegion: {
-    routing: () => Promise<InferenceRegionRouting | null>;
+  fromGatewaySettings: {
+    routing: () => Promise<GatewaySettingsRouting | null>;
     candidateIds: () => Promise<ReadonlyArray<string>>;
   }
 ): Promise<string[]> {
-  const regionDenials = async () => {
-    const routing = await fromRegion.routing();
+  const gatewaySettingsDenials = async () => {
+    const routing = await fromGatewaySettings.routing();
     if (!routing) return [];
-    return inferenceRegionIneligibleCandidates(routing, await fromRegion.candidateIds());
+    return gatewaySettingsIneligibleCandidates(routing, await fromGatewaySettings.candidateIds());
   };
   const groupPolicy = await ctx.organizationGroupPolicyPromise;
-  const [deniedFromPolicy, deniedFromPrivacy, deniedFromRegion] = await Promise.all([
+  const [deniedFromPolicy, deniedFromPrivacy, deniedFromGatewaySettings] = await Promise.all([
     groupPolicy ? fromPolicy(groupPolicy) : [],
     isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy)
       ? fromPrivacy({ zdr: ctx.effectivePrivacy.zdr === true })
       : [],
-    regionDenials(),
+    gatewaySettingsDenials(),
   ]);
-  return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy, ...deniedFromRegion])];
+  return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy, ...deniedFromGatewaySettings])];
 }
 
 function decisionRequest(ctx: ModelResolutionContext, caller: RoutingCaller) {
@@ -277,9 +278,9 @@ async function resolveAutoModelId(
     autoModel === KILO_AUTO_EFFICIENT_MODEL.id || autoModel === KILO_AUTO_BALANCED_MODEL.id;
   // Set by whichever decision runs; resolution only sees the decision itself.
   let classifierCostUsd = 0;
-  let inferenceRegionRouting: Promise<InferenceRegionRouting | null> | undefined;
-  const getInferenceRegionRouting = () =>
-    (inferenceRegionRouting ??= resolveInferenceRegionRouting(ctx));
+  let gatewaySettingsRouting: Promise<GatewaySettingsRouting | null> | undefined;
+  const getGatewaySettingsRouting = () =>
+    (gatewaySettingsRouting ??= resolveGatewaySettingsRouting(ctx));
 
   const decisionForRouter = async (router: AutoRouter) => {
     const caller = await ctx.callerPromise;
@@ -292,7 +293,7 @@ async function resolveAutoModelId(
       policy => collectDeniedAutoRoutingModelIds(policy, router),
       options => collectDataCollectionRequiredAutoRoutingModelIds(router, options),
       {
-        routing: getInferenceRegionRouting,
+        routing: getGatewaySettingsRouting,
         candidateIds: async () => candidateModelIdsFromTable(await getCachedRoutingTable(router)),
       }
     );
@@ -307,8 +308,8 @@ async function resolveAutoModelId(
     if (!decision || isVirtualAutoModelId(decision.model)) return decision;
     // The worker can pick from a newer routing table than the gateway's cached copy, or from
     // any table when the gateway's is unavailable, so the denials above may not cover its pick.
-    const routing = await getInferenceRegionRouting();
-    if (routing && (await inferenceRegionIneligibleCandidates(routing, [decision.model])).length) {
+    const routing = await getGatewaySettingsRouting();
+    if (routing && (await gatewaySettingsIneligibleCandidates(routing, [decision.model])).length) {
       return null;
     }
     return decision;
@@ -332,10 +333,10 @@ async function resolveAutoModelId(
           policy => deniedAutoRoutingCandidates(policy, candidateIds),
           options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options),
           {
-            routing: getInferenceRegionRouting,
-            // The region applies to the model that runs: an alias runs as its pin or stored
-            // target, which are candidates of their own, so denying the alias would also block
-            // an in-region pin.
+            routing: getGatewaySettingsRouting,
+            // The gateway settings apply to the model that runs: an alias runs as its pin or
+            // stored target, which are candidates of their own, so denying the alias would also
+            // block a servable pin.
             candidateIds: async () => candidateIds.filter(id => !isLatestAliasId(id)),
           }
         ),
@@ -385,14 +386,14 @@ async function resolveAutoModelId(
       isAutoFreeCandidateAllowed: async modelId => {
         const [policy, routing] = await Promise.all([
           ctx.organizationGroupPolicyPromise,
-          getInferenceRegionRouting(),
+          getGatewaySettingsRouting(),
         ]);
         if (policy && !(await getEffectiveModelDecision(policy, modelId)).allowed) return false;
         // Free models are served on Kilo's own accounts, so BYOK keys are not considered.
         return (
           !routing ||
           (
-            await inferenceRegionIneligibleCandidates({ ...routing, loadStoredByokKeys: null }, [
+            await gatewaySettingsIneligibleCandidates({ ...routing, loadStoredByokKeys: null }, [
               modelId,
             ])
           ).length === 0

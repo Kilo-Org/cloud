@@ -18,7 +18,7 @@ import {
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+import { gatewaySettingsIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -58,8 +58,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
   getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/inference-region-candidates', () => ({
-  inferenceRegionIneligibleCandidates: jest.fn(async () => []),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates', () => ({
+  gatewaySettingsIneligibleCandidates: jest.fn(async () => []),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
   isNonTrialEnterpriseOrganization: jest.fn(async () => false),
@@ -492,7 +492,7 @@ describe('deniedAutoRoutingModelIdsForMember', () => {
   });
 });
 
-describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
+describe('deniedAutoRoutingModelIdsForMember with organization gateway settings', () => {
   const regionDenied = ['openai/gpt-5'];
   const modelIds = ['anthropic/claude', 'openai/gpt-5', 'kilo-auto/frontier'];
 
@@ -524,16 +524,16 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
     jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(policy());
     jest.mocked(getStoredByokKeys).mockReset();
     jest.mocked(isNonTrialEnterpriseOrganization).mockClear();
-    jest.mocked(inferenceRegionIneligibleCandidates).mockReset();
+    jest.mocked(gatewaySettingsIneligibleCandidates).mockReset();
     jest
-      .mocked(inferenceRegionIneligibleCandidates)
+      .mocked(gatewaySettingsIneligibleCandidates)
       .mockImplementation(async (_routing, candidateIds) =>
         candidateIds.filter(id => regionDenied.includes(id))
       );
   });
 
   function lastRouting() {
-    const routing = jest.mocked(inferenceRegionIneligibleCandidates).mock.lastCall?.[0];
+    const routing = jest.mocked(gatewaySettingsIneligibleCandidates).mock.lastCall?.[0];
     if (!routing) throw new Error('the region check did not run');
     return routing;
   }
@@ -546,7 +546,7 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
     await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual(
       regionDenied
     );
-    expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith(
+    expect(gatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
       expect.objectContaining({ region: 'eu' }),
       ['anthropic/claude', 'openai/gpt-5']
     );
@@ -612,7 +612,7 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
   it('does not region-deny a latest alias, whose pin is in the region and live target is not', async () => {
     const member = await setUp({ settings: { data_region: 'eu' } });
     jest
-      .mocked(inferenceRegionIneligibleCandidates)
+      .mocked(gatewaySettingsIneligibleCandidates)
       .mockImplementation(async (_routing, candidateIds) =>
         candidateIds.filter(id => id !== 'vendor/pin')
       );
@@ -623,7 +623,7 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
         modelIds: ['~vendor/latest', 'vendor/pin', 'vendor/live'],
       })
     ).resolves.toEqual(['vendor/live']);
-    expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith(expect.anything(), [
+    expect(gatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(expect.anything(), [
       'vendor/pin',
       'vendor/live',
     ]);
@@ -647,24 +647,93 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
     );
   });
 
+  describe('with OpenRouter off and no region', () => {
+    it('denies the candidates Kilo’s route cannot serve, with no region', async () => {
+      const member = await setUp({ settings: { disable_openrouter: true } });
+
+      await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual(
+        regionDenied
+      );
+      expect(gatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({ region: null, apiKind: null }),
+        ['anthropic/claude', 'openai/gpt-5']
+      );
+      expect(lastRouting().caller).toEqual({
+        userId: member.userId,
+        organizationId: member.organizationId,
+      });
+    });
+
+    it('reads the organization’s keys once, on demand, as for a region', async () => {
+      const member = await setUp({ settings: { disable_openrouter: true } });
+      const storedKeys = { keys: [], decrypt: jest.fn() } as unknown as StoredByokKeys;
+      jest
+        .mocked(getStoredByokKeys as unknown as () => Promise<StoredByokKeys>)
+        .mockResolvedValue(storedKeys);
+
+      await deniedAutoRoutingModelIdsForMember({ ...member, modelIds });
+      const { loadStoredByokKeys } = lastRouting();
+
+      expect(getStoredByokKeys).not.toHaveBeenCalled();
+      expect(await loadStoredByokKeys?.()).toBe(storedKeys);
+      expect(await loadStoredByokKeys?.()).toBe(storedKeys);
+      expect(jest.mocked(getStoredByokKeys).mock.calls).toEqual([
+        [readDb, { type: 'organization', id: member.organizationId }],
+      ]);
+    });
+
+    it('does not deny a latest alias', async () => {
+      const member = await setUp({ settings: { disable_openrouter: true } });
+
+      await deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['~vendor/latest', 'vendor/pin'],
+      });
+
+      expect(gatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(expect.anything(), [
+        'vendor/pin',
+      ]);
+    });
+
+    it('names the region when the settings set one as well', async () => {
+      const member = await setUp({ settings: { disable_openrouter: true, data_region: 'au' } });
+
+      await deniedAutoRoutingModelIdsForMember({ ...member, modelIds });
+
+      expect(lastRouting().region).toBe('au');
+    });
+  });
+
   it.each([
-    ['the organization has no data region', { settings: {} }],
+    ['the organization has no data region and leaves OpenRouter on', { settings: {} }],
+    [
+      'the organization explicitly leaves OpenRouter on',
+      { settings: { disable_openrouter: false } },
+    ],
     [
       'the gateway settings feature is off',
       { settings: { data_region: 'eu' }, featureEnabled: false },
     ],
     [
+      'the gateway settings feature is off and OpenRouter is disabled',
+      { settings: { disable_openrouter: true }, featureEnabled: false },
+    ],
+    [
       'the organization is not on the enterprise plan',
       { settings: { data_region: 'eu' }, teams: true },
     ],
-  ])('adds no region denial when %s', async (_name, options) => {
+    [
+      'the organization is not on the enterprise plan and OpenRouter is disabled',
+      { settings: { disable_openrouter: true }, teams: true },
+    ],
+  ])('adds no gateway settings denial when %s', async (_name, options) => {
     const member = await setUp(options);
 
     await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual([]);
-    expect(inferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+    expect(gatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
   });
 
-  it('adds no region denial for an unknown organization', async () => {
+  it('adds no gateway settings denial for an unknown organization', async () => {
     await expect(
       deniedAutoRoutingModelIdsForMember({
         userId: 'user-1',
@@ -672,7 +741,7 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
         modelIds,
       })
     ).resolves.toEqual([]);
-    expect(inferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+    expect(gatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
   });
 });
 

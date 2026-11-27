@@ -11,9 +11,9 @@ import {
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
-  inferenceRegionIneligibleCandidates,
-  type InferenceRegionRouting,
-} from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+  gatewaySettingsIneligibleCandidates,
+  type GatewaySettingsRouting,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates';
 import { getOpenAiChatGptByokModelIds } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import {
   createDirectByokReferenceResolver,
@@ -138,7 +138,7 @@ function useKeys(...keys: KeyFixture[]) {
   readStoredKeys.mockResolvedValue(stored(keys));
 }
 
-function routing(overrides: Partial<InferenceRegionRouting> = {}): InferenceRegionRouting {
+function routing(overrides: Partial<GatewaySettingsRouting> = {}): GatewaySettingsRouting {
   return {
     region: 'eu',
     apiKind: 'chat_completions',
@@ -153,12 +153,12 @@ function routing(overrides: Partial<InferenceRegionRouting> = {}): InferenceRegi
   };
 }
 
-function ineligible(candidateIds: string[], overrides: Partial<InferenceRegionRouting> = {}) {
-  return inferenceRegionIneligibleCandidates(routing(overrides), candidateIds);
+function ineligible(candidateIds: string[], overrides: Partial<GatewaySettingsRouting> = {}) {
+  return gatewaySettingsIneligibleCandidates(routing(overrides), candidateIds);
 }
 
 /** A routing that may use the caller's keys and connections. */
-function withKeys(overrides: Partial<InferenceRegionRouting> = {}) {
+function withKeys(overrides: Partial<GatewaySettingsRouting> = {}) {
   return { loadStoredByokKeys, ...overrides };
 }
 
@@ -177,10 +177,14 @@ function catalogModel(
   } as unknown as DirectByokCatalogModel;
 }
 
-function mockCustomLlm(modelId: string) {
+function mockCustomLlm(modelId: string, baseUrl = 'https://upstream.example.com/v1') {
   jest
     .mocked(findCustomLlm)
-    .mockImplementation(async id => (id === modelId ? ({ public_id: id } as CustomLlm) : null));
+    .mockImplementation(async id =>
+      id === modelId
+        ? ({ public_id: id, definition: { base_url: baseUrl } } as unknown as CustomLlm)
+        : null
+    );
 }
 
 /** Provider model ids, mapped to the catalog id a catalog-mode key serves them as (null: none). */
@@ -237,7 +241,7 @@ beforeEach(() => {
   isNonTrialEnterprise.mockReset().mockResolvedValue(true);
 });
 
-describe('inferenceRegionIneligibleCandidates', () => {
+describe('gatewaySettingsIneligibleCandidates', () => {
   describe('on Kilo’s route', () => {
     it('keeps a model some provider serves in the region', async () => {
       await expect(ineligible([IN_REGION])).resolves.toEqual([]);
@@ -554,6 +558,213 @@ describe('inferenceRegionIneligibleCandidates', () => {
       useKeys({ providerId: 'synthetic', serveCatalogModels: false });
 
       await expect(ineligible([US_ONLY], withKeys())).resolves.toEqual([US_ONLY]);
+    });
+  });
+
+  describe('with OpenRouter off and no region', () => {
+    const OPENROUTER_ONLY = 'vendor/openrouter-only-model';
+
+    function offIneligible(
+      candidateIds: string[],
+      overrides: Partial<GatewaySettingsRouting> = {}
+    ) {
+      return ineligible(candidateIds, { region: null, ...overrides });
+    }
+
+    it('denies a model Vercel does not serve', async () => {
+      await expect(offIneligible([OPENROUTER_ONLY, UNLISTED])).resolves.toEqual([
+        OPENROUTER_ONLY,
+        UNLISTED,
+      ]);
+    });
+
+    it('keeps a model Vercel serves, whatever regions it can be pinned to', async () => {
+      await expect(
+        offIneligible([IN_REGION, US_ONLY, GPT_US_ONLY, GPT_BEDROCK_EU_ONLY])
+      ).resolves.toEqual([]);
+      expect(getCachedVercelInferenceRegionsForModel).not.toHaveBeenCalled();
+    });
+
+    it('looks the model up under its Vercel id', async () => {
+      await expect(offIneligible(['z-ai/glm-5.2'])).resolves.toEqual([]);
+    });
+
+    it('ignores virtual auto model ids and deduplicates candidates', async () => {
+      await expect(
+        offIneligible(['kilo-auto/balanced', OPENROUTER_ONLY, OPENROUTER_ONLY])
+      ).resolves.toEqual([OPENROUTER_ONLY]);
+    });
+
+    it('does not pin the region of a model, so a model without any pinnable endpoint is kept', async () => {
+      jest
+        .mocked(getCachedVercelInferenceRegionsForModel)
+        .mockResolvedValue(new Map([['moonshotai', new Set()]]));
+
+      await expect(offIneligible([US_ONLY])).resolves.toEqual([]);
+    });
+
+    describe('under the provider routing settings', () => {
+      it.each([
+        ['names a provider that serves the model', { only: ['amazon-bedrock'] }, []],
+        ['names the provider that serves the model', { only: ['openai'] }, []],
+        ['names only a provider that does not serve the model', { only: ['anthropic'] }, [GPT]],
+        ['ignores one provider that serves the model', { ignore: ['openai'] }, []],
+        [
+          'ignores every provider that serves the model',
+          { ignore: ['openai', 'amazon-bedrock'] },
+          [GPT],
+        ],
+        ['ignores the only provider it names', { only: ['openai'], ignore: ['openai'] }, [GPT]],
+      ])('a request whose provider.only/ignore %s', async (_name, requestProvider, expected) => {
+        await expect(offIneligible([GPT], { requestProvider })).resolves.toEqual(expected);
+      });
+
+      it('applies an organization policy’s eligible provider routes', async () => {
+        jest
+          .mocked(getEffectiveModelDecision)
+          .mockResolvedValue({ allowed: true, eligibleProviderRoutes: new Set(['anthropic']) });
+
+        await expect(offIneligible([GPT], { policy })).resolves.toEqual([GPT]);
+
+        jest
+          .mocked(getEffectiveModelDecision)
+          .mockResolvedValue({ allowed: true, eligibleProviderRoutes: new Set(['openai']) });
+
+        await expect(offIneligible([GPT], { policy })).resolves.toEqual([]);
+      });
+
+      it('denies a model whose organization routes and request providers share none', async () => {
+        jest
+          .mocked(getEffectiveModelDecision)
+          .mockResolvedValue({ allowed: true, eligibleProviderRoutes: new Set(['openai']) });
+
+        await expect(
+          offIneligible([GPT], { policy, requestProvider: { only: ['amazon-bedrock'] } })
+        ).resolves.toEqual([GPT]);
+      });
+
+      it('leaves out the providers Kilo ignores for a non-trial-enterprise organization', async () => {
+        isNonTrialEnterprise.mockResolvedValue(false);
+
+        // Anthropic is ignored for Claude, Amazon Bedrock for OpenAI models.
+        await expect(offIneligible([CLAUDE_US_ONLY, GPT_BEDROCK_EU_ONLY])).resolves.toEqual([
+          CLAUDE_US_ONLY,
+          GPT_BEDROCK_EU_ONLY,
+        ]);
+        // Another provider still serves these.
+        await expect(offIneligible([CLAUDE, GPT])).resolves.toEqual([]);
+      });
+
+      it('keeps them for a non-trial enterprise organization', async () => {
+        isNonTrialEnterprise.mockResolvedValue(true);
+
+        await expect(offIneligible([CLAUDE_US_ONLY, GPT_BEDROCK_EU_ONLY])).resolves.toEqual([]);
+      });
+    });
+
+    describe('a custom LLM', () => {
+      it('is kept when its upstream is not OpenRouter', async () => {
+        mockCustomLlm(OPENROUTER_ONLY);
+
+        await expect(offIneligible([OPENROUTER_ONLY])).resolves.toEqual([]);
+      });
+
+      it('is kept even when Vercel lists a model of its id outside every region', async () => {
+        mockCustomLlm(US_ONLY);
+
+        await expect(offIneligible([US_ONLY])).resolves.toEqual([]);
+      });
+
+      it.each([
+        'https://openrouter.ai/api/v1',
+        'https://api.openrouter.ai/v1',
+        'https://OPENROUTER.AI.:8443/api/v1',
+      ])('is denied when its base_url is on OpenRouter (%s)', async baseUrl => {
+        mockCustomLlm(OPENROUTER_ONLY, baseUrl);
+
+        await expect(offIneligible([OPENROUTER_ONLY, IN_REGION])).resolves.toEqual([
+          OPENROUTER_ONLY,
+        ]);
+      });
+
+      it.each([
+        'https://openrouter.ai.attacker.example/v1',
+        'https://notopenrouter.ai/v1',
+        'https://ai-gateway.vercel.sh/v1',
+      ])('is kept when its base_url only resembles OpenRouter’s (%s)', async baseUrl => {
+        mockCustomLlm(OPENROUTER_ONLY, baseUrl);
+
+        await expect(offIneligible([OPENROUTER_ONLY])).resolves.toEqual([]);
+      });
+
+      it('is denied for a region, whatever its upstream', async () => {
+        mockCustomLlm(IN_REGION);
+
+        await expect(ineligible([IN_REGION], { region: 'eu' })).resolves.toEqual([IN_REGION]);
+      });
+    });
+
+    describe('with the caller’s keys and connections', () => {
+      it('keeps a model an inference key serves that Vercel does not', async () => {
+        useKeys({ providerId: 'moonshotai' });
+        jest
+          .mocked(getModelInferenceUserByokProviders)
+          .mockImplementation(async modelId => (modelId === OPENROUTER_ONLY ? ['moonshotai'] : []));
+
+        await expect(offIneligible([OPENROUTER_ONLY, UNLISTED], withKeys())).resolves.toEqual([
+          UNLISTED,
+        ]);
+      });
+
+      it('keeps a model the owner’s OpenRouter key serves', async () => {
+        useKeys({ providerId: 'openrouter' });
+        jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue(['openrouter']);
+
+        await expect(offIneligible([OPENROUTER_ONLY], withKeys())).resolves.toEqual([]);
+      });
+
+      it('denies the same model without a key loader', async () => {
+        jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai']);
+
+        await expect(offIneligible([OPENROUTER_ONLY])).resolves.toEqual([OPENROUTER_ONLY]);
+        expect(readStoredKeys).not.toHaveBeenCalled();
+      });
+
+      it('loads the keys only when some candidate is not served by Kilo’s route', async () => {
+        await offIneligible([IN_REGION, US_ONLY], withKeys());
+        expect(readStoredKeys).not.toHaveBeenCalled();
+
+        await offIneligible([IN_REGION, OPENROUTER_ONLY, UNLISTED], withKeys());
+        expect(readStoredKeys).toHaveBeenCalledTimes(1);
+      });
+
+      it('still exempts a model a ChatGPT connection serves', async () => {
+        jest.mocked(getOpenAiChatGptByokModelIds).mockResolvedValue(new Set([OPENROUTER_ONLY]));
+
+        await expect(
+          offIneligible([OPENROUTER_ONLY], withKeys({ apiKind: 'responses' }))
+        ).resolves.toEqual([]);
+        await expect(
+          offIneligible([OPENROUTER_ONLY], withKeys({ apiKind: 'chat_completions' }))
+        ).resolves.toEqual([OPENROUTER_ONLY]);
+      });
+
+      it('still exempts a Claude model when the Claude link takes requests', async () => {
+        jest.mocked(claudeBillingLinkTakesRequests).mockResolvedValue(true);
+        jest.mocked(getVercelLanguageModelIdsFromDatabase).mockResolvedValue(new Set());
+
+        await expect(offIneligible([CLAUDE_US_ONLY, US_ONLY], withKeys())).resolves.toEqual([
+          US_ONLY,
+        ]);
+      });
+
+      it('makes no connection lookups when Kilo’s route serves every candidate or the loader is null', async () => {
+        await offIneligible([IN_REGION, GPT], withKeys({ apiKind: 'responses' }));
+        await offIneligible([OPENROUTER_ONLY], { apiKind: 'responses' });
+
+        expect(getOpenAiChatGptByokModelIds).not.toHaveBeenCalled();
+        expect(claudeBillingLinkTakesRequests).not.toHaveBeenCalled();
+      });
     });
   });
 

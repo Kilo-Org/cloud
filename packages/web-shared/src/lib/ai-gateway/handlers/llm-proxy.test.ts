@@ -89,7 +89,7 @@ import {
   type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
-import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+import { gatewaySettingsIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates';
 import type * as AutoRoutingDeniedModelsModule from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
@@ -345,8 +345,8 @@ jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(async () => null),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/inference-region-candidates', () => ({
-  inferenceRegionIneligibleCandidates: jest.fn(async () => []),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates', () => ({
+  gatewaySettingsIneligibleCandidates: jest.fn(async () => []),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () => ({
   candidateModelIdsFromTable: jest.requireActual<typeof AutoRoutingDeniedModelsModule>(
@@ -5047,7 +5047,7 @@ describe('custom routers and signed auto decisions', () => {
   });
 });
 
-describe('auto routing with an organization inference region', () => {
+describe('auto routing with organization gateway settings', () => {
   const vercelProvider = {
     ...provider,
     type: 'vercel',
@@ -5063,8 +5063,8 @@ describe('auto routing with an organization inference region', () => {
   };
   const groupPolicy = { policyRevision: 42 } as EffectiveOrganizationModelPolicy;
   const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
-  const mockedInferenceRegionIneligibleCandidates = jest.mocked(
-    inferenceRegionIneligibleCandidates
+  const mockedGatewaySettingsIneligibleCandidates = jest.mocked(
+    gatewaySettingsIneligibleCandidates
   );
   const kiloAutoBalancedTarget = 'kilo-auto/balanced';
   const routerPool: CustomRouterDefinition = {
@@ -5160,7 +5160,7 @@ describe('auto routing with an organization inference region', () => {
         ? routingTable(inRegionModel, 'anthropic/claude-opus-4.8', kiloAutoBalancedTarget)
         : routingTable(inRegionModel, outOfRegionModel, kiloAutoBalancedTarget)
     );
-    mockedInferenceRegionIneligibleCandidates
+    mockedGatewaySettingsIneligibleCandidates
       .mockReset()
       .mockImplementation(async (_routing, candidateIds) =>
         candidateIds.filter(modelId => modelId !== inRegionModel)
@@ -5187,7 +5187,7 @@ describe('auto routing with an organization inference region', () => {
 
     expect(response.status).toBe(200);
     expect(mockedGetCachedRoutingTable).toHaveBeenCalledWith('efficient');
-    expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith(
+    expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
       expect.objectContaining({ ...regionRouting, policy: groupPolicy }),
       [inRegionModel, outOfRegionModel]
     );
@@ -5248,7 +5248,7 @@ describe('auto routing with an organization inference region', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith(
+    expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
       expect.objectContaining({ ...regionRouting, policy: groupPolicy }),
       [inRegionModel, outOfRegionModel]
     );
@@ -5267,7 +5267,7 @@ describe('auto routing with an organization inference region', () => {
       }
       return { kind: 'no_free_models_available' };
     });
-    mockedInferenceRegionIneligibleCandidates.mockImplementation(async (_routing, candidateIds) =>
+    mockedGatewaySettingsIneligibleCandidates.mockImplementation(async (_routing, candidateIds) =>
       candidateIds.filter(modelId => modelId.startsWith(outOfRegionModel))
     );
 
@@ -5279,7 +5279,7 @@ describe('auto routing with an organization inference region', () => {
       [`${outOfRegionModel}:free`]: false,
     });
     // Free models run on Kilo's own accounts, so BYOK keys are not considered.
-    expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith(
+    expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
       expect.objectContaining({ region: 'eu', loadStoredByokKeys: null }),
       [`${outOfRegionModel}:free`]
     );
@@ -5300,7 +5300,7 @@ describe('auto routing with an organization inference region', () => {
     await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/free')));
 
     expect(allowed).toBe(false);
-    expect(mockedInferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+    expect(mockedGatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
   });
 
   describe('a classifier decision outside the region', () => {
@@ -5332,7 +5332,7 @@ describe('auto routing with an organization inference region', () => {
 
       expect(response.status).toBe(200);
       expect(mockedFetchEfficientAutoDecision.mock.calls[0]?.[0].deniedModelIds).toEqual([]);
-      expect(mockedInferenceRegionIneligibleCandidates).toHaveBeenCalledWith(
+      expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
         expect.objectContaining({ ...regionRouting, policy: groupPolicy }),
         [outOfRegionModel]
       );
@@ -5376,7 +5376,7 @@ describe('auto routing with an organization inference region', () => {
 
         expect(response.status).toBe(200);
         expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(outOfRegionModel);
-        expect(mockedInferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+        expect(mockedGatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
       }
     );
   });
@@ -5386,7 +5386,7 @@ describe('auto routing with an organization inference region', () => {
 
     await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
 
-    expect(mockedInferenceRegionIneligibleCandidates.mock.calls[0]?.[0].policy).toBe(groupPolicy);
+    expect(mockedGatewaySettingsIneligibleCandidates.mock.calls[0]?.[0].policy).toBe(groupPolicy);
   });
 
   describe('the routing the region check evaluates', () => {
@@ -5402,7 +5402,7 @@ describe('auto routing with an organization inference region', () => {
         )
       );
 
-      const [routing] = mockedInferenceRegionIneligibleCandidates.mock.calls[0] ?? [];
+      const [routing] = mockedGatewaySettingsIneligibleCandidates.mock.calls[0] ?? [];
       expect(routing).toMatchObject({
         region: 'eu',
         apiKind: 'responses',
@@ -5416,7 +5416,7 @@ describe('auto routing with an organization inference region', () => {
     it('names the signed-in caller, and the bot of a service run', async () => {
       regionEnabled();
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
-      expect(mockedInferenceRegionIneligibleCandidates.mock.calls[0]?.[0].caller).toEqual({
+      expect(mockedGatewaySettingsIneligibleCandidates.mock.calls[0]?.[0].caller).toEqual({
         userId: 'user-123',
         organizationId: 'org-1',
         botId: undefined,
@@ -5431,7 +5431,7 @@ describe('auto routing with an organization inference region', () => {
       });
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
 
-      expect(mockedInferenceRegionIneligibleCandidates.mock.calls[0]?.[0].caller).toEqual({
+      expect(mockedGatewaySettingsIneligibleCandidates.mock.calls[0]?.[0].caller).toEqual({
         userId: 'user-123',
         organizationId: 'org-1',
         botId: 'bot-123',
@@ -5443,7 +5443,7 @@ describe('auto routing with an organization inference region', () => {
       mockedIsNonTrialEnterpriseOrganization.mockResolvedValue(true);
 
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
-      const [routing] = mockedInferenceRegionIneligibleCandidates.mock.calls[0] ?? [];
+      const [routing] = mockedGatewaySettingsIneligibleCandidates.mock.calls[0] ?? [];
       // Provider selection asks too, so count only what the routing adds.
       const callsBefore = mockedIsNonTrialEnterpriseOrganization.mock.calls.length;
 
@@ -5486,7 +5486,7 @@ describe('auto routing with an organization inference region', () => {
 
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/regional')));
 
-      const candidateIds = mockedInferenceRegionIneligibleCandidates.mock.calls[0]?.[1] ?? [];
+      const candidateIds = mockedGatewaySettingsIneligibleCandidates.mock.calls[0]?.[1] ?? [];
       expect(candidateIds).not.toContain(alias);
       expect(candidateIds).toEqual(
         expect.arrayContaining([inRegionModel, liveTarget, outOfRegionModel])
@@ -5526,7 +5526,7 @@ describe('auto routing with an organization inference region', () => {
 
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
 
-      expect(mockedInferenceRegionIneligibleCandidates.mock.calls.at(-1)?.[1]).toEqual([alias]);
+      expect(mockedGatewaySettingsIneligibleCandidates.mock.calls.at(-1)?.[1]).toEqual([alias]);
     });
   });
 
@@ -5541,7 +5541,7 @@ describe('auto routing with an organization inference region', () => {
     function consultKeysLikeRouting() {
       mockedGetStoredByokKeys.mockResolvedValue(storedKeys(keys));
       const keysSeenByRegionCheck: Array<readonly EnabledByokProvider[]> = [];
-      mockedInferenceRegionIneligibleCandidates.mockImplementation(
+      mockedGatewaySettingsIneligibleCandidates.mockImplementation(
         async ({ loadStoredByokKeys }, candidateIds) => {
           const outside = candidateIds.filter(modelId => modelId !== inRegionModel);
           if (outside.length > 0) {
@@ -5671,15 +5671,136 @@ describe('auto routing with an organization inference region', () => {
     });
   });
 
+  describe('with OpenRouter off and no region', () => {
+    const openRouterOff = () =>
+      setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
+
+    beforeEach(() => {
+      openRouterOff();
+    });
+
+    it('denies the classifier’s table candidates Kilo’s route cannot serve, with no region', async () => {
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(response.status).toBe(200);
+      expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          region: null,
+          apiKind: 'chat_completions',
+          policy: groupPolicy,
+          loadStoredByokKeys: expect.any(Function),
+        }),
+        [inRegionModel, outOfRegionModel]
+      );
+      expect(mockedFetchEfficientAutoDecision.mock.calls[0]?.[0].deniedModelIds).toEqual([
+        outOfRegionModel,
+      ]);
+    });
+
+    it('denies the frontier table candidates too', async () => {
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+
+      expect(mockedGetCachedRoutingTable).toHaveBeenCalledWith('frontier');
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          router: 'frontier',
+          deniedModelIds: ['anthropic/claude-opus-4.8'],
+        })
+      );
+    });
+
+    it('denies the custom router pool entries Kilo’s route cannot serve', async () => {
+      useActualResolution();
+
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/regional')));
+
+      expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({ region: null }),
+        [inRegionModel, outOfRegionModel]
+      );
+      expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ deniedModelIds: [outOfRegionModel] })
+      );
+    });
+
+    it('skips an Auto Free candidate Kilo’s route cannot serve, without considering keys', async () => {
+      const checked: Record<string, boolean | undefined> = {};
+      mockedApplyResolvedAutoModel.mockImplementation(async params => {
+        for (const modelId of [`${inRegionModel}:free`, `${outOfRegionModel}:free`]) {
+          checked[modelId] = await params.isAutoFreeCandidateAllowed?.(modelId);
+        }
+        return { kind: 'no_free_models_available' };
+      });
+      mockedGatewaySettingsIneligibleCandidates.mockImplementation(async (_routing, candidateIds) =>
+        candidateIds.filter(modelId => modelId.startsWith(outOfRegionModel))
+      );
+
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/free')));
+
+      expect(checked).toEqual({
+        [`${inRegionModel}:free`]: true,
+        [`${outOfRegionModel}:free`]: false,
+      });
+      expect(mockedGatewaySettingsIneligibleCandidates).toHaveBeenCalledWith(
+        expect.objectContaining({ region: null, loadStoredByokKeys: null }),
+        [`${outOfRegionModel}:free`]
+      );
+    });
+
+    it('discards a classifier pick Kilo’s route cannot serve', async () => {
+      useActualResolution();
+      mockedGetCachedRoutingTable.mockResolvedValue(null);
+      mockedFetchEfficientAutoDecision.mockResolvedValue({
+        decision: {
+          model: outOfRegionModel,
+          taskType: 'implementation',
+          subtaskType: 'feature_development',
+          source: 'benchmark',
+          tableVersion: 'v1',
+          sticky: false,
+        },
+        costUsd: 0,
+      });
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(PRIMARY_DEFAULT_MODEL);
+    });
+
+    it('still names a region when the settings set one as well', async () => {
+      setOrganization(
+        { disable_openrouter: true, data_region: 'jp' },
+        { gateway_settings: ['org-1'] }
+      );
+
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
+
+      expect(mockedGatewaySettingsIneligibleCandidates.mock.calls[0]?.[0].region).toBe('jp');
+    });
+  });
+
   describe.each([
     ['the gateway settings feature is off', () => setOrganization({ data_region: 'eu' }, {})],
+    [
+      'the gateway settings feature is off and OpenRouter is disabled',
+      () => setOrganization({ disable_openrouter: true }, {}),
+    ],
     [
       'the organization is not on the enterprise plan',
       () => setOrganization({ data_region: 'eu' }, { gateway_settings: ['org-1'] }, 'teams'),
     ],
     [
-      'the organization has no data region',
-      () => setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] }),
+      'the organization is not on the enterprise plan and OpenRouter is disabled',
+      () => setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] }, 'teams'),
+    ],
+    [
+      'the organization leaves OpenRouter on and sets no region',
+      () => setOrganization({ disable_openrouter: false }, { gateway_settings: ['org-1'] }),
+    ],
+    [
+      'the organization sets neither OpenRouter nor a region',
+      () => setOrganization({}, { gateway_settings: ['org-1'] }),
     ],
     ['the caller has no organization', () => setUserAuth()],
   ])('when %s', (_name, configure) => {
@@ -5691,15 +5812,15 @@ describe('auto routing with an organization inference region', () => {
       );
     });
 
-    it('adds no region denials for the classifier tiers', async () => {
+    it('adds no gateway settings denials for the classifier tiers', async () => {
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
 
       expect(mockedFetchEfficientAutoDecision.mock.calls[0]?.[0].deniedModelIds).toEqual([]);
-      expect(mockedInferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+      expect(mockedGatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
       expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
     });
 
-    it('adds no region denials for a custom router', async () => {
+    it('adds no gateway settings denials for a custom router', async () => {
       useActualResolution();
 
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/regional')));
@@ -5707,7 +5828,7 @@ describe('auto routing with an organization inference region', () => {
       expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
         expect.objectContaining({ deniedModelIds: [] })
       );
-      expect(mockedInferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+      expect(mockedGatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
     });
 
     it('accepts every Auto Free candidate', async () => {
@@ -5720,7 +5841,7 @@ describe('auto routing with an organization inference region', () => {
       await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/free')));
 
       expect(allowed).toBe(true);
-      expect(mockedInferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+      expect(mockedGatewaySettingsIneligibleCandidates).not.toHaveBeenCalled();
     });
   });
 });

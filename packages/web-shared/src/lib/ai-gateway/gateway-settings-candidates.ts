@@ -27,16 +27,25 @@ import {
   planRoutes,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { canRouteToVercelInRegion } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
+  canRouteToVercel,
+  canRouteToVercelInRegion,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getManagedGatewayFromUrl } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
-/** What a request routes under, as far as an organization's inference region is concerned. */
-export type InferenceRegionRouting = {
-  region: OrganizationDataRegion;
+/**
+ * What a request routes under, as far as the organization's gateway settings are concerned. It
+ * exists only when they turn OpenRouter off, directly or through an inference region: Kilo then
+ * pays only through Vercel, pinned to the region when one is set.
+ */
+export type GatewaySettingsRouting = {
+  /** The inference region, or null when the settings only turn OpenRouter off. */
+  region: OrganizationDataRegion | null;
   /** The request's API, or null when the candidates are named before the request exists. */
   apiKind: GatewayChatApiKind | null;
   policy: EffectiveOrganizationModelPolicy | null;
@@ -55,13 +64,27 @@ export type InferenceRegionRouting = {
 };
 
 /**
- * Whether routing serves the catalog model in the region: Kilo's route pinned to it, under the
- * provider settings the request would route with, or else one of the caller's keys, which the
- * region exempts (see `getGatewaySettingsRefusal`). Only routes that honor an inference region
- * pin Kilo's route; extend `canRouteToVercelInRegion`'s caller here when another upstream does.
+ * Whether Kilo's route serves the model under the gateway settings: only Vercel may, under the
+ * provider settings the request would route with, and only pinned to the region when one is set.
+ * Extend this when another upstream can serve those requests.
  */
-async function isCatalogModelServableInRegion(
-  routing: InferenceRegionRouting,
+async function kiloRouteServes(
+  routing: GatewaySettingsRouting,
+  model: string,
+  provider: OpenRouterProviderConfig | undefined
+): Promise<boolean> {
+  return routing.region
+    ? canRouteToVercelInRegion(model, provider, routing.region)
+    : canRouteToVercel(model, provider);
+}
+
+/**
+ * Whether routing serves the catalog model under the gateway settings: Kilo's route (see
+ * `kiloRouteServes`), or else one of the caller's keys, which the settings exempt (see
+ * `getGatewaySettingsRefusal`).
+ */
+async function isCatalogModelServable(
+  routing: GatewaySettingsRouting,
   model: string
 ): Promise<boolean> {
   const { policy, loadStoredByokKeys } = routing;
@@ -76,11 +99,7 @@ async function isCatalogModelServableInRegion(
   const routingConfig = access.effectiveProviderConfig ?? routing.requestProvider;
   const kiloIgnoredProviders = getIgnoredProviders(model, await routing.isNonTrialEnterprise());
   if (
-    await canRouteToVercelInRegion(
-      model,
-      withIgnoredProviders(routingConfig, kiloIgnoredProviders),
-      routing.region
-    )
+    await kiloRouteServes(routing, model, withIgnoredProviders(routingConfig, kiloIgnoredProviders))
   ) {
     return true;
   }
@@ -105,39 +124,46 @@ async function isCatalogModelServableInRegion(
 }
 
 /**
- * Whether the region leaves the candidate servable. A custom LLM's route never pins a region. A
+ * Whether the gateway settings leave the candidate servable. A custom LLM's route never pins a
+ * region, and with OpenRouter off it is refused only when its upstream is on OpenRouter's domain. A
  * provider model id the caller's key serves is the caller's own route, and with no usable key it
- * fails whatever the region, so only a catalog-mode key's rewrite to a catalog id matters.
+ * fails whatever the settings, so only a catalog-mode key's rewrite to a catalog id matters.
  */
-async function isCandidateServableInRegion(
-  routing: InferenceRegionRouting,
+async function isCandidateServable(
+  routing: GatewaySettingsRouting,
   modelId: string
 ): Promise<boolean> {
   const requested = await classifyRequestedModel(modelId);
-  if (requested.kind === 'custom-llm') return false;
+  if (requested.kind === 'custom-llm') {
+    return (
+      routing.region === null &&
+      getManagedGatewayFromUrl(requested.customLlm.definition.base_url) !== 'openrouter'
+    );
+  }
   if (requested.kind === 'direct-byok-model' && routing.loadStoredByokKeys) {
     const enabledKeys = enabledStoredByokKeys(await routing.loadStoredByokKeys());
     if (enabledKeys.some(key => key.providerId === requested.provider.id)) {
       const resolved = await createDirectByokReferenceResolver(enabledKeys)(modelId);
       if (resolved === null || resolved === modelId) return true;
-      return isCatalogModelServableInRegion(routing, resolved);
+      return isCatalogModelServable(routing, resolved);
     }
   }
-  return isCatalogModelServableInRegion(routing, modelId);
+  return isCatalogModelServable(routing, modelId);
 }
 
 /**
- * The candidates an organization's inference region rules out: those routing would refuse only
- * because of the region. Auto routing denies them so it never picks a model the request then fails
- * on. Candidates that fail for other reasons are left to the policy checks that cover them.
+ * The candidates the organization's gateway settings rule out: those routing would refuse only
+ * because OpenRouter is off or because of the inference region. Auto routing denies them so it
+ * never picks a model the request then fails on. Candidates that fail for other reasons are left
+ * to the policy checks that cover them.
  */
-export async function inferenceRegionIneligibleCandidates(
-  routing: InferenceRegionRouting,
+export async function gatewaySettingsIneligibleCandidates(
+  routing: GatewaySettingsRouting,
   candidateIds: ReadonlyArray<string>
 ): Promise<string[]> {
   const candidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const servable = await Promise.all(
-    candidates.map(modelId => isCandidateServableInRegion(routing, modelId))
+    candidates.map(modelId => isCandidateServable(routing, modelId))
   );
   const ineligible = candidates.filter((_modelId, index) => !servable[index]);
   if (ineligible.length === 0 || !routing.loadStoredByokKeys) return ineligible;
@@ -146,12 +172,12 @@ export async function inferenceRegionIneligibleCandidates(
 }
 
 /**
- * The candidates the caller's ChatGPT connection or Claude link takes, which the region exempts like
- * a key. A Claude link takes every Claude request, serving it or failing it, so the region never
- * decides those either way.
+ * The candidates the caller's ChatGPT connection or Claude link takes, which the gateway settings
+ * exempt like a key. A Claude link takes every Claude request, serving it or failing it, so the
+ * settings never decide those either way.
  */
 async function candidatesServedByConnection(
-  routing: InferenceRegionRouting,
+  routing: GatewaySettingsRouting,
   candidateIds: string[]
 ): Promise<ReadonlySet<string>> {
   const { userId, organizationId, botId } = routing.caller;

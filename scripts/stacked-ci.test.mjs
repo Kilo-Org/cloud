@@ -140,7 +140,8 @@ function validate(root, mobile) {
     'mobile admission must not filter paths: a required suite check must report on every PR'
   );
   assert.equal(mobile.on.pull_request?.['paths-ignore'], undefined);
-  assert.deepEqual(root.permissions, { contents: 'read', 'pull-requests': 'read' });
+  assert.deepEqual(root.permissions, { contents: 'read' });
+  assert.deepEqual(root.jobs.changes.permissions, { contents: 'read', 'pull-requests': 'read' });
   assert.deepEqual(mobile.permissions, { contents: 'read' });
   assert.ok('workflow_call' in mobile.on, 'mobile release caller must remain enabled');
   assert.equal(

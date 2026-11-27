@@ -1005,10 +1005,10 @@ The `Cloud Agent E2E` GitHub workflow (`.github/workflows/cloud-agent-e2e.yml`)
 runs on manual dispatch from `main` only; its schedule returns with the deployed
 profile (see above). Its `deploy` job (input `deploy`, default on) deploys the
 stack; its `build` job installs the driver with `--ignore-scripts` and hands the
-workspace over; its `tests` job reads the Access service token from STS
-(`ci-cloud-agent-e2e`), takes the Worker hostname from
-`CLOUD_AGENT_E2E_WORKER_HOSTNAME`, requires a non-production `backend_url`,
-checks that Access refuses an anonymous request, runs `matrix.ts --profile
+installed `node_modules` trees over; its `preflight` job checks the variables,
+a non-production `CLOUD_AGENT_E2E_BACKEND_URL` and the Worker's Access secret
+names; its `tests` job reads the Access service token from STS
+(`ci-cloud-agent-e2e`), proves the closed path, runs `matrix.ts --profile
 deployed` with the package's own `tsx` and uploads `e2e.log`. Its `parallel`
 input defaults to `4` and sets `E2E_PARALLEL`; `only` selects scenarios. Job
 failure is the runner's exit code.

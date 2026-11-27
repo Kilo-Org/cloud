@@ -2,16 +2,17 @@
  * Cloudflare Access service-token headers for the deployed e2e stack.
  *
  * Neither deployed e2e Worker has a public address. CI reaches the Worker's and
- * the fake LLM's custom domains through one Access application whose only
- * policy is Service Auth for one service token. The `tests` job reads the token
- * from the STS `ci-cloud-agent-e2e` bundle and passes it to the driver as
+ * the fake LLM's custom domains through two Access applications
+ * (`cloud-agent-e2e-test`, `fake-llm-e2e-test`) whose only policy is Service
+ * Auth for the same service token. The `tests` job reads the token from the STS
+ * `ci-cloud-agent-e2e` bundle and passes it to the driver as
  * `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET`; this is the only place
  * the driver reads them. The driver sends the token on requests to the
  * `WORKER_URL` origin (tRPC, `/stream`, the `/__e2e/*` surface) and the
- * `FAKE_LLM_URL` origin (the `/test/*` side channel), and registers it as the
- * headers of a callback target on the Worker's origin, because callback delivery
- * to the Worker's own origin passes the same Access application. A request to
- * any other origin, such as the backend, never carries it.
+ * `FAKE_LLM_URL` origin (the `/test/*` side channel and auth probes). A request
+ * to any other origin, such as the backend, never carries it. Callback delivery
+ * to the Worker's own origin gets the token from the Worker's fetch wrapper, not
+ * from the driver.
  *
  * Both variables unset adds nothing: the local profiles and a stack without an
  * Access hostname. Exactly one set is a configuration error.

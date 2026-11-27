@@ -19,7 +19,7 @@ import {
   withAccessFetch,
   withoutAccessOriginCookies,
 } from './e2e-surface/access-credentials.js';
-import { refuseWithoutAccess } from './e2e-surface/access-gate.js';
+import { refuseWithoutAccess, withoutAccessHeaders } from './e2e-surface/access-gate.js';
 import { ContainersOutbound as ProductionContainersOutbound } from './sandbox-containers/containers-outbound.js';
 import type { Env } from './types.js';
 
@@ -62,11 +62,13 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const refusal = await refuseWithoutAccess(request, env);
     if (refusal !== null) return refusal;
-    const url = new URL(request.url);
+    // Nothing behind the gate sees the service token or the assertion.
+    const admitted = withoutAccessHeaders(request);
+    const url = new URL(admitted.url);
     if (isE2eSurfacePath(url.pathname)) {
-      return e2eSurfaceApp.fetch(request, env, ctx);
+      return e2eSurfaceApp.fetch(admitted, env, ctx);
     }
-    return production.fetch(request, env, ctx);
+    return production.fetch(admitted, env, ctx);
   },
   async queue(batch: MessageBatch<unknown>, env: Env, ctx: ExecutionContext): Promise<void> {
     return production.queue(batch, env, ctx);

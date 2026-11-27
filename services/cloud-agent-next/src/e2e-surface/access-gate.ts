@@ -30,14 +30,18 @@ const AUD_PATTERN = /^[a-f0-9]{64}$/;
 const TEAM_DOMAIN_PATTERN = /^[a-z0-9-]+\.cloudflareaccess\.com$/;
 const keySets = new Map<string, JWTVerifyGetKey>();
 
-async function hasValidAssertion(request: Request, env: AccessGateEnv): Promise<boolean> {
+async function hasValidAssertion(
+  request: Request,
+  env: AccessGateEnv,
+  binding: AccessBinding
+): Promise<boolean> {
   const audience = env.E2E_ACCESS_AUD ?? '';
   const teamDomain = env.E2E_ACCESS_TEAM_DOMAIN ?? '';
   const clientId = env.E2E_ACCESS_CLIENT_ID ?? '';
   const assertion = request.headers.get('Cf-Access-Jwt-Assertion');
   if (
     !assertion ||
-    !clientId ||
+    (binding === 'client-id' && !clientId) ||
     !AUD_PATTERN.test(audience) ||
     !TEAM_DOMAIN_PATTERN.test(teamDomain)
   ) {
@@ -55,18 +59,45 @@ async function hasValidAssertion(request: Request, env: AccessGateEnv): Promise<
       audience,
       algorithms: ['RS256'],
     });
-    return payload.common_name === clientId;
+    return binding === 'audience' || payload.common_name === clientId;
   } catch {
     return false;
   }
 }
 
+/**
+ * How the assertion's identity is bound. `client-id`: its `common_name` must be
+ * the service token the Worker holds (the e2e Worker). `audience`: the
+ * application audience alone (the fake LLM, whose Access application admits
+ * only that service token and which holds no Access secret).
+ */
+export type AccessBinding = 'client-id' | 'audience';
+
 /** `null` admits the request; otherwise the refusal to return. */
 export async function refuseWithoutAccess(
   request: Request,
-  env: AccessGateEnv
+  env: AccessGateEnv,
+  binding: AccessBinding = 'client-id'
 ): Promise<Response | null> {
   if (env.ENVIRONMENT === 'development') return null;
-  if (await hasValidAssertion(request, env)) return null;
+  if (await hasValidAssertion(request, env, binding)) return null;
   return new Response('Forbidden', { status: 403, headers: { [ACCESS_REFUSAL_HEADER]: 'access' } });
+}
+
+const ACCESS_HEADERS = [
+  'CF-Access-Client-Id',
+  'CF-Access-Client-Secret',
+  'Cf-Access-Jwt-Assertion',
+];
+
+/**
+ * The admitted request without the Access service-token headers and assertion,
+ * so no handler behind the gate ever sees them. A request that carries none of
+ * them is returned unchanged.
+ */
+export function withoutAccessHeaders(request: Request): Request {
+  if (!ACCESS_HEADERS.some(name => request.headers.has(name))) return request;
+  const headers = new Headers(request.headers);
+  for (const name of ACCESS_HEADERS) headers.delete(name);
+  return new Request(request, { headers });
 }

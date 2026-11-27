@@ -10,6 +10,9 @@
   "workers_dev": false,
   "preview_urls": false,
   "dev": { "port": 8812 },
+  // Local `wrangler dev` skips the Access gate; the deployed render replaces
+  // this with the Access audience and team domain, and the fence refuses it.
+  "vars": { "ENVIRONMENT": "development" },
   "durable_objects": {
     "bindings": [{ "name": "FAKE_LLM", "class_name": "FakeLlmState" }],
   },

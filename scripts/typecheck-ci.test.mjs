@@ -271,7 +271,13 @@ test('pnpm reset keeps every deletion inside the checkout', t => {
 
 // A frozen-lockfile install without a warm dependency source refetches every
 // package on each run. Jobs on a Blacksmith runner mount the shared store; jobs
-// on another runner use setup-node's pnpm cache instead.
+// on another runner use setup-node's pnpm cache instead. Listed jobs install
+// cold on purpose.
+const UNCACHED_INSTALL_JOBS = new Set([
+  // Its node_modules trees run in a job that holds an STS bundle, so no shared
+  // cache another workflow can write feeds them.
+  'cloud-agent-e2e.yml:build',
+]);
 test('every workflow install job restores a pnpm dependency cache', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
   const uncached = [];
@@ -284,7 +290,7 @@ test('every workflow install job restores a pnpm dependency cache', () => {
       const installIndex = steps.findIndex(step =>
         (step.run ?? '').split('\n').some(line => /\bpnpm\b.*\binstall\b/.test(line))
       );
-      if (installIndex < 0) continue;
+      if (installIndex < 0 || UNCACHED_INSTALL_JOBS.has(`${file}:${jobName}`)) continue;
       const warmIndex = steps.findIndex(
         step =>
           step.uses === './.github/actions/pnpm-store' ||

@@ -38,7 +38,7 @@ const e2eConfig = buildE2eWorkerConfig(prepared, {
 });
 const fakeConfig = buildFakeLlmConfig(
   parse(readFileSync(new URL('../test/e2e/wrangler.fake-llm.jsonc', import.meta.url), 'utf8')),
-  { hostname: FAKE_HOST }
+  { hostname: FAKE_HOST, access: { aud: 'f'.repeat(64), teamDomain: 'probe.cloudflareaccess.com' } }
 );
 const expected = expectedReadback({
   e2eConfig,
@@ -153,5 +153,18 @@ describe('post-deploy readback', () => {
     expect(lines[0]).toMatch(new RegExp(`^${E2E_WORKER} domains: `));
     expect(lines[1]).toMatch(/HYPERDRIVE:hyperdrive/);
     expect(lines[2]).toMatch(/NEXTAUTH_SECRET:secrets_store_secret:NEXTAUTH_SECRET"/);
+  });
+
+  it('ignores only the Access secret texts, not another binding with their names', () => {
+    const e2e = goodE2e();
+    e2e.version.resources.bindings.push({
+      name: 'E2E_ACCESS_CLIENT_ID',
+      type: 'secrets_store_secret',
+      store_id: 'x',
+      secret_name: 'E2E_ACCESS_CLIENT_ID_PROD',
+    });
+    const lines = diffReadback(expected, read(e2e));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/E2E_ACCESS_CLIENT_ID:secrets_store_secret:E2E_ACCESS_CLIENT_ID_PROD/);
   });
 });

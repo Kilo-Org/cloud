@@ -8,7 +8,7 @@ import { retainNotices, sweepNotices } from './notices/dispatch';
 import { type NoticesAccess, noticesAccess } from './notices/store';
 import { readUtsSecrets } from './secrets';
 import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
-import { type MailSettings, logMisconfigured, signInConfigFor } from './signin/providers/config';
+import { type MailSettings, logMisconfigured, mailSettingsFor } from './signin/providers/config';
 
 /** Arms each shard's relay object; logs `uts.audit_relay.not_started` for one that failed or refused. */
 export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
@@ -90,7 +90,7 @@ export async function scheduled(
   );
   await step('notices', async () =>
     noticeStep(
-      signInConfigFor(env, await readUtsSecrets(env, config, context), config).mail,
+      await mailSettingsFor(env, () => readUtsSecrets(env, config, context), config),
       noticesAccess(binding.connectionString, context),
       platformFetch
     )

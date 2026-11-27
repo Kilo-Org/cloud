@@ -312,6 +312,9 @@ const ALLOWED_RECIPIENTS_PROBLEM = {
   missing: ['UTS_MAIL_ALLOWED_RECIPIENTS'],
 } as const;
 
+/** The mail vars that switch the mail settings on (`readMailSettings`). */
+const MAIL_SWITCH_VARS = ['UTS_MAILGUN_DOMAIN', 'UTS_MAIL_FROM', 'UTS_TURNSTILE_SITE_KEY'] as const;
+
 /**
  * The mail settings: `on` only when the Mailgun domain and sender and the Turnstile site key (vars)
  * and the Mailgun sending key and Turnstile secret (secrets) are all set and valid. The vars are
@@ -326,11 +329,7 @@ function readMailSettings(
   config: UtsConfig,
   dev: DevEndpointsSetting
 ): MailSettings {
-  const core = configured(
-    input,
-    ['UTS_MAILGUN_DOMAIN', 'UTS_MAIL_FROM', 'UTS_TURNSTILE_SITE_KEY'],
-    values => values
-  );
+  const core = configured(input, MAIL_SWITCH_VARS, values => values);
   if (core.status !== 'on') return core;
   if (input.secrets.status === 'unavailable') return UNAVAILABLE;
   const apiKey = ValueSchema.safeParse(input.secrets.values.UTS_MAILGUN_SENDING_KEY);
@@ -486,6 +485,22 @@ export function signInConfigFor(
   const settings = readSignInConfig({ vars: env, secrets }, config);
   configs.set(env, { secrets, settings });
   return settings;
+}
+
+/**
+ * The mail settings for the notice email. The three mail vars are the switch, so with none of them
+ * set the settings are `off` and the secrets are not read: the minute cron and the account API's
+ * notice then never call STS in an environment without mail.
+ */
+export async function mailSettingsFor(
+  env: SignInEnv,
+  secrets: () => Promise<UtsSecrets>,
+  config: UtsConfig
+): Promise<MailSettings> {
+  if (!MAIL_SWITCH_VARS.some(name => ValueSchema.safeParse(env[name]).success)) {
+    return { status: 'off' };
+  }
+  return signInConfigFor(env, await secrets(), config).mail;
 }
 
 /** Logs a misconfigured sign-in method once per request that reaches it; names only. */

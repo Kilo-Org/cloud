@@ -443,6 +443,14 @@ describe('notice step of the cron', () => {
     expect(errors.mock.calls.flat().join('\n')).toContain('UTS_MAILGUN_SENDING_KEY');
   });
 
+  it('claims nothing while STS gives no bundle, so email stays unsettled', async () => {
+    const { calls, notices } = noticeStore();
+    const { calls: sent, fetcher } = standIns();
+    await noticeStep({ status: 'unavailable' }, notices, fetcher);
+    expect(calls).toEqual(['maintainNoticeRows']);
+    expect(sent).toEqual([]);
+  });
+
   it('runs the sweep when mail is off or on', async () => {
     for (const vars of [{}, MAIL_ENV]) {
       const { calls, notices } = noticeStore();

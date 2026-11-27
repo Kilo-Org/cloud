@@ -92,7 +92,7 @@ function workerValues(env: SecretsEnv): UtsSecretValues {
     }
     values = read;
     workerCopies.set(env, values);
-    logRead({ source: 'worker', absent: UTS_SECRET_NAMES.filter(name => !(name in read)) });
+    logRead({ source: 'worker' }, read);
   }
   return values;
 }
@@ -102,15 +102,22 @@ let loggedBundle: string | null = null;
 
 /**
  * One `uts.secrets.read` line per isolate for the `worker` source, and per bundle version and
- * staleness for `sts`, so the logs show which source every isolate reads. Names only.
+ * staleness for `sts`, so the logs show which source every isolate reads. Names only: `absent`
+ * lists the names the source holds no value for, `empty` the names it holds an empty value for
+ * (a manager placeholder); the readers treat both as unset.
  */
-function logRead(fields: {
-  source: SecretsSource;
-  absent: readonly UtsSecretName[];
-  stale?: boolean;
-  fetched_at?: string;
-}): void {
-  console.log(JSON.stringify({ event: 'uts.secrets.read', ...fields }));
+function logRead(
+  fields: { source: SecretsSource; stale?: boolean; fetched_at?: string },
+  values: UtsSecretValues
+): void {
+  console.log(
+    JSON.stringify({
+      event: 'uts.secrets.read',
+      ...fields,
+      absent: UTS_SECRET_NAMES.filter(name => values[name] === undefined),
+      empty: UTS_SECRET_NAMES.filter(name => values[name]?.trim() === ''),
+    })
+  );
 }
 
 function logUnavailable(reason: string): void {
@@ -122,25 +129,20 @@ const NO_VALUES: UtsSecretValues = {};
 async function bundleValues(
   client: Secrets,
   ctx: SecretsExecutionContext
-): Promise<{ values: UtsSecretValues; absent: UtsSecretName[] }> {
+): Promise<UtsSecretValues> {
   const values: Partial<Record<UtsSecretName, string>> = {};
-  const absent: UtsSecretName[] = [];
   for (const name of UTS_SECRET_NAMES) {
     try {
       values[name] = await client.get(name, ctx);
     } catch (error) {
       // A name the policy does not grant or the manager holds no value for is an unset secret.
-      if (
+      const unset =
         error instanceof SecretUnavailableError &&
-        (error.reason === 'missing' || error.reason === 'not_granted')
-      ) {
-        absent.push(name);
-      } else {
-        throw error;
-      }
+        (error.reason === 'missing' || error.reason === 'not_granted');
+      if (!unset) throw error;
     }
   }
-  return { values, absent };
+  return values;
 }
 
 /**
@@ -165,11 +167,11 @@ export async function readUtsSecrets(
   const client = stsSecrets(env.STS);
   try {
     const snapshot = await client.snapshot(ctx);
-    const { values, absent } = await bundleValues(client, ctx);
+    const values = await bundleValues(client, ctx);
     const version = `${snapshot.etag}|${String(snapshot.stale)}`;
     if (loggedBundle !== version) {
       loggedBundle = version;
-      logRead({ source: 'sts', absent, stale: snapshot.stale, fetched_at: snapshot.fetchedAt });
+      logRead({ source: 'sts', stale: snapshot.stale, fetched_at: snapshot.fetchedAt }, values);
     }
     return { status: 'read', source: 'sts', values };
   } catch (error) {

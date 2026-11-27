@@ -1264,17 +1264,24 @@ GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSE
   life, and serves the held copy for up to 24 hours while STS fails.
 - `worker`: the Worker secrets of the same names, read once per isolate.
 
-Staging reads `sts`; production reads `worker` until its flip. Staging and production refuse to
-start without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a
-source or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set
-under either source, so a rollback is the var alone. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker
-secret; the rotation job always reads it from the bundle ("Login rotation").
+Both environments read `worker` until their flips (below). Staging and production refuse to start
+without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
+or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set under
+either source, so a rollback is the var alone. The `worker` source is removed in the same change
+that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret;
+the rotation job always reads it from the bundle ("Login rotation").
+
+Under `sts` the client holds the whole bundle in every request isolate that reads it. Once the
+policy grants `UTS_HYPERDRIVE_SWITCH_TOKEN`, that token, which can edit every Hyperdrive config in
+the account, sits in the memory of those isolates too, not only in the rotation object's. So the
+`uts` policy grants it only in the change that turns the rotation job on.
 
 Only the routes that use a secret read them, once per request: the sign-in pages and their calls,
 the provider, SSO and email routes, `/authorize`, the device pages, the issuer metadata, a
-`device_code` or `kilo-mobile` code exchange at `/token`, a created credential's notice email (after
-the answer) and the minute cron's notice step. A refresh, `/revoke`, `/introspect`, `/tickets`, the
-browser-session API, the account API and the PAT routes never wait for STS. What a read finds:
+`device_code` or `kilo-mobile` code exchange at `/token`, and, only where a mail var is set, a
+created credential's notice email (after the answer) and the minute cron's notice step. A refresh,
+`/revoke`, `/introspect`, `/tickets`, the browser-session API, the account API and the PAT routes
+never wait for STS. What a read finds:
 
 | Bundle state | Methods with their vars set | Methods without vars |
 |---|---|---|
@@ -1288,23 +1295,34 @@ With no usable bundle, the device grant answers 503 (`temporarily_unavailable` o
 `Cache-Control: no-store`; `kilo-mobile` is still sent to sign in, and its code exchange answers 503
 until the bundle is back; the cron's notice step only runs retention, so pending notices wait.
 
-Each isolate logs one `uts.secrets.read` line with `source` (`worker` or `sts`, names of absent
-secrets only, and for `sts` the bundle's `stale` and `fetched_at`) when it first reads, and again
-for each new bundle version. Zero legacy reads over a window is a logs query for
-`event = "uts.secrets.read"` with `source = "worker"` that finds nothing.
+Each isolate logs one `uts.secrets.read` line when it first reads, and again for each new bundle
+version: `source` (`worker` or `sts`), `absent` (names the source holds no value for), `empty`
+(names it holds an empty value for, a manager placeholder; the readers treat both as unset), and
+for `sts` the bundle's `stale` and `fetched_at`. Names only, never a value. Zero legacy reads over
+a window is a logs query for `event = "uts.secrets.read"` with `source = "worker"` that finds
+nothing.
 
-**Production flip.** In this order, with the production `sts` policy in place:
+The secrets client caches a denial per isolate: once STS refuses the `uts` workload, an isolate
+keeps refusing until it is replaced. After fixing a denial (`uts.secrets.unavailable` with
+`reason` `denied`), redeploy UTS, or roll the var back to `worker`.
 
-1. Every name in production `/workloads/uts` holds the Worker secret's value, compared by
-   fingerprint, never printed. `DEVICE_USER_CODE_KEY` and `SIGNIN_EMAIL_HASH_KEY` key hashes that
-   the identity store holds (pending user codes, email codes and links), so a different value breaks
-   those flows.
-2. A staging deploy with `sts` shows `uts.secrets.read` lines with `source` `sts` and no
-   `uts.secrets.unavailable` lines, and the staging sign-in proofs pass.
-3. Deploy production with `SECRETS_SOURCE` `sts` in a quiet window. Watch for one hour:
-   `uts.secrets.read` lines only with `source` `sts`, no `uts.secrets.unavailable`, no new
-   `uts.signin.misconfigured`, and the STS audit rows of the `uts` deliveries.
-4. Rollback is a deploy with `SECRETS_SOURCE` `worker`.
+**Flip, per environment** (staging first, production only after the staging flip held), with the
+environment's `uts` policy live in STS:
+
+1. **Parity.** Every name in the environment's `/workloads/uts` holds the Worker secret's value,
+   compared by fingerprint, never printed, and the environment's read lines list no name under
+   `empty` that is set as a Worker secret. `DEVICE_USER_CODE_KEY` and `SIGNIN_EMAIL_HASH_KEY` key
+   hashes that the identity store holds (pending user codes, email codes and links), so a
+   different value breaks those flows.
+2. **Deploy** `SECRETS_SOURCE` `sts` for that environment, in a quiet window for production.
+3. **Watch** for one hour: `uts.secrets.read` lines only with `source` `sts` and an `absent` and
+   `empty` list that matches the environment's unset methods; no `uts.secrets.unavailable`; no new
+   `uts.signin.misconfigured`; the issuer metadata still lists `device_authorization_endpoint`
+   where the device grant was served; the sign-in proofs of that environment pass; and STS audit
+   rows for the `uts` deliveries.
+4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker`, after re-running the parity check of
+   step 1 the other way: a value changed in the bundle while on `sts` (a rotated provider secret)
+   must reach the Worker secret first, or the rollback serves the old one.
 
 ### Provisioning per environment
 
@@ -1318,7 +1336,7 @@ for each new bundle version. Zero legacy reads over a window is a logs query for
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
 | `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID` | var | The OAuth client ids of the GitHub and Google sign-in registrations; staging sets both, production sets neither, so production offers neither provider (Sign-in providers, "Configuration") |
 | `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
-| `SECRETS_SOURCE` | var | `sts` or `worker` (Deploys, "Runtime secrets"); staging `sts`, production `worker` until its flip |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (Deploys, "Runtime secrets"); both environments `worker` until their flips |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ## Identity store

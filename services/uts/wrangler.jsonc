@@ -48,7 +48,7 @@
     "LOGIN_ROTATION": "off",
     // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
     // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
-    // Production stays on `worker` until the flip; the flip and its rollback are this one var
+    // Each environment stays on `worker` until its flip; the flip and its rollback are this one var
     // (README, "Runtime secrets"). The Worker secrets stay set either way.
     "SECRETS_SOURCE": "worker",
     // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
@@ -127,11 +127,12 @@
         "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
         "LOGIN_ROTATION": "off",
-        // Staging reads the runtime secrets from its STS bundle (README, "Runtime secrets").
-        "SECRETS_SOURCE": "sts",
+        // Staging flips to `sts` in its own change once its STS policy is live and its values match
+        // (README, "Runtime secrets").
+        "SECRETS_SOURCE": "worker",
         // GitHub and Google sign-in. Each client id is the switch: its SIGNIN_<PROVIDER>_CLIENT_SECRET
-        // is in the staging /workloads/uts bundle first (README, "Configuration"). Production
-        // offers neither yet.
+        // is set first, in the staging /workloads/uts bundle and the Worker secret (README,
+        // "Configuration"). Production offers neither yet.
         "SIGNIN_GITHUB_CLIENT_ID": "Ov23liHukmJusfuEp36F",
         "SIGNIN_GOOGLE_CLIENT_ID": "798264175281-uqim60mc4mnbbecouob37hacetigcaoe.apps.googleusercontent.com",
       },

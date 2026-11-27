@@ -26,7 +26,7 @@ import { noticesAccess } from './notices/store';
 import { type UtsSecrets, requestSecrets } from './secrets';
 import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
 import type { SignInMailer } from './signin/email/mailer';
-import { signInConfigFor } from './signin/providers/config';
+import { mailSettingsFor } from './signin/providers/config';
 import { subjectDeps } from './subjects/deps';
 import { handleInternalRequest } from './subjects/routes';
 import type { ServiceTokenVerifier } from './subjects/service-tokens';
@@ -85,10 +85,7 @@ function accountDeps(
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return null;
   const notices: CredentialNotices = async notice => {
-    const email = noticeEmailTransport(
-      signInConfigFor(env, await secrets(), config).mail,
-      platformFetch
-    );
+    const email = noticeEmailTransport(await mailSettingsFor(env, secrets, config), platformFetch);
     if (email === null) return;
     await credentialNotices({
       notices: noticesAccess(binding.connectionString, ctx),

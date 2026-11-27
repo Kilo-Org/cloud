@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import { readUtsSecrets, type UtsSecrets } from '../../src/secrets';
-import { signInConfigFor } from '../../src/signin/providers/config';
+import { mailSettingsFor, signInConfigFor } from '../../src/signin/providers/config';
 import { config, env } from './test-env';
 
 /**
@@ -97,9 +97,14 @@ describe('readUtsSecrets', () => {
 
   it('reads only the bundle under the sts source; a missing or ungranted name is absent', async () => {
     const sts = stsBinding(
-      okBundle({ SIGNIN_GITHUB_CLIENT_SECRET: BUNDLE_VALUE, DEVICE_USER_CODE_KEY: DEVICE_KEY }, [
-        'SIGNIN_GOOGLE_CLIENT_SECRET',
-      ])
+      okBundle(
+        {
+          SIGNIN_GITHUB_CLIENT_SECRET: BUNDLE_VALUE,
+          DEVICE_USER_CODE_KEY: DEVICE_KEY,
+          SIGNIN_WORKOS_API_KEY: '',
+        },
+        ['SIGNIN_GOOGLE_CLIENT_SECRET']
+      )
     );
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const read = await readUtsSecrets(
@@ -116,7 +121,10 @@ describe('readUtsSecrets', () => {
     const lines = log.mock.calls.map(([line]) => String(line));
     const readLine = lines.find(line => line.includes('uts.secrets.read'));
     expect(readLine).toBeDefined();
-    expect(JSON.parse(readLine ?? '{}')).toMatchObject({ source: 'sts', stale: false });
+    const logged: { absent: string[] } = JSON.parse(readLine ?? '{}');
+    expect(logged).toMatchObject({ source: 'sts', stale: false, empty: ['SIGNIN_WORKOS_API_KEY'] });
+    expect(logged.absent).toContain('SIGNIN_GOOGLE_CLIENT_SECRET');
+    expect(logged.absent).not.toContain('SIGNIN_WORKOS_API_KEY');
     expect(readLine).not.toContain(BUNDLE_VALUE);
     expect(readLine).not.toContain(DEVICE_KEY);
   });
@@ -181,6 +189,22 @@ describe('readUtsSecrets', () => {
       { event: 'uts.secrets.unavailable', source: 'sts', reason: 'denied' },
       { event: 'uts.secrets.unavailable', source: 'sts', reason: 'not_bound' },
     ]);
+  });
+});
+
+describe('mail settings for the notice email', () => {
+  it('reads no secret where no mail var is set', async () => {
+    const read = vi.fn(async (): Promise<UtsSecrets> => ({ status: 'unavailable' }));
+    expect(await mailSettingsFor({}, read, config)).toEqual({ status: 'off' });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('reads the secrets once a mail var is set', async () => {
+    const read = vi.fn(async (): Promise<UtsSecrets> => ({ status: 'unavailable' }));
+    expect(await mailSettingsFor({ UTS_MAILGUN_DOMAIN: 'mail.example.com' }, read, config)).toEqual(
+      { status: 'misconfigured', missing: ['UTS_MAIL_FROM', 'UTS_TURNSTILE_SITE_KEY'] }
+    );
+    expect(read).toHaveBeenCalledOnce();
   });
 });
 

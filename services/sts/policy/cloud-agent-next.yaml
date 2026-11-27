@@ -1,0 +1,4 @@
+# Registration only: services/cloud-agent-next/wrangler.jsonc. No environment, identity or grant.
+workload: cloud-agent-next
+registered: true
+secrets: []

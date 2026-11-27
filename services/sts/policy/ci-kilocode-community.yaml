@@ -1,0 +1,23 @@
+# kilocode community-sweep, apart from scan-notify so it never receives the security-alerts
+# webhook (kilocode CI design 6).
+# legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
+# GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
+workload: ci-kilocode-community
+environments:
+  - production
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  legacySubject: true
+  environment: automation
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/community-sweep.yml@refs/heads/main
+  events:
+    - schedule
+    - workflow_dispatch
+secrets:
+  - KILOCODE_MAINTAINER_APP_KEY
+  - KILOCODE_COMMUNITY_TRIAGE_SLACK_TOKEN
+  - KILOCODE_COMMUNITY_TRIAGE_SLACK_WEBHOOK

@@ -1,6 +1,7 @@
 import 'server-only';
 import * as z from 'zod';
-import { INTERNAL_API_SECRET, MODEL_EVAL_INGEST_URL } from '@kilocode/web-shared/lib/config.server';
+import { MODEL_EVAL_INGEST_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 const ModelEvalSyncResultSchema = z.object({
   success: z.literal(true),
@@ -28,7 +29,7 @@ export async function syncModelEvalPromotions(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
+      'x-internal-api-key': await readInternalApiSecret(),
     },
     body: JSON.stringify(request),
   });

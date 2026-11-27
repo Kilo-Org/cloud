@@ -13,10 +13,8 @@ import {
   normalizeClassifierInput,
 } from '@kilocode/auto-routing-contracts';
 import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-contracts';
-import {
-  AUTO_ROUTING_WORKER_URL,
-  INTERNAL_API_SECRET,
-} from '@kilocode/web-shared/lib/config.server';
+import { AUTO_ROUTING_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -110,6 +108,22 @@ function buildDecidePayload(params: EfficientDecisionParams): DecidePayload | nu
   };
 }
 
+/**
+ * The decide call's bearer: the caller's token, else the internal API secret. A secret that cannot
+ * be read is reported through `onError` and leaves the worker uncalled, like an unset one.
+ */
+async function workerAuthToken(options: FetchEfficientDecisionOptions): Promise<string> {
+  if (options.authToken !== undefined) return options.authToken;
+  try {
+    return await readInternalApiSecret();
+  } catch (error) {
+    (options.onError ?? warnExceptInTest)('Efficient auto decision secret unavailable', {
+      error: error instanceof Error ? error.name : String(error),
+    });
+    return '';
+  }
+}
+
 type DecideOutcome =
   | { kind: 'ok'; response: AutoRoutingDecisionResponse }
   | { kind: 'rejected'; error: CustomRouterErrorResponse['error'] }
@@ -189,8 +203,9 @@ export async function fetchEfficientAutoDecision(
   options: FetchEfficientDecisionOptions = {}
 ): Promise<{ decision: AutoRoutingDecision | null; costUsd: number } | null> {
   const workerUrl = parseInternalServiceUrl(options.workerUrl ?? AUTO_ROUTING_WORKER_URL);
-  const authToken = options.authToken ?? INTERNAL_API_SECRET;
-  if (!workerUrl || !authToken) return null;
+  if (!workerUrl) return null;
+  const authToken = await workerAuthToken(options);
+  if (!authToken) return null;
 
   const payload = buildDecidePayload(params);
   if (!payload) return null;
@@ -221,7 +236,7 @@ export async function fetchCustomRouterDecision(
   options: FetchEfficientDecisionOptions = {}
 ): Promise<CustomRouterDecisionOutcome> {
   const workerUrl = parseInternalServiceUrl(options.workerUrl ?? AUTO_ROUTING_WORKER_URL);
-  const authToken = options.authToken ?? INTERNAL_API_SECRET;
+  const authToken = workerUrl ? await workerAuthToken(options) : '';
   if (!workerUrl || !authToken) {
     return { kind: 'unavailable' };
   }

@@ -6,6 +6,7 @@ import {
   type ServiceTokens,
 } from '@kilocode/service-token-client';
 import {
+  STS_CANARY_HELD_STORE_TIMEOUT_MS,
   STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
   STS_CANARY_VERIFY_CALLS_MAX,
   STS_CANARY_RUN_HEADER,
@@ -63,9 +64,10 @@ export const STS_CANARY_JOB_NAME = 'usage_ingest.sts_canary';
  * (`JWKS_FETCH_TIMEOUT_MS`, 5 s), one mint attempt (`HTTP_ATTEMPT_TIMEOUT_MS`, 30 s, both tries
  * after an identity refusal included), then four calls to this Worker
  * (`STS_CANARY_VERIFY_CALL_TIMEOUT_MS`, 10 s each) with the denied mint, one more 30 s attempt,
- * alongside them: 5 + 30 + max(4 x 10, 30) = 75 s. This Worker waits 5 s past that, 80 s, under
- * the route's 90 s `maxDuration` (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`), so even the slowest
- * run lands its report here.
+ * alongside them, then the write of its held tokens (`STS_CANARY_HELD_STORE_TIMEOUT_MS`, 2 s):
+ * 5 + 30 + max(4 x 10, 30) + 2 = 77 s. This Worker waits 3 s past that, 80 s, under the route's
+ * 90 s `maxDuration` (`STS_CANARY_ROUTE_MAX_DURATION_SECONDS`), so even the slowest run lands its
+ * report here.
  */
 export const WEB_CALL_TIMEOUT_MS =
   JWKS_FETCH_TIMEOUT_MS +
@@ -74,7 +76,8 @@ export const WEB_CALL_TIMEOUT_MS =
     STS_CANARY_VERIFY_CALLS_MAX * STS_CANARY_VERIFY_CALL_TIMEOUT_MS,
     HTTP_ATTEMPT_TIMEOUT_MS
   ) +
-  5_000;
+  STS_CANARY_HELD_STORE_TIMEOUT_MS +
+  3_000;
 
 /** One client per isolate, keyed by the binding, so every run after the first reuses its token. */
 let tokens: { binding: MintBinding; client: ServiceTokens } | null = null;

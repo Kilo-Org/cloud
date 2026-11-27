@@ -15,6 +15,7 @@ const config = {
   secret: 'synthetic-writer-secret',
   protectionBypass: 'synthetic-vercel-bypass',
 };
+const serviceToken = 'synthetic-sts-service-token';
 const result = {
   usageId: usage.core.id,
   createdAt: usage.core.created_at,
@@ -36,6 +37,7 @@ afterEach(() => {
     config.url,
     config.secret,
     config.protectionBypass,
+    serviceToken,
     usage.metadata.user_prompt_prefix,
     enkryptRecord.kiloUserId,
     enkryptRecord.sessionId,
@@ -231,6 +233,37 @@ describe('usage writer client', () => {
     });
     pending.resolve(Response.json({ status: 'recorded', result }));
     expect(await outcome).toEqual({ kind: 'recorded', result });
+  });
+
+  it('sends only the STS bearer credential when a service token is configured', async () => {
+    fetchMock.mockResolvedValue(Response.json({ status: 'recorded', result }));
+    const stsConfig = {
+      url: config.url,
+      serviceToken,
+      protectionBypass: config.protectionBypass,
+    };
+    expect(await recordLlmUsage(usage, stsConfig)).toEqual({ kind: 'recorded', result });
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(config.url, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${serviceToken}`,
+        'x-vercel-protection-bypass': config.protectionBypass,
+      },
+      body: JSON.stringify(usage),
+      signal: expect.any(AbortSignal),
+    });
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers;
+    expect(headers).not.toHaveProperty('x-internal-api-key');
+  });
+
+  it('treats an empty service token as missing configuration before any network I/O', async () => {
+    expect(await recordLlmUsage(usage, { url: config.url, serviceToken: '' })).toEqual({
+      kind: 'unavailable',
+      reason: 'missing_config',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('marks explicitly queued requests without changing the event or acknowledgement', async () => {

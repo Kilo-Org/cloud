@@ -5,7 +5,7 @@
  */
 import 'server-only';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { fetchWithinBudget, readJsonWithinBudget } from '@/lib/bounded-service-fetch';
 import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import * as z from 'zod';
@@ -25,7 +25,7 @@ export async function closeCloudAgentOrgStreams(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-internal-api-key': INTERNAL_API_SECRET,
+      'x-internal-api-key': await readInternalApiSecret(),
     },
     body: JSON.stringify({ userId, organizationId }),
     signal: AbortSignal.timeout(30_000),
@@ -73,17 +73,24 @@ export async function readCloudAgentWidgetApprovalKey(
 ): Promise<CloudAgentWidgetApproval> {
   const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
   const readDeadlineAt = Date.now() + WIDGET_APPROVAL_KEY_BUDGET_MS;
+  const deadline = signal ? AbortSignal.any([budget, signal]) : budget;
+  // The secret read spends the same budget and the caller's abort ends it too; the read itself is
+  // left to finish, so an STS revalidation it started is not cut short. Nothing is sent after either
+  // has fired.
+  deadline.throwIfAborted();
+  const internalApiSecret = await untilAborted(readInternalApiSecret(), deadline);
+  deadline.throwIfAborted();
   const response = await fetchWithinBudget(
     `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
     {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': internalApiSecret,
       },
       body: JSON.stringify(input),
       cache: 'no-store',
-      signal: signal ? AbortSignal.any([budget, signal]) : budget,
+      signal: deadline,
     }
   );
   if (!response.ok) {
@@ -99,6 +106,21 @@ export async function readCloudAgentWidgetApprovalKey(
     )
   );
   return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
+}
+
+/**
+ * Settles with `promise`, or rejects with the signal's reason once it aborts first. The caller checks
+ * that the signal has not fired yet, since an abort event never fires twice.
+ */
+async function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  const aborted = Promise.withResolvers<never>();
+  const onAbort = () => aborted.reject(signal.reason);
+  signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    return await Promise.race([promise, aborted.promise]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
 export type VercelSnapshotBuildStartInput = (
@@ -125,7 +147,7 @@ export async function startVercelSnapshotBuild(
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': INTERNAL_API_SECRET,
+          'x-internal-api-key': await readInternalApiSecret(),
         },
         body: JSON.stringify(input),
         signal: AbortSignal.timeout(30_000),
@@ -150,7 +172,7 @@ export async function getVercelRuntimeIdentity(): Promise<VercelRuntimeIdentity>
   let response: Response;
   try {
     response = await fetch(`${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-runtime-identity`, {
-      headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+      headers: { 'x-internal-api-key': await readInternalApiSecret() },
       cache: 'no-store',
       signal: AbortSignal.timeout(30_000),
     });
@@ -182,7 +204,7 @@ export async function getVercelComputeEnrollment(organizationId: string): Promis
     response = await fetch(
       `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/${encodeURIComponent(organizationId)}`,
       {
-        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        headers: { 'x-internal-api-key': await readInternalApiSecret() },
         cache: 'no-store',
         signal: AbortSignal.timeout(30_000),
       }
@@ -214,7 +236,7 @@ export async function getVercelComputeEnrollmentForUser(userId: string): Promise
     response = await fetch(
       `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
       {
-        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        headers: { 'x-internal-api-key': await readInternalApiSecret() },
         cache: 'no-store',
         signal: AbortSignal.timeout(30_000),
       }
@@ -256,7 +278,7 @@ export async function cleanupVercelSnapshotBuild(
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': INTERNAL_API_SECRET,
+          'x-internal-api-key': await readInternalApiSecret(),
         },
         body: JSON.stringify(input),
         signal: AbortSignal.timeout(30_000),

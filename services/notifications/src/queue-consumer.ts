@@ -5,6 +5,7 @@ import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 import type { TicketTokenPair } from './lib/expo-push';
 import { checkPushReceipts } from './lib/expo-push';
+import { skipProviderPush } from './lib/push-gate';
 import { readNotificationsSecret } from './secrets';
 
 type ReceiptCheckMessage = {
@@ -16,6 +17,13 @@ export async function queue(
   env: Env,
   ctx: SecretsExecutionContext
 ): Promise<void> {
+  // Receipt work published before the staging push gate closed is
+  // acknowledged, not retried: checking it would read the Expo credential and
+  // call Expo.
+  if (skipProviderPush(env, 'expo_receipts')) {
+    for (const msg of batch.messages) msg.ack();
+    return;
+  }
   for (const msg of batch.messages) {
     try {
       await processReceiptCheck(env, msg.body, ctx);

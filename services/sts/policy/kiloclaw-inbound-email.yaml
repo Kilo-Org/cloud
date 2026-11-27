@@ -1,0 +1,4 @@
+# Registration only: services/kiloclaw-inbound-email/wrangler.jsonc. No environment, identity or grant.
+workload: kiloclaw-inbound-email
+registered: true
+secrets: []

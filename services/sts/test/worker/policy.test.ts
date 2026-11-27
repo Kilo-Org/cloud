@@ -865,7 +865,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development and two Bouncer scopes in production only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only and two Bouncer scopes in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -931,9 +931,8 @@ describe('dual-accept grants of the shipped policies', () => {
   );
 
   it.each(['staging', 'production'] as const)(
-    'grants the callers only these scopes and audiences in %s',
+    'grants the callers only these scopes and audiences in %s, beside the production Bouncer grants',
     environment => {
-      // Bouncer runs in production only, so its grants are production `environmentGrants`.
       const bouncer = environment === 'production';
       expect(policyFor(environment, 'usage-ingest')).toMatchObject({
         audiences: ['web'],

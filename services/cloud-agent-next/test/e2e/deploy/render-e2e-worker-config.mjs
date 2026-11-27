@@ -13,7 +13,15 @@ const localTargetConfigPath = join(packageDir, '.wrangler', 'wrangler.e2e-local.
 const packageDevVarsPath = join(packageDir, '.dev.vars');
 const localDevVarsPath = join(packageDir, '.wrangler', '.dev.vars');
 const e2eEntryPath = '../src/e2e-entry.ts';
-const defaultWorkerUrl = 'https://cloud-agent-e2e-test.engineering-e11.workers.dev';
+const E2E_WORKER_NAME = 'cloud-agent-e2e-test';
+const fakeLlmSourceConfigPath = join(packageDir, 'test', 'e2e', 'wrangler.fake-llm.jsonc');
+const fakeLlmTargetConfigPath = join(
+  packageDir,
+  'test',
+  'e2e',
+  '.wrangler',
+  'wrangler.fake-llm.jsonc'
+);
 
 // Wrangler resolves `.dev.vars` relative to the selected config's directory and
 // prefers `${configDir}/.dev.vars.${env}` over `${configDir}/.dev.vars`, so with
@@ -28,7 +36,31 @@ const E2E_INTERNAL_SECRET_PATTERN = /^[A-Za-z0-9._~-]+$/;
 
 const CALLBACK_QUEUE = 'cloud-agent-next-callback-queue';
 const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
-const REPORT_QUEUE = 'cloud-agent-next-report-queue';
+
+// Keys copied from the source config unchanged. They carry runtime settings, not
+// account resources. Every other top-level key is left out on purpose: routes,
+// schedules, service bindings, Hyperdrive, R2, KV, D1, AI, analytics, Secrets
+// Store and logpush all reach production. A binding added to wrangler.jsonc later
+// stays out of the e2e Worker until it is reviewed here.
+const COPIED_KEYS = [
+  'account_id',
+  'compatibility_date',
+  'compatibility_flags',
+  'upload_source_maps',
+  'version_metadata',
+  'rules',
+  'observability',
+  'placement',
+];
+
+// The one Secrets Store secret the e2e Worker binds: the development signing key.
+const E2E_SIGNING_SECRET = {
+  binding: 'NEXTAUTH_SECRET',
+  store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
+  secret_name: 'NEXTAUTH_SECRET_DEV',
+};
+
+const HOSTNAME_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 // Native Cloudflare Containers is the only runtime, so the E2E Worker boots the
 // same `SandboxContainers` class as production.
@@ -89,8 +121,10 @@ function withCallbackBinding(durableObjects) {
 }
 
 /**
- * The Worker delivers callbacks to its own public origin, which requires the
- * strict-public fetch flag. It belongs only in the rendered e2e configs.
+ * The Worker delivers callbacks to its own origin, which requires the
+ * strict-public fetch flag. With it, those requests re-enter Cloudflare's front
+ * door like any Internet request, including the Access application in front of
+ * the e2e hostname. It belongs only in the rendered e2e configs.
  */
 function withStrictlyPublicFetch(config) {
   const flags = config.compatibility_flags ?? ['nodejs_compat'];
@@ -100,43 +134,162 @@ function withStrictlyPublicFetch(config) {
   return config;
 }
 
-export function buildE2eWorkerConfig(sourceConfig, overrides) {
-  const { workerUrl, kiloOpenRouterBase } = overrides;
+function routeHost(route) {
+  return String(typeof route === 'string' ? route : route.pattern)
+    .replace(/^[a-z]+:\/\//i, '')
+    .split('/')[0]
+    .toLowerCase();
+}
+
+function hostsOverlap(a, b) {
+  const pattern = host =>
+    new RegExp(`^${host.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
+  return a === b || pattern(a).test(b) || pattern(b).test(a);
+}
+
+/**
+ * A private hostname of the e2e stack: one custom domain that the e2e Access
+ * application must protect. It must be a plain hostname that no route of the
+ * source config covers, and never a `workers.dev` address.
+ */
+function requirePrivateHostname(variable, hostname, sourceConfig) {
+  if (typeof hostname !== 'string' || !HOSTNAME_PATTERN.test(hostname)) {
+    throw new Error(
+      `${variable} must be a plain lowercase hostname without scheme, port, path or wildcard.`
+    );
+  }
+  if (hostname === 'workers.dev' || hostname.endsWith('.workers.dev')) {
+    throw new Error(`${variable} must not be a workers.dev address.`);
+  }
+  const sourceRoutes = sourceConfig.routes ?? (sourceConfig.route ? [sourceConfig.route] : []);
+  if (sourceRoutes.some(route => hostsOverlap(routeHost(route), hostname))) {
+    throw new Error(`${variable} overlaps a production route of the source config.`);
+  }
+  return hostname;
+}
+
+/** The optional private hostname of the e2e Worker. */
+export function requireE2eWorkerHostname(hostname, sourceConfig) {
+  return requirePrivateHostname('E2E_WORKER_HOSTNAME', hostname, sourceConfig);
+}
+
+/**
+ * The fake-LLM Worker for the deployed stack. Its checked-in config has no
+ * address; this render adds exactly the one Access-protected custom domain,
+ * keeps workers.dev and preview URLs off, and replaces the local
+ * `ENVIRONMENT=development` with its own Access application's audience and team
+ * domain, which its gate verifies. The rendered file lives in
+ * `test/e2e/.wrangler/`, so `main` and `$schema` move one directory up.
+ */
+export function buildFakeLlmConfig(sourceConfig, { hostname, access }) {
+  const host = requirePrivateHostname('E2E_FAKE_LLM_HOSTNAME', hostname, sourceConfig);
+  const verified = requireE2eAccess(access, 'E2E_FAKE_LLM_ACCESS_AUD');
   const config = structuredClone(sourceConfig);
+  config.$schema = '../../../node_modules/wrangler/config-schema.json';
+  config.main = `../${sourceConfig.main}`;
+  config.workers_dev = false;
+  config.preview_urls = false;
+  config.routes = [{ pattern: host, custom_domain: true }];
+  const { ENVIRONMENT: _local, ...vars } = config.vars ?? {};
+  config.vars = {
+    ...vars,
+    E2E_ACCESS_AUD: verified.aud,
+    E2E_ACCESS_TEAM_DOMAIN: verified.teamDomain,
+  };
+  return config;
+}
 
-  config.$schema = '../node_modules/wrangler/config-schema.json';
-  config.name = 'cloud-agent-e2e-test';
-  config.main = e2eEntryPath;
-  config.workers_dev = true;
+/**
+ * The Access application in front of a hostname: its audience tag and team
+ * domain. Each e2e Worker's gate refuses every request whose
+ * `Cf-Access-Jwt-Assertion` does not verify against them.
+ */
+export function requireE2eAccess(access, audVariable = 'E2E_ACCESS_AUD') {
+  if (!/^[a-f0-9]{64}$/.test(access?.aud ?? '')) {
+    throw new Error(`${audVariable} must be the Access application audience tag (64 hex).`);
+  }
+  if (!/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(access?.teamDomain ?? '')) {
+    throw new Error('E2E_ACCESS_TEAM_DOMAIN must be <team>.cloudflareaccess.com.');
+  }
+  return access;
+}
 
-  delete config.dev;
-  delete config.env;
-  delete config.routes;
+/**
+ * Only the callback queue, renamed to the e2e queue; every other queue is
+ * production's. A dead-letter queue would be production's too, so it is dropped.
+ */
+function callbackQueueOnly(queues) {
+  const rename = ({ dead_letter_queue: _deadLetterQueue, ...entry }) => ({
+    ...entry,
+    queue: CALLBACK_QUEUE_E2E,
+  });
+  return {
+    producers: (queues?.producers ?? []).filter(p => p.queue === CALLBACK_QUEUE).map(rename),
+    consumers: (queues?.consumers ?? []).filter(c => c.queue === CALLBACK_QUEUE).map(rename),
+  };
+}
+
+/**
+ * Render the deployed e2e Worker. It owns its Durable Objects, container and
+ * callback queue, binds only the development signing key, and has no public
+ * address: `workers.dev` and preview URLs are off, and the only possible route is
+ * the optional custom domain, which requires its Access application.
+ */
+export function buildE2eWorkerConfig(sourceConfig, overrides) {
+  const { workerHostname, access, fakeLlmHostname } = overrides;
+  const source = structuredClone(sourceConfig);
+  const hostname =
+    workerHostname === undefined ? undefined : requireE2eWorkerHostname(workerHostname, source);
+  const verifiedAccess = hostname === undefined ? undefined : requireE2eAccess(access);
+  const fakeLlm = requirePrivateHostname('E2E_FAKE_LLM_HOSTNAME', fakeLlmHostname, source);
+  if (fakeLlm === hostname) {
+    throw new Error('E2E_FAKE_LLM_HOSTNAME must differ from E2E_WORKER_HOSTNAME.');
+  }
+
+  /** @type {Record<string, any>} */
+  const config = {
+    $schema: '../node_modules/wrangler/config-schema.json',
+    name: E2E_WORKER_NAME,
+    main: e2eEntryPath,
+  };
+  for (const key of COPIED_KEYS) {
+    if (source[key] !== undefined) config[key] = source[key];
+  }
+  config.workers_dev = false;
+  config.preview_urls = false;
+  // The scheduled handlers read and delete report data over Hyperdrive; an empty
+  // list also removes schedules a previous deploy left on the script.
+  config.triggers = { crons: [] };
+  if (hostname !== undefined) {
+    config.routes = [{ pattern: hostname, custom_domain: true }];
+  }
 
   const removedContainerClasses = new Set(
-    (config.containers ?? [])
+    (source.containers ?? [])
       .map(entry => entry.class_name)
       .filter(className => !E2E_CONTAINER_CLASSES.has(className))
   );
 
-  config.containers = (config.containers ?? [])
+  config.containers = (source.containers ?? [])
     .filter(entry => E2E_CONTAINER_CLASSES.has(entry.class_name))
     .map(entry => rebaseContainers([entry])[0]);
 
+  // Only this script's own namespaces: a binding with `script_name` would reach
+  // another Worker's objects.
   config.durable_objects = {
-    ...config.durable_objects,
-    bindings: (config.durable_objects?.bindings ?? []).filter(
-      binding => !removedContainerClasses.has(binding.class_name)
+    bindings: (source.durable_objects?.bindings ?? []).filter(
+      binding =>
+        binding.script_name === undefined && !removedContainerClasses.has(binding.class_name)
     ),
   };
 
-  const runtimeAnchorIndex = (config.migrations ?? []).findIndex(entry => entry.tag === 'v15');
+  const runtimeAnchorIndex = (source.migrations ?? []).findIndex(entry => entry.tag === 'v15');
   if (runtimeAnchorIndex === -1) {
     throw new Error(
       "cannot insert the e2e runtime migration: production anchor tag 'v15' is missing"
     );
   }
-  const survivingMigrations = (config.migrations ?? [])
+  const survivingMigrations = (source.migrations ?? [])
     .map((entry, index) => {
       const omittedMigrationClasses = new Set([
         ...removedContainerClasses,
@@ -179,14 +332,17 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);
 
-  config.vars = {
-    ...config.vars,
-    WORKER_URL: workerUrl,
+  const fakeLlmUrl = `https://${fakeLlm}`;
+  const vars = {
+    ...source.vars,
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     // The e2e stack validates its models against the fake Worker, which serves
     // the same route shape as the official backend. Production never sets this.
-    E2E_MODEL_VALIDATION_BASE_URL: new URL(kiloOpenRouterBase).origin,
-    KILO_OPENROUTER_BASE: kiloOpenRouterBase,
+    E2E_MODEL_VALIDATION_BASE_URL: fakeLlmUrl,
+    KILO_OPENROUTER_BASE: `${fakeLlmUrl}/api/openrouter`,
+    // The fake LLM's Access-protected origin: the e2e entry stamps the service
+    // token on the Worker's and the sandboxes' requests to it.
+    E2E_FAKE_LLM_URL: fakeLlmUrl,
     WS_ALLOWED_ORIGINS: 'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000',
     TOOL_CGROUP_ORG_IDS: '*',
     TOOL_CGROUP_MODE: 'enforce',
@@ -196,31 +352,19 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
   };
-
-  config.secrets_store_secrets = config.secrets_store_secrets ?? [];
-  if (!config.secrets_store_secrets.some(secret => secret.binding === 'NEXTAUTH_SECRET')) {
-    config.secrets_store_secrets.unshift({
-      binding: 'NEXTAUTH_SECRET',
-      store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
-      // The e2e Workers are non-production, so they bind the development
-      // signing key rather than the production one.
-      secret_name: 'NEXTAUTH_SECRET_DEV',
-    });
+  // Without its hostname the Worker has no address, so it must not inherit
+  // production's, and the e2e entry refuses every request. With it, callbacks
+  // and sandbox traffic address the Worker only at this Access hostname.
+  if (hostname === undefined) delete vars.WORKER_URL;
+  else {
+    vars.WORKER_URL = `https://${hostname}`;
+    vars.E2E_ACCESS_AUD = verifiedAccess.aud;
+    vars.E2E_ACCESS_TEAM_DOMAIN = verifiedAccess.teamDomain;
   }
+  config.vars = vars;
 
-  config.queues = {
-    ...config.queues,
-    producers: (config.queues?.producers ?? [])
-      .filter(producer => producer.binding !== 'CLOUD_AGENT_REPORT_QUEUE')
-      .map(producer =>
-        producer.queue === CALLBACK_QUEUE ? { ...producer, queue: CALLBACK_QUEUE_E2E } : producer
-      ),
-    consumers: (config.queues?.consumers ?? [])
-      .filter(consumer => consumer.queue !== REPORT_QUEUE)
-      .map(consumer =>
-        consumer.queue === CALLBACK_QUEUE ? { ...consumer, queue: CALLBACK_QUEUE_E2E } : consumer
-      ),
-  };
+  config.secrets_store_secrets = [structuredClone(E2E_SIGNING_SECRET)];
+  config.queues = callbackQueueOnly(source.queues);
 
   return config;
 }
@@ -402,36 +546,29 @@ if (isMain) {
       console.error(error instanceof Error ? error.message : error);
       process.exit(1);
     }
-  } else {
-    const fakeLlmBaseUrl = process.env.FAKE_LLM_BASE_URL;
-    const workerUrl = process.env.WORKER_URL ?? defaultWorkerUrl;
-
-    if (!fakeLlmBaseUrl) {
-      console.error('FAKE_LLM_BASE_URL is required (https://<fake-host>/api/openrouter).');
-      process.exit(1);
-    }
-    let parsedFakeLlmBaseUrl;
+  } else if (process.argv.includes('--fake-llm')) {
+    let rendered;
     try {
-      parsedFakeLlmBaseUrl = new URL(fakeLlmBaseUrl);
-    } catch {
-      console.error('FAKE_LLM_BASE_URL must be a valid absolute URL.');
+      rendered = buildFakeLlmConfig(parse(readFileSync(fakeLlmSourceConfigPath, 'utf8')), {
+        hostname: process.env.E2E_FAKE_LLM_HOSTNAME,
+        access: {
+          aud: process.env.E2E_FAKE_LLM_ACCESS_AUD ?? '',
+          teamDomain: process.env.E2E_ACCESS_TEAM_DOMAIN ?? '',
+        },
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
       process.exit(1);
     }
-    if (
-      parsedFakeLlmBaseUrl.protocol !== 'https:' ||
-      parsedFakeLlmBaseUrl.pathname !== '/api/openrouter' ||
-      parsedFakeLlmBaseUrl.search !== '' ||
-      parsedFakeLlmBaseUrl.hash !== '' ||
-      parsedFakeLlmBaseUrl.username !== '' ||
-      parsedFakeLlmBaseUrl.password !== ''
-    ) {
-      console.error(
-        'FAKE_LLM_BASE_URL must be https://<host>/api/openrouter with no query, fragment or credentials, e.g. https://fake-llm.engineering-e11.workers.dev/api/openrouter'
-      );
-      process.exit(1);
-    }
-
-    const kiloOpenRouterBase = `${parsedFakeLlmBaseUrl.origin}${parsedFakeLlmBaseUrl.pathname}`;
+    mkdirSync(dirname(fakeLlmTargetConfigPath), { recursive: true });
+    writeFileSync(fakeLlmTargetConfigPath, `${JSON.stringify(rendered, null, 2)}\n`);
+    console.log(`Rendered ${fakeLlmTargetConfigPath}`);
+  } else {
+    const workerHostname = process.env.E2E_WORKER_HOSTNAME || undefined;
+    const access = {
+      aud: process.env.E2E_ACCESS_AUD ?? '',
+      teamDomain: process.env.E2E_ACCESS_TEAM_DOMAIN ?? '',
+    };
     const runtimeConfigPath = join(packageDir, 'wrangler.runtime-generated.json');
     if (!existsSync(runtimeConfigPath)) {
       throw new Error(
@@ -451,8 +588,9 @@ if (isMain) {
     let rendered;
     try {
       rendered = buildE2eWorkerConfig(sourceConfig, {
-        workerUrl,
-        kiloOpenRouterBase,
+        workerHostname,
+        access,
+        fakeLlmHostname: process.env.E2E_FAKE_LLM_HOSTNAME,
       });
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);

@@ -2,6 +2,10 @@ import { DurableObject } from 'cloudflare:workers';
 import { WorkOS } from '@workos-inc/node';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import {
+  STS_WEB_SCIM_SYNC,
+  webInternalCredential,
+} from '@kilocode/worker-utils/web-internal-credential';
 
 import migrations from '../../drizzle/migrations';
 import * as state from '../db/state';
@@ -148,7 +152,11 @@ export class ScimSyncDO extends DurableObject<Env> {
       });
       const app: AppCallContext = {
         origin: this.env.BACKEND_API_URL,
-        apiKey: await resolveSecret(this.env.INTERNAL_API_SECRET, 'INTERNAL_API_SECRET'),
+        credential: () =>
+          webInternalCredential(this.env, STS_WEB_SCIM_SYNC, {
+            header: 'x-internal-api-key',
+            secret: () => resolveSecret(this.env.INTERNAL_API_SECRET, 'INTERNAL_API_SECRET'),
+          }),
         // A plain Worker secret rather than a Secrets Store binding, because
         // only the protected origin needs one: a `secrets_store_secrets` entry
         // for a secret that does not exist fails the deploy, so production

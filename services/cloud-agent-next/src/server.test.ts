@@ -1810,6 +1810,102 @@ describe('server runtime credential proxy', () => {
     }
   });
 
+  it.each([
+    ['binding', null],
+    ['', 'internal-secret'],
+    ['legacy', 'internal-secret'],
+  ] as const)(
+    'under SESSION_INGEST_CALLER_AUTH=%j forwards with X-Internal-Secret %j',
+    async (mode, expectedSecret) => {
+      const root = 'ses_12345678901234567890123456';
+      const token = jwt.sign({ exp: 4_000_000_000 }, secret);
+      const readSecret = vi.fn(async () => 'internal-secret');
+      const binding = vi.fn(async (request: Request) => {
+        expect(request.headers.get('Authorization')).toBe(`Bearer ${token}`);
+        expect(request.headers.get('X-Internal-Secret')).toBe(expectedSecret);
+        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('workspace_proxy');
+        return new Response('ok');
+      });
+      const env = Object.assign(createEnv(), {
+        SESSION_INGEST_CALLER_AUTH: mode,
+        INTERNAL_API_SECRET_PROD: { get: readSecret },
+        SESSION_INGEST: { fetch: binding },
+      });
+      env.SANDBOX_SESSION.get.mockReturnValue({
+        resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+          token,
+          runtimeAuthorization: {
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'workspace_proxy',
+          },
+        }),
+      });
+      const upstream = vi.fn();
+      vi.stubGlobal('fetch', upstream);
+      try {
+        const response = await fetchWorker(
+          new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle(root)}`,
+              'Content-Type': 'application/json',
+              'X-Internal-Secret': 'forged-secret',
+            },
+            body: JSON.stringify({ sessionId: 'ses_abcdefghijklmnopqrstuvwxyz' }),
+          }),
+          env
+        );
+        expect(response.status).toBe(200);
+        expect(binding).toHaveBeenCalledTimes(1);
+        expect(readSecret).toHaveBeenCalledTimes(expectedSecret === null ? 0 : 1);
+        expect(upstream).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
+
+  it('fails closed on an unknown SESSION_INGEST_CALLER_AUTH value', async () => {
+    const root = 'ses_12345678901234567890123456';
+    const binding = vi.fn();
+    const env = Object.assign(createEnv(), {
+      SESSION_INGEST_CALLER_AUTH: 'props',
+      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      SESSION_INGEST: { fetch: binding },
+    });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: jwt.sign({ exp: 4_000_000_000 }, secret),
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'workspace_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await handle(root)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sessionId: 'ses_abcdefghijklmnopqrstuvwxyz' }),
+        }),
+        env
+      );
+      expect(response.status).toBe(502);
+      expect(binding).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('preserves root public routes and denies unsafe descendant routes without forwarding', async () => {
     const root = 'ses_12345678901234567890123456';
     const child = 'ses_abcdefghijklmnopqrstuvwxyz';

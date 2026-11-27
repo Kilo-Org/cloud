@@ -1,0 +1,377 @@
+name: Cloud Agent E2E
+
+# Deploys main to the closed e2e stack and runs the deployed suite. It runs
+# only from main: every job refuses another ref, the cloud-agent-e2e
+# environment admits main alone, and the deploy checks that its commit is on
+# origin/main before any step receives a secret. It is never a reusable
+# workflow: the STS policy that serves the tests job pins this file, and a
+# workflow_call token would carry this file's job_workflow_ref for any caller.
+# A schedule returns once the closed stack exists; the STS policy must then
+# allow the schedule event too, and it needs its own failure notifier: branch
+# dispatch, the worker_url/fake_llm_url inputs and the nightly Slack
+# notification of the old workflows are gone. See
+# services/cloud-agent-next/test/e2e/deploy/README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy main to the e2e stack before testing'
+        required: false
+        type: boolean
+        default: true
+      only:
+        description: 'Comma-separated scenario names to run; empty runs every scenario'
+        required: false
+        type: string
+        default: ''
+      parallel:
+        description: 'Scenario concurrency'
+        required: false
+        type: string
+        default: '4'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-agent-e2e
+  cancel-in-progress: false
+
+env:
+  # The STS policy of the tests job, and its Infisical folder /ci/<workload>.
+  STS_WORKLOAD: ci-cloud-agent-e2e
+
+jobs:
+  deploy:
+    # Guard: this workflow_dispatch is reachable from a fork, and the job
+    # deploys Workers with admin secrets. Only the canonical repo's main may run it.
+    if: inputs.deploy && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Its deployment branch policy keeps the environment to main.
+    environment: cloud-agent-e2e
+    permissions:
+      contents: read
+      # Preparation can read this SHA's runtime-publication workflow runs.
+      actions: read
+    # Runtime preparation may wait up to 45 minutes for the exact-SHA handoff.
+    timeout-minutes: 75
+    env:
+      # The renderers give each Worker its one Access custom domain and nothing public.
+      E2E_WORKER_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
+      E2E_FAKE_LLM_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME }}
+      E2E_ACCESS_AUD: ${{ vars.CLOUD_AGENT_E2E_ACCESS_AUD }}
+      E2E_ACCESS_TEAM_DOMAIN: ${{ vars.CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN }}
+      # Audience of the fake LLM's own Access application (fake-llm-e2e-test).
+      E2E_FAKE_LLM_ACCESS_AUD: ${{ vars.CLOUD_AGENT_E2E_FAKE_LLM_ACCESS_AUD }}
+      # Wrangler 4 writes its logger output to log files by default; no step here keeps them.
+      WRANGLER_WRITE_LOGS: 'false'
+    steps:
+      # Inert until both Access applications exist. The deploy reads no Access
+      # credential: an operator uploads it after the closed deploy, and the
+      # Worker refuses every request until then.
+      - name: Check the closed Worker path
+        run: |
+          set -euo pipefail
+          if [ -z "$E2E_WORKER_HOSTNAME" ] || [ -z "$E2E_FAKE_LLM_HOSTNAME" ] || [ -z "$E2E_ACCESS_AUD" ] || [ -z "$E2E_FAKE_LLM_ACCESS_AUD" ] || [ -z "$E2E_ACCESS_TEAM_DOMAIN" ]; then
+            echo "::error::Set CLOUD_AGENT_E2E_WORKER_HOSTNAME, CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME, CLOUD_AGENT_E2E_ACCESS_AUD, CLOUD_AGENT_E2E_FAKE_LLM_ACCESS_AUD and CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN in the cloud-agent-e2e environment (services/cloud-agent-next/test/e2e/deploy/README.md, Closed CI path)"
+            exit 1
+          fi
+
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Require a commit on main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=500 origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on origin/main"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+
+      - name: Prepare downloaded Cloud Agent runtime
+        working-directory: services/cloud-agent-next
+        env:
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Read-only: lets preparation stop waiting once the SHA's publication has failed.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$GITHUB_SHA"
+
+      - name: Deploy fake-LLM Worker
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
+        run: test/e2e/deploy/deploy-fake-llm.sh deploy
+
+      # The deploy checks the Worker's secrets (an operator uploads the Access
+      # token once; see the README), deploys, then checks that Access refuses an
+      # anonymous request.
+      - name: Deploy Cloud Agent e2e Worker
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
+        run: test/e2e/deploy/deploy-e2e-worker.sh deploy
+
+      # Names-only GETs: versions, workers.dev and preview flags, schedules,
+      # domains and bindings of both Workers, against the configs just deployed.
+      - name: Read back both Workers
+        working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
+        run: node test/e2e/deploy/readback-e2e-workers.mjs .wrangler/wrangler.e2e-test.jsonc test/e2e/.wrangler/wrangler.fake-llm.jsonc
+
+  # Installs the driver without lifecycle scripts and without id-token, and
+  # hands the installed workspace to the tests job, which installs nothing.
+  build:
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install the driver
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter cloud-agent-next...
+
+      # Only the node_modules trees: the tests job has checked out the same SHA.
+      # Symlinks into node_modules/.pnpm survive only inside an archive.
+      - name: Pack the installed trees
+        run: find . -path ./.git -prune -o -type d -name node_modules -prune -print | tar -czf "$RUNNER_TEMP/e2e-workspace.tgz" -T -
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-workspace
+          path: ${{ runner.temp }}/e2e-workspace.tgz
+          retention-days: 1
+          # Already gzipped.
+          compression-level: 0
+
+  # Everything that needs no package code, before the tests job: the hostnames,
+  # the backend variable, and that the operator has uploaded both Access secret
+  # names to the e2e Worker. It holds the Cloudflare credential, so the tests
+  # job, which runs package code, never does. curl, jq and node -e only.
+  preflight:
+    needs: [deploy]
+    if: >-
+      !cancelled() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+      && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: cloud-agent-e2e
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    env:
+      E2E_WORKER_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
+      E2E_FAKE_LLM_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME }}
+      E2E_BACKEND_URL: ${{ vars.CLOUD_AGENT_E2E_BACKEND_URL }}
+    steps:
+      # Inert until both Access hostnames and a non-production backend exist.
+      - name: Check the closed Worker path
+        run: |
+          set -euo pipefail
+          if [[ ! "$E2E_WORKER_HOSTNAME" =~ ^[a-z0-9.-]+$ ]] || [[ "$E2E_WORKER_HOSTNAME" == *workers.dev ]]; then
+            echo "::error::Set vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME in the cloud-agent-e2e environment to the Access-protected hostname"
+            exit 1
+          fi
+          if [[ ! "$E2E_FAKE_LLM_HOSTNAME" =~ ^[a-z0-9.-]+$ ]] || [[ "$E2E_FAKE_LLM_HOSTNAME" == *workers.dev ]]; then
+            echo "::error::Set vars.CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME in the cloud-agent-e2e environment to the fake LLM's Access-protected hostname"
+            exit 1
+          fi
+          # Production backends, by parsed hostname: any case, any port.
+          node -e '
+          const denied = new Set(["kilo.ai", "api.kilo.ai", "app.kilo.ai", "kilocode.ai"]);
+          let url;
+          try { url = new URL(process.env.E2E_BACKEND_URL); } catch { process.exit(1); }
+          const host = url.hostname.toLowerCase().replace(/\.$/, "");
+          if (url.protocol !== "https:" || denied.has(host) || host.endsWith(".kilocode.ai")) process.exit(1);
+          ' || {
+            echo "::error::Set vars.CLOUD_AGENT_E2E_BACKEND_URL to an https non-production backend that signs with NEXTAUTH_SECRET_DEV"
+            exit 1
+          }
+
+      # The operator uploads the Access token after the closed deploy; until
+      # then the Worker refuses every request. Names only; no value is requested.
+      - name: Check the Worker's Access secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          url=https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/workers/scripts/cloud-agent-e2e-test/secrets
+          names=$(printf 'header = "Authorization: Bearer %s"\n' "$CLOUDFLARE_API_TOKEN" |
+            curl -fsS --max-time 30 --config - "$url" | jq -r '[.result[]?.name] | sort | join(" ")')
+          for name in E2E_ACCESS_CLIENT_ID E2E_ACCESS_CLIENT_SECRET; do
+            if [[ " $names " != *" $name "* ]]; then
+              echo "::error::cloud-agent-e2e-test lacks the Worker secret $name; do the one-time operator upload in services/cloud-agent-next/test/e2e/deploy/README.md (Closed CI path, step 12)"
+              exit 1
+            fi
+          done
+
+  # Reads the Access service token from STS and runs the driver. Exception to
+  # the STS caller rule, documented in .github/actions/sts-bundle/README.md:
+  # the driver runs package code from the frozen lockfile. The job installs
+  # nothing, runs no lifecycle script and no package manager.
+  tests:
+    needs: [deploy, build, preflight]
+    if: >-
+      !cancelled() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+      && needs.build.result == 'success' && needs.preflight.result == 'success'
+      && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
+    runs-on: ubuntu-latest
+    # The STS policy names this environment; its branch policy keeps it to main.
+    environment: cloud-agent-e2e
+    permissions:
+      contents: read
+      id-token: write
+    # Operational ceiling for one whole run, not a registry-derived bound.
+    timeout-minutes: 180
+    env:
+      # Neither Worker has a public address; each hostname sits behind a
+      # Cloudflare Access application whose policy admits one service token.
+      E2E_WORKER_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
+      WORKER_URL: https://${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
+      E2E_FAKE_LLM_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME }}
+      FAKE_LLM_URL: https://${{ vars.CLOUD_AGENT_E2E_FAKE_LLM_HOSTNAME }}
+      E2E_BACKEND_URL: ${{ vars.CLOUD_AGENT_E2E_BACKEND_URL }}
+      # The harness's existing DEFAULT_PARALLEL; the runner owns concurrency.
+      E2E_PARALLEL: ${{ inputs.parallel || '4' }}
+      E2E_ONLY: ${{ inputs.only }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # The same package-free backend check as preflight, before anything uses it.
+      - name: Check the backend
+        run: |
+          node -e '
+          const denied = new Set(["kilo.ai", "api.kilo.ai", "app.kilo.ai", "kilocode.ai"]);
+          let url;
+          try { url = new URL(process.env.E2E_BACKEND_URL); } catch { process.exit(1); }
+          const host = url.hostname.toLowerCase().replace(/\.$/, "");
+          if (url.protocol !== "https:" || denied.has(host) || host.endsWith(".kilocode.ai")) process.exit(1);
+          ' || {
+            echo "::error::Set vars.CLOUD_AGENT_E2E_BACKEND_URL to an https non-production backend that signs with NEXTAUTH_SECRET_DEV"
+            exit 1
+          }
+
+      - name: Read the Access service token from STS
+        id: sts
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ${{ env.STS_WORKLOAD }}
+          secrets: |
+            E2E_ACCESS_CLIENT_ID
+            E2E_ACCESS_CLIENT_SECRET
+
+      # Only whether each value is set reaches this step.
+      - name: Check the STS bundle
+        env:
+          HAS_ACCESS_TOKEN: ${{ steps.sts.outputs.E2E_ACCESS_CLIENT_ID != '' && steps.sts.outputs.E2E_ACCESS_CLIENT_SECRET != '' }}
+        run: |
+          if [ "$HAS_ACCESS_TOKEN" != "true" ]; then
+            echo "::error::The STS bundle of $STS_WORKLOAD lacks the Access service token; set E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET in Infisical production /ci/$STS_WORKLOAD"
+            exit 1
+          fi
+
+      # Post-deploy proof of the closed path, before the run: Access refuses an
+      # anonymous request to either Worker, and a request with the service
+      # token reaches each (the fake LLM's own bearer checks still hold).
+      - name: Prove the closed path
+        working-directory: services/cloud-agent-next
+        env:
+          FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
+          E2E_ACCESS_CLIENT_ID: ${{ steps.sts.outputs.E2E_ACCESS_CLIENT_ID }}
+          E2E_ACCESS_CLIENT_SECRET: ${{ steps.sts.outputs.E2E_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          test/e2e/deploy/check-access-closed.sh "$E2E_WORKER_HOSTNAME"
+          # The service token reaches curl over stdin, never as an argument.
+          status=$(printf 'header = "CF-Access-Client-Id: %s"\nheader = "CF-Access-Client-Secret: %s"\n' \
+            "$E2E_ACCESS_CLIENT_ID" "$E2E_ACCESS_CLIENT_SECRET" |
+            curl -s -o /dev/null -w '%{http_code}' --max-time 15 --config - "$WORKER_URL/health" || true)
+          if [ "$status" != 200 ]; then
+            echo "::error::$WORKER_URL/health returned $status with the Access service token"
+            exit 1
+          fi
+          echo "$WORKER_URL/health: 200 through Access"
+          test/e2e/deploy/deploy-fake-llm.sh probe
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: e2e-workspace
+          path: ${{ runner.temp }}
+
+      - name: Unpack the workspace
+        run: tar -xzf "$RUNNER_TEMP/e2e-workspace.tgz" -C "$GITHUB_WORKSPACE"
+
+      - name: Run deployed e2e
+        working-directory: services/cloud-agent-next
+        env:
+          # Each value reaches only this step; never echoed.
+          E2E_USER_TOKEN: ${{ secrets.E2E_USER_TOKEN }}
+          FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
+          E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
+          E2E_ACCESS_CLIENT_ID: ${{ steps.sts.outputs.E2E_ACCESS_CLIENT_ID }}
+          E2E_ACCESS_CLIENT_SECRET: ${{ steps.sts.outputs.E2E_ACCESS_CLIENT_SECRET }}
+        # The package's own tsx, never a package manager.
+        run: |
+          set -o pipefail
+          only_args=()
+          if [ -n "$E2E_ONLY" ]; then only_args=(--only "$E2E_ONLY"); fi
+          ./node_modules/.bin/tsx test/e2e/matrix.ts --profile deployed "${only_args[@]}" 2>&1 | tee "$GITHUB_WORKSPACE/e2e.log"
+
+      - name: Summarize results
+        if: always()
+        run: |
+          # The harness always ends with `Summary: <p> passed, <f> failed, <u> unsupported`.
+          summary="$(grep -E '^Summary:' e2e.log 2>/dev/null | tail -n 1 || true)"
+          echo "### ${summary:-No summary line}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-log
+          path: e2e.log
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,11 +1,13 @@
 # The cloudflare-webhook-agent-ingest Worker (services/webhook-agent-ingest/wrangler.jsonc).
-# Production only: the config has no staging block, and its `dev` block binds no STS. No grant yet:
-# its three runtime reads, INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET (each
-# resolved from /shared), are listed after the protected import and before the Worker's
-# SECRETS_SOURCE leaves `secrets-store`.
+# Production only: the config has no staging block, and its `dev` block binds no STS. Its three
+# runtime reads (src/secrets.ts WebhookSecretName), each resolved from /shared. Reads stay on the
+# Secrets Store until the Worker's SECRETS_SOURCE is `sts`.
 workload: cloudflare-webhook-agent-ingest
 environments:
   - production
 identity:
   kind: worker-binding
-secrets: []
+secrets:
+  - INTERNAL_API_SECRET
+  - CALLBACK_TOKEN_SECRET
+  - NEXTAUTH_SECRET

@@ -122,6 +122,7 @@ export async function verifyBenchmarkAssignment(
     token: authorization.slice('Bearer '.length),
     scope: BENCHMARK_GATEWAY_ASSIGNMENT_SCOPE,
     resourceParts: benchmarkGatewayAssignmentParts(assignment),
+    observation: { receiver: 'ai-gateway' },
   });
   return authenticated ? { ok: true, assignment } : invalid();
 }

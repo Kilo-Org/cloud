@@ -31,8 +31,9 @@ import {
   type PersistedFakeLlmState,
 } from './fake-llm-core.js';
 import { verifyModelRouteBearer, type NextAuthSecretBinding } from './fake-llm-model-auth.js';
+import { type AccessGateEnv, refuseWithoutAccess } from '../../src/e2e-surface/access-gate.js';
 
-export type FakeLlmWorkerEnv = {
+export type FakeLlmWorkerEnv = AccessGateEnv & {
   FAKE_LLM: DurableObjectNamespace<FakeLlmState>;
   /** Secrets Store binding in the deployed config; a plain string in tests. */
   NEXTAUTH_SECRET?: NextAuthSecretBinding;
@@ -40,10 +41,14 @@ export type FakeLlmWorkerEnv = {
   FAKE_LLM_ADMIN_TOKEN?: string;
 };
 
+// Marks the Worker's own refusal, as the e2e Worker does, so
+// test/e2e/deploy/check-access-closed.sh can tell it apart from an Access refusal.
+const REFUSAL_HEADER = 'X-Cloud-Agent-E2E-Refusal';
+
 function modelAuthError(status: number, message: string): Response {
   return Response.json(
     { error: { message, code: status, type: status === 500 ? 'server_error' : 'unauthorized' } },
-    { status }
+    { status, headers: { [REFUSAL_HEADER]: 'fake-llm' } }
   );
 }
 
@@ -304,6 +309,10 @@ export class FakeLlmState extends DurableObject<FakeLlmWorkerEnv> {
 
 export default {
   async fetch(request: Request, env: FakeLlmWorkerEnv): Promise<Response> {
+    // The deployed fake sits behind its own Access application; a request that
+    // bypassed it is refused. The local dev config sets ENVIRONMENT=development.
+    const refusal = await refuseWithoutAccess(request, env, 'audience');
+    if (refusal !== null) return refusal;
     const url = new URL(request.url);
 
     if (request.method === 'GET' && url.pathname === '/health') {

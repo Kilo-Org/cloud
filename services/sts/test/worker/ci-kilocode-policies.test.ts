@@ -249,10 +249,11 @@ describe('shipped Kilo-Org/kilocode policies', () => {
   it('refuses another repository, another owner, and subjects naming another repository', async () => {
     const { verify } = await fixture('production');
     const base = claims('release', 'publish.yml', 'workflow_dispatch');
-    // Kilo-Org/bouncer's repository id, with every other claim unchanged.
+    // Kilo-Org/bouncer's repository id, with every other claim unchanged. Bouncer has its own
+    // workload (ci-deploy-bouncer), so the claims match it and its identity check refuses them.
     expect(await verify({ ...base, repository_id: '1395255492' })).toMatchObject({
       status: 'denied',
-      reason: 'unknown_workload',
+      reason: 'identity_rejected',
     });
     expect(await verify({ ...base, repository_owner_id: '1' })).toMatchObject({
       status: 'denied',
@@ -291,10 +292,12 @@ describe('shipped Kilo-Org/kilocode policies', () => {
     it('refuses it with another repository id or owner id', async () => {
       const { verify } = await fixture('production');
       const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
+      // 999999999 is a repository id that no shipped policy holds. Bouncer's id has its own
+      // workload; the case above covers it.
       const changes: Record<string, string>[] = [
-        { repository_id: '1395255492' },
+        { repository_id: '999999999' },
         { repository_owner_id: '1' },
-        { repository_id: '1395255492', repository_owner_id: '1' },
+        { repository_id: '999999999', repository_owner_id: '1' },
       ];
       for (const ids of changes) {
         const outcome = await verify({ ...base, ...ids });

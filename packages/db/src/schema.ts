@@ -2917,10 +2917,6 @@ export const microdollar_usage_metadata = pgTable(
     vercel_ip_latitude: real(),
     vercel_ip_longitude: real(),
     ja4_digest_id: integer().references(() => ja4_digest.ja4_digest_id),
-    user_prompt_prefix: text(),
-    system_prompt_prefix_id: integer().references(
-      () => system_prompt_prefix.system_prompt_prefix_id
-    ),
     system_prompt_length: integer(),
     max_tokens: bigint({ mode: 'number' }),
     has_middle_out_transform: boolean(),
@@ -2949,8 +2945,6 @@ export const microdollar_usage_metadata = pgTable(
     // and PDF parsing, excluding OpenRouter's BYOK fee. Null when not reported separately.
     non_inference_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
-    abuse_delay: integer(),
-    abuse_downgraded_from: text(),
     system_prompt_kind_id: integer(),
   },
   table => [
@@ -3036,17 +3030,6 @@ export const vercel_ip_city = pgTable(
     uniqueIndex('UQ_vercel_ip_city').on(table.vercel_ip_city), // TODO include columns in migration!
   ]
 );
-export const system_prompt_prefix = pgTable(
-  'system_prompt_prefix',
-  {
-    system_prompt_prefix_id: serial().notNull().primaryKey(),
-    system_prompt_prefix: text().notNull(),
-  },
-  table => [
-    uniqueIndex('UQ_system_prompt_prefix').on(table.system_prompt_prefix), // TODO include columns in migration!
-  ]
-);
-
 export const ja4_digest = pgTable(
   'ja4_digest',
   {
@@ -3159,8 +3142,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   provider: text(),
   model: text(),
   requested_model: text(),
-  user_prompt_prefix: text(),
-  system_prompt_prefix: text(),
   system_prompt_length: integer(),
   http_user_agent: text(),
   cache_discount: bigint({ mode: 'number' }),
@@ -3193,8 +3174,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   market_cost: bigint({ mode: 'number' }),
   non_inference_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
-  abuse_delay: integer(),
-  abuse_downgraded_from: text(),
   system_prompt_kind: text(),
 }).as(sql`
   SELECT
@@ -3216,8 +3195,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     mu.provider,
     mu.model,
     mu.requested_model,
-    meta.user_prompt_prefix,
-    spp.system_prompt_prefix,
     meta.system_prompt_length,
     ua.http_user_agent,
     mu.cache_discount,
@@ -3250,8 +3227,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.market_cost,
     meta.non_inference_cost,
     meta.is_free,
-    meta.abuse_delay,
-    meta.abuse_downgraded_from,
     spk.system_prompt_kind
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
@@ -3259,7 +3234,6 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${vercel_ip_city} city ON meta.vercel_ip_city_id = city.vercel_ip_city_id
   LEFT JOIN ${vercel_ip_country} country ON meta.vercel_ip_country_id = country.vercel_ip_country_id
   LEFT JOIN ${ja4_digest} ja4 ON meta.ja4_digest_id = ja4.ja4_digest_id
-  LEFT JOIN ${system_prompt_prefix} spp ON meta.system_prompt_prefix_id = spp.system_prompt_prefix_id
   LEFT JOIN ${http_user_agent} ua ON meta.http_user_agent_id = ua.http_user_agent_id
   LEFT JOIN ${finish_reason} frfr ON meta.finish_reason_id = frfr.finish_reason_id
   LEFT JOIN ${editor_name} edit ON meta.editor_name_id = edit.editor_name_id

@@ -2724,6 +2724,13 @@
       "when": 1795783262941,
       "tag": "0388_drop_static_key_credential_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 389,
+      "version": "7",
+      "when": 1795783295429,
+      "tag": "0389_drop_retired_usage_metadata_columns",
+      "breakpoints": true
     }
   ]
 }

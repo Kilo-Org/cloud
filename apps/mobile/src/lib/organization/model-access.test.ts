@@ -340,6 +340,13 @@ describe('isModelAccessFormDraft', () => {
     ).toBe(true);
   });
 
+  it('accepts a draft with the deny list base it started from, or without one', () => {
+    const draft = { providerAllowList: [], modelDenyList: ['openai/gpt'] };
+    expect(isModelAccessFormDraft({ ...draft, denyListBase: [] })).toBe(true);
+    expect(isModelAccessFormDraft(draft)).toBe(true);
+    expect(isModelAccessFormDraft({ ...draft, denyListBase: [7] })).toBe(false);
+  });
+
   it('rejects a foreign shape: a string list, a nested list, and a missing list', () => {
     const stringList = { providerAllowList: 'anthropic', modelDenyList: [] };
     expect(isModelAccessFormDraft('anthropic')).toBe(false);

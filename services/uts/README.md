@@ -756,7 +756,11 @@ organization a request names against the subject itself.
   grant and its device session, and refuses a session of any other account. The token's `sub` and
   `sid` come from the same session row at the mint, so the BFF manages the credentials of its
   signed-in user only. A create's tier B gate, and a keep's, runs on that session, and the consumed
-  pass names it. In the account audit rows `grantId` is the token's `sid`.
+  pass names it. A session the legacy bridge created holds no UTS sign-in cookie, so its sign-in
+  time (the web app's claim) never counts as a recent sign-in; only a passkey step-up of that
+  session could pass. `uts.open_tier_a_gate_pass` answers `invalid_session` for a browser session,
+  which uses `uts.open_browser_tier_a_gate_pass`. In the account audit rows `grantId` is the
+  token's `sid`, and the create and keep rows and their refusals name the client (`clientId`).
 - A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
   notice and the audit row in one statement. The push and email notice goes through the
   `CredentialNotices` port after the statement; slice 3.8 (security notices) implements the port,

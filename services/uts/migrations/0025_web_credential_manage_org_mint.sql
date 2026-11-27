@@ -10,10 +10,15 @@
 --   acts through another account's session.
 -- * A create's tier B gate, and a keep's, runs on that browser session: its sign-in within 10
 --   minutes, or a passkey step-up of the same session (`uts.tier_b_checks`); the consumed pass
---   names the browser session. A refusal writes at most one denied row per session per minute
---   (`uts.audit_session_gate_refusal`), as a refusal on a grant does per grant.
+--   names the browser session. A browser session without a UTS sign-in cookie (one the legacy
+--   bridge created, `token_hash` NULL) never counts as a recent sign-in: its sign-in time is the
+--   web app's claim, not a sign-in at UTS (design 5.3, 5.5). A refusal writes at most one denied
+--   row per session per minute, as a refusal on a grant does per grant.
 -- * `grantId` in the account audit rows stays the caller token's `sid`: a refresh grant id for
---   the CLI, a browser session id for `kilo-web`.
+--   the CLI, a browser session id for `kilo-web`. The create and keep rows, and their refusals,
+--   also name the client (`clientId`).
+-- * `uts.open_tier_a_gate_pass` stays for a grant's device session only: a browser session opens
+--   its tier A pass through `uts.open_browser_tier_a_gate_pass` (migration 0020).
 -- * `uts.mint_web_session_token` takes an optional organization. With one, the same statement
 --   reads the account's membership and the organization's SSO policy, and mints only for an
 --   active member that meets the SSO rule and holds a role the scope allows
@@ -30,15 +35,17 @@ SET LOCAL ROLE uts_owner;
 -- The live session of `p_account_id` that the token's `sid` (`p_grant_id`) names: a first-party
 -- grant and its device session as in 0005 (`browser_session_id` NULL), or a live browser session
 -- that holds a BFF handle, within its idle and maximum lifetime and issued after any subject-wide
--- revocation, as `uts.live_web_session` reads it (`device_session_id` NULL). For a browser
--- session, `auth_time` and `amr` are the handle's sign-in, the one its tokens carry. One probe of
--- `refresh_grants_pkey` and one of `browser_sessions_pkey`, then `accounts_pkey` (and
--- `device_sessions_pkey` or `revocations_kind_subject_key`).
+-- revocation, as `uts.live_web_session` reads it (`device_session_id` NULL). `client_id` is the
+-- grant's client, or `kilo-web` for a browser session. For a browser session, `auth_time` and
+-- `amr` are the handle's sign-in, the one its tokens carry. One probe of `refresh_grants_pkey` and
+-- one of `browser_sessions_pkey`, then `accounts_pkey` (and `device_sessions_pkey` or
+-- `revocations_kind_subject_key`).
 DROP FUNCTION uts.account_session(text, uuid);
 CREATE FUNCTION uts.account_session(p_account_id text, p_grant_id uuid)
 RETURNS TABLE (
   device_session_id uuid,
   browser_session_id uuid,
+  client_id text,
   auth_time timestamptz,
   amr uts.auth_method[]
 )
@@ -46,7 +53,7 @@ LANGUAGE sql
 STABLE
 SET search_path = pg_catalog, pg_temp
 AS $$
-  SELECT session.id, NULL::uuid, session.auth_time, session.amr
+  SELECT session.id, NULL::uuid, grant_row.client_id::text, session.auth_time, session.amr
   FROM uts.refresh_grants AS grant_row
   JOIN uts.device_sessions AS session ON session.id = grant_row.device_session_id
   JOIN uts.accounts AS account ON account.id = grant_row.account_id
@@ -58,7 +65,7 @@ AS $$
     AND session.status = 'active'
     AND account.status = 'active'
   UNION ALL
-  SELECT NULL::uuid, browser.id, browser.handle_auth_time, browser.handle_amr
+  SELECT NULL::uuid, browser.id, 'kilo-web', browser.handle_auth_time, browser.handle_amr
   FROM uts.browser_sessions AS browser
   JOIN uts.accounts AS account ON account.id = browser.account_id
   WHERE browser.id = $2
@@ -71,26 +78,83 @@ AS $$
     AND NOT uts.subject_revoked_since(browser.account_id, browser.handle_issued_at)
 $$;
 
--- A refused tier B gate of an account statement: one denied audit row per minute per grant, or
--- per browser session for a `kilo-web` caller.
+-- `uts.tier_b_checks` of 0001, except that a browser session without a UTS sign-in cookie
+-- (`token_hash` NULL: the legacy bridge created it with the web app's sign-in time) never meets
+-- `recent_sign_in`; only a passkey step-up of that session could pass its gate.
+CREATE OR REPLACE FUNCTION uts.tier_b_checks(
+  p_account_id text,
+  p_browser_session_id uuid,
+  p_device_session_id uuid
+) RETURNS uts.gate_check[]
+LANGUAGE sql
+STABLE
+SET search_path = pg_catalog, pg_temp
+RETURN (
+  SELECT array_remove(ARRAY[
+    CASE
+      WHEN session.auth_time > now() - interval '10 minutes' AND session.auth_time <= now()
+      THEN 'recent_sign_in'::uts.gate_check
+    END,
+    CASE
+      WHEN EXISTS (
+        SELECT 1 FROM uts.step_ups AS step_up
+        WHERE step_up.account_id = p_account_id
+          AND step_up.completed_at > now() - interval '10 minutes'
+          AND step_up.purpose = 'gate'
+          AND step_up.browser_session_id IS NOT DISTINCT FROM p_browser_session_id
+          AND step_up.device_session_id IS NOT DISTINCT FROM p_device_session_id
+          AND step_up.expires_at > now()
+      )
+      THEN 'passkey'::uts.gate_check
+    END
+  ], NULL)
+  FROM (
+    SELECT CASE WHEN browser.token_hash IS NOT NULL THEN browser.auth_time END AS auth_time
+    FROM uts.browser_sessions AS browser
+    WHERE browser.id = p_browser_session_id
+      AND browser.account_id = p_account_id
+      AND browser.status = 'active'
+      AND browser.idle_expires_at > now()
+      AND browser.expires_at > now()
+    UNION ALL
+    SELECT device.auth_time FROM uts.device_sessions AS device
+    WHERE device.id = p_device_session_id
+      AND device.account_id = p_account_id
+      AND device.status = 'active'
+  ) AS session
+  WHERE num_nonnulls(p_browser_session_id, p_device_session_id) = 1
+);
+
+-- A refused tier B gate of an account statement, with the caller's client: one denied audit row
+-- per minute per grant (`grantId`), or per browser session for a `kilo-web` caller (`sessionId`).
 CREATE FUNCTION uts.audit_account_gate_refusal(
   p_environment text,
   p_account_id text,
   p_grant_id uuid,
   p_browser_session_id uuid,
+  p_client_id text,
   p_action uts.gated_action
 ) RETURNS void
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
+DECLARE
+  claimed boolean;
+  caller_ref jsonb;
 BEGIN
   IF p_browser_session_id IS NULL THEN
-    PERFORM uts.audit_gate_refusal(
-      p_environment, p_account_id, p_grant_id, p_action, 'fresh sign-in required'
-    );
+    claimed := uts.claim_denied_audit('first_party', p_grant_id);
+    caller_ref := jsonb_build_object('grantId', p_grant_id);
   ELSE
-    PERFORM uts.audit_session_gate_refusal(
-      p_environment, p_account_id, p_browser_session_id, p_action, 'fresh sign-in required'
+    claimed := uts.claim_session_denied_audit(p_browser_session_id);
+    caller_ref := jsonb_build_object('sessionId', p_browser_session_id);
+  END IF;
+  IF claimed THEN
+    PERFORM uts.write_audit_event(
+      p_environment, 'ai.kilo.uts.gate.refused', 3001, 99, 'denied', 'fresh sign-in required',
+      p_account_id,
+      jsonb_build_object('action', p_action, 'tier', 'b', 'clientId', uts.audit_client_id(p_client_id))
+        || caller_ref
     );
   END IF;
 END
@@ -325,7 +389,8 @@ BEGIN
   );
   IF written.outcome = 'gate_required' THEN
     PERFORM uts.audit_account_gate_refusal(
-      p_environment, p_account_id, p_grant_id, holder.browser_session_id, 'pat_create'
+      p_environment, p_account_id, p_grant_id, holder.browser_session_id, holder.client_id,
+      'pat_create'
     );
   END IF;
   IF written.outcome <> 'created' THEN
@@ -347,6 +412,7 @@ BEGIN
       'expiresAt', to_char(pat_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'lifetimeDays', p_lifetime_days,
       'grantId', p_grant_id,
+      'clientId', uts.audit_client_id(holder.client_id),
       'gatePassId', written.new_gate_pass_id,
       'gateChecks', to_jsonb(written.gate_checks::text[])
     )
@@ -403,7 +469,8 @@ BEGIN
   );
   IF written.outcome = 'gate_required' THEN
     PERFORM uts.audit_account_gate_refusal(
-      p_environment, p_account_id, p_grant_id, holder.browser_session_id, 'bot_key_create'
+      p_environment, p_account_id, p_grant_id, holder.browser_session_id, holder.client_id,
+      'bot_key_create'
     );
   END IF;
   IF written.outcome <> 'created' THEN
@@ -425,6 +492,7 @@ BEGIN
       'expiresAt', to_char(key_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'lifetimeDays', p_lifetime_days,
       'grantId', p_grant_id,
+      'clientId', uts.audit_client_id(holder.client_id),
       'gatePassId', written.new_gate_pass_id,
       'gateChecks', to_jsonb(written.gate_checks::text[])
     )
@@ -471,7 +539,8 @@ BEGIN
   checks := uts.tier_b_checks(p_account_id, holder.browser_session_id, holder.device_session_id);
   IF coalesce(cardinality(checks), 0) = 0 THEN
     PERFORM uts.audit_account_gate_refusal(
-      p_environment, p_account_id, p_grant_id, holder.browser_session_id, 'bot_key_keep'
+      p_environment, p_account_id, p_grant_id, holder.browser_session_id, holder.client_id,
+      'bot_key_keep'
     );
     outcome := 'gate_required';
     RETURN NEXT;
@@ -498,11 +567,123 @@ BEGIN
         'org', p_org_id,
         'createdBy', found_key.created_by,
         'grantId', p_grant_id,
+        'clientId', uts.audit_client_id(holder.client_id),
         'gateChecks', to_jsonb(checks::text[])
       )
     );
     outcome := 'kept';
   END IF;
+  RETURN NEXT;
+END
+$$;
+
+-- `uts.open_tier_a_gate_pass` of 0005 for a grant's device session only: now that
+-- `uts.account_session` also finds a `kilo-web` browser session, that session answers
+-- `invalid_session` here (it opens its pass through `uts.open_browser_tier_a_gate_pass`, migration
+-- 0020). Otherwise as in 0005.
+CREATE OR REPLACE FUNCTION uts.open_tier_a_gate_pass(
+  p_environment text,
+  p_account_id text,
+  p_grant_id uuid,
+  p_action uts.gated_action,
+  p_email_hash bytea,
+  p_code_hash bytea,
+  p_new_email_hash bytea,
+  p_new_code_hash bytea
+) RETURNS TABLE (outcome text, gate_pass_id uuid, pass_expires_at timestamptz)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  holder record;
+  strongest uts.auth_method;
+  checks uts.gate_check[] := ARRAY['recent_sign_in', 'email_code']::uts.gate_check[];
+  old_ok boolean;
+  new_ok boolean := true;
+BEGIN
+  IF p_action NOT IN ('passkey_add', 'passkey_remove', 'method_add', 'method_remove', 'email_change') THEN
+    RAISE EXCEPTION 'not a tier A action' USING ERRCODE = '22023';
+  END IF;
+  IF (p_action = 'email_change') <> (p_new_email_hash IS NOT NULL AND p_new_code_hash IS NOT NULL) THEN
+    RAISE EXCEPTION 'an email change, and only an email change, names the new address and its code'
+      USING ERRCODE = '22023';
+  END IF;
+  IF p_action = 'email_change' AND p_email_hash IS NOT DISTINCT FROM p_new_email_hash THEN
+    RAISE EXCEPTION 'an email change needs a new address' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO holder FROM uts.account_session(p_account_id, p_grant_id);
+  IF NOT FOUND OR holder.device_session_id IS NULL THEN
+    outcome := 'invalid_session';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  strongest := CASE
+    WHEN EXISTS (SELECT 1 FROM uts.passkey_credentials AS passkey WHERE passkey.account_id = p_account_id)
+      THEN 'passkey'::uts.auth_method
+    WHEN EXISTS (
+      SELECT 1 FROM uts.sign_in_methods AS method
+      WHERE method.account_id = p_account_id AND method.provider = 'workos'
+    ) THEN 'sso'::uts.auth_method
+  END;
+  IF NOT (holder.auth_time > now() - interval '10 minutes' AND holder.auth_time <= now())
+    OR (strongest IS NOT NULL AND NOT strongest = ANY (holder.amr))
+  THEN
+    PERFORM uts.audit_gate_refusal(
+      p_environment, p_account_id, p_grant_id, p_action, 'strongest-method sign-in required'
+    );
+    outcome := 'gate_required';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  IF p_action IN ('passkey_remove', 'method_remove', 'email_change') AND (
+    EXISTS (
+      SELECT 1 FROM uts.sign_in_methods AS method
+      WHERE method.account_id = p_account_id AND method.added_at > now() - interval '24 hours'
+    )
+    OR EXISTS (
+      SELECT 1 FROM uts.passkey_credentials AS passkey
+      WHERE passkey.account_id = p_account_id AND passkey.added_at > now() - interval '24 hours'
+    )
+  ) THEN
+    PERFORM uts.audit_gate_refusal(
+      p_environment, p_account_id, p_grant_id, p_action, 'method added in the last 24 hours'
+    );
+    outcome := 'cooling_off';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  old_ok := uts.use_tier_a_code(p_account_id, 'current', p_email_hash, p_code_hash, false);
+  IF p_action = 'email_change' THEN
+    new_ok := uts.use_tier_a_code(p_account_id, 'new', p_new_email_hash, p_new_code_hash, false);
+    checks := checks || 'email_code_new'::uts.gate_check;
+  END IF;
+  IF NOT (old_ok AND new_ok) THEN
+    PERFORM uts.audit_gate_refusal(p_environment, p_account_id, p_grant_id, p_action, 'email code invalid');
+    outcome := 'code_invalid';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  PERFORM uts.use_tier_a_code(p_account_id, 'current', p_email_hash, p_code_hash, true);
+  IF p_action = 'email_change' THEN
+    PERFORM uts.use_tier_a_code(p_account_id, 'new', p_new_email_hash, p_new_code_hash, true);
+  END IF;
+
+  INSERT INTO uts.gate_passes (account_id, device_session_id, tier, action, satisfied_by, expires_at)
+  VALUES (p_account_id, holder.device_session_id, 'a', p_action, checks, now() + interval '10 minutes')
+  RETURNING id, expires_at INTO gate_pass_id, pass_expires_at;
+  PERFORM uts.write_audit_event(
+    p_environment, 'ai.kilo.uts.gate.passed', 3001, 99, 'success', NULL, p_account_id,
+    jsonb_build_object(
+      'action', p_action,
+      'tier', 'a',
+      'gatePassId', gate_pass_id,
+      'gateChecks', to_jsonb(checks::text[]),
+      'grantId', p_grant_id
+    )
+  );
+  outcome := 'opened';
   RETURN NEXT;
 END
 $$;
@@ -513,7 +694,9 @@ $$;
 -- member's role may hold the scope; the token then carries the organization (`bound_org_id`) and
 -- the role. Without one, a scope limited to listed roles is `org_denied` too. A refusal writes
 -- nothing but the assertion's `jti`. Outcomes: `issued`, `invalid_session`, `org_denied`,
--- `step_up_required`, `assertion_replay`.
+-- `step_up_required`, `assertion_replay`. `p_org_id` defaults to NULL, so the 7-argument call of
+-- a Worker deployed before this migration still resolves here (to a token with no organization)
+-- until the new Worker ships.
 DROP FUNCTION uts.mint_web_session_token(text, bytea, bytea, text, timestamptz, text, boolean);
 CREATE FUNCTION uts.mint_web_session_token(
   p_environment text,
@@ -523,7 +706,7 @@ CREATE FUNCTION uts.mint_web_session_token(
   p_assertion_expires_at timestamptz,
   p_scope text,
   p_step_up boolean,
-  p_org_id uuid
+  p_org_id uuid DEFAULT NULL
 ) RETURNS TABLE (
   outcome text,
   subject_id text,

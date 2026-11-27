@@ -226,6 +226,7 @@ describe('PAT create', () => {
         scope: 'uts:probe.read',
         lifetimeDays: 90,
         grantId: holder.grantId,
+        clientId: 'kilo-cli',
         gateChecks: ['recent_sign_in'],
       },
     });
@@ -302,7 +303,12 @@ describe('PAT create', () => {
       classUid: 3001,
       outcome: 'denied',
       outcomeDetail: 'fresh sign-in required',
-      attributes: { action: 'pat_create', tier: 'b', grantId: holder.grantId },
+      attributes: {
+        action: 'pat_create',
+        tier: 'b',
+        grantId: holder.grantId,
+        clientId: 'kilo-cli',
+      },
     });
   });
 
@@ -944,7 +950,7 @@ async function tierACode(
 }
 
 async function openTierA(
-  holder: Session,
+  holder: Caller,
   action: string,
   codes: { email: Buffer; code: Buffer; newEmail?: Buffer; newCode?: Buffer }
 ) {
@@ -1150,15 +1156,22 @@ describe('tier A gate passes', () => {
 });
 
 /**
- * A browser session of the web BFF that signed in `minutesAgo` minutes ago with `amr` and holds a
- * BFF handle, as the code exchange leaves it. A `kilo-web` token names it in `sid`, so the caller
- * passes it as `grantId`.
+ * A browser session of the web BFF that signed in `minutesAgo` minutes ago with `amr`, by `kind`:
+ * `signed_in` holds a UTS sign-in cookie and a BFF handle, as the code exchange leaves it;
+ * `bridged` holds only a handle, with `amr` `legacy_session`, as the legacy bridge creates it;
+ * `no_handle` holds only the cookie (the BFF never exchanged a code in it). A `kilo-web` token names
+ * the session in `sid`, so the caller passes it as `grantId`.
  */
 async function webSession(
-  options: { minutesAgo?: number; amr?: string[]; accountId?: string; handle?: boolean } = {}
+  options: {
+    minutesAgo?: number;
+    amr?: string[];
+    accountId?: string;
+    kind?: 'signed_in' | 'bridged' | 'no_handle';
+  } = {}
 ) {
   const accountId = options.accountId ?? (await insertAccount(owner));
-  const handle = options.handle ?? true;
+  const kind = options.kind ?? 'signed_in';
   const result = await owner.query<{ id: string }>(
     `INSERT INTO uts.browser_sessions (account_id, token_hash, auth_time, amr, idle_expires_at,
        expires_at, handle_hash, handle_issued_at, handle_auth_time, handle_amr)
@@ -1169,11 +1182,11 @@ async function webSession(
      RETURNING id`,
     [
       accountId,
-      randomBytes(32),
+      kind === 'bridged' ? null : randomBytes(32),
       options.minutesAgo ?? 1,
-      options.amr ?? ['oauth'],
-      handle ? randomBytes(32) : null,
-      handle,
+      options.amr ?? (kind === 'bridged' ? ['legacy_session'] : ['oauth']),
+      kind === 'no_handle' ? null : randomBytes(32),
+      kind !== 'no_handle',
     ]
   );
   const sessionId = result.rows[0].id;
@@ -1205,7 +1218,11 @@ describe('the web BFF’s browser session on the account statements', () => {
     expect(listed.outcome === 'listed' ? listed.pats.map(pat => pat.id) : listed).toEqual([id]);
     expect((await account.revokePat({ environment, ...web, patId: id })).outcome).toBe('revoked');
     const [created] = await auditRows(web.accountId);
-    expect(created.event.data.attributes).toMatchObject({ patId: id, grantId: web.grantId });
+    expect(created.event.data.attributes).toMatchObject({
+      patId: id,
+      grantId: web.grantId,
+      clientId: 'kilo-web',
+    });
   });
 
   it('refuses to act for another account: its session, its PATs and its list stay out of reach', async () => {
@@ -1238,7 +1255,7 @@ describe('the web BFF’s browser session on the account statements', () => {
   });
 
   it('refuses a session without a BFF handle, an ended session, and one a subject revocation covers', async () => {
-    const noHandle = await webSession({ handle: false });
+    const noHandle = await webSession({ kind: 'no_handle' });
     const ended = await webSession();
     await owner.query(
       `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(), revoke_reason = 'sign_out'
@@ -1268,6 +1285,7 @@ describe('the web BFF’s browser session on the account statements', () => {
       action: 'pat_create',
       tier: 'b',
       sessionId: web.browserSessionId,
+      clientId: 'kilo-web',
     });
     const passkey = await owner.query<{ id: string }>(
       `INSERT INTO uts.passkey_credentials (account_id, credential_id, public_key, backup_eligible,
@@ -1304,6 +1322,53 @@ describe('the web BFF’s browser session on the account statements', () => {
     expect((await account.createPat(patInput(ssoWeb, { orgId: randomUUID() }).input)).outcome).toBe(
       'org_denied'
     );
+  });
+
+  it('refuses a legacy-bridged session at every tier B gate, while a signed-in web session within 10 minutes passes', async () => {
+    const orgId = randomUUID();
+    const accountId = await insertAccount(owner);
+    await membership(orgId, accountId, 'admin');
+    // The bridge records the web app's sign-in time; one minute ago is still no UTS sign-in.
+    const bridged = await webSession({ accountId, kind: 'bridged', minutesAgo: 1 });
+    const signedIn = await webSession({ accountId, minutesAgo: 1 });
+
+    expect((await account.createPat(patInput(bridged).input)).outcome).toBe('gate_required');
+    expect((await account.createBotKey(botKeyInput(bridged, orgId).input)).outcome).toBe(
+      'gate_required'
+    );
+    const key = await createdBotKey(signedIn, orgId);
+    await owner.query(
+      `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
+      [key.id]
+    );
+    expect(await account.keepBotKey({ environment, ...bridged, orgId, keyId: key.id })).toBe(
+      'gate_required'
+    );
+    const written = await owner.query(
+      `SELECT
+         (SELECT count(*) FROM uts.personal_access_tokens WHERE account_id = $1)::integer AS pats,
+         (SELECT count(*) FROM uts.org_bot_keys WHERE org_id = $2)::integer AS keys,
+         (SELECT status FROM uts.org_bot_keys WHERE id = $3)::text AS key_status`,
+      [accountId, orgId, key.id]
+    );
+    expect(written.rows).toEqual([{ pats: 0, keys: 1, key_status: 'flagged' }]);
+
+    expect(await account.keepBotKey({ environment, ...signedIn, orgId, keyId: key.id })).toBe(
+      'kept'
+    );
+    expect((await account.createPat(patInput(signedIn).input)).outcome).toBe('created');
+  });
+
+  it('opens no tier A pass through the grant statement for a browser session', async () => {
+    const web = await webSession();
+    const [email, code] = [randomBytes(32), randomBytes(32)];
+    await tierACode(web.accountId, email, code);
+    expect((await openTierA(web, 'passkey_add', { email, code })).outcome).toBe('invalid_session');
+    expect(await codeState(email)).toEqual([{ status: 'pending', attempts: 0 }]);
+    const passes = await owner.query('SELECT 1 FROM uts.gate_passes WHERE account_id = $1', [
+      web.accountId,
+    ]);
+    expect(passes.rowCount).toBe(0);
   });
 
   it('lets only an owner or admin manage bot keys, and keeps a flagged key behind the gate', async () => {

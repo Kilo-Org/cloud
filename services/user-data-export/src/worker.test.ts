@@ -924,11 +924,12 @@ describe('dispatchReadyNotifications', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const minted: unknown[] = [];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+    const get = vi.fn(async () => 'shared-secret');
 
     await dispatchReadyNotifications(
       {
         USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
-        INTERNAL_API_SECRET: 'shared-secret',
+        INTERNAL_API_SECRET: { get },
         STS: sts(minted),
       },
       pending
@@ -938,6 +939,21 @@ describe('dispatchReadyNotifications', () => {
     expect(headers.get('x-internal-api-key')).toBe('shared-secret');
     expect(headers.has('authorization')).toBe(false);
     expect(minted).toEqual([]);
+    // One read for the whole sweep, however many items it sends.
+    expect(get).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the sweep for the next run when no credential can be built', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    // The shared key is missing and the source cannot serve it: a credential failure, reported like
+    // the unavailable path, not a rejected sweep.
+    await expect(
+      dispatchReadyNotifications({ USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai' }, pending)
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('sends nothing, leaving every item leased, when no token can be had', async () => {

@@ -1019,14 +1019,26 @@ export async function dispatchReadyNotifications(
   if (pending.length === 0) return;
   // The shared key is read only when a send actually falls back to it: under WEB_INTERNAL_AUTH=sts
   // every item carries a minted token, so a missing INTERNAL_API_SECRET must not fail the sweep.
-  // One read per sweep, and a rejected read surfaces the same way on every item.
+  // One read per sweep.
   let sharedKey: Promise<string> | undefined;
   for (const item of pending) {
     // Per item: a held STS token is a memory read, and a long sweep presents a fresh one.
-    const credential = await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, {
-      header: 'x-internal-api-key',
-      secret: () => (sharedKey ??= readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx)),
-    });
+    let credential: Awaited<ReturnType<typeof webInternalCredential>>;
+    try {
+      credential = await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, {
+        header: 'x-internal-api-key',
+        secret: () => (sharedKey ??= readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx)),
+      });
+    } catch (error) {
+      // An unreadable shared key is a credential problem, not a failed sweep: report it the way the
+      // unavailable path does and leave every item for the next run.
+      logExportEvent('warn', 'export_notification_callback_failed', {
+        exportId: item.id,
+        reason: 'credential_unavailable',
+        ...safeError(error),
+      });
+      return;
+    }
     if (credential.kind === 'unavailable') {
       // The rest of the sweep would fail the same way; the lease keeps every item for the next.
       logExportEvent('warn', 'export_notification_callback_failed', {

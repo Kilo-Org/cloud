@@ -84,8 +84,8 @@ function tokensFor(binding: MintBinding): ServiceTokens {
 
 /**
  * The credential of one of this Worker's own status writes: its headers, and under `sts` a redirect
- * policy that never carries the token to another origin. Throws `StatusCallbackCredentialError`
- * rather than send a write without its credential.
+ * policy that never carries the token to another origin. Throws `StatusCallbackCredentialError`, or
+ * the secret reader's error in `legacy` mode, rather than send a write without its credential.
  */
 export async function statusCallbackCredential(
   env: StatusCallbackEnv,

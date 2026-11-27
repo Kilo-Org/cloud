@@ -40,6 +40,7 @@ function setup(overrides: Partial<Env> = {}) {
   const accepted = { metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } };
   const send = vi.fn<Env['USAGE_INGEST_QUEUE']['send']>().mockResolvedValue(accepted);
   const tagged = vi.fn<Env['USAGE_INGEST_ENKRYPT_QUEUE']['send']>().mockResolvedValue(accepted);
+  const writeDataPoint = vi.fn();
   const env: Env = {
     USAGE_INGEST_PUBLISH_SECRET: SECRET,
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics: vi.fn() },
@@ -47,11 +48,12 @@ function setup(overrides: Partial<Env> = {}) {
     USAGE_INGEST_ENKRYPT_QUEUE: { send: tagged, sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_ENKRYPT_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: 'true',
+    INTERNAL_AUTH_COUNTER: { writeDataPoint },
     STS_URL,
     STS_ENVIRONMENT: 'production',
     ...overrides,
   };
-  return { send, tagged, env };
+  return { send, tagged, env, writeDataPoint };
 }
 
 function publish(
@@ -172,7 +174,7 @@ describe('dual mode', () => {
     stubKeySet();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { env } = setup({ USAGE_INGEST_PUBLISH_AUTH: 'dual' });
+    const { env, writeDataPoint } = setup({ USAGE_INGEST_PUBLISH_AUTH: 'dual' });
 
     expect((await worker.fetch(publish(`Bearer ${SECRET}`), env)).status).toBe(202);
     expect((await worker.fetch(publish(await stsBearer()), env)).status).toBe(202);
@@ -196,6 +198,13 @@ describe('dual mode', () => {
         count: 1,
       }),
     ]);
+    // Both accepted requests also become one Analytics Engine data point each.
+    expect(writeDataPoint).toHaveBeenCalledTimes(2);
+    expect(writeDataPoint).toHaveBeenNthCalledWith(1, {
+      blobs: ['usage-ingest', 'usage_publish', 'legacy_shared_secret', 'unknown'],
+      doubles: [1],
+      indexes: [expect.any(String)],
+    });
   });
 
   it('accepts the secret and a usage-ingest:usage.publish STS token, and labels each', async () => {

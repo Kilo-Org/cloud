@@ -1,3 +1,5 @@
+import { UTS_ATTESTATION_TYPES } from '@kilocode/uts-contracts';
+
 /**
  * The identity store's enum types, in their database order. `test/db/schema-drift.test.ts` fails
  * when one of these differs from the migrated schema.
@@ -26,6 +28,8 @@ export const AUTH_METHODS = [
   'device_grant',
   'native',
   'access_code',
+  /** A browser session the legacy bridge created; never a fresh sign-in (migration 0013). */
+  'legacy_session',
 ] as const;
 export const CLIENT_CLASSES = ['desktop', 'mobile'] as const;
 export const CLIENT_KINDS = ['first_party', 'third_party'] as const;
@@ -40,6 +44,15 @@ export const REVOKE_REASONS = [
   'reuse_detected',
   'session_ended',
   'client_blocked',
+  // Added by 0014_identity_import_subject_operations.sql, in this order.
+  'account_recovery',
+  'account_reset',
+  'account_deleted',
+  'staff_signout',
+  'workos_relink',
+  'scim_mailbox_move',
+  'apple_consent_revoked',
+  'staff_api_reset',
 ] as const;
 export const SESSION_STATUSES = ['active', 'revoked'] as const;
 export const GRANT_STATUSES = ['active', 'revoked'] as const;
@@ -48,6 +61,8 @@ export const DEVICE_CODE_STATUSES = ['pending', 'approved', 'denied', 'consumed'
 export const EMAIL_CODE_PURPOSES = ['sign_in', 'tier_a'] as const;
 export const EMAIL_CODE_STATUSES = ['pending', 'consumed', 'exhausted'] as const;
 export const EMAIL_CODE_LIMIT_STATUSES = ['open', 'stopped'] as const;
+/** The address a tier A code went to: the account's primary address, or the new one of a change. */
+export const EMAIL_CODE_ADDRESSES = ['current', 'new'] as const;
 export const TICKET_PURPOSES = [
   'sign_in',
   'stream',
@@ -74,6 +89,10 @@ export const REVOCATION_KINDS = [
   'bot_key',
   'sandbox_grant',
   'kid',
+  // Added by 0006_revocation_feed.sql; `ALTER TYPE ... ADD VALUE` appends it.
+  'blocked_account',
+  // Added by 0014_identity_import_subject_operations.sql.
+  'unblocked_account',
 ] as const;
 export const GATE_TIERS = ['a', 'b'] as const;
 export const GATED_ACTIONS = [
@@ -87,6 +106,7 @@ export const GATED_ACTIONS = [
   'ci_policy_create',
   'device_approve',
   'third_party_approve',
+  'bot_key_keep',
 ] as const;
 export const GATE_CHECKS = ['recent_sign_in', 'passkey', 'email_code', 'email_code_new'] as const;
 export const GATE_PASS_STATUSES = ['open', 'consumed'] as const;
@@ -102,9 +122,33 @@ export const NOTICE_KINDS = [
   'sessions_revoked',
   'suspicious_sign_in',
   'sign_in_code_stopped',
+  'bot_key_flagged',
 ] as const;
 export const NOTICE_CHANNELS = ['push', 'email', 'in_app'] as const;
-export const NOTICE_DELIVERIES = ['pending', 'delivered', 'failed'] as const;
+export const NOTICE_DELIVERIES = ['pending', 'sending', 'delivered', 'failed'] as const;
+export const NOTICE_ATTEMPT_OUTCOMES = [
+  'sent',
+  'no_target',
+  'not_configured',
+  'retryable_failure',
+  'permanent_failure',
+] as const;
+export const SIGN_IN_SESSION_KINDS = ['browser', 'device'] as const;
+export const SIGN_IN_INTENTS = ['sign_in', 'link'] as const;
+export const WEBAUTHN_CEREMONIES = ['registration', 'sign_in', 'step_up'] as const;
+export const SUBJECT_OPERATIONS = [
+  'revoke',
+  'unblock',
+  'end_browser_sessions',
+  'end_device_sessions',
+  'revoke_api_credentials',
+  'email_sync',
+  'membership_sync',
+  'sso_organization_sync',
+] as const;
+
+/** Where a code's attestation stands (migration 0017). */
+export const ATTESTATION_STATES = ['verifying', 'attested', 'refused', 'exempt'] as const;
 
 /** Each enum by its type name in the `uts` schema. */
 export const IDENTITY_STORE_ENUMS = {
@@ -121,6 +165,7 @@ export const IDENTITY_STORE_ENUMS = {
   email_code_purpose: EMAIL_CODE_PURPOSES,
   email_code_status: EMAIL_CODE_STATUSES,
   email_code_limit_status: EMAIL_CODE_LIMIT_STATUSES,
+  email_code_address: EMAIL_CODE_ADDRESSES,
   ticket_purpose: TICKET_PURPOSES,
   credential_status: CREDENTIAL_STATUSES,
   bot_key_status: BOT_KEY_STATUSES,
@@ -140,4 +185,11 @@ export const IDENTITY_STORE_ENUMS = {
   notice_kind: NOTICE_KINDS,
   notice_channel: NOTICE_CHANNELS,
   notice_delivery: NOTICE_DELIVERIES,
+  webauthn_ceremony: WEBAUTHN_CEREMONIES,
+  sign_in_intent: SIGN_IN_INTENTS,
+  notice_attempt_outcome: NOTICE_ATTEMPT_OUTCOMES,
+  sign_in_session_kind: SIGN_IN_SESSION_KINDS,
+  subject_operation: SUBJECT_OPERATIONS,
+  attestation_type: UTS_ATTESTATION_TYPES,
+  attestation_state: ATTESTATION_STATES,
 } as const;

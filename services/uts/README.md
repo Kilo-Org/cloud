@@ -527,6 +527,96 @@ The local run is `scripts/clients-e2e.ts`. Start the mint Worker with
 and set `track_functions = 'all'` on the local server, so the run can count the exchange
 statements. The run serves the metadata document and the fake STS key set itself.
 
+## CI token exchange
+
+A GitHub Actions job trades its GitHub OIDC token for one UTS access token at `POST /token`
+(`src/ci/`; design 5.3, 5.5 and 6.2; RFC 8693). It replaces a long-lived Kilo API key in
+repository secrets. The wire contract is `ci.ts` in `@kilocode/uts-contracts`.
+
+- **Switch.** The trust policies are the Worker var `CI_TOKEN_POLICIES`, a JSON array per
+  environment in `wrangler.jsonc`. Absent or `[]`: the exchange answers `unsupported_grant_type`
+  and the metadata does not list the token exchange for it. A value that breaks a load rule keeps
+  it off and logs `uts.ci_token.misconfigured` with the rules it breaks. Production sets none, and
+  `test/repo/worker-configs.test.ts` keeps it that way and checks every configured list.
+- **Policy.** One entry per repository id, GitHub environment and workflow file:
+
+  ```json
+  {
+    "name": "ci-kilocode-smoke-test",
+    "repository": "Kilo-Org/kilocode",
+    "repositoryId": "946087422",
+    "repositoryOwnerId": "201822503",
+    "environment": "smoke-test",
+    "refs": ["refs/heads/main"],
+    "jobWorkflowRefs": ["Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main"],
+    "events": ["workflow_dispatch"],
+    "legacySubject": true,
+    "subject": "<UTS account id of the dedicated CI account>",
+    "scopes": ["kilo-gateway:inference"],
+    "lifetimeSeconds": 3600
+  }
+  ```
+
+  The load rules (`src/ci/policy.ts`) follow the STS GitHub rules (design 6.3): `ci-<job>` names;
+  workflow entries of the policy's own repository, each on a listed ref; events from `push`,
+  `schedule`, `workflow_dispatch` and `workflow_run` only, `workflow_run` alone and never in
+  production; production accepts only `refs/heads/main`; `legacySubject` only for
+  Kilo-Org/kilocode (decision Q62a). Every scope must be registered, PAT-eligible and need no
+  organization claim, so a CI token never holds more than a PAT of the same account could.
+- **Subject.** Each policy names one UTS account, a dedicated CI account for that job, not an org
+  bot key. The token then has the claim profile of any user token, so a verifier needs no new
+  subject kind; blocking the account, or its subject revocation on the feed, stops its CI tokens.
+  The token carries `sub`, `client_id` (the policy name), `scope`, `aud`, `env`, `jti` and the
+  policy's lifetime (at most 1 hour), and no `sid`, `org`, `act` or refresh token.
+- **Checks.** The OIDC token is `RS256` under GitHub's key set, issuer
+  `https://token.actions.githubusercontent.com`, exactly the environment's UTS issuer URL as its
+  one audience, `exp` with 60 seconds of skew and no future `iat`. The repository and owner ids,
+  GitHub environment and workflow entry select the policy; its immutable subject (or the default
+  subject on a `legacySubject` policy), ref, event and the entry's pin to the token's own ref must
+  match. Refusals: `invalid_request`, `invalid_scope`, `invalid_target`, `invalid_grant`, and 503
+  `temporarily_unavailable` with `Retry-After` when GitHub's key set or the identity store fails.
+- **GitHub key set** (`github-keys.ts`). One plain-data copy per isolate, used for at most 5
+  minutes; an unknown `kid` refreshes it at most once per 5 minutes; a failed fetch is not
+  retried for 10 seconds. The URL is pinned, redirects are not followed, the fetch gives up after
+  5 seconds and reads at most 64 KB.
+- **Audit and cost.** A token that matches no policy costs no statement. Otherwise one statement,
+  `uts.exchange_ci_token` (migration 0023), checks that the account is active and writes
+  `ai.kilo.uts.ci_token.issued` (with the token id, policy and run) or
+  `ai.kilo.uts.ci_token.denied`, then one `signMany` call signs the token in the signer its `jti`
+  picks. A token that names a policy's workflow but breaks a binding, or asks for a scope the
+  policy lacks, writes a denied row at most once per policy and reason per minute in each isolate.
+
+A job uses it like this (production issuer shown; staging uses `https://uts-staging.kiloapps.io`
+for both the audience and the URL):
+
+```yaml
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    environment: smoke-test # the policy's `environment`
+    permissions:
+      contents: read
+      id-token: write # lets the job request its OIDC token
+    steps:
+      - name: Get a Kilo CI token
+        run: |
+          set -euo pipefail
+          oidc=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https%3A%2F%2Futs.kiloapps.io" | jq -r .value)
+          echo "::add-mask::$oidc"
+          token=$(curl -sS --fail-with-body https://uts.kiloapps.io/token \
+            --data-urlencode grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+            --data-urlencode subject_token_type=urn:ietf:params:oauth:token-type:id_token \
+            --data-urlencode "subject_token=$oidc" \
+            --data-urlencode scope=kilo-gateway:inference \
+            --data-urlencode resource=urn:kilo:service:kilo-gateway | jq -r .access_token)
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+```
+
+The token lives for the policy's lifetime and cannot be refreshed; a longer job runs the step again
+for a fresh OIDC token and a new CI token.
+
 ## Account API, PATs and org bot keys
 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a

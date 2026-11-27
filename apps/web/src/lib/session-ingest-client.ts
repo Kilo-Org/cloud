@@ -3,8 +3,12 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  SESSION_INGEST_SENDER_AUTH,
+  SESSION_INGEST_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { resolveServiceSenderAuth, serviceSenderHeaders } from '@/lib/service-sender-auth';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import {
   toSharedTranscriptMessages,
@@ -62,6 +66,31 @@ const SessionSnapshotSchema = z.object({
 export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export type SessionMessage = SessionSnapshot['messages'][number];
+
+/**
+ * The STS audience and scope of Session Ingest's service-only
+ * `POST /internal/session-access/invalidate`, granted to the `web` workload
+ * only. It joins `STS_SCOPE_REGISTRY` in `@kilocode/sts-contracts` with the
+ * registry-and-grants change; until then STS refuses it as `unknown_scope`.
+ * The UTS user scopes under the same audience (`session-ingest:sessions.*`)
+ * are a separate registry and never verify on this route.
+ */
+export const SESSION_INGEST_INVALIDATE_SCOPE = {
+  audience: 'session-ingest',
+  scope: 'session-ingest:session-access.invalidate',
+} as const;
+
+/**
+ * `SESSION_INGEST_SENDER_AUTH` (`service-sender-auth.ts`), the credential of
+ * web's service-only calls to Session Ingest: `legacy` sends the internal API
+ * secret in `X-Internal-Secret`, as before; `sts` (the Vercel production
+ * default) sends only a `SESSION_INGEST_INVALIDATE_SCOPE` token.
+ */
+const sessionIngestSender = resolveServiceSenderAuth({
+  auth: SESSION_INGEST_SENDER_AUTH,
+  url: SESSION_INGEST_WORKER_URL,
+  runtime: process.env,
+});
 
 /**
  * Redact a request URL to an allow-listed route label for logging: the
@@ -656,25 +685,38 @@ export async function invalidateOrganizationSessionAccess(
   if (!SESSION_INGEST_WORKER_URL) {
     throw new Error('SESSION_INGEST_WORKER_URL is not configured');
   }
-  const internalApiSecret = await readInternalApiSecret();
-  if (!internalApiSecret) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
-  }
+  const credential = await serviceSenderHeaders({
+    sender: sessionIngestSender,
+    variable: 'SESSION_INGEST_SENDER_AUTH',
+    label: 'session ingest invalidate',
+    request: SESSION_INGEST_INVALIDATE_SCOPE,
+    legacyHeaders: async () => {
+      const internalApiSecret = await readInternalApiSecret();
+      if (!internalApiSecret) {
+        throw new Error('INTERNAL_API_SECRET is not configured');
+      }
+      return { 'X-Internal-Secret': internalApiSecret };
+    },
+  });
+
+  const init: RequestInit = {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...credential,
+    },
+    body: JSON.stringify({ kiloUserId, organizationId }),
+    // Caller deadline, composed with the shared upstream budget by
+    // `fetchWithinBudget`; the shorter budget wins, so a hung worker cannot
+    // hold this past `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+    signal: AbortSignal.timeout(30_000),
+  };
+  // An STS token is for this origin only; a redirect never carries it on.
+  if (sessionIngestSender.kind === 'sts') init.redirect = 'error';
 
   const response = await fetchSessionIngest(
     `${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-Internal-Secret': internalApiSecret,
-      },
-      body: JSON.stringify({ kiloUserId, organizationId }),
-      // Caller deadline, composed with the shared upstream budget by
-      // `fetchWithinBudget`; the shorter budget wins, so a hung worker cannot
-      // hold this past `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
-      signal: AbortSignal.timeout(30_000),
-    }
+    init
   );
 
   if (!response.ok) {

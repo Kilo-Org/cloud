@@ -1,13 +1,37 @@
 import 'server-only';
 
 import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
-import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@kilocode/web-shared/lib/config.server';
+import {
+  CODE_REVIEW_WORKER_AUTH_TOKEN,
+  CODE_REVIEW_WORKER_SENDER_AUTH,
+} from '@kilocode/web-shared/lib/config.server';
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+  type ServiceSenderAuth,
+} from '@/lib/service-sender-auth';
 import * as z from 'zod';
 
 // Fetch timeout in milliseconds
 const FETCH_TIMEOUT_MS = 10000;
 const CODE_REVIEW_WORKER_URL = process.env.CODE_REVIEW_WORKER_URL;
+
+/**
+ * The STS audience and scopes of the Code Review Worker's routes (E4, p4's scope handoff): one
+ * scope per action, granted to the `web` workload only. They join `STS_SCOPE_REGISTRY` in
+ * `@kilocode/sts-contracts` with the registry-and-grants change; until then STS refuses them as
+ * `unknown_scope`.
+ */
+const CODE_REVIEW_AUDIENCE = 'code-review';
+export const CODE_REVIEW_WORKER_SCOPES = {
+  dispatch: { audience: CODE_REVIEW_AUDIENCE, scope: 'code-review:review.dispatch' },
+  statusRead: { audience: CODE_REVIEW_AUDIENCE, scope: 'code-review:review.status-read' },
+  cancel: { audience: CODE_REVIEW_AUDIENCE, scope: 'code-review:review.cancel' },
+  retryFresh: { audience: CODE_REVIEW_AUDIENCE, scope: 'code-review:review.retry-fresh' },
+} as const;
+
+type CodeReviewWorkerAction = keyof typeof CODE_REVIEW_WORKER_SCOPES;
 
 // Types for API responses
 export type DispatchReviewResponse = {
@@ -52,29 +76,63 @@ export type ReviewStatusResponse = z.infer<typeof ReviewStatusResponseSchema>;
 
 /**
  * Code Review Worker API Client
- * Handles all communication with the Cloudflare Worker for code reviews
+ * Handles all communication with the Cloudflare Worker for code reviews.
+ *
+ * `CODE_REVIEW_WORKER_SENDER_AUTH` (`service-sender-auth.ts`) picks the credential: `legacy` sends
+ * `CODE_REVIEW_WORKER_AUTH_TOKEN` as the bearer, as before; `sts` (the Vercel production default)
+ * sends only a `code-review` STS service token scoped to the route's action.
  */
 class CodeReviewWorkerClient {
   private readonly baseUrl: string;
-  private readonly authToken: string;
+  private readonly sender: ServiceSenderAuth;
 
   constructor() {
-    if (!CODE_REVIEW_WORKER_URL || !CODE_REVIEW_WORKER_AUTH_TOKEN) {
+    if (!CODE_REVIEW_WORKER_URL) {
+      throw new Error('CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
+    }
+    this.sender = resolveServiceSenderAuth({
+      auth: CODE_REVIEW_WORKER_SENDER_AUTH,
+      url: CODE_REVIEW_WORKER_URL,
+      runtime: process.env,
+    });
+    if (this.sender.kind === 'legacy' && !CODE_REVIEW_WORKER_AUTH_TOKEN) {
       throw new Error('CODE_REVIEW_WORKER_URL or CODE_REVIEW_WORKER_AUTH_TOKEN not configured');
     }
 
     this.baseUrl = CODE_REVIEW_WORKER_URL;
-    this.authToken = CODE_REVIEW_WORKER_AUTH_TOKEN;
   }
 
   /**
-   * Get common headers for API requests
+   * The headers of one request: its credential for `action` plus `additionalHeaders`. Throws
+   * rather than send without a credential.
    */
-  private getHeaders(additionalHeaders?: Record<string, string>): HeadersInit {
-    return {
-      Authorization: `Bearer ${this.authToken}`,
-      ...additionalHeaders,
-    };
+  private async getHeaders(
+    action: CodeReviewWorkerAction,
+    additionalHeaders?: Record<string, string>
+  ): Promise<Record<string, string>> {
+    const credential = await serviceSenderHeaders({
+      sender: this.sender,
+      variable: 'CODE_REVIEW_WORKER_SENDER_AUTH',
+      label: 'code review worker client',
+      request: CODE_REVIEW_WORKER_SCOPES[action],
+      legacyHeaders: async () => ({ Authorization: `Bearer ${CODE_REVIEW_WORKER_AUTH_TOKEN}` }),
+    });
+    return { ...credential, ...additionalHeaders };
+  }
+
+  /**
+   * A request to the Worker. An STS token is for this origin only, so a redirect is an error rather
+   * than a hop that would carry it elsewhere; the legacy credential keeps the default behaviour.
+   */
+  private fetchWorker(
+    url: string,
+    init: RequestInit & { headers: Record<string, string> }
+  ): Promise<Response> {
+    return fetchWithTimeout(
+      url,
+      this.sender.kind === 'sts' ? { ...init, redirect: 'error' } : init,
+      FETCH_TIMEOUT_MS
+    );
   }
 
   private buildReviewUrl(reviewId: string, suffix: string, attemptId?: string): string {
@@ -90,17 +148,13 @@ class CodeReviewWorkerClient {
    * Creates a CodeReviewOrchestrator Durable Object and starts the review
    */
   async dispatchReview(payload: CodeReviewPayload): Promise<DispatchReviewResponse> {
-    const response = await fetchWithTimeout(
-      `${this.baseUrl}/review`,
-      {
-        method: 'POST',
-        headers: this.getHeaders({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify(payload),
-      },
-      FETCH_TIMEOUT_MS
-    );
+    const response = await this.fetchWorker(`${this.baseUrl}/review`, {
+      method: 'POST',
+      headers: await this.getHeaders('dispatch', {
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(payload),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -125,17 +179,13 @@ class CodeReviewWorkerClient {
     reason?: string,
     attemptId?: string
   ): Promise<CancelReviewResponse> {
-    const response = await fetchWithTimeout(
-      this.buildReviewUrl(reviewId, 'cancel', attemptId),
-      {
-        method: 'POST',
-        headers: this.getHeaders({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify({ reason, attemptId }),
-      },
-      FETCH_TIMEOUT_MS
-    );
+    const response = await this.fetchWorker(this.buildReviewUrl(reviewId, 'cancel', attemptId), {
+      method: 'POST',
+      headers: await this.getHeaders('cancel', {
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ reason, attemptId }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -154,17 +204,13 @@ class CodeReviewWorkerClient {
       retryAttemptId?: string;
     }
   ): Promise<RetryReviewFreshResponse> {
-    const response = await fetchWithTimeout(
-      `${this.baseUrl}/reviews/${reviewId}/retry-fresh`,
-      {
-        method: 'POST',
-        headers: this.getHeaders({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify(input),
-      },
-      FETCH_TIMEOUT_MS
-    );
+    const response = await this.fetchWorker(`${this.baseUrl}/reviews/${reviewId}/retry-fresh`, {
+      method: 'POST',
+      headers: await this.getHeaders('retryFresh', {
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(input),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -178,13 +224,9 @@ class CodeReviewWorkerClient {
     reviewId: string,
     attemptId?: string
   ): Promise<ReviewStatusResponse | null> {
-    const response = await fetchWithTimeout(
-      this.buildReviewUrl(reviewId, 'status', attemptId),
-      {
-        headers: this.getHeaders(),
-      },
-      FETCH_TIMEOUT_MS
-    );
+    const response = await this.fetchWorker(this.buildReviewUrl(reviewId, 'status', attemptId), {
+      headers: await this.getHeaders('statusRead'),
+    });
 
     if (response.status === 404) {
       return null;

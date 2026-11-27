@@ -387,6 +387,7 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'services/sts/wrangler.jsonc'
               - 'packages/harness-sdk/tsconfig.json'
               - 'package.json'
               - '**/package.json'
@@ -409,6 +410,7 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'services/sts/wrangler.jsonc'
               - 'packages/harness-sdk/tsconfig.json'
               - 'package.json'
               - '**/package.json'
@@ -692,6 +694,7 @@ jobs:
           scripts/production-deploy-failure.test.mjs
           scripts/meta-janitor-approve.test.mjs
           scripts/mobile-sbom-workflow.test.mjs
+          scripts/sts-deployment-watch.test.mjs
 
       # The same split for the release workflow: a PR that changes it alone
       # trips no product filter, and its test runs in no other job, so its

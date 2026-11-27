@@ -1,0 +1,20 @@
+# kilocode release: the publish jobs of publish.yml in the protected `release` environment
+# (kilocode CI design 6). The Anaconda and AUR keys and the Kilo Maintainer app key.
+# Kilo-Org/kilocode issues immutable subjects only after its opt-in; until then STS refuses its tokens.
+workload: ci-kilocode-release
+environments:
+  - production
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  environment: release
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/publish.yml@refs/heads/main
+  events:
+    - workflow_dispatch
+secrets:
+  - KILOCODE_ANACONDA_API_KEY
+  - KILOCODE_AUR_KEY
+  - KILOCODE_MAINTAINER_APP_KEY

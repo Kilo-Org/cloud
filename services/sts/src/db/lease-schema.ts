@@ -49,7 +49,7 @@ export const lease = sqliteTable(
     revokeRetryAt: integer('revoke_retry_at'),
     /**
      * The `revoke_failed` row of an owed revocation is written; later failures write none, and a
-     * 404 from Infisical after it is `unconfirmed`, not `gone`.
+     * 404 from Infisical after it is `gone` with detail `gone_after_failure` (and a warning log).
      */
     revokeFailureAudited: integer('revoke_failure_audited', { mode: 'boolean' })
       .notNull()

@@ -1,0 +1,4 @@
+# Registration only: services/ai-attribution/wrangler.jsonc. No environment, identity or grant.
+workload: kilo-ai-attribution
+registered: true
+secrets: []

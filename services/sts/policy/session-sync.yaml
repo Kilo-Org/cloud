@@ -1,0 +1,4 @@
+# Registration only: services/session-sync/wrangler.jsonc. No environment, identity or grant.
+workload: session-sync
+registered: true
+secrets: []

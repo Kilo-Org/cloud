@@ -330,6 +330,23 @@ export type Policy = z.infer<typeof PolicySchema>;
 export type PolicyIdentity = z.infer<typeof PolicyIdentitySchema>;
 
 /**
+ * A workload name reserved for a later policy: no environment, identity or grant, so STS serves,
+ * admits, bundles, audits and hashes nothing for it, exactly as for a name with no file. The
+ * workload's own change replaces `registered` and the empty `secrets` with a policy, which then
+ * passes every policy and binding check.
+ */
+export const RegistrationSchema = z.strictObject({
+  workload: WorkloadNameSchema,
+  registered: z.literal(true),
+  secrets: z.tuple([]),
+});
+
+/** A file that sets `registered` at all is read as a registration, never as a policy. */
+export function isRegistrationDocument(document: unknown): boolean {
+  return typeof document === 'object' && document !== null && Object.hasOwn(document, 'registered');
+}
+
+/**
  * The policy as STS applies it in `environment`: its base grants plus that environment's own, with
  * no `environmentGrants` left, so a reader of the result sees only what this environment grants.
  */

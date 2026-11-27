@@ -104,7 +104,7 @@ test('the EC2 host role can only read its launch documents and write its stop ma
   });
 });
 
-test('the EC2 controller restores only tagged, encrypted snapshots through its launch template', () => {
+test('the EC2 controller restores tagged snapshots only into encrypted volumes', () => {
   const restore = controller.UseOwnWorkspaceSnapshots;
   assert.equal(restore.Action, 'ec2:RunInstances');
   assert.deepEqual(restore.Resource, {
@@ -113,9 +113,9 @@ test('the EC2 controller restores only tagged, encrypted snapshots through its l
   assert.deepEqual(restore.Condition, {
     ArnEquals: { 'ec2:LaunchTemplate': controller.UseOwnLaunchTemplate.Resource },
     StringEquals: { 'aws:ResourceTag/KiloInstallation': { Ref: 'InstallationId' } },
-    Bool: { 'ec2:Encrypted': 'true' },
     Null: { 'aws:ResourceTag/KiloSnapshotCapture': 'false' },
   });
+  assert.deepEqual(controller.CreateSandboxVolumes.Condition.Bool, { 'ec2:Encrypted': 'true' });
   const passRoles = Object.values(controller).filter(statement =>
     [statement.Action].flat().includes('iam:PassRole')
   );

@@ -389,7 +389,6 @@
                     "StringEquals": {
                       "aws:ResourceTag/KiloInstallation": { "Ref": "InstallationId" }
                     },
-                    "Bool": { "ec2:Encrypted": "true" },
                     "Null": { "aws:ResourceTag/KiloSnapshotCapture": "false" }
                   }
                 },

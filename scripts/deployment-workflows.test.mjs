@@ -35,6 +35,14 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
     assert.doesNotMatch(stage.if ?? '', /always\(|failure\(/);
     assert.ok(steps.indexOf(stage) > steps.indexOf(retry));
     assert.match(stage.run, /^pnpm run sentry:stage "\$RUNNER_TEMP\/cloud-agent-sentry"\n/);
+    // handoff.json binds the maps to the run attempt, written before the archive is packed.
+    const handoff = stage.run.indexOf('> "$RUNNER_TEMP/cloud-agent-sentry/handoff.json"');
+    assert.ok(handoff > 0, `${job} writes handoff.json`);
+    assert.match(
+      stage.run,
+      /jq -n --arg run_id "\$GITHUB_RUN_ID" --arg run_attempt "\$GITHUB_RUN_ATTEMPT"/
+    );
+    assert.ok(handoff < stage.run.indexOf('tar -czf'), `${job} writes handoff.json before packing`);
     // The deploy job never holds the Sentry token: the upload job reads it from STS.
     assert.deepEqual(stage.env, { SOURCE_SHA: '${{ inputs.source_sha || github.sha }}' });
     assert.equal(handover['continue-on-error'], true);

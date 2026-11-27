@@ -80,9 +80,10 @@ jobs:
       # lockfile-verified binary and the argument allowlist below are what this
       # job relies on. It takes only this attempt's cloud-agent-sentry-<attempt>,
       # whose handoff.json must name this run, attempt and deployed commit; an older
-      # attempt's maps are never uploaded under this run's result (a missing one is
-      # skipped with a warning). The hand-off lands in a private directory that must
-      # hold exactly one regular file.
+      # attempt's maps are never uploaded under this run's result. Re-running only
+      # this job, or only another leg, skips the maps with this warning; re-run the
+      # deploy leg too to upload them. The hand-off lands in a private directory
+      # that must hold exactly one regular file.
       # sentry-cli then runs with `env -i` and an allowlist: HOME and
       # its working directory are new empty directories with no .sentryclirc or
       # sentry.properties up to /, no SENTRY_* variable but the token, the fixed
@@ -98,8 +99,8 @@ jobs:
           fail() { echo "::error::$1"; exit 1; }
           handoff=$(mktemp -d "$RUNNER_TEMP/handoff.XXXXXX")
           name="cloud-agent-sentry-$GITHUB_RUN_ATTEMPT"
-          artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$name" \
-            --jq '[.artifacts[] | select(.name == "'"$name"'" and (.expired | not))] | .[0].id // empty')
+          artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$name" |
+            jq -r --arg name "$name" '[.artifacts[] | select(.name == $name and (.expired | not))] | .[0].id // empty')
           if [[ -z $artifact_id ]]; then
             echo "::warning::No $name hand-off in this run attempt; no Cloud Agent source maps uploaded"
             exit 0

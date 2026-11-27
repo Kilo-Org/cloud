@@ -398,6 +398,7 @@ test('the Sentry hand-off check refuses anything but the staged files', linuxOnl
       const root = join(work, name);
       mkdirSync(join(root, '0'), { recursive: true });
       writeFileSync(join(root, 'uploads.json'), '[]');
+      writeFileSync(join(root, 'handoff.json'), '{}');
       writeFileSync(join(root, 'sentry-cli'), 'binary');
       writeFileSync(join(root, '0', 'index.js'), 'code');
       writeFileSync(join(root, '0', 'index.js.map'), '{}');
@@ -413,6 +414,7 @@ test('the Sentry hand-off check refuses anything but the staged files', linuxOnl
       ['properties', root => writeFileSync(join(root, 'sentry.properties'), 'defaults.url=x')],
       ['symlink', root => symlinkSync('/etc/passwd', join(root, '0', 'link.js'))],
       ['other-file', root => writeFileSync(join(root, '0', 'notes.txt'), 'x')],
+      ['nested-handoff', root => writeFileSync(join(root, '0', 'handoff.json'), '{}')],
     ]) {
       const result = check(pack(name, setup));
       assert.notEqual(result.status, 0, `${name} is refused`);

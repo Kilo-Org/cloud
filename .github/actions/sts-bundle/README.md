@@ -111,9 +111,10 @@ the tool by its path, without a package manager and without adding it to `PATH`.
 - `cloud-agent-sentry-sourcemaps.yml` `upload`: the maps and the argument lists the deploy job
   staged (`stageSentryUploads` in `services/cloud-agent-next/scripts/sentry-source-maps.ts`). The
   hand-off carries no digest: the job takes only this attempt's `cloud-agent-sentry-<attempt>`,
-  whose `handoff.json` must name this run, attempt, deployed commit and worker (a missing one is
-  skipped with a warning, never replaced by an older attempt's maps), into a private directory
-  that must hold exactly one regular file, and
+  whose `handoff.json` must name this run, attempt, deployed commit and worker, into a private
+  directory that must hold exactly one regular file; an older attempt's maps are never used.
+  Re-running only this job, or only another leg, skips the maps with this warning; re-run the
+  deploy leg too to upload them. Then
   `scripts/ci/check-sentry-handoff.sh` refuses any archive member but `uploads.json`, `sentry-cli`
   and code files with maps in numbered folders. It runs only a `sentry-cli` binary it fetches
   itself and checks against the integrity `pnpm-lock.yaml` records at the deployed commit (and

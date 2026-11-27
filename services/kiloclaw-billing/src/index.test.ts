@@ -399,7 +399,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
@@ -666,7 +666,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).toHaveBeenCalledWith({
       kind: 'lifecycle',
       runId,
@@ -753,7 +753,8 @@ describe('kiloclaw billing worker handler', () => {
         runId: '22222222-2222-4222-8222-222222222222',
         sweep: 'trial_inactivity_stop',
       },
-      1
+      1,
+      {}
     );
     expect(processTrialInactivityStopCandidate).not.toHaveBeenCalled();
     expect(lifecycleSend).not.toHaveBeenCalled();

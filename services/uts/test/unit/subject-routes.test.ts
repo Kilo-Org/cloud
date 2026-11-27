@@ -58,7 +58,7 @@ function deps(stub: Stub = {}): InternalDeps & { published: FeedEntry[][] } {
       return { outcome: 'imported' };
     },
     async syncPrimaryEmail() {
-      return { outcome: 'refused', error: 'email_taken' };
+      return { outcome: 'retry_later', error: 'email_taken' };
     },
     async syncMembership() {
       return { outcome: 'applied', feedEntries: [entry] };
@@ -300,7 +300,11 @@ describe('import, authority sync and app events', () => {
         ),
         deps()
       )
-    ).toMatchObject({ status: 409, body: { outcome: 'refused', error: 'email_taken' } });
+    ).toMatchObject({
+      status: 409,
+      retryAfter: '30',
+      body: { outcome: 'retry_later', error: 'email_taken', operation_id: common.operation_id },
+    });
     const routeDeps = deps();
     expect(
       await call(

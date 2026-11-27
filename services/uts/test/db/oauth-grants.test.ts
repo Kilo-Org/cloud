@@ -1294,10 +1294,12 @@ describe('a blocked third-party client', () => {
       })
     ).toEqual({ outcome: 'issued', orgRole: null });
 
-    // The block is the status change alone: no family changes in that statement.
-    await app.query(`UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`, [
-      family.clientId,
-    ]);
+    // The block is the status change alone: no family changes in that statement. Only an operator
+    // changes a client's status (migration 0021 takes the app login's DML away).
+    await owner.query(
+      `UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`,
+      [family.clientId]
+    );
     const live = async () =>
       (
         await owner.query<{ live: number }>(
@@ -1333,7 +1335,7 @@ describe('a blocked third-party client', () => {
     // An unblock is refused, retryably, while any family of the client is still active.
     const OBJECT_IN_USE = '55006';
     const unblock = () =>
-      app.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
+      owner.query(`UPDATE uts.third_party_clients SET status = 'active' WHERE client_id = $1`, [
         family.clientId,
       ]);
     expect(await sqlStateOf(unblock)).toBe(OBJECT_IN_USE);

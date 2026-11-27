@@ -74,8 +74,7 @@ export type SsoOrganizationSyncInput = SyncCommon & {
 
 export type SyncRow =
   | { outcome: 'applied' | 'already_applied' | 'no_subject'; feedEntries: FeedEntry[] }
-  | { outcome: 'retry_later'; error: 'connection_conflict' }
-  | { outcome: 'refused'; error: 'email_taken' };
+  | { outcome: 'retry_later'; error: 'connection_conflict' | 'email_taken' };
 
 export type SubjectStore = {
   applyOperation(input: OperationInput): Promise<OperationRow>;
@@ -122,7 +121,7 @@ const ImportRowSchema = z.discriminatedUnion('outcome', [
 
 const EmailRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.enum(['applied', 'already_applied', 'no_subject']) }),
-  z.object({ outcome: z.literal('refused'), error: z.literal('email_taken') }),
+  z.object({ outcome: z.literal('retry_later'), error: z.literal('email_taken') }),
 ]);
 
 const MembershipRowSchema = z.object({
@@ -216,7 +215,7 @@ export function identityStoreSubjects(store: IdentityStore): SubjectStore {
         ],
         EmailRowSchema
       );
-      return row.outcome === 'refused' ? row : { outcome: row.outcome, feedEntries: [] };
+      return row.outcome === 'retry_later' ? row : { outcome: row.outcome, feedEntries: [] };
     },
 
     async syncMembership(input) {

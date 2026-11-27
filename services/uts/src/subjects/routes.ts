@@ -149,8 +149,6 @@ function authorityResponse(result: AuthorityResult): Response {
       return jsonResponse(result, 409, {
         'Retry-After': String(UTS_CONNECTION_CONFLICT_RETRY_SECONDS),
       });
-    case 'refused':
-      return jsonResponse(result, 409);
     case 'invalid_request':
       return invalidRequest();
     case 'unavailable':

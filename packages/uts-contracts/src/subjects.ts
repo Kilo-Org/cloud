@@ -318,10 +318,12 @@ export type AuthorityKind = z.infer<typeof AuthorityKindSchema>;
 
 /**
  * `applied`, `already_applied` (the same `operation_id`, an effect that already holds, or a
- * source version older than one UTS applied) and `no_subject` are 200. `retry_later` with
- * `connection_conflict` (409, `Retry-After: 30`): a WorkOS connection is still active in another
- * organization; nothing was written, and the outbox retries until that organization's sync
- * releases it. `refused` with `email_taken` (409) is final for this request.
+ * source version older than one UTS applied) and `no_subject` are 200. `retry_later` (409,
+ * `Retry-After: 30`) writes nothing, and the outbox retries it: with `connection_conflict`, a
+ * WorkOS connection is still active in another organization, until that organization's sync
+ * releases it; with `email_taken`, another account still holds the address, until the email sync
+ * that moves that account away arrives (deliveries of two subjects' syncs can arrive in either
+ * order).
  */
 export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -330,13 +332,12 @@ export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   }),
   z.strictObject({
     outcome: z.literal('retry_later'),
-    error: z.literal('connection_conflict'),
+    error: z.enum(['connection_conflict', 'email_taken']),
     operation_id: z.uuid(),
   }),
-  z.strictObject({ outcome: z.literal('refused'), error: z.literal('email_taken') }),
 ]);
 
-/** Seconds an SSO sync waits for another organization to release a connection. */
+/** Seconds an authority sync waits before its retry: a connection or an address to be released. */
 export const UTS_CONNECTION_CONFLICT_RETRY_SECONDS = 30;
 export type AuthorityAnswer = z.infer<typeof AuthorityAnswerSchema>;
 

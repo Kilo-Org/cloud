@@ -19,7 +19,8 @@ const INSUFFICIENT_PRIVILEGE = '42501';
 /**
  * Tables the app login writes only through security-definer functions: the OAuth grant functions
  * (migration 0004), the account functions (migration 0005), the sign-in functions (migration
- * 0008) and the notice and sign-in functions and triggers (migration 0010).
+ * 0008), the notice and sign-in functions and triggers (migration 0010) and the third-party
+ * client functions (migration 0021).
  */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
@@ -48,6 +49,8 @@ const FUNCTION_WRITTEN_TABLES = [
   'known_devices',
   'known_networks',
   'sign_ins',
+  'third_party_clients',
+  'third_party_consents',
 ];
 
 /**
@@ -610,11 +613,10 @@ describe('table privileges', () => {
     );
 
     // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns. PATs and org
-    // bot keys lose even those in 0005, like gate passes, and device codes in 0008: only the
-    // account and sign-in functions write them.
+    // bot keys lose even those in 0005, like gate passes, device codes in 0008 and third-party
+    // consents in 0021: only the account, sign-in and consent functions write them.
     const gatedUpdates: Record<string, string[]> = {
       ci_trust_policies: ['revoked_at', 'status', 'updated_at'],
-      third_party_consents: ['revoked_at', 'status'],
     };
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
       table =>
@@ -697,6 +699,7 @@ describe('functions', () => {
       { routine: 'exchange_delegated_token', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'exchange_web_code', grantee: 'uts_app' },
+      { routine: 'extend_third_party_client', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'finish_notice', grantee: 'uts_app' },
       { routine: 'grant_third_party_consent', grantee: 'uts_app' },
@@ -719,6 +722,7 @@ describe('functions', () => {
       { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_subject_operation_rows', grantee: 'uts_app' },
+      { routine: 'maintain_third_party_client_rows', grantee: 'uts_app' },
       { routine: 'mint_web_session_token', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'read_app_account_events', grantee: 'uts_app' },
@@ -736,6 +740,7 @@ describe('functions', () => {
       { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
       { routine: 'revoke_web_device', grantee: 'uts_app' },
+      { routine: 'save_third_party_client', grantee: 'uts_app' },
       { routine: 'sso_app_organization', grantee: 'uts_app' },
       { routine: 'start_email_sign_in', grantee: 'uts_app' },
       { routine: 'start_sign_in_flow', grantee: 'uts_app' },

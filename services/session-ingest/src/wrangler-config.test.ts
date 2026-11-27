@@ -82,7 +82,7 @@ function boundKinds(effective: Effective): string[] {
 }
 
 describe('session-ingest wrangler.jsonc', () => {
-  it('keeps the production render as it was', () => {
+  it('keeps the production render as it was, plus the admission observation flag', () => {
     const production = unstable_readConfig({ config });
 
     expect(production.name).toBe('session-ingest');
@@ -96,7 +96,7 @@ describe('session-ingest wrangler.jsonc', () => {
     expect(production.logpush).toBe(true);
     expect(production.observability).toEqual({ enabled: true });
     expect(production.placement).toEqual({ mode: 'smart' });
-    expect(production.vars).toEqual(VARS);
+    expect(production.vars).toEqual({ ...VARS, KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED: 'true' });
     expect(boundKinds(production)).toEqual([
       'durable_objects',
       'hyperdrive',

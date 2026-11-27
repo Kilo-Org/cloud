@@ -861,7 +861,7 @@ test('M142 live parity: the creating entry reads every other binder of its share
   }
 });
 
-test('policy: a flow list is read, an unreadable policy refuses by name, never as empty', () => {
+test('policy: a flow list is read, an unreadable policy refuses by name, never as empty', async () => {
   assert.deepEqual(parsePolicy('workload: w\nsecrets: [A_ONE, B_TWO]\n').lists.secrets, [
     'A_ONE',
     'B_TWO',
@@ -901,4 +901,26 @@ test('policy: a flow list is read, an unreadable policy refuses by name, never a
     );
     assert.doesNotThrow(() => JSON.stringify(v));
   }
+  // The plan passes the refusal through by name, unprefixed, and reads no environment.
+  const sha = 'b'.repeat(40);
+  const plan = await planMatrix({
+    env: {
+      GITHUB_REPOSITORY: 'Kilo-Org/cloud',
+      GITHUB_REF: 'refs/heads/main',
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      GITHUB_SHA: sha,
+      EXPECTED_COMMIT: sha,
+      GITHUB_RUN_ID: '1',
+      GITHUB_RUN_ATTEMPT: '1',
+      GITHUB_TOKEN: 'synthetic',
+    },
+    headSha: sha,
+    ghFor: () => assert.fail('no environment read with an unreadable policy'),
+    table: FIXTURE,
+    root: rootWith(`${head}secrets: [${keys}\n`),
+  });
+  assert.deepEqual(
+    [plan.ok, plan.workers, plan.failures],
+    [false, [], ['policy_unreadable: notifications']]
+  );
 });

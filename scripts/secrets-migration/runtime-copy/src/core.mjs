@@ -479,8 +479,9 @@ async function createRow(fetchImpl, accessToken, batch, row, value) {
   return out.echo === 'differs' ? { out, stop: 'stored_echo_mismatch' } : { out, stop: null };
 }
 
-// One revoke, then one probe with the same token. With accessTokenNumUsesLimit = 2 (the one create
-// and this probe), a revoked token answers 401 and an unrevoked create-only token answers 403.
+// One revoke, then one probe with the same token. With accessTokenNumUsesLimit = rows + 1 (one per
+// create plus this probe), a revoked token answers 401 and an unrevoked create-only token answers
+// 403.
 async function revokeAndProve(fetchImpl, accessToken, batch) {
   const r = { revoked: false, denialProved: false };
   try {

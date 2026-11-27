@@ -1666,7 +1666,7 @@ export async function planMatrix({ env, headSha, ghFor, table = TABLE, root = RE
     ...table.problems.map(p => `table_${p}`),
     ...table.workers.flatMap(w =>
       validatedNameTable(table.batches[w], root, table).failures.map(f =>
-        f === `source_not_on_main: ${w}` ? f : `${w}:${f}`
+        f === `source_not_on_main: ${w}` || f === `policy_unreadable: ${w}` ? f : `${w}:${f}`
       )
     ),
   ];

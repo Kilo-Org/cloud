@@ -48,6 +48,7 @@ const FUNCTION_WRITTEN_TABLES = [
   'known_devices',
   'known_networks',
   'sign_ins',
+  'notices',
 ];
 
 /** Tables the app login cannot even read: only the sign-in functions reach them. */
@@ -69,6 +70,7 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   known_devices: 'last_seen_at',
   known_networks: 'last_seen_at',
   sign_ins: 'new_device',
+  notices: 'delivery',
 };
 
 let db: TestDatabase;
@@ -228,18 +230,6 @@ describe('role attributes', () => {
 });
 
 describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
-  it('reads and writes the ungated credential tables', async () => {
-    const app = await db.connect(login);
-    const accountId = await insertAccount(app);
-    // Browser sessions, PATs and gate passes change only through the sign-in and account
-    // functions (migrations 0005 and 0008); a notice is a table the app login still writes.
-    const result = await app.query(
-      `INSERT INTO uts.notices (account_id, kind) VALUES ($1, 'sessions_revoked') RETURNING id`,
-      [accountId]
-    );
-    expect(result.rowCount).toBe(1);
-  });
-
   it('reads a PAT but cannot write it, and a revoked PAT stays revoked', async () => {
     const owner = await db.connectAsOwner();
     const accountId = await insertAccount(owner);
@@ -700,6 +690,7 @@ describe('functions', () => {
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
       { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
+      { routine: 'open_browser_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'read_browser_session', grantee: 'uts_app' },
       { routine: 'read_device_code', grantee: 'uts_app' },

@@ -183,7 +183,8 @@ export type SignInRefusal =
   | 'no_sso_connection'
   | 'invalid_link'
   | 'code_locked'
-  | 'codes_stopped';
+  | 'codes_stopped'
+  | 'send_limited';
 
 const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   invalid_state: {
@@ -235,6 +236,11 @@ const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   codes_stopped: {
     status: 429,
     message: 'Too many wrong codes for this address. Use the link in the email.',
+  },
+  send_limited: {
+    status: 429,
+    message:
+      'Too many sign-in emails for this address. Use the link in an email already sent, or try again in an hour.',
   },
 };
 

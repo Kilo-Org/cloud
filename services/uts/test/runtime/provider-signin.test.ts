@@ -257,6 +257,23 @@ describe('email routes', () => {
     expect(mail[0].code).toBeNull();
   });
 
+  it('mails nothing and answers 429 once the link-only emails of the hour are spent', async () => {
+    const mail: SignInEmail[] = [];
+    const { methods } = methodsWith(
+      { startEmail: async () => ({ outcome: 'send_limited' }) },
+      mail
+    );
+    const response = await handleEmailRequest(
+      post('/signin/email/start', 'email=a%40example.com'),
+      '/signin/email/start',
+      methods
+    );
+    expect(response?.status).toBe(429);
+    expect(await response?.text()).toContain('Too many sign-in emails');
+    expect(response?.headers.get('Set-Cookie')).toBeNull();
+    expect(mail).toEqual([]);
+  });
+
   it('shows the address on the link page, warns in another browser, and consumes nothing', async () => {
     const { methods, calls } = methodsWith({
       readEmailLink: async () => ({ email: 'person@example.com', binderHash: new Uint8Array(32) }),

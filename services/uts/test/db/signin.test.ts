@@ -13,7 +13,7 @@ import {
   identityStoreSignIn,
 } from '../../src/signin/store';
 import { type TicketStore, identityStoreTickets } from '../../src/tickets/store';
-import { TestDatabase, insertAccount, insertGatePass } from './harness';
+import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
 /**
  * The sign-in, device-grant and ticket functions (migration 0008) through the Worker's own
@@ -26,6 +26,7 @@ import { TestDatabase, insertAccount, insertGatePass } from './harness';
 
 let db: TestDatabase;
 let owner: pg.Client;
+let app: pg.Client;
 let signIn: SignInStore;
 let grants: GrantStore;
 let tickets: TicketStore;
@@ -33,10 +34,11 @@ let tickets: TicketStore;
 beforeAll(async () => {
   db = await TestDatabase.create();
   owner = await db.connectAsOwner();
-  const app = new IdentityStore(await db.connect('uts_app_a'));
-  signIn = identityStoreSignIn(app);
-  grants = identityStoreGrants(app);
-  tickets = identityStoreTickets(app);
+  app = await db.connect('uts_app_a');
+  const store = new IdentityStore(app);
+  signIn = identityStoreSignIn(store);
+  grants = identityStoreGrants(store);
+  tickets = identityStoreTickets(store);
 });
 afterAll(() => db.drop());
 
@@ -1044,13 +1046,11 @@ describe('one-time tickets', () => {
     });
     expect(issued.outcome).toBe('issued');
 
-    expect(await tickets.redeem(environment, sha256(ticket), 'kilo-chat')).toEqual({
-      outcome: 'unknown',
-    });
-    expect(await tickets.redeem(environment, sha256(ticket), 'kilo-chat')).toEqual({
-      outcome: 'unknown',
-    });
-    expect(await tickets.redeem(environment, sha256(ticket), 'gateway')).toEqual({
+    const redeem = (hash: Buffer, audience: string) =>
+      tickets.redeem(environment, hash, audience, 'terminal', null);
+    expect(await redeem(sha256(ticket), 'kilo-chat')).toEqual({ outcome: 'unknown' });
+    expect(await redeem(sha256(ticket), 'kilo-chat')).toEqual({ outcome: 'unknown' });
+    expect(await redeem(sha256(ticket), 'gateway')).toEqual({
       outcome: 'redeemed',
       accountId,
       purpose: 'terminal',
@@ -1059,15 +1059,9 @@ describe('one-time tickets', () => {
       grantId: grant.grantId,
       clientId: 'kilo-cli',
     });
-    expect(await tickets.redeem(environment, sha256(ticket), 'gateway')).toEqual({
-      outcome: 'unknown',
-    });
-    expect(await tickets.redeem(environment, sha256(ticket), 'gateway')).toEqual({
-      outcome: 'unknown',
-    });
-    expect(await tickets.redeem(environment, sha256(token()), 'gateway')).toEqual({
-      outcome: 'unknown',
-    });
+    expect(await redeem(sha256(ticket), 'gateway')).toEqual({ outcome: 'unknown' });
+    expect(await redeem(sha256(ticket), 'gateway')).toEqual({ outcome: 'unknown' });
+    expect(await redeem(sha256(token()), 'gateway')).toEqual({ outcome: 'unknown' });
     const types = (await auditTypes(accountId)).filter(type =>
       type.startsWith('ai.kilo.uts.ticket.')
     );
@@ -1076,6 +1070,45 @@ describe('one-time tickets', () => {
       'ai.kilo.uts.ticket.denied',
       'ai.kilo.uts.ticket.redeemed',
       'ai.kilo.uts.ticket.reused',
+    ]);
+  });
+
+  it('redeem only for the purpose and resource they were minted for, and stay usable after a mismatch', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const ticket = token();
+    const issued = await tickets.issue({
+      environment,
+      tokenHash: sha256(grant.refreshToken),
+      grantId: grant.grantId,
+      clientId: 'kilo-cli',
+      proof: { jkt: grant.jkt, jti: randomUUID() },
+      ticketHash: sha256(ticket),
+      purpose: 'terminal',
+      audience: 'gateway',
+      resource: 'box-1',
+    });
+    expect(issued.outcome).toBe('issued');
+    for (const [purpose, resource] of [
+      ['stream', 'box-1'],
+      ['terminal', 'box-2'],
+      ['terminal', null],
+    ] as const) {
+      expect(
+        await tickets.redeem(environment, sha256(ticket), 'gateway', purpose, resource)
+      ).toEqual({ outcome: 'unknown' });
+    }
+    expect(
+      await tickets.redeem(environment, sha256(ticket), 'gateway', 'terminal', 'box-1')
+    ).toMatchObject({ outcome: 'redeemed', purpose: 'terminal', resource: 'box-1' });
+    // One denied row a minute for the three mismatches, as for a wrong audience.
+    const types = (await auditTypes(accountId)).filter(type =>
+      type.startsWith('ai.kilo.uts.ticket.')
+    );
+    expect(types).toEqual([
+      'ai.kilo.uts.ticket.issued',
+      'ai.kilo.uts.ticket.denied',
+      'ai.kilo.uts.ticket.redeemed',
     ]);
   });
 
@@ -1104,7 +1137,10 @@ describe('one-time tickets', () => {
               expires_at = now() - interval '1 minute' WHERE ticket_hash = $1`,
       [sha256(expired)]
     );
-    expect((await tickets.redeem(environment, sha256(expired), 'gateway')).outcome).toBe('unknown');
+    expect(
+      (await tickets.redeem(environment, sha256(expired), 'gateway', 'download', 'export-1'))
+        .outcome
+    ).toBe('unknown');
 
     const live = await mint();
     await owner.query(
@@ -1112,7 +1148,9 @@ describe('one-time tickets', () => {
        WHERE id = $1`,
       [grant.grantId]
     );
-    expect((await tickets.redeem(environment, sha256(live), 'gateway')).outcome).toBe('unknown');
+    expect(
+      (await tickets.redeem(environment, sha256(live), 'gateway', 'download', 'export-1')).outcome
+    ).toBe('unknown');
   });
 
   it('redeem an organization ticket only while the membership and SSO requirement still hold', async () => {
@@ -1144,7 +1182,9 @@ describe('one-time tickets', () => {
 
     const removed = await memberGrant();
     const before = await mint(removed.grant);
-    expect(await tickets.redeem(environment, sha256(before), 'gateway')).toMatchObject({
+    expect(
+      await tickets.redeem(environment, sha256(before), 'gateway', 'stream', null)
+    ).toMatchObject({
       outcome: 'redeemed',
       orgId: removed.orgId,
     });
@@ -1153,7 +1193,9 @@ describe('one-time tickets', () => {
       `UPDATE uts.org_memberships SET status = 'removed', removed_at = now() WHERE org_id = $1`,
       [removed.orgId]
     );
-    expect(await tickets.redeem(environment, sha256(afterRemoval), 'gateway')).toEqual({
+    expect(
+      await tickets.redeem(environment, sha256(afterRemoval), 'gateway', 'stream', null)
+    ).toEqual({
       outcome: 'unknown',
     });
 
@@ -1164,7 +1206,9 @@ describe('one-time tickets', () => {
       `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, 'required', 1)`,
       [ssoRequired.orgId]
     );
-    expect(await tickets.redeem(environment, sha256(afterPolicy), 'gateway')).toEqual({
+    expect(
+      await tickets.redeem(environment, sha256(afterPolicy), 'gateway', 'stream', null)
+    ).toEqual({
       outcome: 'unknown',
     });
   });
@@ -1358,5 +1402,316 @@ describe('anonymous write limits', () => {
       [`${site}::1`]
     );
     expect(stored.rows).toHaveLength(1);
+  });
+});
+
+describe('required inputs (migration 0020)', () => {
+  const NULL_VALUE_NOT_ALLOWED = '22004';
+
+  it('refuse a device decision whose approval is NULL instead of approving it', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const { userCodeHash } = await deviceCode();
+    expect(
+      await sqlStateOf(() =>
+        app.query('SELECT * FROM uts.decide_device_code($1, $2, $3, $4, $5, $6)', [
+          environment,
+          userCodeHash,
+          session.hash,
+          network.clientIp,
+          true,
+          null,
+        ])
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    const code = await owner.query(
+      'SELECT status FROM uts.device_codes WHERE user_code_hash = $1',
+      [userCodeHash]
+    );
+    expect(code.rows).toEqual([{ status: 'pending' }]);
+  });
+
+  it('refuse a device exchange without a client id instead of skipping the client check', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const { code, userCodeHash } = await deviceCode();
+    expect(
+      await signIn.decideDeviceCode({
+        environment,
+        userCodeHash,
+        sessionTokenHash: session.hash,
+        clientIp: network.clientIp,
+        source: 'typed',
+        approve: true,
+      })
+    ).toBe('approved');
+    const input = exchangeInput(code);
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `SELECT * FROM uts.exchange_device_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+             $13, $14, $15, $16)`,
+          [
+            environment,
+            input.deviceCodeHash,
+            null,
+            input.clientClass,
+            input.proof.jkt,
+            input.proof.jti,
+            input.grantId,
+            input.refreshTokenHash,
+            device.label,
+            device.platform,
+            device.clientIp,
+            device.asn,
+            device.country,
+            device.city,
+            null,
+            null,
+          ]
+        )
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    expect((await signIn.exchangeDeviceCode(input)).outcome).toBe('issued');
+  });
+
+  it('refuse a ticket mint without the grant id, client id or DPoP key instead of skipping their checks', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const mint = (grantId: string | null, clientId: string | null, jkt: Buffer | null) =>
+      app.query('SELECT * FROM uts.issue_ticket($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', [
+        environment,
+        sha256(grant.refreshToken),
+        grantId,
+        clientId,
+        jkt,
+        randomUUID(),
+        sha256(token()),
+        'stream',
+        'gateway',
+        null,
+      ]);
+    for (const [grantId, clientId, jkt] of [
+      [null, 'kilo-cli', grant.jkt],
+      [grant.grantId, null, grant.jkt],
+      [grant.grantId, 'kilo-cli', null],
+    ] as const) {
+      expect(await sqlStateOf(() => mint(grantId, clientId, jkt))).toBe(NULL_VALUE_NOT_ALLOWED);
+    }
+    expect(
+      (await auditTypes(accountId)).filter(type => type === 'ai.kilo.uts.ticket.issued')
+    ).toEqual([]);
+  });
+
+  it('refuse a redemption without an audience instead of skipping the audience check', async () => {
+    const accountId = await insertAccount(owner);
+    const grant = await firstPartyGrant(accountId);
+    const ticket = token();
+    const issued = await tickets.issue({
+      environment,
+      tokenHash: sha256(grant.refreshToken),
+      grantId: grant.grantId,
+      clientId: 'kilo-cli',
+      proof: { jkt: grant.jkt, jti: randomUUID() },
+      ticketHash: sha256(ticket),
+      purpose: 'stream',
+      audience: 'kilo-chat',
+      resource: null,
+    });
+    expect(issued.outcome).toBe('issued');
+    expect(
+      await sqlStateOf(() =>
+        app.query('SELECT * FROM uts.redeem_ticket($1, $2, $3, $4, $5)', [
+          environment,
+          sha256(ticket),
+          null,
+          'stream',
+          null,
+        ])
+      )
+    ).toBe(NULL_VALUE_NOT_ALLOWED);
+    const stored = await owner.query('SELECT status FROM uts.tickets WHERE ticket_hash = $1', [
+      sha256(ticket),
+    ]);
+    expect(stored.rows).toEqual([{ status: 'issued' }]);
+  });
+});
+
+describe('tier A passes of a browser session (migration 0020)', () => {
+  /** A pending tier A code to the account's primary address, as the gate's mail would store it. */
+  async function tierACode(accountId: string, address: 'current' | 'new' = 'current') {
+    const [email, code] = [randomBytes(32), randomBytes(32)];
+    await owner.query(
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, address)
+       VALUES ('tier_a', $1, $2, $3, now() + interval '10 minutes', $4)`,
+      [email, accountId, code, address]
+    );
+    return { email, code };
+  }
+
+  async function open(
+    sessionHash: Buffer,
+    action: string,
+    codes: { email: Buffer; code: Buffer | null; newEmail?: Buffer; newCode?: Buffer }
+  ) {
+    const result = await app.query<{ outcome: string; gate_pass_id: string | null }>(
+      'SELECT outcome, gate_pass_id FROM uts.open_browser_tier_a_gate_pass($1, $2, $3, $4, $5, $6, $7)',
+      [
+        environment,
+        sessionHash,
+        action,
+        codes.email,
+        codes.code,
+        codes.newEmail ?? null,
+        codes.newCode ?? null,
+      ]
+    );
+    return result.rows[0];
+  }
+
+  async function codeState(email: Buffer) {
+    const result = await owner.query(
+      'SELECT status, attempts FROM uts.email_codes WHERE email_hash = $1',
+      [email]
+    );
+    return result.rows;
+  }
+
+  it('open for the session after a recent sign-in and the emailed code, and passkey registration consumes the pass', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const codes = await tierACode(accountId);
+    const opened = await open(session.hash, 'passkey_add', codes);
+    expect(opened.outcome).toBe('opened');
+    const pass = await owner.query(
+      `SELECT browser_session_id, device_session_id, tier, action, status,
+              satisfied_by::text[] AS satisfied_by
+       FROM uts.gate_passes WHERE id = $1`,
+      [opened.gate_pass_id]
+    );
+    expect(pass.rows).toEqual([
+      {
+        browser_session_id: session.id,
+        device_session_id: null,
+        tier: 'a',
+        action: 'passkey_add',
+        status: 'open',
+        satisfied_by: ['recent_sign_in', 'email_code'],
+      },
+    ]);
+    expect(await codeState(codes.email)).toEqual([{ status: 'consumed', attempts: 0 }]);
+
+    const { hash, result } = await challenge('registration', session.hash);
+    expect(result.outcome).toBe('created');
+    const registered = await signIn.registerPasskey({
+      environment,
+      challengeHash: hash,
+      sessionTokenHash: session.hash,
+      credentialId: randomBytes(32),
+      publicKey: randomBytes(77),
+      signCount: 0n,
+      aaguid: randomUUID(),
+      transports: ['internal'],
+      backupEligible: true,
+      backedUp: true,
+      name: 'Work laptop',
+    });
+    expect(registered.outcome).toBe('registered');
+    const stored = await owner.query(
+      `SELECT passkey.gate_pass_id, pass.status FROM uts.passkey_credentials AS passkey
+       JOIN uts.gate_passes AS pass ON pass.id = passkey.gate_pass_id
+       WHERE passkey.account_id = $1`,
+      [accountId]
+    );
+    expect(stored.rows).toEqual([{ gate_pass_id: opened.gate_pass_id, status: 'consumed' }]);
+    const rows = await auditRows(accountId);
+    expect(rows.map(row => row.type)).toEqual([
+      'ai.kilo.uts.gate.passed',
+      'ai.kilo.uts.passkey.registered',
+    ]);
+    expect(rows[0].event.data.attributes).toMatchObject({
+      action: 'passkey_add',
+      tier: 'a',
+      gatePassId: opened.gate_pass_id,
+      sessionId: session.id,
+    });
+  });
+
+  it('need a sign-in with the strongest method of the account within 10 minutes', async () => {
+    const accountId = await insertAccount(owner);
+    const stale = await browserSession(accountId, 11);
+    const codes = await tierACode(accountId);
+    expect((await open(stale.hash, 'method_add', codes)).outcome).toBe('gate_required');
+    await storedPasskey(accountId);
+    // The account holds a passkey now: a fresh sign-in by another method does not do.
+    const fresh = await browserSession(accountId);
+    expect((await open(fresh.hash, 'method_add', codes)).outcome).toBe('gate_required');
+    expect(await codeState(codes.email)).toEqual([{ status: 'pending', attempts: 0 }]);
+    const passkeyToken = token();
+    await owner.query(
+      `INSERT INTO uts.browser_sessions (account_id, token_hash, auth_time, amr, idle_expires_at, expires_at)
+       VALUES ($1, $2, now(), '{passkey}', now() + interval '14 days', now() + interval '29 days')`,
+      [accountId, sha256(passkeyToken)]
+    );
+    expect((await open(sha256(passkeyToken), 'method_add', codes)).outcome).toBe('opened');
+    expect(await auditTypes(accountId)).toEqual([
+      'ai.kilo.uts.gate.refused',
+      'ai.kilo.uts.gate.refused',
+      'ai.kilo.uts.gate.passed',
+    ]);
+  });
+
+  it('refuse an unknown session, a wrong code, a removal in the cooling-off day and a missing code', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const codes = await tierACode(accountId);
+    expect((await open(randomBytes(32), 'method_add', codes)).outcome).toBe('no_session');
+    expect(
+      (await open(session.hash, 'method_add', { ...codes, code: randomBytes(32) })).outcome
+    ).toBe('code_invalid');
+    expect(await codeState(codes.email)).toEqual([{ status: 'pending', attempts: 1 }]);
+    expect(await sqlStateOf(() => open(session.hash, 'method_add', { ...codes, code: null }))).toBe(
+      '22004'
+    );
+    expect(await sqlStateOf(() => open(session.hash, 'pat_create', codes))).toBe('22023');
+    await owner.query(
+      `INSERT INTO uts.sign_in_methods (account_id, provider, provider_subject, added_at)
+       VALUES ($1, 'github', $2, now() - interval '1 hour')`,
+      [accountId, randomUUID()]
+    );
+    expect((await open(session.hash, 'method_remove', codes)).outcome).toBe('cooling_off');
+    expect(await codeState(codes.email)).toEqual([{ status: 'pending', attempts: 1 }]);
+  });
+
+  it('need both codes for an email change, each in its own role', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const current = await tierACode(accountId);
+    const next = await tierACode(accountId, 'new');
+    expect(await sqlStateOf(() => open(session.hash, 'email_change', current))).toBe('22023');
+    // Each code counts only in its own role: swapped, neither matches.
+    expect(
+      (
+        await open(session.hash, 'email_change', {
+          email: next.email,
+          code: next.code,
+          newEmail: current.email,
+          newCode: current.code,
+        })
+      ).outcome
+    ).toBe('code_invalid');
+    const opened = await open(session.hash, 'email_change', {
+      ...current,
+      newEmail: next.email,
+      newCode: next.code,
+    });
+    expect(opened.outcome).toBe('opened');
+    const pass = await owner.query(
+      'SELECT satisfied_by::text[] AS satisfied_by FROM uts.gate_passes WHERE id = $1',
+      [opened.gate_pass_id]
+    );
+    expect(pass.rows).toEqual([
+      { satisfied_by: ['recent_sign_in', 'email_code', 'email_code_new'] },
+    ]);
   });
 });

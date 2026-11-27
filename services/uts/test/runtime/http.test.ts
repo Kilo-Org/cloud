@@ -24,6 +24,8 @@ const productionEnv: Env = {
   ...env,
   UTS_ENVIRONMENT: 'production',
   DO_JURISDICTION: 'eu',
+  WEBAUTHN_RP_ID: 'app.kilo.ai',
+  WEBAUTHN_ORIGINS: 'https://uts.kiloapps.io',
   IDENTITY_STORE: undefined,
 };
 

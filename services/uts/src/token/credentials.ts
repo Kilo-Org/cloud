@@ -15,6 +15,8 @@ import { z } from 'zod';
 const GRANT_ID_LABEL = 'kilo-uts-grant-id:';
 /** Separates the refresh secret derivation from the grant id and the stored hashes. */
 const REFRESH_SECRET_LABEL = 'kilo-uts-first-party-refresh:';
+/** Separates the browser-session handle derivation from every other derivation and hash. */
+const SESSION_HANDLE_LABEL = 'kilo-uts-browser-session-handle:';
 
 const RANDOM_BYTES = 32;
 /** 32 bytes in base64url without padding. */
@@ -93,6 +95,20 @@ export async function firstPartyRefreshTokenOfExchange(
 ): Promise<string> {
   const secret = base64url(await sha256(`${REFRESH_SECRET_LABEL}${code}:${verifier}`));
   return firstPartyRefreshToken(grantId, secret);
+}
+
+/**
+ * The browser-session handle a `kilo-web` code exchange returns: SHA-256 over a fixed label, the
+ * code and the PKCE verifier, as base64url (43 characters), derived like the first-party refresh
+ * secret. Every attempt with one code and verifier returns the same handle, so a retry after a
+ * lost answer gets the handle the session holds (design 5.3), and the identity store, which keeps
+ * only the SHA-256 of the code, the verifier's challenge and the handle, does not give it.
+ */
+export async function browserSessionHandleOfExchange(
+  code: string,
+  verifier: string
+): Promise<string> {
+  return base64url(await sha256(`${SESSION_HANDLE_LABEL}${code}:${verifier}`));
 }
 
 /** The grant id a first-party refresh token names, or null when the value has another shape. */

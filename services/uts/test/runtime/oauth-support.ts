@@ -1,10 +1,15 @@
+import type { AttestationAccess } from '../../src/attest/store';
+import { type UtsScopeEntry, utsScopeEntry } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { type JWK, SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import { IdentityStoreError } from '../../src/db/client';
 import type { GrantStore, GrantsAccess, Minted } from '../../src/grants/store';
 import type { OAuthDeps } from '../../src/oauth/routes';
+import type { FeedEntry } from '../../src/revocation/entries';
+import type { FeedPublish, PublishOutcome } from '../../src/revocation/publish';
+import type { ScopeRegistry } from '../../src/scopes/policy';
 import { signerAccess } from '../../src/token/mint';
-import { config, env } from './test-env';
+import { config, env, noSignInMethods } from './test-env';
 
 /** Helpers for the OAuth runtime tests: DPoP keys and proofs, a recording grant store, requests. */
 
@@ -69,17 +74,13 @@ function recorded<Input, Output>(
 export function fakeGrants(implementation: Partial<GrantStore> = {}) {
   const calls: Call[] = [];
   const store: GrantStore = {
-    findThirdPartyClient: recorded(
-      'findThirdPartyClient',
-      calls,
-      implementation.findThirdPartyClient
-    ),
     issueCode: recorded('issueCode', calls, implementation.issueCode),
     exchangeCode: recorded('exchangeCode', calls, implementation.exchangeCode),
     refreshFirstParty: recorded('refreshFirstParty', calls, implementation.refreshFirstParty),
     refreshThirdParty: recorded('refreshThirdParty', calls, implementation.refreshThirdParty),
     revoke: recorded('revoke', calls, implementation.revoke),
     introspect: recorded('introspect', calls, implementation.introspect),
+    exchangeDelegated: recorded('exchangeDelegated', calls, implementation.exchangeDelegated),
   };
   const access: GrantsAccess = work => work(store);
   return { access, calls };
@@ -98,6 +99,7 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   return {
     subjectId: 'oauth/runtime-user',
     orgId: null,
+    orgRole: null,
     authTime: new Date(Date.now() - 60_000),
     amr: ['passkey'],
     tokenIds: [crypto.randomUUID()],
@@ -106,14 +108,107 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   };
 }
 
+/** A fixture scope that the CLI and any third-party client may hold, 10 minutes, any user. */
+const fixtureScope = (audience: string): UtsScopeEntry => ({
+  audience,
+  maxLifetimeSeconds: 600,
+  allowedClients: ['kilo-cli', 'third_party'],
+  subjects: { kind: 'any_user' },
+  thirdPartySafe: true,
+  stepUp: false,
+  patEligible: false,
+  privileged: false,
+  requiresSession: false,
+  requiresOrgClaim: false,
+  delegable: false,
+  issuance: 'grant',
+  delegatesTo: [],
+  consentText: `Use the ${audience} fixture`,
+});
+
+const FIXTURE_SCOPES: Readonly<Record<string, UtsScopeEntry>> = {
+  'gateway:models.read': fixtureScope('gateway'),
+  'kilo-chat:messages.read': fixtureScope('kilo-chat'),
+  'mcp:tools.read': fixtureScope('mcp'),
+};
+
+/**
+ * The scope registry plus the fixture scopes these tests mint: the registry holds no
+ * third-party-safe scope yet, and the flows need one.
+ */
+export const testScopes: ScopeRegistry = scope =>
+  utsScopeEntry(scope) ??
+  (Object.hasOwn(FIXTURE_SCOPES, scope) ? (FIXTURE_SCOPES[scope] ?? null) : null);
+
+/**
+ * A feed publisher that records every batch and answers `outcome`, so a test sees what an
+ * endpoint published after its statement.
+ */
+export function recordingPublisher(outcome: PublishOutcome = 'published') {
+  const batches: FeedEntry[][] = [];
+  const publish: FeedPublish = async entries => {
+    batches.push([...entries]);
+    return outcome;
+  };
+  return { publish, batches };
+}
+
+/** A feed entry as a revoking statement returns it. */
+export function grantEntry(id: string = crypto.randomUUID()): FeedEntry {
+  const now = Date.now();
+  return { kind: 'grant', id, revokedBefore: null, revokedAt: now, expiresAt: now + 1_200_000 };
+}
+
+/** A store access that fails the request: a test that reaches it ran a statement it did not expect. */
+export const unexpectedStore = async (): Promise<never> => {
+  throw new Error('unexpected store call');
+};
+
+/** An attestation store that only marks codes exempt, as development without config does. */
+export const exemptOnlyStore: AttestationAccess = work =>
+  work({
+    claim: async () => {
+      throw new Error('unexpected attestation claim');
+    },
+    settle: async () => {
+      throw new Error('unexpected attestation settle');
+    },
+    exempt: async () => undefined,
+  });
+
 /** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
     config,
     grants,
     sign: signerAccess(env, config),
-    handoff: null,
-    deviceCodeGrant: null,
+    scopes: testScopes,
+    publish: recordingPublisher().publish,
+    handoff: async () => {
+      throw new Error('unexpected hand-off');
+    },
+    device: { status: 'off' },
+    signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
+    tickets: { config, tickets: unexpectedStore },
+    clients: async () => {
+      throw new Error('unexpected client lookup');
+    },
+    thirdParty: unexpectedStore,
+    exchange: null,
+    // The runtime pool runs in development without attestation config (src/attest/config.ts):
+    // a kilo-mobile exchange only marks its code exempt first.
+    attestation: { kind: 'unattested_development', store: exemptOnlyStore },
+    web: {
+      config,
+      keys: async () => ({ status: 'unconfigured' }),
+      sessions: unexpectedStore,
+      sign: signerAccess(env, config),
+      scopes: testScopes,
+      publish: recordingPublisher().publish,
+      bridge: { status: 'off' },
+      windows: new Map(),
+      now: Date.now,
+    },
     ...overrides,
   };
 }

@@ -3,12 +3,19 @@ import { describe, expect, it } from 'vitest';
 import type { UtsConfig } from '../../src/env';
 import type { Minted } from '../../src/grants/store';
 import { SignableClaimsSchema } from '../../src/keys/claims';
-import { accessTokenClaims, tokenResponseBody } from '../../src/token/mint';
+import {
+  accessTokenClaims,
+  accessTokenLifetimeSeconds,
+  tokenResponseBody,
+} from '../../src/token/mint';
 
 const config: UtsConfig = {
   environment: 'production',
   endpoints: UTS_ENDPOINTS.production,
   jurisdiction: 'eu',
+  relyingParty: { rpId: 'app.kilo.ai', origins: ['https://uts.kiloapps.io'] },
+  managerBaseUrl: null,
+  loginRotation: { status: 'off' },
 };
 const NOW = 1_800_000_000;
 const grantId = '6f1c1b8e-4b55-4c1a-9a43-0d3b1f7d2c10';
@@ -17,6 +24,7 @@ function minted(overrides: Partial<Minted> = {}): Minted {
   return {
     subjectId: 'oauth/user-1',
     orgId: null,
+    orgRole: null,
     authTime: new Date((NOW - 3600) * 1000),
     amr: ['passkey'],
     tokenIds: [crypto.randomUUID(), crypto.randomUUID()],
@@ -61,6 +69,34 @@ describe('access-token claims', () => {
     expect(claimSet.org).toBe(orgId);
     expect(claimSet).not.toHaveProperty('act');
     expect(claimSet).not.toHaveProperty('req');
+  });
+
+  it("live each scope's registered maximum: 5 minutes for a one-shot capability, else 10", () => {
+    const scopes = [
+      'user-data-export:exports.dispatch',
+      'git-token-service:github-user-authorizations.disconnect',
+      'git-token-service:bitbucket.repositories.read',
+      'gateway:models.read',
+    ];
+    const claims = accessTokenClaims(
+      config,
+      'kilo-web',
+      grantId,
+      minted({ scopes, tokenIds: scopes.map(() => crypto.randomUUID()) }),
+      NOW
+    );
+    expect(claims.map(claimSet => claimSet.exp - claimSet.iat)).toEqual([300, 300, 600, 600]);
+    expect(scopes.map(accessTokenLifetimeSeconds)).toEqual([300, 300, 600, 600]);
+    const body = TokenResponseSchema.parse(
+      tokenResponseBody(
+        claims,
+        scopes.map((_, index) => `token-${index}`),
+        null,
+        NOW * 1000
+      )
+    );
+    expect(body.expires_in).toBe(300);
+    expect(body.issued_tokens.map(token => token.expires_in)).toEqual([300, 300, 600, 600]);
   });
 });
 

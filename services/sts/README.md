@@ -505,7 +505,7 @@ deploy token; their bundles are `/ci/<workload>`:
 policies set `legacySubject: true` (see "Legacy subject" below). No policy admits the `v2` branch
 or `release-v2`.
 
-Two kilocode-side rules hold these policies to what they name:
+Three kilocode-side rules hold these policies to what they name:
 
 - None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
   carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
@@ -513,6 +513,10 @@ Two kilocode-side rules hold these policies to what they name:
 - The GitHub environments `automation`, `release-keys` and `release-jetbrains` admit deployments
   from `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch
   rule is what makes it mean `main`.
+- `publish.yml`'s `package-managers` job is the only job that may declare `environment:
+  release-keys`, and that job may run only SHA-pinned GitHub-org actions and repository code: STS
+  cannot tell the jobs of one workflow file apart, so another job of `publish.yml` declaring the
+  environment receives the bundle too.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -731,7 +735,6 @@ identity:
   refs: [refs/heads/main]   # the default
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/publish.yml@refs/heads/main
-    - Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main
   events: [workflow_dispatch]
 secrets: [KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
 ```

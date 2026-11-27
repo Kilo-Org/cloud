@@ -1,5 +1,5 @@
-# kilocode release: the trusted publish job in the protected `release-keys` environment
-# (kilocode CI design 6). The AUR key and the Kilo Maintainer app key.
+# kilocode release: the `package-managers` job of publish.yml in the protected `release-keys`
+# environment (kilocode CI design 6). The AUR key and the Kilo Maintainer app key.
 # legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
 # GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
 workload: ci-kilocode-release

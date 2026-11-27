@@ -233,7 +233,13 @@ describe('shipped Kilo-Org/kilocode policies', () => {
   it('refuses a listed workflow from another GitHub environment', async () => {
     const { verify } = await fixture('production');
     for (const policy of EXPECTED) {
-      for (const environment of ['release-keys', 'release-jetbrains', 'automation', 'agent']) {
+      for (const environment of [
+        'release',
+        'release-keys',
+        'release-jetbrains',
+        'automation',
+        'agent',
+      ]) {
         if (environment === policy.environment) continue;
         const file = policy.workflows[0] ?? '';
         const event = policy.events[0] ?? '';
@@ -243,6 +249,21 @@ describe('shipped Kilo-Org/kilocode policies', () => {
           reason: 'identity_rejected',
         });
       }
+    }
+  });
+
+  it('refuses publish.yml from the release environment, which is not the trusted one', async () => {
+    const { verify } = await fixture('production');
+    for (const sub of [
+      `repo:Kilo-Org@${OWNER_ID}/kilocode@${REPOSITORY_ID}:environment:release`,
+      'repo:Kilo-Org/kilocode:environment:release',
+    ]) {
+      const outcome = await verify({
+        ...claims('release', 'publish.yml', 'workflow_dispatch'),
+        sub,
+      });
+      expect(outcome, sub).toMatchObject({ status: 'denied', reason: 'identity_rejected' });
+      expect(outcome, sub).not.toMatchObject({ workload: 'ci-kilocode-release' });
     }
   });
 
@@ -317,6 +338,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
         { event_name: 'push' },
         { job_workflow_ref: pinned('ci.yml') },
         { environment: 'automation' },
+        { environment: 'release', sub: 'repo:Kilo-Org/kilocode:environment:release' },
       ];
       for (const change of changes) {
         expect(await verify({ ...base, ...change }), JSON.stringify(change)).toMatchObject({

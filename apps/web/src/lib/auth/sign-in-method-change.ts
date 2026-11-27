@@ -39,18 +39,27 @@ async function organizationAllowsNonSsoSignInMethods(organizationId: string): Pr
  * account whose domain requires SSO may not, unless the organization that
  * owns the domain allows it. A domain whose SSO authority is misconfigured
  * refuses.
+ *
+ * The OpenAI link is the exception: it connects the person's ChatGPT plan for
+ * BYOK. Sign-in still resolves the account's primary email domain and sends
+ * an SSO domain to SSO, so the link adds no way into the account.
  */
-async function linkAllowedBySsoPolicy(authority: SsoDomainAuthority | null): Promise<boolean> {
+async function linkAllowedBySsoPolicy(
+  authority: SsoDomainAuthority | null,
+  provider: AuthProviderId
+): Promise<boolean> {
   if (!authority || authority.status === 'not_required') return true;
   if (authority.status === 'misconfigured') return false;
+  if (provider === 'openai') return true;
   return organizationAllowsNonSsoSignInMethods(authority.sourceOrganizationId);
 }
 
 /** The SSO policy check alone, for the link callback that completes a started link. */
 export async function isSignInMethodLinkAllowed(
-  user: Pick<User, 'google_user_email'>
+  user: Pick<User, 'google_user_email'>,
+  provider: AuthProviderId
 ): Promise<boolean> {
-  return linkAllowedBySsoPolicy(await ssoAuthorityForUser(user));
+  return linkAllowedBySsoPolicy(await ssoAuthorityForUser(user), provider);
 }
 
 /**
@@ -64,10 +73,11 @@ export async function isSignInMethodLinkAllowed(
 export async function authorizeSignInMethodChange(params: {
   user: Pick<User, 'google_user_email'>;
   change: SignInMethodChange;
+  provider: AuthProviderId;
 }): Promise<SignInMethodChangeRefusal | null> {
   const authority = await ssoAuthorityForUser(params.user);
   if (authority?.status === 'misconfigured') return 'ssoLinkNotAllowed';
-  if (params.change === 'link' && !(await linkAllowedBySsoPolicy(authority))) {
+  if (params.change === 'link' && !(await linkAllowedBySsoPolicy(authority, params.provider))) {
     return 'ssoLinkNotAllowed';
   }
   return null;

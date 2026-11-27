@@ -118,10 +118,12 @@ function parseUpsert(query: SQL): { values: Partial<StoredRow>; set: Partial<Sto
     columns.map((column, index) => [column, value(placeholders[index])])
   ) as Partial<StoredRow>;
   const set = Object.fromEntries(
-    update[1].split(', ').map(assignment => {
-      const [column, placeholder] = assignment.split(' = ');
-      return [column.replaceAll('"', ''), value(placeholder)];
-    })
+    update[1]
+      .split(', ')
+      .map(assignment => assignment.split(' = '))
+      // Server-side assignments such as `now()` carry no parameter.
+      .filter(([, placeholder]) => placeholder.trim().startsWith('$'))
+      .map(([column, placeholder]) => [column.replaceAll('"', ''), value(placeholder)])
   ) as Partial<StoredRow>;
   return { values, set };
 }

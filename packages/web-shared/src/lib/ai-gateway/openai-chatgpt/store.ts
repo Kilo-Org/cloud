@@ -419,10 +419,14 @@ export async function saveOpenAiChatGptConnection(
       sql`, `
     )}) WHERE ${shape.conflict.targetWhere}
     DO UPDATE SET ${sql.join(
-      conflictKeys.map(
-        key =>
-          sql`${sql.identifier(tableColumns[key].name)} = ${sql.param(conflictSet[key], tableColumns[key])}`
-      ),
+      [
+        ...conflictKeys.map(
+          key =>
+            sql`${sql.identifier(tableColumns[key].name)} = ${sql.param(conflictSet[key], tableColumns[key])}`
+        ),
+        // Drizzle's conflict update also sets this through the column's `$onUpdateFn`.
+        sql`${sql.identifier(tableColumns.updated_at.name)} = now()`,
+      ],
       sql`, `
     )}
   `);

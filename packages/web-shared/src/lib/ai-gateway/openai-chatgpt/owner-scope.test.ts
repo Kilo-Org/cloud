@@ -135,6 +135,40 @@ describe('openai-chatgpt owner scope (real database)', () => {
     expect(orgRow?.created_by).toBe(user.id);
   });
 
+  it('advances updated_at when a reconnect replaces the connection', async () => {
+    const org = await createTestOrganization(`ChatGPT Org C ${randomUUID()}`, user.id, 0);
+    const owner = { kiloUserId: user.id, organizationId: org.id };
+    const readUpdatedAt = async () => {
+      const [row] = await db
+        .select({ updated_at: openai_chatgpt_connections.updated_at })
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            eq(openai_chatgpt_connections.organization_id, org.id)
+          )
+        );
+      return new Date(row.updated_at).getTime();
+    };
+    try {
+      await saveOpenAiChatGptConnection(
+        owner,
+        connection(`first-${randomUUID()}@example.com`),
+        user.id
+      );
+      const firstUpdatedAt = await readUpdatedAt();
+      await saveOpenAiChatGptConnection(
+        owner,
+        connection(`second-${randomUUID()}@example.com`),
+        user.id
+      );
+      expect(await readUpdatedAt()).toBeGreaterThan(firstUpdatedAt);
+    } finally {
+      // Deleting the organization cascades to its connection rows.
+      await db.delete(organizations).where(eq(organizations.id, org.id));
+    }
+  });
+
   it('reads each account its own connection', async () => {
     await expect(
       getOpenAiChatGptStoredConnection({ kiloUserId: user.id, organizationId: null })

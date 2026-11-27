@@ -33,7 +33,11 @@ export type BouncerScope = 'bouncer:decide' | 'bouncer:usage.write' | 'bouncer:s
 /** The headers one Bouncer call adds besides `content-type` and `x-internal-api-key`. */
 export type BouncerAuthHeaders = Readonly<Record<string, string>>;
 
-export type BouncerAuth = (scope: BouncerScope) => Promise<BouncerAuthHeaders>;
+/** The headers for one call; `signal` is the call's deadline, which ends the token wait too. */
+export type BouncerAuth = (
+  scope: BouncerScope,
+  signal?: AbortSignal
+) => Promise<BouncerAuthHeaders>;
 
 /** Reads one token, from memory when the client holds a fresh one (`ServiceTokens.get`). */
 export type BouncerTokenRead = (
@@ -92,10 +96,16 @@ const SETTLED = Symbol('settled');
 
 type Raced = { token: string } | { error: unknown } | typeof SETTLED;
 
-/** `promise`, or `SETTLED` once `ms` passes first; a held token wins a 0 ms race. */
-async function within(promise: Promise<string>, ms: number): Promise<Raced> {
+/**
+ * `promise`, or `SETTLED` once `ms` passes or `signal` aborts first; a held token wins a 0 ms
+ * race.
+ */
+async function within(promise: Promise<string>, ms: number, signal?: AbortSignal): Promise<Raced> {
   const timer = Promise.withResolvers<typeof SETTLED>();
-  const handle = setTimeout(() => timer.resolve(SETTLED), ms);
+  const settle = () => timer.resolve(SETTLED);
+  const handle = setTimeout(settle, ms);
+  if (signal?.aborted) settle();
+  signal?.addEventListener('abort', settle, { once: true });
   try {
     return await Promise.race([
       promise.then(
@@ -106,6 +116,7 @@ async function within(promise: Promise<string>, ms: number): Promise<Raced> {
     ]);
   } finally {
     clearTimeout(handle);
+    signal?.removeEventListener('abort', settle);
   }
 }
 
@@ -181,7 +192,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     timeouts = 0;
   }
 
-  return async scope => {
+  return async (scope, signal) => {
     const enabled = bouncerStsTokensEnabled(options.flag());
     if (enabled === 'invalid') miss('config', scope);
     if (enabled !== true) return callerHeaders;
@@ -193,7 +204,7 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     const reading = load().then(read => read({ audience: 'bouncer', scope }, ctx));
     void reading.then(succeeded, () => undefined);
 
-    const raced = await within(reading, waitMs);
+    const raced = await within(reading, waitMs, signal);
     if (raced === SETTLED) {
       // The mint runs on past the response; the next call finds its token.
       options.waitUntil(reading.catch(() => undefined));
@@ -243,7 +254,10 @@ export function installBouncerAuth(caller: BouncerCaller): void {
 }
 
 /** The installed auth's headers for one call; none in a process that installed nothing. */
-export async function bouncerAuthHeaders(scope: BouncerScope): Promise<BouncerAuthHeaders> {
+export async function bouncerAuthHeaders(
+  scope: BouncerScope,
+  signal?: AbortSignal
+): Promise<BouncerAuthHeaders> {
   const auth = globalThis.__kilocodeBouncerAuth;
-  return auth === undefined ? {} : auth(scope);
+  return auth === undefined ? {} : auth(scope, signal);
 }

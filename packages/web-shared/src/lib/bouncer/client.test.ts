@@ -13,6 +13,7 @@ import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
 import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { BOUNCER_TOKEN_WAIT_MS, createBouncerAuth } from './sts-auth';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id, so the client
 // is loaded after the config mock is registered (same convention as the store-completion tests).
@@ -747,7 +748,8 @@ describe('parseBouncerCreditEventBody ja4', () => {
 });
 
 describe('STS headers from the installed Bouncer auth', () => {
-  const installedAuth = jest.fn<(scope: string) => Promise<Record<string, string>>>();
+  const installedAuth =
+    jest.fn<(scope: string, signal?: AbortSignal) => Promise<Record<string, string>>>();
 
   beforeEach(() => {
     installedAuth.mockImplementation(async scope => ({
@@ -826,7 +828,7 @@ describe('STS headers from the installed Bouncer auth', () => {
     '%s asks for %s and sends it with the legacy key',
     async (_name, call, path, scope) => {
       await call();
-      expect(installedAuth).toHaveBeenCalledWith(scope);
+      expect(installedAuth).toHaveBeenCalledWith(scope, expect.any(AbortSignal));
       const { path: sentPath, headers } = sent();
       expect(sentPath).toBe(path);
       expect(headers.get('authorization')).toBe(`Bearer token-for-${scope}`);
@@ -850,5 +852,81 @@ describe('STS headers from the installed Bouncer auth', () => {
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
     expect(installedAuth).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('a decide whose STS mint hangs', () => {
+  // `AbortSignal.timeout` runs on a timer Jest does not fake; this stand-in aborts with the same
+  // `TimeoutError` on a faked timer, so the deadline is driven deterministically.
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException('timed out', 'TimeoutError')), ms);
+      return controller.signal;
+    });
+    globalThis.__kilocodeBouncerAuth = createBouncerAuth({
+      caller: 'kilocode-ai-gateway',
+      flag: () => 'on',
+      // The mint never answers.
+      loadTokens: async () => async () => await Promise.withResolvers<string>().promise,
+      waitUntil: () => undefined,
+      log: () => undefined,
+    });
+    // Bouncer answers only when the call's signal aborts, as a hung request would.
+    mockFetch.mockImplementation(async (_url, init) => {
+      const aborted = Promise.withResolvers<Response>();
+      const signal = init?.signal;
+      if (signal?.aborted) aborted.reject(signal.reason);
+      signal?.addEventListener('abort', () => aborted.reject(signal.reason));
+      return await aborted.promise;
+    });
+  });
+
+  afterEach(() => {
+    globalThis.__kilocodeBouncerAuth = undefined;
+    jest.useRealTimers();
+  });
+
+  function legacyOnly(): void {
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const headers = new Headers(mockFetch.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-internal-api-key')).toBe('test-internal-secret');
+    expect(headers.get('x-kilo-caller')).toBe('kilocode-ai-gateway');
+  }
+
+  it('waits for the token out of the decide timeout and ends at that timeout', async () => {
+    let settled = false;
+    const call = decide(
+      { requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' },
+      { timeoutMs: 1000 }
+    ).then(verdict => {
+      settled = true;
+      return verdict;
+    });
+    await jest.advanceTimersByTimeAsync(BOUNCER_TOKEN_WAIT_MS);
+    legacyOnly();
+    await jest.advanceTimersByTimeAsync(1000 - BOUNCER_TOKEN_WAIT_MS - 1);
+    expect(settled).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+    await expect(call).resolves.toBeNull();
+  });
+
+  it('cuts the token wait at a decide timeout shorter than the wait', async () => {
+    let settled = false;
+    const call = decide(
+      { requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' },
+      { timeoutMs: 100 }
+    ).then(verdict => {
+      settled = true;
+      return verdict;
+    });
+    await jest.advanceTimersByTimeAsync(99);
+    expect(settled).toBe(false);
+    expect(mockFetch).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    await expect(call).resolves.toBeNull();
+    legacyOnly();
   });
 });

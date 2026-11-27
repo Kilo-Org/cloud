@@ -466,8 +466,9 @@ type PostResult =
  * The request URL comes from the shared endpoint helper, so it derives from the value the transport
  * rule accepted instead of from concatenation. A configured endpoint that carries a trailing
  * separator therefore still reaches the worker's own path, and a value outside the rule, or a
- * missing key, is `unconfigured` and sends nothing. The STS headers are read alongside the key;
- * that read never fails and waits at most `BOUNCER_TOKEN_WAIT_MS` (`sts-auth.ts`).
+ * missing key, is `unconfigured` and sends nothing. The STS headers are read within the call's
+ * own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`, `sts-auth.ts`)
+ * and the request, so the call never takes longer than `timeoutMs`; that read never fails.
  */
 async function postWithResult(
   path: BouncerApiPath,
@@ -477,7 +478,6 @@ async function postWithResult(
 ): Promise<PostResult> {
   const endpoint = parseInternalServiceEndpoint(BOUNCER_URL, path);
   if (!endpoint) return { ok: false, kind: 'unconfigured' };
-  const authHeaders = bouncerAuthHeaders(BOUNCER_PATH_SCOPES[path]);
   let internalApiSecret: string;
   try {
     internalApiSecret = await readInternalApiSecret();
@@ -485,8 +485,9 @@ async function postWithResult(
     return failedWithoutResponse(error);
   }
   if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
-  const auth = await authHeaders;
   const timeout = AbortSignal.timeout(timeoutMs);
+  const deadline = signal ? AbortSignal.any([timeout, signal]) : timeout;
+  const auth = await bouncerAuthHeaders(BOUNCER_PATH_SCOPES[path], deadline);
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -496,7 +497,7 @@ async function postWithResult(
         'x-internal-api-key': internalApiSecret,
       },
       body: JSON.stringify(body),
-      signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
+      signal: deadline,
       cache: 'no-store',
     });
     if (!response.ok) {

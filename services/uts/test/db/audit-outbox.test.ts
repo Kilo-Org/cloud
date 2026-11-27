@@ -12,7 +12,7 @@ import {
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { withIdentityStore } from '../../src/db/client';
-import { AuditEventRowSchema } from '../../src/db/rows';
+import { RelayReadRowSchema } from '../../src/audit/outbox';
 import { RELAY_READ, TestDatabase, auditEvent, insertAudit, sqlStateOf } from './harness';
 
 const CHECK_VIOLATION = '23514';
@@ -487,7 +487,7 @@ describe('relay batches', () => {
           store =>
             store.rows(
               { text: RELAY_READ, values: [3, AUDIT_BATCH_MAX_EVENTS] },
-              AuditEventRowSchema
+              RelayReadRowSchema
             )
         );
         expect(read).toHaveLength(AUDIT_BATCH_MAX_EVENTS);

@@ -1,0 +1,23 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  // A Worker verifier for the local end-to-end run only; nothing deploys it. It binds the local
+  // feed Worker's FeedReader entrypoint with its own deployed name as props.caller.
+  "name": "feed-reader-e2e",
+  "main": "reader-worker.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": false },
+  },
+  "services": [
+    {
+      "binding": "UTS_FEED",
+      "service": "uts-feed-local",
+      "entrypoint": "FeedReader",
+      "props": { "caller": "feed-reader-e2e" },
+    },
+  ],
+}

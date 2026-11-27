@@ -29,6 +29,7 @@ export default defineConfig({
   ],
   test: {
     include: ['test/worker/**/*.test.ts'],
+    setupFiles: ['./test/worker/setup.ts'],
     testTimeout: 20_000,
   },
 });

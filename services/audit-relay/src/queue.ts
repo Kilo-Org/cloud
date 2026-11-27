@@ -7,7 +7,7 @@ import type { Env } from './env';
 import { pageOperator } from './page';
 import { deadLetterKey, putImmutable } from './relay/archive';
 import { errorName } from './relay/error-name';
-import { admittedOn } from './producers';
+import { streamRefusal } from './relay/stream-producer';
 
 const DLQ_SUFFIX = '-dlq';
 /**
@@ -32,11 +32,6 @@ const DEAD_LETTER_FINAL_ATTEMPT = 101;
 /** The StreamDO that rate-limits pages for bodies with no readable stream (not a valid stream name). */
 const UNKNOWN_STREAM_OBJECT = '~unknown';
 /**
- * Another producer's batch is filed and paged as `foreign/<receiving queue>`, never under the
- * stream it claims. A stream name cannot hold `/`, so no real stream shares this name.
- */
-const FOREIGN_PREFIX = 'foreign/';
-/**
  * An archive write that fails retries 60 s, 120 s, 240 s, 480 s, then every 15 minutes: with the
  * main consumer's `max_retries: 24` that spans about 5.25 hours before the DLQ takes over.
  */
@@ -56,16 +51,17 @@ export async function handleQueue(batch: MessageBatch<unknown>, env: Env): Promi
     return;
   }
 
-  const refused: Message<unknown>[] = [];
+  const kept: Message<unknown>[] = [];
   for (const message of batch.messages) {
     const auditBatch = await decodeMessage(message.body);
-    if (auditBatch && admittedOn(batch.queue, auditBatch))
+    if (auditBatch && streamRefusal(auditBatch, batch.queue) === null)
       await handleBatch(auditBatch, message, env);
-    else refused.push(message);
+    else kept.push(message);
   }
-  // A body `encodeAuditBatch` did not produce never decodes, and another producer's batch never
-  // belongs on this queue, so a retry cannot help: each is kept like a dead letter, not dropped.
-  if (refused.length > 0) await keepDeadLetters(refused, batch.queue, env);
+  // A body `encodeAuditBatch` did not produce never decodes, and a batch that is not its queue's
+  // producer's (`streamRefusal`) is refused; a retry cannot help either, so each is kept like a
+  // dead letter rather than dropped, and never reaches a stream.
+  if (kept.length > 0) await keepDeadLetters(kept, batch.queue, env);
 }
 
 async function handleBatch(
@@ -84,7 +80,9 @@ async function handleBatch(
 type DeadLetterFate =
   | { kind: 'recovered'; outcome: 'accepted' | 'duplicate' }
   | { kind: 'waiting'; reason: string; progressing: boolean }
-  | { kind: 'lost'; reason: string };
+  | { kind: 'lost'; reason: string }
+  /** A batch that is not its queue's producer's (`streamRefusal`); it never reaches its stream. */
+  | { kind: 'refused'; reason: string };
 
 /** 30 s while the stream's gap is closing (early deliveries only), else 15 minutes. */
 export function deadLetterRetrySeconds(
@@ -97,8 +95,7 @@ export function deadLetterRetrySeconds(
 }
 
 /**
- * Handles messages that will never be delivered normally: a DLQ message, an undecodable body, or
- * a batch of another producer than the queue's (`producers.ts`).
+ * Handles messages that will never be delivered normally: a DLQ message or an undecodable body.
  *
  * The messages are grouped by stream; streams run in parallel and each stream's batches run in
  * sequence order, so the batches an R2 outage or a gap dead-lettered archive themselves in one
@@ -107,29 +104,23 @@ export function deadLetterRetrySeconds(
  * (they would only gap). Every other message has its raw bytes stored under
  * `dead-letter/<stream or unknown>/<enqueue time>-<id>.gz` (create-only, so a retry rewrites
  * nothing) and a waiting one is retried: after 30 s while its stream's head is advancing, else
- * after 15 minutes. A message that cannot recover (a forged or conflicting copy, another
- * producer's batch, an undecodable body, its final delivery, or bytes that could not be stored by
- * then) is acked and paged; each stream (and the unknown bucket) pages at most once an hour.
+ * after 15 minutes. A message that cannot recover (a forged or conflicting copy, an undecodable
+ * body, a batch that is not its queue's producer's, its final delivery, or
+ * bytes that could not be stored by then) is acked and paged; each stream (and the unknown
+ * bucket, which also holds every refused batch) pages at most once an hour.
  */
 async function keepDeadLetters(
   messages: readonly Message<unknown>[],
   queue: string,
   env: Env
 ): Promise<void> {
-  type Letter = { message: Message<unknown>; auditBatch: AuditBatch | null; filedUnder: string };
-  const groups = new Map<string, Letter[]>();
+  const groups = new Map<string, { message: Message<unknown>; auditBatch: AuditBatch | null }[]>();
   for (const message of messages) {
     const auditBatch = await decodeMessage(message.body);
-    // Another producer's batch is filed, grouped and paged under the receiving queue, never under
-    // the stream it claims: a foreign writer can neither place objects under that stream's
-    // dead-letter prefix nor use up its hourly page.
-    let filedUnder = UNKNOWN_STREAM_OBJECT;
-    if (auditBatch) {
-      filedUnder = admittedOn(queue, auditBatch) ? auditBatch.stream : `${FOREIGN_PREFIX}${queue}`;
-    }
-    const group = groups.get(filedUnder) ?? [];
-    group.push({ message, auditBatch, filedUnder });
-    groups.set(filedUnder, group);
+    const stream = auditBatch?.stream ?? UNKNOWN_STREAM_OBJECT;
+    const group = groups.get(stream) ?? [];
+    group.push({ message, auditBatch });
+    groups.set(stream, group);
   }
 
   const lines = await Promise.all(
@@ -139,15 +130,15 @@ async function keepDeadLetters(
       );
       const groupLines: string[] = [];
       let blocked: DeadLetterFate | null = null;
-      for (const { message, auditBatch, filedUnder } of group) {
+      for (const { message, auditBatch } of group) {
         let fate: DeadLetterFate;
+        const refusal = auditBatch ? streamRefusal(auditBatch, queue) : null;
         if (!auditBatch) fate = { kind: 'lost', reason: 'undecodable' };
-        else if (filedUnder !== auditBatch.stream) {
-          fate = { kind: 'lost', reason: 'foreign_producer' };
-        } else if (blocked) fate = blocked;
+        else if (refusal) fate = { kind: 'refused', reason: `refused_${refusal}` };
+        else if (blocked) fate = blocked;
         else fate = await offerAgain(auditBatch, env);
         if (fate.kind === 'waiting') blocked = fate;
-        const line = await settleDeadLetter(message, auditBatch, filedUnder, fate, queue, env);
+        const line = await settleDeadLetter(message, auditBatch, fate, queue, env);
         if (line) groupLines.push(line);
       }
       return groupLines;
@@ -166,13 +157,10 @@ async function keepDeadLetters(
 async function settleDeadLetter(
   message: Message<unknown>,
   auditBatch: AuditBatch | null,
-  filedUnder: string,
   fate: DeadLetterFate,
   queue: string,
   env: Env
 ): Promise<string | null> {
-  const filedStream = filedUnder === UNKNOWN_STREAM_OBJECT ? null : filedUnder;
-  const foreign = filedStream !== null && filedStream !== auditBatch?.stream;
   const log = { queue, stream: auditBatch?.stream ?? null, fromSeq: auditBatch?.fromSeq ?? null };
   if (fate.kind === 'recovered') {
     console.log(
@@ -183,7 +171,10 @@ async function settleDeadLetter(
   }
 
   const final = message.attempts >= DEAD_LETTER_FINAL_ATTEMPT;
-  const key = deadLetterKey(filedStream, message.timestamp, message.id);
+  // A refused batch names a stream it may not write, so its bytes and its page budget go under
+  // `unknown`, never under that stream.
+  const owner = fate.kind === 'refused' ? null : (auditBatch?.stream ?? null);
+  const key = deadLetterKey(owner, message.timestamp, message.id);
   let reason = fate.reason;
   let where = `at ${key}`;
   try {
@@ -221,7 +212,7 @@ async function settleDeadLetter(
     return null;
   }
 
-  const stub = getStreamDOStub(env, filedUnder);
+  const stub = getStreamDOStub(env, owner ?? UNKNOWN_STREAM_OBJECT);
   const page = await stub.claimDeadLetterPage();
   console.error(
     JSON.stringify({
@@ -236,8 +227,8 @@ async function settleDeadLetter(
   );
   message.ack();
   if (!page) return null;
-  const range = auditBatch && !foreign ? ` seq ${auditBatch.fromSeq}..${auditBatch.toSeq}` : '';
-  return `${filedStream ?? 'unknown stream'}${range} (${reason}) after ${message.attempts} attempts ${where}`;
+  const range = auditBatch ? ` seq ${auditBatch.fromSeq}..${auditBatch.toSeq}` : '';
+  return `${auditBatch?.stream ?? 'unknown stream'}${range} (${reason}) after ${message.attempts} attempts ${where}`;
 }
 
 /** Offers a dead-lettered batch to its stream again; the archive decides what it is now. */

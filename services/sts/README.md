@@ -493,7 +493,7 @@ deploy token; their bundles are `/ci/<workload>`:
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
-| `ci-kilocode-release` | `release` | `publish.yml` | `workflow_dispatch` |
+| `ci-kilocode-release` | `release-keys` | `publish.yml` | `workflow_dispatch` |
 | `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
 | `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
 | `ci-kilocode-scan-notify` | `automation` | `security-findings-notify.yml` | `schedule`, `workflow_dispatch` |
@@ -510,9 +510,9 @@ Two kilocode-side rules hold these policies to what they name:
 - None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
   carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
   `main` that called it with a listed event would get the bundle.
-- The GitHub environments `automation`, `release` and `release-jetbrains` admit deployments from
-  `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
-  what makes it mean `main`.
+- The GitHub environments `automation`, `release-keys` and `release-jetbrains` admit deployments
+  from `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch
+  rule is what makes it mean `main`.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -727,13 +727,13 @@ identity:
   repository: Kilo-Org/kilocode
   repositoryId: '<repository id>'
   repositoryOwnerId: '<owner id>'
-  environment: release
+  environment: release-keys
   refs: [refs/heads/main]   # the default
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/publish.yml@refs/heads/main
     - Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main
   events: [workflow_dispatch]
-secrets: [KILOCODE_ANACONDA_API_KEY, KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
+secrets: [KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
 ```
 
 How a token finds its policy, in this order:

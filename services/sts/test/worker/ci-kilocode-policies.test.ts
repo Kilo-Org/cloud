@@ -24,10 +24,10 @@ type Expected = {
 const EXPECTED: Expected[] = [
   {
     workload: 'ci-kilocode-release',
-    environment: 'release',
+    environment: 'release-keys',
     workflows: ['publish.yml'],
     events: ['workflow_dispatch'],
-    secrets: ['KILOCODE_ANACONDA_API_KEY', 'KILOCODE_AUR_KEY', 'KILOCODE_MAINTAINER_APP_KEY'],
+    secrets: ['KILOCODE_AUR_KEY', 'KILOCODE_MAINTAINER_APP_KEY'],
   },
   {
     workload: 'ci-kilocode-release-jetbrains',
@@ -233,7 +233,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
   it('refuses a listed workflow from another GitHub environment', async () => {
     const { verify } = await fixture('production');
     for (const policy of EXPECTED) {
-      for (const environment of ['release', 'release-jetbrains', 'automation', 'agent']) {
+      for (const environment of ['release-keys', 'release-jetbrains', 'automation', 'agent']) {
         if (environment === policy.environment) continue;
         const file = policy.workflows[0] ?? '';
         const event = policy.events[0] ?? '';
@@ -248,7 +248,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
 
   it('refuses another repository, another owner, and subjects naming another repository', async () => {
     const { verify } = await fixture('production');
-    const base = claims('release', 'publish.yml', 'workflow_dispatch');
+    const base = claims('release-keys', 'publish.yml', 'workflow_dispatch');
     // Kilo-Org/bouncer's repository id, with every other claim unchanged. Bouncer has its own
     // workload (ci-deploy-bouncer), so the claims match it and its identity check refuses them.
     expect(await verify({ ...base, repository_id: '1395255492' })).toMatchObject({
@@ -261,9 +261,9 @@ describe('shipped Kilo-Org/kilocode policies', () => {
     });
     // The subject names another repository while the id claims still name kilocode.
     for (const sub of [
-      `repo:Kilo-Org@${OWNER_ID}/kilocode@1395255492:environment:release`,
-      `repo:Kilo-Org@${OWNER_ID}/bouncer@1395255492:environment:release`,
-      'repo:Kilo-Org/bouncer:environment:release',
+      `repo:Kilo-Org@${OWNER_ID}/kilocode@1395255492:environment:release-keys`,
+      `repo:Kilo-Org@${OWNER_ID}/bouncer@1395255492:environment:release-keys`,
+      'repo:Kilo-Org/bouncer:environment:release-keys',
       'repo:Kilo-Org/kilocode:environment:automation',
       'repo:Kilo-Org/kilocode:ref:refs/heads/main',
       'repo:Kilo-Org/kilocode:pull_request',
@@ -278,7 +278,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
 
   // Kilo-Org/kilocode keeps GitHub's default subject until npm/cli#9969 is fixed (legacySubject).
   describe('the default subject kilocode issues today', () => {
-    const LEGACY = 'repo:Kilo-Org/kilocode:environment:release';
+    const LEGACY = 'repo:Kilo-Org/kilocode:environment:release-keys';
 
     it.each(cases)('issues %s for %s on %s', async (workload, file, event, policy) => {
       const { verify } = await fixture('production');
@@ -291,7 +291,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
 
     it('refuses it with another repository id or owner id', async () => {
       const { verify } = await fixture('production');
-      const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
+      const base = { ...claims('release-keys', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
       // 999999999 is a repository id that no shipped policy holds. Bouncer's id has its own
       // workload; the case above covers it.
       const changes: Record<string, string>[] = [
@@ -311,7 +311,7 @@ describe('shipped Kilo-Org/kilocode policies', () => {
 
     it('keeps every other binding', async () => {
       const { verify } = await fixture('production');
-      const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
+      const base = { ...claims('release-keys', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
       const changes: Record<string, string>[] = [
         { ref: 'refs/heads/v2', job_workflow_ref: pinned('publish.yml', 'refs/heads/v2') },
         { event_name: 'push' },
@@ -373,7 +373,9 @@ secrets: [APP_SECRET]
     'serves none of them from %s STS',
     async environment => {
       const { verify } = await fixture(environment);
-      expect(await verify(claims('release', 'publish.yml', 'workflow_dispatch'))).toMatchObject({
+      expect(
+        await verify(claims('release-keys', 'publish.yml', 'workflow_dispatch'))
+      ).toMatchObject({
         status: 'denied',
         reason: 'environment_mismatch',
       });

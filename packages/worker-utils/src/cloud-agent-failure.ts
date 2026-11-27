@@ -238,6 +238,9 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_provider_authentication',
   'managed_model_configuration',
   'model_catalog_unavailable',
+  'chatgpt_usage_limit',
+  'organization_unavailable',
+  'variant_unsupported',
   'provider_unavailable',
   'provider_disconnect',
   'gateway_unavailable',
@@ -304,6 +307,9 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASONS = [
   'content_filter',
   'structured_output',
   'model_catalog_unavailable',
+  'chatgpt_usage_limit',
+  'organization_unavailable',
+  'variant_unsupported',
   'unknown',
 ] as const;
 export const CloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS);
@@ -426,7 +432,10 @@ function classifyAdmissionFailure(
  * ownership does not change the responsibility for a provider outage, rate
  * limit, timeout or model-availability failure. Only a failure whose handling
  * the cloud agent platform itself controls stays `platform`, such as a model
- * catalog path that the runtime credential proxy does not allow.
+ * catalog path that the runtime credential proxy does not allow, a model
+ * variant that the platform offered but the runtime does not support, or an
+ * organization that admission accepted but the runtime cannot use. The
+ * account's own ChatGPT plan limit is the user's.
  */
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
@@ -436,6 +445,15 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
     return classified('platform', 'model_catalog_unavailable');
   }
   if (input.assistantReason === 'rate_limited') return classified('provider', 'rate_limited');
+  if (input.assistantReason === 'chatgpt_usage_limit') {
+    return classified('user', 'chatgpt_usage_limit');
+  }
+  if (input.assistantReason === 'organization_unavailable') {
+    return classified('platform', 'organization_unavailable');
+  }
+  if (input.assistantReason === 'variant_unsupported') {
+    return classified('platform', 'variant_unsupported');
+  }
   if (input.code === 'model_missing' || input.assistantReason === 'model_unavailable') {
     return classified('provider', 'model_unavailable');
   }

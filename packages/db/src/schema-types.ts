@@ -3974,6 +3974,11 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   // The billed or acting user is blocked (abuse, ToS, deletion), not short on credit.
   'account_blocked',
   'model_not_found',
+  // The runtime does not support the requested variant (thinking effort) for the model.
+  'model_variant_unsupported',
+  // The Kilo account cannot use the session's organization, so the runtime
+  // cannot load the organization's model catalog.
+  'organization_unavailable',
   'github_installation_required',
   'github_ip_allow_list',
   'gitlab_project_access_required',
@@ -4001,6 +4006,10 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_rate_limited',
   'assistant_rate_limited_byok',
   'assistant_rate_limited_managed',
+  // A ChatGPT plan usage limit on a "Sign in with ChatGPT" connection. It is
+  // not a rate limit that clears in minutes, so it is kept apart from
+  // assistant_rate_limited.
+  'assistant_chatgpt_usage_limit',
   'assistant_unavailable',
   // `assistant_unavailable` collapsed two different gateway outcomes under one
   // label: a real upstream provider connection failure, and the gateway's own
@@ -4072,6 +4081,12 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // ownership could be either.
   'assistant_rate_limited_byok',
   'assistant_invalid_request_byok',
+  // The customer's own ChatGPT plan allowance ran out. Like a BYOK quota, only
+  // the customer can restore it. 'model_variant_unsupported' and
+  // 'organization_unavailable' are deliberately NOT benign: the first is drift
+  // between the variants we offer and the runtime's list, and in the second
+  // admission accepted an organization that the runtime cannot use.
+  'assistant_chatgpt_usage_limit',
   // Set only by the stale review reaper, which measures cleanup rather than the
   // fault that stranded the review, so alerting on it would count janitorial work
   // as incidents. Every stranded pending review measured on 2026-08-04 traced to

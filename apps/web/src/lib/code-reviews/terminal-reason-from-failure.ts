@@ -106,6 +106,9 @@ const ASSISTANT_REASON_REASONS = {
   insufficient_credits: 'billing',
   model_unavailable: 'model_not_found',
   model_catalog_unavailable: 'assistant_failed',
+  chatgpt_usage_limit: 'assistant_chatgpt_usage_limit',
+  organization_unavailable: 'organization_unavailable',
+  variant_unsupported: 'model_variant_unsupported',
   unknown: 'assistant_failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, CodeReviewTerminalReason>;
 

@@ -174,6 +174,156 @@ describe('native v2 failure attribution', () => {
   });
 });
 
+describe('ChatGPT usage limit', () => {
+  const CHATGPT_USAGE_LIMIT_MESSAGE =
+    'The ChatGPT usage limit was reached; check usage in ChatGPT settings';
+
+  // The OpenAI stream text (gateway logs), and the two Kilo v2 0.0.0-v2-141 texts
+  // for `subscription_sharing_usage_limit_exceeded` and the workspace-admin limit.
+  it.each([
+    'The ChatGPT user has reached their Subscription Sharing usage limit',
+    'ChatGPT usage limit reached. Check ChatGPT Settings → Usage for details.',
+    "You've reached the usage limit your ChatGPT workspace admin set for you. Ask them to raise it in the OpenAI Admin Console.",
+  ])('classifies %s with a specific safe message', text => {
+    for (const source of [
+      text,
+      { name: 'APIError', data: { message: text } },
+      { name: 'APIError', data: { statusCode: 200, message: text } },
+      { name: 'APIError', data: { statusCode: 429, message: text } },
+      { name: 'APIError', data: { statusCode: 402, message: text } },
+    ]) {
+      const failure = classifyAssistantFailure(source);
+      expect(failure).toEqual({
+        reason: 'chatgpt_usage_limit',
+        providerOwnership: 'unknown',
+        safeMessage: CHATGPT_USAGE_LIMIT_MESSAGE,
+      });
+      const safeError = projectSafeAssistantError(source);
+      expect(safeError).toBe(CHATGPT_USAGE_LIMIT_MESSAGE);
+      expect(classifyAssistantFailure(safeError)).toEqual(failure);
+    }
+  });
+
+  it.each([
+    ['Usage limit exceeded', 'rate_limited'],
+    ['You have reached your usage limit', 'unknown'],
+    ["ChatGPT usage can't be checked right now. Try again later.", 'unknown'],
+  ] as const)('does not claim the unrelated text %s', (text, reason) => {
+    expect(classifyAssistantFailure(text).reason).toBe(reason);
+  });
+
+  it('keeps the gateway credit 402 as insufficient credits', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode: 402,
+          message: 'Add credits to continue, or switch to a free model',
+          responseBody: JSON.stringify({ error_type: 'usage_limit_exceeded' }),
+        },
+      }).reason
+    ).toBe('insufficient_credits');
+  });
+});
+
+describe('Kilo team catalog failures', () => {
+  // Fixed Kilo v2 0.0.0-v2-141 catalog texts. They hold no identifiers, but
+  // their advice to select another team does not apply to a Cloud Agent session.
+  const ORGANIZATION_MISSING_TEXT =
+    'The selected Kilo team is no longer available. Select another team or clear the team selection.';
+
+  it.each(['', 'SessionRunnerModel.ModelUnavailableError: '])(
+    'classifies the missing organization text with prefix %j',
+    prefix => {
+      const source = {
+        name: 'UnknownError',
+        data: { message: `${prefix}${ORGANIZATION_MISSING_TEXT}` },
+      };
+      const failure = classifyAssistantFailure(source);
+      expect(failure).toEqual({
+        reason: 'organization_unavailable',
+        providerOwnership: 'unknown',
+        safeMessage: 'The organization for this session is not available to this account',
+      });
+      const safeError = projectSafeAssistantError(source);
+      expect(safeError).toBe(failure.safeMessage);
+      expect(classifyAssistantFailure(safeError)).toEqual(failure);
+    }
+  );
+
+  it.each([
+    'Not signed in to Kilo Gateway. Sign in to load the team model catalog.',
+    "The selected Kilo team conflicts with the team of the Kilo token. Select the token's team or use another token.",
+    'This Kilo account has no personal account. Select a team to load its model catalog.',
+  ])('classifies the runtime catalog text %s as a catalog failure', text => {
+    for (const message of [text, `SessionRunnerModel.ModelUnavailableError: ${text}`]) {
+      const failure = classifyAssistantFailure({ name: 'UnknownError', data: { message } });
+      expect(failure).toEqual({
+        reason: 'model_catalog_unavailable',
+        providerOwnership: 'unknown',
+        safeMessage: 'The Kilo model catalog could not be loaded',
+      });
+    }
+  });
+
+  it('does not claim a team text inside another failure', () => {
+    expect(classifyAssistantFailure(`Request failed: ${ORGANIZATION_MISSING_TEXT}`).reason).toBe(
+      'unknown'
+    );
+  });
+});
+
+describe('Unsupported model variant', () => {
+  const GENERIC_VARIANT_MESSAGE = 'The selected model does not support the selected variant';
+
+  it.each([
+    ['Variant unavailable for kilo/example/model-1: thinking', 'kilo/example/model-1', 'thinking'],
+    [
+      'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example/model-2:free: instant',
+      'kilo/example/model-2:free',
+      'instant',
+    ],
+  ])('names the model and variant from %s', (text, model, variant) => {
+    const source = { name: 'UnknownError', data: { message: text } };
+    const failure = classifyAssistantFailure(source);
+    expect(failure).toEqual({
+      reason: 'variant_unsupported',
+      providerOwnership: 'unknown',
+      safeMessage: `The selected model ${model} does not support the variant ${variant}`,
+    });
+    const safeError = projectSafeAssistantError(source);
+    expect(safeError).toBe(failure.safeMessage);
+    expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  it('keeps BYOK ownership through the safe message round trip', () => {
+    const source = '[BYOK] Variant unavailable for kilo/example/model-1: thinking';
+    const failure = classifyAssistantFailure(source);
+    expect(failure).toEqual({
+      reason: 'variant_unsupported',
+      providerOwnership: 'byok',
+      safeMessage: 'The selected model kilo/example/model-1 does not support the variant thinking',
+    });
+    const safeError = projectSafeAssistantError(source);
+    expect(safeError).toBe(`[BYOK] ${failure.safeMessage}`);
+    expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  it.each([
+    'Variant unavailable for kilo/example model: thinking',
+    `Variant unavailable for kilo/example/model-1: ${'x'.repeat(65)}`,
+    'Variant unavailable for kilo/example/model-1: thinking. Private detail',
+  ])('uses the generic message when %s has an unsafe name', text => {
+    const failure = classifyAssistantFailure(text);
+    expect(failure).toEqual({
+      reason: 'variant_unsupported',
+      providerOwnership: 'unknown',
+      safeMessage: GENERIC_VARIANT_MESSAGE,
+    });
+    expect(classifyAssistantFailure(projectSafeAssistantError(text))).toEqual(failure);
+  });
+});
+
 describe('projectSafeAssistantError', () => {
   it('preserves a specific missing-agent failure without exposing the CLI agent list', () => {
     const error = {

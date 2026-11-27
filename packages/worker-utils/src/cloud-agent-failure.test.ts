@@ -34,6 +34,21 @@ describe('CloudAgentCallbackFailureSchema', () => {
     expect(CloudAgentCallbackFailureSchema.parse(failure)).toEqual(failure);
   });
 
+  it.each(['chatgpt_usage_limit', 'organization_unavailable', 'variant_unsupported'] as const)(
+    'retains the %s assistant reason',
+    assistantReason => {
+      const failure = {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        message: 'Assistant request failed',
+        assistantReason,
+        providerOwnership: 'unknown',
+      };
+
+      expect(CloudAgentCallbackFailureSchema.parse(failure)).toEqual(failure);
+    }
+  );
+
   it.each([
     { code: 'future_failure_code', message: 'Future failure' },
     { code: 'workspace_setup_failed', subtype: 'future_workspace_failure' },
@@ -113,6 +128,12 @@ describe('classifyCloudAgentFailure', () => {
     ['gateway_unavailable', 'unknown', 'provider', 'gateway_unavailable'],
     ['model_catalog_unavailable', 'managed', 'platform', 'model_catalog_unavailable'],
     ['model_catalog_unavailable', 'unknown', 'platform', 'model_catalog_unavailable'],
+    ['chatgpt_usage_limit', 'unknown', 'user', 'chatgpt_usage_limit'],
+    ['chatgpt_usage_limit', 'byok', 'user', 'chatgpt_usage_limit'],
+    ['organization_unavailable', 'unknown', 'platform', 'organization_unavailable'],
+    ['organization_unavailable', 'managed', 'platform', 'organization_unavailable'],
+    ['variant_unsupported', 'unknown', 'platform', 'variant_unsupported'],
+    ['variant_unsupported', 'byok', 'platform', 'variant_unsupported'],
   ] as const)(
     'classifies %s with %s ownership without losing the known cause',
     (assistantReason, providerOwnership, responsibility, reason) => {
@@ -699,6 +720,31 @@ const ASSISTANT_FAILURE_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['model_catalog_unavailable'],
     },
     expected: { responsibility: 'platform', reason: 'model_catalog_unavailable' },
+  },
+  // The account's own ChatGPT plan limit, whatever the code or ownership.
+  {
+    match: {
+      code: ['assistant_error', 'model_missing'],
+      assistantReason: ['chatgpt_usage_limit'],
+    },
+    expected: { responsibility: 'user', reason: 'chatgpt_usage_limit' },
+  },
+  // Admission accepted an organization that the runtime cannot use, whatever the
+  // code or ownership.
+  {
+    match: {
+      code: ['assistant_error', 'model_missing'],
+      assistantReason: ['organization_unavailable'],
+    },
+    expected: { responsibility: 'platform', reason: 'organization_unavailable' },
+  },
+  // The platform offered a variant that the runtime does not support for the model.
+  {
+    match: {
+      code: ['assistant_error', 'model_missing'],
+      assistantReason: ['variant_unsupported'],
+    },
+    expected: { responsibility: 'platform', reason: 'variant_unsupported' },
   },
   // `model_missing` resolves to the unavailable-model branch for every reason except the overrides above.
   {

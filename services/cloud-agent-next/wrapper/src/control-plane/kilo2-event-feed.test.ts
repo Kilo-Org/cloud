@@ -691,7 +691,7 @@ it.each([
   ['provider.budget-limit', 'rate_limited', 'provider', 'rate_limited'],
   ['provider.model-budget-limit', 'rate_limited', 'provider', 'rate_limited'],
   ['provider.go-limit', 'rate_limited', 'provider', 'rate_limited'],
-  ['provider.chatgpt-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.chatgpt-limit', 'chatgpt_usage_limit', 'user', 'chatgpt_usage_limit'],
   ['provider.internal', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
   ['provider.transport', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
   ['provider.invalid-output', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
@@ -755,6 +755,44 @@ it.each([
   expect(classifyAssistantFailure(translated).reason).toBe(reason);
 });
 
+// Kilo v2 0.0.0-v2-141 sets `status` from the provider HTTP status, which is 200
+// for an error inside a streamed response. It types the workspace-admin limit by
+// its HTTP tag, not as `provider.chatgpt-limit`.
+const CHATGPT_LIMIT_TEXT =
+  'ChatGPT usage limit reached. Check ChatGPT Settings → Usage for details.';
+const CHATGPT_WORKSPACE_LIMIT_TEXT =
+  "You've reached the usage limit your ChatGPT workspace admin set for you. Ask them to raise it in the OpenAI Admin Console.";
+
+it.each([
+  { type: 'provider.chatgpt-limit', message: CHATGPT_LIMIT_TEXT },
+  { type: 'provider.chatgpt-limit', message: CHATGPT_LIMIT_TEXT, status: 200 },
+  { type: 'provider.chatgpt-limit', message: CHATGPT_LIMIT_TEXT, status: 429 },
+  { type: 'provider.rate-limit', message: CHATGPT_WORKSPACE_LIMIT_TEXT },
+  { type: 'provider.quota', message: CHATGPT_WORKSPACE_LIMIT_TEXT },
+  { type: 'provider.rate-limit', message: CHATGPT_WORKSPACE_LIMIT_TEXT, status: 429 },
+  {
+    type: 'provider.no-route',
+    message: 'The ChatGPT user has reached their Subscription Sharing usage limit',
+  },
+])('classifies the native ChatGPT usage limit %j', error => {
+  const translated = nativeTurnError(error);
+  expect(translated.data.message).toBe(
+    'The ChatGPT usage limit was reached; check usage in ChatGPT settings'
+  );
+  const failure = classifyAssistantFailure(translated, 'managed');
+  expect(failure.reason).toBe('chatgpt_usage_limit');
+  expect(failure.terminalCode).toBeUndefined();
+  expect(
+    classifyCloudAgentFailure({
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      assistantReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+    })
+  ).toEqual({ responsibility: 'user', reason: 'chatgpt_usage_limit' });
+});
+
 it.each(['Rate limit reached', 'Request timed out', 'insufficient credits'])(
   'does not replace a native invalid-request identity with %s',
   message => {
@@ -804,10 +842,13 @@ it.each([
     'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
     'model_unavailable',
   ],
-  ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
+  [
+    'Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant',
+    'variant_unsupported',
+  ],
   [
     'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
-    'invalid_request',
+    'variant_unsupported',
   ],
   ['Request failed: Model unavailable: kilo/example', 'unknown'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
@@ -821,6 +862,68 @@ it.each([
     expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
     expect(failure.terminalCode).toBeUndefined();
   }
+  if (reason === 'variant_unsupported') {
+    expect(failure.safeMessage).toMatch(
+      /^The selected model kilo\/\S+ does not support the variant instant$/
+    );
+    expect(failure.terminalCode).toBeUndefined();
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility: 'platform', reason: 'variant_unsupported' });
+  }
+});
+
+// Kilo v2 0.0.0-v2-141 reports each team catalog failure kind with a fixed text.
+// The organization kind means the account profile does not list the session's
+// organization that admission accepted. All kinds are platform faults.
+const ORGANIZATION_MISSING_TEXT =
+  'The selected Kilo team is no longer available. Select another team or clear the team selection.';
+const TEAM_CATALOG_TEXTS = [
+  'Not signed in to Kilo Gateway. Sign in to load the team model catalog.',
+  "The selected Kilo team conflicts with the team of the Kilo token. Select the token's team or use another token.",
+  'This Kilo account has no personal account. Select a team to load its model catalog.',
+];
+
+it.each([
+  [ORGANIZATION_MISSING_TEXT, 'organization_unavailable', 'platform'],
+  [
+    `SessionRunnerModel.ModelUnavailableError: ${ORGANIZATION_MISSING_TEXT}`,
+    'organization_unavailable',
+    'platform',
+  ],
+  ...TEAM_CATALOG_TEXTS.flatMap(text => [
+    [text, 'model_catalog_unavailable', 'platform'] as const,
+    [
+      `SessionRunnerModel.ModelUnavailableError: ${text}`,
+      'model_catalog_unavailable',
+      'platform',
+    ] as const,
+  ]),
+] as const)('classifies the native team catalog failure %s as %s', (message, reason, owner) => {
+  const translated = nativeTurnError({ type: 'provider.no-route', message });
+  const failure = classifyAssistantFailure(translated, 'managed');
+  expect(failure.reason).toBe(reason);
+  expect(failure.terminalCode).toBeUndefined();
+  expect(failure.safeMessage).toBe(
+    reason === 'organization_unavailable'
+      ? 'The organization for this session is not available to this account'
+      : 'The Kilo model catalog could not be loaded'
+  );
+  expect(
+    classifyCloudAgentFailure({
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      assistantReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+    })
+  ).toEqual({ responsibility: owner, reason });
 });
 
 it('restricts step starts to their message and emits each pending permission once', async () => {

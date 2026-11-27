@@ -20,6 +20,9 @@ const ASSISTANT_FAILURE_MESSAGES = {
   content_filter: 'The model provider blocked the response under its content policy',
   structured_output: 'The model response did not match the required format',
   model_catalog_unavailable: 'The Kilo model catalog could not be loaded',
+  chatgpt_usage_limit: 'The ChatGPT usage limit was reached; check usage in ChatGPT settings',
+  organization_unavailable: 'The organization for this session is not available to this account',
+  variant_unsupported: 'The selected model does not support the selected variant',
   unknown: 'Assistant request failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, string>;
 const BYOK_INVALID_REQUEST_MESSAGE =
@@ -140,6 +143,24 @@ export function missingAgentSlug(source: unknown): string | undefined {
   );
 }
 
+// Kilo v2 `SessionRunnerModel.VariantUnavailableError` text, and the safe message
+// built from it. The model and variant come from the session configuration.
+// Each capture is restricted to identifier characters; other text gets the
+// generic variant message.
+function unsupportedVariant(source: unknown): { model: string; variant: string } | undefined {
+  const message = assistantFailureText(source).replace(/^\[BYOK\] /, '');
+  const match =
+    /^(?:SessionRunnerModel\.VariantUnavailableError: )?Variant unavailable for ([A-Za-z0-9/._:-]{1,200}): ([A-Za-z0-9._-]{1,64})$/.exec(
+      message
+    ) ??
+    /^The selected model ([A-Za-z0-9/._:-]{1,200}) does not support the variant ([A-Za-z0-9._-]{1,64})$/.exec(
+      message
+    );
+  const model = match?.[1];
+  const variant = match?.[2];
+  return model === undefined || variant === undefined ? undefined : { model, variant };
+}
+
 export function classifyAssistantFailure(
   source: unknown,
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
@@ -155,6 +176,14 @@ export function classifyAssistantFailure(
     return {
       reason: 'invalid_request',
       safeMessage: `Agent "${missingAgent}" was not found in the repository or profile`,
+      providerOwnership,
+    };
+  }
+  const variant = unsupportedVariant(source);
+  if (variant !== undefined) {
+    return {
+      reason: 'variant_unsupported',
+      safeMessage: `The selected model ${variant.model} does not support the variant ${variant.variant}`,
       providerOwnership,
     };
   }
@@ -422,6 +451,26 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   if (/\bfailed to load the kilo model catalog \(http 404\)/.test(message)) {
     return 'model_catalog_unavailable';
   }
+  // Kilo v2 reports each team catalog failure kind with a fixed text that holds
+  // no identifiers. `organization_missing` means the account profile does not
+  // list the organization that admission accepted for the session, so a fresh
+  // session fails the same way. `unauthenticated`, `scope_conflict` and
+  // `personal_unavailable` mean the runtime credential or team scope is wrong.
+  // The platform owns all four kinds.
+  if (
+    /^(?:sessionrunnermodel\.modelunavailableerror: )?the selected kilo team is no longer available\./.test(
+      canonicalMessage
+    )
+  ) {
+    return 'organization_unavailable';
+  }
+  if (
+    /^(?:sessionrunnermodel\.modelunavailableerror: )?(?:not signed in to kilo gateway\. sign in to load the team model catalog|the selected kilo team conflicts with the team of the kilo token|this kilo account has no personal account\. select a team to load its model catalog)\./.test(
+      canonicalMessage
+    )
+  ) {
+    return 'model_catalog_unavailable';
+  }
   if (
     /^(?:sessionrunnermodel\.modelunavailableerror: )?model unavailable:/.test(canonicalMessage)
   ) {
@@ -432,7 +481,18 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
       canonicalMessage
     )
   ) {
-    return 'invalid_request';
+    return 'variant_unsupported';
+  }
+  // The ChatGPT subscription route reports the plan limit, the subscription
+  // sharing limit and the workspace admin limit with these texts. Each limit
+  // belongs to the user's ChatGPT account, so a fresh session reaches it again.
+  // They are checked before the generic rate-limit and credit patterns.
+  if (
+    /\b(?:subscription sharing usage limit|chatgpt usage limit reached|usage limit your chatgpt workspace admin set)\b/.test(
+      message
+    )
+  ) {
+    return 'chatgpt_usage_limit';
   }
   if (/\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message)) {
     return 'insufficient_credits';

@@ -179,6 +179,23 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     ).toBe(expected);
   });
 
+  it.each([
+    ['chatgpt_usage_limit', 'assistant_chatgpt_usage_limit'],
+    ['organization_unavailable', 'organization_unavailable'],
+    ['variant_unsupported', 'model_variant_unsupported'],
+  ] as const)('maps assistant reason %s to %s for every ownership', (assistantReason, expected) => {
+    for (const providerOwnership of ['byok', 'managed', 'unknown', undefined] as const) {
+      expect(
+        terminalReasonFromCloudAgentFailure({
+          code: 'assistant_error',
+          assistantReason,
+          providerOwnership,
+          message: 'Assistant request was rate limited',
+        })
+      ).toBe(expected);
+    }
+  });
+
   it('splits assistant failures by their safe message', () => {
     expect(
       terminalReasonFromCloudAgentFailure({

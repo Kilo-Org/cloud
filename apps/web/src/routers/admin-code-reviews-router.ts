@@ -98,6 +98,8 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   billing: 'Billing',
   account_blocked: 'Account Blocked',
   model_not_found: 'Model Not Found',
+  model_variant_unsupported: 'Model Variant Unsupported',
+  organization_unavailable: 'Organization Unavailable',
   workspace_capacity: 'Sandbox Capacity',
   sandbox_connection: 'Sandbox Connection',
   container_shutdown: 'Container Shutdown',
@@ -109,6 +111,7 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   // should page us and the other should not.
   assistant_rate_limited_byok: 'Rate Limited (customer key)',
   assistant_rate_limited_managed: 'Rate Limited (Kilo key)',
+  assistant_chatgpt_usage_limit: 'ChatGPT Usage Limit (customer plan)',
   assistant_unavailable: 'Assistant Unavailable',
   assistant_provider_disconnect: 'Assistant Provider Disconnect',
   assistant_gateway_unavailable: 'Assistant Gateway Unavailable',

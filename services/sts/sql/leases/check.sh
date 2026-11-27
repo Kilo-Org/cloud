@@ -3,10 +3,12 @@
 # Docker; never against a real database. It mirrors Supabase's roles: the bootstrap superuser is
 # `supabase_admin`; `postgres` is a non-superuser CREATEROLE login that owns the database and the
 # `public` schema and is a member of pg_signal_backend, pg_monitor and pg_read_all_data; a schema
-# `net` stands in for pg_net's PUBLIC grants. It runs setup.sql as `postgres` and
-# setup-ci-migration.sql as the superuser, then each statement file the way Infisical runs it: the
-# template variables filled in, the text split on ';', and every part in one transaction, as the
-# dynamic secret's own login. Every password is generated here. Exits 1 on the first failure.
+# `net` stands in for pg_net's PUBLIC grants. It runs setup.sql and setup-replica-sweeper.sql as
+# `postgres` and setup-ci-migration.sql as the superuser, then each statement file the way
+# Infisical runs it: the template variables filled in, the text split on ';', and every part in
+# one transaction, as the dynamic secret's own login. A second container is a streaming hot
+# standby of the first, for the replica sweep (design decision Q63). Every password is generated
+# here. Exits 1 on the first failure.
 #
 #   PG_IMAGE=postgres:16 services/sts/sql/leases/check.sh
 set -euo pipefail
@@ -14,7 +16,9 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 IMAGE=${PG_IMAGE:-postgres:16}
 PORT=${PG_PORT:-55432}
+REPLICA_PORT=${PG_REPLICA_PORT:-$((PORT + 1))}
 NAME=sts-lease-sql-check-$PORT
+NET=$NAME
 DB=postgres
 TMP=$(mktemp -d)
 
@@ -25,6 +29,7 @@ OWNER_PW=$(secret)
 APP_PW=$(secret)
 REPLICA_ADMIN_PW=$(secret)
 MIGRATION_ADMIN_PW=$(secret)
+SWEEPER_PW=$(secret)
 
 pass() { echo "PASS $*"; }
 fail() {
@@ -32,18 +37,37 @@ fail() {
   exit 1
 }
 
-docker rm -f "$NAME" >/dev/null 2>&1 || true
-docker run -d --rm --name "$NAME" -p "127.0.0.1:$PORT:5432" \
+docker rm -f "$NAME" "$NAME-replica" >/dev/null 2>&1 || true
+docker network rm "$NET" >/dev/null 2>&1 || true
+docker network create "$NET" >/dev/null
+docker run -d --rm --name "$NAME" --network "$NET" --network-alias primary \
+  -p "127.0.0.1:$PORT:5432" \
   -e POSTGRES_USER=supabase_admin -e POSTGRES_PASSWORD="$SUPER_PW" -e POSTGRES_DB="$DB" \
   "$IMAGE" >/dev/null
 cleanup() {
   jobs -p | xargs -r kill 2>/dev/null || true
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
+  docker rm -f "$NAME" "$NAME-replica" >/dev/null 2>&1 || true
+  docker network rm "$NET" >/dev/null 2>&1 || true
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 for _ in $(seq 1 60); do
   if PGPASSWORD=$SUPER_PW psql -h 127.0.0.1 -p "$PORT" -U supabase_admin -d "$DB" -qtAc 'select 1' >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+# The replica: a base backup of the primary over the replication protocol, then a hot standby that
+# streams from it (`-R` writes primary_conninfo and standby.signal). Roles, the kilo_lease schema
+# and its rows reach it only through replication.
+docker exec "$NAME" sh -c 'echo "host replication all all scram-sha-256" >>"$PGDATA/pg_hba.conf"'
+PGPASSWORD=$SUPER_PW psql -h 127.0.0.1 -p "$PORT" -U supabase_admin -d "$DB" -qtAc 'select pg_reload_conf()' >/dev/null
+docker run -d --rm --name "$NAME-replica" --network "$NET" -p "127.0.0.1:$REPLICA_PORT:5432" \
+  --user postgres -e PGPASSWORD="$SUPER_PW" --entrypoint bash "$IMAGE" -c \
+  'pg_basebackup -h primary -U supabase_admin -D /tmp/standby -R -X stream && chmod 700 /tmp/standby && exec postgres -D /tmp/standby' >/dev/null
+for _ in $(seq 1 60); do
+  if [ "$(PGPASSWORD=$SUPER_PW psql -h 127.0.0.1 -p "$REPLICA_PORT" -U supabase_admin -d "$DB" -qtAc 'select pg_is_in_recovery()' 2>/dev/null)" = t ]; then
     break
   fi
   sleep 1
@@ -99,6 +123,48 @@ wait_for_session() { # login
 }
 report() { owner -f "$HERE/report.sql"; }
 
+# The replica, over TCP with a password.
+replica_sql() { # login password sql...
+  local login=$1 password=$2
+  shift 2
+  PGPASSWORD=$password psql -h 127.0.0.1 -p "$REPLICA_PORT" -U "$login" -d "$DB" -v ON_ERROR_STOP=1 -qtA "$@"
+}
+replica_super() { replica_sql supabase_admin "$SUPER_PW" "$@"; }
+sweeper() { replica_sql kilo_lease_sweeper "$SWEEPER_PW" "$@"; }
+sweep() { sweeper -c 'select kilo_lease.sweep_sessions()'; }
+# Waits until the replica has replayed everything the primary wrote so far.
+caught_up() {
+  local lsn
+  lsn=$(super -c 'select pg_current_wal_lsn()')
+  for _ in $(seq 1 100); do
+    [ "$(replica_super -c "select pg_last_wal_replay_lsn() >= '$lsn'::pg_lsn")" = t ] && return 0
+    sleep 0.1
+  done
+  fail 'the replica caught up with the primary'
+}
+# Opens an idle session on the replica (it runs one statement, then waits for input), in this
+# shell, and sets RPID to its backend pid.
+replica_session() { # login password
+  local log
+  log=$(mktemp -p "$TMP")
+  { echo 'select pg_backend_pid();'; sleep 300; } |
+    PGPASSWORD=$2 psql -h 127.0.0.1 -p "$REPLICA_PORT" -U "$1" -d "$DB" -qtA >"$log" 2>&1 &
+  for _ in $(seq 1 50); do
+    RPID=$(head -n 1 "$log" | grep -E '^[0-9]+$' || true)
+    [ -n "$RPID" ] && return 0
+    sleep 0.2
+  done
+  fail "a replica session of $1 opened: $(cat "$log")"
+}
+replica_alive() { [ "$(replica_super -c "select count(*) from pg_stat_activity where pid = $1")" = 1 ]; }
+replica_ended() { # pid
+  for _ in $(seq 1 50); do
+    replica_alive "$1" || return 0
+    sleep 0.1
+  done
+  fail "the replica session $1 ended"
+}
+
 echo "PostgreSQL $(super -c 'show server_version')"
 
 # Supabase's shape: `postgres` owns the database, the schema and the application tables, and an
@@ -141,6 +207,13 @@ grep -qF 'statement: CREATE ROLE kilo_lease_replica_read NOLOGIN' "$TMP/setup.lo
 if grep -qF "$REPLICA_ADMIN_PW" "$TMP/setup.log"; then fail 'setup.sql keeps the replica admin password out of the server log under log_statement = ddl'; fi
 if grep -qF "$REPLICA_ADMIN_PW" "$TMP/setup.out"; then fail 'setup.sql does not print the replica admin password'; fi
 pass 'under log_statement = ddl setup.sql keeps the replica admin password out of the server log and its output'
+owner -v sweeper_password="$SWEEPER_PW" -f "$HERE/setup-replica-sweeper.sql" >"$TMP/setup-replica-sweeper.out"
+docker logs "$NAME" >"$TMP/setup.log" 2>&1
+grep -qF 'statement: ALTER TABLE kilo_lease.lease_role ADD COLUMN gone_since timestamptz' "$TMP/setup.log" ||
+  fail 'the server logs the DDL of setup-replica-sweeper.sql under log_statement = ddl'
+if grep -qF "$SWEEPER_PW" "$TMP/setup.log"; then fail 'setup-replica-sweeper.sql keeps the sweeper password out of the server log under log_statement = ddl'; fi
+if grep -qF "$SWEEPER_PW" "$TMP/setup-replica-sweeper.out"; then fail 'setup-replica-sweeper.sql does not print the sweeper password'; fi
+pass 'setup-replica-sweeper.sql ran as postgres and, under log_statement = ddl, keeps the sweeper password out of the server log and its output'
 
 # Known limit (README Risks, design decision Q64): `postgres` administers every role it created,
 # so it can reset the replica admin's password. An owner role in between would not help: ADMIN
@@ -523,5 +596,148 @@ kill "$DROPPED_SESSION" 2>/dev/null || true
 wait "$DROPPED_SESSION" 2>/dev/null || true
 super -c "select pg_terminate_backend(pid) from pg_stat_activity where backend_type = 'client backend' and usename is null" >/dev/null
 pass 'a revocation leaves the session of a dropped role that was never a lease alone'
+
+# Replica sessions (design decision Q63). The standby got every role, the kilo_lease objects and
+# their rows through replication. A revocation or an expiry runs on the primary and ends the
+# lease's sessions there only; kilo_lease.sweep_sessions(), run on the replica as
+# kilo_lease_sweeper (what the lease object does once a minute through Hyperdrive), ends them on
+# the replica.
+caught_up
+[ "$(replica_super -c 'select pg_is_in_recovery()')" = t ] || fail 'the replica is a hot standby'
+[ "$(replica_super -c "select pg_get_userbyid(proowner) from pg_proc where proname = 'sweep_sessions'")" = kilo_lease_owner ] ||
+  fail 'the replica has sweep_sessions, owned by kilo_lease_owner'
+if replica_super -c 'create table public.on_replica (x int)' >/dev/null 2>&1; then fail 'the replica refuses writes'; fi
+pass 'the replica is a read-only hot standby with sweep_sessions owned by kilo_lease_owner'
+
+# Sessions no sweep may end: an application login, `postgres`, the superuser, a live lease of
+# each template, the sweeper's own other session, and a role that was dropped but never a lease.
+LIVE=$(role_name rr)
+LIVE_PW=$(secret)
+create_replica "$LIVE" "$LIVE_PW" "$(expires_in 600)"
+LIVE_CM=$(role_name cm)
+LIVE_CM_PW=$(secret)
+create_migration "$LIVE_CM" "$LIVE_CM_PW" "$(expires_in 600)"
+super -c "create role app_gone login password '$APP_PW'" >/dev/null
+caught_up
+KEEP=()
+for login in "app_pool $APP_PW" "postgres $OWNER_PW" "supabase_admin $SUPER_PW" "$LIVE $LIVE_PW" \
+  "$LIVE_CM $LIVE_CM_PW" "kilo_lease_sweeper $SWEEPER_PW" "app_gone $APP_PW"; do
+  # shellcheck disable=SC2086 # login and password, split on purpose
+  replica_session $login
+  KEEP+=("$RPID")
+done
+super -c 'drop role app_gone' >/dev/null
+caught_up
+keep_alive() { # what
+  for pid in "${KEEP[@]}"; do replica_alive "$pid" || fail "$1: replica session $pid is still open"; done
+}
+keep_alive 'before any sweep'
+
+# Revocation: the primary drops the role; its idle replica session stays until the sweep.
+RR20=$(role_name rr)
+RR20_PW=$(secret)
+create_replica "$RR20" "$RR20_PW" "$(expires_in 600)"
+caught_up
+replica_session "$RR20" "$RR20_PW"
+R20=$RPID
+revoke_replica "$RR20"
+caught_up
+[ "$(replica_super -c "select count(*) from pg_roles where rolname = '$RR20'")" = 0 ] || fail 'the drop reached the replica'
+sleep 1
+replica_alive "$R20" || fail 'the revocation on the primary leaves the replica session open (design decision Q63)'
+pass 'KNOWN (design decision Q63): after the revocation dropped the role on the primary, its idle replica session is still open'
+[ "$(sweep)" = 1 ] || fail 'the sweep ends the revoked lease session on the replica'
+replica_ended "$R20"
+pass 'the sweep on the replica ends the session of the revoked lease'
+
+# Expiry whose revocation did not run (or failed): the role still exists, past VALID UNTIL.
+RR21=$(role_name rr)
+RR21_PW=$(secret)
+create_replica "$RR21" "$RR21_PW" "$(expires_in 6)"
+caught_up
+replica_session "$RR21" "$RR21_PW"
+R21=$RPID
+sleep 7
+[ "$(role_count "$RR21")" = 1 ] || fail 'the expired role still exists'
+replica_alive "$R21" || fail 'a replica session outlives VALID UNTIL'
+[ "$(sweep)" = 1 ] || fail 'the sweep ends the session of a lease past VALID UNTIL'
+replica_ended "$R21"
+revoke_replica "$RR21"
+pass 'the sweep ends the replica session of an expired lease whose revocation did not run'
+
+# A revocation whose first transaction committed (NOLOGIN) and whose second did not.
+RR22=$(role_name rr)
+RR22_PW=$(secret)
+create_replica "$RR22" "$RR22_PW" "$(expires_in 600)"
+caught_up
+replica_session "$RR22" "$RR22_PW"
+R22=$RPID
+replica_admin -c "select kilo_lease.block_lease('$RR22')" >/dev/null
+caught_up
+replica_alive "$R22" || fail 'the blocked lease keeps its replica session until the sweep'
+[ "$(sweep)" = 1 ] || fail 'the sweep ends the session of a blocked lease'
+replica_ended "$R22"
+revoke_replica "$RR22"
+pass 'the sweep ends the replica session of a lease blocked by a half-done revocation'
+
+# A ci-migration lease on the replica (its session runs as `postgres`) after its revocation.
+CM20=$(role_name cm)
+CM20_PW=$(secret)
+create_migration "$CM20" "$CM20_PW" "$(expires_in 600)"
+caught_up
+replica_session "$CM20" "$CM20_PW"
+C20=$RPID
+revoke_migration "$CM20"
+caught_up
+[ "$(sweep)" = 1 ] || fail 'the sweep ends the revoked ci-migration session on the replica'
+replica_ended "$C20"
+pass 'the sweep ends the replica session of a revoked ci-migration lease'
+
+# The row of a dropped lease role outlives later revocations of its template (setup.sql's
+# end_sessions forgot it at the next one, as the primary had no session of it), so the replica's
+# sweep still knows it was a lease; 7 days after the role went, the row goes.
+RR23=$(role_name rr)
+RR23_PW=$(secret)
+create_replica "$RR23" "$RR23_PW" "$(expires_in 600)"
+OID23=$(super -c "select oid from pg_roles where rolname = '$RR23'")
+caught_up
+replica_session "$RR23" "$RR23_PW"
+R23=$RPID
+revoke_replica "$RR23"
+revoke_replica "$(role_name rr)"
+caught_up
+[ "$(super -c "select count(*) from kilo_lease.lease_role where role = $OID23 and gone_since is not null")" = 1 ] ||
+  fail 'a later revocation keeps the dropped lease role row and marks when it went'
+[ "$(sweep)" = 1 ] || fail 'the sweep ends the session of a lease dropped before a later revocation'
+replica_ended "$R23"
+pass 'after a later revocation of the template, the replica sweep still ends the session of the dropped lease'
+super -c "update kilo_lease.lease_role set gone_since = now() - interval '8 days' where role = $OID23" >/dev/null
+revoke_replica "$(role_name rr)"
+[ "$(super -c "select count(*) from kilo_lease.lease_role where role = $OID23")" = 0 ] ||
+  fail 'a revocation forgets the row of a role gone over 7 days'
+pass 'a revocation forgets the row of a lease role gone over 7 days, so the table stays small'
+
+caught_up
+[ "$(sweep)" = 0 ] || fail 'a sweep with no ended lease session ends nothing'
+keep_alive 'after every sweep'
+pass 'no sweep ended an application, postgres, superuser, live-lease, sweeper or dropped non-lease session'
+
+# The sweeper login can do nothing else, on either node.
+if sweeper -c "select pg_terminate_backend(${KEEP[0]})" >/dev/null 2>"$TMP/err"; then
+  fail 'the sweeper cannot end an application session directly'
+fi
+grep -q 'permission denied to terminate' "$TMP/err" || fail "terminate refused: $(cat "$TMP/err")"
+if sweeper -c "select kilo_lease.end_sessions('app_pool')" >/dev/null 2>&1; then fail 'the sweeper cannot call end_sessions'; fi
+if sweeper -c 'select 1 from public.accounts' >/dev/null 2>&1; then fail 'the sweeper reads no application table'; fi
+if sql app_pool "$APP_PW" -c 'select kilo_lease.sweep_sessions()' >/dev/null 2>&1; then
+  fail 'only the sweeper (and the owner) can call sweep_sessions'
+fi
+[ "$(sql kilo_lease_sweeper "$SWEEPER_PW" -c 'select kilo_lease.sweep_sessions()')" = 0 ] ||
+  fail 'the sweep on the primary ends nothing while no ended lease has a session there'
+keep_alive 'after the sweeper tried to end one directly'
+pass 'the sweeper login can end no session directly, call no other kilo_lease function, read no table; on the primary its sweep ends nothing live'
+revoke_replica "$LIVE"
+revoke_migration "$LIVE_CM"
+replica_super -c "select pg_terminate_backend(pid) from pg_stat_activity where backend_type = 'client backend' and pid <> pg_backend_pid()" >/dev/null
 
 echo 'ALL PASS'

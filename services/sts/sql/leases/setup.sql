@@ -8,7 +8,8 @@
 --
 -- The password goes into the Infisical dynamic secret once, by hand, and nowhere else. Roles are
 -- created on the primary; a replica receives them through replication. `ci-migration` needs
--- setup-ci-migration.sql afterwards, which only a superuser can run.
+-- setup-ci-migration.sql afterwards, which only a superuser can run. `replica-read` also needs
+-- setup-replica-sweeper.sql right after this file (before setup-ci-migration.sql).
 
 \if :{?replica_admin_password}
 \else
@@ -175,7 +176,8 @@ $$;
 -- pg_signal_backend there). Returns the number of sessions signalled; they exit right after. It
 -- drops the transaction's activity snapshot first, so a second call in the same revocation sees
 -- the logins that landed since the first, and it forgets the rows of roles that are gone with no
--- session left.
+-- session left. setup-replica-sweeper.sql replaces it with one that keeps such a row 7 days, so a
+-- replica's sweep still knows the dropped role was a lease.
 CREATE FUNCTION kilo_lease.end_sessions(username text) RETURNS integer
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
   SELECT pg_catalog.pg_stat_clear_snapshot();

@@ -1,6 +1,6 @@
--- The `ci-migration` part of the lease setup (README "Database leases"), after setup.sql; Igor
--- accepted design decision Q64 on 2026-11-26. It must run as a superuser, on the primary's direct
--- endpoint:
+-- The `ci-migration` part of the lease setup (README "Database leases"), after setup.sql and
+-- setup-replica-sweeper.sql; Igor accepted design decision Q64 on 2026-11-26. It must run as a
+-- superuser, on the primary's direct endpoint:
 --
 --   psql "<primary direct URL>" -v ON_ERROR_STOP=1 \
 --     -v migration_admin_password="<generated>" -f services/sts/sql/leases/setup-ci-migration.sql
@@ -88,5 +88,6 @@ ALTER FUNCTION kilo_lease.end_sessions(text) OWNER TO kilo_lease_owner;
 ALTER FUNCTION kilo_lease.create_lease(text, text, timestamptz) OWNER TO kilo_lease_owner;
 ALTER FUNCTION kilo_lease.block_lease(text) OWNER TO kilo_lease_owner;
 ALTER FUNCTION kilo_lease.revoke_lease(text) OWNER TO kilo_lease_owner;
+ALTER FUNCTION kilo_lease.sweep_sessions() OWNER TO kilo_lease_owner;
 
 COMMIT;

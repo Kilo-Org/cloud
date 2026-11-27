@@ -578,7 +578,7 @@ describe('response classes', () => {
   });
 
   describe('WEB_INTERNAL_AUTH=sts', () => {
-    // Every config sets `legacy`, so the generated `Env` types the flag as that literal.
+    // No config sets `sts`, so the generated `Env` types the flag as `legacy` alone.
     type StsEnv = Omit<Env, 'WEB_INTERNAL_AUTH'> & {
       WEB_INTERNAL_AUTH?: string;
       STS?: { mintTokens(request: unknown): Promise<unknown> };

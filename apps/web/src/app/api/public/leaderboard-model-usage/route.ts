@@ -8,7 +8,6 @@ import {
 } from '@/lib/leaderboard-model';
 import { createPublicReport, publicReportOptions } from '@/lib/public-report';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 type ModelUsageRow = {
   usage_date: string;
@@ -87,7 +86,6 @@ async function aggregateModelUsage(rows: ModelUsageRow[]): Promise<ModelUsage[]>
 }
 
 export const GET = createPublicReport({
-  cacheKey: LEADERBOARD_MODEL_USAGE_REDIS_KEY,
   errorMessage: 'Failed to fetch leaderboard model usage',
   load: async () => {
     const { rows } = await readDb.execute<ModelUsageRow>(LEADERBOARD_MODEL_USAGE_QUERY);

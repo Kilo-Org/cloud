@@ -14,13 +14,17 @@ const CORS_HEADERS = {
 };
 
 // Single source of truth for every cache layer in front of the data source: the
-// Vercel edge cache, the in-process cache, and the Redis cache all expire after
-// one hour so the data served stays consistent across layers.
+// Vercel edge cache, the in-process cache, and the optional Redis cache all
+// expire after one hour so the data served stays consistent across layers.
 const CACHE_TTL_SECONDS = 3600;
 const IN_MEMORY_CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
 type PublicReportOptions<Usage> = {
-  cacheKey: RedisKey;
+  /**
+   * Shares the report across instances through Redis. Only worth it for a slow
+   * or costly source; a cheap one relies on the edge and in-process caches.
+   */
+  cacheKey?: RedisKey;
   errorMessage: string;
   /** Loads the report from its source. Throws when the source fails. */
   load: () => Promise<Usage>;
@@ -40,33 +44,38 @@ function successResponse<Usage>(usage: Usage): NextResponse {
 }
 
 /**
- * Read the report from Redis, falling back to the source on a miss and
- * repopulating Redis. Throws on source failure so the in-process cache keeps
- * serving the last-known-good value (or `null` when nothing has been cached).
+ * Load the report, through Redis when the report has a `cacheKey`. Throws on
+ * source failure so the in-process cache keeps serving the last-known-good
+ * value (or `null` when nothing has been cached).
  */
 async function fetchReport<Usage>(options: PublicReportOptions<Usage>): Promise<Usage> {
-  try {
-    const cached = await redisClient.get<string>(options.cacheKey);
-    if (cached !== null) {
-      return options.schema.parse(JSON.parse(cached));
+  const { cacheKey } = options;
+  if (cacheKey) {
+    try {
+      const cached = await redisClient.get<string>(cacheKey);
+      if (cached !== null) {
+        return options.schema.parse(JSON.parse(cached));
+      }
+    } catch (error) {
+      captureException(error, {
+        tags: { source: options.source, operation: 'redis-read' },
+      });
     }
-  } catch (error) {
-    captureException(error, {
-      tags: { source: options.source, operation: 'redis-read' },
-    });
   }
 
   try {
     const usage = options.schema.parse(await options.load());
 
-    try {
-      await redisClient.set(options.cacheKey, JSON.stringify(usage), {
-        ex: CACHE_TTL_SECONDS,
-      });
-    } catch (error) {
-      captureException(error, {
-        tags: { source: options.source, operation: 'redis-write' },
-      });
+    if (cacheKey) {
+      try {
+        await redisClient.set(cacheKey, JSON.stringify(usage), {
+          ex: CACHE_TTL_SECONDS,
+        });
+      } catch (error) {
+        captureException(error, {
+          tags: { source: options.source, operation: 'redis-write' },
+        });
+      }
     }
 
     return usage;
@@ -81,9 +90,9 @@ async function fetchReport<Usage>(options: PublicReportOptions<Usage>): Promise<
 /**
  * Builds a cached GET handler for a public report.
  *
- * Caching cascades through three layers, all expiring after one hour: the
- * Vercel edge cache (`s-maxage`), an in-process `createCachedFetch` so warm
- * instances avoid Redis entirely, and the Redis cache in front of the source.
+ * Caching cascades through up to three layers, all expiring after one hour:
+ * the Vercel edge cache (`s-maxage`), an in-process `createCachedFetch` so warm
+ * instances skip the load, and, with a `cacheKey`, Redis in front of the source.
  * The in-process cache is created once per report (module scope) and stores
  * pure data, so it is safe to share across requests.
  */

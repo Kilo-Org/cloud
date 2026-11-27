@@ -69,6 +69,8 @@ describe('GET /api/public/leaderboard-model-usage', () => {
       { usageDate: utcDaysAgo(1), model: 'model', mode: 'code', tokens: 15 },
       { usageDate: utcDaysAgo(7), model: 'model', mode: 'code', tokens: 20 },
     ]);
+    expect(redisClient.get).not.toHaveBeenCalled();
+    expect(redisClient.set).not.toHaveBeenCalled();
   });
 
   test('classifies modes without treating the KiloClaw feature as a mode', async () => {
@@ -91,24 +93,6 @@ describe('GET /api/public/leaderboard-model-usage', () => {
       { usageDate: yesterday, model: 'model', mode: 'ask', tokens: 400 },
       { usageDate: yesterday, model: 'model', mode: 'debug', tokens: 300 },
       { usageDate: yesterday, model: 'model', mode: null, tokens: 200 },
-    ]);
-  });
-
-  test('refreshes cached rows containing the retired kiloclaw mode', async () => {
-    jest
-      .mocked(redisClient.get)
-      .mockResolvedValueOnce(
-        JSON.stringify([
-          { usageDate: yesterday, model: 'acme/model', mode: 'kiloclaw', tokens: 12_000_000 },
-        ])
-      );
-    await insertLeaderboardUsage([{ mode: null, input_tokens: 12_000_000, output_tokens: 0 }]);
-
-    const response = await GET();
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual([
-      { usageDate: yesterday, model: 'model', mode: null, tokens: 12_000_000 },
     ]);
   });
 

@@ -95,6 +95,8 @@ describe('GET /api/public/leaderboard-model-provider-usage', () => {
         percentageOfModel: 100,
       },
     ]);
+    expect(redisClient.get).not.toHaveBeenCalled();
+    expect(redisClient.set).not.toHaveBeenCalled();
   });
 
   test('keeps Claude Platform on AWS separate from Amazon Bedrock for the same model', async () => {

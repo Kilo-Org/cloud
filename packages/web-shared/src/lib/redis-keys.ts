@@ -41,10 +41,6 @@ export const byokDataKeyRedisKey = (digest: string) => redisKey(`byok-data-key:v
 export const partnerUpstreamErrorRedisKey = (digest: string) =>
   redisKey(`partner-upstream-error:v1:${digest}`);
 
-export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
-  'public-api:leaderboard-model-provider-usage'
-);
-export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
 /** Enkrypt guardrail calls started in one minute; `minute` counts minutes since the Unix epoch. */

@@ -9,7 +9,6 @@ import {
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import { createPublicReport, publicReportOptions } from '@/lib/public-report';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 const MINIMUM_TOKENS = 10_000_000;
 const MAXIMUM_ERROR_RATE = 0.5;
@@ -161,7 +160,6 @@ async function aggregateUsage(rows: ModelProviderUsageRow[]): Promise<ModelProvi
 }
 
 export const GET = createPublicReport({
-  cacheKey: LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY,
   errorMessage: 'Failed to fetch leaderboard model provider usage',
   load: async () => {
     const { rows } = await readDb.execute<ModelProviderUsageRow>(

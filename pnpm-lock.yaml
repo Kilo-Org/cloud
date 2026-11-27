@@ -2814,6 +2814,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../../packages/service-token-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

@@ -7,8 +7,16 @@ import {
   deriveAttachmentService,
 } from '../utils/attachment-download.js';
 import type { WrapperBootstrapAttachment } from '../shared/wrapper-bootstrap.js';
+import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from '../secrets.js';
 
-type R2AttachmentDownloadEnv = {
+type R2AttachmentDownloadEnv = CloudAgentNextSecretsEnv & {
+  R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
+  R2_ENDPOINT?: string;
+  R2_ATTACHMENTS_BUCKET?: string;
+};
+
+/** The four values the download client needs, with the secret resolved by the reader. */
+type R2AttachmentDownloadConfig = {
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
   R2_ENDPOINT?: string;
@@ -59,25 +67,25 @@ export const PROMPT_MIME_BY_EXTENSION: Record<string, string> = {
 
 export const PROMPT_MIME_FALLBACK = 'application/octet-stream';
 
-export function assertR2AttachmentDownloadConfigured<T extends R2AttachmentDownloadEnv>(
-  env: T
-): asserts env is T & {
+export function assertR2AttachmentDownloadConfigured<T extends R2AttachmentDownloadConfig>(
+  config: T
+): asserts config is T & {
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID: string;
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: string;
   R2_ENDPOINT: string;
   R2_ATTACHMENTS_BUCKET: string;
 } {
   if (
-    !env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID ||
-    !env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY ||
-    !env.R2_ENDPOINT ||
-    !env.R2_ATTACHMENTS_BUCKET
+    !config.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID ||
+    !config.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY ||
+    !config.R2_ENDPOINT ||
+    !config.R2_ATTACHMENTS_BUCKET
   ) {
     logger.warn('Attachments requested but R2 download config is incomplete', {
-      hasAccessKeyId: Boolean(env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID),
-      hasSecretAccessKey: Boolean(env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY),
-      hasEndpoint: Boolean(env.R2_ENDPOINT),
-      hasBucket: Boolean(env.R2_ATTACHMENTS_BUCKET),
+      hasAccessKeyId: Boolean(config.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID),
+      hasSecretAccessKey: Boolean(config.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY),
+      hasEndpoint: Boolean(config.R2_ENDPOINT),
+      hasBucket: Boolean(config.R2_ATTACHMENTS_BUCKET),
     });
     throw ExecutionError.workspaceSetupFailed(
       'Attachments were requested, but R2 attachment download is not configured'
@@ -100,16 +108,22 @@ export async function buildSignedPromptAttachments({
 }): Promise<WrapperBootstrapAttachment[]> {
   if (!attachments) return [];
 
-  assertR2AttachmentDownloadConfigured(env);
+  // A missing or unreadable secret keeps the existing fail-closed configuration error.
+  const secretAccessKey = await readCloudAgentNextSecret(
+    env,
+    'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY'
+  ).catch(() => undefined);
+  const config = { ...env, R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: secretAccessKey };
+  assertR2AttachmentDownloadConfigured(config);
 
   const r2Client = createR2Client({
-    accessKeyId: env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID,
-    secretAccessKey: env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY,
-    endpoint: env.R2_ENDPOINT,
+    accessKeyId: config.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID,
+    secretAccessKey: config.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY,
+    endpoint: config.R2_ENDPOINT,
   });
   const presignedAttachments = await buildPresignedAttachments(
     r2Client,
-    env.R2_ATTACHMENTS_BUCKET,
+    config.R2_ATTACHMENTS_BUCKET,
     sessionId,
     userId,
     deriveAttachmentService(createdOnPlatform),

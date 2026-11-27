@@ -8,13 +8,9 @@ import { appRouter } from './router.js';
 import type { Env, TRPCContext } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
-import {
-  resolveSecret,
-  validateStreamTicket,
-  STREAM_TICKET_AUDIENCE,
-  TERMINAL_TICKET_AUDIENCE,
-} from './auth.js';
+import { validateStreamTicket, STREAM_TICKET_AUDIENCE, TERMINAL_TICKET_AUDIENCE } from './auth.js';
 import { validateKiloToken } from './validate-kilo-token.js';
+import { readCloudAgentNextSecret } from './secrets.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createNotFoundHandler } from '@kilocode/worker-utils';
 import { createWorkerErrorHandler } from './error-handler.js';
@@ -189,7 +185,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Missing ticket', { status: 401 });
   }
 
-  const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
   const ticketResult = validateStreamTicket(ticket, nextAuthSecret, TERMINAL_TICKET_AUDIENCE);
   if (!ticketResult.success) {
     logger
@@ -310,12 +306,15 @@ app.get('/health', (c: Context<HonoContext>) => {
 // nor an upstream authority. Register before the broad facade routes.
 app.all('/api/runtime-credential-proxy/:route/*', routeRuntimeCredentialProxy);
 
-function requireInternalApi(c: Context<HonoContext>): Response | null {
-  if (!c.env.INTERNAL_API_SECRET) {
+async function requireInternalApi(c: Context<HonoContext>): Promise<Response | null> {
+  const expected = await readCloudAgentNextSecret(c.env, 'INTERNAL_API_SECRET').catch(
+    () => undefined
+  );
+  if (!expected) {
     return c.text('Internal API secret not configured', 500);
   }
   const internalApiKey = c.req.header('x-internal-api-key');
-  if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
+  if (!internalApiKey || !timingSafeEqual(internalApiKey, expected)) {
     return c.text('Invalid or missing internal API key', 401);
   }
   return null;
@@ -328,7 +327,7 @@ registerStartupFailureRoute(app);
 registerEnvironmentBuildRoutes(app);
 
 app.get('/internal/code-review/billing/:type/:id', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
   const subject = billingSubjectSchema.safeParse({
     type: c.req.param('type'),
@@ -343,7 +342,7 @@ app.get('/internal/code-review/billing/:type/:id', async (c: Context<HonoContext
 });
 
 app.get('/internal/containers/billing/:type/:id/:instance', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
   const subject = billingSubjectSchema.safeParse({
     type: c.req.param('type'),
@@ -359,8 +358,8 @@ app.get('/internal/containers/billing/:type/:id/:instance', async (c: Context<Ho
   return c.json({ billingMode }, 200, { 'Cache-Control': 'no-store' });
 });
 
-app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+app.get('/internal/byoc/vercel-enrollment/:organizationId', async (c: Context<HonoContext>) => {
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   const organizationId = z.uuid().safeParse(c.req.param('organizationId'));
@@ -371,8 +370,8 @@ app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoCont
   });
 });
 
-app.get('/internal/byoc/vercel-enrollment/user/:userId', (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+app.get('/internal/byoc/vercel-enrollment/user/:userId', async (c: Context<HonoContext>) => {
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   const userId = z.string().min(1).safeParse(c.req.param('userId'));
@@ -384,7 +383,7 @@ app.get('/internal/byoc/vercel-enrollment/user/:userId', (c: Context<HonoContext
 });
 
 app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   try {
@@ -395,7 +394,7 @@ app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>
 });
 
 app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   const input = SnapshotBuildStartInputSchema.safeParse(await c.req.json().catch(() => null));
@@ -417,7 +416,7 @@ app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoCon
 });
 
 app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   const input = SnapshotBuildCleanupInputSchema.safeParse(await c.req.json().catch(() => null));
@@ -718,10 +717,7 @@ async function forwardRuntimeCredentialProxy(
   try {
     // The route allowlist is resolved above before a proof is issued.
     const proof = await issueRuntimeProxyAttestation({
-      secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
-        if (!value) throw new Error('Authentication unavailable');
-        return value;
-      }),
+      secret: await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET'),
       audience: destination,
       bearer: credential.token,
       ...credential.runtimeAuthorization,
@@ -785,7 +781,7 @@ async function routeToUserKiloFacade(
 }
 
 async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET').catch(() => null);
   const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, {
     secret: nextAuthSecret,
     connectionString: c.env.HYPERDRIVE.connectionString,
@@ -826,7 +822,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Missing ticket', 401);
   }
 
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET').catch(() => null);
   const ticketResult = validateStreamTicket(ticket, nextAuthSecret, STREAM_TICKET_AUDIENCE);
   if (!ticketResult.success) {
     logger
@@ -896,7 +892,7 @@ app.get('/terminal', async (c: Context<HonoContext>) => {
 const ORG_STREAM_CLOSE_CONCURRENCY = 8;
 
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   const body = (await c.req.json().catch(() => null)) as {
@@ -965,7 +961,7 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
 // carries a one-way binding plus the pending request's command as one trimmed
 // line, never the raw permission or any mutation authority.
 app.post('/internal/widgets/approval-key', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
+  const unauthorized = await requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
   const parsed = widgetApprovalKeyRequestSchema.safeParse(await c.req.json().catch(() => null));

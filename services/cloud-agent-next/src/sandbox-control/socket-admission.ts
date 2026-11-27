@@ -1,4 +1,4 @@
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from '../secrets.js';
 import type { Env } from '../types.js';
 import { parseSandboxLaunchBearer, verifySandboxLaunchCredential } from './credential.js';
 import { getSandboxControlStub, isSandboxControlId } from './stub.js';
@@ -24,7 +24,7 @@ export type WrapperLaunchVerdict =
  */
 export async function verifyWrapperLaunch(
   request: Request,
-  env: Pick<Env, 'NEXTAUTH_SECRET'>,
+  env: CloudAgentNextSecretsEnv,
   sandboxId: string
 ): Promise<WrapperLaunchVerdict> {
   if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
@@ -38,7 +38,7 @@ export async function verifyWrapperLaunch(
     const refusal = new Response('Invalid or missing Authorization header', { status: 401 });
     return { ok: false, refusal };
   }
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret) {
     return { ok: false, refusal: new Response('Authentication unavailable', { status: 503 }) };
   }

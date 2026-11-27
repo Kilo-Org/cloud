@@ -15,6 +15,7 @@ import {
 import { z } from 'zod';
 import { byocOwnerKey, byocOwnerSchema, type ByocOwner, type ByocSource } from './owner.js';
 import type { Env } from '../types.js';
+import { readCloudAgentNextSecret, readCloudAgentNextStoreSecret } from '../secrets.js';
 import { createMicrovmClient } from '../agent-sandbox/aws/microvm-client.js';
 import { createAwsObjectStore } from '../agent-sandbox/aws/object-store.js';
 import type { AwsRuntimeAccess } from '../sandbox-control/aws-provider.js';
@@ -64,7 +65,7 @@ export async function fetchAwsByocConnection(env: Env, owner: ByocOwner, credent
   let response: Response;
   let secret: string;
   try {
-    secret = await env.INTERNAL_API_SECRET_PROD.get();
+    secret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET');
     if (!secret) throw new Error('missing internal authentication');
   } catch {
     throw lookupFailure('internal_auth');
@@ -101,7 +102,11 @@ export async function resolveAwsByocConfiguration(
   source: ByocSource
 ): Promise<AwsByocConfiguration> {
   const connection = await fetchAwsByocConnection(env, source, source.credentialId);
-  if (connection.setupStatus !== 'ready' || !env.AGENT_ENV_VARS_PRIVATE_KEY)
+  // A missing key stays optional here; the caller maps it to the same not-ready error.
+  const privateKey = await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
+    () => undefined
+  );
+  if (connection.setupStatus !== 'ready' || !privateKey)
     throw new ByocAwsProviderError('byoc_aws_not_ready');
   let configuration: AwsByocConfiguration;
   try {
@@ -109,7 +114,7 @@ export async function resolveAwsByocConfiguration(
       JSON.stringify(connection.credentialsEncrypted),
       AWS_BYOC_ENVELOPE_SCHEME,
       {
-        active: { keyId: AWS_BYOC_ENVELOPE_KEY_ID, privateKeyPem: env.AGENT_ENV_VARS_PRIVATE_KEY },
+        active: { keyId: AWS_BYOC_ENVELOPE_KEY_ID, privateKeyPem: privateKey },
       },
       `byoc-aws-configuration:v1:${byocOwnerKey(source)}:${source.credentialId}`
     );

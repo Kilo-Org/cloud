@@ -8,7 +8,7 @@ import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
-import { resolveSecret } from './auth.js';
+import { readCloudAgentNextSecret } from './secrets.js';
 
 const MIN_BALANCE_DOLLARS = 1;
 
@@ -64,7 +64,7 @@ export async function validateBalanceOnly(
   const balancePath = isControlToken ? '/api/cloud-agent-next/balance' : '/api/profile/balance';
   if (claims !== null && typeof claims === 'object' && claims.runtimeAuthorization !== undefined) {
     try {
-      const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+      const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
       if (!secret) throw new Error();
       const verified = await verifyKiloTokenForPolicy(token, secret, {
         audience: 'kilo-api',

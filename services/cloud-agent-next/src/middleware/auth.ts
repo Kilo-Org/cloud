@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
 import type { HonoContext } from '../hono-context.js';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import { validateKiloToken } from '../validate-kilo-token.js';
 import { logger } from '../logger.js';
 import { buildTrpcErrorResponse } from '../trpc-error.js';
@@ -11,7 +11,9 @@ import { isCloudAgentManagementPath } from '../cloud-agent-child-management.js';
 export const authMiddleware = createMiddleware<HonoContext>(
   async (c: Context<HonoContext>, next: Next) => {
     const authHeader = c.req.header('authorization');
-    const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+    const nextAuthSecret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET').catch(
+      () => null
+    );
     const pathname = new URL(c.req.url).pathname;
     const procedureName = extractProcedureName(pathname);
     const cloudAgentAuthorityAllowed =

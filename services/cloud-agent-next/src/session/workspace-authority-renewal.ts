@@ -4,7 +4,7 @@ import {
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import { logger } from '../logger.js';
 import type { Env } from '../types.js';
@@ -54,7 +54,7 @@ export async function renewWorkspaceAuthorityForUserSend(input: {
     const status = await withDORetry(stub, workspace => workspace.describe(), 'describe');
     if (status.state !== 'expired' || status.authorizationId === null) return;
     const expectedAuthorizationId = status.authorizationId;
-    const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+    const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
     if (!secret) return;
     const created = await createRuntimeAuthorization({
       token: authToken,

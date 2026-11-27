@@ -35,7 +35,7 @@ import {
   RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
@@ -191,7 +191,7 @@ async function preflightChatRuntimeAuthorization(
   const expectedOldId = state.id;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, cloudAgentSessionId);
   if (!metadata || metadata.identity.userId !== ctx.userId) return state.workspaceSessionId;
-  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(ctx.env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret)
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
   const created = await createRuntimeAuthorization({

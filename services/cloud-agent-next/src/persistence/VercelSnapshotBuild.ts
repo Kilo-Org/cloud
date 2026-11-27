@@ -46,7 +46,7 @@ import {
 import { buildControlWrapperLaunchEnv } from '../sandbox-control/wrapper-launch-env.js';
 import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
 import {
   VERCEL_BASE_INSTALL_COMMAND,
@@ -764,7 +764,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         const credentialHash = await this.external(state, () => hashSandboxCredential(credential));
         const allocationId = state.build_generation;
         const signingSecret = await this.external(state, () =>
-          resolveSecret(this.env.NEXTAUTH_SECRET)
+          readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null)
         );
         if (!signingSecret) throw new Error('provider_configuration_failed');
         const launchCredential = mintSandboxLaunchCredential(

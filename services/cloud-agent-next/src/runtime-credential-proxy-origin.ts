@@ -3,7 +3,7 @@ import {
   CLOUD_AGENT_SESSION_SYNC_ORIGIN,
   RUNTIME_PROXY_ORIGIN_HEADER,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
-import { resolveSecret, type SecretBinding } from './auth.js';
+import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
 import { logger } from './logger.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 
@@ -29,7 +29,7 @@ export function parseRuntimeProxyOriginProof(value: unknown): string | undefined
   return typeof value === 'string' && PROOF_PATTERN.test(value) ? value : undefined;
 }
 
-type OriginEnv = { NEXTAUTH_SECRET?: SecretBinding };
+type OriginEnv = CloudAgentNextSecretsEnv;
 
 /**
  * The proof for one sandbox egress: a keyed MAC over its outbound id (the
@@ -40,12 +40,14 @@ export async function runtimeProxyOriginProof(
   env: OriginEnv,
   outboundId: string
 ): Promise<string | null> {
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret) {
     // Egress then sends no proof; make that visible before readers require it.
-    const reason = env.NEXTAUTH_SECRET ? 'secret_unavailable' : 'secret_not_configured';
     logger
-      .withFields({ logTag: 'runtime_proxy_origin_proof_unavailable', reason })
+      .withFields({
+        logTag: 'runtime_proxy_origin_proof_unavailable',
+        reason: 'secret_unavailable',
+      })
       .warn('Runtime proxy origin proof unavailable');
     return null;
   }

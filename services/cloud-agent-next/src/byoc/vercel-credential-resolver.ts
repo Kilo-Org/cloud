@@ -16,6 +16,7 @@ import type {
   VercelComputeSetupStep,
 } from '@kilocode/db/schema-types';
 import type { Env } from '../types.js';
+import { readCloudAgentNextSecret, readCloudAgentNextStoreSecret } from '../secrets.js';
 import { z } from 'zod';
 
 const BYOC_VERCEL_ENVELOPE_SCHEME =
@@ -182,7 +183,7 @@ function ownerMatches(left: ByocVercelOwner, right: ByocVercelOwner): boolean {
 
 async function internalSecret(env: Env): Promise<string> {
   try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
+    const secret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET');
     if (secret) return secret;
   } catch {
     // Convert secret-store failures into the same safe resolver error.
@@ -377,20 +378,24 @@ export async function resolveByocVercelAccessConfig(
   return decryptCredentialRuntimeConfig(env, credential);
 }
 
-function decryptCredentialRuntimeConfig(
+async function decryptCredentialRuntimeConfig(
   env: Env,
   credential: ByocVercelCredential
-): VercelSandboxRuntimeConfig {
+): Promise<VercelSandboxRuntimeConfig> {
   if (!credential.runtimeBuildId) throw new ByocCredentialResolverError();
 
   const defaults = parseVercelSandboxRuntimeDefaults(env);
-  if (!defaults || !env.AGENT_ENV_VARS_PRIVATE_KEY) {
+  // A missing key stays a resolver error, as before.
+  const privateKey = await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
+    () => undefined
+  );
+  if (!defaults || !privateKey) {
     throw new ByocCredentialResolverError();
   }
 
   return {
     ...defaults,
-    accessToken: decryptCredentialAccessToken(env, credential),
+    accessToken: decryptCredentialAccessToken(credential, privateKey),
     teamId: credential.teamId,
     scope: credential.tokenScope,
     projectId: credential.projectId,
@@ -399,8 +404,10 @@ function decryptCredentialRuntimeConfig(
   };
 }
 
-function decryptCredentialAccessToken(env: Env, credential: ByocVercelCredential): string {
-  if (!env.AGENT_ENV_VARS_PRIVATE_KEY) throw new ByocCredentialResolverError();
+function decryptCredentialAccessToken(
+  credential: ByocVercelCredential,
+  privateKey: string
+): string {
   try {
     const accessToken = decryptKeyedEnvelope(
       JSON.stringify(credential.tokenEncrypted),
@@ -408,7 +415,7 @@ function decryptCredentialAccessToken(env: Env, credential: ByocVercelCredential
       {
         active: {
           keyId: BYOC_VERCEL_ENVELOPE_KEY_ID,
-          privateKeyPem: env.AGENT_ENV_VARS_PRIVATE_KEY,
+          privateKeyPem: privateKey,
         },
       },
       `byoc-vercel-credential:v1:${ownerAadKey(credential)}:${credential.credentialId}`

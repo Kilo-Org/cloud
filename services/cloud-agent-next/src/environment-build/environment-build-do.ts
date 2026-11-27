@@ -8,7 +8,7 @@ import {
   readEnvironmentReference,
   type EnvironmentReference,
 } from '@kilocode/cloud-agent-profile';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../utils/encryption.js';
@@ -108,7 +108,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
     const env = this.env;
     const storage = this.ctx.storage;
     const signingSecret = async (): Promise<string> => {
-      const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+      const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
       if (!secret) throw new Error('Environment build signing secret is unavailable');
       return secret;
     };
@@ -165,8 +165,12 @@ export class EnvironmentBuild extends DurableObject<Env> {
         const secret = await signingSecret();
         return timingSafeEqual(await deriveRunnerCredential(secret, claims), credential);
       },
-      decryptSecrets: encrypted =>
-        mergeEnvVarsWithSecrets({}, encrypted as EncryptedSecrets, env.AGENT_ENV_VARS_PRIVATE_KEY),
+      decryptSecrets: async encrypted =>
+        mergeEnvVarsWithSecrets(
+          {},
+          encrypted as EncryptedSecrets,
+          await readCloudAgentNextSecret(env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(() => undefined)
+        ),
       billingInput: ({ owner, actorUserId, sandboxId: billingSandboxId, buildId }) => {
         return {
           sandboxId: billingSandboxId as never,

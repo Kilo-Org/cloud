@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { resolveSecret } from './auth.js';
+import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -20,7 +20,6 @@ import {
   logRuntimeProxyRequestFailed,
   type RuntimeProxyRejectionStage,
 } from './runtime-credential-proxy-diagnostics.js';
-import type { Env } from './types.js';
 
 type Storage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -82,7 +81,7 @@ function upgradeLegacyGrantToV3(
  * can never lengthen the persisted lease.
  */
 export async function issuePersistedRuntimeProxyGrant(input: {
-  env: Pick<Env, 'NEXTAUTH_SECRET'>;
+  env: CloudAgentNextSecretsEnv;
   storage: Storage;
   metadata: SessionMetadata | null;
   authorization: RuntimeAuthorization | null;
@@ -150,7 +149,7 @@ export async function issuePersistedRuntimeProxyGrant(input: {
 }
 
 export async function resolvePersistedRuntimeProxyCredential(input: {
-  env: Pick<Env, 'NEXTAUTH_SECRET'>;
+  env: CloudAgentNextSecretsEnv;
   storage: Storage;
   handle: string;
   metadata: () => Promise<SessionMetadata | null>;
@@ -165,7 +164,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
 } | null> {
   const now = input.now ?? Date.now();
   // Resolve the signing secret before the fence: Secrets Store can yield to external I/O.
-  const secret = await resolveSecret(input.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(input.env, 'NEXTAUTH_SECRET').catch(() => null);
   const claims = verifyRuntimeCredentialProxyHandleWithSecret(secret, input.handle);
   if (!secret || !claims || !('sessionId' in claims)) {
     logRuntimeProxyRequestFailed({ upstreamAttempted: false, rejectionStage: 'handle' });

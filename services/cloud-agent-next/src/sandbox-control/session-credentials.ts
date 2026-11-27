@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import {
   getSandboxProvider,
   requiresContainmentSandbox,
@@ -1655,7 +1656,12 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
-  const payload = buildSessionAttachPayload(metadata, undefined, env.AGENT_ENV_VARS_PRIVATE_KEY);
+  // A missing key stays optional, as before; the attach payload then carries no decrypted values.
+  const agentEnvVarsPrivateKey = await readCloudAgentNextSecret(
+    env,
+    'AGENT_ENV_VARS_PRIVATE_KEY'
+  ).catch(() => undefined);
+  const payload = buildSessionAttachPayload(metadata, undefined, agentEnvVarsPrivateKey);
   return prepareCredentialGrant({
     env,
     source: credentialSourceFromMetadata(metadata),

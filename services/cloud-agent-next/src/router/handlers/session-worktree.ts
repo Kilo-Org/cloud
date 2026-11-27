@@ -69,7 +69,7 @@ import {
 } from '../../session/runtime-authorization-persistence.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 import {
   AgentVariantSchema,
   AttachmentsSchema,
@@ -635,7 +635,7 @@ type WorktreeRuntimeAuthorization = (DelegatedRuntimeTokens & { seal: string }) 
  * bindings.
  */
 async function requiresRuntimeAuthorization(ctx: TRPCContext): Promise<boolean> {
-  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(ctx.env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret) {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
   }
@@ -664,7 +664,7 @@ async function createDestinationRuntimeAuthorization(
 ): Promise<WorktreeRuntimeAuthorization> {
   if (!(await requiresRuntimeAuthorization(ctx))) return undefined;
 
-  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(ctx.env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret) {
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
   }

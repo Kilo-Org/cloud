@@ -61,6 +61,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
 import { logger } from '../../logger.js';
 import { NETWORK_SECRET_LIMITS } from '@kilocode/worker-utils/network-secrets';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 
 const WEB_ORIGIN = 'cloud-agent-web';
 
@@ -696,12 +697,16 @@ export async function preflightSessionCreation(
       createdOnPlatform: parentCreatedOnPlatform,
     };
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
+    const expectedInternalApiSecret = await readCloudAgentNextSecret(
+      ctx.env,
+      'INTERNAL_API_SECRET'
+    ).catch(() => undefined);
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
-      typeof ctx.env.INTERNAL_API_SECRET === 'string' &&
+      typeof expectedInternalApiSecret === 'string' &&
       internalApiKey !== undefined &&
       internalApiKey !== null &&
-      timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET);
+      timingSafeEqual(internalApiKey, expectedInternalApiSecret);
     if (!skipBalance) {
       const balance = await validateBalanceOnly(
         token,

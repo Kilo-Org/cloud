@@ -20,7 +20,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 import {
   CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
   WorkspaceAuthorityRecordSchema,
@@ -623,7 +623,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
   }
 
   private async secret(): Promise<string> {
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
     if (!secret) throw new Error('Authentication unavailable');
     return secret;
   }

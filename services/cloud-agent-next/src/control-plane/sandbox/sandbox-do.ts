@@ -90,7 +90,7 @@ import {
   SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 import {
   workspaceSessionIdForScope,
   type WorkspaceMcpBinding,
@@ -2545,7 +2545,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 ? { ok: true, isCurrent: () => true }
                 : { ok: false, status: 403, code: 'invalid_identity' },
           },
-          this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+          await readCloudAgentNextSecret(this.env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
+            () => undefined
+          ),
           [...(this.env.WORKER_URL ? [this.env.WORKER_URL] : []), CLOUD_AGENT_SESSION_SYNC_ORIGIN],
           input.url
         );
@@ -3011,7 +3013,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const token = parseSandboxLaunchBearer(request.headers.get('Authorization'));
     if (token === null)
       return new Response('Invalid or missing Authorization header', { status: 401 });
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').catch(() => null);
     if (!secret) return new Response('Authentication unavailable', { status: 503 });
     const launch = verifySandboxLaunchCredential(token, secret);
     return this.enqueue(async () => {
@@ -4904,13 +4906,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * sending a frame the wrapper would drop while the route waits out its
    * preparation timeout.
    */
-  private materializeRouteMcp(route: RouteRecord): ControlPlaneRouteSpec['mcp'] {
+  private materializeRouteMcp(
+    route: RouteRecord,
+    privateKey: string | undefined
+  ): ControlPlaneRouteSpec['mcp'] {
     const encrypted = route.credentialSource?.mcpServers;
     if (encrypted === undefined || Object.keys(encrypted).length === 0) return undefined;
     const servers = z.record(z.string().min(1).max(100), MCPServerConfigSchema).parse(encrypted);
     let materialized: Record<string, CliMcpServer>;
     try {
-      materialized = materializeMcpServers(servers, this.env.AGENT_ENV_VARS_PRIVATE_KEY);
+      materialized = materializeMcpServers(servers, privateKey);
     } catch (error) {
       if (error instanceof McpConfigurationError) {
         throw new McpAttachValidationError(
@@ -4973,7 +4978,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
-  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
+  private materializePrepareFrame(
+    route: RouteRecord,
+    socket: WebSocket,
+    privateKey: string | undefined
+  ): MaterializedPrepareFrame {
     if (
       route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
       !this.wrapperInstallsSkillsSh(socket)
@@ -5010,7 +5019,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const frameEnv = buildFrameEnv({
         specEnv: route.spec.env,
         encryptedSecrets,
-        privateKey: this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        privateKey,
       });
       // Fail closed only when a secret value would actually reach the frame and
       // the wrapper cannot redact it by name; a snapshot whose keys are all
@@ -5034,7 +5043,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
       });
       if (!this.wrapperAcceptsWorkspaceConfiguration(socket)) {
-        const mcp = this.materializeRouteMcp(route);
+        const mcp = this.materializeRouteMcp(route, privateKey);
         return {
           type: 'session.prepare',
           spec: controlPlaneRouteSpecSchema.parse({
@@ -5047,7 +5056,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return {
         type: 'session.attach',
         spec: attachmentSpecFromRouteSpec(frameSpec),
-        workspace: workspaceConfigFromSpec(frameSpec, this.materializeRouteMcp(route)),
+        workspace: workspaceConfigFromSpec(frameSpec, this.materializeRouteMcp(route, privateKey)),
       };
     } catch (error) {
       if (error instanceof PrepareFrameMaterializationError) throw error;
@@ -5306,9 +5315,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
     }
     const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(latest);
+    const privateKey = await readCloudAgentNextSecret(this.env, 'AGENT_ENV_VARS_PRIVATE_KEY').catch(
+      () => undefined
+    );
     let frame: MaterializedPrepareFrame;
     try {
-      frame = this.materializePrepareFrame(latest, socket);
+      frame = this.materializePrepareFrame(latest, socket, privateKey);
     } catch (error) {
       this.logPrepareFrameMaterializationFailure(latest, error);
       await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
@@ -7680,7 +7692,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         return;
       case 'transfer.grant':
         if (current && attachment.transferGrants === true)
-          void resolveSecret(this.env.NEXTAUTH_SECRET).then(
+          void readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET').then(
             signingSecret =>
               serveTransferGrant({
                 frame,
@@ -7810,7 +7822,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     provider: AgentSandboxProvider
   ): Promise<Record<string, string>> {
     const signingSecret = await withTimeout(
-      resolveSecret(this.env.NEXTAUTH_SECRET),
+      readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET'),
       1_000,
       'Wrapper launch signing secret lookup timed out'
     ).catch(() => null);

@@ -26,6 +26,7 @@ import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { authMiddleware } from '../middleware/auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import type { HonoContext } from '../hono-context.js';
 import { handleAllocationInspect } from './allocation.js';
 import {
@@ -66,7 +67,9 @@ export const e2eSurfaceSecretMiddleware = createMiddleware<HonoContext>(
       await next();
       return;
     }
-    const expected = c.env.INTERNAL_API_SECRET;
+    const expected = await readCloudAgentNextSecret(c.env, 'INTERNAL_API_SECRET').catch(
+      () => undefined
+    );
     const presented = c.req.header(INTERNAL_API_KEY_HEADER);
     if (!expected || !presented || !timingSafeEqual(presented, expected)) {
       return new Response('Unauthorized', { status: 401 });

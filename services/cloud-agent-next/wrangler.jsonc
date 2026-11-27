@@ -19,6 +19,8 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,
@@ -87,6 +89,10 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
+    // Where every runtime secret read goes: `env` (the Worker secret and Secrets Store binding
+    // below) or `sts` (the bundle over the `STS` binding). An absent value means `env`; any other
+    // value refuses every read. The `sts` source never falls back to the legacy binding.
+    "SECRETS_SOURCE": "env",
   },
   "placement": { "mode": "smart" },
   "ai": { "binding": "AI" },
@@ -135,6 +141,15 @@
       "binding": "CONTAINER_USAGE_METER",
       "service": "container-usage-meter",
       "entrypoint": "ContainerUsageMeter",
+    },
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // cloud-agent-next.yaml grants the names. Nothing reads it while SECRETS_SOURCE is `env`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloud-agent-next" },
     },
   ],
   "secrets_store_secrets": [
@@ -375,6 +390,9 @@
       "routes": [],
       "workers_dev": false,
       "preview_urls": false,
+      // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+      // (services/sts/test/repo/worker-configs.ts).
+      "observability": { "traces": { "enabled": false } },
       "triggers": {
         "crons": [],
       },
@@ -437,7 +455,10 @@
         {
           "binding": "INTERNAL_API_SECRET_PROD",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "INTERNAL_API_SECRET_PROD",
+          // A config that binds STS may not read a production-named store secret from a
+          // non-production block (services/sts/test/repo/worker-configs.ts), and this block
+          // points every base URL at localhost. The store already holds the development copy.
+          "secret_name": "INTERNAL_API_SECRET_DEV",
         },
       ],
       "r2_buckets": [

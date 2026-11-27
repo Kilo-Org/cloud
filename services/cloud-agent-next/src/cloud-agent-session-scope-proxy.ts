@@ -11,8 +11,9 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
+import { readCloudAgentNextStoreSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
 
-type ScopeProxyEnv = Pick<Cloudflare.Env, 'INTERNAL_API_SECRET_PROD' | 'SESSION_INGEST'>;
+type ScopeProxyEnv = Pick<Cloudflare.Env, 'SESSION_INGEST'> & CloudAgentNextSecretsEnv;
 
 function getCloudAgentSessionScopeInternalUrl(requestUrl: string): URL | null {
   const url = new URL(requestUrl);
@@ -103,7 +104,7 @@ export async function forwardCloudAgentSessionScopeRequest(
   if (!url || request.method !== 'POST')
     throw new Error('Unsupported Cloud Agent session scope route');
 
-  const internalSecret = await env.INTERNAL_API_SECRET_PROD.get();
+  const internalSecret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET');
   if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
 
   const headers = stripCallerScopeHeaders(request);
@@ -143,7 +144,7 @@ export async function forwardCloudAgentSessionScopeV2Request(
   const url = getCloudAgentSessionScopeV2InternalUrl(request.url);
   if (!url) throw new Error('Unsupported Cloud Agent session scope v2 route');
 
-  const internalSecret = await env.INTERNAL_API_SECRET_PROD.get();
+  const internalSecret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET');
   if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
 
   const headers = stripCallerScopeHeaders(request);

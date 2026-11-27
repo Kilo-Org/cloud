@@ -28,6 +28,7 @@ import type {
   ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
+import type { BundleBinding } from '@kilocode/secrets-client';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
@@ -500,6 +501,19 @@ export type Env = {
    * production with the top-level config and development with `env.dev`.
    */
   ENVIRONMENT?: string;
+  /**
+   * Where every runtime secret read goes: `env` (the bindings below) or `sts` (the bundle over the
+   * `STS` binding). Absent means `env`; see secrets.ts. Never read the credential fields below
+   * directly.
+   */
+  SECRETS_SOURCE?: string;
+  /** STS SecretsBroker binding; absent until the deployment binds it (services/sts/policy). */
+  STS?: BundleBinding;
+  /**
+   * Sentry DSN, a client-side public key. Its consumers are synchronous (the Sentry SDK's
+   * options callbacks and the egress envelope hostname check), so it stays on `env` and is not
+   * routed through the STS reader; see secrets.ts.
+   */
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
   CF_VERSION_METADATA?: { id: string };
@@ -528,7 +542,7 @@ export type Env = {
   SESSION_INGEST: SessionIngestBinding;
   SESSION_SYNC?: Fetcher;
   CONTAINER_USAGE_METER: ContainerUsageRpcMethods & ContainerBillingStatusRpcMethods;
-  /** Shared secret for internal service-to-service authentication */
+  /** Outbound internal-auth secret; read through readCloudAgentNextStoreSecret (secrets.ts). */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
@@ -562,7 +576,7 @@ export type Env = {
   GITHUB_LITE_APP_SLUG?: string;
   /** GitHub Lite App bot user ID for git commit email */
   GITHUB_LITE_APP_BOT_USER_ID?: string;
-  /** Shared secret for JWT token validation */
+  /** Shared secret for JWT token validation; read through readCloudAgentNextSecret (secrets.ts). */
   NEXTAUTH_SECRET: SecretBinding;
   /** Comma-separated allowed Origins for the /stream and /terminal WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
@@ -582,7 +596,10 @@ export type Env = {
   REAPER_INTERVAL_MS?: string;
   /** Kilo server idle timeout override (ms) - defaults to 15 minutes */
   KILO_SERVER_IDLE_TIMEOUT_MS?: string;
-  /** Shared secret for backend-to-backend authentication (prepareSession/updateSession) */
+  /**
+   * Inbound `x-internal-api-key` secret (prepareSession/updateSession); read through
+   * readCloudAgentNextSecret (secrets.ts). Distinct from the outbound store copy above.
+   */
   INTERNAL_API_SECRET?: string;
   /** Worker base URL for building WebSocket ingest endpoint */
   WORKER_URL?: string;
@@ -591,6 +608,7 @@ export type Env = {
   /**
    * RSA private key for decrypting encrypted secrets from agent environment profiles.
    * Required when using encryptedSecrets feature. PEM format (base64-encoded).
+   * Read through readCloudAgentNextSecret (secrets.ts).
    */
   AGENT_ENV_VARS_PRIVATE_KEY?: string;
   /** GitHub App slug for git commit attribution (e.g., 'kiloconnect') */
@@ -627,7 +645,7 @@ export type Env = {
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
-  /** R2 read-only secret access key for downloading image attachments */
+  /** R2 read-only secret access key; read through readCloudAgentNextSecret (secrets.ts). */
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
   /** R2 bucket name for image attachments */
   R2_ATTACHMENTS_BUCKET?: string;

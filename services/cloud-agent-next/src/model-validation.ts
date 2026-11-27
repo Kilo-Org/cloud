@@ -6,7 +6,7 @@ import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
-import { resolveSecret } from './auth.js';
+import { readCloudAgentNextSecret } from './secrets.js';
 import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import { modelValidationAudience } from './model-validation-audience.js';
@@ -296,7 +296,7 @@ async function attestCatalogContext(
   // Only the exact configured backend route may receive a runtime proof or bearer.
   if (encodedBase || selectedUrl !== officialValidationUrl(env, context.organizationId))
     throw deny();
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret) throw deny();
   try {
     const audience = modelValidationAudience(env, context.organizationId);

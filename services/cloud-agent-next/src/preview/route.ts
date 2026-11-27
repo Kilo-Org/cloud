@@ -2,12 +2,12 @@ import { TRPCError } from '@trpc/server';
 import {
   PREVIEW_SESSION_LIFETIME_SECONDS,
   mintPreviewSessionToken,
-  resolveSecret,
   validatePreviewEntryTicket,
   validatePreviewSessionToken,
   type PreviewClaims,
   type PreviewEntryClaims,
 } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import {
   withPreviewTransport,
   type PreviewProviderCoordinates,
@@ -257,7 +257,10 @@ export async function handlePreviewOpen(request: Request, env: Env): Promise<Res
   }
   const url = new URL(request.url);
   const ticket = url.searchParams.get('ticket');
-  const validated = validatePreviewEntryTicket(ticket, await resolveSecret(env.NEXTAUTH_SECRET));
+  const validated = validatePreviewEntryTicket(
+    ticket,
+    await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null)
+  );
   let label: string | null = null;
   if (validated.success) {
     const targetId = previewTargetId(validated.claims);
@@ -293,7 +296,7 @@ async function handleEntry(
     return entryResponse(405, 'Method not allowed');
   }
   const url = new URL(request.url);
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
   const ticket = validatePreviewEntryTicket(url.searchParams.get('ticket'), secret);
   if (!ticket.success || secret === null || !claimsMatchHost(ticket.claims, match)) {
     return entryResponse(401, 'Preview ticket is missing or invalid');
@@ -474,7 +477,7 @@ async function handleProxy(
   }
 
   const secure = url.protocol === 'https:';
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET').catch(() => null);
   const session = validatePreviewSessionToken(
     readPreviewCookie(request.headers.get('Cookie'), secure),
     secret

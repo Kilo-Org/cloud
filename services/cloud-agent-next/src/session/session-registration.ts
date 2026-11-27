@@ -21,6 +21,7 @@ import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import { ByocAwsProviderError, fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -964,8 +965,9 @@ async function issueSessionRuntimeAuthorization(
   }
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
   if (isPolicyBearingAuthToken(ctx.authToken)) {
-    const secret = ctx.env.NEXTAUTH_SECRET;
-    const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
+    const nextAuthSecret = await readCloudAgentNextSecret(ctx.env, 'NEXTAUTH_SECRET').catch(
+      () => null
+    );
     if (!nextAuthSecret)
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
     const created = await createRuntimeAuthorization({

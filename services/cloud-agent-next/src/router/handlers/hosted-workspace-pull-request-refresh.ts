@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 import { DEFAULT_BACKEND_URL } from '../../constants.js';
 import { getPgDb } from '../../db/pg.js';
 import { logger } from '../../logger.js';
@@ -97,7 +97,7 @@ async function requestWorkspacePullRequestRefresh(
   env: Env,
   body: { workspaceId: string; userId: string; organizationId: string | null }
 ): Promise<RefreshResult> {
-  const secret = await resolveSecret(env.INTERNAL_API_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'INTERNAL_API_SECRET').catch(() => null);
   if (!secret) {
     logger.error('hosted workspace PR refresh unavailable: internal API secret is not configured');
     return { status: 'unavailable', retryAt: null };

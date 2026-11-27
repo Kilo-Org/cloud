@@ -1,4 +1,4 @@
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import type { Env } from '../types.js';
 import { ProviderCreationError, type ProviderStartupCommand } from './provider.js';
@@ -25,7 +25,7 @@ export async function downloadedStartup(input: {
   const release = await loadRuntimeRelease(input.descriptor, input.env.RUNTIME_RELEASE_BUCKET);
   if (runtimeReleaseHarness(release) !== (input.harness ?? 'kilo'))
     throw new ProviderCreationError('invalid_configuration');
-  const secret = await resolveSecret(input.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(input.env, 'NEXTAUTH_SECRET').catch(() => null);
   if (!secret) throw new Error('Runtime signing unavailable');
   const grant = mintRuntimeArtifactGrant(
     [

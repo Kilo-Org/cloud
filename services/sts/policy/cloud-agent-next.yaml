@@ -1,4 +1,18 @@
-# Registration only: services/cloud-agent-next/wrangler.jsonc. No environment, identity or grant.
+# The cloud-agent-next Worker (services/cloud-agent-next/wrangler.jsonc). It reads its runtime
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Worker secret and
+# Secrets Store binding it holds today) until secrets-cutover flips it. INTERNAL_API_SECRET and
+# NEXTAUTH_SECRET resolve from /shared; the rest live in /workloads/cloud-agent-next.
 workload: cloud-agent-next
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET
+  - NEXTAUTH_SECRET
+  - GITHUB_APP_PRIVATE_KEY
+  - GITHUB_LITE_APP_PRIVATE_KEY
+  - AGENT_ENV_VARS_PRIVATE_KEY
+  - SSEC_KEY
+  - R2_SECRET_ACCESS_KEY
+  - R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY

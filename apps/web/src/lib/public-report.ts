@@ -13,11 +13,13 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-// Single source of truth for every cache layer in front of the data source: the
-// Vercel edge cache, the in-process cache, and the optional Redis cache all
-// expire after one hour so the data served stays consistent across layers.
-const CACHE_TTL_SECONDS = 3600;
+// The Vercel edge cache and the in-process cache share one short TTL, so a new
+// report reaches readers within minutes of the source changing.
+const CACHE_TTL_SECONDS = 300;
 const IN_MEMORY_CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
+// Redis fronts only slow or costly sources, so it keeps a longer TTL to bound
+// how often instances query them.
+const REDIS_CACHE_TTL_SECONDS = 3600;
 
 type PublicReportOptions<Usage> = {
   /**
@@ -69,7 +71,7 @@ async function fetchReport<Usage>(options: PublicReportOptions<Usage>): Promise<
     if (cacheKey) {
       try {
         await redisClient.set(cacheKey, JSON.stringify(usage), {
-          ex: CACHE_TTL_SECONDS,
+          ex: REDIS_CACHE_TTL_SECONDS,
         });
       } catch (error) {
         captureException(error, {
@@ -90,9 +92,9 @@ async function fetchReport<Usage>(options: PublicReportOptions<Usage>): Promise<
 /**
  * Builds a cached GET handler for a public report.
  *
- * Caching cascades through up to three layers, all expiring after one hour:
- * the Vercel edge cache (`s-maxage`), an in-process `createCachedFetch` so warm
- * instances skip the load, and, with a `cacheKey`, Redis in front of the source.
+ * Caching cascades through up to three layers: the Vercel edge cache
+ * (`s-maxage`) and an in-process `createCachedFetch`, both expiring after five
+ * minutes, and, with a `cacheKey`, Redis in front of the source for one hour.
  * The in-process cache is created once per report (module scope) and stores
  * pure data, so it is safe to share across requests.
  */

@@ -521,6 +521,33 @@ describe('end, end-all and device revoke', () => {
     });
   });
 
+  it('revokes a device by its app grant id with its live widget grant, and answers both feed entries', async () => {
+    const { accountId, handle } = await webSession();
+    const app = await firstPartyGrant(accountId, 'mobile');
+    const widget = await owner.query<{ id: string }>(
+      `INSERT INTO uts.refresh_grants (account_id, device_session_id, client_id, client_class,
+         token_hash, dpop_jkt, allowed_scopes, idle_expires_at, expires_at, parent_grant_id,
+         audit_environment)
+       VALUES ($1, $2, 'kilo-mobile', 'mobile', $3, $4, '{kilo-api:home-widget.use}',
+         now() + interval '1 day', now() + interval '1 day', $5, 'development') RETURNING id`,
+      [accountId, app.deviceSessionId, randomBytes(32), randomBytes(32), app.grantId]
+    );
+    const widgetId = widget.rows[0].id;
+
+    const revoked = await sessions.revokeDevice({ ...handleInput(handle), sid: app.grantId });
+    if (revoked.outcome !== 'ended') throw new Error(`answered ${revoked.outcome}`);
+    expect(revoked.feedEntries.map(entry => entry.id).sort()).toEqual(
+      [app.grantId, widgetId].sort()
+    );
+    expect(await grantStatus(widgetId)).toBe('revoked');
+    // A repeat publishes both entries again.
+    const repeat = await sessions.revokeDevice({ ...handleInput(handle), sid: app.grantId });
+    if (repeat.outcome !== 'ended') throw new Error(`answered ${repeat.outcome}`);
+    expect(repeat.feedEntries.map(entry => entry.id).sort()).toEqual(
+      [app.grantId, widgetId].sort()
+    );
+  });
+
   it('keeps an ended session ended and its handle fixed', async () => {
     const { sessionId, handle } = await webSession();
     await sessions.end(handleInput(handle));

@@ -226,6 +226,7 @@ describe('the UTS scope registry', () => {
     ['notifications:badges.write', ['kilo-mobile'], null],
     ['event-service:events.subscribe', ['kilo-web', 'kilo-mobile', 'kilo-cli'], null],
     ['kilo-chat:chat.use', ['kilo-web'], null],
+    ['kilo-api:home-widget.use', ['kilo-mobile'], null],
   ] as const)(
     'lists %s for %j with a session for 10 minutes, org roles %j, no PAT and no delegation',
     (scope, clients, roles) => {
@@ -291,6 +292,7 @@ describe('the UTS scope registry', () => {
       'kilo-api:auto-routing.write',
       'kilo-api:credits.redeem',
       'kilo-api:feedback.write',
+      'kilo-api:home-widget.use',
       'kilo-api:mcp.read',
       'kilo-api:notifications.read',
       'kilo-api:organizations.read',

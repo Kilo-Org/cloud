@@ -1,5 +1,4 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   agent_configs,
   security_findings,
@@ -30,7 +29,6 @@ import {
   resolveNotificationRecipientUserIds,
   type SecurityNotificationOwner,
 } from './recipients';
-import { readSecuritySyncSecret, type SecuritySyncSecretsEnv } from '../secrets';
 
 const STUCK_CLAIM_RECOVERY_MINUTES = 5;
 const MAX_SLA_MATERIALIZATION_PER_TICK = 1000;
@@ -43,9 +41,12 @@ const INELIGIBLE_EVALUATION_LIMIT = 5000;
 const PENDING_SELECTION_LIMIT = 250;
 const MAX_ATTEMPTS = 4;
 
-export type SecurityNotificationSweepEnv = SecuritySyncSecretsEnv & {
+type SecretBinding = { get(): Promise<string> };
+
+export type SecurityNotificationSweepEnv = {
   HYPERDRIVE?: { connectionString: string };
   BACKEND_API_URL?: string;
+  INTERNAL_API_SECRET?: SecretBinding;
   SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED?: string;
   SECURITY_NOTIFICATION_DISPATCH_ENABLED?: string;
 };
@@ -1089,12 +1090,10 @@ async function dispatchPendingRows(
   };
 }
 
-async function readInternalSecret(
-  env: SecurityNotificationSweepEnv,
-  ctx?: SecretsExecutionContext
-): Promise<string | null> {
+async function readInternalSecret(env: SecurityNotificationSweepEnv): Promise<string | null> {
+  if (!env.INTERNAL_API_SECRET) return null;
   try {
-    const secret = await readSecuritySyncSecret(env, 'INTERNAL_API_SECRET', ctx);
+    const secret = await env.INTERNAL_API_SECRET.get();
     return secret || null;
   } catch {
     return null;
@@ -1102,8 +1101,7 @@ async function readInternalSecret(
 }
 
 export async function runSecurityNotificationSweep(
-  env: SecurityNotificationSweepEnv,
-  ctx?: SecretsExecutionContext
+  env: SecurityNotificationSweepEnv
 ): Promise<SweepResult> {
   const startedAt = Date.now();
   const empty = {
@@ -1182,7 +1180,7 @@ export async function runSecurityNotificationSweep(
   let dispatchCapReached = false;
 
   if (dispatchEnabled) {
-    const [backendUrl, internalSecret] = [env.BACKEND_API_URL, await readInternalSecret(env, ctx)];
+    const [backendUrl, internalSecret] = [env.BACKEND_API_URL, await readInternalSecret(env)];
     if (!backendUrl || !internalSecret) {
       console.warn(
         '[security-notifications] BACKEND_API_URL or internal secret missing; skipping dispatch'

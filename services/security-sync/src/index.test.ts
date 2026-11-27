@@ -213,7 +213,7 @@ describe('scheduled sync dispatch', () => {
       env
     );
 
-    expect(runSecurityNotificationSweep).toHaveBeenCalledWith(env, undefined);
+    expect(runSecurityNotificationSweep).toHaveBeenCalledWith(env);
     expect(getWorkerDb).not.toHaveBeenCalled();
     expect(
       JSON.parse(

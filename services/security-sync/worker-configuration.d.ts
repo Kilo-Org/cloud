@@ -49,10 +49,6 @@ declare type ExecutionContext = {
 
 declare type CloudflareEnv = {
   INTERNAL_API_SECRET: SecretBinding;
-  // `wrangler types` has not run for the SecretsBroker binding yet; this is its RPC shape
-  // (packages/secrets-client `BundleBinding`). Absent until the binding deploys.
-  SECRETS_SOURCE?: string;
-  STS?: import('@kilocode/secrets-client').BundleBinding;
   SYNC_QUEUE: Queue<import('./src/index').SecuritySyncQueueMessage>;
   DISMISS_QUEUE: Queue<import('./src/index').SecurityDismissMessage>;
   HYPERDRIVE: Hyperdrive;

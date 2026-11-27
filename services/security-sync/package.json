@@ -15,7 +15,6 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
-    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"

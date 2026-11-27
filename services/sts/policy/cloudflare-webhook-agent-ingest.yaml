@@ -1,12 +1,4 @@
-# The cloudflare-webhook-agent-ingest Worker (services/webhook-agent-ingest/wrangler.jsonc). It
-# reads its runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the
-# Secrets Store bindings) until secrets-cutover flips it. All three names resolve from /shared.
+# Registration only: services/webhook-agent-ingest/wrangler.jsonc. No environment, identity or grant.
 workload: cloudflare-webhook-agent-ingest
-environments:
-  - production
-identity:
-  kind: worker-binding
-secrets:
-  - INTERNAL_API_SECRET
-  - CALLBACK_TOKEN_SECRET
-  - NEXTAUTH_SECRET
+registered: true
+secrets: []

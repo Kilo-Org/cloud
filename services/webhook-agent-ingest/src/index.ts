@@ -52,11 +52,7 @@ app.onError((err, c) => {
 
 export default {
   fetch: app.fetch,
-  async queue(
-    batch: MessageBatch<WebhookDeliveryMessage>,
-    env: Env,
-    ctx?: ExecutionContext
-  ): Promise<void> {
-    await handleWebhookDeliveryBatch(batch, env, ctx);
+  async queue(batch: MessageBatch<WebhookDeliveryMessage>, env: Env): Promise<void> {
+    await handleWebhookDeliveryBatch(batch, env);
   },
 };

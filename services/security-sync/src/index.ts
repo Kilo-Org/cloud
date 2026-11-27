@@ -26,7 +26,6 @@ import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { SECURITY_SYNC_OWNER_BUDGET_MS, releaseOwnerSyncLease, syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
 import { runSecurityNotificationSweep } from './notifications/sweep';
-import { readSecuritySyncSecret } from './secrets';
 
 const SecuritySyncOwnerSchema = z
   .object({
@@ -793,7 +792,7 @@ async function processSecuritySyncMessage(
 }
 
 export default {
-  async fetch(request: Request, env: CloudflareEnv, ctx?: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === 'GET' && url.pathname === '/health') {
@@ -812,7 +811,7 @@ export default {
         );
       }
       const [internalSecret, authHeader] = await Promise.all([
-        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET', ctx),
+        env.INTERNAL_API_SECRET.get(),
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
@@ -848,7 +847,7 @@ export default {
         );
       }
       const [internalSecret, authHeader] = await Promise.all([
-        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET', ctx),
+        env.INTERNAL_API_SECRET.get(),
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
@@ -883,7 +882,7 @@ export default {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   },
 
-  async scheduled(controller: ScheduledController, env: CloudflareEnv, ctx?: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: CloudflareEnv) {
     const environment = getEnvironment(env);
     if (controller.cron === '15 * * * *') {
       const run = createScheduledJobRun({
@@ -891,7 +890,7 @@ export default {
         environment,
       });
       try {
-        const result = await runSecurityNotificationSweep(env, ctx);
+        const result = await runSecurityNotificationSweep(env);
         emitScheduledJobEvent(
           buildScheduledJobSuccessEvent(run, {
             scheduled_time: controller.scheduledTime,

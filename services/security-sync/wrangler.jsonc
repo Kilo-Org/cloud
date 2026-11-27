@@ -15,9 +15,6 @@
       "persist": true,
       "invocation_logs": false,
     },
-    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
-    // (services/sts/test/repo/worker-configs.ts).
-    "traces": { "enabled": false },
   },
   "logpush": true,
   "routes": [
@@ -39,10 +36,6 @@
     "BACKEND_API_URL": "https://app.kilo.ai",
     "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
     "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
-    // Where every runtime secret read goes: `env` (the Secrets Store binding below) or `sts`
-    // (the bundle over the `STS` binding). An absent value means `env`; any other value refuses
-    // every read. The `sts` source never falls back to the legacy binding.
-    "SECRETS_SOURCE": "env",
   },
   "triggers": {
     "crons": ["0 */6 * * *", "15 * * * *"],
@@ -87,16 +80,6 @@
       "binding": "GIT_TOKEN_SERVICE",
       "service": "git-token-service",
       "entrypoint": "GitTokenRPCEntrypoint",
-    },
-    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
-    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
-    // cloudflare-security-sync.yaml grants INTERNAL_API_SECRET. Nothing reads it while
-    // SECRETS_SOURCE is `env`.
-    {
-      "binding": "STS",
-      "service": "sts",
-      "entrypoint": "SecretsBroker",
-      "props": { "caller": "cloudflare-security-sync" },
     },
   ],
   "secrets_store_secrets": [

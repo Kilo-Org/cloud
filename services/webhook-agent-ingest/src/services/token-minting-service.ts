@@ -2,7 +2,6 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
-import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   getWorkerDb,
   findUserForToken,
@@ -11,11 +10,12 @@ import {
   isDirectOrgMember,
   type WorkerDb,
 } from '../db/queries.js';
-import { readWebhookAgentIngestSecret, type WebhookAgentIngestSecretsEnv } from '../secrets.js';
 import { logger } from '../util/logger.js';
+import { getSecretValue } from '../util/secret.js';
 
-export type TokenMintingEnv = WebhookAgentIngestSecretsEnv & {
+export type TokenMintingEnv = {
   HYPERDRIVE: { connectionString: string };
+  NEXTAUTH_SECRET: SecretsStoreSecret | string; // Same secret used by kilocode-backend
   ENVIRONMENT: string;
   SHARED_RESOURCE_TOKENS_ENABLED?: string | boolean;
 };
@@ -39,11 +39,8 @@ const WEBHOOK_BOT_ID = 'webhook-bot';
 export class CreatorExecutionAuthorizationError extends Error {}
 export class PersonalExecutionAuthorizationError extends Error {}
 
-export function getTokenMintingService(
-  env: TokenMintingEnv,
-  ctx?: SecretsExecutionContext
-): TokenMintingService {
-  return new TokenMintingService(env, ctx);
+export function getTokenMintingService(env: TokenMintingEnv): TokenMintingService {
+  return new TokenMintingService(env);
 }
 
 /**
@@ -56,10 +53,7 @@ export class TokenMintingService {
   private db: WorkerDb | null = null;
   private jwtSecret: string | null = null;
 
-  constructor(
-    private env: TokenMintingEnv,
-    private ctx?: SecretsExecutionContext
-  ) {}
+  constructor(private env: TokenMintingEnv) {}
 
   private getDb(): WorkerDb {
     if (!this.db) {
@@ -70,7 +64,7 @@ export class TokenMintingService {
 
   private async getJwtSecret(): Promise<string> {
     if (!this.jwtSecret) {
-      this.jwtSecret = await readWebhookAgentIngestSecret(this.env, 'NEXTAUTH_SECRET', this.ctx);
+      this.jwtSecret = await getSecretValue(this.env.NEXTAUTH_SECRET);
     }
     return this.jwtSecret;
   }

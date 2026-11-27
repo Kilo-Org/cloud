@@ -834,39 +834,21 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
   );
 
   it.each(STS_ENVIRONMENTS)(
-    'refuses a registration-only workload its own scopes and the web dispatch in %s',
+    'refuses the registered-only Security Sync workload its own scopes and the web dispatch in %s',
     async environment => {
-      // kiloclaw.yaml stays a registration until KiloClaw is retired (design 9.3): STS answers
-      // for it as for a name with no file.
+      // cloudflare-security-sync.yaml is a registration: STS answers for it as for a name with no file.
       for (const entry of [
         STS_SECURITY_SYNC_MANUAL_SYNC,
         STS_SECURITY_SYNC_DISMISS_FINDING,
         STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
       ]) {
-        expect(await mintAsShipped(environment, 'kiloclaw', entry)).toEqual({
+        expect(await mintAsShipped(environment, 'cloudflare-security-sync', entry)).toEqual({
           status: 'ok',
           tokens: [{ status: 'denied', ...entry, reason: 'unknown_workload' }],
         });
       }
     }
   );
-
-  it('denies a registered scope under an active policy that grants no audiences', async () => {
-    // cloudflare-security-sync.yaml is active in production with no audiences, so a registered
-    // scope is denied at the audience check before the scope check (src/tokens/mint.ts).
-    expect(
-      await mintAsShipped('production', 'cloudflare-security-sync', STS_SECURITY_SYNC_MANUAL_SYNC)
-    ).toEqual({
-      status: 'ok',
-      tokens: [
-        {
-          status: 'denied',
-          ...STS_SECURITY_SYNC_MANUAL_SYNC,
-          reason: 'audience_not_allowed',
-        },
-      ],
-    });
-  });
 });
 
 describe('canary denied probe', () => {

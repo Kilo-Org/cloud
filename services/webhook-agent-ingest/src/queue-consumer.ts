@@ -18,8 +18,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
-import { readWebhookAgentIngestSecret } from './secrets';
-import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { getSecretValue } from './util/secret';
 import { deliverExistingChatMessage, ExistingChatDeliveryError } from './existing-chat-delivery';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
@@ -66,11 +65,10 @@ async function failRequest(
 
 async function getOrMintToken(
   env: Env,
-  triggerConfig: TriggerConfig,
-  ctx?: SecretsExecutionContext
+  triggerConfig: TriggerConfig
 ): Promise<{ token: string; cached: boolean }> {
   if (triggerConfig.executionUserId != null) {
-    const result = await getTokenMintingService(env, ctx).mintToken({
+    const result = await getTokenMintingService(env).mintToken({
       userId: triggerConfig.userId,
       orgId: triggerConfig.orgId,
       executionUserId: triggerConfig.executionUserId,
@@ -88,7 +86,7 @@ async function getOrMintToken(
 
   logger.debug('Token cache miss, minting new token', { triggerId: triggerConfig.triggerId });
 
-  const tokenMintingService = getTokenMintingService(env, ctx);
+  const tokenMintingService = getTokenMintingService(env);
   const result = await tokenMintingService.mintToken({
     userId: triggerConfig.userId,
     orgId: triggerConfig.orgId,
@@ -269,8 +267,7 @@ export async function processKiloclawChatMessage(
 
 async function processWebhookMessage(
   message: Message<WebhookDeliveryMessage>,
-  env: Env,
-  ctx?: SecretsExecutionContext
+  env: Env
 ): Promise<void> {
   const webhook = message.body;
   let sessionCreated = false;
@@ -340,8 +337,7 @@ async function processWebhookMessage(
           env,
           () => env.TRIGGER_DO.get(doId),
           request,
-          triggerConfig,
-          ctx
+          triggerConfig
         );
       }
       message.ack();
@@ -390,11 +386,11 @@ async function processWebhookMessage(
       return;
     }
 
-    const { token } = await getOrMintToken(env, triggerConfig, ctx);
+    const { token } = await getOrMintToken(env, triggerConfig);
 
     const [internalApiSecret, callbackTokenSecret] = await Promise.all([
-      readWebhookAgentIngestSecret(env, 'INTERNAL_API_SECRET', ctx),
-      readWebhookAgentIngestSecret(env, 'CALLBACK_TOKEN_SECRET', ctx),
+      getSecretValue(env.INTERNAL_API_SECRET),
+      getSecretValue(env.CALLBACK_TOKEN_SECRET),
     ]);
 
     if (!cloudAgentSessionId) {
@@ -716,8 +712,7 @@ async function processWebhookMessage(
 
 export async function handleWebhookDeliveryBatch(
   batch: MessageBatch<WebhookDeliveryMessage>,
-  env: Env,
-  ctx?: SecretsExecutionContext
+  env: Env
 ): Promise<void> {
   logger.info('Processing webhook delivery batch', {
     queue: batch.queue,
@@ -725,7 +720,7 @@ export async function handleWebhookDeliveryBatch(
   });
 
   for (const message of batch.messages) {
-    await processWebhookMessage(message, env, ctx);
+    await processWebhookMessage(message, env);
   }
 
   logger.info('Webhook delivery batch processed', {

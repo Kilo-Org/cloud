@@ -17,6 +17,14 @@
   // Observability - enables Workers Logs
   "observability": {
     "enabled": true,
+    // Traces stay off: a trace records outbound URLs and Durable Object SQL
+    // bindings, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts). `env.dev` inherits this
+    // block. Cloudflare records no traces without `traces.enabled: true`, so
+    // this pins the current setting.
+    "traces": {
+      "enabled": false,
+    },
   },
   "logpush": true,
   "version_metadata": {
@@ -35,6 +43,12 @@
     "WEBHOOK_AGENT_URL": "https://hooks.kilosessions.ai",
     "KILOCLAW_API_URL": "https://claw.kilosessions.ai",
     "SHARED_RESOURCE_TOKENS_ENABLED": "true",
+    // Where every INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
+    // NEXTAUTH_SECRET read goes (src/secrets.ts): `secrets-store` reads the
+    // Secrets Store bindings below, `sts` reads the STS bundle over the `STS`
+    // binding and never falls back. An absent value means `secrets-store`;
+    // any other value refuses every read.
+    "SECRETS_SOURCE": "secrets-store",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [
@@ -46,6 +60,18 @@
       "binding": "KILO_CHAT",
       "service": "kilo-chat",
       "entrypoint": "KiloChatService",
+    },
+    // STS serves the runtime secret bundle over the account-internal binding.
+    // `props.caller` is what STS authorizes on and must equal this Worker's
+    // top-level name. This block deploys production only, so it binds the
+    // production `sts`; services/sts/policy/cloudflare-webhook-agent-ingest.yaml
+    // grants no name yet. Nothing reads it while SECRETS_SOURCE is
+    // `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloudflare-webhook-agent-ingest" },
     },
   ],
   // PRODUCTION Queue for webhook delivery
@@ -103,7 +129,9 @@
       "new_sqlite_classes": [],
     },
   ],
-  // PRODUCTION Secrets Store (shared Kilo secrets store)
+  // PRODUCTION Secrets Store (shared Kilo secrets store). The `secrets-store`
+  // source reads these bindings. They stay bound while STS reads are proven,
+  // so a rollback is one redeploy with SECRETS_SOURCE set to `secrets-store`.
   "secrets_store_secrets": [
     {
       "binding": "INTERNAL_API_SECRET",

@@ -10,11 +10,13 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
-  getEnabledByokProviders,
   getOrganizationByokProviderIds,
+  getStoredByokKeys,
   hasInferenceProviderUserByokForModel,
-  type EnabledByokProvider,
+  type StoredByokKeys,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
@@ -49,7 +51,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
   getOrganizationByokProviderIds: jest.fn(async () => []),
-  getEnabledByokProviders: jest.fn(async () => []),
+  getStoredByokKeys: jest.fn(),
   hasInferenceProviderUserByokForModel: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
@@ -58,6 +60,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/inference-region-candidates', () => ({
   inferenceRegionIneligibleCandidates: jest.fn(async () => []),
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
+  isNonTrialEnterpriseOrganization: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/organization-features'),
@@ -517,14 +522,21 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
 
   beforeEach(() => {
     jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(policy());
-    jest.mocked(getEnabledByokProviders).mockClear();
+    jest.mocked(getStoredByokKeys).mockReset();
+    jest.mocked(isNonTrialEnterpriseOrganization).mockClear();
     jest.mocked(inferenceRegionIneligibleCandidates).mockReset();
     jest
       .mocked(inferenceRegionIneligibleCandidates)
-      .mockImplementation(async ({ candidateIds }) =>
+      .mockImplementation(async (_routing, candidateIds) =>
         candidateIds.filter(id => regionDenied.includes(id))
       );
   });
+
+  function lastRouting() {
+    const routing = jest.mocked(inferenceRegionIneligibleCandidates).mock.lastCall?.[0];
+    if (!routing) throw new Error('the region check did not run');
+    return routing;
+  }
 
   it('denies candidates outside the region of an enterprise organization with the feature', async () => {
     const member = await setUp({ settings: { data_region: 'eu' } });
@@ -534,23 +546,86 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
     await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual(
       regionDenied
     );
-    expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
-      region: 'eu',
-      candidateIds: ['anthropic/claude', 'openai/gpt-5'],
-      loadByokKeys: expect.any(Function),
-      policy: memberPolicy,
+    expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ region: 'eu' }),
+      ['anthropic/claude', 'openai/gpt-5']
+    );
+    expect(lastRouting().policy).toBe(memberPolicy);
+    expect(lastRouting().caller).toEqual({
+      userId: member.userId,
+      organizationId: member.organizationId,
     });
-    const params = jest.mocked(inferenceRegionIneligibleCandidates).mock.lastCall?.[0];
-    expect(params?.policy).toBe(memberPolicy);
-    // The key loader reads the member's organization keys, and nothing reads them before it runs.
-    expect(getEnabledByokProviders).not.toHaveBeenCalled();
-    const keys: EnabledByokProvider[] = [{ providerId: 'openai', serveCatalogModels: false }];
+  });
+
+  it('routes the candidates under the member’s policy and the organization’s settings, with no request', async () => {
+    const settings = { data_region: 'eu', data_collection: 'deny' } as const;
+    const member = await setUp({ settings });
     jest
-      .mocked(getEnabledByokProviders as unknown as () => Promise<EnabledByokProvider[]>)
-      .mockResolvedValue(keys);
-    expect(await params?.loadByokKeys?.()).toBe(keys);
-    expect(jest.mocked(getEnabledByokProviders).mock.calls).toEqual([
+      .mocked(resolveOrganizationMemberModelPolicy)
+      .mockResolvedValue(policy({ dataCollection: 'deny' }));
+
+    await deniedAutoRoutingModelIdsForMember({ ...member, modelIds });
+
+    expect(lastRouting()).toMatchObject({
+      region: 'eu',
+      // The CLI names its candidates before the request exists.
+      apiKind: null,
+      requestProvider: undefined,
+      settings,
+      effectivePrivacy: getEffectiveProviderPrivacy(undefined, 'deny'),
+    });
+  });
+
+  it('reads the member’s organization keys once, and only when the region check asks', async () => {
+    const member = await setUp({ settings: { data_region: 'eu' } });
+    const stored = { keys: [], decrypt: jest.fn() } as unknown as StoredByokKeys;
+    jest
+      .mocked(getStoredByokKeys as unknown as () => Promise<StoredByokKeys>)
+      .mockResolvedValue(stored);
+
+    await deniedAutoRoutingModelIdsForMember({ ...member, modelIds });
+    const { loadStoredByokKeys } = lastRouting();
+
+    expect(getStoredByokKeys).not.toHaveBeenCalled();
+    expect(await loadStoredByokKeys?.()).toBe(stored);
+    expect(await loadStoredByokKeys?.()).toBe(stored);
+    expect(jest.mocked(getStoredByokKeys).mock.calls).toEqual([
       [readDb, { type: 'organization', id: member.organizationId }],
+    ]);
+  });
+
+  it('checks the non-trial enterprise status once, only when the region check asks', async () => {
+    const member = await setUp({ settings: { data_region: 'eu' } });
+    jest.mocked(isNonTrialEnterpriseOrganization).mockResolvedValue(true);
+
+    await deniedAutoRoutingModelIdsForMember({ ...member, modelIds });
+    const { isNonTrialEnterprise } = lastRouting();
+
+    expect(isNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+    await expect(isNonTrialEnterprise()).resolves.toBe(true);
+    await expect(isNonTrialEnterprise()).resolves.toBe(true);
+    expect(jest.mocked(isNonTrialEnterpriseOrganization).mock.calls).toEqual([
+      [member.organizationId, readDb],
+    ]);
+  });
+
+  it('does not region-deny a latest alias, whose pin is in the region and live target is not', async () => {
+    const member = await setUp({ settings: { data_region: 'eu' } });
+    jest
+      .mocked(inferenceRegionIneligibleCandidates)
+      .mockImplementation(async (_routing, candidateIds) =>
+        candidateIds.filter(id => id !== 'vendor/pin')
+      );
+
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        ...member,
+        modelIds: ['~vendor/latest', 'vendor/pin', 'vendor/live'],
+      })
+    ).resolves.toEqual(['vendor/live']);
+    expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith(expect.anything(), [
+      'vendor/pin',
+      'vendor/live',
     ]);
   });
 

@@ -163,42 +163,50 @@ export async function getCachedVercelInferenceProviderIdsForModel(
   return inferenceProviderIdsByModel.get(modelId) ?? null;
 }
 
-/** The inference regions Vercel can pin the model to at any of its endpoints. */
-export function extractVercelInferenceRegionsFromModel(
+/** Per inference provider, the regions Vercel can pin the model's endpoints at that provider to. */
+export function extractVercelInferenceRegionsByProvider(
   model: GatewayModelWithEndpoints
-): ReadonlySet<OrganizationDataRegion> {
-  const regions = new Set<OrganizationDataRegion>();
+): ReadonlyMap<string, ReadonlySet<OrganizationDataRegion>> {
+  const regionsByProvider = new Map<string, Set<OrganizationDataRegion>>();
   for (const endpoint of model.endpoints) {
+    if (endpoint.provider_name === undefined) continue;
+    const regions = regionsByProvider.get(endpoint.provider_name) ?? new Set();
     for (const { geo_region } of endpoint.inference_regions ?? []) {
       const region = OrganizationDataRegionSchema.safeParse(geo_region);
       if (region.success) regions.add(region.data);
     }
+    regionsByProvider.set(endpoint.provider_name, regions);
   }
-  return regions;
+  return regionsByProvider;
 }
 
-/** Inference regions per Vercel language model id, projected from the cached Vercel metadata map. */
-const getVercelInferenceRegionsByModel = createCachedFetch<
-  ReadonlyMap<string, ReadonlySet<OrganizationDataRegion>>
->(
-  async () => {
-    const models = await getVercelModelsMetadataFromDatabase();
-    return new Map(
-      Object.values(models)
-        .filter(model => model.type === 'language')
-        .map(model => [model.id, extractVercelInferenceRegionsFromModel(model)])
-    );
-  },
-  TTL_MS,
-  new Map(),
-  { name: 'vercelInferenceRegionsByModel' }
-);
+type InferenceRegionsByProvider = ReadonlyMap<string, ReadonlySet<OrganizationDataRegion>>;
 
-/** The regions Vercel can pin the language model to, or null when Vercel does not list it. */
+// Memoized on the metadata snapshot like `vercelInferenceProviderIdsByModel`, so a cold-read
+// failure's empty fallback is replaced as soon as the metadata cache recovers.
+const vercelInferenceRegionsByModel = new WeakMap<
+  GatewayModelMap,
+  ReadonlyMap<string, InferenceRegionsByProvider>
+>();
+
+/**
+ * Per inference provider, the regions Vercel can pin the language model to, or null when Vercel
+ * does not list it.
+ */
 export async function getCachedVercelInferenceRegionsForModel(
   vercelModelId: string
-): Promise<ReadonlySet<OrganizationDataRegion> | null> {
-  return (await getVercelInferenceRegionsByModel()).get(vercelModelId) ?? null;
+): Promise<InferenceRegionsByProvider | null> {
+  const models = await getVercelModelsMetadataFromDatabase();
+  let regionsByModel = vercelInferenceRegionsByModel.get(models);
+  if (regionsByModel === undefined) {
+    regionsByModel = new Map(
+      Object.values(models)
+        .filter(model => model.type === 'language')
+        .map(model => [model.id, extractVercelInferenceRegionsByProvider(model)])
+    );
+    vercelInferenceRegionsByModel.set(models, regionsByModel);
+  }
+  return regionsByModel.get(vercelModelId) ?? null;
 }
 
 function createModelIdsFetcher(

@@ -716,14 +716,24 @@ describe('canRouteToVercel', () => {
   });
 });
 
-describe('getVercelInferenceRegions', () => {
-  async function loadGetVercelInferenceRegions(
-    regionsByVercelModelId: Record<string, OrganizationDataRegion[]>
+describe('canRouteToVercelInRegion', () => {
+  const MODEL = 'openai/gpt-5';
+  const regionalEndpoints = { [MODEL]: { openai: ['eu', 'us'], bedrock: ['us'] } } satisfies Record<
+    string,
+    Record<string, OrganizationDataRegion[]>
+  >;
+
+  async function loadCanRouteToVercelInRegion(
+    regionsByModel: Record<string, Record<string, OrganizationDataRegion[]>>
   ) {
     jest.resetModules();
     const getCachedVercelInferenceRegionsForModel = jest.fn(async (vercelModelId: string) => {
-      const regions = regionsByVercelModelId[vercelModelId];
-      return regions ? new Set(regions) : null;
+      const providers = regionsByModel[vercelModelId];
+      return providers
+        ? new Map(
+            Object.entries(providers).map(([providerId, regions]) => [providerId, new Set(regions)])
+          )
+        : null;
     });
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set()),
@@ -742,34 +752,93 @@ describe('getVercelInferenceRegions', () => {
     });
     return {
       getCachedVercelInferenceRegionsForModel,
-      getVercelInferenceRegions: (
+      canRouteToVercelInRegion: (
         await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')
-      ).getVercelInferenceRegions,
+      ).canRouteToVercelInRegion,
     };
   }
 
-  it('returns the regions Vercel can pin the model to', async () => {
-    const { getVercelInferenceRegions } = await loadGetVercelInferenceRegions({
-      'anthropic/claude-sonnet-4.5': ['eu', 'us'],
-    });
+  it('accepts a model some provider serves in the region', async () => {
+    const { canRouteToVercelInRegion } = await loadCanRouteToVercelInRegion(regionalEndpoints);
 
-    await expect(getVercelInferenceRegions('anthropic/claude-sonnet-4.5')).resolves.toEqual(
-      new Set(['eu', 'us'])
-    );
+    await expect(canRouteToVercelInRegion(MODEL, undefined, 'eu')).resolves.toBe(true);
   });
 
-  it('returns null for a model Vercel does not list', async () => {
-    const { getVercelInferenceRegions } = await loadGetVercelInferenceRegions({});
+  it('rejects a model no provider serves in the region', async () => {
+    const { canRouteToVercelInRegion } = await loadCanRouteToVercelInRegion(regionalEndpoints);
 
-    await expect(getVercelInferenceRegions('vendor/unknown')).resolves.toBeNull();
+    await expect(canRouteToVercelInRegion(MODEL, undefined, 'jp')).resolves.toBe(false);
+  });
+
+  it('rejects a model with providers but none pinnable', async () => {
+    const { canRouteToVercelInRegion } = await loadCanRouteToVercelInRegion({
+      [MODEL]: { openai: [] },
+    });
+
+    await expect(canRouteToVercelInRegion(MODEL, undefined, 'eu')).resolves.toBe(false);
+  });
+
+  it('rejects a model Vercel does not list', async () => {
+    const { canRouteToVercelInRegion } = await loadCanRouteToVercelInRegion({});
+
+    await expect(canRouteToVercelInRegion('vendor/unknown', undefined, 'eu')).resolves.toBe(false);
   });
 
   it('looks the model up under its Vercel id', async () => {
-    const { getVercelInferenceRegions, getCachedVercelInferenceRegionsForModel } =
-      await loadGetVercelInferenceRegions({ 'zai/glm-5.2': ['au'] });
+    const { canRouteToVercelInRegion, getCachedVercelInferenceRegionsForModel } =
+      await loadCanRouteToVercelInRegion({ 'zai/glm-5.2': { zai: ['au'] } });
 
-    await expect(getVercelInferenceRegions('z-ai/glm-5.2')).resolves.toEqual(new Set(['au']));
+    await expect(canRouteToVercelInRegion('z-ai/glm-5.2', undefined, 'au')).resolves.toBe(true);
     expect(getCachedVercelInferenceRegionsForModel).toHaveBeenCalledWith('zai/glm-5.2');
+  });
+
+  describe('under provider routing settings', () => {
+    it.each([
+      ['only names the in-region provider', { only: ['openai'] }, true],
+      [
+        'only names just a provider that serves the model elsewhere',
+        { only: ['amazon-bedrock'] },
+        false,
+      ],
+      [
+        'only names an in-region and an out-of-region provider',
+        { only: ['amazon-bedrock', 'openai'] },
+        true,
+      ],
+      ['ignore names the in-region provider', { ignore: ['openai'] }, false],
+      ['ignore names only the out-of-region provider', { ignore: ['amazon-bedrock'] }, true],
+      [
+        'only and ignore leave no in-region provider',
+        { only: ['openai'], ignore: ['openai'] },
+        false,
+      ],
+    ] as const)('when %s', async (_name, provider, expected) => {
+      const { canRouteToVercelInRegion } = await loadCanRouteToVercelInRegion(regionalEndpoints);
+
+      await expect(
+        canRouteToVercelInRegion(
+          MODEL,
+          {
+            only: 'only' in provider ? [...provider.only] : undefined,
+            ignore: 'ignore' in provider ? [...provider.ignore] : undefined,
+          },
+          'eu'
+        )
+      ).resolves.toBe(expected);
+    });
+
+    it('translates OpenRouter provider ids to Vercel’s', async () => {
+      const { canRouteToVercelInRegion } = await loadCanRouteToVercelInRegion({
+        [MODEL]: { bedrock: ['eu'] },
+      });
+
+      await expect(
+        canRouteToVercelInRegion(MODEL, { only: ['amazon-bedrock'] }, 'eu')
+      ).resolves.toBe(true);
+      await expect(
+        canRouteToVercelInRegion(MODEL, { ignore: ['amazon-bedrock'] }, 'eu')
+      ).resolves.toBe(false);
+    });
   });
 });
 

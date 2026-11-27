@@ -255,11 +255,30 @@ export async function isVercelModel(requestedModel: string) {
   return vercelModels.has(vercelModelId);
 }
 
-/** The inference regions Vercel can pin the model to, or null when Vercel does not serve it. */
-export async function getVercelInferenceRegions(
-  requestedModel: string
-): Promise<ReadonlySet<OrganizationDataRegion> | null> {
-  return getCachedVercelInferenceRegionsForModel(await mapModelIdToVercel(requestedModel));
+/**
+ * Whether Vercel can serve the model pinned to the inference region under the provider routing
+ * settings: some inference provider that the settings admit must serve it in that region, since
+ * Vercel fails a pinned request rather than leave the region.
+ */
+export async function canRouteToVercelInRegion(
+  requestedModel: string,
+  provider: OpenRouterProviderConfig | undefined,
+  region: OrganizationDataRegion
+): Promise<boolean> {
+  const regionsByProvider = await getCachedVercelInferenceRegionsForModel(
+    await mapModelIdToVercel(requestedModel)
+  );
+  if (!regionsByProvider) return false;
+  const providersInRegion = [...regionsByProvider]
+    .filter(([, regions]) => regions.has(region))
+    .map(([providerId]) => providerId);
+  return (
+    getVercelInferenceProvidersExcludingIgnored(
+      provider?.ignore ?? [],
+      provider?.only,
+      providersInRegion
+    ).length > 0
+  );
 }
 
 /**

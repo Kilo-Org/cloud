@@ -37,8 +37,13 @@ import {
   deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
-import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
-import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
+import {
+  inferenceRegionIneligibleCandidates,
+  type InferenceRegionRouting,
+} from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   createDirectByokReferenceResolver,
@@ -47,7 +52,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   enabledStoredByokKeys,
-  type EnabledByokProvider,
   type StoredByokKeys,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -153,29 +157,39 @@ async function authenticatedRoutingCaller(
   return { caller: { userId: caller.user.id, organizationId: caller.organizationId ?? null } };
 }
 
-type InferenceRegionScope = {
-  region: OrganizationDataRegion;
-  loadByokKeys: () => Promise<readonly EnabledByokProvider[]>;
-};
-
-/** The organization's inference region, when its gateway settings set one, and the caller's keys. */
-async function resolveInferenceRegionScope(
+/**
+ * How the request routes under the organization's inference region, or null when its gateway
+ * settings set none.
+ */
+async function resolveInferenceRegionRouting(
   ctx: ModelResolutionContext
-): Promise<InferenceRegionScope | null> {
+): Promise<InferenceRegionRouting | null> {
   const caller = await ctx.callerPromise;
   if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
+  const organizationId = caller.organizationId;
   const { plan, settings } = await ctx.balanceAndSettingsPromise;
   const { dataRegion } = await resolveOrganizationGatewaySettings({
-    organizationId: caller.organizationId,
+    organizationId,
     plan,
     settings,
   });
-  return dataRegion
-    ? {
-        region: dataRegion,
-        loadByokKeys: async () => enabledStoredByokKeys(await ctx.loadStoredByokKeys()),
-      }
-    : null;
+  if (!dataRegion) return null;
+  let isNonTrialEnterprise: Promise<boolean> | undefined;
+  return {
+    region: dataRegion,
+    apiKind: ctx.request.kind,
+    policy: await ctx.organizationGroupPolicyPromise,
+    settings,
+    requestProvider: ctx.request.body.provider,
+    effectivePrivacy: ctx.effectivePrivacy,
+    isNonTrialEnterprise: () =>
+      (isNonTrialEnterprise ??=
+        plan === 'enterprise'
+          ? isNonTrialEnterpriseOrganization(organizationId, readDb)
+          : Promise.resolve(false)),
+    caller: { userId: caller.user.id, organizationId, botId: caller.botId },
+    loadStoredByokKeys: ctx.loadStoredByokKeys,
+  };
 }
 
 async function autoRoutingDenials(
@@ -183,20 +197,16 @@ async function autoRoutingDenials(
   fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
   fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>,
   fromRegion: {
-    scope: () => Promise<InferenceRegionScope | null>;
+    routing: () => Promise<InferenceRegionRouting | null>;
     candidateIds: () => Promise<ReadonlyArray<string>>;
   }
 ): Promise<string[]> {
-  const groupPolicy = await ctx.organizationGroupPolicyPromise;
   const regionDenials = async () => {
-    const scope = await fromRegion.scope();
-    if (!scope) return [];
-    return inferenceRegionIneligibleCandidates({
-      ...scope,
-      policy: groupPolicy,
-      candidateIds: await fromRegion.candidateIds(),
-    });
+    const routing = await fromRegion.routing();
+    if (!routing) return [];
+    return inferenceRegionIneligibleCandidates(routing, await fromRegion.candidateIds());
   };
+  const groupPolicy = await ctx.organizationGroupPolicyPromise;
   const [deniedFromPolicy, deniedFromPrivacy, deniedFromRegion] = await Promise.all([
     groupPolicy ? fromPolicy(groupPolicy) : [],
     isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy)
@@ -267,8 +277,9 @@ async function resolveAutoModelId(
     autoModel === KILO_AUTO_EFFICIENT_MODEL.id || autoModel === KILO_AUTO_BALANCED_MODEL.id;
   // Set by whichever decision runs; resolution only sees the decision itself.
   let classifierCostUsd = 0;
-  let inferenceRegionScope: Promise<InferenceRegionScope | null> | undefined;
-  const getInferenceRegionScope = () => (inferenceRegionScope ??= resolveInferenceRegionScope(ctx));
+  let inferenceRegionRouting: Promise<InferenceRegionRouting | null> | undefined;
+  const getInferenceRegionRouting = () =>
+    (inferenceRegionRouting ??= resolveInferenceRegionRouting(ctx));
 
   const decisionForRouter = async (router: AutoRouter) => {
     const caller = await ctx.callerPromise;
@@ -281,7 +292,7 @@ async function resolveAutoModelId(
       policy => collectDeniedAutoRoutingModelIds(policy, router),
       options => collectDataCollectionRequiredAutoRoutingModelIds(router, options),
       {
-        scope: getInferenceRegionScope,
+        routing: getInferenceRegionRouting,
         candidateIds: async () => candidateModelIdsFromTable(await getCachedRoutingTable(router)),
       }
     );
@@ -296,17 +307,8 @@ async function resolveAutoModelId(
     if (!decision || isVirtualAutoModelId(decision.model)) return decision;
     // The worker can pick from a newer routing table than the gateway's cached copy, or from
     // any table when the gateway's is unavailable, so the denials above may not cover its pick.
-    const scope = await getInferenceRegionScope();
-    if (
-      scope &&
-      (
-        await inferenceRegionIneligibleCandidates({
-          ...scope,
-          policy: await ctx.organizationGroupPolicyPromise,
-          candidateIds: [decision.model],
-        })
-      ).length > 0
-    ) {
+    const routing = await getInferenceRegionRouting();
+    if (routing && (await inferenceRegionIneligibleCandidates(routing, [decision.model])).length) {
       return null;
     }
     return decision;
@@ -329,7 +331,13 @@ async function resolveAutoModelId(
           ctx,
           policy => deniedAutoRoutingCandidates(policy, candidateIds),
           options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options),
-          { scope: getInferenceRegionScope, candidateIds: async () => candidateIds }
+          {
+            routing: getInferenceRegionRouting,
+            // The region applies to the model that runs: an alias runs as its pin or stored
+            // target, which are candidates of their own, so denying the alias would also block
+            // an in-region pin.
+            candidateIds: async () => candidateIds.filter(id => !isLatestAliasId(id)),
+          }
         ),
       decide: async (router, deniedModelIds, aliasTargets) => {
         const outcome = await fetchCustomRouterDecision({
@@ -375,21 +383,18 @@ async function resolveAutoModelId(
         })
       ),
       isAutoFreeCandidateAllowed: async modelId => {
-        const [policy, regionScope] = await Promise.all([
+        const [policy, routing] = await Promise.all([
           ctx.organizationGroupPolicyPromise,
-          getInferenceRegionScope(),
+          getInferenceRegionRouting(),
         ]);
         if (policy && !(await getEffectiveModelDecision(policy, modelId)).allowed) return false;
         // Free models are served on Kilo's own accounts, so BYOK keys are not considered.
         return (
-          !regionScope ||
+          !routing ||
           (
-            await inferenceRegionIneligibleCandidates({
-              region: regionScope.region,
-              candidateIds: [modelId],
-              loadByokKeys: null,
-              policy: null,
-            })
+            await inferenceRegionIneligibleCandidates({ ...routing, loadStoredByokKeys: null }, [
+              modelId,
+            ])
           ).length === 0
         );
       },

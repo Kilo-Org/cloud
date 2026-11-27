@@ -33,7 +33,6 @@ import {
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
   efficientPoolBlockedResponse,
-  getOrganizationProviderPrivacy,
   inferenceProvidersNotAllowedResponse,
   unknownModelResponse,
   modelNotAllowedResponse,
@@ -46,17 +45,13 @@ import { isAnonymousContext, type AnonymousUserContext } from '@kilocode/web-sha
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { resolveModelProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/model-provider-access';
 import {
   allowsInferenceProviderUserByok,
-  getEffectiveModelDecision,
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
-import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import {
-  composeProviderPreferences,
-  type getEffectiveProviderPrivacy,
-} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { ValidatedGatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-request';
 import type { AdmittedModelResolution } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy-model-resolution';
 
@@ -119,46 +114,24 @@ type ProviderPolicyResult =
 
 async function resolveAccessCheck(input: ProviderPolicyInput) {
   const { settings } = await input.balanceAndSettingsPromise;
-  const groupPolicy = await input.organizationGroupPolicyPromise;
-  const organizationPrivacy = getOrganizationProviderPrivacy(settings);
-  let organizationOnly: string[] | undefined;
-  let effectiveProviderConfig: OpenRouterProviderConfig | undefined;
-  let groupModelAllowed = true;
-  let groupModelAllowedForInferenceProviderUserByok = true;
-  let groupProvidersAllowed = true;
-  let providerPreferencesExhausted = false;
-  let allowedProviders: ReadonlySet<string> | undefined;
-  if (groupPolicy) {
-    const groupDecision = await getEffectiveModelDecision(groupPolicy, input.model);
-    groupModelAllowed = groupDecision.allowed;
-    // An `organization_provider` denial means no allowed provider serves the model.
-    allowedProviders = groupDecision.allowed ? groupDecision.eligibleProviderRoutes : new Set();
-    groupModelAllowedForInferenceProviderUserByok = allowsInferenceProviderUserByok(groupDecision);
-    if (groupDecision.eligibleProviderRoutes) {
-      organizationOnly = withoutVirtualProvider([...groupDecision.eligibleProviderRoutes]);
-    }
-  }
-  if (organizationPrivacy || organizationOnly) {
-    const composed = composeProviderPreferences({
+  const { groupDecision, allowedProviders, effectiveProviderConfig, providerPreferencesExhausted } =
+    await resolveModelProviderAccess({
+      model: input.model,
+      groupPolicy: await input.organizationGroupPolicyPromise,
+      settings,
       requestProvider: input.requestProvider,
-      organizationOnly,
       effectivePrivacy: input.effectivePrivacy,
     });
-    if (composed.kind === 'none') {
-      providerPreferencesExhausted = true;
-      // A public custom LLM answers its own provider_not_allowed response, which names the
-      // providers the model needs, so it keeps that answer instead of the generic refusal.
-      if (!input.customLlm?.definition.public) groupProvidersAllowed = false;
-    } else {
-      effectiveProviderConfig = composed.provider;
-    }
-  }
   return {
     allowedProviders,
     effectiveProviderConfig,
-    groupModelAllowed,
-    groupModelAllowedForInferenceProviderUserByok,
-    groupProvidersAllowed,
+    groupModelAllowed: groupDecision?.allowed ?? true,
+    groupModelAllowedForInferenceProviderUserByok: groupDecision
+      ? allowsInferenceProviderUserByok(groupDecision)
+      : true,
+    // A public custom LLM answers its own provider_not_allowed response, which names the
+    // providers the model needs, so it keeps that answer instead of the generic refusal.
+    groupProvidersAllowed: !providerPreferencesExhausted || !!input.customLlm?.definition.public,
     providerPreferencesExhausted,
   };
 }

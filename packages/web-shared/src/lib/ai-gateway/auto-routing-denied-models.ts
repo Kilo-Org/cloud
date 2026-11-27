@@ -7,7 +7,13 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { byokOwner, getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  byokOwner,
+  getStoredByokKeys,
+  type StoredByokKeys,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { getOrganizationGatewaySettings } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
@@ -199,11 +205,27 @@ async function inferenceRegionDeniedCandidatesForMember(
     settings: organization.settings,
   });
   if (!dataRegion) return [];
-  return inferenceRegionIneligibleCandidates({
-    region: dataRegion,
-    candidateIds,
-    loadByokKeys: () =>
-      getEnabledByokProviders(readDb, byokOwner(request.userId, request.organizationId)),
-    policy,
-  });
+  const owner = byokOwner(request.userId, request.organizationId);
+  let storedKeys: Promise<StoredByokKeys> | undefined;
+  let isNonTrialEnterprise: Promise<boolean> | undefined;
+  return inferenceRegionIneligibleCandidates(
+    {
+      region: dataRegion,
+      // A CLI decision names its candidates before the request, so its API is not known yet.
+      apiKind: null,
+      policy,
+      settings: organization.settings,
+      requestProvider: undefined,
+      effectivePrivacy: getEffectiveProviderPrivacy(undefined, policy.dataCollection),
+      isNonTrialEnterprise: () =>
+        (isNonTrialEnterprise ??=
+          organization.plan === 'enterprise'
+            ? isNonTrialEnterpriseOrganization(request.organizationId, readDb)
+            : Promise.resolve(false)),
+      caller: { userId: request.userId, organizationId: request.organizationId },
+      loadStoredByokKeys: () => (storedKeys ??= getStoredByokKeys(readDb, owner)),
+    },
+    // An alias runs as its pin or stored target, which are candidates of their own.
+    candidateIds.filter(id => !isLatestAliasId(id))
+  );
 }

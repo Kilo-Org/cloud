@@ -42,6 +42,33 @@ const DATABASE_URL_SECRETS = [
 /** The secrets web and ai-gateway hold in staging and production. */
 const APP_SECRETS = ['INTERNAL_API_SECRET', ...DATABASE_URL_SECRETS];
 
+/**
+ * The web values ai-gateway reuses in production only (ruling M142b): each is copied Create-only
+ * into production /shared, the authoritative path, and its bundle resolves it from there.
+ */
+const GATEWAY_SHARED_SECRETS = [
+  'BYOK_KMS_SERVICE_TOKEN',
+  'CREDIT_CATEGORIES_ENCRYPTION_KEY',
+  'CREDIT_CATEGORIES_ENCRYPTION_KEY_V2',
+  'ENKRYPT_API_KEY',
+  'MAILGUN_API_KEY',
+  'MISTRAL_API_KEY',
+  'O11Y_KILO_GATEWAY_CLIENT_SECRET',
+  'OPENAI_CHATGPT_API_KEY',
+  'OPENAI_CLIENT_SECRET',
+  'OPENROUTER_API_KEY',
+  'R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID',
+  'R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY',
+  'R2_API_REQUEST_LOG_ACCESS_KEY_ID',
+  'R2_API_REQUEST_LOG_SECRET_ACCESS_KEY',
+  'SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL',
+  'STRIPE_SECRET_KEY',
+  'VERCEL_AI_GATEWAY_API_KEY',
+];
+
+/** The secrets ai-gateway holds in production. */
+const GATEWAY_PRODUCTION_SECRETS = [...APP_SECRETS, ...GATEWAY_SHARED_SECRETS];
+
 function withGrants(grants: string): string {
   return `${valid}${grants}`;
 }
@@ -889,7 +916,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key and database URLs outside it, and two Bouncer scopes in production only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key and database URLs outside it, and two Bouncer scopes and the shared web names in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -915,7 +942,7 @@ secrets: [APP_TWO_SECRET]
       environments: ['development', 'staging', 'production'],
       audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'bouncer'],
       scopes: [...GATEWAY_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write'],
-      secrets: APP_SECRETS,
+      secrets: GATEWAY_PRODUCTION_SECRETS,
       dynamic: [],
       environmentGrants: {},
     });
@@ -982,7 +1009,7 @@ describe('dual-accept grants of the shipped policies', () => {
           ...GATEWAY_BASE_SCOPES,
           ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
         ],
-        secrets: APP_SECRETS,
+        secrets: bouncer ? GATEWAY_PRODUCTION_SECRETS : APP_SECRETS,
       });
     }
   );
@@ -1011,6 +1038,71 @@ describe('database URL grants of the shipped policies (decision D67)', () => {
     for (const policy of policyIndex.forEnvironment('development')) {
       expect(policy.secrets.filter(name => DATABASE_URL_SECRETS.includes(name))).toEqual([]);
     }
+  });
+});
+
+describe('shared web secrets of the ai-gateway policy (ruling M142b)', () => {
+  /** o11y holds one of the names too: it checks the gateway's legacy admin token with it. */
+  const OTHER_HOLDERS: Readonly<Record<string, readonly string[]>> = {
+    O11Y_KILO_GATEWAY_CLIENT_SECRET: ['o11y'],
+  };
+
+  it('grants ai-gateway exactly the seventeen names in production and no other policy beside their holders', () => {
+    expect(
+      policyFor('production', 'ai-gateway')?.secrets.filter(name =>
+        GATEWAY_SHARED_SECRETS.includes(name)
+      )
+    ).toEqual(GATEWAY_SHARED_SECRETS);
+    for (const name of GATEWAY_SHARED_SECRETS) {
+      expect(
+        policyIndex
+          .forEnvironment('production')
+          .filter(policy => policy.secrets.includes(name))
+          .map(policy => policy.workload)
+          .sort()
+      ).toEqual(['ai-gateway', ...(OTHER_HOLDERS[name] ?? [])].sort());
+    }
+  });
+
+  it.each(['development', 'staging'] as const)(
+    'grants ai-gateway none of the names in %s',
+    environment => {
+      expect(
+        policyFor(environment, 'ai-gateway')?.secrets.filter(name =>
+          GATEWAY_SHARED_SECRETS.includes(name)
+        )
+      ).toEqual([]);
+    }
+  );
+
+  it('resolves every name from /shared and never from the web folder', () => {
+    const gateway = policyFor('production', 'ai-gateway');
+    if (gateway === null) throw new Error('the ai-gateway policy did not load');
+    const { path } = bundleFolder(gateway);
+    expect(path).toBe('/workloads/ai-gateway');
+    const entry = (folder: string, name: string) => ({
+      path: folder,
+      name,
+      id: `${folder}/${name}`,
+      version: 1,
+      value: `${folder}-value`,
+    });
+    const resolved = resolveWorkloadSecrets(
+      path,
+      gateway.secrets,
+      { entries: GATEWAY_SHARED_SECRETS.map(name => entry('/workloads/web', name)), refused: [] },
+      { entries: GATEWAY_SHARED_SECRETS.map(name => entry('/shared', name)), refused: [] }
+    );
+    expect(resolved.secrets).toEqual(
+      Object.fromEntries(
+        GATEWAY_SHARED_SECRETS.map(name => [
+          name,
+          { value: '/shared-value', version: 1, id: `/shared/${name}` },
+        ])
+      )
+    );
+    // The other granted names are in neither folder here, so the bundle reports them missing.
+    expect(resolved.missing).toEqual(APP_SECRETS);
   });
 });
 

@@ -44,6 +44,13 @@ scopes:
 # secrets-cutover PR. A granted name that comes back `missing` is a configuration error for the
 # reader to report: a missing EU replica keeps today's behaviour and never routes EU reads to the
 # primary. Previews keep `env`.
+# The seventeen production names after the database URLs (ruling M142b): web values the gateway
+# reuses, read by gateway code under packages/web-shared/src/lib (config.server.ts,
+# ai-gateway/byok/kms-client.ts, ai-gateway/openai-chatgpt/upstream.ts,
+# ai-gateway/providers/definitions, r2/ and stripe-client.ts) for the read under
+# SECRETS_SOURCE=sts in the secrets-cutover PR. Each is copied Create-only into production /shared,
+# which is authoritative, and none into /workloads/ai-gateway, so the bundle resolves it from
+# /shared. Production only: staging and previews keep `env`.
 environmentGrants:
   development:
     audiences:
@@ -69,3 +76,20 @@ environmentGrants:
       - POSTGRES_REPLICA_US_URL
       - POSTGRES_REPLICA_EU_URL
       - POSTGRES_REPLICA_EU_URL_2
+      - BYOK_KMS_SERVICE_TOKEN
+      - CREDIT_CATEGORIES_ENCRYPTION_KEY
+      - CREDIT_CATEGORIES_ENCRYPTION_KEY_V2
+      - ENKRYPT_API_KEY
+      - MAILGUN_API_KEY
+      - MISTRAL_API_KEY
+      - O11Y_KILO_GATEWAY_CLIENT_SECRET
+      - OPENAI_CHATGPT_API_KEY
+      - OPENAI_CLIENT_SECRET
+      - OPENROUTER_API_KEY
+      - R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID
+      - R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY
+      - R2_API_REQUEST_LOG_ACCESS_KEY_ID
+      - R2_API_REQUEST_LOG_SECRET_ACCESS_KEY
+      - SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL
+      - STRIPE_SECRET_KEY
+      - VERCEL_AI_GATEWAY_API_KEY

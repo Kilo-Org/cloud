@@ -23,6 +23,7 @@
     "test:kilo-extension-release": "node --test 'scripts/kilo-extension-*.test.mjs'",
     "test:validate": "node --test scripts/validate.test.mjs",
     "lint": "scripts/lint-all.sh",
+    "lint:workflows": "scripts/zizmor.sh",
     "format": "oxfmt",
     "format:check": "oxfmt --list-different .",
     "format:changed": "bash scripts/format-changed.sh",

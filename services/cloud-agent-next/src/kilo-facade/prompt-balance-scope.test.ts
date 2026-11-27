@@ -160,7 +160,12 @@ describe('prompt payer scope', () => {
       kiloUserId: 'usr_1',
       cloudAgentSessionId: workspaceSessionId,
     });
-    expect(validateBalanceOnly).toHaveBeenCalledWith('validated-token', 'org-funded', env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      'validated-token',
+      'org-funded',
+      env,
+      undefined
+    );
     expect(admitPrompt).toHaveBeenCalledOnce();
   });
 
@@ -267,7 +272,12 @@ describe('prompt payer scope', () => {
     });
 
     expect(response.status).toBe(204);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('validated-token', 'org-funded', env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      'validated-token',
+      'org-funded',
+      env,
+      undefined
+    );
     expect(admitPrompt).toHaveBeenCalledOnce();
   });
 
@@ -341,7 +351,12 @@ describe('prompt payer scope', () => {
 
     expect(response.status).toBe(204);
     expect(requireCurrentSessionAccess).toHaveBeenCalledTimes(2);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('validated-token', 'org-funded', env, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      'validated-token',
+      'org-funded',
+      env,
+      undefined
+    );
     expect(admitPrompt).toHaveBeenCalledOnce();
     expect(loggerWarnMock).not.toHaveBeenCalled();
   });

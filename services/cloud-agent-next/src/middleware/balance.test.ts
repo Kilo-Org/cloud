@@ -189,7 +189,12 @@ describe('balanceMiddleware', () => {
     expect(response.status).toBe(200);
     expect(calls).toEqual(['sendMessageV2']);
     expect(getToken).toHaveBeenCalledWith(scoped);
-    expect(validateBalanceOnly).toHaveBeenCalledWith('parent-runtime-token', undefined, requestEnv, undefined);
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      'parent-runtime-token',
+      undefined,
+      requestEnv,
+      undefined
+    );
   });
 
   it('uses the exact organization and parent token for an organization follow-up', async () => {

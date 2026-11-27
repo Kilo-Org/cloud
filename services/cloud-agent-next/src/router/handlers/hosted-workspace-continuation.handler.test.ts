@@ -299,7 +299,12 @@ describe('continueHostedWorkspace balance before admission', () => {
       code: 'PAYMENT_REQUIRED',
       message: 'insufficient_balance',
     });
-    expect(mocks.validateBalanceOnly).toHaveBeenCalledWith('test-token', ORG_ID, expect.anything(), undefined);
+    expect(mocks.validateBalanceOnly).toHaveBeenCalledWith(
+      'test-token',
+      ORG_ID,
+      expect.anything(),
+      undefined
+    );
     expect(mocks.admitOperation).not.toHaveBeenCalled();
   });
 });

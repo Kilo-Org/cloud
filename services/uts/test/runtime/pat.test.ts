@@ -156,9 +156,10 @@ describe('the PAT lookup', () => {
   });
 
   it('answers unavailable when a connect hangs, so a lookup ends by its deadline', async () => {
-    // TEST-NET-1 (RFC 5737) routes nowhere, so the connect never completes.
+    // TEST-NET-1 (RFC 5737) routes nowhere, so the connect never completes and no password is
+    // ever sent; the URL carries none.
     const lookup = identityStorePatLookup(
-      'postgres://uts_pat:unused@192.0.2.1:5432/uts',
+      'postgres://uts_pat@192.0.2.1:5432/uts',
       createExecutionContext()
     );
     const limiter = lookupLimiter();

@@ -111,7 +111,9 @@ describe('internal auth observation', () => {
 
   it('flushes at the memory cap without losing a count', () => {
     for (let route = 0; route < 512; route++) {
-      for (let i = 0; i < 3; i++) observeInternalAuth('web', `route_${route}`, 'legacy_shared_secret');
+      for (let i = 0; i < 3; i++) {
+        observeInternalAuth('web', `route_${route}`, 'legacy_shared_secret');
+      }
     }
     // The 513th bucket forces the cap flush: every held bucket writes its two unsent requests.
     observeInternalAuth('web', 'route_512', 'legacy_shared_secret');

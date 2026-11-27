@@ -6,7 +6,12 @@ import { usage, wireUsage } from './usage.test-fixture';
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
 });
+
+// This suite asserts exact enqueue log lines and mocked `Date.now` sequences; the item-9 counter
+// has its own suite (src/publish-auth.test.ts), so it stays off here.
+process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
 
 function setup() {
   const info = vi.spyOn(console, 'info').mockImplementation(() => {});

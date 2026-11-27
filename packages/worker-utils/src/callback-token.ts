@@ -1,4 +1,4 @@
-import { callerLabel, observeInternalAuth } from './internal-auth-observation.js';
+import { callerLabel, observeInternalAuth } from './internal-auth-observation';
 
 const CALLBACK_TOKEN_HEX_PATTERN = /^[0-9a-f]{64}$/;
 

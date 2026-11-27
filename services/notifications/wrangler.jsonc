@@ -11,10 +11,6 @@
   // bindings, and a Worker that binds STS records none
   // (services/sts/test/repo/worker-configs.ts).
   "observability": { "enabled": true, "traces": { "enabled": false } },
-  // Item 9 internal-auth counter (design section 9.4): this Worker compares two shared secrets and
-  // has no other Axiom path, so its `kilo_internal_auth` lines need Logpush. Volume is its own
-  // request rate (low thousands per hour), not a per-request billing path.
-  "logpush": true,
   // Notification history retention. `NotificationsService.scheduled` prunes rows
   // older than the 90-day history window; see
   // src/lib/notification-history-prune.ts.

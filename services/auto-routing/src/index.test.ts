@@ -279,6 +279,9 @@ function decideRequest(payload: unknown) {
 
 describe('auto routing worker', () => {
   beforeEach(async () => {
+    // This suite asserts the exact decision log lines; the item-9 counter has its own suite
+    // (packages/worker-utils/src/backend-auth-middleware.test.ts).
+    process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
     clearClassifierConfigCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
@@ -362,6 +365,7 @@ describe('auto routing worker', () => {
   afterEach(async () => {
     await drainBackgroundTasks();
     globalThis.fetch = originalFetch;
+    delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
     vi.restoreAllMocks();
   });
 

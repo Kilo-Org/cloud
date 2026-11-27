@@ -399,7 +399,9 @@ answers 503 before its first await. The exchange statement then runs as for any 
 client, behind a backstop: the trigger `authorization_codes_require_attestation` refuses to
 consume a `kilo-mobile` code (SQLSTATE 23514) unless it is attested or, in development without
 attestation config only, marked exempt (`uts.exempt_code_attestation`, refused in every other
-environment). Per mobile sign-in: 3 statements (claim, settle, exchange) instead of 1, a retry of
+environment; it trusts the Worker's `UTS_ENVIRONMENT`, so a production deploy misconfigured as
+development would mark codes exempt and the backstop would not catch it; `test/repo` holds the
+trigger's client list equal to the attestation-required clients). Per mobile sign-in: 3 statements (claim, settle, exchange) instead of 1, a retry of
 an attested exchange 2, development without config 2 (exempt, exchange); for Android one
 `decodeIntegrityToken` call plus one token exchange per isolate per hour; no Durable Object hop
 beyond the signer call; no queue message; one audit row per refusal. After a Google 429 each

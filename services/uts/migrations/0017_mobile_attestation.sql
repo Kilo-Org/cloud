@@ -304,7 +304,10 @@ END
 $$;
 
 -- The backstop: an attestation-required client's code is consumed only when attested or exempt.
--- The client list is the `attestation: 'required'` clients of src/oauth/clients.ts.
+-- The client list is the `attestation: 'required'` clients of src/oauth/clients.ts and the
+-- contracts (test/repo/attestation-clients.test.ts holds them equal). The exempt mark trusts the
+-- Worker's `UTS_ENVIRONMENT`: a production Worker misconfigured as development would mark codes
+-- exempt, and this backstop would not catch it.
 CREATE FUNCTION uts.require_code_attestation() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp

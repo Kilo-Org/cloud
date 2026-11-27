@@ -124,10 +124,10 @@ type Proof =
 
 const BASE64 = /^[A-Za-z0-9+/_-]+={0,2}$/;
 /**
- * A Play Integrity token is opaque to UTS: printable base64url characters and dots, within the
- * size limit; `decodeIntegrityToken` decides whether it is one.
+ * A Play Integrity token is opaque to UTS: printable base64url characters, dots and padding,
+ * within the size limit; `decodeIntegrityToken` decides whether it is one.
  */
-const INTEGRITY_TOKEN = /^[A-Za-z0-9_.-]+$/;
+const INTEGRITY_TOKEN = /^[A-Za-z0-9_.=-]+$/;
 const KEY_ID_BYTES = 32;
 
 function malformed(): Response {

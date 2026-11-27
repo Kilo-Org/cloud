@@ -40,9 +40,10 @@ export type FirstPartyClient = {
 /**
  * The first-party clients (design 5.5): the CLI, which the VS Code and JetBrains extensions drive,
  * with the device grant as its fallback, and the mobile app, which signs in through the system
- * browser. A client joins this list when it moves to UTS.
+ * browser. A client joins this list when it moves to UTS. Exported for `test/repo`, which holds the
+ * attestation-required ids equal to the backstop trigger's list (migration 0017).
  */
-const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
+export const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
   [
     'kilo-cli',
     {

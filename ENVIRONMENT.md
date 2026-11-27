@@ -104,7 +104,7 @@ does not require this credential.
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
 - `AI_GATEWAY_URL` - Optional origin of the `apps/ai-gateway` app that `apps/web` rewrites its AI gateway routes to; read at build time in `apps/web/ai-gateway-rewrites.mjs`. When unset, Vercel's `production` target uses `https://ai-gateway.kilo.ai`, its `staging` target uses `https://staging-ai-gateway.kilo.ai`, other Vercel targets fail the build, and outside Vercel it defaults to `http://localhost:<3010 + KILO_PORT_OFFSET>`. `apps/web` has no gateway routes of its own. `pnpm dev:start` sets it to the local ai-gateway app. [SERVER]
-- `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `packages/web-shared/src/lib/config.server.ts`. [SERVER]
+- `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for per-instance KiloClaw hosts, containing `{label}`; used in `packages/web-shared/src/lib/config.server.ts`. `legacy` (any case) turns per-instance hosts off everywhere. In the production Vercel deployment (`VERCEL_ENV` and `VERCEL_TARGET_ENV` both `production`) unset means `https://{label}.kiloclaw.ai`. Anywhere else only an explicit `http(s)` template off the production KiloClaw hosts (`kiloclaw.ai`, `*.kiloclaw.ai`, `claw.kilosessions.ai`, `claw.kilo.ai`) is used; unset or refused keeps every instance on the legacy host (see `KILOCLAW_API_URL`). Local development: `http://{label}.kiloclaw.localhost:8795` (`apps/web/.env.development.local.example`). [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
 - `SESSION_SYNC_SECRET` - Signs short-lived grants for the native session sync service. Keep it separate from user credentials and `NEXTAUTH_SECRET`. `[SECRET]`
@@ -395,7 +395,8 @@ admission responses within the same slot and deadline.
 
 ### Internal Services
 
-- `WEBHOOK_AGENT_URL` - URL for the webhook agent worker. [SERVER]
+- `WEBHOOK_AGENT_URL` - URL for the webhook agent worker. In the production Vercel deployment (`VERCEL_ENV` and `VERCEL_TARGET_ENV` both `production`) unset means `https://hooks.kilosessions.ai`. Anywhere else it must be set to a non-production `https` or loopback `http` URL; unset, the production host, or the production Worker's `workers.dev` host leaves webhook triggers unavailable (nothing is sent or written). [SERVER]
+- `AUTO_ROUTING_BENCHMARK_WORKER_URL` - URL for the auto-routing benchmark worker. In the production Vercel deployment unset means `https://auto-routing-benchmark.kiloapps.io`. Anywhere else it must be set to a non-production `https` or loopback `http` URL; unset or the production host makes benchmark admin calls answer "not configured" and case admission answer `admission_unavailable` without a request. [SERVER]
 - `MODEL_EVAL_INGEST_URL` - URL for model evaluation ingest worker. [SERVER]
 - `SESSION_INGEST_WORKER_URL` - URL for the session ingest worker. [SERVER]
 - `NOTIFICATIONS_WORKER_URL` - URL for the push-notifications worker internal dispatch endpoint. [SERVER]
@@ -405,7 +406,7 @@ admission responses within the same slot and deadline.
 - `NEXT_PUBLIC_SESSION_SYNC_URL` - Optional development-only native remote preview relay URL, defaulting to `http://localhost:8817` for the isolated local session-sync Worker. `/native-remote`, its credential endpoint, and its CSP connection permissions require `NODE_ENV=development`; production feature flags cannot enable the preview. This does not change the native CLI or session-sync service endpoints. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
-- `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
+- `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. It is also the legacy host in the dashboard's KiloClaw Open link (`workerUrl`). In the production Vercel deployment an unset value there means `https://claw.kilo.ai`. Anywhere else the link uses only an explicit `http(s)` value off the production KiloClaw hosts; otherwise the dashboard shows no Open link. [SERVER]
 - `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API. [SERVER]
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]

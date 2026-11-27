@@ -13,7 +13,18 @@ const DENIED_MODELS_ATTEMPTS = 2;
 
 type GatewayPolicyEnv = Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_AI_GATEWAY_BASE_URL'>;
 
-const deniedModelsCache = new Map<string, { expiresAt: number; value: string[] }>();
+type PolicyCacheEntry = {
+  expiresAt: number;
+  value: string[];
+  /** When the lookup that produced this answer started; its TTL runs from here. */
+  startedAt: number;
+  /** Start order of that lookup, so an older answer never replaces a newer one. */
+  sequence: number;
+};
+
+const deniedModelsCache = new Map<string, PolicyCacheEntry>();
+
+let lookupSequence = 0;
 
 export function clearOrganizationPolicyCache(): void {
   deniedModelsCache.clear();
@@ -88,14 +99,22 @@ export async function deniedOrganizationModelIds(
   const now = Date.now();
   const hit = deniedModelsCache.get(key);
   if (hit && hit.expiresAt > now) return hit.value;
+  lookupSequence += 1;
+  const sequence = lookupSequence;
   // Only a resolved answer is cached: a pending lookup belongs to the request that started it, so
   // a request that joined it would fail when that request was cancelled.
   const deniedModelIds = await fetchDeniedModelIdsWithRetry(env, { ...request, modelIds });
   if (deniedModelIds === null) return null;
+  const existing = deniedModelsCache.get(key);
+  // A lookup that started before the cached answer must not replace it, and the TTL runs from the
+  // lookup's start, not from when the gateway happened to answer.
+  if (existing !== undefined && existing.sequence > sequence) return deniedModelIds;
   deniedModelsCache.delete(key);
   deniedModelsCache.set(key, {
-    expiresAt: Date.now() + POLICY_CACHE_TTL_MS,
+    expiresAt: now + POLICY_CACHE_TTL_MS,
     value: deniedModelIds,
+    startedAt: now,
+    sequence,
   });
   if (deniedModelsCache.size > POLICY_CACHE_LIMIT) {
     const oldest = deniedModelsCache.keys().next().value;

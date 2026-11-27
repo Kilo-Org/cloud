@@ -25,9 +25,13 @@ type CacheEntry = {
   value: CustomRouterDefinition | null;
   /** Database time of the read that proved this value, or null for a TTL-only read. */
   observedAtMs: number | null;
+  /** Start order of the read that produced this value, so an older read never replaces a newer one. */
+  sequence: number;
 };
 
 const cache = new Map<string, CacheEntry>();
+
+let readSequence = 0;
 
 export function clearCustomRouterCache(): void {
   cache.clear();
@@ -92,30 +96,47 @@ export function hasGatewayAlias(router: CustomRouterDefinition): boolean {
   return router.entries.some(isGatewayAliasEntry);
 }
 
-function entryCached(
-  key: string,
-  value: CustomRouterDefinition | null,
-  observedAtMs: number | null
-): void {
+function storeCached(key: string, entry: CacheEntry): void {
   cache.delete(key);
-  cache.set(key, { expiresAt: Date.now() + CUSTOM_ROUTER_CACHE_TTL_MS, value, observedAtMs });
+  cache.set(key, entry);
   if (cache.size > CUSTOM_ROUTER_CACHE_LIMIT) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) cache.delete(oldest);
   }
 }
 
+/**
+ * A read that started before the cached answer must never replace it, and neither may a read that
+ * started before an observation landed: a slower answer never becomes the current one.
+ */
+function storeRead(key: string, entry: CacheEntry, started: CacheEntry | undefined): void {
+  const existing = cache.get(key);
+  if (existing !== undefined && existing !== started) {
+    if (existing.sequence > entry.sequence) return;
+    if (existing.observedAtMs !== null) return;
+  }
+  storeCached(key, entry);
+}
+
 async function cached(
   key: string,
   load: () => Promise<CustomRouterDefinition | null>
 ): Promise<CustomRouterDefinition | null> {
-  const now = Date.now();
-  const hit = cache.get(key);
-  if (hit && hit.expiresAt > now) return hit.value;
+  const started = cache.get(key);
+  const startedAt = Date.now();
+  if (started && started.expiresAt > startedAt) return started.value;
+  readSequence += 1;
+  const sequence = readSequence;
   // Only a resolved read is cached: workerd binds a promise's I/O to the request that created it,
   // so a request that awaited another request's pending read would fail when that one was cancelled.
   const value = await load();
-  entryCached(key, value, null);
+  // The TTL runs from the start of the read, so a slow read cannot extend how long an old answer is
+  // served.
+  storeRead(
+    key,
+    { expiresAt: startedAt + CUSTOM_ROUTER_CACHE_TTL_MS, value, observedAtMs: null, sequence },
+    started
+  );
   return value;
 }
 
@@ -184,7 +205,13 @@ function rememberObservation(
 ): void {
   const hit = cache.get(key);
   if (hit && hit.observedAtMs !== null && hit.observedAtMs > observedAtMs) return;
-  entryCached(key, router, observedAtMs);
+  readSequence += 1;
+  storeCached(key, {
+    expiresAt: Date.now() + CUSTOM_ROUTER_CACHE_TTL_MS,
+    value: router,
+    observedAtMs,
+    sequence: readSequence,
+  });
 }
 
 export function findCustomRouter(

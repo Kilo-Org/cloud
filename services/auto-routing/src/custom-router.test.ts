@@ -1037,10 +1037,9 @@ describe('public custom router decide', () => {
         // The request that started this read is cancelled while it is pending: workerd tears the
         // I/O down and rejects it. The bound only keeps this test terminating when a later request
         // is still waiting on that read; how the first request ends is not what is under test.
-        await Promise.race([
-          endFirstRequest.promise,
-          new Promise(resolve => setTimeout(resolve, 2_000)),
-        ]);
+        const backstop = setTimeout(endFirstRequest.resolve, 2_000);
+        await endFirstRequest.promise;
+        clearTimeout(backstop);
         throw new Error('This promise was created by a request that has since ended.');
       }
       return Response.json({ error: 'unexpected path' }, { status: 500 });
@@ -1058,6 +1057,62 @@ describe('public custom router decide', () => {
     expect(cancelledRes.status).toBe(500);
     expect(await errorCode(cancelledRes)).toBe('internal_error');
     expect(tableReads).toBe(2);
+  });
+
+  it('keeps a table build alive through waitUntil so an abandoned request still caches it', async () => {
+    const waitUntil = vi.spyOn(executionCtx, 'waitUntil');
+    const tableRead = Promise.withResolvers<void>();
+    const releaseTable = Promise.withResolvers<void>();
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        tableRead.resolve();
+        await releaseTable.promise;
+        return Response.json({ table: rankedTable });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const tableFetches = () =>
+      benchmarkFetch.mock.calls.filter(
+        ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
+      ).length;
+
+    // Nobody is waiting for this response any more: the gateway gave up on it. The build the worker
+    // handed to `waitUntil` still finishes and writes the cache for the next request.
+    const abandoned = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    await tableRead.promise;
+    expect(waitUntil).toHaveBeenCalled();
+    releaseTable.resolve();
+    await Promise.all(waitUntil.mock.calls.map(([promise]) => promise));
+    expect(tableFetches()).toBe(1);
+
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(1);
+    await decisionOf(await abandoned);
+  });
+
+  it('never rejects the build it hands to waitUntil', async () => {
+    const waitUntil = vi.spyOn(executionCtx, 'waitUntil');
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        throw new Error('This promise was created by a request that has since ended.');
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(500);
+    // A failed build must not surface as an unhandled rejection held open by the runtime.
+    const kept = await Promise.allSettled(waitUntil.mock.calls.map(([promise]) => promise));
+    expect(kept.filter(result => result.status === 'rejected')).toHaveLength(0);
   });
 
   it('never answers a post-settlement request from a build started before it', async () => {

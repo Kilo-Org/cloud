@@ -223,7 +223,8 @@ function cacheEntry(key: string, entry: CachedTableEntry): void {
  */
 async function loadCustomRouterTable(
   env: Env,
-  router: CustomRouterDefinition
+  router: CustomRouterDefinition,
+  waitUntil: (promise: Promise<unknown>) => void
 ): Promise<CustomRouterTableLoad> {
   const context = customRouterBenchmarkContext(router);
   const key = JSON.stringify(context);
@@ -233,33 +234,38 @@ async function loadCustomRouterTable(
     cached && (cached.load.servingPins.size > 0 || cached.load.servingFallback.size > 0)
       ? CUSTOM_ROUTER_PINNED_TABLE_CACHE_TTL_MS
       : CUSTOM_ROUTER_TABLE_CACHE_TTL_MS;
+  // The fingerprint this request already read while checking the cached table.
+  let prefetchedVersion: string | null = null;
   if (cached && epoch !== null && Date.now() - cached.builtAt < cacheTtl) {
     if (cached.epoch === epoch) return cached.load;
     // The router's registry moved. Only this pool's own ready set decides whether it rebuilds, and
     // the record of that check must not extend `builtAt`: the hard TTL still has to expire so
     // catalogue and pricing changes refresh.
-    const version = await fetchCustomRouterTableVersion(env, context);
-    if (version !== null && version === cached.version) {
+    prefetchedVersion = await fetchCustomRouterTableVersion(env, context);
+    if (prefetchedVersion !== null && prefetchedVersion === cached.version) {
       if (cached.epoch === null || epoch > cached.epoch) {
         cacheEntry(key, { ...cached, epoch });
       }
       return cached.load;
     }
   }
-  // A burst on a cold context builds once per request rather than sharing one load: a promise
-  // belongs to the request that started it, so joining another request's rebuild would fail here
-  // with its cancellation. The build still caches only its resolved table, and `sequence` keeps an
-  // older build from replacing a newer one that finished first.
+  // `sequence` keeps an older build from replacing a newer one that finished first.
   cacheSequence += 1;
   const sequence = cacheSequence;
   const startedAt = Date.now();
-  try {
+  const build = (async (): Promise<CustomRouterTableLoad> => {
     // Fingerprint before the table: a change landing after it advances the epoch again, so the next
     // request re-checks instead of trusting this build.
-    const version = await fetchCustomRouterTableVersion(env, context);
+    const version = prefetchedVersion ?? (await fetchCustomRouterTableVersion(env, context));
     const load = await fetchCustomRouterTable(env, context);
     cacheEntry(key, { load, epoch, version, builtAt: startedAt, sequence });
     return load;
+  })();
+  // The build belongs to this request, so it is never joined by another one, but the runtime keeps
+  // it alive through `waitUntil`: a request the gateway cancels still finishes its cache write.
+  waitUntil(build.catch(() => {}));
+  try {
+    return await build;
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -323,7 +329,7 @@ export function customRouterTarget(
     deniedModelIds: routing.deniedModelIds,
     loadRouting: async timings => {
       const tableStartedAt = performance.now();
-      const loaded = await loadCustomRouterTable(env, router);
+      const loaded = await loadCustomRouterTable(env, router, waitUntil);
       // The benchmark worker is the authority on which pins still have a usable measurement.
       routing.usablePins = new Map(loaded.servingPins);
       routing.servingFallback = new Set(loaded.servingFallback);

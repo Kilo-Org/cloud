@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type * as DbModule from '@kilocode/db';
@@ -9,6 +9,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import {
   clearCustomRouterCache,
+  findCustomRouter,
   findServingCustomRouter,
   hasGatewayAlias,
 } from './custom-router-store';
@@ -19,6 +20,10 @@ const state = vi.hoisted(() => ({
   aliasTargets: null as unknown,
   selections: [] as unknown[],
   reads: 0,
+  /** Held until resolved so a test can decide which read finishes first. */
+  holdRead: null as Promise<void> | null,
+  /** Thrown by the next read that is not held. */
+  failRead: null as Error | null,
 }));
 
 vi.mock('@kilocode/db', async importOriginal => {
@@ -27,14 +32,22 @@ vi.mock('@kilocode/db', async importOriginal => {
     ...actual,
     getWorkerDb: () => {
       state.reads++;
+      // Captured at the read's start: a later change of `rows` is what a newer read would see.
+      const rows = state.rows;
+      const hold = state.holdRead;
+      const fail = state.failRead;
+      state.holdRead = null;
+      state.failRead = null;
       return {
         select: (fields?: unknown) => {
           state.selections.push(fields);
           const freshness = fields !== undefined;
           const joined = () => ({
             where: () => ({
-              limit: async () =>
-                state.rows.map(item =>
+              limit: async () => {
+                if (hold) await hold;
+                if (fail) throw fail;
+                return rows.map(item =>
                   freshness
                     ? {
                         router: item,
@@ -42,7 +55,8 @@ vi.mock('@kilocode/db', async importOriginal => {
                         observedAtMs: state.observedAtMs,
                       }
                     : item
-                ),
+                );
+              },
             }),
           });
           return {
@@ -120,6 +134,12 @@ beforeEach(() => {
   state.observedAtMs = 1_766_000_000_000;
   state.selections = [];
   state.reads = 0;
+  state.holdRead = null;
+  state.failRead = null;
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('custom router alias predicate', () => {
@@ -198,16 +218,56 @@ describe('serving definition read', () => {
     expect(await findServingCustomRouter(env, OWNER, 'mine')).toBeNull();
   });
 
-  it('gives each concurrent request its own read instead of joining a pending one', async () => {
+  it('gives each concurrent request its own read and caches the one that succeeded', async () => {
+    const firstRead = Promise.withResolvers<void>();
+    state.holdRead = firstRead.promise;
+    state.failRead = new Error('This promise was created by a request that has since ended.');
     state.rows = [storedRow([concreteEntry])];
-    const [first, second] = await Promise.all([
-      findServingCustomRouter(env, OWNER, 'mine'),
-      findServingCustomRouter(env, OWNER, 'mine'),
-    ]);
-    expect(first?.router.slug).toBe('mine');
-    expect(second?.router.slug).toBe('mine');
-    // A pending read belongs to the request that started it, so two requests read twice and only
-    // the resolved definitions are cached.
+
+    const cancelled = findCustomRouter(env, OWNER, 'mine');
+    const served = await findCustomRouter(env, OWNER, 'mine');
+    expect(served?.slug).toBe('mine');
+
+    firstRead.resolve();
+    await expect(cancelled).rejects.toThrow('has since ended');
+
+    // The definition the second request read is the cached one, not the failed read.
+    await expect(findCustomRouter(env, OWNER, 'mine')).resolves.toBe(served);
+    expect(state.reads).toBe(2);
+  });
+
+  it('does not let a read that started earlier replace a newer cached read', async () => {
+    const held = Promise.withResolvers<void>();
+    const newerEntry: CustomRouterEntry = { kind: 'gateway', model: 'openai/gpt-5.2' };
+    state.holdRead = held.promise;
+    state.rows = [storedRow([concreteEntry])];
+    const slow = findCustomRouter(env, OWNER, 'mine');
+
+    state.rows = [storedRow([newerEntry])];
+    const newer = await findCustomRouter(env, OWNER, 'mine');
+    expect(newer?.entries).toEqual([newerEntry]);
+
+    held.resolve();
+    await slow;
+    // The later read's answer stands even though the earlier read finished last.
+    expect((await findCustomRouter(env, OWNER, 'mine'))?.entries).toEqual([newerEntry]);
+    expect(state.reads).toBe(2);
+  });
+
+  it('expires the cached read from when it started, not from when it finished', async () => {
+    let clock = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const held = Promise.withResolvers<void>();
+    state.holdRead = held.promise;
+    state.rows = [storedRow([concreteEntry])];
+    const slow = findCustomRouter(env, OWNER, 'mine');
+
+    // The read finishes 29 s after it started, so a finish-based TTL would keep it for 59 s.
+    clock += 29_000;
+    held.resolve();
+    await slow;
+    clock += 2_000;
+    await findCustomRouter(env, OWNER, 'mine');
     expect(state.reads).toBe(2);
   });
 

@@ -4,6 +4,7 @@ export * from './browser-sessions';
 export * from './clients';
 export * from './environment';
 export * from './exchange';
+export * from './home-widget';
 export * from './jwks';
 export * from './metadata';
 export * from './oauth';

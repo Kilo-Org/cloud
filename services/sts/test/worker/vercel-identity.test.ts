@@ -416,7 +416,16 @@ describe('Vercel identity of the shipped ai-gateway policy', () => {
     });
   });
 
-  it('refuses every kilocode-ai-gateway environment on staging and production STS', async () => {
+  it('verifies a kilocode-ai-gateway production function on production STS as ai-gateway', async () => {
+    const production = await shipped('production');
+    expect(await production(gatewayClaims('production'))).toMatchObject({
+      status: 'verified',
+      workload: 'ai-gateway',
+      provider: 'vercel',
+    });
+  });
+
+  it('refuses every kilocode-ai-gateway environment on staging STS, and a preview on production STS', async () => {
     const staging = await shipped('staging');
     expect(await staging(gatewayClaims('preview'))).toMatchObject({
       status: 'denied',
@@ -440,9 +449,11 @@ describe('Vercel identity of the shipped ai-gateway policy', () => {
       reason: 'environment_mismatch',
       subject: { actor: 'ai-gateway' },
     });
-    expect(await production(gatewayClaims('production'))).toMatchObject({
+    // Production STS never serves a preview (design 6.2), and development STS never production.
+    const development = await shipped('development');
+    expect(await development(gatewayClaims('production'))).toMatchObject({
       status: 'denied',
-      reason: 'identity_rejected',
+      reason: 'environment_mismatch',
       subject: { actor: 'ai-gateway' },
     });
   });

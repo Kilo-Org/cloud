@@ -86,8 +86,14 @@ describe('policy token grants', () => {
     ).toThrow('audience canary is reserved and no policy may grant it');
     // The shipped web policy, which sends the probe, grants neither.
     expect(policyIndex.get('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest'],
-      scopes: ['usage-ingest:sts.canary'],
+      audiences: ['usage-ingest', 'bouncer'],
+      scopes: [
+        'usage-ingest:sts.canary',
+        'bouncer:decide',
+        'bouncer:usage.write',
+        'bouncer:signup.decide',
+        'bouncer:signup.history',
+      ],
     });
   });
 
@@ -760,7 +766,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway previews and grants it only the UTS feed, in development only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway previews and production, with the UTS feed in development and two Bouncer scopes in production', () => {
     const gateway = policyFor('development', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -768,18 +774,24 @@ secrets: [APP_TWO_SECRET]
       teamId: 'team_ItxRShuUkJaEd9GmXMEEgunb',
       projectId: 'prj_cFtsRYRBCm4qa8D35LC2j183FohC',
       projectName: 'kilocode-ai-gateway',
-      environments: ['preview'],
+      environments: ['preview', 'production'],
     });
     expect(gateway).toMatchObject({
-      environments: ['development'],
+      environments: ['development', 'production'],
       audiences: ['uts-feed'],
       scopes: ['uts-feed:revocation.read'],
       secrets: [],
       dynamic: [],
       environmentGrants: {},
     });
+    expect(policyFor('production', 'ai-gateway')).toMatchObject({
+      audiences: ['bouncer'],
+      scopes: ['bouncer:decide', 'bouncer:usage.write'],
+      secrets: [],
+      dynamic: [],
+      environmentGrants: {},
+    });
     expect(policyFor('staging', 'ai-gateway')).toBeNull();
-    expect(policyFor('production', 'ai-gateway')).toBeNull();
   });
 });
 
@@ -1133,7 +1145,7 @@ scopes: ['gateway:models.read']
     ).toBe(true);
   });
 
-  it('grants web its UTS audiences, scopes and client keys in development only', () => {
+  it('grants web its UTS audiences, scopes and client keys in development only, and the Bouncer scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
       audiences: ['usage-ingest', 'uts-feed', 'uts'],
@@ -1146,12 +1158,21 @@ scopes: ['gateway:models.read']
       ],
       secrets: ['UTS_KILO_WEB_CLIENT_KEY', 'UTS_KILO_WEB_CLIENT_KEY_NEXT'],
     });
-    for (const environment of ['staging', 'production'] as const) {
-      expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest'],
-        scopes: ['usage-ingest:sts.canary'],
-        secrets: [],
-      });
-    }
+    expect(policyFor('staging', 'web')).toMatchObject({
+      audiences: ['usage-ingest'],
+      scopes: ['usage-ingest:sts.canary'],
+      secrets: [],
+    });
+    expect(policyFor('production', 'web')).toMatchObject({
+      audiences: ['usage-ingest', 'bouncer'],
+      scopes: [
+        'usage-ingest:sts.canary',
+        'bouncer:decide',
+        'bouncer:usage.write',
+        'bouncer:signup.decide',
+        'bouncer:signup.history',
+      ],
+      secrets: [],
+    });
   });
 });

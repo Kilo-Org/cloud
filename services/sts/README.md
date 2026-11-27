@@ -378,9 +378,11 @@ Identity kinds:
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
 `STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`: the canary scopes `web:sts.canary` and
-`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`, and
+`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`,
 under `uts` the scopes `uts:subjects.revoke`, `uts:browser-sessions.end`,
-`uts:api-credentials.revoke` and `uts:token-exchange`) and belong to a listed audience, every
+`uts:api-credentials.revoke` and `uts:token-exchange`, under `bouncer` the scopes `bouncer:decide`,
+`bouncer:usage.write`, `bouncer:signup.decide` and `bouncer:signup.history`, and the phase 4
+service scopes) and belong to a listed audience, every
 audience needs at least one scope, and no audience may be the workload itself. A reserved scope
 (`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its audience fail the load whatever the
 registry says: no policy may grant them (see [Alerts on token denials](#alerts-on-token-denials)).
@@ -450,10 +452,15 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide`, `bouncer:signup.history` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
-| `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (the policy lists only `development`) |
+| `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
+| `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`); identity Vercel production |
 
-Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
+Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
+are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only and accepts only
+production STS tokens; the shared Bouncer client of both apps mints them behind
+`BOUNCER_STS_TOKENS` (`ENVIRONMENT.md`). The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
 config check below refuses a `worker-binding` policy that no config here binds. Its local block
@@ -462,12 +469,16 @@ not deploy, so the binding goes in an `env.local` block named `kilo-mcp-local`, 
 `observability.traces.enabled: false` in every block.
 
 The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
-exists for the gateway's authenticated UTS HTTPS feed transport. It lists development only. Staging
-and production STS refuse a real gateway token whole (401 `identity_rejected`) and audit it with
-actor `ai-gateway`: a preview token as `environment_mismatch`, a staging or production token as
-`identity_rejected`, since the policy lists neither identity. A caller that reached the mint there
-would get `unknown_workload`, as no policy names it. Its activation adds staging and production to
-both its `environments` lists and is reviewed like any policy change.
+lists development and production, and each grant belongs to one of them: the gateway's
+authenticated UTS HTTPS feed transport reads the feed in development only, and its Bouncer calls
+(`bouncer:decide`, `bouncer:usage.write`) mint in production only. Production STS refuses a preview
+token as `environment_mismatch`, and development STS a production token. Staging STS refuses a real
+gateway token whole (401 `identity_rejected`) and audits it with actor `ai-gateway`: a preview token
+as `environment_mismatch`, a staging token as `identity_rejected`, since the policy lists neither
+staging nor its custom environment. A caller that reached the staging mint would get
+`unknown_workload`, as no policy names it there, and a production caller asking for the feed gets
+`audience_not_allowed`. Phase 4's UTS activation adds staging to both `environments` lists and moves
+the feed grant, and is reviewed like any policy change.
 
 Any preview build of `kilocode-ai-gateway`, from any branch, can obtain this development read
 scope, the same as `web`'s development grants. If fork or outside pull-request previews are ever
@@ -658,9 +669,9 @@ environment. Anyone with deploy rights on the project can deploy to that custom 
 staging values must not be production-grade. Team `kilocode` is `team_ItxRShuUkJaEd9GmXMEEgunb`.
 
 The AI gateway (`apps/ai-gateway`, workload `ai-gateway`) is the project `kilocode-ai-gateway`
-(`prj_cFtsRYRBCm4qa8D35LC2j183FohC`). Its policy lists only `preview`, so development STS serves its
-preview deployments and nothing else; its own custom environment `staging`
-(`env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV`) and `production` are not listed yet. Both projects share the
+(`prj_cFtsRYRBCm4qa8D35LC2j183FohC`). Its policy lists `preview` and `production`, so development STS
+serves its preview deployments and production STS its production deployment; its own custom
+environment `staging` (`env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV`) is not listed yet. Both projects share the
 team issuer `https://oidc.vercel.com/kilocode`; the project id alone tells them apart.
 
 A policy fails to load when a listed Vercel environment can read none of the policy's STS

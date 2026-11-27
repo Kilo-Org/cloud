@@ -30,6 +30,7 @@ export type Env = Omit<
   | 'USAGE_INGEST_HEDGE_DELAY_MS'
   | 'USAGE_INGEST_HEDGE_PERCENT'
   | 'USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED'
+  | 'USAGE_WRITER_AUTH'
   // `StsEnv` (sts.ts) types the STS binding and vars, `StsCanaryEnv` (sts-canary.ts) the canary's.
   | 'STS'
   | 'STS_CANARY_ENABLED'

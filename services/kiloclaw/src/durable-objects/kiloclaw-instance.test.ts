@@ -3174,6 +3174,51 @@ describe('startExistingMachine: failed Fly machine', () => {
   });
 });
 
+describe('startExistingMachine: stopped machine after update', () => {
+  it('starts the machine explicitly when the update leaves it stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: 'machine-1' });
+
+    (flyClient.getMachine as Mock)
+      .mockResolvedValueOnce({ state: 'stopped', config: {} })
+      .mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockResolvedValue({ instance_id: 'instance-1' });
+    (flyClient.startMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(flyClient.updateMachine).toHaveBeenCalled();
+    expect(flyClient.startMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+    expect(flyClient.waitForState).toHaveBeenCalledWith(
+      expect.anything(),
+      'machine-1',
+      'started',
+      expect.any(Number),
+      'instance-1'
+    );
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('skips the explicit start when the update already launched the machine', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: 'machine-1' });
+
+    (flyClient.getMachine as Mock)
+      .mockResolvedValueOnce({ state: 'stopped', config: {} })
+      .mockResolvedValue({ state: 'starting' });
+    (flyClient.updateMachine as Mock).mockResolvedValue({ instance_id: 'instance-1' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('running');
+  });
+});
+
 describe('createNewMachine: persist ID before waitForState', () => {
   it('persists machine ID to storage before calling waitForState', async () => {
     const { instance, storage } = createInstance();

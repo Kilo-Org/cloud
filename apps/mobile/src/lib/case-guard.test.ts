@@ -51,6 +51,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/credits/store-products-loader.ts': 'store failure report token normalization',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
+  'lib/telemetry/sentry-scrub-request.ts': 'HTTP header-name comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
   'lib/pr-review/merge/merge-blocked-reasons.ts': 'merge-method wire-code lookup key',
   'lib/pr-review/merge/merge-result-banner-store.ts': 'review-key composition',

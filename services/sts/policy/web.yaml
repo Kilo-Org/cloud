@@ -1,7 +1,10 @@
 # The web app (Vercel project kilocode-app). Its STS canary route mints usage-ingest:sts.canary
 # with the function's own OIDC token, exchanged for the STS audience (decision D6c). Production
 # STS serves Vercel production, staging STS the custom environment staging, development STS
-# previews (design 6.2); the Vercel development environment is never accepted.
+# previews (design 6.2); the Vercel development environment is never accepted. Its /api/exa route
+# publishes Exa usage to usage-ingest's /exa-usage (usage-ingest:usage.publish); its security agent
+# writes API metrics to o11y (o11y:api-metrics.write), and its admin alerts router reads and
+# changes o11y's alerting configuration (o11y:alerting.read, o11y:alerting.write).
 workload: web
 environments:
   - development
@@ -20,12 +23,22 @@ identity:
 secrets: []
 audiences:
   - usage-ingest
+  - o11y
 scopes:
   - usage-ingest:sts.canary
+  - usage-ingest:usage.publish
+  - o11y:api-metrics.write
+  - o11y:alerting.read
+  - o11y:alerting.write
 # UTS grants, development only until phase 4's activation go; staging and production are each a
 # key added below. The web app reads the UTS revocation feed (uts-feed), ends or revokes a
 # subject's sessions and credentials (uts), and signs its kilo-web client assertion with
 # UTS_KILO_WEB_CLIENT_KEY (UTS_KILO_WEB_CLIENT_KEY_NEXT during a rotation).
+# Bouncer (repo Kilo-Org/bouncer) runs in production only and accepts only production STS tokens,
+# so its scopes are a production grant: the shared Bouncer client sends one token per call
+# (bouncer:decide for decide, charge-decide and release; bouncer:usage.write for usage and credit
+# events; bouncer:signup.decide for signup), beside the legacy key while Bouncer runs
+# STS_AUTH=dual. The web app makes no signup-history call, so it holds no bouncer:signup.history.
 environmentGrants:
   development:
     audiences:
@@ -39,3 +52,10 @@ environmentGrants:
     secrets:
       - UTS_KILO_WEB_CLIENT_KEY
       - UTS_KILO_WEB_CLIENT_KEY_NEXT
+  production:
+    audiences:
+      - bouncer
+    scopes:
+      - bouncer:decide
+      - bouncer:usage.write
+      - bouncer:signup.decide

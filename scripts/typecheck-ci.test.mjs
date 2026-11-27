@@ -20,6 +20,10 @@ import { load } from 'js-yaml';
 
 import { DEPENDENCY_INPUTS } from './affected-workspaces.mjs';
 
+// GitHub resolves `$/path` (self-repository syntax) and `./path` to the same
+// in-repo action, so the suites compare one spelling.
+const loadWorkflow = text => load(text.replace(/^(\s*-?\s*uses:\s*)\$\//gm, '$1./'));
+
 const workflows = Object.fromEntries(
   [
     'ci.yml',
@@ -29,7 +33,7 @@ const workflows = Object.fromEntries(
     'explorer-ios-release.yml',
   ].map(file => [
     file,
-    load(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
+    loadWorkflow(readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')),
   ])
 );
 const harnessBuildAction = load(
@@ -48,7 +52,7 @@ const pluginPath = 'node_modules/.cache/ttsc/plugins';
 // The step each plugin saver's save must follow.
 const jobRun = new Map([
   ['ci.yml:harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
-  ['ci.yml:workspace-tests', 'pnpm --filter ${{ matrix.workspace.name }} test'],
+  ['ci.yml:workspace-tests', 'pnpm --filter "$WORKSPACE" test'],
   ['.github/actions/harness-sdk-build', harnessBuild],
 ]);
 const ciJobs = workflows['ci.yml'].jobs;
@@ -93,7 +97,7 @@ test('each required check name is published by exactly one pull-request workflow
   for (const file of readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
-    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    const workflow = loadWorkflow(readFileSync(new URL(file, directory), 'utf8'));
     const triggers = workflow.on ?? {};
     // A workflow without these triggers never reports a check on a PR or a
     // merge-queue entry, so its job names cannot satisfy the ruleset there.
@@ -278,7 +282,7 @@ test('every workflow install job restores a pnpm dependency cache', () => {
   for (const file of readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
-    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    const workflow = loadWorkflow(readFileSync(new URL(file, directory), 'utf8'));
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
       const installIndex = steps.findIndex(step =>
@@ -310,7 +314,7 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   for (const file of readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
-    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    const workflow = loadWorkflow(readFileSync(new URL(file, directory), 'utf8'));
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
       steps.forEach((step, index) => {
@@ -347,13 +351,13 @@ test('every Chromium install skips apt and restores the browser cache first', ()
 });
 
 for (const [file, name, command, condition] of [
-  ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group ${{ matrix.group }}'],
+  ['ci.yml', 'typecheck-groups', 'scripts/typecheck-all.sh --group "$GROUP"'],
   ['ci.yml', 'typecheck-trpc', 'scripts/typecheck-all.sh --group trpc'],
   ['ci.yml', 'harness-sdk', 'pnpm --filter @kilocode/harness-sdk check:ci'],
   [
     'ci.yml',
     'workspace-tests',
-    'pnpm --filter ${{ matrix.workspace.name }} test',
+    'pnpm --filter "$WORKSPACE" test',
     "matrix.workspace.name == '@kilocode/harness-sdk'",
   ],
 ]) {
@@ -1634,7 +1638,7 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(install.run, webTestInstall, 'the shards install the suite closure');
   assert.deepEqual(job.strategy.matrix.shard, [1, 2, 3, 4], 'four shards still run');
   const run = job.steps.find(step => step.name === 'Run web tests');
-  assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
+  assert.equal(run.run, 'pnpm --filter web test --shard="$SHARD/4"');
 });
 
 // The four cloud-agent-next parts run one service suite, and the suite reaches

@@ -30,12 +30,13 @@ type Phase =
 /**
  * One of the 8 key-set shards (design 5.7), named `<environment>:keyset:<0-7>`, in the `eu`
  * jurisdiction with the western-Europe hint. Each `SignerKeys` isolate asks one shard, so the 16
- * signer objects see at most 8 reads per 2 seconds, whatever the number of feed isolates
- * (design 3). The shard keeps the 2-second combined copy in memory, and each signer's held keys
- * in memory and in its storage: a restarted shard, which a deploy or an eviction causes, still
- * answers a failing signer's last good keys until 24 hours after the read they came from, so a
- * cold feed isolate never builds a key set without them. Workers RPC exposes every public method
- * of the class, so the only public member is the RPC method `signerKeys`.
+ * signer objects and the 2 feed objects see at most 8 reads per 2 seconds, whatever the number of
+ * feed isolates (design 3). The shard keeps the 2-second combined copy in memory, the feed
+ * objects' held keys in memory, and each signer's held keys in memory and in its storage: a
+ * restarted shard, which a deploy or an eviction causes, still answers a failing signer's last
+ * good keys until 24 hours after the read they came from, so a cold feed isolate never builds a
+ * key set without them. Workers RPC exposes every public method of the class, so the only public
+ * member is the RPC method `signerKeys`.
  */
 export class UtsKeySetDO extends DurableObject<Env> {
   readonly #config: UtsConfig;
@@ -60,7 +61,7 @@ export class UtsKeySetDO extends DurableObject<Env> {
         if (stored === undefined) return;
         const parsed = StoredHeldKeysSchema.safeParse(stored);
         if (parsed.success) {
-          cache.held = parsed.data;
+          cache.held = { signers: parsed.data, feeds: cache.held.feeds };
         } else {
           // Only public keys a later store replaces; the shard starts without them.
           console.error(JSON.stringify({ event: 'uts.key_set_shard.stored_keys_invalid' }));

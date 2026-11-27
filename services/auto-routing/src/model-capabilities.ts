@@ -330,8 +330,9 @@ export async function getModelCapabilities(
     // not have to wait on the routing-table fetch before kicking off the
     // capability lookup. Keeping the fetch inside this closure means the
     // 500ms sub-budget covers the routing-table read as well as the cache/DB
-    // lookups. `routing-table.ts`'s `ttlCached` dedups the concurrent in-flight
-    // call with whichever other component also asked for the table.
+    // lookups. `routing-table.ts`'s `ttlCached` serves a table that an earlier
+    // request resolved; a concurrent request still reads its own, because a
+    // pending load belongs to the request that started it.
     const routingTable = await getRoutingTable(env, router);
     const ids = new Set<string>();
     if (routingTable) {

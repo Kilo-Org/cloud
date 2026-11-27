@@ -5,11 +5,14 @@ import {
   STS_DENIED_PROBE_WORKLOAD,
   STS_ENVIRONMENTS,
   STS_SECURE_PROXY_FORWARD,
+  STS_SECURITY_SYNC_DISMISS_FINDING,
+  STS_SECURITY_SYNC_MANUAL_SYNC,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
+  STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   isStsDeniedProbe,
   type MintRequest,
   type MintResult,
@@ -733,8 +736,8 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
 });
 
 describe('phase 4 service scopes under the shipped policies (default deny)', () => {
-  // The O11y scopes share one audience and a mint holds one token per audience, so each scope is
-  // asked for in a request of its own.
+  // The O11y scopes, the Security Sync scopes and the web scopes each share one audience, and a
+  // mint holds one token per audience, so each scope is asked for in a request of its own.
   const SERVICE_SCOPES = [
     STS_SECURE_PROXY_FORWARD,
     STS_USAGE_PUBLISH,
@@ -742,6 +745,15 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
     STS_O11Y_API_METRICS_WRITE,
     STS_O11Y_ALERTING_READ,
     STS_O11Y_ALERTING_WRITE,
+    STS_SECURITY_SYNC_MANUAL_SYNC,
+    STS_SECURITY_SYNC_DISMISS_FINDING,
+    STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+  ];
+  // The scopes under an audience the canary pair holds (`web`, `usage-ingest`).
+  const CANARY_PAIR_AUDIENCE_SCOPES: readonly { audience: string; scope: string }[] = [
+    STS_USAGE_PUBLISH,
+    STS_USAGE_RECORD,
+    STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   ];
   const shipped = STS_ENVIRONMENTS.flatMap(environment =>
     defaultMintAuthority.policies
@@ -781,11 +793,10 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
     'refuses $workload in $environment every phase 4 service scope, never as unknown_scope',
     async ({ environment, workload, policy }) => {
       for (const entry of SERVICE_SCOPES) {
-        // No shipped policy lists the Secure Proxy or O11y audience. A policy holding a usage
-        // audience (the canary pair) is refused the scope instead.
-        const usage = entry === STS_USAGE_PUBLISH || entry === STS_USAGE_RECORD;
+        // No shipped policy lists the Secure Proxy, O11y or Security Sync audience. A policy
+        // holding a `web` or `usage-ingest` audience (the canary pair) is refused the scope instead.
         const reason =
-          usage && policy.audiences.includes(entry.audience)
+          CANARY_PAIR_AUDIENCE_SCOPES.includes(entry) && policy.audiences.includes(entry.audience)
             ? 'scope_not_allowed'
             : 'audience_not_allowed';
         expect(await mintAsShipped(environment, workload, entry)).toEqual({
@@ -797,7 +808,7 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
   );
 
   it.each(STS_ENVIRONMENTS)(
-    'refuses the canary pair, which holds the audiences, the usage scopes as not granted in %s',
+    'refuses the canary pair, which holds the audiences, the usage scopes and the web dispatch as not granted in %s',
     async environment => {
       expect(await mintAsShipped(environment, 'web', STS_USAGE_PUBLISH)).toEqual({
         status: 'ok',
@@ -807,6 +818,35 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
         status: 'ok',
         tokens: [{ status: 'denied', ...STS_USAGE_RECORD, reason: 'scope_not_allowed' }],
       });
+      expect(
+        await mintAsShipped(environment, 'usage-ingest', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH)
+      ).toEqual({
+        status: 'ok',
+        tokens: [
+          {
+            status: 'denied',
+            ...STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+            reason: 'scope_not_allowed',
+          },
+        ],
+      });
+    }
+  );
+
+  it.each(STS_ENVIRONMENTS)(
+    'refuses the registered-only Security Sync workload its own scopes and the web dispatch in %s',
+    async environment => {
+      // cloudflare-security-sync.yaml is a registration: STS answers for it as for a name with no file.
+      for (const entry of [
+        STS_SECURITY_SYNC_MANUAL_SYNC,
+        STS_SECURITY_SYNC_DISMISS_FINDING,
+        STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+      ]) {
+        expect(await mintAsShipped(environment, 'cloudflare-security-sync', entry)).toEqual({
+          status: 'ok',
+          tokens: [{ status: 'denied', ...entry, reason: 'unknown_workload' }],
+        });
+      }
     }
   );
 });

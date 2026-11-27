@@ -497,9 +497,17 @@ describe('worker config rules', () => {
         { name: 'AUDIT_SIGNER', class_name: 'SignerDO' },
       ],
     };
-    const relayQueues = (queue: string) => ({
-      consumers: [{ queue, dead_letter_queue: `${queue}-dlq` }, { queue: `${queue}-dlq` }],
-    });
+    const relayQueues = (queue: string) => {
+      const uts = queue.replace('kilo-audit', 'kilo-audit-uts');
+      return {
+        consumers: [
+          { queue, dead_letter_queue: `${queue}-dlq` },
+          { queue: `${queue}-dlq` },
+          { queue: uts, dead_letter_queue: `${uts}-dlq` },
+          { queue: `${uts}-dlq` },
+        ],
+      };
+    };
     const archive = (bucket_name: string, jurisdiction?: string) => [
       { binding: 'AUDIT_ARCHIVE', bucket_name, ...(jurisdiction ? { jurisdiction } : {}) },
     ];
@@ -540,7 +548,7 @@ describe('worker config rules', () => {
     expect(internalWorkerProblems(configs)).toEqual([]);
   });
 
-  it('refuses a producer on an audit queue outside the STS deployment of that environment', () => {
+  it('refuses a producer on an audit queue outside its own producer and environment', () => {
     const audit = (queue: string) => ({ producers: [{ binding: 'AUDIT', queue }] });
     const foreign = consumer({
       queues: {
@@ -558,19 +566,26 @@ describe('worker config rules', () => {
       name: 'sts',
       ...NO_TRACES,
       queues: audit('kilo-audit-staging'),
-      env: { local: { name: 'sts-local', queues: audit('kilo-audit-local') } },
+      env: { local: { name: 'sts-local', queues: audit('kilo-audit-uts-local') } },
     });
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
       ...NO_TRACES,
       queues: audit('kilo-audit'),
     });
-    expect(problemsOf(foreign, crossed, relay)).toEqual([
+    const utsOnSts = parseWorkerConfig('services/uts/wrangler.jsonc', {
+      name: 'uts',
+      ...NO_TRACES,
+      queues: audit('kilo-audit'),
+    });
+    expect(problemsOf(foreign, crossed, relay, utsOnSts)).toEqual([
       `${PATH} (top level): AUDIT produces to kilo-audit; only sts may`,
       `${PATH} (env.staging): AUDIT produces to kilo-audit-staging; only sts-staging may`,
       `${PATH} (env.local): AUDIT produces to kilo-audit-local-dlq; no Worker may`,
       'services/sts/wrangler.jsonc (top level): AUDIT produces to kilo-audit-staging; only sts-staging may',
+      'services/sts/wrangler.jsonc (env.local): AUDIT produces to kilo-audit-uts-local; only uts-local, uts-test may',
       'services/audit-relay/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
+      'services/uts/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
     ]);
   });
 

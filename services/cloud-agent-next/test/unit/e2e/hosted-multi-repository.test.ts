@@ -32,17 +32,32 @@ function envelope(data: unknown): Response {
 }
 
 describe('staged hosted multi-repository proof', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it.each([
     { target: 'production' },
     { workerUrl: 'https://cloud-agent-next.kilosessions.ai' },
     { workerUrl: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev' },
+    { workerUrl: 'https://cloud-agent-e2e.kiloapps.io' },
     { backendUrl: 'https://app.kilo.ai' },
     { additional: { ...fixtureInput.additional, fullName: 'other/PRIMARY' } },
     { primary: { ...fixtureInput.primary, markerPath: '../marker.txt' } },
   ])('rejects unsafe or unprovable fixture settings: %j', overrides => {
     expect(() => parseHostedMultiRepositoryFixture({ ...fixtureInput, ...overrides })).toThrow();
+  });
+
+  it('refuses the configured e2e Worker hostname as a staging origin', () => {
+    vi.stubEnv('CLOUD_AGENT_E2E_WORKER_HOSTNAME', 'Fenced-E2E.example.test');
+    expect(() =>
+      parseHostedMultiRepositoryFixture({
+        ...fixtureInput,
+        workerUrl: 'https://fenced-e2e.example.test',
+      })
+    ).toThrow();
+    expect(parseHostedMultiRepositoryFixture(fixtureInput).workerUrl).toBe(fixtureInput.workerUrl);
   });
 
   it('fails closed when the catalog does not advertise capability version 1', async () => {

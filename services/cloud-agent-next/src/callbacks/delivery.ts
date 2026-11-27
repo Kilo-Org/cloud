@@ -60,6 +60,9 @@ async function deliverToTarget(
       headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+      // A redirect would carry the target's headers (service credentials) to
+      // another URL, so it counts as a non-2xx answer, never as a hop to follow.
+      redirect: 'manual',
     };
     const response = await fetch(target.url, requestInit);
 

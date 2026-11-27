@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withSelfAccessCredentials } from './access-credentials.js';
+import { withoutSelfOriginCookies, withSelfAccessCredentials } from './access-credentials.js';
 
 const env = {
   WORKER_URL: 'https://cloud-agent-e2e.example.test',
@@ -39,5 +39,43 @@ describe('withSelfAccessCredentials', () => {
       request
     );
     expect(withSelfAccessCredentials(request, { ...env, WORKER_URL: undefined })).toBe(request);
+  });
+});
+
+describe('withoutSelfOriginCookies', () => {
+  const cookieResponse = () =>
+    new Response('body', {
+      status: 202,
+      headers: { 'Set-Cookie': 'CF_Authorization=token; Secure', 'X-Kept': 'yes' },
+    });
+
+  it('drops Set-Cookie from a Worker-origin response and keeps the rest', async () => {
+    const stripped = withoutSelfOriginCookies(
+      new Request('https://cloud-agent-e2e.example.test/sandbox-control/x'),
+      cookieResponse(),
+      env
+    );
+    expect(stripped.headers.has('Set-Cookie')).toBe(false);
+    expect(stripped.headers.get('X-Kept')).toBe('yes');
+    expect(stripped.status).toBe(202);
+    expect(await stripped.text()).toBe('body');
+  });
+
+  it('treats a wss URL of the Worker host as its own origin', () => {
+    const request = new Request('https://cloud-agent-e2e.example.test/x');
+    const stamped = withSelfAccessCredentials(request, {
+      ...env,
+      WORKER_URL: 'wss://cloud-agent-e2e.example.test',
+    });
+    expect(stamped.headers.get('CF-Access-Client-Id')).toBe('client-id.access');
+  });
+
+  it('leaves other origins and cookie-free responses unchanged', () => {
+    const other = cookieResponse();
+    expect(withoutSelfOriginCookies(new Request('https://github.com/x'), other, env)).toBe(other);
+    const plain = new Response('ok');
+    expect(
+      withoutSelfOriginCookies(new Request('https://cloud-agent-e2e.example.test/'), plain, env)
+    ).toBe(plain);
   });
 });

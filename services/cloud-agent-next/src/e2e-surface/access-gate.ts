@@ -4,12 +4,14 @@
  *
  * The Worker's only hostname sits behind an Access application. Access adds a
  * signed `Cf-Access-Jwt-Assertion` to every request it admits; the Worker
- * verifies it against the team's signing keys and the application audience, so
- * a request that bypassed Access (a `workers.dev` or preview address turned on
- * by hand, a route added outside the renderer) is refused. Without a configured
- * audience and team domain every request is refused. Only the local development
- * config (`ENVIRONMENT=development`) skips the gate; the deployed render never
- * sets it, and the fence checks that.
+ * verifies it against the team's signing keys and the application audience, and
+ * requires its `common_name` (the service token's client id) to be the token the
+ * Worker holds, so a request that bypassed Access (a `workers.dev` or preview
+ * address turned on by hand, a route added outside the renderer) or that another
+ * identity got admitted is refused. Without a configured audience, team domain
+ * and client id every request is refused. Only the local development config
+ * (`ENVIRONMENT=development`) skips the gate; the deployed render never sets it,
+ * and the fence checks that.
  * https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
  */
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
@@ -18,6 +20,7 @@ export type AccessGateEnv = {
   ENVIRONMENT?: string;
   E2E_ACCESS_AUD?: string;
   E2E_ACCESS_TEAM_DOMAIN?: string;
+  E2E_ACCESS_CLIENT_ID?: string;
 };
 
 /** Marks the Worker's own refusal, so a probe can tell it apart from Access's. */
@@ -30,8 +33,14 @@ const keySets = new Map<string, JWTVerifyGetKey>();
 async function hasValidAssertion(request: Request, env: AccessGateEnv): Promise<boolean> {
   const audience = env.E2E_ACCESS_AUD ?? '';
   const teamDomain = env.E2E_ACCESS_TEAM_DOMAIN ?? '';
+  const clientId = env.E2E_ACCESS_CLIENT_ID ?? '';
   const assertion = request.headers.get('Cf-Access-Jwt-Assertion');
-  if (!assertion || !AUD_PATTERN.test(audience) || !TEAM_DOMAIN_PATTERN.test(teamDomain)) {
+  if (
+    !assertion ||
+    !clientId ||
+    !AUD_PATTERN.test(audience) ||
+    !TEAM_DOMAIN_PATTERN.test(teamDomain)
+  ) {
     return false;
   }
   const issuer = `https://${teamDomain}`;
@@ -41,8 +50,12 @@ async function hasValidAssertion(request: Request, env: AccessGateEnv): Promise<
     keySets.set(issuer, keySet);
   }
   try {
-    await jwtVerify(assertion, keySet, { issuer, audience, algorithms: ['RS256'] });
-    return true;
+    const { payload } = await jwtVerify(assertion, keySet, {
+      issuer,
+      audience,
+      algorithms: ['RS256'],
+    });
+    return payload.common_name === clientId;
   } catch {
     return false;
   }

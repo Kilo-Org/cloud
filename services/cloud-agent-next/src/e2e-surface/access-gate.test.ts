@@ -4,7 +4,13 @@ import { ACCESS_REFUSAL_HEADER, refuseWithoutAccess } from './access-gate.js';
 
 const TEAM_DOMAIN = 'gate-probe.cloudflareaccess.com';
 const AUD = 'a'.repeat(64);
-const env = { ENVIRONMENT: 'production', E2E_ACCESS_AUD: AUD, E2E_ACCESS_TEAM_DOMAIN: TEAM_DOMAIN };
+const CLIENT_ID = 'client-id.access';
+const env = {
+  ENVIRONMENT: 'production',
+  E2E_ACCESS_AUD: AUD,
+  E2E_ACCESS_TEAM_DOMAIN: TEAM_DOMAIN,
+  E2E_ACCESS_CLIENT_ID: CLIENT_ID,
+};
 
 let signingKey: CryptoKey;
 let otherKey: CryptoKey;
@@ -26,9 +32,9 @@ beforeAll(async () => {
 });
 
 function assertion(
-  overrides: { aud?: string; iss?: string; exp?: number; key?: CryptoKey } = {}
+  overrides: { aud?: string; iss?: string; exp?: number; key?: CryptoKey; commonName?: string } = {}
 ): Promise<string> {
-  return new SignJWT({ common_name: 'client-id.access' })
+  return new SignJWT({ common_name: overrides.commonName ?? CLIENT_ID })
     .setProtectedHeader({ alg: 'RS256', kid: 'gate-probe' })
     .setIssuer(overrides.iss ?? `https://${TEAM_DOMAIN}`)
     .setAudience(overrides.aud ?? AUD)
@@ -55,6 +61,13 @@ describe('refuseWithoutAccess', () => {
       await assertion({ iss: 'https://other.cloudflareaccess.com' }),
       await assertion({ exp: Math.floor(Date.now() / 1000) - 60 }),
       await assertion({ key: otherKey }),
+      await assertion({ commonName: 'other-client.access' }),
+      await new SignJWT({ email: 'person@example.test' })
+        .setProtectedHeader({ alg: 'RS256', kid: 'gate-probe' })
+        .setIssuer(`https://${TEAM_DOMAIN}`)
+        .setAudience(AUD)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 300)
+        .sign(signingKey),
     ];
     for (const token of tokens) {
       const refusal = await refuseWithoutAccess(request(token), env);
@@ -63,11 +76,12 @@ describe('refuseWithoutAccess', () => {
     }
   });
 
-  it('fails closed without an audience or team domain', async () => {
+  it('fails closed without an audience, team domain or client id', async () => {
     const token = await assertion();
     for (const partial of [
       { ...env, E2E_ACCESS_AUD: undefined },
       { ...env, E2E_ACCESS_TEAM_DOMAIN: undefined },
+      { ...env, E2E_ACCESS_CLIENT_ID: undefined },
       { ENVIRONMENT: 'production' },
       {},
     ]) {

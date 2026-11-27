@@ -117,6 +117,28 @@ describe('deliverCallbackJob', () => {
       expect(result.type).toBe('failed');
     });
 
+    it('does not follow a redirect and fails the delivery without retrying', async () => {
+      const redirectFetch = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(null, { status: 302, headers: { Location: 'https://elsewhere.test/' } })
+        );
+      globalThis.fetch = redirectFetch;
+      const target: CallbackTarget = {
+        url: 'https://example.com/callback',
+        headers: { 'X-Internal-Secret': 'secret' },
+      };
+
+      const result = await deliverCallbackJob(target, mockPayload, 1);
+
+      expect(result.type).toBe('failed');
+      expect(redirectFetch).toHaveBeenCalledTimes(1);
+      expect(redirectFetch).toHaveBeenCalledWith(
+        'https://example.com/callback',
+        expect.objectContaining({ redirect: 'manual' })
+      );
+    });
+
     it('should retry on 502 (bad gateway)', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 502 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };

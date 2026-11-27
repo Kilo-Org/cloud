@@ -13,7 +13,10 @@
 
 import production from './index.js';
 import { e2eSurfaceApp } from './e2e-surface/app.js';
-import { withSelfAccessCredentials } from './e2e-surface/access-credentials.js';
+import {
+  withoutSelfOriginCookies,
+  withSelfAccessCredentials,
+} from './e2e-surface/access-credentials.js';
 import { refuseWithoutAccess } from './e2e-surface/access-gate.js';
 import { ContainersOutbound as ProductionContainersOutbound } from './sandbox-containers/containers-outbound.js';
 import type { Env } from './types.js';
@@ -32,13 +35,15 @@ export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 
 /**
  * Container egress with the e2e Worker's Access service token on requests to
- * its own origin. `SandboxContainers` installs `ctx.exports.ContainersOutbound`
- * as the outbound handler, so this export replaces production's only in the e2e
- * Worker. Every other destination is forwarded unchanged.
+ * its own origin, and without any cookie those responses set. `SandboxContainers`
+ * installs `ctx.exports.ContainersOutbound` as the outbound handler, so this
+ * export replaces production's only in the e2e Worker. Every other destination
+ * is forwarded unchanged.
  */
 export class ContainersOutbound extends ProductionContainersOutbound {
-  override fetch(request: Request): Promise<Response> {
-    return super.fetch(withSelfAccessCredentials(request, this.env));
+  override async fetch(request: Request): Promise<Response> {
+    const response = await super.fetch(withSelfAccessCredentials(request, this.env));
+    return withoutSelfOriginCookies(request, response, this.env);
   }
 }
 

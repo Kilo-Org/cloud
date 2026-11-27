@@ -20,6 +20,12 @@ export type SelfAccessEnv = {
   E2E_ACCESS_CLIENT_SECRET?: string;
 };
 
+/** `ws:`/`wss:` and `http:`/`https:` URLs of one host share an origin here. */
+function isSelfOrigin(url: string, workerUrl: string): boolean {
+  const origin = (value: string) => new URL(value.replace(/^ws(s?):/i, 'http$1:')).origin;
+  return origin(url) === origin(workerUrl);
+}
+
 /**
  * Stamp the Worker's Access service token on a request to its own origin, and
  * only there: a request to any other origin is returned unchanged, and without
@@ -30,9 +36,32 @@ export function withSelfAccessCredentials(request: Request, env: SelfAccessEnv):
   const clientId = env.E2E_ACCESS_CLIENT_ID;
   const clientSecret = env.E2E_ACCESS_CLIENT_SECRET;
   if (!env.WORKER_URL || !clientId || !clientSecret) return request;
-  if (new URL(request.url).origin !== new URL(env.WORKER_URL).origin) return request;
+  if (!isSelfOrigin(request.url, env.WORKER_URL)) return request;
   const headers = new Headers(request.headers);
   headers.set(CLIENT_ID_HEADER, clientId);
   headers.set(CLIENT_SECRET_HEADER, clientSecret);
   return new Request(request, { headers });
+}
+
+/**
+ * Drop `Set-Cookie` from a response of the Worker's own origin before it
+ * reaches the sandbox, so an Access session cookie (`CF_Authorization`) issued
+ * for the stamped token never lands in sandbox hands. Other origins' responses
+ * are returned unchanged.
+ */
+export function withoutSelfOriginCookies(
+  request: Request,
+  response: Response,
+  env: SelfAccessEnv
+): Response {
+  if (!env.WORKER_URL || !isSelfOrigin(request.url, env.WORKER_URL)) return response;
+  if (!response.headers.has('Set-Cookie')) return response;
+  const headers = new Headers(response.headers);
+  headers.delete('Set-Cookie');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+    ...(response.webSocket ? { webSocket: response.webSocket } : {}),
+  });
 }

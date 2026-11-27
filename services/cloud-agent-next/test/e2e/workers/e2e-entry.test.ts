@@ -6,6 +6,7 @@ import { inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import production from '../../../src/index.js';
+import e2eEntry from '../../../src/e2e-entry.js';
 import { e2eSurfaceApp } from '../../../src/e2e-surface/app.js';
 
 const ALLOWED_USER = 'usr_e2e_surface_allowed';
@@ -129,6 +130,29 @@ afterAll(async () => {
     .where(inArray(kilocode_users.id, [ALLOWED_USER]))
     .catch(() => undefined);
   await db.pool.end().catch(() => undefined);
+});
+
+// This suite runs with ENVIRONMENT=development, which skips the Access gate; a
+// deployed render never does, so the gate must refuse a production environment.
+describe('Cloudflare Access gate in a production environment', () => {
+  it.each([
+    `https://worker.test/__e2e/inspect/allocation/${SESSION_ID}`,
+    'https://worker.test/trpc/getSession',
+  ])('refuses %s without a valid Access assertion', async url => {
+    const response = await e2eEntry.fetch(
+      new Request(url, {
+        headers: {
+          Authorization: `Bearer ${tokenFor(ALLOWED_USER)}`,
+          'x-internal-api-key': internalApiSecret,
+          'Cf-Access-Jwt-Assertion': 'not-a-verified-assertion',
+        },
+      }),
+      { ...env, ENVIRONMENT: 'production' },
+      createExecutionContext()
+    );
+    expect(response.status).toBe(403);
+    expect(response.headers.get('X-Cloud-Agent-E2E-Refusal')).toBe('access');
+  });
 });
 
 describe('e2e surface auth chain', () => {

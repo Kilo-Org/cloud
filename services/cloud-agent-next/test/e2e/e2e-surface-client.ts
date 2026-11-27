@@ -62,7 +62,7 @@ export type SurfaceRequestOptions = {
 
 function surfaceHeaders(options: SurfaceRequestOptions): Record<string, string> {
   return {
-    ...workerAccessHeaders(),
+    ...workerAccessHeaders(options.surfaceUrl),
     ...(options.bearerToken === undefined
       ? {}
       : { Authorization: `Bearer ${options.bearerToken}` }),
@@ -298,9 +298,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
         callbackUrl: minted.callbackUrl,
         // Delivery to the Worker's own origin passes the same Access
         // application; the token never goes to any other origin.
-        ...(new URL(minted.callbackUrl).origin === new URL(base).origin
-          ? { callbackHeaders: workerAccessHeaders() }
-          : {}),
+        callbackHeaders: workerAccessHeaders(minted.callbackUrl),
         records: recordsSignal => records(minted.token, recordsSignal ?? signal),
         waitFor: async (predicate, timeoutMs, waitSignal) => {
           const effective = waitSignal ?? signal ?? options.signal;

@@ -42,12 +42,19 @@ const STAGING_HOST_DENYLIST = new Set([
   'api.kilo.ai',
 ]);
 
+/** The fenced e2e Worker's hostname, as configured for CI, is never a staging origin. */
+function isDeniedStagingHost(hostname: string): boolean {
+  const host = hostname.replace(/\.$/, '').toLowerCase();
+  const e2eHost = process.env.CLOUD_AGENT_E2E_WORKER_HOSTNAME?.toLowerCase();
+  return STAGING_HOST_DENYLIST.has(host) || (e2eHost !== undefined && host === e2eHost);
+}
+
 const stagedOrigin = z.url().refine(value => {
   const url = new URL(value);
   return (
     url.protocol === 'https:' &&
     (value === url.origin || value === `${url.origin}/`) &&
-    !STAGING_HOST_DENYLIST.has(url.hostname.replace(/\.$/, ''))
+    !isDeniedStagingHost(url.hostname)
   );
 }, 'Expected a dedicated staging HTTPS origin');
 const markerPath = z

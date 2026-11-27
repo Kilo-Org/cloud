@@ -38,7 +38,7 @@ jobs:
 
   notify-failure:
     needs: [deploy, tests]
-    # Only main posts to Slack; a branch run never does.
+    # The stack runs only from main; a failed deploy or test run posts to Slack.
     if: always() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -200,7 +200,7 @@ export async function trpcCall<T>(
     : (config.bearerToken ??
       mintApiToken(config.user, config.nextAuthSecret, 60 * 60, config.kilocodeOrganizationId));
   const headers: Record<string, string> = {
-    ...workerAccessHeaders(),
+    ...workerAccessHeaders(url.href),
     'Content-Type': 'application/json',
     Authorization: `Bearer ${bearer}`,
   };
@@ -1365,7 +1365,8 @@ export function openStream(
 
   function openSocket(ticket: string): void {
     const generation = ++currentGeneration;
-    const ws = new WebSocket(buildUrl(ticket), { headers: workerAccessHeaders() });
+    const target = buildUrl(ticket);
+    const ws = new WebSocket(target, { headers: workerAccessHeaders(target) });
     currentWs = ws;
     let opened = false;
 

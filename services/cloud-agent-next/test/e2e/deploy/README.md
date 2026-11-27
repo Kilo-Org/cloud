@@ -15,17 +15,18 @@ modified, so the production/default deploy is unaffected.
 ## Why the deployed profile is paused
 
 The rendered e2e Worker binds no production resource and has no public address
-(see [What the render changes](#what-the-render-changes-and-why)). Running the
-deployed profile again needs all of the following; until then the deploy and
-tests workflows stop at their first step:
+(see [What the render changes](#what-the-render-changes-and-why)). Until the
+Access configuration below exists, the deploy and tests workflows stop at their
+first step, which checks it. A passing run additionally needs:
 
 - the closed ingress in [Closed CI path](#closed-ci-path): the Access
   application, its service token and the `cloud-agent-e2e` GitHub environment;
 - verified staging replacements for what a session start requires: a Cloud
   Agent staging database role behind a staging Hyperdrive, Session Ingest and
   container usage meter staging RPC targets, a staging runtime-release bucket,
-  and a staging-only internal secret. The renderer binds them once their
-  identifiers exist; the fence rejects production ones;
+  and a staging-only internal secret. A deploy succeeds without them, but no
+  session starts. The renderer binds them once their identifiers exist; the
+  fence rejects production ones;
 - a Kilo backend that signs control tokens and stream tickets with
   `NEXTAUTH_SECRET_DEV`, a personal API token issued by it, the repository
   variable `CLOUD_AGENT_E2E_BACKEND_URL` set to it (the tests workflow's required
@@ -61,8 +62,10 @@ application whose single policy is Service Auth for one service token.
   stamps it only on requests to the Worker's own origin.
 - The Worker refuses every request whose `Cf-Access-Jwt-Assertion` does not
   verify against `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` and
-  the application audience (`src/e2e-surface/access-gate.ts`). Without
-  `E2E_ACCESS_AUD` and `E2E_ACCESS_TEAM_DOMAIN` it refuses everything.
+  the application audience, or whose `common_name` is not the service token's
+  client id (`src/e2e-surface/access-gate.ts`). Without `E2E_ACCESS_AUD`,
+  `E2E_ACCESS_TEAM_DOMAIN` or the `E2E_ACCESS_CLIENT_ID` secret it refuses
+  everything.
 - After each deploy, and before each test run, an anonymous request to the
   hostname must be refused by Access (`check-access-closed.sh`).
 
@@ -92,8 +95,17 @@ Prerequisites, in order:
    [Attach Worker Domain API](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/update/)
    accepts; Wrangler since workers-sdk #15903 no longer needs zone Workers
    Routes for a deploy whose only routes are custom domains.
-7. Only then deploy from `main`. The deploy attaches the custom domain and the
+7. Check the Worker's secrets:
+   `pnpm exec wrangler secret list --name cloud-agent-e2e-test` must list only
+   `INTERNAL_API_SECRET`, `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET`
+   (the deploy refuses otherwise). Deleting any other secret is a production
+   change that needs approval first.
+8. Only then deploy from `main`. The deploy attaches the custom domain and the
    Access check runs right after it.
+
+Until that first closed deploy, the live `cloud-agent-e2e-test` version stays
+open in every other respect: D35 turned off only its `workers.dev` and preview
+addresses, so its production bindings, schedules and queue consumer remain.
 
 Wrangler publishes custom domains only when the config lists one, and then
 replaces the script's set with exactly that list. Rendering without
@@ -324,8 +336,17 @@ resources. Any other key of `wrangler.jsonc`, including a binding added later,
 stays out until it is reviewed. The fence (`e2e-worker-fence.mjs`, tested by
 `scripts/e2e-worker-fence.test.ts` and run by `deploy-e2e-worker.sh` on the
 file it deploys) fails on any top-level key the renderer does not emit, any
-production queue or secret, and any public address, where production is every
-resource a `services/*/wrangler.json{,c}` top level binds.
+Durable Object binding to another script, any secret not named `*_DEV` or
+`*_STAGING`, a development environment, a route without the Access vars, and any
+public address. Its production hosts and queues come from:
+
+- the top level of every direct `services/*/wrangler.json` and
+  `services/*/wrangler.jsonc`;
+- the `env.production` block of each of those files, where present;
+- the prepared source config the renderer read (`wrangler.runtime-generated.json`
+  in the deploy; the same `renderRuntimeTarget` output in the test).
+
+Every other resource kind is refused by the key allowlist, whatever it names.
 
 | Change | Reason |
 |---|---|

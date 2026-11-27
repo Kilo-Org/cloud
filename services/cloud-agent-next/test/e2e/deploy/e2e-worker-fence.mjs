@@ -84,7 +84,6 @@ export function collectProduction(extraConfigs = [], servicesDir = defaultServic
   ];
   return {
     hosts: configs.flatMap(config => routesOf(config).map(hostOf)),
-    scripts: new Set(configs.map(config => text(config.name).toLowerCase())),
     queues: new Set(configs.flatMap(queuesOf)),
   };
 }

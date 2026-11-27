@@ -1036,12 +1036,12 @@ prompt carries that shard's marker; a request the harness dials without the
 scenario's prompt (for example a buggy lazy create) is not attributed and stays a
 documented limit.
 
-Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
-Worker names keep the stack addressable separately from production; they do
-**not** isolate its resources. The e2e Worker render clones the production
-bindings — the production Hyperdrive/Postgres database, the `kilocode-sessions`
-R2 bucket, and production service bindings — and its endpoints are public with
-valid-token admission only, with no per-user isolation.
+Isolation (repeated from `deploy/README.md`): the e2e Worker render binds none
+of production's resources — no Hyperdrive, R2 bucket, service binding,
+production queue or production secret — and the fence rejects any. It is
+reachable only through the Access-protected custom domain and refuses requests
+without a valid Access assertion. There is still no per-user isolation inside
+the e2e Worker.
 
 Docker scope boundary: deploying the fake Worker needs no Docker (it is a Worker
 and a Durable Object, not a container image); deploying the Cloud Agent e2e

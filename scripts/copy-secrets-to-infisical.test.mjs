@@ -169,38 +169,104 @@ test('the policy files present match the snapshot', () => {
   }
 });
 
+const COMMIT_CHECK =
+  '[[ $EXPECTED_COMMIT =~ ^[0-9a-f]{40}$ && $EXPECTED_COMMIT == "$GITHUB_SHA" ]] ||\n' +
+  '  fail "expected_commit is not the dispatched commit $GITHUB_SHA"\n';
+const EXPECTED_COMMIT_ENV = '${{ inputs.expected_commit }}';
+
 test('runs only on a dispatch by iscekic on main, in the copy-secrets environment', () => {
   assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
   assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), [
     'mode',
     'identity_id',
+    'expected_commit',
     'only',
   ]);
+  assert.equal(workflow.on.workflow_dispatch.inputs.expected_commit.required, true);
   assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode.options, ['copy', 'probe-login']);
   assert.deepEqual(workflow.permissions, {});
   assert.deepEqual(workflow.concurrency, {
     group: 'copy-secrets-to-infisical',
     'cancel-in-progress': false,
   });
-  assert.deepEqual(Object.keys(workflow.jobs), ['copy', 'probe-login']);
-  for (const [name, job] of Object.entries(workflow.jobs)) {
+  assert.deepEqual(Object.keys(workflow.jobs), ['environment-guard', 'copy', 'probe-login']);
+  for (const name of ['copy', 'probe-login']) {
+    const job = workflow.jobs[name];
+    assert.equal(job.needs, 'environment-guard', `${name} needs the environment guard`);
     assert.equal(job.if, `${GATE} && inputs.mode == '${name}'`, name);
     assert.equal(job.environment, 'copy-secrets', name);
     assert.deepEqual(job.permissions, { 'id-token': 'write' }, name);
+    assert.ok(job.steps[0].run.includes(`readonly AUDIENCE=${AUDIENCE}\n`), `${name}: audience`);
+  }
+  for (const [name, job] of Object.entries(workflow.jobs)) {
     assert.equal(job['runs-on'], 'ubuntu-24.04', name);
     assert.equal(job.steps.length, 1, `${name}: one step, no checkout and no action`);
     assert.equal(job.steps[0].uses, undefined, name);
     assert.equal(job.steps[0].shell, 'bash --noprofile --norc -euo pipefail {0}', name);
-    assert.ok(job.steps[0].run.includes(`readonly AUDIENCE=${AUDIENCE}\n`), `${name}: audience`);
     // Inputs and values reach the script through env only, never through an expression.
     assert.doesNotMatch(job.steps[0].run, /\$\{\{/, name);
+    // Every job refuses a dispatch whose expected_commit is not the run's commit, before any
+    // network call.
+    assert.equal(job.steps[0].env.EXPECTED_COMMIT, EXPECTED_COMMIT_ENV, name);
+    const run = job.steps[0].run;
+    assert.ok(run.includes(COMMIT_CHECK), `${name}: expected_commit is checked`);
+    // The first request each job makes: the OIDC token request, or the guard's first API read.
+    const firstRequest = [run.indexOf('jwt=$(curl '), run.indexOf('resp=$(api ')].filter(
+      i => i >= 0
+    );
+    assert.equal(firstRequest.length, 1, `${name}: one first request`);
+    assert.ok(run.indexOf(COMMIT_CHECK) < firstRequest[0], `${name}: checked before any request`);
   }
+  assert.ok(workflow.jobs['environment-guard']['timeout-minutes'] <= 5);
   assert.ok(workflow.jobs.copy['timeout-minutes'] <= 10);
   assert.ok(workflow.jobs['probe-login']['timeout-minutes'] <= 5);
 });
 
+test('the environment guard reads copy-secrets back with no environment and no secret', () => {
+  const guard = workflow.jobs['environment-guard'];
+  assert.equal(guard.if, GATE);
+  assert.equal(guard.needs, undefined);
+  assert.equal(guard.environment, undefined, 'naming the environment would auto-create it');
+  assert.deepEqual(guard.permissions, { actions: 'read' });
+  assert.deepEqual(guard.steps[0].env, {
+    EXPECTED_COMMIT: EXPECTED_COMMIT_ENV,
+    GH_TOKEN: '${{ github.token }}',
+  });
+  assert.doesNotMatch(JSON.stringify(guard), /secrets\./);
+  const run = guard.steps[0].run;
+  assert.match(run, /readonly ENVIRONMENT=copy-secrets\n/);
+  assert.match(run, /api "environments\/\$ENVIRONMENT"\)/);
+  assert.match(
+    run,
+    /api "environments\/\$ENVIRONMENT\/deployment-branch-policies\?per_page=100"\)/
+  );
+  // Exists (404 fails), admin bypass off, a custom branch policy of exactly main, and one
+  // required-reviewers rule with at least two reviewers (iscekic among them) and self-review
+  // prevented, so the dispatcher cannot approve their own run.
+  assert.match(run, /\[\[ \$status != 404 \]\] \|\| fail/);
+  assert.match(run, /\[\[ \$bypass == false \]\] \|\| fail/);
+  assert.match(
+    run,
+    /\[\[ \$custom == true && \$protected == false && \$branches == branch:main \]\] \|\|\n\s*fail/
+  );
+  assert.ok(run.includes('select(.type == "required_reviewers")'));
+  assert.ok(run.includes('(($r[0].reviewers // []) | length | tostring)'));
+  assert.ok(run.includes('any(.reviewer.login == "iscekic")'));
+  assert.ok(run.includes('($r[0].prevent_self_review | tostring)'));
+  assert.match(
+    run,
+    /\[\[ \$rules == 1 && \$reviewers -ge 2 && \$listed == true && \$self == true \]\] \|\|\n\s*fail/
+  );
+  assert.doesNotMatch(workflowText, /no required reviewers/i);
+  // The token reaches curl through --config, never argv.
+  assert.match(run, /-K <\(printf 'header = "Authorization: Bearer %s"\\n' "\$GH_TOKEN"\)/);
+});
+
 test('the probe job holds no secret', () => {
-  assert.deepEqual(probeStep.env, { IDENTITY_ID: '${{ inputs.identity_id }}' });
+  assert.deepEqual(probeStep.env, {
+    EXPECTED_COMMIT: EXPECTED_COMMIT_ENV,
+    IDENTITY_ID: '${{ inputs.identity_id }}',
+  });
   assert.doesNotMatch(JSON.stringify(workflow.jobs['probe-login']), /secrets\./);
 });
 
@@ -212,7 +278,7 @@ test('the copy step binds only the copied secrets and creates only', () => {
   assert.deepEqual(secretEnv, used);
   assert.deepEqual(
     Object.keys(copyStep.env).filter(key => !key.startsWith('V_')),
-    ['IDENTITY_ID', 'ONLY']
+    ['EXPECTED_COMMIT', 'IDENTITY_ID', 'ONLY']
   );
   const run = copyStep.run;
   // One POST per target to the v4 create endpoint; no update, delete or retry flag.

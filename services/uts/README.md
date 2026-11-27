@@ -351,9 +351,12 @@ Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata D
 
   The document must name the same client id. It must not carry a client secret, and every
   redirect URI must be HTTPS, HTTP loopback on `127.0.0.1` or `localhost` (never `[::1]`: the
-  confirm page's `form-action` cannot name an IPv6 literal), or a reverse-domain private-use
-  scheme (RFC 8252 section 7.1: `com.example.app:`, never a scheme without a period); `/authorize`
-  checks a cached URI against the same rule again. A blocked client is never served and keeps its
+  confirm page's `form-action` cannot name an IPv6 literal), or a private-use scheme of a native
+  app, short ones included (`cursor://`, `vscode://`; RFC 8252 section 7.1's reverse-domain form is
+  a SHOULD), except a scheme that runs code, reads local data or leaves the browser (`javascript`,
+  `data`, `file`, `blob`, `about`, `vbscript`, `filesystem`, `ftp`, `ws`, `wss`, `mailto`); the
+  consent and confirm pages show the whole redirect URI, and `/authorize` checks a cached URI
+  against the same rule again. A blocked client is never served and keeps its
   status through a refresh. Each isolate runs one fetch per client id at a time, and after a
   failure it waits 60 seconds before it fetches that id again. Every fetch also counts against the
   requesting network's anonymous-write allowance (10 a minute per network per isolate, its own

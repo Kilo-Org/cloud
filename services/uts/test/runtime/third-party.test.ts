@@ -303,13 +303,16 @@ describe('the consent screen', () => {
         name: pending.client.name,
         redirectKind: 'private_use_scheme',
       },
-      redirectUri: 'com.example.app:/oauth/callback',
+      redirectUri: 'cursor://anysphere.cursor-retrieval/oauth/callback',
     };
     const shown = await step(store.access)(new Request(authorizeUrl), nativeApp, session);
     if (shown.status !== 'interaction') throw new Error('expected the confirm page, not a code');
-    expect(await shown.response.text()).toContain('id="confirm-app"');
+    const shownHtml = await shown.response.text();
+    expect(shownHtml).toContain('id="confirm-app"');
+    // The user sees where the code goes, short scheme included.
+    expect(shownHtml).toContain('cursor://anysphere.cursor-retrieval/oauth/callback');
     expect(shown.response.headers.get('Content-Security-Policy')).toContain(
-      "form-action 'self' com.example.app:;"
+      "form-action 'self' cursor:;"
     );
     expect(
       (await step(store.access)(consentPost({}, 'https://evil.example'), nativeApp, session)).status

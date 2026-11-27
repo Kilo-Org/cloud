@@ -935,24 +935,40 @@ describe('authorization endpoint', () => {
     expect(redirectOf(response).searchParams.get('error')).toBe('access_denied');
   });
 
-  it('refuses a cached redirect URI that is not a reverse-domain private-use scheme', async () => {
+  it.each(['data:text/html,hi', 'javascript:alert(1)'])(
+    'refuses a cached redirect URI %s the blocklist refuses',
+    async uri => {
+      const response = await call(
+        authorizeUrl({ ...base, client_id: THIRD_PARTY, redirect_uri: uri, dpop_jkt: '' }),
+        oauthDeps(fakeGrants().access, {
+          clients: async clientId => ({
+            kind: 'client',
+            client: { clientId, name: 'Example', redirectUris: [uri] },
+          }),
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe('invalid_request');
+    }
+  );
+
+  it.each([
+    'cursor://anysphere.cursor-retrieval/oauth/callback',
+    'vscode://vscode.github-authentication/did-authenticate',
+  ])('accepts the private-use redirect %s of a real MCP client', async uri => {
     const response = await call(
-      authorizeUrl({
-        ...base,
-        client_id: THIRD_PARTY,
-        redirect_uri: 'myapp:/callback',
-        dpop_jkt: '',
-      }),
+      authorizeUrl({ ...base, client_id: THIRD_PARTY, redirect_uri: uri, dpop_jkt: '' }),
       oauthDeps(fakeGrants().access, {
         clients: async clientId => ({
           kind: 'client',
-          client: { clientId, name: 'Example', redirectUris: ['myapp:/callback'] },
+          client: { clientId, name: 'Example', redirectUris: [uri] },
         }),
+        handoff: async () => ({ status: 'denied' }),
       })
     );
-    expect(response.status).toBe(400);
-    expect(response.headers.get('Location')).toBeNull();
-    expect(await errorOf(response)).toBe('invalid_request');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')?.startsWith(uri)).toBe(true);
   });
 
   it('answers 429 with Retry-After when the network used its metadata fetch allowance', async () => {

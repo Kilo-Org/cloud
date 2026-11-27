@@ -48,6 +48,17 @@ export const POLICY_FILES = [
   'ci-db-migrate.yaml',
   'ci-db-migrate-staging.yaml',
   'migration-proxy.yaml',
+  'ci-vercel-stage-production-app.yaml',
+  'ci-vercel-stage-production-ai-gateway.yaml',
+  'ci-vercel-stage-production-ai-gateway-secure-proxy.yaml',
+  'ci-vercel-stage-staging-app.yaml',
+  'ci-vercel-stage-staging-ai-gateway.yaml',
+  'ci-vercel-promote.yaml',
+  'ci-cloud-agent-sentry.yaml',
+  'ci-cloud-agent-sentry-staging.yaml',
+  'ci-kilo-app-release.yaml',
+  'ci-auto-docs.yaml',
+  'ci-kiloclaw-dev-push.yaml',
 ] as const;
 
 export type PolicyFile = (typeof POLICY_FILES)[number];

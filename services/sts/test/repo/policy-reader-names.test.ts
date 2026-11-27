@@ -110,14 +110,18 @@ describe('policy secrets match the reader that serves them', () => {
       for (const [stsName, binding] of reader) {
         expect(vars.has(binding), `${workload}: ${binding} is a var, not a secret`).toBe(false);
         // A Secrets Store binding is in the manifest, and the entry behind it must carry the name
-        // of the secret it holds: the binding's own name, the canonical lookup name, or either
-        // with the `_PROD` alias the first Workers used. Otherwise the copier copies a different
+        // of the secret it holds: the canonical lookup name or its `_PROD` alias when the binding
+        // is that name, and the binding's own name or its `_PROD` alias when the binding is a
+        // prefixed or legacy alias of the lookup name. Otherwise the copier copies a different
         // secret than the policy grants. A plain Worker secret (`wrangler secret put`) has no
         // manifest entry at all: only the deployment holds it, and the Worker's own reader suite
         // pins the binding names it reads.
         const entry = storeEntries.find(secret => secret.binding === binding);
         if (entry !== undefined) {
-          const names = [binding, `${binding}_PROD`, stsName, `${stsName}_PROD`];
+          const names =
+            binding === stsName || binding === `${stsName}_PROD`
+              ? [stsName, `${stsName}_PROD`]
+              : [binding, `${binding}_PROD`];
           expect(names, `${workload}: ${stsName} -> ${binding}`).toContain(entry.secret_name);
         }
       }

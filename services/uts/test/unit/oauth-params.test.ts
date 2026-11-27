@@ -1,3 +1,9 @@
+import {
+  UTS_RESOURCE_ORIGINS,
+  UTS_SCOPE_REGISTRY,
+  audienceOfResource,
+  protectedResourceMetadataFor,
+} from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import { identifyClient, isLoopbackRedirect } from '../../src/oauth/clients';
 import {
@@ -100,16 +106,168 @@ describe('request parameters', () => {
   });
 
   it('map resource indicators to audiences and find a mismatch with the scopes', () => {
-    expect(audiencesOfResources(['urn:kilo:service:gateway', 'urn:kilo:service:gateway'])).toEqual([
-      'gateway',
-    ]);
-    expect(audiencesOfResources(['https://gateway.example.com'])).toBeNull();
     expect(
-      audiencesOfResources(Array.from({ length: 9 }, (_, index) => `urn:kilo:service:s${index}`))
+      audiencesOfResources(['urn:kilo:service:gateway', 'urn:kilo:service:gateway'], 'development')
+    ).toEqual(['gateway']);
+    expect(audiencesOfResources(['https://gateway.example.com'], 'development')).toBeNull();
+    expect(
+      audiencesOfResources(
+        Array.from({ length: 9 }, (_, index) => `urn:kilo:service:s${index}`),
+        'development'
+      )
     ).toBeNull();
     expect(targetMismatch(['gateway:models.read'], ['gateway'])).toBe(false);
     expect(targetMismatch(['gateway:models.read'], ['gateway', 'mcp'])).toBe(true);
     expect(targetMismatch(['gateway:models.read', 'mcp:tools.call'], ['gateway'])).toBe(true);
+  });
+
+  it.each([
+    ['production', 'https://app.kilo.ai', 'https://uts.kiloapps.io'],
+    ['staging', 'https://staging-app.kilo.ai', 'https://uts-staging.kiloapps.io'],
+    ['development', 'http://localhost:3000', 'http://localhost:8800'],
+  ] as const)(
+    'accept in %s only its own Kilo API origin and issuer, exactly',
+    (environment, apiOrigin, issuer) => {
+      expect(audienceOfResource(apiOrigin, environment)).toBe('kilo-api');
+      expect(audienceOfResource(issuer, environment)).toBe('uts');
+      expect(audienceOfResource('urn:kilo:service:kilo-api', environment)).toBe('kilo-api');
+      for (const changed of [
+        `${apiOrigin}/`,
+        `${apiOrigin}/api/profile`,
+        `${apiOrigin}?a=b`,
+        `${apiOrigin}#x`,
+        apiOrigin.toUpperCase(),
+        `${issuer}/`,
+        `${apiOrigin}.example.com`,
+      ]) {
+        expect(audienceOfResource(changed, environment)).toBeNull();
+      }
+      for (const [other, origins] of Object.entries(UTS_RESOURCE_ORIGINS)) {
+        if (other === environment) continue;
+        for (const origin of Object.keys(origins)) {
+          if (!Object.hasOwn(UTS_RESOURCE_ORIGINS[environment], origin)) {
+            expect(audienceOfResource(origin, environment)).toBeNull();
+          }
+        }
+      }
+    }
+  );
+
+  it.each([
+    ['https://ai-attribution.kiloapps.io', 'ai-attribution'],
+    ['https://session-sync.kiloapps.io', 'session-sync'],
+    ['https://notifications.kiloapps.io', 'notifications'],
+    ['https://events.kiloapps.io', 'event-service'],
+    ['https://chat.kiloapps.io', 'kilo-chat'],
+    ['https://ingest.kilosessions.ai', 'session-ingest'],
+    ['https://user-data-export.kilosessions.ai', 'user-data-export'],
+    ['https://git-token-service.kilosessions.ai', 'git-token-service'],
+    ['https://cloud-agent-next.kilosessions.ai', 'cloud-agent-next'],
+  ] as const)('map the production origin %s to %s and refuse it elsewhere', (origin, audience) => {
+    expect(audienceOfResource(origin, 'production')).toBe(audience);
+    expect(audienceOfResource(origin, 'staging')).toBeNull();
+    expect(audienceOfResource(origin, 'development')).toBeNull();
+  });
+
+  it.each([
+    ['http://localhost:3000', 'kilo-api'],
+    ['http://localhost:8800', 'uts'],
+    ['http://localhost:8787', 'ai-attribution'],
+    ['http://localhost:8817', 'session-sync'],
+    ['http://localhost:8804', 'notifications'],
+    ['http://localhost:8809', 'event-service'],
+    ['http://localhost:8808', 'kilo-chat'],
+    ['http://localhost:8821', 'session-ingest'],
+    ['http://localhost:8818', 'user-data-export'],
+    ['http://localhost:8802', 'git-token-service'],
+    ['http://localhost:8794', 'cloud-agent-next'],
+  ] as const)('map the loopback origin %s to %s in development only', (origin, audience) => {
+    expect(audienceOfResource(origin, 'development')).toBe(audience);
+    expect(audienceOfResource(origin, 'staging')).toBeNull();
+    expect(audienceOfResource(origin, 'production')).toBeNull();
+  });
+
+  it('hold exactly the agreed origins, loopback in development only', () => {
+    expect(UTS_RESOURCE_ORIGINS).toEqual({
+      production: {
+        'https://app.kilo.ai': 'kilo-api',
+        'https://uts.kiloapps.io': 'uts',
+        'https://ai-attribution.kiloapps.io': 'ai-attribution',
+        'https://session-sync.kiloapps.io': 'session-sync',
+        'https://notifications.kiloapps.io': 'notifications',
+        'https://events.kiloapps.io': 'event-service',
+        'https://chat.kiloapps.io': 'kilo-chat',
+        'https://ingest.kilosessions.ai': 'session-ingest',
+        'https://user-data-export.kilosessions.ai': 'user-data-export',
+        'https://git-token-service.kilosessions.ai': 'git-token-service',
+        'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
+      },
+      staging: {
+        'https://staging-app.kilo.ai': 'kilo-api',
+        'https://uts-staging.kiloapps.io': 'uts',
+      },
+      development: {
+        'http://localhost:3000': 'kilo-api',
+        'http://localhost:8800': 'uts',
+        'http://localhost:8787': 'ai-attribution',
+        'http://localhost:8817': 'session-sync',
+        'http://localhost:8804': 'notifications',
+        'http://localhost:8809': 'event-service',
+        'http://localhost:8808': 'kilo-chat',
+        'http://localhost:8821': 'session-ingest',
+        'http://localhost:8818': 'user-data-export',
+        'http://localhost:8802': 'git-token-service',
+        'http://localhost:8794': 'cloud-agent-next',
+      },
+    });
+    for (const environment of ['production', 'staging'] as const) {
+      for (const origin of Object.keys(UTS_RESOURCE_ORIGINS[environment])) {
+        expect(origin).toMatch(/^https:\/\/[a-z0-9.-]+$/);
+      }
+    }
+    for (const origin of Object.keys(UTS_RESOURCE_ORIGINS.development)) {
+      expect(origin).toMatch(/^http:\/\/localhost:\d+$/);
+    }
+  });
+
+  it('refuse prototype keys and other loopback forms', () => {
+    for (const environment of ['production', 'staging', 'development'] as const) {
+      for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+        expect(audienceOfResource(key, environment)).toBeNull();
+      }
+    }
+    for (const loopback of [
+      'http://localhost:3001',
+      'http://127.0.0.1:3000',
+      'https://localhost:3000',
+      'http://127.0.0.1:8787',
+    ]) {
+      expect(audienceOfResource(loopback, 'development')).toBeNull();
+    }
+  });
+
+  it('name the resource origin in its RFC 9728 metadata, from the origin table only', () => {
+    expect(protectedResourceMetadataFor('staging', 'kilo-api', 'Kilo API')).toEqual({
+      resource: 'https://staging-app.kilo.ai',
+      authorization_servers: ['https://uts-staging.kiloapps.io'],
+      scopes_supported: Object.keys(UTS_SCOPE_REGISTRY).filter(scope =>
+        scope.startsWith('kilo-api:')
+      ),
+      bearer_methods_supported: ['header'],
+      resource_name: 'Kilo API',
+    });
+    expect(protectedResourceMetadataFor('production', 'kilo-api', 'Kilo API')?.resource).toBe(
+      'https://app.kilo.ai'
+    );
+    expect(protectedResourceMetadataFor('production', 'event-service', 'Kilo events')).toEqual({
+      resource: 'https://events.kiloapps.io',
+      authorization_servers: ['https://uts.kiloapps.io'],
+      scopes_supported: ['event-service:events.subscribe'],
+      bearer_methods_supported: ['header'],
+      resource_name: 'Kilo events',
+    });
+    expect(protectedResourceMetadataFor('staging', 'event-service', 'Kilo events')).toBeNull();
+    expect(protectedResourceMetadataFor('production', 'gateway', 'Kilo gateway')).toBeNull();
   });
 });
 

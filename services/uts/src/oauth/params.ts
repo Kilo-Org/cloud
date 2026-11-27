@@ -1,9 +1,11 @@
 import {
   UTS_MAX_TOKENS_PER_CALL,
   UtsScopeSchema,
+  type UtsEnvironment,
   audienceOfResource,
   audienceOfScope,
 } from '@kilocode/uts-contracts';
+import { readBoundedText } from '../request-body';
 
 /**
  * Request parameters of the OAuth endpoints (RFC 6749 section 3.1): a parameter sent without a
@@ -40,38 +42,6 @@ export type FormRead =
   | { status: 'ok'; params: Params }
   | { status: 'invalid'; description: string };
 
-/**
- * The body as UTF-8 text, read chunk by chunk with a byte count: null as soon as the count passes
- * `max`, after the rest of the stream is cancelled, so a body without a `Content-Length` (or with
- * a false one) is never held whole in memory.
- */
-async function readBoundedText(
-  body: ReadableStream<Uint8Array> | null,
-  max: number
-): Promise<string | null> {
-  if (body === null) return '';
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    total += chunk.value.byteLength;
-    if (total > max) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(chunk.value);
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(bytes);
-}
-
 /** Reads an `application/x-www-form-urlencoded` POST body (RFC 6749 sections 4.1.3 and 6). */
 export async function readForm(request: Request): Promise<FormRead> {
   const contentType = request.headers.get('Content-Type') ?? '';
@@ -97,13 +67,16 @@ export function parseScopes(value: string, max: number): string[] | null {
 }
 
 /**
- * The audiences that RFC 8707 `resource` values name, without repeats; null when a value names no
- * Kilo service or more than 8 services are named.
+ * The audiences that RFC 8707 `resource` values name in `environment`, without repeats; null when
+ * a value names no Kilo service there or more than 8 services are named (`audienceOfResource`).
  */
-export function audiencesOfResources(resources: readonly string[]): string[] | null {
+export function audiencesOfResources(
+  resources: readonly string[],
+  environment: UtsEnvironment
+): string[] | null {
   const audiences = new Set<string>();
   for (const resource of resources) {
-    const audience = audienceOfResource(resource);
+    const audience = audienceOfResource(resource, environment);
     if (audience === null) return null;
     audiences.add(audience);
   }

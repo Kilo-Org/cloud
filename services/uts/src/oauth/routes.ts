@@ -7,17 +7,23 @@ import {
 import type { Env, UtsConfig } from '../env';
 import { grantsAccess, identityStoreBinding } from '../grants/binding';
 import type { GrantsAccess } from '../grants/store';
+import { type FeedPublish, feedPublisher } from '../revocation/publish';
+import type { ScopeRegistry } from '../scopes/policy';
 import { type SignerAccess, signerAccess } from '../token/mint';
 import { type AuthorizationHandoff, handleAuthorize } from './authorize';
 import { handleIntrospect } from './introspect';
 import { handleRevoke } from './revoke';
 import { type DeviceCodeGrant, handleToken } from './token-endpoint';
 
-/** What an OAuth request needs; the runtime tests pass their own `grants`. */
+/** What an OAuth request needs; the runtime tests pass their own `grants`, `scopes` and `publish`. */
 export type OAuthDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
+  /** The scope registry the endpoints enforce: `UTS_SCOPE_REGISTRY` in every deployed Worker. */
+  scopes: ScopeRegistry;
+  /** Writes a committed statement's feed entries to the feed objects (src/revocation/publish.ts). */
+  publish: FeedPublish;
   /** Null until the sign-in slice provides one: the authorization endpoint is not served. */
   handoff: AuthorizationHandoff | null;
   /** Null until the device sign-in slice provides one: the device grant is not offered. */
@@ -29,14 +35,16 @@ export type OAuthService = { kind: 'unprovisioned' } | { kind: 'ready'; deps: OA
 
 /**
  * `sign` null uses the grant's signer object; only the development entry passes another one, to
- * show a signing failure in the local end-to-end run (src/dev.ts).
+ * show a signing failure in the local end-to-end run (src/dev.ts). `scopes` is the scope registry
+ * (`utsScopeEntry`) in every deployed entry; the development entry adds its fixture scopes.
  */
 export function oauthService(
   env: Env,
   ctx: ExecutionContext,
   config: UtsConfig,
   handoff: AuthorizationHandoff | null,
-  sign: SignerAccess | null
+  sign: SignerAccess | null,
+  scopes: ScopeRegistry
 ): OAuthService {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return binding;
@@ -46,6 +54,8 @@ export function oauthService(
       config,
       grants: grantsAccess(binding.connectionString, ctx),
       sign: sign ?? signerAccess(env, config),
+      scopes,
+      publish: feedPublisher(env, config, ctx),
       handoff,
       deviceCodeGrant: null,
     },

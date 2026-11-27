@@ -48,6 +48,8 @@ export const DEVICE_CODE_STATUSES = ['pending', 'approved', 'denied', 'consumed'
 export const EMAIL_CODE_PURPOSES = ['sign_in', 'tier_a'] as const;
 export const EMAIL_CODE_STATUSES = ['pending', 'consumed', 'exhausted'] as const;
 export const EMAIL_CODE_LIMIT_STATUSES = ['open', 'stopped'] as const;
+/** The address a tier A code went to: the account's primary address, or the new one of a change. */
+export const EMAIL_CODE_ADDRESSES = ['current', 'new'] as const;
 export const TICKET_PURPOSES = [
   'sign_in',
   'stream',
@@ -74,6 +76,8 @@ export const REVOCATION_KINDS = [
   'bot_key',
   'sandbox_grant',
   'kid',
+  // Added by 0006_revocation_feed.sql; `ALTER TYPE ... ADD VALUE` appends it.
+  'blocked_account',
 ] as const;
 export const GATE_TIERS = ['a', 'b'] as const;
 export const GATED_ACTIONS = [
@@ -87,6 +91,7 @@ export const GATED_ACTIONS = [
   'ci_policy_create',
   'device_approve',
   'third_party_approve',
+  'bot_key_keep',
 ] as const;
 export const GATE_CHECKS = ['recent_sign_in', 'passkey', 'email_code', 'email_code_new'] as const;
 export const GATE_PASS_STATUSES = ['open', 'consumed'] as const;
@@ -102,6 +107,7 @@ export const NOTICE_KINDS = [
   'sessions_revoked',
   'suspicious_sign_in',
   'sign_in_code_stopped',
+  'bot_key_flagged',
 ] as const;
 export const NOTICE_CHANNELS = ['push', 'email', 'in_app'] as const;
 export const NOTICE_DELIVERIES = ['pending', 'delivered', 'failed'] as const;
@@ -121,6 +127,7 @@ export const IDENTITY_STORE_ENUMS = {
   email_code_purpose: EMAIL_CODE_PURPOSES,
   email_code_status: EMAIL_CODE_STATUSES,
   email_code_limit_status: EMAIL_CODE_LIMIT_STATUSES,
+  email_code_address: EMAIL_CODE_ADDRESSES,
   ticket_purpose: TICKET_PURPOSES,
   credential_status: CREDENTIAL_STATUSES,
   bot_key_status: BOT_KEY_STATUSES,

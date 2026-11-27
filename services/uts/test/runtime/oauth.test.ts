@@ -4,6 +4,7 @@ import {
   IntrospectionResponseSchema,
   TokenResponseSchema,
   UtsAccessTokenClaimsSchema,
+  type UtsOrgRole,
   signerOfTokenKid,
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
@@ -38,6 +39,8 @@ import {
   formRequest,
   minted,
   oauthDeps,
+  grantEntry,
+  recordingPublisher,
   storeFailure,
 } from './oauth-support';
 import { config, env } from './test-env';
@@ -165,9 +168,11 @@ describe('token endpoint: authorization_code', () => {
     expect(grants.calls).toEqual([]);
   });
 
-  it('maps each refused exchange to its OAuth error', async () => {
+  it('maps each refused exchange to its OAuth error and publishes what its statement revoked', async () => {
     for (const outcome of ['invalid_grant', 'invalid_scope', 'invalid_target'] as const) {
-      const grants = fakeGrants({ exchangeCode: async () => ({ outcome }) });
+      const revoked = outcome === 'invalid_grant' ? [grantEntry()] : [];
+      const grants = fakeGrants({ exchangeCode: async () => ({ outcome, feedEntries: revoked }) });
+      const feed = recordingPublisher();
       const response = await call(
         formRequest('/token', {
           grant_type: 'authorization_code',
@@ -176,10 +181,11 @@ describe('token endpoint: authorization_code', () => {
           client_id: THIRD_PARTY,
           code_verifier: VERIFIER,
         }),
-        oauthDeps(grants.access)
+        oauthDeps(grants.access, { publish: feed.publish })
       );
       expect(response.status).toBe(400);
       expect(await errorOf(response)).toBe(outcome);
+      expect(feed.batches).toEqual([revoked]);
     }
   });
 
@@ -267,6 +273,108 @@ describe('token endpoint: refresh_token', () => {
     expect((await verifiedClaims(body.access_token, 'gateway')).claims.sid).toBe(grant.grantId);
   });
 
+  it('signs a token for a role-limited organization scope only for an allowed role in the org', async () => {
+    const request = async (orgId: string | null, orgRole: UtsOrgRole | null) => {
+      const grant = await firstParty();
+      const grants = fakeGrants({
+        refreshFirstParty: async () => ({
+          outcome: 'issued',
+          ...minted({ scopes: ['ai-attribution:identity.read'], orgId, orgRole }),
+        }),
+      });
+      return await call(
+        formRequest(
+          '/token',
+          {
+            grant_type: 'refresh_token',
+            refresh_token: grant.token,
+            client_id: 'kilo-cli',
+            scope: 'ai-attribution:identity.read',
+          },
+          { DPoP: await dpopProof(grant.key) }
+        ),
+        oauthDeps(grants.access)
+      );
+    };
+    const org = crypto.randomUUID();
+    for (const [orgId, role] of [
+      [null, null],
+      [org, 'admin'],
+      [org, 'billing_manager'],
+      [org, null],
+    ] as const) {
+      const refused = await request(orgId, role);
+      expect(refused.status).toBe(400);
+      expect(await errorOf(refused)).toBe('invalid_grant');
+    }
+
+    for (const role of ['owner', 'member'] as const) {
+      const signed = await request(org, role);
+      expect(signed.status).toBe(200);
+      const body = TokenResponseSchema.parse(await signed.json());
+      expect((await verifiedClaims(body.access_token, 'ai-attribution')).claims.org).toBe(org);
+    }
+  });
+
+  it.each([
+    ['kilo-cli', 'user-data-export:exports.dispatch'],
+    ['kilo-cli', 'gateway:unknown.read'],
+    [THIRD_PARTY, 'kilo-api:profile.read'],
+    [THIRD_PARTY, 'ai-attribution:identity.read'],
+  ])(
+    'refuses %s a requested scope it may not hold before the statement, and a minted one before signing',
+    async (clientId, scope) => {
+      const firstPartyClient = clientId === 'kilo-cli';
+      const request = async (form: Record<string, string>) => {
+        const grant = await firstParty();
+        const body = {
+          grant_type: 'refresh_token',
+          refresh_token: firstPartyClient ? grant.token : randomCredential(),
+          client_id: clientId,
+          ...form,
+        };
+        return firstPartyClient
+          ? formRequest('/token', body, { DPoP: await dpopProof(grant.key) })
+          : formRequest('/token', body);
+      };
+      const issued = {
+        outcome: 'issued',
+        familyId: crypto.randomUUID(),
+        refreshExpiresAt: new Date(Date.now() + 86_400_000),
+        ...minted({ scopes: [scope] }),
+      } as const;
+
+      const named = fakeGrants({
+        refreshFirstParty: async () => issued,
+        refreshThirdParty: async () => issued,
+      });
+      const before = await call(await request({ scope }), oauthDeps(named.access));
+      expect(before.status).toBe(400);
+      expect(await errorOf(before)).toBe('invalid_scope');
+      expect(named.calls).toEqual([]);
+
+      // A grant that holds such a scope (the registry changed after it was created) signs nothing.
+      const stored = fakeGrants({
+        refreshFirstParty: async () => issued,
+        refreshThirdParty: async () => issued,
+      });
+      let signed = false;
+      const after = await call(
+        await request({}),
+        oauthDeps(stored.access, {
+          sign: async () => {
+            signed = true;
+            return { status: 'unavailable' };
+          },
+        })
+      );
+      expect(after.status).toBe(400);
+      expect(await errorOf(after)).toBe('invalid_scope');
+      expect(stored.calls).toHaveLength(1);
+      expect(signed).toBe(false);
+    }
+  );
+
   it('passes the proof jti to the grant statement and refuses a proof it recorded before', async () => {
     const grant = await firstParty();
     const recorded = new Set<string>();
@@ -308,16 +416,24 @@ describe('token endpoint: refresh_token', () => {
     );
     expect(await errorOf(mismatched)).toBe('invalid_grant');
 
-    const reuse = fakeGrants({ refreshThirdParty: async () => ({ outcome: 'reuse_detected' }) });
-    const reused = await call(
-      formRequest('/token', {
-        grant_type: 'refresh_token',
-        refresh_token: randomCredential(),
-        client_id: THIRD_PARTY,
-      }),
-      oauthDeps(reuse.access)
-    );
-    expect(await errorOf(reused)).toBe('invalid_grant');
+    const family = grantEntry();
+    const reuse = fakeGrants({
+      refreshThirdParty: async () => ({ outcome: 'reuse_detected', feedEntries: [family] }),
+    });
+    for (const outcome of ['published', 'unpublished'] as const) {
+      const feed = recordingPublisher(outcome);
+      const reused = await call(
+        formRequest('/token', {
+          grant_type: 'refresh_token',
+          refresh_token: randomCredential(),
+          client_id: THIRD_PARTY,
+        }),
+        oauthDeps(reuse.access, { publish: feed.publish })
+      );
+      // A failed publish changes nothing in the answer; the backfill adds the entry.
+      expect(await errorOf(reused)).toBe('invalid_grant');
+      expect(feed.batches).toEqual([[family]]);
+    }
 
     const none = fakeGrants();
     const malformed = await call(
@@ -537,7 +653,7 @@ describe('authorization endpoint', () => {
 
   it('issues a code bound to the DPoP key and returns it with state and iss', async () => {
     let pending: PendingAuthorization | undefined;
-    const grants = fakeGrants({ issueCode: async () => 'issued' });
+    const grants = fakeGrants({ issueCode: async () => ({ outcome: 'issued', orgRole: null }) });
     const response = await call(
       authorizeUrl({
         ...base,
@@ -643,7 +759,9 @@ describe('authorization endpoint', () => {
 
     const blocked = await call(
       authorizeUrl(base),
-      oauthDeps(fakeGrants({ issueCode: async () => 'access_denied' }).access, { handoff: approve })
+      oauthDeps(fakeGrants({ issueCode: async () => ({ outcome: 'access_denied' }) }).access, {
+        handoff: approve,
+      })
     );
     expect(redirectOf(blocked).searchParams.get('error')).toBe('access_denied');
 
@@ -673,6 +791,47 @@ describe('authorization endpoint', () => {
     expect(redirectOf(broken).searchParams.get('error')).toBe('server_error');
   });
 
+  it('refuses an organization scope without an organization or with a role outside its roles', async () => {
+    const issuedAs = (orgRole: UtsOrgRole | null) => async () =>
+      ({ outcome: 'issued', orgRole }) as const;
+    const scoped = { ...base, scope: 'ai-attribution:identity.read' };
+    const without = fakeGrants({ issueCode: issuedAs(null) });
+    const refused = await call(
+      authorizeUrl(scoped),
+      oauthDeps(without.access, { handoff: approve })
+    );
+    expect(redirectOf(refused).searchParams.get('error')).toBe('invalid_scope');
+    expect(without.calls).toEqual([]);
+
+    const org = crypto.randomUUID();
+    const inOrg: AuthorizationHandoff = async (request, next) => {
+      const decision = await approve(request, next);
+      return decision.status === 'approved'
+        ? { ...decision, approval: { ...decision.approval, orgId: org } }
+        : decision;
+    };
+    // The code statement refuses a role outside the scope's roles itself (migration 0005), and
+    // the endpoint hands out nothing.
+    const roleRefused = fakeGrants({ issueCode: async () => ({ outcome: 'invalid_scope' }) });
+    const admin = await call(
+      authorizeUrl(scoped),
+      oauthDeps(roleRefused.access, { handoff: inOrg })
+    );
+    expect(redirectOf(admin).searchParams.get('error')).toBe('invalid_scope');
+    expect(redirectOf(admin).searchParams.get('code')).toBeNull();
+    expect(roleRefused.calls.map(item => item.method)).toEqual(['issueCode']);
+
+    for (const role of ['owner', 'member'] as const) {
+      const withOrg = fakeGrants({ issueCode: issuedAs(role) });
+      const issued = await call(
+        authorizeUrl(scoped),
+        oauthDeps(withOrg.access, { handoff: inOrg })
+      );
+      expect(redirectOf(issued).searchParams.get('code')).not.toBeNull();
+      expect((withOrg.calls[0].input as IssueCodeInput).orgId).toBe(org);
+    }
+  });
+
   it('authorizes a third-party client from its cached metadata with the consent the hand-off names', async () => {
     const grants = fakeGrants({
       findThirdPartyClient: async clientId => ({
@@ -680,7 +839,7 @@ describe('authorization endpoint', () => {
         name: 'Example',
         redirectUris: ['https://client.example.com/callback'],
       }),
-      issueCode: async () => 'issued',
+      issueCode: async () => ({ outcome: 'issued', orgRole: null }),
     });
     const response = await call(
       authorizeUrl({
@@ -715,20 +874,64 @@ describe('authorization endpoint', () => {
     expect(lookupFailure.status).toBe(503);
     expect(lookupFailure.headers.get('Location')).toBeNull();
   });
+
+  it.each([
+    ['an unregistered scope', 'kilo-cli', 'gateway:unknown.read'],
+    ['a scope of another first-party client', 'kilo-cli', 'user-data-export:exports.dispatch'],
+    ['a scope for the web app only', 'kilo-cli', 'uts:security.read'],
+    ['a scope that is not third-party-safe', THIRD_PARTY, 'kilo-api:profile.read'],
+    ['a first-party-only service scope', THIRD_PARTY, 'event-service:events.subscribe'],
+  ])('refuses %s before the hand-off and stores nothing', async (_name, clientId, scope) => {
+    const grants = fakeGrants({
+      findThirdPartyClient: async id => ({
+        clientId: id,
+        name: 'Example',
+        redirectUris: ['https://client.example.com/callback'],
+      }),
+      issueCode: async () => ({ outcome: 'issued', orgRole: null }),
+    });
+    let handedOff = false;
+    const thirdParty = clientId === THIRD_PARTY;
+    const response = await call(
+      authorizeUrl({
+        ...base,
+        client_id: clientId,
+        scope,
+        ...(thirdParty
+          ? { redirect_uri: 'https://client.example.com/callback', dpop_jkt: '' }
+          : {}),
+      }),
+      oauthDeps(grants.access, {
+        handoff: async (request, next) => {
+          handedOff = true;
+          return await approve(request, next);
+        },
+      })
+    );
+    expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
+    expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    expect(handedOff).toBe(false);
+    expect(grants.calls.filter(item => item.method === 'issueCode')).toEqual([]);
+  });
 });
 
 describe('revocation endpoint', () => {
-  it('revokes a refresh token and answers 200 for unknown and malformed tokens', async () => {
-    const grants = fakeGrants({ revoke: async () => 'revoked' });
+  it('revokes a refresh token, publishes its feed entry, and answers 200 for unknown and malformed tokens', async () => {
+    const entry = grantEntry();
+    const grants = fakeGrants({
+      revoke: async () => ({ outcome: 'revoked', feedEntries: [entry] }),
+    });
+    const feed = recordingPublisher();
     const token = firstPartyRefreshToken(crypto.randomUUID(), randomCredential());
     const revoked = await call(
       formRequest('/revoke', { token, client_id: 'kilo-cli' }),
-      oauthDeps(grants.access)
+      oauthDeps(grants.access, { publish: feed.publish })
     );
     expect(revoked.status).toBe(200);
     expect(grants.calls).toHaveLength(1);
+    expect(feed.batches).toEqual([[entry]]);
 
-    const unknown = fakeGrants({ revoke: async () => 'unknown' });
+    const unknown = fakeGrants({ revoke: async () => ({ outcome: 'unknown', feedEntries: [] }) });
     expect(
       (
         await call(
@@ -769,7 +972,7 @@ describe('revocation endpoint', () => {
 
   it('answers a token of another client like an unknown token', async () => {
     const answer = async (outcome: 'client_mismatch' | 'unknown') => {
-      const grants = fakeGrants({ revoke: async () => outcome });
+      const grants = fakeGrants({ revoke: async () => ({ outcome, feedEntries: [] }) });
       const response = await call(
         formRequest('/revoke', { token: randomCredential(), client_id: THIRD_PARTY }),
         oauthDeps(grants.access)
@@ -779,6 +982,21 @@ describe('revocation endpoint', () => {
     };
     expect(await answer('client_mismatch')).toEqual(await answer('unknown'));
     expect(await answer('client_mismatch')).toEqual({ status: 200, body: '' });
+  });
+
+  it('answers 503 when neither feed object took the entry, and the revocation stands', async () => {
+    const grants = fakeGrants({
+      revoke: async () => ({ outcome: 'revoked', feedEntries: [grantEntry()] }),
+    });
+    const feed = recordingPublisher('unpublished');
+    const response = await call(
+      formRequest('/revoke', { token: randomCredential(), client_id: THIRD_PARTY }),
+      oauthDeps(grants.access, { publish: feed.publish })
+    );
+    expect(response.status).toBe(503);
+    expect(await errorOf(response)).toBe('temporarily_unavailable');
+    expect(grants.calls).toHaveLength(1);
+    expect(feed.batches).toHaveLength(1);
   });
 
   it('answers 503 and 500 for store failures', async () => {

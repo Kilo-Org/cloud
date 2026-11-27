@@ -3,6 +3,13 @@ import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
+import type { FeedPublish } from '../revocation/publish';
+import {
+  type MintClient,
+  type ScopeRegistry,
+  clientScopeRefusal,
+  orgScopeRefusal,
+} from '../scopes/policy';
 import {
   firstPartyRefreshTokenOfExchange,
   grantIdOfCode,
@@ -12,7 +19,7 @@ import {
   sha256,
 } from '../token/credentials';
 import { type SignerAccess, accessTokenClaims, tokenResponseBody } from '../token/mint';
-import { type FirstPartyClient, requestClient } from './clients';
+import { type ClientIdentity, type FirstPartyClient, requestClient } from './clients';
 import { failureResponse, oauthError, temporarilyUnavailable } from './errors';
 import { type Params, audiencesOfResources, parseScopes, readForm, targetMismatch } from './params';
 import { CodeVerifierSchema, s256Challenge } from './pkce';
@@ -31,6 +38,10 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * token, which derives from the code and the PKCE verifier. A third-party client that lost an
  * answer authorizes again: a second use of its code, like a second use of a replaced refresh
  * token, revokes the family.
+ *
+ * A refused exchange or third-party refresh whose statement revoked a grant (a second use of a
+ * code, a reused rotated token) publishes the statement's feed entries before it answers; a failed
+ * publish changes nothing in the answer, and the backfill adds the entries (design 5.6).
  */
 
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
@@ -40,6 +51,8 @@ export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
+  scopes: ScopeRegistry;
+  publish: FeedPublish;
   deviceCodeGrant: DeviceCodeGrant | null;
 };
 
@@ -62,7 +75,8 @@ const IpSchema = z.union([z.ipv4(), z.ipv6()]);
 
 const GRANT_ERRORS = {
   invalid_grant: 'the grant is invalid, expired or revoked',
-  invalid_scope: 'the scopes are not all granted, or there are more than 8',
+  invalid_scope:
+    'the scopes are not all granted, a scope needs another role in the organization, or there are more than 8',
   invalid_target: 'each resource must name a Kilo service that a requested scope belongs to',
 } as const;
 
@@ -82,8 +96,16 @@ function grantError(
 
 type TokenSelection = { scopes: string[] | null; resources: string[] | null };
 
-/** The optional `scope` and `resource` of a token request (RFC 6749 section 6, RFC 8707). */
-function tokenSelection(params: Params): TokenSelection | Response {
+/**
+ * The optional `scope` and `resource` of a token request (RFC 6749 section 6, RFC 8707). A named
+ * scope the client may not hold (`clientScopeRefusal`) answers `invalid_scope` before the grant
+ * statement runs.
+ */
+function tokenSelection(
+  params: Params,
+  deps: TokenDeps,
+  client: MintClient
+): TokenSelection | Response {
   const scopeParam = params.one('scope');
   if (scopeParam.status === 'repeated') return oauthError('invalid_request', 400, 'scope repeats');
   let scopes: string[] | null = null;
@@ -92,16 +114,29 @@ function tokenSelection(params: Params): TokenSelection | Response {
     if (scopes === null) {
       return oauthError('invalid_scope', 400, 'scope must name at most 8 UTS scopes once each');
     }
+    if (clientScopeRefusal(scopes, client, deps.scopes) !== null) {
+      return oauthError(
+        'invalid_scope',
+        400,
+        'a requested scope is not registered for this client'
+      );
+    }
   }
   const resourceValues = params.all('resource');
   let resources: string[] | null = null;
   if (resourceValues.length > 0) {
-    resources = audiencesOfResources(resourceValues);
+    resources = audiencesOfResources(resourceValues, deps.config.environment);
     if (resources === null || (scopes !== null && targetMismatch(scopes, resources))) {
       return grantError('invalid_target');
     }
   }
   return { scopes, resources };
+}
+
+function mintClient(identity: Exclude<ClientIdentity, { kind: 'unknown' }>): MintClient {
+  return identity.kind === 'first_party'
+    ? { kind: 'first_party', clientId: identity.client.clientId }
+    : { kind: 'third_party', clientId: identity.clientId };
 }
 
 function required(params: Params, name: string): string | Response {
@@ -139,14 +174,33 @@ function deviceContext(
   };
 }
 
-/** Signs the minted tokens and answers the token response. */
+/**
+ * Signs the minted tokens and answers the token response. The statement already refused a role
+ * outside a scope's roles without writing anything (migration 0005), and `/authorize` stored only
+ * scopes the client may hold; this last check before signing keeps a token from ever carrying a
+ * scope the registry does not allow the client, or an organization scope without `org` or with
+ * another role, even if the registry changed after the grant was created.
+ */
 async function completeMint(
   deps: TokenDeps,
-  clientId: string,
+  client: MintClient,
   grantId: string,
   minted: Minted,
   refresh: { token: string; expiresAt: Date } | null
 ): Promise<Response> {
+  const clientId = client.clientId;
+  if (clientScopeRefusal(minted.scopes, client, deps.scopes) !== null) {
+    console.error(JSON.stringify({ event: 'uts.token.client_scope_refused', client: clientId }));
+    return oauthError('invalid_scope', 400, 'a granted scope is not registered for this client');
+  }
+  if (orgScopeRefusal(minted.scopes, minted.orgId, minted.orgRole, deps.scopes) !== null) {
+    console.error(JSON.stringify({ event: 'uts.token.org_scope_refused', client: clientId }));
+    return oauthError(
+      'invalid_grant',
+      400,
+      'the grant names no organization, or another role, for its scopes'
+    );
+  }
   const nowMs = Date.now();
   const nowSeconds = Math.floor(nowMs / 1000);
   const claims = accessTokenClaims(deps.config, clientId, grantId, minted, nowSeconds);
@@ -170,7 +224,8 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
   if (!CodeVerifierSchema.safeParse(verifier).success) {
     return oauthError('invalid_request', 400, 'code_verifier is malformed');
   }
-  const selection = tokenSelection(params);
+  const client = mintClient(identity);
+  const selection = tokenSelection(params, deps, client);
   if (selection instanceof Response) return selection;
   if (!isRandomCredential(code)) return grantError('invalid_grant');
 
@@ -195,7 +250,7 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
     binding = { kind: 'third_party' };
     refreshToken = randomCredential();
   }
-  const clientId = identity.kind === 'first_party' ? identity.client.clientId : identity.clientId;
+  const clientId = client.clientId;
 
   const result = await deps.grants(async grants =>
     grants.exchangeCode({
@@ -210,8 +265,11 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
       ...selection,
     })
   );
-  if (result.outcome !== 'issued') return grantError(result.outcome);
-  return await completeMint(deps, clientId, grantId, result, {
+  if (result.outcome !== 'issued') {
+    await deps.publish(result.feedEntries);
+    return grantError(result.outcome);
+  }
+  return await completeMint(deps, client, grantId, result, {
     token: refreshToken,
     expiresAt: result.refreshExpiresAt,
   });
@@ -222,7 +280,8 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
   if (identity instanceof Response) return identity;
   const token = required(params, 'refresh_token');
   if (token instanceof Response) return token;
-  const selection = tokenSelection(params);
+  const client = mintClient(identity);
+  const selection = tokenSelection(params, deps, client);
   if (selection instanceof Response) return selection;
 
   if (identity.kind === 'first_party') {
@@ -241,7 +300,7 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
       })
     );
     if (result.outcome !== 'issued') return grantError(result.outcome);
-    return await completeMint(deps, identity.client.clientId, grantId, result, null);
+    return await completeMint(deps, client, grantId, result, null);
   }
 
   const refused = refuseThirdPartyProof(request);
@@ -257,8 +316,11 @@ async function refresh(request: Request, params: Params, deps: TokenDeps): Promi
       ...selection,
     })
   );
-  if (result.outcome !== 'issued') return grantError(result.outcome);
-  return await completeMint(deps, identity.clientId, result.familyId, result, {
+  if (result.outcome !== 'issued') {
+    await deps.publish(result.feedEntries);
+    return grantError(result.outcome);
+  }
+  return await completeMint(deps, client, result.familyId, result, {
     token: rotated,
     expiresAt: result.refreshExpiresAt,
   });

@@ -297,6 +297,7 @@ export const EmailCodeRowSchema = z.strictObject({
   expires_at: timestamp,
   status: z.enum(enums.EMAIL_CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  address: z.enum(enums.EMAIL_CODE_ADDRESSES).nullable(),
 });
 
 export const EmailCodeLimitRowSchema = z.strictObject({

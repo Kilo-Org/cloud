@@ -17,7 +17,10 @@ import {
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 
-/** Tables the app login writes only through the OAuth grant functions (migration 0004). */
+/**
+ * Tables the app login writes only through security-definer functions: the OAuth grant functions
+ * (migration 0004) and the account functions (migration 0005).
+ */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
   'refresh_grants',
@@ -27,6 +30,14 @@ const FUNCTION_WRITTEN_TABLES = [
   'third_party_rotated_tokens',
   'revocations',
   'dpop_proofs',
+  'personal_access_tokens',
+  'org_bot_keys',
+  'gate_passes',
+  'accounts',
+  'sso_connections',
+  'sso_domains',
+  'org_sso_policies',
+  'org_memberships',
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
@@ -35,6 +46,7 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   third_party_rotated_tokens: 'family_id',
   revocations: 'kind',
   dpop_proofs: 'jti',
+  org_sso_policies: 'enforcement',
 };
 
 let db: TestDatabase;
@@ -195,7 +207,7 @@ describe('role attributes', () => {
 describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
   it('reads and writes the ungated credential tables', async () => {
     const app = await db.connect(login);
-    const accountId = await insertAccount(app);
+    const accountId = await insertAccount(await db.connectAsOwner());
     const sessionId = await insertBrowserSession(app, accountId);
     const result = await app.query(
       `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(),
@@ -206,7 +218,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     expect(result.rowCount).toBe(1);
   });
 
-  it('revokes a PAT, but cannot bring it back', async () => {
+  it('reads a PAT but cannot write it, and a revoked PAT stays revoked', async () => {
     const owner = await db.connectAsOwner();
     const accountId = await insertAccount(owner);
     const pat = await owner.query<{ id: string }>(
@@ -217,7 +229,22 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
       [accountId, randomHash(), await insertGatePass(owner, accountId, 'pat_create')]
     );
     const app = await db.connect(login);
-    await app.query(
+    const read = await app.query('SELECT id FROM uts.personal_access_tokens WHERE id = $1', [
+      pat.rows[0].id,
+    ]);
+    expect(read.rowCount).toBe(1);
+    // PATs change only through the account functions (migration 0005).
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `UPDATE uts.personal_access_tokens
+           SET status = 'revoked', revoked_at = now(), revoke_reason = 'user_revoke'
+           WHERE id = $1`,
+          [pat.rows[0].id]
+        )
+      )
+    ).toBe('42501');
+    await owner.query(
       `UPDATE uts.personal_access_tokens
        SET status = 'revoked', revoked_at = now(), revoke_reason = 'user_revoke'
        WHERE id = $1`,
@@ -225,7 +252,7 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     );
     expect(
       await sqlStateOf(() =>
-        app.query(
+        owner.query(
           `UPDATE uts.personal_access_tokens
            SET status = 'active', revoked_at = NULL, revoke_reason = NULL
            WHERE id = $1`,
@@ -338,14 +365,19 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     'cannot insert, update or delete uts.%s directly, only read it',
     async table => {
       const app = await db.connect(login);
-      await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
-      const column = UPDATE_COLUMN[table] ?? 'status';
-      for (const statement of [
-        `INSERT INTO uts.${table} DEFAULT VALUES`,
-        `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
-        `DELETE FROM uts.${table} WHERE false`,
-      ]) {
-        expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+      // Closed here: this file opens a connection per test, and these cases alone are 32 of them.
+      try {
+        await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
+        const column = UPDATE_COLUMN[table] ?? 'status';
+        for (const statement of [
+          `INSERT INTO uts.${table} DEFAULT VALUES`,
+          `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
+          `DELETE FROM uts.${table} WHERE false`,
+        ]) {
+          expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+        }
+      } finally {
+        await app.end();
       }
     }
   );
@@ -429,8 +461,7 @@ describe.each(['uts_pat_a', 'uts_pat_b'] as const)('PAT login %s', login => {
 
 describe.each(['uts_reader_a', 'uts_reader_b'] as const)('reader login %s', login => {
   it('reads the account views', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
+    const accountId = await insertAccount(await db.connectAsOwner());
     const reader = await db.connect(login);
     const result = await reader.query('SELECT id, status FROM uts_read.accounts WHERE id = $1', [
       accountId,
@@ -528,26 +559,9 @@ describe('table privileges', () => {
        ) AS grants`
     );
 
-    // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns.
+    // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns. PATs and org
+    // bot keys lose even those in 0005, like gate passes: only the account functions write them.
     const gatedUpdates: Record<string, string[]> = {
-      personal_access_tokens: [
-        'last_used_asn',
-        'last_used_at',
-        'last_used_country',
-        'last_used_ip',
-        'revoke_reason',
-        'revoked_at',
-        'status',
-      ],
-      org_bot_keys: [
-        'flagged_at',
-        'kept_at',
-        'kept_by',
-        'last_used_at',
-        'revoked_at',
-        'revoked_by',
-        'status',
-      ],
       ci_trust_policies: ['revoked_at', 'status', 'updated_at'],
       third_party_consents: ['revoked_at', 'status'],
       device_codes: [
@@ -574,10 +588,7 @@ describe('table privileges', () => {
     ];
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
       table =>
-        table !== 'audit_events' &&
-        table !== 'audit_relay_watermarks' &&
-        table !== 'gate_passes' &&
-        !(table in gatedUpdates)
+        table !== 'audit_events' && table !== 'audit_relay_watermarks' && !(table in gatedUpdates)
     );
     const views = await admin.query<{ relname: string }>(
       `SELECT relname FROM pg_class WHERE relnamespace = 'uts_read'::regnamespace AND relkind = 'v'`
@@ -594,7 +605,6 @@ describe('table privileges', () => {
           : ['DELETE', 'INSERT', 'SELECT', 'UPDATE']
         ).map(privilege => app(`uts.${table}`, privilege))
       ),
-      app('uts.gate_passes', 'SELECT'),
       ...Object.entries(gatedUpdates).flatMap(([table, columns]) => [
         app(`uts.${table}`, 'DELETE'),
         app(`uts.${table}`, 'SELECT'),
@@ -633,19 +643,31 @@ describe('functions', () => {
     );
     expect(result.rows).toEqual([
       { routine: 'advance_audit_watermark', grantee: 'uts_app' },
+      { routine: 'create_bot_key', grantee: 'uts_app' },
+      { routine: 'create_pat', grantee: 'uts_app' },
       { routine: 'end_long_transactions', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'introspect_refresh_token', grantee: 'uts_app' },
       { routine: 'is_audit_event', grantee: 'uts_app' },
       { routine: 'is_scope', grantee: 'uts_app' },
       { routine: 'is_scope_set', grantee: 'uts_app' },
       { routine: 'issue_authorization_code', grantee: 'uts_app' },
+      { routine: 'keep_bot_key', grantee: 'uts_app' },
+      { routine: 'list_bot_keys', grantee: 'uts_app' },
+      { routine: 'list_pats', grantee: 'uts_app' },
+      { routine: 'live_feed_entries', grantee: 'uts_app' },
+      { routine: 'live_feed_entries_of_refresh_token', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },
       { routine: 'maintain_oauth_rows', grantee: 'uts_app' },
+      { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'refresh_first_party', grantee: 'uts_app' },
       { routine: 'refresh_third_party', grantee: 'uts_app' },
+      { routine: 'remove_org_member', grantee: 'uts_app' },
+      { routine: 'revoke_bot_key', grantee: 'uts_app' },
+      { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
     ]);
   });

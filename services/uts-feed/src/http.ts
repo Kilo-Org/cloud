@@ -1,12 +1,19 @@
 import {
+  encodeBase64Url,
+  UTS_BOOTSTRAP_PATH,
+  UTS_FEED_HEAD_PATH,
+  UTS_FEED_LIST_PATH_PREFIX,
   UTS_JWKS_MAX_AGE_SECONDS,
   UTS_JWKS_OLDEST_AGE_HEADER,
   UTS_JWKS_PATH,
   UTS_JWKS_STALE_IF_ERROR_SECONDS,
   UTS_SIGNER_KEYS_HOLD_MS,
+  type UtsBootstrapWire,
 } from '@kilocode/uts-contracts';
-import { readConfig, type Env } from './env';
+import { serveBootstrap } from './bootstrap';
+import { readConfig, type Env, type FeedConfig } from './env';
 import { KEY_SET_READ_GUARD_MS, serveKeySet } from './jwks';
+import { FEED_RETRY_AFTER_SECONDS, serveHead, serveList } from './revocation';
 
 function errorResponse(
   error: string,
@@ -55,13 +62,88 @@ async function keySet(env: Env, ctx: ExecutionContext): Promise<Response> {
   }
 }
 
+/** The answer for a feed read that failed: 503 to retry after a backfill, 500 for a deploy error. */
+function feedFailure(status: 'unavailable' | 'misconfigured'): Response {
+  return status === 'misconfigured'
+    ? errorResponse('server_error', 500)
+    : errorResponse('temporarily_unavailable', 503, {
+        'Retry-After': String(FEED_RETRY_AFTER_SECONDS),
+      });
+}
+
+const NO_STORE = { 'Cache-Control': 'no-store' };
+
+/**
+ * The revocation feed over HTTPS, for Vercel and Fly verifiers (design 5.6). The feed names
+ * accounts and grants, so it answers only callers with a verified workload identity, and that
+ * check verifies STS audience tokens with `@kilocode/verify` (phase 2, decision Q7). Until the feed
+ * Worker carries it, staging and production answer these paths 404 and serve the feed over
+ * service bindings only (`FeedReader`); development serves them to the local end-to-end run.
+ */
+type FeedRoute = { kind: 'head' } | { kind: 'list'; hash: string } | { kind: 'bootstrap' };
+
+function feedRoute(pathname: string): FeedRoute | null {
+  if (pathname === UTS_FEED_HEAD_PATH) return { kind: 'head' };
+  if (pathname === UTS_BOOTSTRAP_PATH) return { kind: 'bootstrap' };
+  if (pathname.startsWith(UTS_FEED_LIST_PATH_PREFIX)) {
+    return { kind: 'list', hash: pathname.slice(UTS_FEED_LIST_PATH_PREFIX.length) };
+  }
+  return null;
+}
+
+async function revocationFeed(
+  route: FeedRoute,
+  env: Env,
+  config: FeedConfig,
+  ctx: ExecutionContext
+): Promise<Response> {
+  switch (route.kind) {
+    case 'head': {
+      const read = await serveHead(env.UTS_FEED_READS, config, ctx);
+      if (read.status !== 'ok') return feedFailure(read.status);
+      return new Response(read.head, {
+        headers: { 'Content-Type': 'application/jwt', ...NO_STORE },
+      });
+    }
+    case 'list': {
+      const read = await serveList(env.UTS_FEED_READS, config, route.hash, ctx);
+      if (read.status === 'not_found') return errorResponse('not_found', 404);
+      if (read.status !== 'ok') return feedFailure(read.status);
+      return new Response(read.bytes, {
+        headers: { 'Content-Type': 'application/json', ...NO_STORE },
+      });
+    }
+    case 'bootstrap': {
+      const read = await serveBootstrap(env, config, ctx);
+      if (read.status !== 'ok') return feedFailure(read.status);
+      const body: UtsBootstrapWire = {
+        jwks: read.jwks,
+        key_ages: read.keyAges,
+        head: read.head,
+        list: encodeBase64Url(read.list),
+      };
+      // The same ages as the key-set response's headers, so either reader counts them.
+      return Response.json(body, {
+        headers: {
+          ...NO_STORE,
+          Age: String(read.keyAges.newest),
+          [UTS_JWKS_OLDEST_AGE_HEADER]: String(read.keyAges.oldest),
+        },
+      });
+    }
+  }
+}
+
 export async function handleRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
   const { pathname } = new URL(request.url);
-  if (pathname !== UTS_JWKS_PATH) return errorResponse('not_found', 404);
+  const config = readConfig(env);
+  const route = config.environment === 'development' ? feedRoute(pathname) : null;
+  if (pathname !== UTS_JWKS_PATH && route === null) return errorResponse('not_found', 404);
   if (request.method !== 'GET') return errorResponse('method_not_allowed', 405, { Allow: 'GET' });
-  return await keySet(env, ctx);
+  if (route === null) return await keySet(env, ctx);
+  return await revocationFeed(route, env, config, ctx);
 }

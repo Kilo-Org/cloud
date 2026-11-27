@@ -1,6 +1,11 @@
-import { UtsSignerIndexSchema, type UtsEnvironment } from '@kilocode/uts-contracts';
+import {
+  UtsFeedIndexSchema,
+  UtsSignerIndexSchema,
+  type UtsEnvironment,
+} from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { Env, UtsConfig } from '../env';
+import type { UtsFeedDO } from '../feed/UtsFeedDO';
 import type { UtsKeySetDO } from './UtsKeySetDO';
 import type { UtsSignerDO } from './UtsSignerDO';
 
@@ -10,6 +15,12 @@ import type { UtsSignerDO } from './UtsSignerDO';
  * primary in Frankfurt (design 5.7). The hint is best effort; the jurisdiction is enforced.
  */
 export const UTS_OBJECT_LOCATION_HINT: DurableObjectLocationHint = 'weur';
+
+/**
+ * The two feed objects sit in the `eu` jurisdiction with different EU hints, western and eastern
+ * Europe, so one regional failure does not stop both (design 5.6).
+ */
+export const FEED_OBJECT_LOCATION_HINTS: readonly DurableObjectLocationHint[] = ['weur', 'eeur'];
 
 /** The fixed number of key-set shards (design 5.7); it bounds the signer reads (design 3). */
 export const KEY_SET_SHARD_COUNT = 8;
@@ -22,6 +33,7 @@ const KeySetShardSchema = z
 
 const SIGNER_NAME_PATTERN = /^(production|staging|development):signer:(\d{2})$/;
 const KEY_SET_SHARD_NAME_PATTERN = /^(production|staging|development):keyset:(\d)$/;
+const FEED_NAME_PATTERN = /^(production|staging|development):feed:(\d)$/;
 
 /** Object names carry the environment, so a staging object can never serve production. */
 export function signerObjectName(environment: UtsEnvironment, signer: number): string {
@@ -30,6 +42,18 @@ export function signerObjectName(environment: UtsEnvironment, signer: number): s
 
 export function keySetShardObjectName(environment: UtsEnvironment, shard: number): string {
   return `${environment}:keyset:${KeySetShardSchema.parse(shard)}`;
+}
+
+export function feedObjectName(environment: UtsEnvironment, feed: number): string {
+  return `${environment}:feed:${UtsFeedIndexSchema.parse(feed)}`;
+}
+
+/** The feed index an object name names in this environment, or null for any other name. */
+export function feedOfObjectName(environment: UtsEnvironment, name: string): number | null {
+  const match = FEED_NAME_PATTERN.exec(name);
+  if (match === null || match[1] !== environment) return null;
+  const feed = UtsFeedIndexSchema.safeParse(Number(match[2]));
+  return feed.success ? feed.data : null;
 }
 
 /** The signer index an object name names in this environment, or null for any other name. */
@@ -60,7 +84,7 @@ export type ObjectIdCheck =
 function indexOfObjectId(
   config: UtsConfig,
   id: Pick<DurableObjectId, 'name' | 'jurisdiction'>,
-  kind: 'signer' | 'key-set shard',
+  kind: 'signer' | 'key-set shard' | 'feed',
   indexOfName: (environment: UtsEnvironment, name: string) => number | null
 ): ObjectIdCheck {
   const index = id.name === undefined ? null : indexOfName(config.environment, id.name);
@@ -103,33 +127,73 @@ function signerObjectId(env: Env, config: UtsConfig, signer: number): DurableObj
 }
 
 /**
- * Checks that an object which already stores the state of signer `signer` is that signer's
- * object in this environment and jurisdiction, before it imports the stored keys. It compares the
- * object's id with the id the signer's name gives in this environment; an id carries its
- * jurisdiction but not always its name (an object started by an alarm or opened by its raw id has
- * none), so this check needs no name. A state copied to another object, or an object of another
- * environment, is refused.
+ * Checks that an object which already stores the state of `kind` object `index` is that object in
+ * this environment and jurisdiction, before it imports the stored keys. It compares the object's
+ * id with `expected`, the id that object's name gives in this environment (null when `index`
+ * names no such object); an id carries its jurisdiction but not always its name (an object
+ * started by an alarm or opened by its raw id has none), so this check needs no name. A state
+ * copied to another object, or an object of another environment, is refused.
  */
+function storedObjectCheck(
+  kind: 'signer' | 'feed',
+  config: UtsConfig,
+  id: DurableObjectId,
+  index: number,
+  expected: DurableObjectId | null
+): ObjectIdCheck {
+  const jurisdiction = id.jurisdiction ?? 'none';
+  if (jurisdiction !== config.jurisdiction) {
+    return {
+      status: 'refused',
+      reason: `${kind} object is in jurisdiction ${jurisdiction}, not ${config.jurisdiction}`,
+    };
+  }
+  if (expected === null || !id.equals(expected)) {
+    return {
+      status: 'refused',
+      reason: `stored state names ${kind} ${index}, but this is not that ${kind}'s ${config.environment} object`,
+    };
+  }
+  return { status: 'accepted', index };
+}
+
+/** `storedObjectCheck` for a signer object that stores signer `signer`'s keys. */
 export function storedSignerCheck(
   env: Env,
   config: UtsConfig,
   id: DurableObjectId,
   signer: number
 ): ObjectIdCheck {
-  const jurisdiction = id.jurisdiction ?? 'none';
-  if (jurisdiction !== config.jurisdiction) {
-    return {
-      status: 'refused',
-      reason: `signer object is in jurisdiction ${jurisdiction}, not ${config.jurisdiction}`,
-    };
-  }
-  if (!id.equals(signerObjectId(env, config, signer))) {
-    return {
-      status: 'refused',
-      reason: `stored state names signer ${signer}, but this is not that signer's ${config.environment} object`,
-    };
-  }
-  return { status: 'accepted', index: signer };
+  return storedObjectCheck('signer', config, id, signer, signerObjectId(env, config, signer));
+}
+
+/** The feed index a new feed object takes from its id. */
+export function feedOfObjectId(
+  config: UtsConfig,
+  id: Pick<DurableObjectId, 'name' | 'jurisdiction'>
+): ObjectIdCheck {
+  return indexOfObjectId(config, id, 'feed', feedOfObjectName);
+}
+
+function feedNamespace(env: Env, config: UtsConfig): DurableObjectNamespace<UtsFeedDO> {
+  return config.jurisdiction === 'eu' ? env.UTS_FEED_DO.jurisdiction('eu') : env.UTS_FEED_DO;
+}
+
+/**
+ * `storedObjectCheck` for a feed object that stores feed `feed`'s keys. The stored state has the
+ * signer state's shape, so its index is checked as a feed index here.
+ */
+export function storedFeedCheck(
+  env: Env,
+  config: UtsConfig,
+  id: DurableObjectId,
+  feed: number
+): ObjectIdCheck {
+  const index = UtsFeedIndexSchema.safeParse(feed);
+  const expected = index.success
+    ? feedNamespace(env, config).idFromName(feedObjectName(config.environment, index.data))
+    : null;
+  return storedObjectCheck('feed', config, id, feed, expected);
 }
 
 export function getSignerStub(
@@ -151,5 +215,17 @@ export function getKeySetShardStub(
     config.jurisdiction === 'eu' ? env.UTS_KEY_SET_DO.jurisdiction('eu') : env.UTS_KEY_SET_DO;
   return namespace.get(namespace.idFromName(keySetShardObjectName(config.environment, shard)), {
     locationHint: UTS_OBJECT_LOCATION_HINT,
+  });
+}
+
+export function getFeedStub(
+  env: Env,
+  config: UtsConfig,
+  feed: number
+): DurableObjectStub<UtsFeedDO> {
+  const namespace = feedNamespace(env, config);
+  const index = UtsFeedIndexSchema.parse(feed);
+  return namespace.get(namespace.idFromName(feedObjectName(config.environment, index)), {
+    locationHint: FEED_OBJECT_LOCATION_HINTS[index],
   });
 }

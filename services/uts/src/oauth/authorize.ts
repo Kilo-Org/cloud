@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { AUTH_METHODS } from '../db/enums';
 import type { UtsConfig } from '../env';
 import type { GrantsAccess, IssueCodeInput } from '../grants/store';
+import { type ScopeRegistry, clientScopeRefusal, orgScopeRefusal } from '../scopes/policy';
 import { randomCredential, sha256 } from '../token/credentials';
 import { type FirstPartyClient, identifyClient, isLoopbackRedirect } from './clients';
 import { jktOfParameter } from './dpop';
@@ -82,6 +83,7 @@ export type AuthorizationHandoff = (
 export type AuthorizeDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
+  scopes: ScopeRegistry;
   handoff: AuthorizationHandoff;
 };
 
@@ -178,11 +180,14 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     return fail('invalid_scope', 'scope must name at most 8 UTS scopes once each');
   }
   const scopes = [...requested].sort();
+  if (clientScopeRefusal(scopes, client, deps.scopes) !== null) {
+    return fail('invalid_scope', 'a requested scope is not registered for this client');
+  }
 
   const resources = params.all('resource');
   let audiences = [...new Set(scopes.map(audienceOfScope))];
   if (resources.length > 0) {
-    const named = audiencesOfResources(resources);
+    const named = audiencesOfResources(resources, deps.config.environment);
     if (named === null || targetMismatch(scopes, named)) {
       return fail(
         'invalid_target',
@@ -219,6 +224,10 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   if (decision.status === 'interaction') return decision.response;
   if (decision.status === 'denied') return fail('access_denied', 'the user denied the request');
   const { approval } = decision;
+  // Without an organization no organization scope can pass, so no code is stored for it.
+  if (approval.orgId === null && orgScopeRefusal(scopes, null, null, deps.scopes) !== null) {
+    return fail('invalid_scope', 'a requested scope needs an organization');
+  }
 
   let codeClient: IssueCodeInput['client'];
   if (client.kind === 'first_party' && approval.clientKind === 'first_party' && dpopJkt !== null) {
@@ -256,7 +265,18 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       'the authorization could not be completed'
     );
   }
-  if (outcome === 'access_denied') return fail('access_denied', 'the account cannot authorize');
-  if (outcome === 'consent_required') return fail('access_denied', 'consent is required');
+  if (outcome.outcome === 'invalid_scope') {
+    // The statement stored nothing: the caller's role in the organization is not one the scope
+    // registry lists for a requested scope (`uts.scope_org_roles`).
+    return fail('invalid_scope', 'a requested scope needs another role in the organization');
+  }
+  if (outcome.outcome !== 'issued') {
+    return fail(
+      'access_denied',
+      outcome.outcome === 'consent_required'
+        ? 'consent is required'
+        : 'the account cannot authorize'
+    );
+  }
   return back({ code });
 }

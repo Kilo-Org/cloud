@@ -12,29 +12,40 @@
   "vars": {
     "UTS_ENVIRONMENT": "development",
     "DO_JURISDICTION": "none",
+    "PAT_LOOKUP_CONNECTIONS": "34",
   },
   "durable_objects": {
     "bindings": [
       { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+      { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
   ],
-  // The OAuth routes are served once this binding exists. Nothing listens on it: the runtime tests
-  // pass their own grant store, and test/db runs every statement against the local Postgres.
+  // The OAuth routes and the account API are served once IDENTITY_STORE exists, the PAT probe
+  // route and the PAT lookup once IDENTITY_STORE_PAT does. Nothing listens on either: the runtime
+  // tests pass their own stores (a lookup through the real binding fails as an unreachable
+  // database would), and test/db runs every statement against the local Postgres.
   "hyperdrive": [
     {
       "binding": "IDENTITY_STORE",
       "id": "uts-test-identity-store",
       "localConnectionString": "postgres://uts_app_a:unused@127.0.0.1:1/uts",
     },
+    {
+      "binding": "IDENTITY_STORE_PAT",
+      "id": "uts-test-identity-store-pat",
+      "localConnectionString": "postgres://uts_pat_a:unused@127.0.0.1:1/uts",
+    },
   ],
-  // The mint Worker's SignerKeys entrypoint as the development feed Worker binds it, and as two
-  // callers it refuses; and the default entrypoint with the feed Worker's props, which serves no
-  // signer keys.
+  // The mint Worker's SignerKeys and FeedReads entrypoints as the development feed Worker binds
+  // them, and as callers they refuse; the default entrypoint with the feed Worker's props, which
+  // serves no signer keys; and the PatLookup entrypoint as the development verifier, another
+  // caller and a binding without props.
   "services": [
     {
       "binding": "FEED_MINT",
@@ -57,6 +68,35 @@
       "binding": "DEFAULT_MINT",
       "service": "uts-test",
       "props": { "caller": "uts-feed-local" },
+    },
+    {
+      "binding": "VERIFIER_PAT_LOOKUP",
+      "service": "uts-test",
+      "entrypoint": "PatLookup",
+      "props": { "caller": "uts-verifier-local" },
+    },
+    {
+      "binding": "OTHER_PAT_LOOKUP",
+      "service": "uts-test",
+      "entrypoint": "PatLookup",
+      "props": { "caller": "o11y" },
+    },
+    {
+      "binding": "PROPLESS_PAT_LOOKUP",
+      "service": "uts-test",
+      "entrypoint": "PatLookup",
+    },
+    {
+      "binding": "FEED_READS",
+      "service": "uts-test",
+      "entrypoint": "FeedReads",
+      "props": { "caller": "uts-feed-local" },
+    },
+    {
+      "binding": "OTHER_READS",
+      "service": "uts-test",
+      "entrypoint": "FeedReads",
+      "props": { "caller": "o11y" },
     },
   ],
 }

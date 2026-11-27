@@ -21,15 +21,12 @@ let db: TestDatabase;
 // directly, so these tests reach every CHECK, foreign key and trigger on them.
 let writer: pg.Client;
 // The app login writes grants, codes, device sessions and revocations only through the OAuth
-// functions (`oauth-grants.test.ts`), and `privileges.test.ts` covers who may write what. The
-// gated rows it may still change itself (a bot key's lifecycle columns) are changed as `app`
-// here, so the column grants are exercised on the real login.
-let app: pg.Client;
+// functions (`oauth-grants.test.ts`), and PATs, bot keys and gate passes only through the account
+// functions (`account.test.ts`); `privileges.test.ts` covers who may write what.
 let accountId: string;
 
 beforeAll(async () => {
   db = await TestDatabase.create();
-  app = await db.connect('uts_app_a');
   writer = await db.connectAsOwner();
   accountId = await insertAccount(writer);
 });
@@ -387,9 +384,19 @@ describe('email codes and limits', () => {
     account: string | null = null
   ) {
     return writer.query(
-      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at)
-       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END)`,
-      [purpose, randomHash(), account, randomHash(), attempts, status, consumed]
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, address)
+       VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END,
+               CASE WHEN $8::boolean THEN 'current'::uts.email_code_address END)`,
+      [
+        purpose,
+        randomHash(),
+        account,
+        randomHash(),
+        attempts,
+        status,
+        consumed,
+        purpose === 'tier_a',
+      ]
     );
   }
 
@@ -415,6 +422,22 @@ describe('email codes and limits', () => {
       CHECK_VIOLATION
     );
     await insertEmailCode('pending', 0, false, 'tier_a', accountId);
+  });
+
+  it('give a tier A code, and only a tier A code, the address it went to', async () => {
+    const insertAddressed = (purpose: string, address: string | null) =>
+      writer.query(
+        `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, address)
+         VALUES ($1, $2, $3, $4, now() + interval '10 minutes', $5)`,
+        [purpose, randomHash(), accountId, randomHash(), address]
+      );
+    await insertAddressed('tier_a', 'new');
+    for (const [purpose, address] of [
+      ['tier_a', null],
+      ['sign_in', 'current'],
+    ] as const) {
+      expect(await sqlStateOf(() => insertAddressed(purpose, address))).toBe(CHECK_VIOLATION);
+    }
   });
 
   it('cap a limit row at 5 codes per hour and stop only sign-in codes', async () => {
@@ -751,7 +774,8 @@ describe('gate pass binding', () => {
       crypto.randomUUID(),
       await insertGatePass(writer, accountId, 'bot_key_create')
     );
-    await app.query(
+    // Only the account functions change bot keys (migration 0005); the trigger binds the owner too.
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
        WHERE id = $1`,
       [key.rows[0].id]
@@ -794,7 +818,7 @@ describe('gate pass binding', () => {
         crypto.randomUUID(),
         await insertGatePass(writer, accountId, 'bot_key_create')
       );
-      await app.query(
+      await writer.query(
         `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
         [key.rows[0].id]
       );
@@ -816,12 +840,12 @@ describe('gate pass binding', () => {
       )
     ).toBe(CHECK_VIOLATION);
 
-    await app.query(
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'kept', kept_by = 'admin', kept_at = now()
        WHERE id = $1`,
       [await flaggedKey()]
     );
-    await app.query(
+    await writer.query(
       `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = 'admin'
        WHERE id = $1`,
       [await flaggedKey()]

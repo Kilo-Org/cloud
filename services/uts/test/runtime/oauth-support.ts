@@ -1,8 +1,12 @@
+import { type UtsScopeEntry, utsScopeEntry } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { type JWK, SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import { IdentityStoreError } from '../../src/db/client';
 import type { GrantStore, GrantsAccess, Minted } from '../../src/grants/store';
 import type { OAuthDeps } from '../../src/oauth/routes';
+import type { FeedEntry } from '../../src/revocation/entries';
+import type { FeedPublish, PublishOutcome } from '../../src/revocation/publish';
+import type { ScopeRegistry } from '../../src/scopes/policy';
 import { signerAccess } from '../../src/token/mint';
 import { config, env } from './test-env';
 
@@ -98,6 +102,7 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   return {
     subjectId: 'oauth/runtime-user',
     orgId: null,
+    orgRole: null,
     authTime: new Date(Date.now() - 60_000),
     amr: ['passkey'],
     tokenIds: [crypto.randomUUID()],
@@ -106,12 +111,62 @@ export function minted(overrides: Partial<Minted> = {}): Minted {
   };
 }
 
+/** A fixture scope that the CLI and any third-party client may hold, 10 minutes, any user. */
+const fixtureScope = (audience: string): UtsScopeEntry => ({
+  audience,
+  maxLifetimeSeconds: 600,
+  allowedClients: ['kilo-cli', 'third_party'],
+  subjects: { kind: 'any_user' },
+  thirdPartySafe: true,
+  stepUp: false,
+  patEligible: false,
+  privileged: false,
+  requiresSession: false,
+  requiresOrgClaim: false,
+  delegable: false,
+});
+
+const FIXTURE_SCOPES: Readonly<Record<string, UtsScopeEntry>> = {
+  'gateway:models.read': fixtureScope('gateway'),
+  'kilo-chat:messages.read': fixtureScope('kilo-chat'),
+  'mcp:tools.read': fixtureScope('mcp'),
+};
+
+/**
+ * The scope registry plus the fixture scopes these tests mint: the registry holds no
+ * third-party-safe scope yet, and the flows need one.
+ */
+export const testScopes: ScopeRegistry = scope =>
+  utsScopeEntry(scope) ??
+  (Object.hasOwn(FIXTURE_SCOPES, scope) ? (FIXTURE_SCOPES[scope] ?? null) : null);
+
+/**
+ * A feed publisher that records every batch and answers `outcome`, so a test sees what an
+ * endpoint published after its statement.
+ */
+export function recordingPublisher(outcome: PublishOutcome = 'published') {
+  const batches: FeedEntry[][] = [];
+  const publish: FeedPublish = async entries => {
+    batches.push([...entries]);
+    return outcome;
+  };
+  return { publish, batches };
+}
+
+/** A feed entry as a revoking statement returns it. */
+export function grantEntry(id: string = crypto.randomUUID()): FeedEntry {
+  const now = Date.now();
+  return { kind: 'grant', id, revokedBefore: null, revokedAt: now, expiresAt: now + 1_200_000 };
+}
+
 /** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
     config,
     grants,
     sign: signerAccess(env, config),
+    scopes: testScopes,
+    publish: recordingPublisher().publish,
     handoff: null,
     deviceCodeGrant: null,
     ...overrides,

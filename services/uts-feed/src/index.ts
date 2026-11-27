@@ -1,3 +1,5 @@
+export { FeedReader } from './reader';
+
 import type { Env } from './env';
 import { handleRequest } from './http';
 

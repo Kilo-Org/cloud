@@ -957,24 +957,28 @@ jobs:
           done
           exit 1
 
-      # Masks the token and hands it on only as a step output. A refusal fails the job: it never
-      # falls back to the secret; rolling back means setting DEPLOY_TOKEN_SOURCE to `secret`.
-      - name: Get a deploy token from STS
-        id: sts
+      # cloud-agent-next's preparation can wait up to 45 minutes for the runtime handoff, so it
+      # gets a token of its own, revoked right after it; the deploy token below is minted after
+      # the wait. Masks each token and hands it on only as a step output; a refusal fails the job
+      # and never falls back to the secret (rolling back means DEPLOY_TOKEN_SOURCE `secret`).
+      - name: Get a runtime token from STS
+        id: sts_runtime
+        if: inputs.worker == 'services/cloud-agent-next'
         env:
           STS_ENVIRONMENT: ${{ inputs.target_environment }}
         run: bash scripts/ci/sts-deploy-token.sh mint
 
-      # Temporary R2 credentials for the runtime bucket, from the deploy token: this job never
-      # reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
+      # Temporary read-only R2 credentials for the runtime bucket, from the runtime token: this job
+      # never reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
       - name: Get temporary R2 credentials
         id: r2
         if: inputs.worker == 'services/cloud-agent-next'
         env:
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts_runtime.outputs.token }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_PARENT_ACCESS_KEY_ID: ${{ vars.CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID }}
+          RUNTIME_R2_PERMISSION: object-read-only
         run: bash scripts/ci/r2-temp-credentials.sh
 
       - name: Prepare downloaded Cloud Agent runtime
@@ -990,13 +994,26 @@ jobs:
           RUNTIME_R2_SECRET_ACCESS_KEY: ${{ steps.r2.outputs.secret_access_key }}
           RUNTIME_R2_SESSION_TOKEN: ${{ steps.r2.outputs.session_token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts_runtime.outputs.token }}
           # Read-only: lets preparation stop waiting once the SHA's publication has failed.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
             pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
           fi
+
+      - name: Revoke the runtime token
+        if: always() && steps.sts_runtime.outputs.token_id != ''
+        env:
+          STS_ENVIRONMENT: ${{ inputs.target_environment }}
+          TOKEN_ID: ${{ steps.sts_runtime.outputs.token_id }}
+        run: bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"
+
+      - name: Get a deploy token from STS
+        id: sts
+        env:
+          STS_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: bash scripts/ci/sts-deploy-token.sh mint
 
       # The deploy token holds no Secrets Store permission: each Secrets Store binding deploys as
       # an inherited binding, after a check that the Worker's latest version carries it unchanged.
@@ -1160,24 +1177,28 @@ jobs:
           done
           exit 1
 
-      # Masks the token and hands it on only as a step output. A refusal fails the job: it never
-      # falls back to the secret; rolling back means setting DEPLOY_TOKEN_SOURCE to `secret`.
-      - name: Get a deploy token from STS
-        id: sts
+      # cloud-agent-next's preparation can wait up to 45 minutes for the runtime handoff, so it
+      # gets a token of its own, revoked right after it; the deploy token below is minted after
+      # the wait. Masks each token and hands it on only as a step output; a refusal fails the job
+      # and never falls back to the secret (rolling back means DEPLOY_TOKEN_SOURCE `secret`).
+      - name: Get a runtime token from STS
+        id: sts_runtime
+        if: matrix.worker == 'services/cloud-agent-next'
         env:
           STS_ENVIRONMENT: ${{ inputs.target_environment }}
         run: bash scripts/ci/sts-deploy-token.sh mint
 
-      # Temporary R2 credentials for the runtime bucket, from the deploy token: this job never
-      # reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
+      # Temporary read-only R2 credentials for the runtime bucket, from the runtime token: this job
+      # never reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
       - name: Get temporary R2 credentials
         id: r2
         if: matrix.worker == 'services/cloud-agent-next'
         env:
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts_runtime.outputs.token }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_PARENT_ACCESS_KEY_ID: ${{ vars.CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID }}
+          RUNTIME_R2_PERMISSION: object-read-only
         run: bash scripts/ci/r2-temp-credentials.sh
 
       - name: Prepare downloaded Cloud Agent runtime
@@ -1193,13 +1214,26 @@ jobs:
           RUNTIME_R2_SECRET_ACCESS_KEY: ${{ steps.r2.outputs.secret_access_key }}
           RUNTIME_R2_SESSION_TOKEN: ${{ steps.r2.outputs.session_token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts_runtime.outputs.token }}
           # Read-only: lets preparation stop waiting once the SHA's publication has failed.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
             pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
           fi
+
+      - name: Revoke the runtime token
+        if: always() && steps.sts_runtime.outputs.token_id != ''
+        env:
+          STS_ENVIRONMENT: ${{ inputs.target_environment }}
+          TOKEN_ID: ${{ steps.sts_runtime.outputs.token_id }}
+        run: bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"
+
+      - name: Get a deploy token from STS
+        id: sts
+        env:
+          STS_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: bash scripts/ci/sts-deploy-token.sh mint
 
       # The deploy token holds no Secrets Store permission: each Secrets Store binding deploys as
       # an inherited binding, after a check that the Worker's latest version carries it unchanged.
@@ -1474,23 +1508,26 @@ jobs:
           done
           exit 1
 
-      # Masks the token and hands it on only as a step output. A refusal fails the job: it never
-      # falls back to the secret; rolling back means setting DEPLOY_TOKEN_SOURCE to `secret`.
-      - name: Get a deploy token from STS
-        id: sts
+      # The preparation can wait up to 45 minutes for the runtime handoff, so it gets a token of
+      # its own, revoked right after it; the deploy token below is minted after the wait. Masks
+      # each token and hands it on only as a step output; a refusal fails the job and never falls
+      # back to the secret (rolling back means DEPLOY_TOKEN_SOURCE `secret`).
+      - name: Get a runtime token from STS
+        id: sts_runtime
         env:
           STS_ENVIRONMENT: ${{ inputs.target_environment }}
         run: bash scripts/ci/sts-deploy-token.sh mint
 
-      # Temporary R2 credentials for the runtime bucket, from the deploy token: this job never
-      # reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
+      # Temporary read-only R2 credentials for the runtime bucket, from the runtime token: this job
+      # never reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
       - name: Get temporary R2 credentials
         id: r2
         env:
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts_runtime.outputs.token }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_PARENT_ACCESS_KEY_ID: ${{ vars.CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID }}
+          RUNTIME_R2_PERMISSION: object-read-only
         run: bash scripts/ci/r2-temp-credentials.sh
 
       - name: Prepare downloaded Cloud Agent runtime
@@ -1505,13 +1542,26 @@ jobs:
           RUNTIME_R2_SECRET_ACCESS_KEY: ${{ steps.r2.outputs.secret_access_key }}
           RUNTIME_R2_SESSION_TOKEN: ${{ steps.r2.outputs.session_token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts_runtime.outputs.token }}
           # Read-only: lets preparation stop waiting once the SHA's publication has failed.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
             pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
           fi
+
+      - name: Revoke the runtime token
+        if: always() && steps.sts_runtime.outputs.token_id != ''
+        env:
+          STS_ENVIRONMENT: ${{ inputs.target_environment }}
+          TOKEN_ID: ${{ steps.sts_runtime.outputs.token_id }}
+        run: bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"
+
+      - name: Get a deploy token from STS
+        id: sts
+        env:
+          STS_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: bash scripts/ci/sts-deploy-token.sh mint
 
       # The deploy token holds no Secrets Store permission: each Secrets Store binding deploys as
       # an inherited binding, after a check that the Worker's latest version carries it unchanged.

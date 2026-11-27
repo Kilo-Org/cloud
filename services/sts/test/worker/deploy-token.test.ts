@@ -882,6 +882,21 @@ describe('mint', () => {
     );
   });
 
+  it('lets a later job of a run that already minted this hour in while another run holds tokens', async () => {
+    installFakes(github);
+    // An ordered path: the first job's token is revoked before the next job of the run starts.
+    const first = issued((await mint(runsClaims('600'))).result);
+    expect((await revoke(first.tokenId, runsClaims('600'))).status).toBe(200);
+    issued((await mint(runsClaims('601'))).result);
+    // Run 601 holds an unexpired token (maxActive 1), yet run 600 was counted this hour.
+    expect((await mint(runsClaims('600'))).result).toMatchObject({ status: 'ok' });
+    // A run attempt that made no token this hour still waits.
+    expect((await mint(runsClaims('602'))).result).toMatchObject({
+      status: 'limited',
+      reason: 'too_many_active',
+    });
+  });
+
   it('answers unavailable without the minting credential, and makes no Cloudflare call', async () => {
     const cloudflare = installFakes(github);
     vi.spyOn(console, 'error').mockImplementation(() => {});

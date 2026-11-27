@@ -9,8 +9,9 @@
 #
 # Env: CLOUDFLARE_API_TOKEN, RUNTIME_R2_ACCOUNT_ID, RUNTIME_R2_BUCKET,
 # RUNTIME_R2_PARENT_ACCESS_KEY_ID (the access key id of the R2 API token the credentials derive
-# from; an id, not a secret), GITHUB_OUTPUT. The credentials last 1 hour, reach only keys under
-# runtime-artifacts/v1/ of that bucket, read and write objects, and never exceed the parent
+# from; an id, not a secret), RUNTIME_R2_PERMISSION (`object-read-only` for a deploy, which only
+# reads the handoff; `object-read-write` for the publisher), GITHUB_OUTPUT. The credentials last
+# 1 hour, reach only keys under runtime-artifacts/v1/ of that bucket, and never exceed the parent
 # token's rights. The secret key and the session token are masked before anything else touches
 # them and never printed; no retry. Needs bash, curl and jq.
 #
@@ -48,10 +49,12 @@ readonly CLOUDFLARE_API_URL
   fail "RUNTIME_R2_BUCKET is not a bucket name"
 [[ ${RUNTIME_R2_PARENT_ACCESS_KEY_ID:-} =~ ^[0-9a-f]{32}$ ]] ||
   fail "RUNTIME_R2_PARENT_ACCESS_KEY_ID is not an R2 access key id"
+[[ ${RUNTIME_R2_PERMISSION:-} == object-read-only || ${RUNTIME_R2_PERMISSION:-} == object-read-write ]] ||
+  fail "RUNTIME_R2_PERMISSION must be object-read-only or object-read-write"
 
 body=$(jq -cn --arg bucket "$RUNTIME_R2_BUCKET" --arg parent "$RUNTIME_R2_PARENT_ACCESS_KEY_ID" \
-  --arg prefix "$PREFIX" --argjson ttl "$TTL_SECONDS" \
-  '{bucket: $bucket, parentAccessKeyId: $parent, permission: "object-read-write",
+  --arg permission "$RUNTIME_R2_PERMISSION" --arg prefix "$PREFIX" --argjson ttl "$TTL_SECONDS" \
+  '{bucket: $bucket, parentAccessKeyId: $parent, permission: $permission,
     ttlSeconds: $ttl, prefixes: [$prefix]}')
 
 # The bearer goes to curl on stdin, so the token appears in no process's arguments.

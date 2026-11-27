@@ -285,7 +285,8 @@ class WindowCheckFailure extends Error {
  * audit stream. A token is returned only with its `deploy_token.minted` row committed; one STS
  * cannot hand over is deleted at once. A deletion Cloudflare cannot take is audited and retried by
  * the alarm until it succeeds, because an expired token still counts against the account's
- * 500-token cap. The minting credential lives in memory only. Deploys are few (tens a day), so one
+ * 500-token cap. The minting credential lives in memory only. Deploys are a few hundred a day
+ * (Kilo-Org/cloud's Worker deploys mint one token per job), so one
  * object serves the environment. A stub can call every prototype method, so everything but `mint`,
  * `revoke` and `alarm` is ECMAScript-private: no caller reaches the minting credential or creates a
  * token past `mint`'s limits.
@@ -917,13 +918,10 @@ export class DeployTokenDO extends DurableObject<Env> {
       }
       if (row.createdAt > now - HOUR_MS) lastCreated.set(key, row.createdAt);
     }
-    const ownActive = rows.some(
-      row =>
-        runKey(row.runId, row.runAttempt) === ownKey &&
-        (row.state === 'pending' || row.state === 'active') &&
-        row.expiresAt > now
-    );
-    if (!ownActive && activeUntil.size >= grant.maxActive) {
+    // A run attempt that made a token in the last hour is already counted, as for the hourly cap,
+    // so an ordered later job of the same run (one that starts after the earlier jobs revoked
+    // theirs) is never refused while another run holds tokens. Every token lives at most an hour.
+    if (own.length === 0 && activeUntil.size >= grant.maxActive) {
       const soonest = Math.min(...activeUntil.values());
       return {
         status: 'limited',

@@ -2388,8 +2388,10 @@ const STS_TWINS = [
 ];
 const STS_ONLY_STEPS = new Set([
   'Check DEPLOY_TOKEN_SOURCE',
+  'Get a runtime token from STS',
   'Get a deploy token from STS',
   'Get temporary R2 credentials',
+  'Revoke the runtime token',
   'Inherit Secrets Store bindings',
   'Revoke the deploy token',
 ]);
@@ -2410,6 +2412,7 @@ function asSecretJob(job) {
     .map(step => {
       const text = JSON.stringify(step)
         .replaceAll('${{ steps.sts.outputs.token }}', '${{ secrets.CLOUDFLARE_API_TOKEN }}')
+        .replaceAll('${{ steps.sts_runtime.outputs.token }}', '${{ secrets.CLOUDFLARE_API_TOKEN }}')
         .replaceAll(
           '${{ steps.r2.outputs.access_key_id }}',
           '${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}'
@@ -2505,6 +2508,47 @@ test('only the STS twins hold an OIDC token, and none reads the stored deploy se
   }
 });
 
+test('cloud-agent-next mints its deploy token after the runtime handoff wait', () => {
+  // The preparation waits up to 45 minutes (HANDOFF_WAIT_MS) for the runtime handoff; a 1-hour
+  // token minted before it could expire before the deploy and its retry.
+  for (const id of [
+    'deploy-manual-sts',
+    'deploy-changed-sts',
+    'deploy-cloud-agent-after-session-ingest-sts',
+  ]) {
+    const steps = workers.jobs[id].steps;
+    const at = predicate => steps.findIndex(predicate);
+    const runtimeMint = at(step => step.id === 'sts_runtime');
+    const r2 = at(step => step.id === 'r2');
+    const handoff = at(step => step.id === 'runtime');
+    const runtimeRevoke = at(step => step.name === 'Revoke the runtime token');
+    const deployMint = at(step => step.id === 'sts');
+    assert.ok(
+      runtimeMint >= 0 && runtimeMint < r2 && r2 < handoff && handoff < runtimeRevoke,
+      `${id}: the runtime token serves the handoff wait alone`
+    );
+    assert.ok(deployMint > handoff, `${id}: the deploy token is minted after the handoff step`);
+    assert.equal(steps[runtimeRevoke].if, "always() && steps.sts_runtime.outputs.token_id != ''");
+    assert.equal(steps[r2].env.CLOUDFLARE_API_TOKEN, '${{ steps.sts_runtime.outputs.token }}');
+    assert.equal(steps[r2].env.RUNTIME_R2_PERMISSION, 'object-read-only', `${id} only reads R2`);
+    assert.equal(steps[handoff].env.CLOUDFLARE_API_TOKEN, '${{ steps.sts_runtime.outputs.token }}');
+    steps.forEach((step, index) => {
+      if (JSON.stringify(step).includes('steps.sts_runtime.outputs.token }}')) {
+        assert.ok(
+          index > runtimeMint && index < runtimeRevoke,
+          `${id}: ${step.name} in its window`
+        );
+      }
+    });
+  }
+  const publisher = runtimePublish.jobs['publish-sts'].steps.find(step => step.id === 'r2');
+  assert.equal(
+    publisher.env.RUNTIME_R2_PERMISSION,
+    'object-read-write',
+    'only the publisher writes'
+  );
+});
+
 test('the STS twins name the right STS for each target environment', () => {
   for (const [file, id] of STS_TWINS.filter(([file]) => file === workers)) {
     const mint = file.jobs[`${id}-sts`].steps.find(step => step.id === 'sts');
@@ -2555,6 +2599,7 @@ function deployableWorkers() {
       const staging = config.env?.staging;
       return {
         dir,
+        config,
         production: config.name,
         staging: staging === undefined ? undefined : (staging.name ?? `${config.name}-staging`),
       };
@@ -2575,7 +2620,40 @@ test('the STS deploy policies intend exactly the Workers deploy-workers.yml can 
     assert.deepEqual(source.identity.jobWorkflowRefs, [
       'Kilo-Org/cloud/.github/workflows/deploy-workers.yml@refs/heads/main',
     ]);
-    // One token per deploy job of a run: maxPerRun covers the most jobs a run can start.
-    assert.ok(grant.maxPerRun >= names.length, `${policy} maxPerRun covers ${names.length} jobs`);
+    // One token per deploy job of a run, plus cloud-agent-next's runtime token and one spare for an
+    // ordered job that follows: maxPerRun covers the most a run can mint.
+    assert.ok(
+      grant.maxPerRun >= names.length + 2,
+      `${policy} maxPerRun covers ${names.length} jobs and the follow-on tokens`
+    );
+  }
+});
+
+/**
+ * Zone ids of the zones deploy-workers.yml routes to. A zone whose id is still to be read in
+ * setup step 3 (live setup, README "Cloudflare deploy tokens") is listed as pending: its routes
+ * cannot deploy on the STS path until the id joins the pins and ci-deploy-cloud.
+ */
+const ROUTE_ZONE_IDS = { 'kiloapps.io': '9f7103cbcadbe93a052c120f231e8507' };
+const PENDING_ROUTE_ZONES = ['kiloapps.ai'];
+
+test('every zone route a production Worker deploys is in ci-deploy-cloud zones and intended routes', () => {
+  const policy = load(
+    readFileSync(new URL('../services/sts/policy/ci-deploy-cloud.yaml', import.meta.url), 'utf8')
+  );
+  const [grant] = policy.dynamic;
+  const routes = deployableWorkers().flatMap(({ config }) =>
+    [...(config.routes ?? []), ...(config.route === undefined ? [] : [config.route])].filter(
+      route => typeof route === 'string' || route.custom_domain !== true
+    )
+  );
+  assert.ok(routes.length > 0, 'zone routes were read');
+  for (const route of routes) {
+    const pattern = typeof route === 'string' ? route : route.pattern;
+    const zone = typeof route === 'string' ? undefined : route.zone_name;
+    assert.ok(zone, `${pattern} names its zone`);
+    assert.ok(grant.intendedRoutes.includes(pattern), `${pattern} is an intended route`);
+    if (PENDING_ROUTE_ZONES.includes(zone)) continue;
+    assert.ok(grant.zones.includes(ROUTE_ZONE_IDS[zone]), `${zone} (${pattern}) is a policy zone`);
   }
 });

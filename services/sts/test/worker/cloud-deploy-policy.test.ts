@@ -187,4 +187,19 @@ dynamic:
       })
     ).toThrow('declare the same identity');
   });
+
+  it('refuse a set of deploy policies whose tokens together could exceed an environment share', () => {
+    const second = deployPolicy({
+      workflow: RUNTIME_PUBLISH,
+      events: '[workflow_run, workflow_dispatch]',
+    }).replace('workload: ci-deploy-x', 'workload: ci-deploy-y');
+    // 2 x 40 twice: 160 tokens at once, against 100.
+    expect(() =>
+      loadPolicies({ 'ci-deploy-x.yaml': deployPolicy(), 'ci-deploy-y.yaml': second })
+    ).toThrow(
+      "the production cloudflare-deploy policies may hold 160 tokens at once, above the environment's share of 100"
+    );
+    // The shipped set fits: 2 x 40 + bouncer 2 + runtime 1 + catalog 1 in production.
+    expect(policyIndex.has('ci-deploy-cloud')).toBe(true);
+  });
 });

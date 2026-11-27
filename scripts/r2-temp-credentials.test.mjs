@@ -63,6 +63,7 @@ async function run(status, body, env = {}) {
         RUNTIME_R2_ACCOUNT_ID: ACCOUNT,
         RUNTIME_R2_BUCKET: 'kilo-runtime',
         RUNTIME_R2_PARENT_ACCESS_KEY_ID: PARENT,
+        RUNTIME_R2_PERMISSION: 'object-read-write',
         ...env,
       }).filter(([, value]) => value !== undefined)
     );
@@ -86,6 +87,12 @@ function assertNoLeak({ stdout, stderr }) {
     }
   }
 }
+
+test('asks for read-only credentials when the deploy asks for them', async () => {
+  const result = await run(200, ISSUED, { RUNTIME_R2_PERMISSION: 'object-read-only' });
+  assert.equal(result.code, 0, result.stdout);
+  assert.equal(JSON.parse(result.requests[0].body).permission, 'object-read-only');
+});
 
 test('masks the secret and the session token, then writes the three outputs', async () => {
   const result = await run(200, ISSUED);
@@ -150,6 +157,8 @@ for (const [variable, value] of [
   ['RUNTIME_R2_BUCKET', 'Bad_Bucket'],
   ['CLOUDFLARE_API_TOKEN', undefined],
   ['GITHUB_OUTPUT', undefined],
+  ['RUNTIME_R2_PERMISSION', undefined],
+  ['RUNTIME_R2_PERMISSION', 'admin-read-write'],
 ]) {
   test(`refuses ${variable}=${String(value)} before any call`, async () => {
     const result = await run(200, ISSUED, { [variable]: value });

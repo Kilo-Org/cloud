@@ -4,11 +4,12 @@ import {
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { parse } from 'yaml';
-import type { CloudflareDeployPins } from '../constants';
+import { DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING, type CloudflareDeployPins } from '../constants';
 import { sha256Base64Url } from '../crypto/hash';
 import {
   PolicySchema,
   RegistrationSchema,
+  cloudflareDeployGrant,
   effectivePolicy,
   holdsMigrationRun,
   isLeaseDynamicGrant,
@@ -207,6 +208,25 @@ export function loadPolicies(
       throw new Error(`more than one policy file declares workload ${workload}`);
     }
     workloads.add(workload);
+  }
+
+  // Every unexpired deploy token of an environment counts against its share of the account's
+  // tokens. If every policy held its most at once (maxActive, times maxPerRun under per-run
+  // limits), together they must still fit, so no deploy is refused with `account_limit` by
+  // another workload's legitimate tokens.
+  for (const environment of ['development', 'staging', 'production'] as const) {
+    const most = policies
+      .filter(policy => policy.environments.includes(environment))
+      .map(policy => cloudflareDeployGrant(policy))
+      .reduce(
+        (sum, grant) => sum + (grant === undefined ? 0 : grant.maxActive * (grant.maxPerRun ?? 1)),
+        0
+      );
+    if (most > DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING) {
+      throw new Error(
+        `the ${environment} cloudflare-deploy policies may hold ${String(most)} tokens at once, above the environment's share of ${String(DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING)}`
+      );
+    }
   }
 
   const triggerWorkflows = new Map<string, string>();

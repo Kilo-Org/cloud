@@ -163,6 +163,8 @@ jobs:
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_PARENT_ACCESS_KEY_ID: ${{ vars.CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID }}
+          # The publisher writes the release and the exact-SHA handoff.
+          RUNTIME_R2_PERMISSION: object-read-write
         run: bash scripts/ci/r2-temp-credentials.sh
       - name: Publish verified runtime and exact-SHA handoff
         working-directory: services/cloud-agent-next

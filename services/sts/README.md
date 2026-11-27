@@ -1509,6 +1509,25 @@ the stored-secret jobs as the rollback):
   lists only the bouncer groups); the repository variable `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID`
   is set; and the `cloud-agent-runtime-publication` GitHub environment admits `main` only. A STS
   deploy rides the sts path too: if a broken STS cannot mint, set the variable to `secret`.
+- **Rollout and its limits.** The first production run on `sts` must deploy a Worker with a
+  Custom Domain on `kilosessions.ai` (for example `git-token-service`) and one on
+  `kilousercontent.com` (`nteract-pages-outputs`): their zones are in no grant, and Cloudflare
+  documents Workers Scripts Write as enough for a Custom Domain, which only such a run proves. A
+  direct dispatch of `deploy-workers.yml` from a ref other than `main` (the policies admit `main`
+  alone), and a redeploy of a commit from before this change (it lacks `scripts/ci/`), need
+  `DEPLOY_TOKEN_SOURCE` `secret`.
+- **cloud-agent-next's two tokens.** Its runtime preparation can wait up to 45 minutes for the
+  runtime handoff, so it gets a token of its own (revoked right after it) and read-only R2
+  credentials, and the job mints its deploy token after the wait. Only the runtime publisher's
+  credentials can write.
+- **The catalog index, for Igor.** The Vectorize upsert moved out of `catalog-merge` into
+  `catalog-index` (or `catalog-index-sts`), which runs after `catalog-merge` passed, so a failed
+  upsert fails `catalog-index`, not the required `catalog-merge` check. `catalog-index-sts` binds
+  the GitHub environment `production`, so each main push that changes the catalog records a
+  deployment there.
+- **Recorded for Igor, not taken:** separate grants for the Workers that need R2 Storage or D1
+  Write. The matrix deploys every Worker under one workload, so `ci-deploy-cloud` holds both for
+  every job.
 
 **Calling it.** The job asks with no body and revokes in an `always()` step:
 

@@ -505,10 +505,11 @@ primary (`packages/db/src/database-url.ts`), and `POSTGRES_REPLICA_US_URL`,
 `POSTGRES_REPLICA_EU_URL` and `POSTGRES_REPLICA_EU_URL_2`, the read replicas of
 `packages/web-shared/src/lib/read-replicas.ts` that `packages/web-shared/src/lib/drizzle.ts`
 connects with. They are regular secrets of each workload's own bundle, granted in staging and
-production only for the read under `SECRETS_SOURCE=sts`; until that read lands, `drizzle.ts` reads
-the environment, and previews keep `env`. An environment with no URL for a replica gets that name
-back as `missing`, not `not_granted`, and the reader decides what that means. No other workload
-holds them: Workers reach the database through their Hyperdrive bindings.
+production only for the read under `SECRETS_SOURCE=sts`; that reader change is in the
+secrets-cutover PR, and previews keep `env`. A granted name that comes back `missing` is a
+configuration error for the reader to report: a missing EU replica keeps today's behaviour and
+never routes EU reads to the primary. No other workload holds them: Workers reach the database
+through their Hyperdrive bindings.
 
 Workloads with a policy, all over `worker-binding`:
 

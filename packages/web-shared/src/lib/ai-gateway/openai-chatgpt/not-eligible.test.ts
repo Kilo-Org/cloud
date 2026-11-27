@@ -8,7 +8,6 @@ import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.help
 import { and, eq, isNull } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { isChatGptUserNotEligible, probeOpenAiChatGptEligibility } from './eligibility';
 import {
@@ -112,7 +111,6 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
   async function readPayloadColumns() {
     const [row] = await db
       .select({
-        obsolete: openai_chatgpt_connections.encrypted_connection,
         envelope: openai_chatgpt_connections.encrypted_connection_envelope,
         isEnabled: openai_chatgpt_connections.is_enabled,
       })
@@ -176,7 +174,7 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
     expect(stored?.connection).toMatchObject({ status: 'connected', access_token: 'reconnected' });
   });
 
-  it('writes the refusal as an envelope without tokens, the placeholder in the obsolete column and the system actor recorded', async () => {
+  it('writes the refusal as an envelope without tokens and the system actor recorded', async () => {
     const { credentialKeyId } = await saveOpenAiChatGptConnection(
       owner,
       connection('refused-both'),
@@ -187,7 +185,6 @@ describe('markOpenAiChatGptNotEligible (real database)', () => {
     await markOpenAiChatGptNotEligible(owner, refusal('refused-both', credentialKeyId));
 
     const row = await readPayloadColumns();
-    expect(row?.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(row?.envelope).not.toBeNull();
     const serialized = JSON.stringify(row);
     expect(serialized).not.toContain('refused-both');

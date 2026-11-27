@@ -1,5 +1,4 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 
 import {
@@ -11,10 +10,7 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import {
-  CredentialKmsError,
-  OBSOLETE_STATIC_KEY_PLACEHOLDER,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
+import { CredentialKmsError } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import {
@@ -45,8 +41,6 @@ import {
 import {
   insertInventoryRow,
   sealedInventoryColumns,
-  sealedInventoryColumnsWithStaticKeyCopy,
-  staticKeyInventoryCredential,
 } from '@/tests/helpers/coding-plan-inventory.helper';
 
 const ADMIN_USER_ID = 'admin-user-id';
@@ -83,25 +77,16 @@ async function selectInventory(id: string) {
   return row;
 }
 
-function expectClearedCredential(row: {
-  encrypted_api_key: unknown;
-  encrypted_api_key_envelope: unknown;
-}) {
-  expect(row.encrypted_api_key).toBeNull();
+function expectClearedCredential(row: { encrypted_api_key_envelope: unknown }) {
   expect(row.encrypted_api_key_envelope).toBeNull();
 }
 
 function expectSealedForRow(row: Awaited<ReturnType<typeof selectInventory>>, plaintext: string) {
-  expect(row.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
   expect(row.encrypted_api_key_envelope).not.toBeNull();
   expect(decryptApiKey(row.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)).toBe(
     plaintext
   );
-  expect(row.encrypted_api_key_envelope!.legacy_digest).toBe(
-    createHash('sha256').update('..').digest('hex')
-  );
-  const serialized = JSON.stringify([row.encrypted_api_key, row.encrypted_api_key_envelope]);
-  expect(serialized).not.toContain(plaintext);
+  expect(JSON.stringify(row.encrypted_api_key_envelope)).not.toContain(plaintext);
 }
 
 async function insertSubscribableUser() {
@@ -119,7 +104,7 @@ async function installedByokPlaintext(userId: string) {
 describe('uploadKeysToInventory', () => {
   const validateCredential = async () => ({ valid: true });
 
-  it('writes the placeholder and a KMS envelope bound to each inserted row', async () => {
+  it('writes a KMS envelope bound to each inserted row', async () => {
     await uploadKeysToInventory(
       'minimax',
       MINIMAX_PLAN_ID,
@@ -178,35 +163,23 @@ describe('openCodingPlanInventoryCredential', () => {
     expect(decryptRequests[0].body).toMatchObject(inventoryContext(id));
   });
 
-  it('reads the envelope, not a real static-key copy in the obsolete column', async () => {
+  it('reads no credential for a row without an envelope', async () => {
     const result = await openCodingPlanInventoryCredential({
       id: crypto.randomUUID(),
-      ...sealedInventoryColumnsWithStaticKeyCopy('envelope-value', 'static-key-value'),
-    });
-
-    expect(result).toBe('envelope-value');
-  });
-
-  it('reads no credential for a row without an envelope, even if the obsolete column holds a static-key ciphertext', async () => {
-    const row = {
-      id: crypto.randomUUID(),
-      encrypted_api_key: staticKeyInventoryCredential('static-key-only-value'),
       encrypted_api_key_envelope: null,
-    };
-
-    const result = await openCodingPlanInventoryCredential(row);
+    });
 
     expect(result).toBeNull();
     expect(kms.requests).toHaveLength(0);
   });
 
-  it('throws instead of using the static-key copy when the KMS decrypt fails', async () => {
+  it('throws when the KMS decrypt fails', async () => {
     kms.fail('/decrypt', 403);
 
     await expect(
       openCodingPlanInventoryCredential({
         id: crypto.randomUUID(),
-        ...sealedInventoryColumnsWithStaticKeyCopy('envelope-value', 'static-key-value'),
+        ...sealedInventoryColumns('envelope-value'),
       })
     ).rejects.toBeInstanceOf(CredentialKmsError);
   });
@@ -228,10 +201,7 @@ describe('openCodingPlanInventoryCredential', () => {
 describe('reading an assigned inventory credential', () => {
   async function insertAssignedMinimaxRow(
     userId: string,
-    columns: Pick<
-      typeof coding_plan_key_inventory.$inferInsert,
-      'encrypted_api_key' | 'encrypted_api_key_envelope'
-    >
+    columns: Pick<typeof coding_plan_key_inventory.$inferInsert, 'encrypted_api_key_envelope'>
   ) {
     return await insertInventoryRow({
       plan_id: MINIMAX_PLAN_ID,
@@ -251,12 +221,9 @@ describe('reading an assigned inventory credential', () => {
     };
   }
 
-  it('returns the envelope credential, not a static-key copy', async () => {
+  it('returns the envelope credential', async () => {
     const user = await insertTestUser();
-    const row = await insertAssignedMinimaxRow(
-      user.id,
-      sealedInventoryColumnsWithStaticKeyCopy('envelope-secret', 'static-key-secret')
-    );
+    const row = await insertAssignedMinimaxRow(user.id, sealedInventoryColumns('envelope-secret'));
 
     await expect(getAssignedCodingPlanUsageContext(assignmentOf(row, user.id))).resolves.toEqual({
       providerId: 'minimax',
@@ -267,24 +234,18 @@ describe('reading an assigned inventory credential', () => {
     );
   });
 
-  it('returns no credential for a row whose envelope is null, even with a static-key ciphertext', async () => {
+  it('returns no credential for a row whose envelope is null', async () => {
     const user = await insertTestUser();
-    const row = await insertAssignedMinimaxRow(user.id, {
-      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
-      encrypted_api_key_envelope: null,
-    });
+    const row = await insertAssignedMinimaxRow(user.id, { encrypted_api_key_envelope: null });
 
     await expect(getAssignedCodingPlanUsageContext(assignmentOf(row, user.id))).resolves.toBeNull();
     await expect(getAssignedCodingPlanApiKey(assignmentOf(row, user.id))).resolves.toBeNull();
     expect(kms.requests).toHaveLength(0);
   });
 
-  it('returns no credential, without using the static-key copy, when the KMS decrypt fails', async () => {
+  it('returns no credential when the KMS decrypt fails', async () => {
     const user = await insertTestUser();
-    const row = await insertAssignedMinimaxRow(
-      user.id,
-      sealedInventoryColumnsWithStaticKeyCopy('envelope-secret', 'static-key-secret')
-    );
+    const row = await insertAssignedMinimaxRow(user.id, sealedInventoryColumns('envelope-secret'));
     kms.fail('/decrypt', 403);
 
     await expect(getAssignedCodingPlanUsageContext(assignmentOf(row, user.id))).resolves.toBeNull();
@@ -292,10 +253,10 @@ describe('reading an assigned inventory credential', () => {
 });
 
 describe('claiming an inventory credential', () => {
-  it('subscribe installs the credential from the envelope, not the static-key copy', async () => {
+  it('subscribe installs the credential from the envelope', async () => {
     const user = await insertSubscribableUser();
     const inventory = await insertInventoryRow({
-      ...sealedInventoryColumnsWithStaticKeyCopy('envelope-secret', 'static-key-decoy'),
+      ...sealedInventoryColumns('envelope-secret'),
     });
     kms.requests.length = 0;
 
@@ -308,15 +269,13 @@ describe('claiming an inventory credential', () => {
     expect((await selectInventory(inventory.id)).status).toBe('assigned');
   });
 
-  it('subscribe does not claim a row whose envelope is null, even with a static-key ciphertext', async () => {
+  it('subscribe does not claim a row whose envelope is null', async () => {
     const user = await insertSubscribableUser();
-    const inventory = await insertInventoryRow({
-      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
-    });
+    const inventory = await insertInventoryRow({ encrypted_api_key_envelope: null });
     kms.requests.length = 0;
 
     await expect(
-      subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'static-only-subscribe')
+      subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'unsealed-subscribe')
     ).rejects.toThrow('No managed credential is available');
 
     expect(kms.requests.filter(request => request.path === '/decrypt')).toHaveLength(0);
@@ -325,9 +284,7 @@ describe('claiming an inventory credential', () => {
 
   it('does not count a row without an envelope as stock for availability or the waitlist', async () => {
     const user = await insertSubscribableUser();
-    await insertInventoryRow({
-      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
-    });
+    await insertInventoryRow({ encrypted_api_key_envelope: null });
 
     await expect(getAvailableCodingPlanIds()).resolves.not.toContain(BYTEPLUS_PLAN_ID);
     await expect(
@@ -340,9 +297,7 @@ describe('claiming an inventory credential', () => {
 
   it('subscribe claims sealed stock past a row without an envelope', async () => {
     const user = await insertSubscribableUser();
-    const unsealed = await insertInventoryRow({
-      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
-    });
+    const unsealed = await insertInventoryRow({ encrypted_api_key_envelope: null });
     await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
 
     await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'past-unsealed-subscribe');
@@ -388,14 +343,13 @@ describe('claiming an inventory credential', () => {
   it('subscribe skips a row whose envelope KMS refuses and installs healthy stock', async () => {
     const user = await insertSubscribableUser();
     const refused = await insertInventoryRow({
-      ...sealedInventoryColumnsWithStaticKeyCopy('refused-envelope', 'refused-static-key'),
+      ...sealedInventoryColumns('refused-envelope'),
     });
     await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
     kms.refuseDecryptFor(refused.id);
 
     await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'refused-row-subscribe');
 
-    // The refused row's static-key copy is never used in its place.
     expect(await installedByokPlaintext(user.id)).toBe('healthy-secret');
     expect((await selectInventory(refused.id)).status).toBe('available');
   });
@@ -405,7 +359,7 @@ describe('claiming an inventory credential', () => {
       sealedInventoryColumns('previous-secret')
     );
     const refused = await insertInventoryRow({
-      ...sealedInventoryColumnsWithStaticKeyCopy('refused-envelope', 'refused-static-key'),
+      ...sealedInventoryColumns('refused-envelope'),
     });
     const healthy = await insertInventoryRow({ ...sealedInventoryColumns('healthy-secret') });
     kms.refuseDecryptFor(refused.id);
@@ -418,22 +372,10 @@ describe('claiming an inventory credential', () => {
     expect((await selectInventory(refused.id)).status).toBe('available');
   });
 
-  it('subscribe does not claim a row whose credential was cleared', async () => {
-    const user = await insertSubscribableUser();
-    await insertInventoryRow({
-      encrypted_api_key: null,
-      encrypted_api_key_envelope: null,
-    });
-
-    await expect(
-      subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'cleared-subscribe')
-    ).rejects.toThrow('No managed credential is available');
-  });
-
   async function insertAssignedSubscription(
     previousColumns: Pick<
       typeof coding_plan_key_inventory.$inferInsert,
-      'encrypted_api_key' | 'encrypted_api_key_envelope'
+      'encrypted_api_key_envelope'
     >
   ) {
     const user = await insertTestUser();
@@ -476,7 +418,7 @@ describe('claiming an inventory credential', () => {
       sealedInventoryColumns('previous-secret')
     );
     const pooled = await insertInventoryRow({
-      ...sealedInventoryColumnsWithStaticKeyCopy('pooled-envelope-secret', 'static-key-decoy'),
+      ...sealedInventoryColumns('pooled-envelope-secret'),
     });
     kms.requests.length = 0;
 
@@ -493,24 +435,22 @@ describe('claiming an inventory credential', () => {
     expect((await selectInventory(pooled.id)).status).toBe('assigned');
   });
 
-  it('reassign does not claim a row whose envelope is null, even with a static-key ciphertext', async () => {
+  it('reassign does not claim a row whose envelope is null', async () => {
     const { subscription } = await insertAssignedSubscription(
       sealedInventoryColumns('previous-secret')
     );
-    const staticOnly = await insertInventoryRow({
-      encrypted_api_key: staticKeyInventoryCredential('static-key-only-secret'),
-    });
+    const unsealedRow = await insertInventoryRow({ encrypted_api_key_envelope: null });
     kms.requests.length = 0;
 
     await expect(reassignSubscriptionCredential(subscription.id, ADMIN_USER_ID)).rejects.toThrow();
 
     expect(kms.requests.filter(request => request.path === '/decrypt')).toHaveLength(0);
-    expect((await selectInventory(staticOnly.id)).status).toBe('available');
+    expect((await selectInventory(unsealedRow.id)).status).toBe('available');
   });
 });
 
 describe('replacing an inventory credential', () => {
-  it('replaceInventoryCredential writes the placeholder and an envelope bound to the row id', async () => {
+  it('replaceInventoryCredential writes an envelope bound to the row id', async () => {
     const row = await insertInventoryRow({
       plan_id: MINIMAX_PLAN_ID,
       provider_id: 'minimax',
@@ -572,24 +512,7 @@ describe('replacing an inventory credential', () => {
     }
   );
 
-  it('replaceInventoryCredential replaces a static-key copy left in the obsolete column with the placeholder', async () => {
-    const row = await insertInventoryRow({
-      plan_id: MINIMAX_PLAN_ID,
-      provider_id: 'minimax',
-      upstream_usage_id: null,
-      ...sealedInventoryColumnsWithStaticKeyCopy('old-secret', 'static-key-old-secret'),
-    });
-
-    await replaceInventoryCredential(row.id, 'fresh-secret', ADMIN_USER_ID, {
-      validateCredential: async () => ({ valid: true }),
-    });
-
-    const after = await selectInventory(row.id);
-    expectSealedForRow(after, 'fresh-secret');
-    await expect(openCodingPlanInventoryCredential(after)).resolves.toBe('fresh-secret');
-  });
-
-  it('replaceManualCredentialRevocation writes the placeholder and an envelope bound to the row id', async () => {
+  it('replaceManualCredentialRevocation writes an envelope bound to the row id', async () => {
     const row = await insertInventoryRow({ status: 'revocation_pending' });
 
     await replaceManualCredentialRevocation(row.id, ' manual-replacement ', ADMIN_USER_ID, {
@@ -624,10 +547,10 @@ describe('replacing an inventory credential', () => {
 });
 
 describe('clearing an inventory credential', () => {
-  it('markCredentialManuallyRevoked clears the envelope and a static-key copy', async () => {
+  it('markCredentialManuallyRevoked clears the envelope', async () => {
     const row = await insertInventoryRow({
       status: 'revocation_pending',
-      ...sealedInventoryColumnsWithStaticKeyCopy('revoke-me', 'static-key-revoke-me'),
+      ...sealedInventoryColumns('revoke-me'),
     });
 
     await markCredentialManuallyRevoked(row.id);
@@ -637,10 +560,10 @@ describe('clearing an inventory credential', () => {
     expectClearedCredential(after);
   });
 
-  it('markCredentialManualRevocationFailed clears the envelope and a static-key copy', async () => {
+  it('markCredentialManualRevocationFailed clears the envelope', async () => {
     const row = await insertInventoryRow({
       status: 'revocation_pending',
-      ...sealedInventoryColumnsWithStaticKeyCopy('fail-me', 'static-key-fail-me'),
+      ...sealedInventoryColumns('fail-me'),
     });
 
     await markCredentialManualRevocationFailed(row.id, 'upstream said no');
@@ -650,10 +573,10 @@ describe('clearing an inventory credential', () => {
     expectClearedCredential(after);
   });
 
-  it('requeueManualCredentialRevocation clears the envelope and a static-key copy', async () => {
+  it('requeueManualCredentialRevocation clears the envelope', async () => {
     const row = await insertInventoryRow({
       status: 'revocation_failed',
-      ...sealedInventoryColumnsWithStaticKeyCopy('requeue-me', 'static-key-requeue-me'),
+      ...sealedInventoryColumns('requeue-me'),
     });
 
     await requeueManualCredentialRevocation(row.id);
@@ -663,10 +586,10 @@ describe('clearing an inventory credential', () => {
     expectClearedCredential(after);
   });
 
-  it('queueAvailableInventoryForRevocation clears the envelope and a static-key copy', async () => {
+  it('queueAvailableInventoryForRevocation clears the envelope', async () => {
     const row = await insertInventoryRow({
       status: 'available',
-      ...sealedInventoryColumnsWithStaticKeyCopy('reduce-me', 'static-key-reduce-me'),
+      ...sealedInventoryColumns('reduce-me'),
     });
 
     const result = await queueAvailableInventoryForRevocation(BYTEPLUS_PLAN_ID, 1, ADMIN_USER_ID);

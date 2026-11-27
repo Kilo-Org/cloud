@@ -1,7 +1,8 @@
 # kilocode JetBrains release: the publish jobs in the protected `release-jetbrains` environment
 # (kilocode CI design 6). A publish-jetbrains.yml run started by a closed pull request is refused:
 # only workflow_dispatch is listed.
-# Kilo-Org/kilocode issues immutable subjects only after its opt-in; until then STS refuses its tokens.
+# legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
+# GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
 workload: ci-kilocode-release-jetbrains
 environments:
   - production
@@ -10,6 +11,7 @@ identity:
   repository: Kilo-Org/kilocode
   repositoryId: '946087422'
   repositoryOwnerId: '201822503'
+  legacySubject: true
   environment: release-jetbrains
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/publish-jetbrains.yml@refs/heads/main

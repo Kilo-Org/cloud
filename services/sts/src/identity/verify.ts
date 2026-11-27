@@ -18,6 +18,7 @@ import { PROVIDER_FETCH_TIMEOUT_MS } from '../constants';
 import {
   JobWorkflowRefSchema,
   VERCEL_ISSUER_PREFIX,
+  githubLegacySubject,
   githubSubject,
   vercelStsEnvironments,
   type GithubIdentity,
@@ -276,7 +277,12 @@ function meetsGithubBindings(payload: JWTPayload, identity: GithubIdentity): boo
   if (!claim(payload, 'job_workflow_ref')?.endsWith(`@${ref}`)) return false;
   const event = claim(payload, 'event_name');
   if (!identity.events.some(listed => listed === event)) return false;
-  return claim(payload, 'sub') === githubSubject(identity, ref);
+  const subject = claim(payload, 'sub');
+  if (subject === githubSubject(identity, ref)) return true;
+  // Kilo-Org/kilocode only (the loader refuses the flag elsewhere): its default subject, with the
+  // repository and owner id claims already matched above. Why and how to upgrade:
+  // GITHUB_LEGACY_SUBJECT_REPOSITORY in ../policy/schema.
+  return identity.legacySubject === true && subject === githubLegacySubject(identity, ref);
 }
 
 /** Classifies a failed `jwtVerify`: a dependency failure is retryable, anything else is a rejection. */

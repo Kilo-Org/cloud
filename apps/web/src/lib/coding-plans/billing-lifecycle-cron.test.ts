@@ -324,7 +324,6 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.installed_byok_key_id).toBeNull();
     expect(credential.status).toBe('revocation_pending');
     expect(credential.upstream_plan_id).toEqual(expect.any(String));
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
     expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
   });
@@ -357,7 +356,6 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.cancel_at_period_end).toBe(true);
     expect(subscription.installed_byok_key_id).not.toBeNull();
     expect(credential.status).toBe('assigned');
-    expect(credential.encrypted_api_key).not.toBeNull();
     expect(credential.encrypted_api_key_envelope).not.toBeNull();
   });
 
@@ -402,7 +400,6 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.status).toBe('canceled');
     expect(subscription.cancellation_reason).toBe('insufficient_credits');
     expect(credential.status).toBe('revocation_pending');
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
   });
 
@@ -502,7 +499,6 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.status).toBe('canceled');
     expect(subscription.cancellation_reason).toBe('insufficient_credits');
     expect(credential.status).toBe('revocation_pending');
-    expect(credential.encrypted_api_key).toBeNull();
     expect(credential.encrypted_api_key_envelope).toBeNull();
   });
 

@@ -1,6 +1,7 @@
 # kilocode watch-opencode-releases (kilocode CI design 6). Only the Slack webhook: the sync call's
 # service token (audience opencode-watch-sync) waits until that audience is registered.
-# Kilo-Org/kilocode issues immutable subjects only after its opt-in; until then STS refuses its tokens.
+# legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
+# GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
 workload: ci-kilocode-opencode-watch
 environments:
   - production
@@ -9,6 +10,7 @@ identity:
   repository: Kilo-Org/kilocode
   repositoryId: '946087422'
   repositoryOwnerId: '201822503'
+  legacySubject: true
   environment: automation
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/watch-opencode-releases.yml@refs/heads/main

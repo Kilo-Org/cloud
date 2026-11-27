@@ -14,8 +14,6 @@ import { OPENAI_TOKEN_ENDPOINT } from '@kilocode/web-shared/lib/auth/openai/conf
 import { and, eq, isNull } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
-import { staticKeyOpenAiChatGptConnection } from '@kilocode/web-shared/tests/helpers/openai-chatgpt-connection.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import {
@@ -158,7 +156,6 @@ describe('refresh with KMS envelopes against a real database', () => {
   async function readRow() {
     const [row] = await db
       .select({
-        obsolete: openai_chatgpt_connections.encrypted_connection,
         envelope: openai_chatgpt_connections.encrypted_connection_envelope,
         isEnabled: openai_chatgpt_connections.is_enabled,
       })
@@ -187,7 +184,7 @@ describe('refresh with KMS envelopes against a real database', () => {
     );
   });
 
-  it('rotates the tokens into a new envelope and keeps the placeholder in the obsolete column', async () => {
+  it('rotates the tokens into a new envelope', async () => {
     await saveOpenAiChatGptConnection(owner, connection(), owner.kiloUserId as string);
     fetchMock.mockResolvedValue(
       Response.json({
@@ -208,7 +205,6 @@ describe('refresh with KMS envelopes against a real database', () => {
       credentialKeyId: after.envelope?.key_id,
     });
     expect(after.envelope?.key_id).not.toBe(before.envelope?.key_id);
-    expect(after.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(JSON.stringify(after.envelope)).not.toContain('rotated');
     const dataKeyRequests = kms.requests.filter(request => request.path === '/data-key');
     expect(dataKeyRequests.at(-1)?.body).toMatchObject({
@@ -220,20 +216,12 @@ describe('refresh with KMS envelopes against a real database', () => {
     });
   });
 
-  it('refreshes with the envelope refresh token, never the one in the obsolete static-key column', async () => {
+  it('refreshes with the envelope refresh token', async () => {
     await saveOpenAiChatGptConnection(
       owner,
       connection({ refresh_token: 'envelope-refresh-token' }),
       owner.kiloUserId as string
     );
-    await db
-      .update(openai_chatgpt_connections)
-      .set({
-        encrypted_connection: staticKeyOpenAiChatGptConnection(
-          connection({ refresh_token: 'static-refresh-token' })
-        ),
-      })
-      .where(personalRowWhere());
     fetchMock.mockResolvedValue(
       Response.json({ access_token: 'new-access-token', expires_in: 60 })
     );
@@ -246,8 +234,6 @@ describe('refresh with KMS envelopes against a real database', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(refreshTokenSent()).toBe('envelope-refresh-token');
-    const after = await readRow();
-    expect(after.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toMatchObject({
       connection: { refresh_token: 'envelope-refresh-token', access_token: 'new-access-token' },
     });
@@ -275,7 +261,7 @@ describe('refresh with KMS envelopes against a real database', () => {
     await expect(readRow()).resolves.toEqual(before);
   });
 
-  it('writes the terminal error state into the envelope and the placeholder into the obsolete column', async () => {
+  it('writes the terminal error state into the envelope', async () => {
     await saveOpenAiChatGptConnection(owner, connection(), owner.kiloUserId as string);
     fetchMock.mockResolvedValue(TERMINAL_REFRESH_RESPONSE);
 
@@ -283,7 +269,6 @@ describe('refresh with KMS envelopes against a real database', () => {
 
     const row = await readRow();
     expect(row.isEnabled).toBe(false);
-    expect(row.obsolete).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(JSON.stringify(row.envelope)).not.toContain('stale-refresh-token');
     await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toMatchObject({
       isEnabled: false,

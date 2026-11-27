@@ -217,8 +217,11 @@
     // Local development only (`wrangler dev --env local`); no deploy workflow targets this name.
     "local": {
       "name": "audit-relay-local",
-      "workers_dev": true,
-      // Not inherited from the top level: a local run has no custom domain.
+      // Fence: this name is local-only, but a stray `wrangler deploy --env local` would publish it.
+      // Named environments inherit the top-level routes, so clear them (the production custom
+      // domain must never attach here), and keep workers.dev and preview URLs off.
+      "workers_dev": false,
+      "preview_urls": false,
       "routes": [],
       "vars": {
         "AXIOM_DATASET": "kilo-audit-local",

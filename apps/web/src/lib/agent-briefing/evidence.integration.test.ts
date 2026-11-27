@@ -1196,7 +1196,9 @@ function maintenanceSnapshot(
     morning_end_at: '2026-10-28T12:00:00.000Z',
     captured_at: '2026-10-28T08:00:00.000Z',
     published_at: '2026-10-28T08:00:00.000Z',
-    expires_at: '2026-11-27T08:00:00.000Z',
+    // Relative to the real clock: the sweep deletes expired snapshots, so a fixed date
+    // stops this fixture from existing once that date passes.
+    expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     facts: buildBriefingSnapshot([]),
     summary: briefingStore.emptySummary,
   };

@@ -51,6 +51,7 @@ const withOverriddenAppUrl = async (
   }
 };
 
+import { version } from 'uuid';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { isUSRegion } from '@kilocode/web-shared/lib/drizzle';
@@ -116,6 +117,7 @@ describe('recordEnkryptUsage region routing', () => {
       id: expect.any(String),
       occurredAt: expect.any(String),
     });
+    expect(version(body.id)).toBe(7);
     expect(await enkryptLedgerRows(usageRecord.organizationId)).toEqual([]);
     expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(0);
   });

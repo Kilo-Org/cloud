@@ -105,7 +105,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       { enabled: organizationData?.plan === 'enterprise' }
     )
   );
-  const showAdvancedPoliciesTab = gatewaySettings?.available === true;
+  // The tab holds policies for every enterprise organization; `available` only adds the
+  // gateway routing policies to it.
+  const showGatewayAvailability = gatewaySettings?.available === true;
   const {
     models: openRouterModels,
     providers: openRouterProviders,
@@ -495,7 +497,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
-            {showAdvancedPoliciesTab && (
+            {gatewaySettings && (
               <TabsTrigger value="advanced-policies">Advanced policies</TabsTrigger>
             )}
           </TabsList>
@@ -515,6 +517,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onToggleModelAllowed={handleToggleModelAllowed}
               onSetModelsAllowed={handleSetModelsAllowed}
               onOpenModelDetails={actions.setInfoModelId}
+              newModelsDisabledByDefault={gatewaySettings?.disable_new_models === true}
             />
           </TabsContent>
 
@@ -554,7 +557,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
 
-          {showAdvancedPoliciesTab && (
+          {gatewaySettings && (
             <TabsContent value="advanced-policies" className="mt-6">
               <AdvancedPoliciesTab
                 organizationId={organizationId}
@@ -567,7 +570,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
         <ModelDetailsDialog
           organizationId={organizationId}
-          showGatewayAvailability={showAdvancedPoliciesTab}
+          showGatewayAvailability={showGatewayAvailability}
           open={state.infoModelId !== null}
           canEdit={canEdit}
           infoModel={infoModel}

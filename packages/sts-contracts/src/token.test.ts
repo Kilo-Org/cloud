@@ -10,6 +10,7 @@ import {
   STS_CODE_REVIEW_STATUS_READ,
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
+  STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
@@ -34,6 +35,7 @@ import {
   STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH,
   STS_WEB_SCIM_SYNC,
   STS_WEB_SECURITY_ANALYSIS_CALLBACK,
+  STS_WEB_MCP_CATALOG_TOKEN_MINT,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
   STS_WEB_USAGE_RECEIPTS_READ,
@@ -190,7 +192,7 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes and the phase 2 C1 scopes, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes, the CI scopes and the phase 2 C1 scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: {
         scopes: [
@@ -216,6 +218,7 @@ describe('STS scope registry', () => {
           'web:security-analysis.callback',
           'web:code-review.agent-callback',
           'web:code-review.status-callback',
+          'web:mcp-catalog-token.mint',
         ],
       },
       'usage-ingest': { scopes: ['usage-ingest:sts.canary', 'usage-ingest:usage.publish'] },
@@ -253,6 +256,9 @@ describe('STS scope registry', () => {
         ],
       },
       'session-ingest': { scopes: ['session-ingest:session-access.invalidate'] },
+      'community-contributions-dashboard': {
+        scopes: ['community-contributions-dashboard:opencode.sync'],
+      },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
@@ -272,6 +278,12 @@ describe('STS scope registry', () => {
     expect(isRegisteredStsScope('code-review', 'web:code-review.status-callback')).toBe(false);
     // UTS's user scopes under the session-ingest audience are not STS scopes.
     expect(isRegisteredStsScope('session-ingest', 'session-ingest:sessions.read')).toBe(false);
+    expect(isRegisteredStsScope('web', 'community-contributions-dashboard:opencode.sync')).toBe(
+      false
+    );
+    expect(
+      isRegisteredStsScope('community-contributions-dashboard', 'web:mcp-catalog-token.mint')
+    ).toBe(false);
   });
 
   it('lists each shipped scope under its own audience', () => {
@@ -341,6 +353,12 @@ describe('STS scope registry', () => {
       'session-ingest:session-access.invalidate',
       'session-ingest',
       STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
+    ],
+    ['web:mcp-catalog-token.mint', 'web', STS_WEB_MCP_CATALOG_TOKEN_MINT],
+    [
+      'community-contributions-dashboard:opencode.sync',
+      'community-contributions-dashboard',
+      STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
     ],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });

@@ -320,6 +320,24 @@ export const STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE = {
 } as const;
 
 /**
+ * A GitHub Actions job asks the web app to mint the one-hour catalog API token
+ * (`POST /api/internal/mcp-catalog/token`): the MCP catalog dump and the kilo-app changelog jobs.
+ */
+export const STS_WEB_MCP_CATALOG_TOKEN_MINT = {
+  audience: 'web',
+  scope: 'web:mcp-catalog-token.mint',
+} as const;
+
+/**
+ * Kilo-Org/kilocode's watch-opencode-releases job asks the community contributions dashboard to
+ * sync a new upstream opencode release (`POST /api/opencode/sync`).
+ */
+export const STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC = {
+  audience: 'community-contributions-dashboard',
+  scope: 'community-contributions-dashboard:opencode.sync',
+} as const;
+
+/**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
  * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
  * reserved denied probe. The UTS scopes are those UTS and its feed accept from a service: the web
@@ -329,8 +347,11 @@ export const STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE = {
  * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
  * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
  * finding dismissal (`STS_SECURITY_SYNC_*`), the web app's security notification dispatch
- * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), and the Bouncer scopes (`STS_BOUNCER_*`). The
- * phase 2 C1 scopes are each one sender's call to the web app (the other `STS_WEB_*` pairs),
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), and the Bouncer scopes (`STS_BOUNCER_*`). The CI
+ * scopes are the web app's catalog token mint (`STS_WEB_MCP_CATALOG_TOKEN_MINT`) and the
+ * community contributions dashboard's opencode sync
+ * (`STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC`).
+ * The phase 2 C1 scopes are each one sender's call to the web app (the other `STS_WEB_*` pairs),
  * Cloud Agent's callbacks to Webhook Agent Ingest and Security Auto Analysis, the web app's calls
  * to the Code Review Worker (`STS_CODE_REVIEW_*`), and its session access invalidation at Session
  * Ingest. STS mints each one only where a policy grants it (default deny).
@@ -360,6 +381,7 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       STS_WEB_SECURITY_ANALYSIS_CALLBACK.scope,
       STS_WEB_CODE_REVIEW_AGENT_CALLBACK.scope,
       STS_WEB_CODE_REVIEW_STATUS_CALLBACK.scope,
+      STS_WEB_MCP_CATALOG_TOKEN_MINT.scope,
     ],
   },
   'usage-ingest': { scopes: ['usage-ingest:sts.canary', STS_USAGE_PUBLISH.scope] },
@@ -408,6 +430,9 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.audience]: {
     scopes: [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.scope],
+  },
+  'community-contributions-dashboard': {
+    scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],
   },
 };
 

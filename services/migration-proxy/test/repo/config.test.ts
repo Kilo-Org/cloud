@@ -123,8 +123,7 @@ describe('the real wrangler.jsonc', () => {
       ok: false,
       problems: ['MIGRATION_PROXY_GITHUB_API_URL: only the development stack may set it'],
     });
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    expect(readConfig({ ...stagingVars(), ...rest, ...fake }).ok).toBe(false);
+    expect(readConfig({ ...stagingVars(), ...fake }).ok).toBe(false);
     const development = readConfig({
       ...topLevelVars(),
       ...SET_BY_E,
@@ -149,8 +148,7 @@ describe('the real wrangler.jsonc', () => {
   });
 
   it('derives the login rule and the attestation re-check from the one environment constant', () => {
-    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
-    const staging = readConfig({ ...stagingVars(), ...rest });
+    const staging = readConfig(stagingVars());
     if (!staging.ok) throw new Error('staging must load');
     const stagingRun = {
       workload: 'ci-db-migrate-staging',
@@ -170,9 +168,9 @@ describe('the real wrangler.jsonc', () => {
 
     // The same vars with only the constant flipped to production: the login rule now refuses
     // direct mode, and the re-check now expects production's workflow and workload.
-    expect(
-      readConfig({ ...stagingVars(), ...rest, MIGRATION_PROXY_ENVIRONMENT: 'production' }).ok
-    ).toBe(false);
+    expect(readConfig({ ...stagingVars(), MIGRATION_PROXY_ENVIRONMENT: 'production' }).ok).toBe(
+      false
+    );
     const production = { ...staging.config, environment: 'production' as const };
     expect(claimsMismatch(stagingRun, production)).toBe(true);
     expect(expectedRun('production')).toEqual({

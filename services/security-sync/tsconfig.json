@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["esnext"],
+    "lib": ["esnext", "webworker"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["@types/node", "./worker-configuration.d.ts"],

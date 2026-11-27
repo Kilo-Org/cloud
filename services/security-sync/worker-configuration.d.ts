@@ -47,8 +47,15 @@ declare type ExecutionContext = {
   passThroughOnException(): void;
 };
 
+/** The workerd built-in; only the `sts` secrets source loads it (src/secrets.ts). */
+declare module 'cloudflare:workers' {
+  export function waitUntil(promise: Promise<unknown>): void;
+}
+
 declare type CloudflareEnv = {
   INTERNAL_API_SECRET: SecretBinding;
+  /** Production only; `env.dev` binds no STS. */
+  STS?: import('@kilocode/secrets-client').BundleBinding;
   SYNC_QUEUE: Queue<import('./src/index').SecuritySyncQueueMessage>;
   DISMISS_QUEUE: Queue<import('./src/index').SecurityDismissMessage>;
   HYPERDRIVE: Hyperdrive;
@@ -59,4 +66,5 @@ declare type CloudflareEnv = {
   BACKEND_API_URL: string | undefined;
   SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED: string | undefined;
   SECURITY_NOTIFICATION_DISPATCH_ENABLED: string | undefined;
+  SECRETS_SOURCE: string | undefined;
 };

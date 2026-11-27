@@ -1,4 +1,10 @@
-# Registration only: services/security-sync/wrangler.jsonc. No environment, identity or grant.
+# The cloudflare-security-sync Worker (services/security-sync/wrangler.jsonc). Production only: the
+# config has no staging block, and its `dev` block binds no STS. No grant yet: its one runtime read,
+# INTERNAL_API_SECRET (resolved from /shared), is listed after the protected import and before the
+# Worker's SECRETS_SOURCE leaves `secrets-store`.
 workload: cloudflare-security-sync
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []

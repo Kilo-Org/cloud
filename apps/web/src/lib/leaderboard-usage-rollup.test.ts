@@ -498,7 +498,7 @@ describe('leaderboard usage rollup', () => {
 
       await expect(waitForReplayCatchUp(readDb)).resolves.toEqual({
         status: 'timed_out',
-        waitedMs: 62_000,
+        waitedMs: 31_000,
       });
     } finally {
       clock.restore();
@@ -512,8 +512,39 @@ describe('leaderboard usage rollup', () => {
 
       await expect(waitForReplayCatchUp(readDb, clock.now() + 500)).resolves.toEqual({
         status: 'deadline',
-        waitedMs: 2_000,
+        waitedMs: 1_000,
       });
+    } finally {
+      clock.restore();
+    }
+  });
+
+  test('starts no replay probe at or after the deadline', async () => {
+    const clock = fakeClock();
+    try {
+      const deadline = clock.now() + 500_000;
+      clock.advance(499_000);
+      const probeStarts: number[] = [];
+      const readDb = {
+        execute: async (query: Parameters<DrizzleDatabase['execute']>[0]) => {
+          probeStarts.push(clock.now());
+          clock.advance(1_500);
+          return JSON.stringify(query).includes('receive_lsn')
+            ? { rows: [{ receive_lsn: '3E72/CFDFAC50' }] }
+            : { rows: [{ caught_up: false }] };
+        },
+      } as unknown as DrizzleDatabase;
+
+      const catchUp = await waitForReplayCatchUp(readDb, deadline);
+
+      expect(catchUp.status).toBe('deadline');
+      expect(probeStarts).toEqual([deadline - 1_000]);
+      expect(probeStarts.every(start => start < deadline)).toBe(true);
+      await expect(waitForReplayCatchUp(readDb, deadline)).resolves.toEqual({
+        status: 'deadline',
+        waitedMs: 0,
+      });
+      expect(probeStarts).toHaveLength(1);
     } finally {
       clock.restore();
     }

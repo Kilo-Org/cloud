@@ -112,20 +112,30 @@ export async function waitForReplayCatchUp(
     status,
     waitedMs: Date.now() - startedAt,
   });
+  // Checked before every probe, so none starts at or after the cutoff; a probe
+  // already in flight is left to finish.
+  const cutoff = (): ReplayCatchUp['status'] | null => {
+    const now = Date.now();
+    if (deadline !== undefined && now >= deadline) return 'deadline';
+    if (now >= giveUpAt) return 'timed_out';
+    return null;
+  };
+
+  const beforeReceive = cutoff();
+  if (beforeReceive) return result(beforeReceive);
   const received = await readDb.execute<{ receive_lsn: string | null }>(
     sql`SELECT pg_last_wal_receive_lsn()::text AS receive_lsn`
   );
   const receiveLsn = received.rows[0]?.receive_lsn;
   if (!receiveLsn) return result('caught_up');
   for (;;) {
+    const beforeReplay = cutoff();
+    if (beforeReplay) return result(beforeReplay);
     const replayed = await readDb.execute<{ caught_up: boolean | null }>(
       sql`SELECT pg_last_wal_replay_lsn() >= ${receiveLsn}::pg_lsn AS caught_up`
     );
     if (replayed.rows[0]?.caught_up !== false) return result('caught_up');
-    const now = Date.now();
-    if (deadline !== undefined && now >= deadline) return result('deadline');
-    if (now >= giveUpAt) return result('timed_out');
-    await sleep(Math.min(REPLAY_POLL_MS, giveUpAt - now));
+    await sleep(Math.max(0, Math.min(REPLAY_POLL_MS, giveUpAt - Date.now())));
   }
 }
 

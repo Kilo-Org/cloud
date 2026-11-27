@@ -457,11 +457,13 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
 | `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `web` | `code-review`: `code-review:review.dispatch`, `code-review:review.status-read`, `code-review:review.cancel`, `code-review:review.retry-fresh`; `session-ingest`: `session-ingest:session-access.invalidate` | | production only (`environmentGrants`) |
+| `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 | `ai-gateway` | `web`: `web:usage.region-handoff.record`, `web:claude-billing.payer-state.read` | none | production only (`environmentGrants`) |
+| `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `notifications` | `web`: `web:glanceable-snapshot.read` | in its file | production |
 | `container-usage-meter` | `web`: `web:compute-balance-alert.send` | in its file | production |
 | `cloudflare-scim-sync` | `web`: `web:scim.sync` | none | production |
@@ -470,7 +472,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `security-auto-analysis` | `web`: `web:security-notifications.lifecycle` | none | production |
 | `auto-routing-benchmark` | `web`: `web:auto-routing.pool-pins.write`, `web:usage.receipts.read`, `web:auto-routing.production-profile.read`, `web:usage.benchmark-grader.record` | none | production |
 | `auto-routing` | `web`: `web:usage.classifier.record` | none | production |
-| `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback` | none | production |
+| `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:security-remediation.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback`, `security-auto-analysis:remediation.callback` | none | production |
 | `kilo-code-review-worker` | `web`: `web:code-review.status-callback` | none | production |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
@@ -509,6 +511,12 @@ Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every sc
 holds on development STS, the same as `web`'s development grants. If fork or outside pull-request
 previews are ever enabled on that project, these grants need a review first.
 
+`web` and `ai-gateway` read `INTERNAL_API_SECRET` from their bundle only when the deployment's
+`SECRETS_SOURCE` is `sts` (`packages/web-shared/src/lib/sts-secret-reader.ts`), from
+`/workloads/web` or `/workloads/ai-gateway` if the name is there, else from `/shared`. The grant is
+in staging and production only: previews read development STS and keep `env`, so no preview build
+can read the key; a preview flip adds a `development` key.
+
 Workloads with a policy, all over `worker-binding`:
 
 | Workload | Environments | Worker config |
@@ -523,6 +531,7 @@ Workloads with a policy, all over `worker-binding`:
 | `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-webhook-agent-ingest` | production | `services/webhook-agent-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `cloudflare-scim-sync` | production | `services/scim-sync/wrangler.jsonc` |
 | `user-data-export` | production | `services/user-data-export/wrangler.jsonc` |
 | `cloudflare-security-sync` | production | `services/security-sync/wrangler.jsonc` |
@@ -532,9 +541,9 @@ Workloads with a policy, all over `worker-binding`:
 | `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc` |
 | `kilo-code-review-worker` | production | `services/code-review-infra/wrangler.jsonc` |
 
-The eight Workers after `container-usage-meter` became policies for their phase 2 C1 grants. Each
-config's production STS binding arrives with that Worker's own change; until then the repository
-check in `test/repo/worker-configs.test.ts` fails for it.
+The eight Workers after `cloudflare-webhook-agent-ingest` became policies for their phase 2 C1
+grants. Each config's production STS binding arrives with that Worker's own change; until then the
+repository check in `test/repo/worker-configs.test.ts` fails for it.
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.

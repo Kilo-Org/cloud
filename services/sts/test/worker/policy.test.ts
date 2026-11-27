@@ -893,10 +893,19 @@ secrets: [APP_TWO_SECRET]
       'AUDIT_RELAY_SLACK_WEBHOOK_PAGE',
     ]);
     expect(policyIndex.has('audit-relay')).toBe(true);
+    // The three runtime reads of services/webhook-agent-ingest/src/secrets.ts, production only.
+    expect(policyFor('production', 'cloudflare-webhook-agent-ingest')?.secrets).toEqual([
+      'INTERNAL_API_SECRET',
+      'CALLBACK_TOKEN_SECRET',
+      'NEXTAUTH_SECRET',
+    ]);
+    for (const environment of ['development', 'staging'] as const) {
+      expect(policyFor(environment, 'cloudflare-webhook-agent-ingest')).toBeNull();
+    }
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only and its Bouncer and web scopes in production only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key outside it, and its Bouncer and web scopes in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -914,7 +923,7 @@ secrets: [APP_TWO_SECRET]
       environments: ['development', 'staging', 'production'],
       audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
       scopes: GATEWAY_BASE_SCOPES,
-      secrets: [],
+      secrets: ['INTERNAL_API_SECRET'],
       dynamic: [],
       environmentGrants: {},
     });
@@ -922,7 +931,7 @@ secrets: [APP_TWO_SECRET]
       environments: ['development', 'staging', 'production'],
       audiences: GATEWAY_PRODUCTION_AUDIENCES,
       scopes: GATEWAY_PRODUCTION_SCOPES,
-      secrets: [],
+      secrets: ['INTERNAL_API_SECRET'],
       dynamic: [],
       environmentGrants: {},
     });
@@ -973,14 +982,14 @@ describe('dual-accept grants of the shipped policies', () => {
       expect(policyFor(environment, 'web')).toMatchObject({
         audiences: production ? WEB_PRODUCTION_AUDIENCES : ['usage-ingest', 'o11y'],
         scopes: production ? WEB_PRODUCTION_SCOPES : WEB_BASE_SCOPES,
-        secrets: [],
+        secrets: ['INTERNAL_API_SECRET'],
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
         audiences: production
           ? GATEWAY_PRODUCTION_AUDIENCES
           : ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
         scopes: production ? GATEWAY_PRODUCTION_SCOPES : GATEWAY_BASE_SCOPES,
-        secrets: [],
+        secrets: ['INTERNAL_API_SECRET'],
       });
     }
   );
@@ -1422,7 +1431,7 @@ scopes: ['gateway:models.read']
     ).toBe(true);
   });
 
-  it('grants web its UTS audiences, scopes and client keys in development only, and its Bouncer and phase 2 C1 scopes in production only', () => {
+  it('grants web its UTS audiences, scopes and client keys in development only, the internal key in staging and production only, and its Bouncer and phase 2 C1 scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'uts-feed', 'uts'],
@@ -1438,12 +1447,12 @@ scopes: ['gateway:models.read']
     expect(policyFor('staging', 'web')).toMatchObject({
       audiences: ['usage-ingest', 'o11y'],
       scopes: WEB_BASE_SCOPES,
-      secrets: [],
+      secrets: ['INTERNAL_API_SECRET'],
     });
     expect(policyFor('production', 'web')).toMatchObject({
       audiences: WEB_PRODUCTION_AUDIENCES,
       scopes: WEB_PRODUCTION_SCOPES,
-      secrets: [],
+      secrets: ['INTERNAL_API_SECRET'],
     });
   });
 });

@@ -128,7 +128,7 @@ describe('leaderboard usage rollup', () => {
 
     expect(written).toEqual({
       rows: 4,
-      slices: 96,
+      slices: 288,
       durationMs: expect.any(Number),
       slowestSliceMs: expect.any(Number),
       replayWaitMs: 0,
@@ -302,8 +302,8 @@ describe('leaderboard usage rollup', () => {
 
     expect(summary).toEqual({
       built: [
-        expect.objectContaining({ usageDate: '2026-11-08', rows: 1, slices: 96 }),
-        expect.objectContaining({ usageDate: '2026-11-07', rows: 1, slices: 96 }),
+        expect.objectContaining({ usageDate: '2026-11-08', rows: 1, slices: 288 }),
+        expect.objectContaining({ usageDate: '2026-11-07', rows: 1, slices: 288 }),
       ],
       remaining: ['2026-11-06', '2026-11-05', '2026-11-04', '2026-11-03'],
       unsettled: ['2026-11-09'],
@@ -408,8 +408,8 @@ describe('leaderboard usage rollup', () => {
 
     const build = await rebuildLeaderboardUsageDay('2026-11-10', { readDb: flakyReadDb, db });
 
-    expect(build).toMatchObject({ rows: 1, slices: 96, conflictRetries: 1 });
-    expect(calls).toBe(97);
+    expect(build).toMatchObject({ rows: 1, slices: 288, conflictRetries: 1 });
+    expect(calls).toBe(289);
     expect((await rollupRows()).map(row => row.request_count)).toEqual([2]);
   });
 

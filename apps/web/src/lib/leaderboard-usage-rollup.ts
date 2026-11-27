@@ -21,10 +21,11 @@ export const MAX_DAYS_PER_RUN = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSERT_BATCH_SIZE = 1_000;
 
-// A busy hour is ~800k usage rows. A 15-minute slice keeps each read a few
-// seconds when warm, and well under the replica's 90s
-// `max_standby_streaming_delay` when cold, past which WAL replay may cancel it.
-const SLICE_MS = 15 * 60 * 1000;
+// A busy hour is ~800k usage rows, so a 5-minute slice reads ~70k and takes
+// about half a second warm. WAL replay can wait on a running slice, so the
+// slice length bounds the replica lag a slice causes, and keeps it well under
+// the replica's 90s `max_standby_streaming_delay` even when cold.
+const SLICE_MS = 5 * 60 * 1000;
 const SLICE_STATEMENT_TIMEOUT_MS = 60_000;
 // The default 32MB spills the usage-side hash join to disk at a busy hour.
 const SLICE_WORK_MEM = '128MB';
@@ -179,7 +180,7 @@ function postgresErrorCode(error: unknown): string | null {
 }
 
 /**
- * Aggregates one UTC day of usage from `readDb` 15 minutes at a time, then replaces
+ * Aggregates one UTC day of usage from `readDb` 5 minutes at a time, then replaces
  * that day's rollup rows on `db` in one transaction. Returns what was written,
  * or `null` without writing anything when `deadline` passes before the last
  * slice. A failure is logged with the day, the stage and the slice, then rethrown.

@@ -137,6 +137,37 @@ describe(`member mode on ${IMAGE}`, () => {
     expect(output).not.toContain(PASSWORD);
   });
 
+  it('exits non-zero when the password is not set', () => {
+    let failed = false;
+    try {
+      db.psql(
+        ['-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-v', 'block=rotate', '-f', '-'],
+        {},
+        setupLoginSql()
+      );
+    } catch {
+      failed = true;
+    }
+    expect(failed).toBe(true);
+  });
+
+  it('reads a full connection limit (53300) as probe_failed/connect_timeout, which CI retries', async () => {
+    const database = await newDatabase();
+    const holders = [await loginSession('psql-a'), await loginSession('psql-b')];
+    try {
+      const { status } = await apply(
+        applyBody(LOGIN, database, migrationSet([{ tag: '0001_a', sql: 'SELECT 1;' }]))
+      );
+      expect(status.failure).toMatchObject({
+        code: 'probe_failed',
+        reason: 'connect_timeout',
+        sqlstate: '53300',
+      });
+    } finally {
+      for (const holder of holders) await holder.end();
+    }
+  });
+
   it('acts as postgres; RESET ROLE stays postgres, SET ROLE NONE gives the login', async () => {
     const client = await loginSession('test-roles');
     const user = async () =>

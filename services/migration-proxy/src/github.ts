@@ -178,10 +178,14 @@ function segments(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/');
 }
 
+/** Each GitHub call, body included, gets this long before it counts as a network failure. */
+export const GITHUB_REQUEST_TIMEOUT_MS = 30_000;
+
 export function createGithubClient(
   credentials: GithubAppCredentials,
   fetcher: GithubFetch,
-  now: () => number = Date.now
+  now: () => number = Date.now,
+  timeoutMs: number = GITHUB_REQUEST_TIMEOUT_MS
 ): GithubClient {
   let cached: { token: string; expiresAt: number } | null = null;
   const API = credentials.apiUrl;
@@ -197,13 +201,22 @@ export function createGithubClient(
   const send = async (url: string, init: RequestInit): Promise<Response> => {
     let response: Response;
     try {
-      response = await fetcher(url, init);
+      response = await fetcher(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
     } catch {
       throw new GithubUnavailableError('network');
     }
     const limited = rateLimitedUntil(response, now());
     if (limited !== null) throw new GithubUnavailableError('rate limited', limited);
     return response;
+  };
+
+  /** The JSON body; a body cut off by the timeout is a network failure too. */
+  const body = async (response: Response): Promise<unknown> => {
+    try {
+      return await response.json();
+    } catch {
+      throw new GithubUnavailableError('network');
+    }
   };
 
   const token = async (): Promise<string> => {
@@ -228,7 +241,7 @@ export function createGithubClient(
       }
     );
     if (response.status !== 201) throw new GithubUnavailableError(`token ${response.status}`);
-    const parsed = TokenSchema.parse(await response.json());
+    const parsed = TokenSchema.parse(await body(response));
     cached = { token: parsed.token, expiresAt: Date.parse(parsed.expires_at) };
     return parsed.token;
   };
@@ -241,7 +254,7 @@ export function createGithubClient(
       if (response.status === 401) cached = null;
       throw new GithubUnavailableError(`GET ${response.status}`);
     }
-    return await response.json();
+    return await body(response);
   };
 
   return {

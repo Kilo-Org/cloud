@@ -7,6 +7,7 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,

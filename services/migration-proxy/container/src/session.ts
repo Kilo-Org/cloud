@@ -43,7 +43,10 @@ export class ProbeError extends Error {
   }
 }
 
-export const CA_BUNDLE_PATH = new URL('../ca-bundle.pem', import.meta.url);
+/** A path string, not a URL object: the Worker's and Node's URL types differ in shared typechecks. */
+export const CA_BUNDLE_PATH = decodeURIComponent(
+  new URL('../ca-bundle.pem', import.meta.url).pathname
+);
 
 /**
  * A probe statement: node-postgres honours a per-query `query_timeout` (30 s, §6 step 2), which
@@ -88,6 +91,8 @@ function errorCode(error: unknown): string | null {
 export function connectFailure(error: unknown): ProbeError {
   const code = errorCode(error);
   if (code === '28P01' || code === '28000') return new ProbeError('auth_failed', code);
+  // too_many_connections: the login's limit of 2 is taken, often by a leftover; a retry can pass.
+  if (code === '53300') return new ProbeError('connect_timeout', code);
   if (code === '57P03') return new ProbeError('not_primary', code);
   if (code !== null && TLS_ERROR_CODES.has(code)) return new ProbeError('tls_verify_failed');
   // node-postgres reports a server without TLS, or one that refuses it, by message only.
@@ -136,9 +141,10 @@ export async function connect(login: Login, applicationName: string): Promise<pg
 
 /** `(pg_backend_pid(), backend_start)` of this session, with microseconds, in UTC. */
 export async function ownPair(client: pg.Client): Promise<SessionPair> {
-  const result = await client.query<{ pid: number; backend_start: string }>(
-    probeQuery(`SELECT pid, to_char(backend_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS backend_start
-                FROM pg_stat_activity WHERE pid = pg_backend_pid()`)
+  const result = await probeStatement<{ pid: number; backend_start: string }>(
+    client,
+    `SELECT pid, to_char(backend_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS backend_start
+     FROM pg_stat_activity WHERE pid = pg_backend_pid()`
   );
   const row = result.rows[0];
   if (row === undefined) throw new Error('own session missing from pg_stat_activity');
@@ -146,15 +152,36 @@ export async function ownPair(client: pg.Client): Promise<SessionPair> {
 }
 
 /**
+ * A probe statement's failure: node-postgres's read timeout (no answer within 30 s) is the server
+ * not answering, `connect_timeout` (retryable), never a migration failure.
+ */
+export function probeStatementFailure(error: unknown): unknown {
+  return error instanceof Error && /Query read timeout/i.test(error.message)
+    ? new ProbeError('connect_timeout')
+    : error;
+}
+
+async function probeStatement<Row extends pg.QueryResultRow>(
+  client: pg.Client,
+  text: string
+): Promise<pg.QueryResult<Row>> {
+  try {
+    return await client.query<Row>(probeQuery(text));
+  } catch (error) {
+    throw probeStatementFailure(error);
+  }
+}
+
+/**
  * §6 step 2: the first statements of the connection. Member mode requires the dedicated login
  * acting as `postgres`; direct mode requires `postgres` itself; neither may be a standby.
  */
 export async function probe(client: pg.Client, loginMode: LoginMode): Promise<void> {
-  const result = await client.query<{
+  const result = await probeStatement<{
     current_user: string;
     session_user: string;
     in_recovery: boolean;
-  }>(probeQuery('SELECT current_user, session_user, pg_is_in_recovery() AS in_recovery'));
+  }>(client, 'SELECT current_user, session_user, pg_is_in_recovery() AS in_recovery');
   const row = result.rows[0];
   if (row === undefined) throw new ProbeError('wrong_role');
   const roleOk =

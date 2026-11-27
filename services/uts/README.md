@@ -702,11 +702,12 @@ reads the grant or browser session the `sid` names, so a revoked grant, an ended
 blocked account fails at once, with no feed lookup.
 
 **The profile API key and released clients (decision D54).** The released CLI, extension and mobile
-app send one profile API key to two hosts: the gateway for inference and the kilo-api for reads. A
-UTS PAT holds one audience and one scope, so a PAT created on the profile page serves gateway
-inference only. Released clients keep their legacy profile key for kilo-api reads until the phase 5
-client releases; no compatibility credential exists. The criterion 4 measure counts legacy
-profile-key issuance as a released-app path, labelled separately from UTS-issued credentials.
+app send one profile API key to the gateway for inference, and to the kilo-api (reads and writes)
+and Session Ingest. A UTS PAT holds one audience and one scope, so the PAT the profile page creates
+serves gateway inference only (a product choice; other PAT-eligible scopes exist). Released clients
+keep their legacy profile key for kilo-api and Session Ingest calls until the phase 5 client
+releases; no compatibility credential exists. The criterion 4 measure counts legacy profile-key
+issuance as a released-app path, labelled separately from UTS-issued credentials.
 
 `/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
 as a dependency: `utsScopeEntry` in every deployed Worker, plus the `fixture:*` scopes in the

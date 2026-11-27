@@ -42,12 +42,12 @@ test('watches completed main workflows without checking out code or granting per
   assert.ok(job.steps.every(step => step.uses && !step.uses.includes('checkout')));
 });
 
-test('covers every push workflow, except E2E whose nightly sends its own notification', () => {
+test('covers every push workflow', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
   const pushWorkflows = readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .map(name => load(readFileSync(new URL(name, directory), 'utf8')))
-    .filter(item => item.on?.push && item.name !== 'Cloud Agent E2E tests')
+    .filter(item => item.on?.push)
     .map(item => item.name)
     .sort();
   assert.deepEqual([...workflow.on.workflow_run.workflows].sort(), pushWorkflows);
@@ -76,13 +76,13 @@ test('does not notify for another branch or repository', () => {
   assert.equal(shouldNotify({ ...failedRun, head_repository: { full_name: 'fork/cloud' } }), false);
 });
 
-test('preserves the richer E2E notification without sending a duplicate', () => {
-  assert.equal(shouldNotify({ ...failedRun, name: 'Cloud Agent E2E tests' }), false);
-  const e2e = readWorkflow('cloud-agent-e2e-tests');
-  assert.equal(e2e.name, 'Cloud Agent E2E tests');
-  // The nightly owns the notification, so a manual tests run does not post.
+test('leaves the dispatch-only E2E workflow out', () => {
+  assert.equal(shouldNotify({ ...failedRun, name: 'Cloud Agent E2E' }), false);
+  const e2e = readWorkflow('cloud-agent-e2e');
+  assert.equal(e2e.name, 'Cloud Agent E2E');
+  // Runs only on a manual dispatch from main; its failure is in front of the person who started it.
+  assert.deepEqual(Object.keys(e2e.on), ['workflow_dispatch']);
   assert.equal(e2e.jobs['notify-failure'], undefined);
-  assert.ok(readWorkflow('cloud-agent-e2e-nightly').jobs['notify-failure']);
 });
 
 test('Slack payload uses the failed run metadata and safely serializes special characters', async () => {

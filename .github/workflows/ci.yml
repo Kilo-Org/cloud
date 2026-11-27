@@ -482,12 +482,15 @@ jobs:
               - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
+              - 'services/notifications/src/secrets.ts'
+              - 'services/sts/policy/notifications.yaml'
               - 'services/auto-routing/.dev.vars.example'
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
               - '.github/workflows/extension-store-release.yml'
               - '.github/workflows/kilo-mcp-release.yml'
+              - '.github/workflows/notifications-runtime-copy.yml'
               - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
@@ -515,12 +518,15 @@ jobs:
               - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
+              - 'services/notifications/src/secrets.ts'
+              - 'services/sts/policy/notifications.yaml'
               - 'services/auto-routing/.dev.vars.example'
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
               - '.github/workflows/extension-store-release.yml'
               - '.github/workflows/kilo-mcp-release.yml'
+              - '.github/workflows/notifications-runtime-copy.yml'
               - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
@@ -724,6 +730,8 @@ jobs:
           scripts/mobile-sbom-workflow.test.mjs
           scripts/sts-deployment-watch.test.mjs
           scripts/wrangler-nonproduction-fence.test.mjs
+          scripts/sts-bundle-action.test.mjs
+          scripts/cloud-agent-e2e-workflow.test.mjs
 
       # The same split for the release workflow: a PR that changes it alone
       # trips no product filter, and its test runs in no other job, so its

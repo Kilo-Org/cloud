@@ -73,6 +73,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => {
   return {
     ...actual,
     KILOCLAW_API_URL: 'https://claw.test',
+    KILOCLAW_LEGACY_WORKER_URL: 'https://claw.test',
     INTERNAL_API_SECRET: 'test-secret',
   };
 });

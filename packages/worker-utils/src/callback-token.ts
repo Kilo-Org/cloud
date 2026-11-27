@@ -1,3 +1,5 @@
+import { callerLabel, observeInternalAuth } from './internal-auth-observation';
+
 const CALLBACK_TOKEN_HEX_PATTERN = /^[0-9a-f]{64}$/;
 
 export type CallbackTokenParams = {
@@ -8,6 +10,11 @@ export type CallbackTokenParams = {
 
 export type VerifyCallbackTokenParams = CallbackTokenParams & {
   token: string | null | undefined;
+  /**
+   * Reports each acceptance for the item-9 counter (design section 9.4); the token's `scope` is the
+   * route label. Omit to write nothing.
+   */
+  observation?: { receiver: string; caller?: string | null };
 };
 
 function encodeResourceParts(resourceParts: readonly string[]): string {
@@ -73,5 +80,14 @@ export async function verifyCallbackToken(params: VerifyCallbackTokenParams): Pr
   }
 
   const expectedToken = await deriveCallbackToken(params);
-  return equalLengthStringsMatch(expectedToken, params.token);
+  if (!equalLengthStringsMatch(expectedToken, params.token)) return false;
+  if (params.observation !== undefined) {
+    observeInternalAuth(
+      params.observation.receiver,
+      params.scope,
+      'legacy_shared_secret',
+      callerLabel(params.observation.caller)
+    );
+  }
+  return true;
 }

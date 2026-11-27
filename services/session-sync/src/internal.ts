@@ -1,6 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { timingSafeEqual } from 'node:crypto';
 import { withDORetry } from '@kilocode/worker-utils';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { Hono } from 'hono';
 import { userIDSchema } from './protocol';
 
@@ -22,6 +27,12 @@ internal.post('/users/:userID/erase', async c => {
     ) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+    observeInternalAuth(
+      'session-sync',
+      'user_erase',
+      'legacy_shared_secret',
+      callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+    );
   } catch (error) {
     console.error('session-sync internal auth unavailable', {
       error: error instanceof Error ? error.name : typeof error,

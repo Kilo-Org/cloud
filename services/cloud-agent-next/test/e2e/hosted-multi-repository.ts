@@ -33,6 +33,7 @@ const STAGING_HOST_DENYLIST = new Set([
   'cloud-agent-next.kilosessions.ai',
   'cloud-agent-e2e-test.engineering-e11.workers.dev',
   'cloud-agent-e2e-test.kilosessions.ai',
+  'cloud-agent-e2e.kiloapps.io',
   'kilocode.ai',
   'app.kilocode.ai',
   'api.kilocode.ai',
@@ -41,12 +42,29 @@ const STAGING_HOST_DENYLIST = new Set([
   'api.kilo.ai',
 ]);
 
+/** The configured fenced e2e Worker hosts (CI variable, deploy input, driver URL). */
+function configuredE2eHosts(): string[] {
+  const hosts = [process.env.CLOUD_AGENT_E2E_WORKER_HOSTNAME, process.env.E2E_WORKER_HOSTNAME];
+  try {
+    if (process.env.WORKER_URL) hosts.push(new URL(process.env.WORKER_URL).hostname);
+  } catch {
+    // An invalid WORKER_URL names no host to refuse.
+  }
+  return hosts.filter((host): host is string => Boolean(host)).map(host => host.toLowerCase());
+}
+
+/** The fenced e2e Worker is never a staging origin, whichever way it is configured. */
+function isDeniedStagingHost(hostname: string): boolean {
+  const host = hostname.replace(/\.$/, '').toLowerCase();
+  return STAGING_HOST_DENYLIST.has(host) || configuredE2eHosts().includes(host);
+}
+
 const stagedOrigin = z.url().refine(value => {
   const url = new URL(value);
   return (
     url.protocol === 'https:' &&
     (value === url.origin || value === `${url.origin}/`) &&
-    !STAGING_HOST_DENYLIST.has(url.hostname.replace(/\.$/, ''))
+    !isDeniedStagingHost(url.hostname)
   );
 }, 'Expected a dedicated staging HTTPS origin');
 const markerPath = z

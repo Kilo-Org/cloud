@@ -7,6 +7,8 @@
   "vars": {
     "NEXTAUTH_SECRET": "fake-llm-miniflare-secret",
     "FAKE_LLM_ADMIN_TOKEN": "fake-llm-miniflare-admin-token",
+    // The Access gate is skipped here; one test calls the Worker with a deployed env.
+    "ENVIRONMENT": "development",
   },
   "durable_objects": {
     "bindings": [{ "name": "FAKE_LLM", "class_name": "FakeLlmState" }],

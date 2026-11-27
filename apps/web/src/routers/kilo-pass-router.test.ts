@@ -40,7 +40,7 @@ import {
   ImpactReferralRewardStatus,
   ImpactReferralWinningTouchType,
 } from '@kilocode/db/schema-types';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
   computeMonthlyCadenceBonusPercent,
@@ -2322,6 +2322,250 @@ describe('kiloPassRouter', () => {
 
       // The current monthly base baseline excludes the earlier $10 and includes the later $5.
       expect(result.subscription?.currentPeriodUsageUsd).toBe(5);
+    });
+
+    it('uses the current period usage window when the latest base issuance predates the period', async () => {
+      freezeKiloPassClock('2026-06-15T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_stale_base_issuance',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_start: Date.parse('2026-06-01T00:00:00.000Z') / 1000,
+              current_period_end: Date.parse('2026-07-01T00:00:00.000Z') / 1000,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-stale-base-issuance@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_stale_base_issuance',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-05-01',
+        stripeInvoiceId: 'in_test_stale_base_issuance',
+        createdAt: '2026-05-01T00:00:00.000Z',
+        usageBaselineMicrodollars: 10_000_000,
+      });
+      await db.insert(microdollar_usage).values([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          cost: 10_000_000,
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: '2026-05-15T00:00:00.000Z',
+        },
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          cost: 4_000_000,
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: '2026-06-10T00:00:00.000Z',
+        },
+      ]);
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 24_000_000 })
+        .where(eq(kilocode_users.id, user.id));
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getState();
+
+      expect(result.subscription?.currentPeriodUsageUsd).toBe(4);
+    });
+
+    it('keeps counter-delta usage when the base issuance is in the current period', async () => {
+      freezeKiloPassClock('2026-06-15T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_current_base_issuance',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_start: Date.parse('2026-06-01T00:00:00.000Z') / 1000,
+              current_period_end: Date.parse('2026-07-01T00:00:00.000Z') / 1000,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-current-base-issuance@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_current_base_issuance',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-06-01',
+        stripeInvoiceId: 'in_test_current_base_issuance',
+        createdAt: '2026-06-02T00:00:00.000Z',
+        usageBaselineMicrodollars: 10_000_000,
+      });
+      await db.insert(microdollar_usage).values({
+        kilo_user_id: user.id,
+        organization_id: null,
+        cost: 2_000_000,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: '2026-06-10T00:00:00.000Z',
+      });
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 13_000_000 })
+        .where(eq(kilocode_users.id, user.id));
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getState();
+
+      expect(result.subscription?.currentPeriodUsageUsd).toBe(3);
+    });
+
+    it('does not report a previous-period bonus as issued for the current period', async () => {
+      freezeKiloPassClock('2026-06-15T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_stale_bonus_item',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_start: Date.parse('2026-06-01T00:00:00.000Z') / 1000,
+              current_period_end: Date.parse('2026-07-01T00:00:00.000Z') / 1000,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-stale-bonus-item@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_stale_bonus_item',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-05-01',
+        stripeInvoiceId: 'in_test_stale_bonus_item',
+        createdAt: '2026-05-01T00:00:00.000Z',
+        bonusKind: KiloPassIssuanceItemKind.Bonus,
+        bonusAmountUsd: 5,
+        usageBaselineMicrodollars: 10_000_000,
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getState();
+
+      expect(result.subscription?.isBonusUnlocked).toBe(false);
+      expect(result.subscription?.isBonusAvailableToUnlock).toBe(true);
+      expect(result.subscription?.currentPeriodBonus).toEqual({
+        status: 'available',
+        kind: null,
+        actualAmountUsd: null,
+        projectedAmountUsd: expect.any(Number),
+      });
+    });
+
+    it('uses the newest credit transaction when issuances share an issue month', async () => {
+      freezeKiloPassClock('2026-06-15T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_shared_issue_month',
+        status: 'active',
+        items: {
+          data: [
+            {
+              current_period_start: Date.parse('2026-06-01T00:00:00.000Z') / 1000,
+              current_period_end: Date.parse('2026-07-01T00:00:00.000Z') / 1000,
+            },
+          ],
+        },
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-get-state-shared-issue-month@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_shared_issue_month',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        currentStreakMonths: 1,
+        startedAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      // The schema allows one issuance per subscription-month. Legacy duplicate
+      // months are the case the ordering tie-breaker guards.
+      await db.execute(
+        sql`ALTER TABLE "kilo_pass_issuances" DROP CONSTRAINT "UQ_kilo_pass_issuances_subscription_issue_month"`
+      );
+      try {
+        await insertBaseCreditsIssuance({
+          subscriptionId,
+          kiloUserId: user.id,
+          issueMonth: '2026-06-01',
+          stripeInvoiceId: 'in_test_shared_issue_month_older',
+          createdAt: '2026-06-02T00:00:00.000Z',
+          usageBaselineMicrodollars: 10_000_000,
+        });
+        await insertBaseCreditsIssuance({
+          subscriptionId,
+          kiloUserId: user.id,
+          issueMonth: '2026-06-01',
+          stripeInvoiceId: 'in_test_shared_issue_month_newer',
+          createdAt: '2026-06-03T00:00:00.000Z',
+          usageBaselineMicrodollars: 12_000_000,
+        });
+        await db
+          .update(kilocode_users)
+          .set({ microdollars_used: 15_000_000 })
+          .where(eq(kilocode_users.id, user.id));
+
+        const result = await (await createCallerForUser(user.id)).kiloPass.getState();
+
+        expect(result.subscription?.currentPeriodUsageUsd).toBe(3);
+      } finally {
+        await db
+          .delete(kilo_pass_issuances)
+          .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId));
+        await db.execute(
+          sql`ALTER TABLE "kilo_pass_issuances" ADD CONSTRAINT "UQ_kilo_pass_issuances_subscription_issue_month" UNIQUE ("kilo_pass_subscription_id", "issue_month")`
+        );
+      }
     });
   });
 

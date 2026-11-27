@@ -696,10 +696,17 @@ Every account route takes a UTS access token for the `uts` audience with the rou
 holds, read through an isolate copy of the key list (one Durable Object call per isolate per 10
 seconds, or per 2 seconds while tokens name a kid the copy lacks, so a flood of forged tokens costs
 no call each), `typ` `at+jwt`, the issuer, 60 seconds of skew and
-the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
-only). A PAT names no session, so it is refused there. Each action is one statement that reads the
-grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
-account fails at once, with no feed lookup.
+the claim profile, and a client that the scope registry allows for the scope (`kilo-cli` or
+`kilo-web` only). A PAT names no session, so it is refused there. Each action is one statement that
+reads the grant or browser session the `sid` names, so a revoked grant, an ended session or a
+blocked account fails at once, with no feed lookup.
+
+**The profile API key and released clients (decision D54).** The released CLI, extension and mobile
+app send one profile API key to two hosts: the gateway for inference and the kilo-api for reads. A
+UTS PAT holds one audience and one scope, so a PAT created on the profile page serves gateway
+inference only. Released clients keep their legacy profile key for kilo-api reads until the phase 5
+client releases; no compatibility credential exists. The criterion 4 measure counts legacy
+profile-key issuance as a released-app path, labelled separately from UTS-issued credentials.
 
 `/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
 as a dependency: `utsScopeEntry` in every deployed Worker, plus the `fixture:*` scopes in the

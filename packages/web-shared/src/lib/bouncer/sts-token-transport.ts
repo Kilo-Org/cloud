@@ -150,7 +150,10 @@ export function connectBouncerSts(options: {
       if (now() >= skipJitterUntil) {
         const jitter = Promise.withResolvers<void>();
         endJitter = jitter.resolve;
-        const timer = setTimeout(jitter.resolve, Math.floor(random() * BOUNCER_FIRST_MINT_JITTER_MS));
+        const timer = setTimeout(
+          jitter.resolve,
+          Math.floor(random() * BOUNCER_FIRST_MINT_JITTER_MS)
+        );
         await jitter.promise;
         clearTimeout(timer);
         endJitter = null;

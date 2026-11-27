@@ -432,7 +432,12 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
       // wait. Readiness runs beside that wait only to tell a cold start from a slow mint.
       let exchangeHeld: boolean | null = null;
       if (mode === 'sts') {
-        if (wait.admission) void transport.then(t => t.skipJitter(), () => undefined);
+        if (wait.admission) {
+          void transport.then(
+            t => t.skipJitter(),
+            () => undefined
+          );
+        }
         void transport
           .then(t => t.exchangeReady())
           .then(

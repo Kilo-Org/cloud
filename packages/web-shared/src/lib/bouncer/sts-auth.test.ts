@@ -577,7 +577,8 @@ describe('createBouncerAuth', () => {
         'x-kilo-caller': 'kilocode-app',
         authorization: `Bearer ${TOKEN}`,
       });
-      expect(h.exchangeReady).not.toHaveBeenCalled();
+      // Readiness runs beside the wait only to classify a miss; it does not gate the wait.
+      expect(h.exchangeReady).toHaveBeenCalledTimes(1);
       // The mint this call waits for skips the first-mint jitter.
       expect(h.skipJitter).toHaveBeenCalledTimes(1);
     });

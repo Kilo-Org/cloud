@@ -498,6 +498,9 @@ jobs:
     # status function and the per-gate conditions are required. The expression
     # is wrapped because a bare condition that starts with `!` is a YAML tag.
     if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.preflight.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && ((needs.reuse.result == 'success' && needs.reuse.outputs.suite == 'passed' && needs.validate.result == 'skipped') || (needs.validate.result == 'success' && needs.reuse.outputs.suite != 'passed')) && github.repository == 'Kilo-Org/cloud' }}
+    # The release environment admits only main and holds the kilo-maintainer
+    # app key (KILO_MAINTAINER_APP_SECRET) that the tag pushes mint tokens with.
+    environment: release
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     outputs:
@@ -621,10 +624,11 @@ jobs:
       # write and Workflows: write: GitHub refuses a GITHUB_TOKEN tag push when
       # the tagged commit's .github/workflows differs from every branch tip,
       # which happens whenever a workflow change merges while this job runs.
-      # Each push mints its own token, because an installation token expires
-      # after an hour and the submissions between the two pushes can outlast
-      # it. The tokens reach only the two push steps, never .git/config, so
-      # pnpm and eas-cli cannot read them.
+      # The app key is a secret of the release environment, available only to
+      # main. A token never reaches .git/config or a later step's environment,
+      # but it stays valid until revoked, so the marker step revokes its token
+      # before eas submit runs. That revoked token cannot serve Tag release, so
+      # the release tag push mints a second one after both submissions.
       - name: Mint the iOS upload marker token
         id: marker-token
         uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
@@ -634,6 +638,9 @@ jobs:
           repositories: cloud
           permission-contents: write
           permission-workflows: write
+          # The marker step revokes the token itself; the end-of-job revocation
+          # would only fail on the revoked token.
+          skip-token-revoke: true
 
       # The cap ledger must never under-count, so the marker is pushed BEFORE
       # the submission, not after it succeeds. App Store Connect can accept the
@@ -654,10 +661,17 @@ jobs:
       # runner has none.
       # GIT_CONFIG_* is command-line level: the empty value drops the persisted
       # GITHUB_TOKEN header, and the second entry sends the release token.
+      # The EXIT trap revokes the token whether the push succeeded or not.
       - name: Mark the iOS upload
         env:
           RELEASE_TOKEN: ${{ steps.marker-token.outputs.token }}
         run: |
+          revoke_token() {
+            if ! GH_TOKEN="$RELEASE_TOKEN" gh api -X DELETE installation/token > /dev/null; then
+              echo "::warning::Could not revoke the iOS upload marker token; it expires within an hour"
+            fi
+          }
+          trap revoke_token EXIT
           AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
           echo "::add-mask::$AUTH"
           export GIT_CONFIG_COUNT=2

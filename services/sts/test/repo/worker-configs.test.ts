@@ -13,8 +13,10 @@ import {
   type WorkerConfig,
   deployConfigEntries,
   internalWorkerProblems,
+  stsVarProblems,
   parseWorkerConfig,
   trackedPaths,
+  workerBindingPolicyProblems,
   workerConfigPaths,
   workerConfigProblems,
 } from './worker-configs';
@@ -128,6 +130,14 @@ describe('repository Worker configs', () => {
   it('agree with the deployment lists the check relies on', () => {
     expect(internalWorkerProblems(repoConfigs())).toEqual([]);
   });
+
+  it('set every var STS reads in each STS deployment, with the issuer verifiers expect', () => {
+    expect(stsVarProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('bind STS as every worker-binding policy, unless its Worker is listed as external', () => {
+    expect(workerBindingPolicyProblems(repoConfigs(), shippedPolicies())).toEqual([]);
+  });
 });
 
 describe("Wrangler's config schema", () => {
@@ -174,6 +184,7 @@ describe("Wrangler's config schema", () => {
       ...keysOf(definition('WorkerEntrypointExport')),
     ],
     'secrets_store_secrets[]': keysOf(environment('secrets_store_secrets', 'items')),
+    'hyperdrive[]': keysOf(environment('hyperdrive', 'items')),
   };
 
   it('has no key the check leaves unclassified, at any level the check models', () => {
@@ -248,6 +259,108 @@ describe('worker config rules', () => {
           `${PATH} (top level): SIGNER binds Durable Object class SignerDO of ${script}; its Durable Objects are internal`
       )
     );
+  });
+
+  it("refuses a config outside services/sts that binds one of STS's own classes", () => {
+    const config = consumer({
+      durable_objects: {
+        bindings: [
+          { name: 'TOKENS', class_name: 'TokenSignerDO' },
+          { name: 'SIGNER', class_name: 'SignerDO' },
+        ],
+      },
+    });
+    expect(problemsOf(config)).toEqual([
+      `${PATH} (top level): TOKENS binds Durable Object class TokenSignerDO, which only STS defines and binds`,
+    ]);
+    const own = parseWorkerConfig('services/sts/test/fixtures/x/wrangler.jsonc', {
+      name: 'secrets-broker-x-test',
+      ...NO_TRACES,
+      durable_objects: { bindings: [{ name: 'TOKENS', class_name: 'TokenSignerDO' }] },
+    });
+    expect(problemsOf(own)).toEqual([]);
+  });
+
+  it('refuses an STS block whose vars readConfig would refuse or whose issuer differs', () => {
+    const vars = {
+      STS_ENVIRONMENT: 'staging',
+      STS_ISSUER: 'https://sts-staging.kiloapps.io',
+      MANAGER_BASE_URL: 'https://eu.infisical.com',
+      MANAGER_PROJECT_ID: 'project',
+      MANAGER_PROJECT_SLUG: '',
+      MANAGER_ENVIRONMENT_SLUG: 'staging',
+      MANAGER_IDENTITY_ID: 'identity',
+      DO_JURISDICTION: 'eu',
+      TOKEN_SIGNING_KIDS_REVOKED: '',
+      LEASE_CI_MIGRATION_TARGET: '',
+      CF_DEPLOY_ACCOUNT_ID: '',
+      LEASE_REPLICA_SWEEP_BINDINGS: '',
+    };
+    const sts = (blockVars: Record<string, string>) =>
+      parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
+    expect(stsVarProblems([sts(vars)])).toEqual([]);
+    expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'a'.repeat(43) })])).toEqual(
+      []
+    );
+    const { TOKEN_SIGNING_KIDS_REVOKED: _omitted, ...withoutKids } = vars;
+    expect(stsVarProblems([sts(withoutKids)])).toEqual([
+      expect.stringContaining('TOKEN_SIGNING_KIDS_REVOKED'),
+    ]);
+    expect(stsVarProblems([sts({ ...vars, TOKEN_SIGNING_KIDS_REVOKED: 'not-a-kid' })])).toEqual([
+      expect.stringContaining('vars do not pass EnvVarsSchema'),
+    ]);
+    expect(
+      stsVarProblems([
+        sts({
+          ...vars,
+          MANAGER_PROJECT_SLUG: 'kilo-project',
+          LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:5432/postgres',
+          CF_DEPLOY_ACCOUNT_ID: 'e115e769bcdd4c3d66af59d3332cb394',
+        }),
+      ])
+    ).toEqual([]);
+    for (const bad of [
+      { MANAGER_PROJECT_SLUG: 'Kilo Project' },
+      { LEASE_CI_MIGRATION_TARGET: 'postgres://user:secret@db.example.invalid/postgres' },
+      { LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:99999/postgres' },
+      { CF_DEPLOY_ACCOUNT_ID: 'cfat_not-an-account-id' },
+      { LEASE_REPLICA_SWEEP_BINDINGS: 'REPLICA' },
+      { LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_A,LEASE_SWEEP_A' },
+    ]) {
+      expect(stsVarProblems([sts({ ...vars, ...bad })]), JSON.stringify(bad)).toEqual([
+        expect.stringContaining('vars do not pass EnvVarsSchema'),
+      ]);
+    }
+    expect(stsVarProblems([sts({ ...vars, STS_ISSUER: 'https://sts.kiloapps.io' })])).toEqual([
+      'services/sts/wrangler.jsonc (top level): STS_ISSUER is https://sts.kiloapps.io, expected https://sts-staging.kiloapps.io',
+    ]);
+  });
+
+  it('refuses an STS block that sweeps a replica it has no Hyperdrive binding for', () => {
+    const vars = {
+      STS_ENVIRONMENT: 'staging',
+      STS_ISSUER: 'https://sts-staging.kiloapps.io',
+      MANAGER_BASE_URL: 'https://eu.infisical.com',
+      MANAGER_PROJECT_ID: 'project',
+      MANAGER_PROJECT_SLUG: '',
+      MANAGER_ENVIRONMENT_SLUG: 'staging',
+      MANAGER_IDENTITY_ID: 'identity',
+      DO_JURISDICTION: 'eu',
+      TOKEN_SIGNING_KIDS_REVOKED: '',
+      LEASE_CI_MIGRATION_TARGET: '',
+      CF_DEPLOY_ACCOUNT_ID: '',
+      LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_EU_WEST, LEASE_SWEEP_EU_NORTH',
+    };
+    const sts = (hyperdrive: string[]) =>
+      parseWorkerConfig('services/sts/wrangler.jsonc', {
+        name: 'sts',
+        vars,
+        hyperdrive: hyperdrive.map(binding => ({ binding, id: `${binding.toLowerCase()}-id` })),
+      });
+    expect(stsVarProblems([sts(['LEASE_SWEEP_EU_WEST', 'LEASE_SWEEP_EU_NORTH'])])).toEqual([]);
+    expect(stsVarProblems([sts(['LEASE_SWEEP_EU_WEST'])])).toEqual([
+      'services/sts/wrangler.jsonc (top level): LEASE_REPLICA_SWEEP_BINDINGS names LEASE_SWEEP_EU_NORTH, which is no Hyperdrive binding of this block',
+    ]);
   });
 
   it('refuses an STS binding at any entrypoint other than SecretsBroker', () => {
@@ -384,9 +497,17 @@ describe('worker config rules', () => {
         { name: 'AUDIT_SIGNER', class_name: 'SignerDO' },
       ],
     };
-    const relayQueues = (queue: string) => ({
-      consumers: [{ queue, dead_letter_queue: `${queue}-dlq` }, { queue: `${queue}-dlq` }],
-    });
+    const relayQueues = (queue: string) => {
+      const uts = queue.replace('kilo-audit', 'kilo-audit-uts');
+      return {
+        consumers: [
+          { queue, dead_letter_queue: `${queue}-dlq` },
+          { queue: `${queue}-dlq` },
+          { queue: uts, dead_letter_queue: `${uts}-dlq` },
+          { queue: `${uts}-dlq` },
+        ],
+      };
+    };
     const archive = (bucket_name: string, jurisdiction?: string) => [
       { binding: 'AUDIT_ARCHIVE', bucket_name, ...(jurisdiction ? { jurisdiction } : {}) },
     ];
@@ -427,7 +548,7 @@ describe('worker config rules', () => {
     expect(internalWorkerProblems(configs)).toEqual([]);
   });
 
-  it('refuses a producer on an audit queue outside the STS deployment of that environment', () => {
+  it('refuses a producer on an audit queue outside its own producer and environment', () => {
     const audit = (queue: string) => ({ producers: [{ binding: 'AUDIT', queue }] });
     const foreign = consumer({
       queues: {
@@ -445,19 +566,26 @@ describe('worker config rules', () => {
       name: 'sts',
       ...NO_TRACES,
       queues: audit('kilo-audit-staging'),
-      env: { local: { name: 'sts-local', queues: audit('kilo-audit-local') } },
+      env: { local: { name: 'sts-local', queues: audit('kilo-audit-uts-local') } },
     });
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
       ...NO_TRACES,
       queues: audit('kilo-audit'),
     });
-    expect(problemsOf(foreign, crossed, relay)).toEqual([
+    const utsOnSts = parseWorkerConfig('services/uts/wrangler.jsonc', {
+      name: 'uts',
+      ...NO_TRACES,
+      queues: audit('kilo-audit'),
+    });
+    expect(problemsOf(foreign, crossed, relay, utsOnSts)).toEqual([
       `${PATH} (top level): AUDIT produces to kilo-audit; only sts may`,
       `${PATH} (env.staging): AUDIT produces to kilo-audit-staging; only sts-staging may`,
       `${PATH} (env.local): AUDIT produces to kilo-audit-local-dlq; no Worker may`,
       'services/sts/wrangler.jsonc (top level): AUDIT produces to kilo-audit-staging; only sts-staging may',
+      'services/sts/wrangler.jsonc (env.local): AUDIT produces to kilo-audit-uts-local; only uts-local, uts-test may',
       'services/audit-relay/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
+      'services/uts/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
     ]);
   });
 
@@ -494,6 +622,23 @@ describe('worker config rules', () => {
       `${PATH} (env.x) deploys as sts, which only the sts config deploys`,
       `${PATH} (env.y) deploys as audit-relay-local, which only the audit-relay config deploys`,
       `${PATH} (env.z) deploys as sts-test, which only the sts-test config deploys`,
+    ]);
+  });
+
+  it('refuses a config deploying under the name of a workload whose config lives elsewhere', () => {
+    const impostor = parseWorkerConfig('services/impostor/wrangler.jsonc', {
+      name: 'bouncer-watch',
+      ...NO_TRACES,
+      services: [stsBinding('sts', { props: { caller: 'bouncer-watch' } })],
+    });
+    const renamed = consumer({ env: { x: { name: 'bouncer-watch' } } });
+    const policies = [
+      workerBindingPolicy('consumer'),
+      workerBindingPolicy('bouncer-watch', ['production']),
+    ];
+    expect(workerConfigProblems([impostor, renamed], policies)).toEqual([
+      'services/impostor/wrangler.jsonc (top level) deploys as bouncer-watch, whose config lives in Kilo-Org/bouncer',
+      `${PATH} (env.x) deploys as bouncer-watch, whose config lives in Kilo-Org/bouncer`,
     ]);
   });
 
@@ -751,6 +896,32 @@ describe('deployment lists', () => {
     });
     expect(internalWorkerProblems([stsConfig('staging'), relay])).toEqual([
       'services/audit-relay/wrangler.jsonc deploys audit-relay, audit-relay-dev, audit-relay-staging; AUDIT_RELAY_DEPLOYMENTS lists audit-relay, audit-relay-local, audit-relay-staging',
+    ]);
+  });
+
+  it('ties every worker-binding policy to a config here that binds STS, or to a listed external workload', () => {
+    const bound = consumer({ services: [stsBinding('sts')] });
+    const unbound = parseWorkerConfig('services/other/wrangler.jsonc', { name: 'other' });
+    const fly = PolicySchema.parse({
+      workload: 'flyer',
+      environments: ALL_ENVIRONMENTS,
+      identity: { kind: 'fly-oidc', org: 'kilo', orgId: '10', app: 'flyer', appId: '20' },
+      secrets: [],
+    });
+    const policies = [
+      workerBindingPolicy('consumer'),
+      workerBindingPolicy('other'),
+      workerBindingPolicy('absent'),
+      workerBindingPolicy('bouncer-watch', ['production']),
+      fly,
+    ];
+    const hint = 'list it in EXTERNAL_WORKLOADS if another repository holds its config';
+    expect(workerBindingPolicyProblems([bound, unbound], policies)).toEqual([
+      `policy other has no config here that binds STS as other; ${hint}`,
+      `policy absent has no config here that binds STS as absent; ${hint}`,
+    ]);
+    expect(workerBindingPolicyProblems([bound], [workerBindingPolicy('consumer')])).toEqual([
+      'EXTERNAL_WORKLOADS lists bouncer-watch (Kilo-Org/bouncer), which has no worker-binding policy',
     ]);
   });
 });

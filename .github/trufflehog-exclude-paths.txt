@@ -71,3 +71,40 @@ apps/web/src/db/reset-target\.test\.ts
 # assembles it from parts, but that commit stays in branch history. Exclude the
 # fixture path so the historical commit does not fail the scan.
 apps/mobile/src/components/chat/mcp-settings-state-remote-servers\.test\.ts
+
+# STS worker-config fixtures. worker-configs.test.ts asserts that a
+# LEASE_CI_MIGRATION_TARGET carrying credentials fails the vars schema, so it lists
+# a synthetic connection string on an .invalid host. Exclude the fixture path so
+# the placeholder credential URI does not fail the scan.
+services/sts/test/repo/worker-configs\.test\.ts
+
+# STS replica-sweep fixtures. replica-sweep.test.ts gives each fake replica a
+# synthetic Hyperdrive connection string on an .invalid host, so the test can
+# tell which replica the sweep called. The commit that added them stays in branch
+# history. Exclude the fixture path so the placeholder credential URIs do not
+# fail the scan.
+services/sts/test/worker/replica-sweep\.test\.ts
+
+# UTS connection-policy fixtures. operator-connection.test.ts asserts which
+# operator and test-admin URLs the identity-store scripts refuse, so it lists
+# synthetic credential URLs for a remote example host. Earlier commits on the
+# branch used literal URIs and a later commit assembles them from parts, but
+# those commits stay in branch history. Exclude the fixture path so the
+# historical commits do not fail the scan.
+services/uts/test/db/operator-connection\.test\.ts
+
+# UTS PAT lookup fixtures. pat.test.ts points a lookup at a TEST-NET-1 address
+# that routes nowhere to assert that a hanging connect ends by its deadline. An
+# earlier commit on the branch put a placeholder password in that connection
+# string, and a later commit removed it, but that commit stays in branch
+# history. Exclude the fixture path so the historical commit does not fail the
+# scan.
+services/uts/test/runtime/pat\.test\.ts
+
+# UTS end-to-end database URL fixtures. e2e-database-urls.test.ts asserts which
+# database URLs the end-to-end scripts refuse, so it lists URLs with a login for
+# loopback and remote example hosts. The commit that added the file used literal
+# placeholder passwords and a later commit builds them at run time, but that
+# commit stays in branch history. Exclude the fixture path so the historical
+# commit does not fail the scan.
+services/uts/test/repo/e2e-database-urls\.test\.ts

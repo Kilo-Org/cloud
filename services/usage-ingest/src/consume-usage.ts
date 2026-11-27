@@ -16,6 +16,7 @@ import { logSafely, queueMetrics } from './diagnostics';
 import { logFinalAttemptFailure } from './final-attempt';
 import { parseQueuedUsage, type QueuedUsage } from './queued-usage';
 import { usageRetryDelaySeconds } from './retry-policy';
+import { createWriterCredentials, type WriterCredential } from './writer-auth';
 
 const INVOCATION_BUDGET_MS = 840_000;
 const MIN_LAUNCH_REMAINING_MS = 180_000;
@@ -35,13 +36,18 @@ function diagnosticFields(entryAtMs: number, batch: MessageBatch<unknown>): Diag
   return { batch_size: batch.messages.length, handler_entry_at_ms: entryAtMs };
 }
 
-export function handleQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
-  return processQueue(batch, env, Date.now(), performance.now());
+export function handleQueue(
+  batch: MessageBatch<unknown>,
+  env: Env,
+  ctx?: ExecutionContext
+): Promise<void> {
+  return processQueue(batch, env, createWriterCredentials(env, ctx), Date.now(), performance.now());
 }
 
 async function processQueue(
   batch: MessageBatch<unknown>,
   env: Env,
+  writerCredential: () => Promise<WriterCredential>,
   entryAtMs: number,
   startedAtMs: number
 ): Promise<void> {
@@ -62,6 +68,7 @@ async function processQueue(
         const result = await processMessage(
           message,
           env,
+          writerCredential,
           batch,
           diagnostics,
           batchId,
@@ -116,13 +123,14 @@ function writerUrlFor(path: string, llmWriterUrl: string | undefined): string | 
 
 function recordQueuedUsage(
   usage: Exclude<QueuedUsage, { kind: 'invalid' }>,
-  env: Env
+  env: Env,
+  credential: Exclude<WriterCredential, { unavailable: unknown }>
 ): Promise<LlmUsageWriteOutcome | EnkryptUsageWriteOutcome | ExaUsageWriteOutcome> {
   const config = {
-    secret: env.USAGE_WRITER_SECRET,
+    ...credential,
     protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
-    source: 'queue',
-  } as const;
+    source: 'queue' as const,
+  };
   if (usage.kind === 'llm') {
     return recordLlmUsage(usage.usage, { url: env.USAGE_WRITER_URL, ...config });
   }
@@ -150,6 +158,7 @@ function usageIdentity(parsed: QueuedUsage, llmFields: (usage: LlmUsageQueueMess
 async function processMessage(
   message: Message<unknown>,
   env: Env,
+  writerCredential: () => Promise<WriterCredential>,
   batch: MessageBatch<unknown>,
   diagnostics: Diagnostics,
   batchId: string,
@@ -181,7 +190,15 @@ async function processMessage(
     | LlmUsageWriteOutcome
     | EnkryptUsageWriteOutcome
     | ExaUsageWriteOutcome
-    | { kind: 'unavailable'; reason: 'invalid_event' | 'unsupported_kind' | 'invocation_budget' };
+    | {
+        kind: 'unavailable';
+        reason:
+          | 'invalid_event'
+          | 'unsupported_kind'
+          | 'invocation_budget'
+          | 'writer_auth_misconfigured'
+          | 'writer_token_unavailable';
+      };
   let writerDurationMs: number | undefined;
   if (parsed.kind === 'invalid') {
     outcome = { kind: 'unavailable', reason: parsed.reason };
@@ -189,10 +206,21 @@ async function processMessage(
     // Leave room for the full existing HTTP timeout; never abandon an in-flight write.
     outcome = { kind: 'unavailable', reason: 'invocation_budget' };
   } else {
-    const writerStartedAt = performance.now();
-    outcome = await recordQueuedUsage(parsed, env);
-    if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
-      writerDurationMs = Math.round(performance.now() - writerStartedAt);
+    const credential = await writerCredential();
+    if ('unavailable' in credential) {
+      outcome = { kind: 'unavailable', reason: credential.unavailable };
+    } else {
+      // One clock read starts the writer duration and, after an STS mint, decides whether the
+      // mint spent the launch budget. The legacy secret keeps only the check above.
+      const writerStartedAt = performance.now();
+      if ('serviceToken' in credential && writerStartedAt > lastLaunchAtMs) {
+        outcome = { kind: 'unavailable', reason: 'invocation_budget' };
+      } else {
+        outcome = await recordQueuedUsage(parsed, env, credential);
+        if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
+          writerDurationMs = Math.round(performance.now() - writerStartedAt);
+        }
+      }
     }
   }
 

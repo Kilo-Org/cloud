@@ -1,9 +1,14 @@
-import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   organizationMemberProcedure,
   organizationBillingMutationProcedure,
+  organizationBillingMemberMutationProcedure,
   organizationMemberMutationProcedure,
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
@@ -11,9 +16,7 @@ import {
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
-import { recordElevatedOrganizationAdminAction } from '@/lib/admin/admin-action-audit';
+import { inputFieldTarget } from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import {
   getGitHubConnectionStatusForOwner,
   getIntegrationForOrganization,
@@ -366,17 +369,6 @@ async function ensureBitbucketWorkspaceWebhook(input: {
   }
 }
 
-// The rotated secret is returned to the caller, so an elevated admin rotation
-// is recorded durably. The secret itself is never logged.
-async function recordGitLabSecretRotation(ctx: TRPCContext, organizationId: string) {
-  await recordElevatedOrganizationAdminAction(ctx, {
-    organizationId,
-    requiredRoles: ORGANIZATION_BILLING_ROLES,
-    action: 'organization.gitlab_webhook_secret.rotate',
-    message: 'Rotated GitLab webhook secret (new secret returned to the caller)',
-  });
-}
-
 export const organizationReviewAgentRouter = createTRPCRouter({
   createManualReviewJob: organizationMemberMutationProcedure
     .input(CreateManualReviewJobInputSchema)
@@ -416,15 +408,18 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       };
     }),
 
-  triggerBitbucketCodeReview: baseProcedure
+  // Kilo admins only: the admin guard checks the role, the network and step-up;
+  // the organization check below still applies.
+  triggerBitbucketCodeReview: adminProcedure
+    .meta({
+      adminAudit: {
+        kind: 'declarative',
+        action: 'organization.bitbucket.code_review.trigger',
+        target: inputFieldTarget('organization', 'organizationId'),
+      },
+    })
     .input(TriggerBitbucketCodeReviewInputSchema)
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user.is_admin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Admin access required',
-        });
-      }
       await ensureOrganizationAccess(ctx, input.organizationId);
 
       try {
@@ -1374,7 +1369,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    * Scope is per-org: only this integration's metadata is touched. See
    * P1-D-32.
    */
-  rotateGitLabWebhookSecret: organizationBillingMutationProcedure
+  rotateGitLabWebhookSecret: organizationBillingMemberMutationProcedure
     .input(OrganizationIdInputSchema)
     .mutation(async ({ input, ctx }) => {
       const organizationId = input.organizationId;
@@ -1415,7 +1410,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           details: { id: 'reviewAgent.secretRotated', updated: 0, errors: 0 },
           message: 'Rotated GitLab webhook secret (no Kilo-managed webhooks to re-sync)',
         });
-        await recordGitLabSecretRotation(ctx, organizationId);
         return {
           webhookSecret: newSecret,
           webhookSync: {
@@ -1507,7 +1501,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         message: `Rotated GitLab webhook secret (webhooks: ${webhookSyncResult.updated} updated, ${webhookSyncResult.errors.length} errors)`,
       });
 
-      await recordGitLabSecretRotation(ctx, organizationId);
       return {
         webhookSecret: newSecret,
         webhookSync: webhookSyncResult,

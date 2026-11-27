@@ -128,6 +128,7 @@ import {
   resetAccountToMagicLink,
   type MagicLinkRecoveryResult,
 } from '@/lib/user/account-recovery';
+import { scheduleSecurityNotice, supportSecurityNoticeRequest } from '@/lib/security-notices';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -137,6 +138,7 @@ import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-res
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { newPepperRotation } from '@kilocode/web-shared/lib/auth/pepper-rotation';
 import { revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
 import {
   kilo_pass_issuances,
@@ -154,10 +156,7 @@ import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import {
-  cancelAndRefundKiloPassForUser,
-  type CancelAndRefundKiloPassResult,
-} from '@/lib/kilo-pass/cancel-and-refund';
+import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -168,11 +167,15 @@ import {
 } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import {
+  addAdminAuditMetadata,
+  inputFieldTarget,
   recordAdminAction,
   redactEmailAddressesInAuditText,
+  setAdminAuditFailureAction,
+  setAdminAuditTarget,
   userActionTarget,
   type AdminActionContext,
-} from '@/lib/admin/admin-action-audit';
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,
@@ -600,6 +603,12 @@ export const adminRouter = createTRPCRouter({
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
     lookupOrganizationInstallation: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'exempt',
+          reason: 'mutation-typed read: looks up a GitHub App installation without changing it',
+        },
+      })
       .input(GitHubOrganizationInstallationLookupInputSchema)
       .mutation(async ({ input }) => {
         try {
@@ -612,8 +621,18 @@ export const adminRouter = createTRPCRouter({
         }
       }),
     uninstallOrganizationInstallation: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'github.installation.uninstall' } })
       .input(GitHubInstallationUninstallInputSchema)
       .mutation(async ({ ctx, input }) => {
+        setAdminAuditTarget({
+          type: input.owner.type === 'organization' ? 'organization' : 'user',
+          id: input.owner.id,
+        });
+        addAdminAuditMetadata({
+          integrationId: input.integrationId,
+          installationId: input.installationId,
+          appType: input.appType,
+        });
         return uninstallGitHubOrganizationInstallation({
           input,
           actor: {
@@ -672,50 +691,96 @@ export const adminRouter = createTRPCRouter({
   }),
 
   users: createTRPCRouter({
-    addNote: adminProcedure.input(AddNoteSchema).mutation(async ({ input, ctx }) => {
-      const insertResult = await db
-        .insert(user_admin_notes)
-        .values({
-          kilo_user_id: input.kilo_user_id,
-          note_content: input.noteContent,
-          admin_kilo_user_id: ctx.user.id,
-        })
-        .returning();
-
-      return {
-        ...insertResult[0],
-        admin_kilo_user: {
-          id: ctx.user.id,
-          google_user_name: ctx.user.google_user_name,
-          google_user_email: ctx.user.google_user_email,
+    addNote: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'user.note.add',
+          target: inputFieldTarget('user', 'kilo_user_id'),
         },
-      };
-    }),
+      })
+      .input(AddNoteSchema)
+      .mutation(async ({ input, ctx }) => {
+        const insertResult = await db
+          .insert(user_admin_notes)
+          .values({
+            kilo_user_id: input.kilo_user_id,
+            note_content: input.noteContent,
+            admin_kilo_user_id: ctx.user.id,
+          })
+          .returning();
 
-    deleteNote: adminProcedure.input(DeleteNoteSchema).mutation(async ({ input }) => {
-      const res = await db.delete(user_admin_notes).where(eq(user_admin_notes.id, input.note_id));
-      return { success: (res.rowCount ?? 0) > 0 };
-    }),
+        return {
+          ...insertResult[0],
+          admin_kilo_user: {
+            id: ctx.user.id,
+            google_user_name: ctx.user.google_user_name,
+            google_user_email: ctx.user.google_user_email,
+          },
+        };
+      }),
 
-    resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input, ctx }) => {
-      await db
-        .update(kilocode_users)
-        .set({ api_token_pepper: crypto.randomUUID() })
-        .where(eq(kilocode_users.id, input.userId));
+    deleteNote: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'user.note.delete' } })
+      .input(DeleteNoteSchema)
+      .mutation(async ({ input }) => {
+        addAdminAuditMetadata({ noteId: input.note_id });
+        const deleted = await db
+          .delete(user_admin_notes)
+          .where(eq(user_admin_notes.id, input.note_id))
+          .returning({ kiloUserId: user_admin_notes.kilo_user_id });
+        if (deleted[0]) setAdminAuditTarget(userActionTarget(deleted[0].kiloUserId));
+        return { success: deleted.length > 0 };
+      }),
 
-      await recordAdminAction(ctx, {
-        action: 'user.api_key.reset',
-        target: userActionTarget(input.userId),
-        message: 'Reset API key (all API tokens invalidated)',
-      });
-
-      return successResult();
-    }),
-
-    signOutBrowserSessions: adminProcedure
+    resetAPIKey: adminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['user.api_key.reset'] } })
       .input(ResetAPIKeySchema)
       .mutation(async ({ input, ctx }) => {
-        await revokeWebSessions(input.userId);
+        setAdminAuditTarget(userActionTarget(input.userId));
+        const rotation = newPepperRotation();
+        const [target] = await db
+          .update(kilocode_users)
+          .set({ api_token_pepper: rotation.pepper })
+          .where(eq(kilocode_users.id, input.userId))
+          .returning({
+            id: kilocode_users.id,
+            google_user_email: kilocode_users.google_user_email,
+          });
+
+        // The owner learns that support reset the token, never from where.
+        if (target) {
+          await scheduleSecurityNotice(
+            target,
+            { type: 'api_key_reset', rotationId: rotation.rotationId },
+            supportSecurityNoticeRequest()
+          );
+        }
+
+        await recordAdminAction(ctx, {
+          action: 'user.api_key.reset',
+          target: userActionTarget(input.userId),
+          message: 'Reset API key (all API tokens invalidated)',
+        });
+
+        return successResult();
+      }),
+
+    signOutBrowserSessions: adminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['user.browser_sessions.revoke'] } })
+      .input(ResetAPIKeySchema)
+      .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
+        // The recipient comes from the revoking update itself, so no read
+        // after the rotation can fail the action or skip the audit write.
+        const revocation = await revokeWebSessions(input.userId);
+        if (revocation) {
+          await scheduleSecurityNotice(
+            revocation.user,
+            { type: 'browser_sessions_revoked', rotationId: revocation.rotationId },
+            supportSecurityNoticeRequest()
+          );
+        }
 
         await recordAdminAction(ctx, {
           action: 'user.browser_sessions.revoke',
@@ -739,38 +804,49 @@ export const adminRouter = createTRPCRouter({
         return pullAnthropicUserProfileStatus(user.anthropic_user_profile_id);
       }),
 
-    checkKiloPass: adminProcedure.input(CheckKiloPassSchema).mutation(async ({ input }) => {
-      const before = await db.query.kilocode_users.findFirst({
-        columns: {
-          microdollars_used: true,
-          kilo_pass_threshold: true,
+    checkKiloPass: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'kilo_pass.bonus.check',
+          target: inputFieldTarget('user', 'userId'),
         },
-        where: eq(kilocode_users.id, input.userId),
-      });
+      })
+      .input(CheckKiloPassSchema)
+      .mutation(async ({ input }) => {
+        const before = await db.query.kilocode_users.findFirst({
+          columns: {
+            microdollars_used: true,
+            kilo_pass_threshold: true,
+          },
+          where: eq(kilocode_users.id, input.userId),
+        });
 
-      if (!before) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
-      }
+        if (!before) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
 
-      await maybeIssueKiloPassBonusFromUsageThreshold({
-        kiloUserId: input.userId,
-        nowIso: new Date().toISOString(),
-      });
+        await maybeIssueKiloPassBonusFromUsageThreshold({
+          kiloUserId: input.userId,
+          nowIso: new Date().toISOString(),
+        });
 
-      const after = await db.query.kilocode_users.findFirst({
-        columns: {
-          microdollars_used: true,
-          kilo_pass_threshold: true,
-        },
-        where: eq(kilocode_users.id, input.userId),
-      });
+        const after = await db.query.kilocode_users.findFirst({
+          columns: {
+            microdollars_used: true,
+            kilo_pass_threshold: true,
+          },
+          where: eq(kilocode_users.id, input.userId),
+        });
 
-      return { before, after };
-    }),
+        return { before, after };
+      }),
 
     resetToMagicLinkLogin: adminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['user.login.reset_to_magic_link'] } })
       .input(ResetToMagicLinkLoginSchema)
       .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
         const user = await findUserById(input.userId);
         if (!user) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
@@ -816,6 +892,14 @@ export const adminRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
+        // One notice for the whole reset, scheduled before the audit write so
+        // an audit failure cannot drop it.
+        await scheduleSecurityNotice(
+          user,
+          { type: 'sign_in_reset_by_support', rotationId: recovery.rotationId },
+          supportSecurityNoticeRequest()
+        );
+
         await recordAdminAction(ctx, {
           action: 'user.login.reset_to_magic_link',
           target: userActionTarget(input.userId),
@@ -832,8 +916,10 @@ export const adminRouter = createTRPCRouter({
       }),
 
     releaseEmailAddress: adminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['user.email.release'] } })
       .input(ReleaseEmailAddressSchema)
       .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
         if (input.userId === ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -983,9 +1069,13 @@ export const adminRouter = createTRPCRouter({
       }),
 
     updateBlockStatus: adminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['user.block', 'user.unblock'] } })
       .input(UpdateUserBlockStatusSchema)
       .mutation(async ({ input, ctx }) => {
         const isBlocking = Boolean(input.blocked_reason);
+        setAdminAuditTarget(userActionTarget(input.userId));
+        setAdminAuditFailureAction(isBlocking ? 'user.block' : 'user.unblock');
+        addAdminAuditMetadata({ blocking: isBlocking });
         let didTransition = false;
 
         const previousBlock = await db.transaction(async tx => {
@@ -1030,14 +1120,22 @@ export const adminRouter = createTRPCRouter({
           return current;
         });
 
-        // Blocking is attributed on the user row; unblocking clears those
-        // columns, so the audit row is the only record of who lifted it.
-        if (didTransition && !isBlocking) {
+        if (isBlocking) {
+          await recordAdminAction(ctx, {
+            action: 'user.block',
+            target: userActionTarget(input.userId),
+            message: 'Blocked user',
+            metadata: { changed: didTransition },
+          });
+        } else {
+          // Unblocking clears the block columns on the user row, so the audit
+          // row is the only record of who lifted it.
           await recordAdminAction(ctx, {
             action: 'user.unblock',
             target: userActionTarget(input.userId),
             message: 'Unblocked user',
             metadata: {
+              changed: didTransition,
               previousBlockedReason: previousBlock?.blocked_reason ?? null,
               previousBlockedAt: previousBlock?.blocked_at ?? null,
               previousBlockedByKiloUserId: previousBlock?.blocked_by_kilo_user_id ?? null,
@@ -1049,8 +1147,10 @@ export const adminRouter = createTRPCRouter({
       }),
 
     setPersonalAccountDisabled: adminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['user.personal_account.set_disabled'] } })
       .input(SetPersonalAccountDisabledSchema)
       .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
         const result = await db
           .update(kilocode_users)
           .set({ personal_account_disabled: input.value })
@@ -1376,8 +1476,16 @@ export const adminRouter = createTRPCRouter({
       }),
 
     updateKiloClawTrialEndAt: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'kiloclaw.subscription.update_trial_end',
+          target: inputFieldTarget('user', 'userId'),
+        },
+      })
       .input(UpdateKiloClawTrialEndAtSchema)
       .mutation(async ({ input, ctx }) => {
+        addAdminAuditMetadata({ subscriptionId: input.subscriptionId });
         const user = await db.query.kilocode_users.findFirst({
           columns: { id: true },
           where: eq(kilocode_users.id, input.userId),
@@ -1571,8 +1679,16 @@ export const adminRouter = createTRPCRouter({
       }),
 
     cancelKiloClawSubscription: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'kiloclaw.subscription.admin_cancel',
+          target: inputFieldTarget('user', 'userId'),
+        },
+      })
       .input(CancelKiloClawSubscriptionSchema)
       .mutation(async ({ input, ctx }) => {
+        addAdminAuditMetadata({ subscriptionId: input.subscriptionId, mode: input.mode });
         const subscription = await db.transaction(tx =>
           lockMutableKiloClawSubscription({
             tx,
@@ -1850,12 +1966,26 @@ export const adminRouter = createTRPCRouter({
     }),
 
     recomputeBalances: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'user.balance.recompute',
+          target: inputFieldTarget('user', 'userId'),
+        },
+      })
       .input(z.object({ userId: z.string(), dryRun: z.boolean().default(true) }))
       .mutation(async ({ input }) => {
+        addAdminAuditMetadata({ dryRun: input.dryRun });
         return assertNoError(await recomputeUserBalances(input));
       }),
 
     DEV_ONLY_messUpBalance: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'exempt',
+          reason: 'development-only operator, refused outside NODE_ENV=development',
+        },
+      })
       .input(z.object({ userId: z.string() }))
       .mutation(async ({ input }) => {
         if (process.env.NODE_ENV !== 'development') {
@@ -1895,8 +2025,10 @@ export const adminRouter = createTRPCRouter({
       }),
 
     cancelAndRefundKiloPass: superadminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['kilo_pass.cancel_refund'] } })
       .input(CancelAndRefundKiloPassSchema)
       .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
         const userExists = await db.query.kilocode_users.findFirst({
           columns: { id: true },
           where: eq(kilocode_users.id, input.userId),
@@ -1906,29 +2038,19 @@ export const adminRouter = createTRPCRouter({
         }
 
         // The helper writes the reason to the target user records (block reason,
-        // admin note and credit transaction description); the audit row repeats it.
+        // admin note and credit transaction description); the audit rows repeat it.
         const reason = redactEmailAddressesInAuditText(input.reason);
+        // The helper creates the Stripe refund before its local transaction, so a
+        // throw can leave a refund behind; the scope's failure row attributes it.
+        addAdminAuditMetadata({ reason });
 
-        let result: CancelAndRefundKiloPassResult;
-        try {
-          result = await cancelAndRefundKiloPassForUser({
-            db,
-            stripe: stripeClient,
-            userId: input.userId,
-            reason,
-            adminKiloUserId: ctx.user.id,
-          });
-        } catch (error) {
-          // The helper creates the Stripe refund before its local transaction, so
-          // a failure here can leave a refund with no other attribution.
-          await recordAdminAction(ctx, {
-            action: 'kilo_pass.cancel_refund',
-            target: userActionTarget(input.userId),
-            message: 'Kilo Pass cancel attempted with unknown outcome',
-            metadata: { reason },
-          });
-          throw error;
-        }
+        const result = await cancelAndRefundKiloPassForUser({
+          db,
+          stripe: stripeClient,
+          userId: input.userId,
+          reason,
+          adminKiloUserId: ctx.user.id,
+        });
 
         if (result.status === 'skipped') {
           if (result.reason.kind === 'no_subscription') {
@@ -2032,8 +2154,10 @@ export const adminRouter = createTRPCRouter({
       }),
 
     setPlatformAdminAccess: superadminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['admin.platform_access.set'] } })
       .input(SetPlatformAdminAccessSchema)
       .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
         const actorId = ctx.user.id;
         const targetId = input.userId;
 
@@ -2166,22 +2290,27 @@ export const adminRouter = createTRPCRouter({
 
         // user_admin_notes can be deleted by any admin, so the audit row is the
         // durable record of role changes.
-        if (attempt.result.changed) {
-          await recordAdminAction(ctx, {
-            action: 'admin.platform_access.set',
-            target: userActionTarget(targetId),
-            message: input.isAdmin
+        await recordAdminAction(ctx, {
+          action: 'admin.platform_access.set',
+          target: userActionTarget(targetId),
+          message: !attempt.result.changed
+            ? 'Platform admin access already as requested'
+            : input.isAdmin
               ? 'Granted platform admin access'
               : 'Revoked platform admin access',
-            metadata: { isAdmin: input.isAdmin, previous: attempt.previous },
-          });
-        }
+          metadata:
+            'previous' in attempt
+              ? { isAdmin: input.isAdmin, previous: attempt.previous }
+              : { isAdmin: input.isAdmin, changed: false },
+        });
         return attempt.result;
       }),
 
     setAdminPermissions: superadminProcedure
+      .meta({ adminAudit: { kind: 'handler', actions: ['admin.permissions.set'] } })
       .input(SetAdminPermissionsSchema)
       .mutation(async ({ input, ctx }) => {
+        setAdminAuditTarget(userActionTarget(input.userId));
         const actorId = ctx.user.id;
         const targetId = input.userId;
 
@@ -2303,80 +2432,89 @@ export const adminRouter = createTRPCRouter({
           };
         });
 
-        if (outcome.audit) {
-          await recordAdminAction(ctx, {
-            action: 'admin.permissions.set',
-            target: userActionTarget(targetId),
-            message: outcome.audit.notes.join(' '),
-            metadata: { changes: outcome.audit.changes, previous: outcome.audit.previous },
-          });
-        }
+        await recordAdminAction(ctx, {
+          action: 'admin.permissions.set',
+          target: userActionTarget(targetId),
+          message: outcome.audit ? outcome.audit.notes.join(' ') : 'Admin permissions unchanged',
+          metadata: outcome.audit
+            ? { changes: outcome.audit.changes, previous: outcome.audit.previous }
+            : { changed: false },
+        });
         return outcome.result;
       }),
   }),
 
   enrichmentData: createTRPCRouter({
-    upsert: adminProcedure.input(UpsertEnrichmentDataSchema).mutation(async ({ input }) => {
-      const { user_id, github_enrichment_data, linkedin_enrichment_data, clay_enrichment_data } =
-        input;
+    upsert: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'user.enrichment_data.upsert',
+          target: inputFieldTarget('user', 'user_id'),
+        },
+      })
+      .input(UpsertEnrichmentDataSchema)
+      .mutation(async ({ input }) => {
+        const { user_id, github_enrichment_data, linkedin_enrichment_data, clay_enrichment_data } =
+          input;
 
-      const user = await db.query.kilocode_users.findFirst({
-        where: eq(kilocode_users.id, user_id),
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'User not found',
+        const user = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, user_id),
         });
-      }
 
-      const existingData = await db.query.enrichment_data.findFirst({
-        where: eq(enrichment_data.user_id, user_id),
-      });
+        if (!user) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found',
+          });
+        }
 
-      const updateData: {
-        github_enrichment_data?: unknown;
-        linkedin_enrichment_data?: unknown;
-        clay_enrichment_data?: unknown;
-      } = {};
+        const existingData = await db.query.enrichment_data.findFirst({
+          where: eq(enrichment_data.user_id, user_id),
+        });
 
-      if (github_enrichment_data !== undefined) {
-        updateData.github_enrichment_data = github_enrichment_data;
-      }
-      if (linkedin_enrichment_data !== undefined) {
-        updateData.linkedin_enrichment_data = linkedin_enrichment_data;
-      }
-      if (clay_enrichment_data !== undefined) {
-        updateData.clay_enrichment_data = clay_enrichment_data;
-      }
+        const updateData: {
+          github_enrichment_data?: unknown;
+          linkedin_enrichment_data?: unknown;
+          clay_enrichment_data?: unknown;
+        } = {};
 
-      let result;
+        if (github_enrichment_data !== undefined) {
+          updateData.github_enrichment_data = github_enrichment_data;
+        }
+        if (linkedin_enrichment_data !== undefined) {
+          updateData.linkedin_enrichment_data = linkedin_enrichment_data;
+        }
+        if (clay_enrichment_data !== undefined) {
+          updateData.clay_enrichment_data = clay_enrichment_data;
+        }
 
-      if (existingData) {
-        const updated = await db
-          .update(enrichment_data)
-          .set(updateData)
-          .where(eq(enrichment_data.user_id, user_id))
-          .returning();
+        let result;
 
-        result = updated[0];
-      } else {
-        const inserted = await db
-          .insert(enrichment_data)
-          .values({
-            user_id,
-            github_enrichment_data: github_enrichment_data ?? null,
-            linkedin_enrichment_data: linkedin_enrichment_data ?? null,
-            clay_enrichment_data: clay_enrichment_data ?? null,
-          })
-          .returning();
+        if (existingData) {
+          const updated = await db
+            .update(enrichment_data)
+            .set(updateData)
+            .where(eq(enrichment_data.user_id, user_id))
+            .returning();
 
-        result = inserted[0];
-      }
+          result = updated[0];
+        } else {
+          const inserted = await db
+            .insert(enrichment_data)
+            .values({
+              user_id,
+              github_enrichment_data: github_enrichment_data ?? null,
+              linkedin_enrichment_data: linkedin_enrichment_data ?? null,
+              clay_enrichment_data: clay_enrichment_data ?? null,
+            })
+            .returning();
 
-      return successResult({ data: result });
-    }),
+          result = inserted[0];
+        }
+
+        return successResult({ data: result });
+      }),
   }),
 
   modelStats: createTRPCRouter({
@@ -2466,109 +2604,134 @@ export const adminRouter = createTRPCRouter({
       };
     }),
 
-    create: adminProcedure.input(CreateModelSchema).mutation(async ({ input }) => {
-      const [newModel] = await db
-        .insert(modelStats)
-        .values({
-          openrouterId: input.openrouterId,
-          name: input.name,
-          slug: input.slug || null,
-          aaSlug: input.aaSlug || null,
-          isActive: input.isActive,
-          openrouterData: sql`'{}'::jsonb`,
-        })
-        .returning();
+    create: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'model_stats.create' } })
+      .input(CreateModelSchema)
+      .mutation(async ({ input }) => {
+        const [newModel] = await db
+          .insert(modelStats)
+          .values({
+            openrouterId: input.openrouterId,
+            name: input.name,
+            slug: input.slug || null,
+            aaSlug: input.aaSlug || null,
+            isActive: input.isActive,
+            openrouterData: sql`'{}'::jsonb`,
+          })
+          .returning();
 
-      invalidateModelStatsCache();
-      revalidatePath('/api/models/stats');
+        if (newModel) setAdminAuditTarget({ type: 'model', id: newModel.id });
+        invalidateModelStatsCache();
+        revalidatePath('/api/models/stats');
 
-      return newModel;
-    }),
+        return newModel;
+      }),
 
-    update: adminProcedure.input(UpdateModelSchema).mutation(async ({ input }) => {
-      const { id, ...data } = input;
-
-      const [updatedModel] = await db
-        .update(modelStats)
-        .set(data)
-        .where(eq(modelStats.id, id))
-        .returning();
-
-      if (!updatedModel) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Model not found',
-        });
-      }
-
-      invalidateModelStatsCache();
-      revalidatePath('/api/models/stats');
-
-      return updatedModel;
-    }),
-
-    triggerSync: adminProcedure.mutation(async (): Promise<SyncResponse> => {
-      const cronUrl = `${APP_URL}/api/cron/sync-model-stats`;
-      const response = await fetch(cronUrl, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${CRON_SECRET}`,
+    update: adminProcedure
+      .meta({
+        adminAudit: {
+          kind: 'declarative',
+          action: 'model_stats.update',
+          target: inputFieldTarget('model', 'id'),
         },
-      });
+      })
+      .input(UpdateModelSchema)
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
 
-      if (!response.ok) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to trigger stats update',
+        const [updatedModel] = await db
+          .update(modelStats)
+          .set(data)
+          .where(eq(modelStats.id, id))
+          .returning();
+
+        if (!updatedModel) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Model not found',
+          });
+        }
+
+        invalidateModelStatsCache();
+        revalidatePath('/api/models/stats');
+
+        return updatedModel;
+      }),
+
+    triggerSync: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'model_stats.sync.trigger' } })
+      .mutation(async (): Promise<SyncResponse> => {
+        const cronUrl = `${APP_URL}/api/cron/sync-model-stats`;
+        const response = await fetch(cronUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${CRON_SECRET}`,
+          },
         });
-      }
 
-      const text = await response.text();
-      const parsed = parseJsonSafe(text);
-      return SyncResponseSchema.parse(parsed);
-    }),
+        if (!response.ok) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to trigger stats update',
+          });
+        }
 
-    bustCache: adminProcedure.mutation(() => {
-      invalidateModelStatsCache();
-      revalidatePath('/api/models/stats');
-      revalidatePath('/api/models/stats/[slug]', 'page');
-      return { success: true, message: 'Cache busted successfully' };
-    }),
+        const text = await response.text();
+        const parsed = parseJsonSafe(text);
+        return SyncResponseSchema.parse(parsed);
+      }),
+
+    bustCache: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'model_stats.cache.bust' } })
+      .mutation(() => {
+        invalidateModelStatsCache();
+        revalidatePath('/api/models/stats');
+        revalidatePath('/api/models/stats/[slug]', 'page');
+        return { success: true, message: 'Cache busted successfully' };
+      }),
   }),
 
   syncProviders: createTRPCRouter({
     getManualSyncEnabled: adminProcedure.query(() => isManualProviderSyncEnabled()),
-    triggerSync: adminProcedure.mutation(async () => {
-      if (!isManualProviderSyncEnabled()) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
-        });
-      }
-      const result = await syncAndStoreProviders();
-      return result;
-    }),
-    triggerDirectByokSync: adminProcedure.mutation(async () => {
-      if (!isManualProviderSyncEnabled()) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
-        });
-      }
-      return syncAndStoreDirectByokProviders();
-    }),
-    triggerMetadataCacheRefresh: adminProcedure.mutation(async () => {
-      if (!isManualProviderSyncEnabled()) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Manual provider sync is disabled in production; the cron handles syncing.',
-        });
-      }
-      return refreshMetadataCache();
-    }),
+    triggerSync: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'providers.sync.trigger' } })
+      .mutation(async () => {
+        if (!isManualProviderSyncEnabled()) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+          });
+        }
+        const result = await syncAndStoreProviders();
+        return result;
+      }),
+    triggerDirectByokSync: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'providers.direct_byok_sync.trigger' } })
+      .mutation(async () => {
+        if (!isManualProviderSyncEnabled()) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+          });
+        }
+        return syncAndStoreDirectByokProviders();
+      }),
+    triggerMetadataCacheRefresh: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'providers.metadata_cache.refresh' } })
+      .mutation(async () => {
+        if (!isManualProviderSyncEnabled()) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Manual provider sync is disabled in production; the cron handles syncing.',
+          });
+        }
+        return refreshMetadataCache();
+      }),
     postTestStaleAlert: adminProcedure
+      .meta({ adminAudit: { kind: 'declarative', action: 'providers.stale_alert.test_post' } })
       .input(z.object({ job: z.enum(['metadata_cache', 'providers', 'direct_byok']) }))
       .mutation(async ({ input }) => {
+        addAdminAuditMetadata({ job: input.job });
         const delivery =
           input.job === 'metadata_cache'
             ? await postTestMetadataCacheStaleAlert()

@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
+import { captureException } from '@sentry/nextjs';
 
 import { callerAddressFromHeaders } from '@/lib/auth/caller-address';
 import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
@@ -10,6 +11,12 @@ import {
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
 import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
+import {
+  auditAuthRoute,
+  authAuditRequestFromHeaders,
+  type AuthAuditAttempt,
+} from '@/lib/auth/auth-audit';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 /**
  * Vercel Firewall rate-limit rules applied by this route.
@@ -45,12 +52,30 @@ const requestSchema = z.discriminatedUnion('action', [
 ]);
 
 export async function POST(request: NextRequest) {
+  // One attempt per call. A verified assertion only mints a ticket, and the
+  // sign-in that redeems it records the success, so a success writes no row
+  // here. A refusal records the response's stable code, attributed to the
+  // credential's account once the assertion names a stored credential.
+  const attempt: AuthAuditAttempt = {
+    action: 'auth.sign_in',
+    method: 'passkey',
+    skipSuccessRow: true,
+  };
+  return auditAuthRoute(
+    authAuditRequestFromHeaders(request.headers, '/api/auth/passkey/authenticate'),
+    attempt,
+    () => authenticate(request, attempt)
+  );
+}
+
+async function authenticate(request: NextRequest, attempt: AuthAuditAttempt): Promise<Response> {
   const body = await request.json().catch(() => undefined);
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
+  attempt.metadata = { step: parsed.data.action };
   try {
     if (parsed.data.action === 'options') {
       const limit = await checkFirewallRateLimit(OPTIONS_RATE_LIMIT_ID, {
@@ -73,10 +98,26 @@ export async function POST(request: NextRequest) {
     const refusal = firewallRateLimitRefusal(limit);
     if (refusal) return refusal;
 
-    const { ticket } = await verifyAuthentication(parsed.data.challengeId, parsed.data.response);
+    const { ticket } = await verifyAuthentication(
+      parsed.data.challengeId,
+      parsed.data.response,
+      kiloUserId => {
+        attempt.userId = kiloUserId;
+      }
+    );
     return NextResponse.json({ ticket });
   } catch (error) {
     if (error instanceof PasskeyVerificationError) {
+      // A refusal stored under the credential's owner hashes the owner's
+      // email. Only a refusal pays for the read: a success writes no row here.
+      // A failed read leaves the hash out; the refusal is answered unchanged.
+      if (attempt.userId) {
+        try {
+          attempt.email = (await findUserById(attempt.userId))?.google_user_email ?? null;
+        } catch (lookupError) {
+          captureException(lookupError, { tags: { operation: 'passkey_refusal_owner_email' } });
+        }
+      }
       return NextResponse.json({ error: error.code }, { status: 401 });
     }
     throw error;

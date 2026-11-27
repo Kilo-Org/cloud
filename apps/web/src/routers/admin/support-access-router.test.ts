@@ -19,7 +19,7 @@ import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-a
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
+import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 
 async function insertRequester(overrides: Parameters<typeof insertTestUser>[0] = {}) {
   return insertTestUser({
@@ -936,7 +936,7 @@ describe('support access lifecycle switch and step-up failures', () => {
     const { supportStepUpPort } = await import('@kilocode/web-shared/lib/admin/support-step-up');
     const stepUpSpy = jest.spyOn(supportStepUpPort, 'requireFresh');
     const admin = await insertRequester();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const { organization } = await orgWithOwner();
     const grantId = crypto.randomUUID();
 
@@ -971,7 +971,7 @@ describe('support access lifecycle switch and step-up failures', () => {
   test('ON refuses a bearer write request even with step-up enabled', async () => {
     const admin = await insertRequester();
     const { organization } = await orgWithOwner();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createBearerCallerForUser(admin.id);
 
     await expect(
       caller.admin.supportAccess.request({

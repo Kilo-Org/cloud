@@ -777,7 +777,7 @@ describe('createSkippedBalanceCheckCloudAgentNextClient', () => {
       url: 'http://cloud-agent-next/trpc',
       headers: expect.any(Function),
     });
-    expect(mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
+    expect(await mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
       Authorization: `Bearer ${token}`,
       'x-skip-balance-check': 'true',
       'x-internal-api-key': 'test-secret',
@@ -1211,7 +1211,7 @@ describe('CloudAgentNextClient.deleteWorktree', () => {
         cleanup: 'complete',
       });
       expect(mutate).toHaveBeenCalledWith(input);
-      expect(mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
+      expect(await mockHttpLink.mock.calls[0]?.[0].headers()).toEqual({
         Authorization: 'Bearer auth-token',
         'x-internal-api-key': 'test-secret',
       });

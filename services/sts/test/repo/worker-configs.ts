@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { StsEnvironment } from '@kilocode/sts-contracts';
+import { STS_ISSUERS, type StsEnvironment } from '@kilocode/sts-contracts';
 import { z } from 'zod';
+import { EnvVarsSchema } from '../../src/env';
 import type { Policy } from '../../src/policy/schema';
 
 /**
@@ -27,32 +28,50 @@ export const AUDIT_RELAY_DEPLOYMENTS: readonly string[] = [
 /** [deployed Worker name, resource]: one right on an audit queue or archive bucket. */
 type Grant = readonly [worker: string, resource: string];
 
-/** Each STS deployment produces only to its own environment's audit queue. */
+/**
+ * Each STS deployment produces only to its own environment's STS audit queue, and each UTS mint
+ * deployment (its audit outbox relay) only to its environment's UTS audit queue. The relay trusts
+ * the queue a batch arrives on to name its producer, so no producer shares a queue with another.
+ */
 export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['sts', 'kilo-audit'],
   ['sts-staging', 'kilo-audit-staging'],
   ['sts-local', 'kilo-audit-local'],
   // services/sts/wrangler.test.jsonc, which only the Workers test pool runs.
   ['sts-test', 'kilo-audit-local'],
+  ['uts', 'kilo-audit-uts'],
+  ['uts-staging', 'kilo-audit-uts-staging'],
+  ['uts-local', 'kilo-audit-uts-local'],
+  // services/uts/wrangler.test.jsonc, which only the Workers test pool runs.
+  ['uts-test', 'kilo-audit-uts-local'],
 ];
 
 /**
- * Each relay deployment consumes its own environment's audit queue and dead-letter queue. Nothing
+ * Each relay deployment consumes its own environment's audit queues and dead-letter queues. Nothing
  * produces to a dead-letter queue: only the relay's own consumer moves messages there.
  */
 export const AUDIT_QUEUE_CONSUMERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit'],
   ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay', 'kilo-audit-uts'],
+  ['audit-relay', 'kilo-audit-uts-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay-local', 'kilo-audit-uts-local'],
+  ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
 ];
 
 export const AUDIT_QUEUE_DEAD_LETTERS: readonly Grant[] = [
   ['audit-relay', 'kilo-audit-dlq'],
+  ['audit-relay', 'kilo-audit-uts-dlq'],
   ['audit-relay-staging', 'kilo-audit-staging-dlq'],
+  ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
+  ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
 ];
 
 /**
@@ -95,9 +114,42 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ...AUDIT_RELAY_DEPLOYMENTS.map((name): [string, string] => [name, 'audit-relay']),
   ['sts-test', 'sts-test'],
   ['audit-relay-test', 'audit-relay-test'],
+  // The UTS mint Worker holds an audit queue producer grant under these names, so only its own
+  // configs may deploy as them (services/uts/test/repo pins the rest of the UTS names):
+  // services/uts/wrangler.dev.jsonc is the `uts-local` config.
+  ['uts', 'uts'],
+  ['uts-staging', 'uts'],
+  ['uts-local', 'uts-local'],
+  ['uts-test', 'uts-test'],
+]);
+
+/**
+ * Workloads with a worker-binding policy whose Worker config lives in another repository, which
+ * this check cannot read; that repository's review covers the config's STS binding. No config here
+ * may deploy under one of these names: it would replace that Worker and, with `props.caller` set to
+ * its own top-level name, read that workload's bundle.
+ */
+export const EXTERNAL_WORKLOADS: ReadonlyMap<string, string> = new Map([
+  // watch/wrangler.jsonc there is to bind `sts` from its top-level (production) block once
+  // bouncer's step 2 lands.
+  ['bouncer-watch', 'Kilo-Org/bouncer'],
 ]);
 
 const STS_ENTRYPOINT = 'SecretsBroker';
+
+/**
+ * Durable Object classes only STS defines (design 5.7: only STS binds its own objects). A config
+ * outside `services/sts/` that binds a class by one of these names fails. `SignerDO` is left out:
+ * the audit relay defines a class of its own by that name.
+ */
+export const STS_CLASS_NAMES: readonly string[] = [
+  'BundleDO',
+  'RefresherDO',
+  'DenialDO',
+  'TokenSignerDO',
+  'LeaseDO',
+  'DeployTokenDO',
+];
 
 // Prefix matches, wider than the deployment lists on purpose: a binding to a name that only looks
 // like STS or the relay fails here instead of slipping past an exact-name list.
@@ -140,7 +192,6 @@ export const INERT_ENVIRONMENT_KEYS: readonly string[] = [
   'find_additional_modules',
   'first_party_worker',
   'flagship',
-  'hyperdrive',
   'images',
   'jsx_factory',
   'jsx_fragment',
@@ -295,6 +346,13 @@ const SecretsStoreSecretSchema = z.strictObject({
   secret_name: z.string(),
 });
 
+/** A Hyperdrive binding: STS sweeps replicas through the ones `LEASE_REPLICA_SWEEP_BINDINGS` names. */
+const HyperdriveBindingSchema = z.strictObject({
+  binding: z.string(),
+  id: z.string(),
+  localConnectionString: z.string().optional(),
+});
+
 const RouteObjectSchema = z.strictObject({
   pattern: z.string(),
   zone_id: z.string().optional(),
@@ -337,6 +395,7 @@ const BINDING_SHAPE = {
   unsafe: z.unknown().optional(),
   observability: ObservabilitySchema.optional(),
   secrets_store_secrets: z.array(SecretsStoreSecretSchema).optional(),
+  hyperdrive: z.array(HyperdriveBindingSchema).optional(),
 };
 
 const ENVIRONMENT_SHAPE = {
@@ -387,6 +446,7 @@ export const CLASSIFIED_KEYS: Readonly<Record<string, readonly string[]>> = {
   'migrations[].transferred_classes[]': Object.keys(TransferredClassSchema.shape),
   'exports.*': EXPORT_KEYS,
   'secrets_store_secrets[]': Object.keys(SecretsStoreSecretSchema.shape),
+  'hyperdrive[]': Object.keys(HyperdriveBindingSchema.shape),
 };
 
 export type WorkerConfig = { path: string; config: z.infer<typeof WorkerConfigSchema> };
@@ -674,8 +734,11 @@ function grantProblem(
 }
 
 /**
- * An audit batch is trusted as the producing STS deployment's own stream, so a foreign producer
- * could forge one, and a foreign consumer (or dead-letter target) would take batches from the relay.
+ * A queue message carries no producer identity, so the audit relay takes the producer from the
+ * queue a batch arrives on: an STS queue may carry only `sts:<env>:` streams with STS sources, and
+ * a UTS queue only the 8 `uts:<env>:` shard streams with UTS sources. That holds only while each
+ * audit queue has exactly one producer per environment, which these grants enforce. A foreign
+ * consumer (or dead-letter target) would take batches from the relay.
  */
 function auditQueueProblems(block: Block): string[] {
   const worker = block.deployedName;
@@ -807,6 +870,14 @@ function routeProblems(block: Block, owner: string | undefined): string[] {
   return problems;
 }
 
+/** A preview binds no STS, so only the deployed blocks count. */
+function bindsStsAnywhere(blocks: readonly Block[]): boolean {
+  return blocks.some(
+    block =>
+      !block.preview && (block.bindings.services ?? []).some(binding => isStsName(binding.service))
+  );
+}
+
 /**
  * Problems with how the repository's Worker configs reach STS and the audit relay. The only way in
  * is a `SecretsBroker` service binding whose `props.caller` names the binding Worker. STS trusts
@@ -837,11 +908,7 @@ export function workerConfigProblems(
   for (const worker of configs) {
     const caller = worker.config.name;
     const blocks = blocksOf(worker);
-    const bindsSts = blocks.some(
-      block =>
-        !block.preview &&
-        (block.bindings.services ?? []).some(binding => isStsName(binding.service))
-    );
+    const bindsSts = bindsStsAnywhere(blocks);
     for (const block of blocks) {
       for (const key of block.unknownKeys) {
         problems.push(
@@ -857,10 +924,25 @@ export function workerConfigProblems(
           `${block.where} deploys as ${block.deployedName}, which only the ${owner} config deploys`
         );
       }
+      const external = EXTERNAL_WORKLOADS.get(block.deployedName ?? '');
+      if (external !== undefined) {
+        problems.push(
+          `${block.where} deploys as ${block.deployedName}, whose config lives in ${external}`
+        );
+      }
       problems.push(...routeProblems(block, caller));
       problems.push(...internalReferenceProblems(block));
       problems.push(...auditQueueProblems(block));
       problems.push(...archiveBucketProblems(block));
+      if (!worker.path.startsWith('services/sts/')) {
+        for (const object of block.bindings.durable_objects?.bindings ?? []) {
+          if (STS_CLASS_NAMES.includes(object.class_name)) {
+            problems.push(
+              `${block.where}: ${object.name} binds Durable Object class ${object.class_name}, which only STS defines and binds`
+            );
+          }
+        }
+      }
       for (const binding of block.bindings.services ?? []) {
         if (isAuditRelayName(binding.service)) {
           problems.push(
@@ -924,6 +1006,76 @@ export function internalWorkerProblems(configs: readonly WorkerConfig[]): string
     if (deployed !== expectedRelay) {
       problems.push(
         `${worker.path} deploys ${deployed}; AUDIT_RELAY_DEPLOYMENTS lists ${expectedRelay}`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * Problems with the vars of each STS deployment block: Wrangler inherits no vars into an env
+ * block, and `readConfig` refuses every request when one is missing or malformed (a bad kid in
+ * `TOKEN_SIGNING_KIDS_REVOKED`, say), so each block must pass `EnvVarsSchema` on its own, and its
+ * `STS_ISSUER` must be the issuer verifiers expect for its environment (`STS_ISSUERS`). Each
+ * replica `LEASE_REPLICA_SWEEP_BINDINGS` names must be a Hyperdrive binding of the same block.
+ */
+export function stsVarProblems(configs: readonly WorkerConfig[]): string[] {
+  const problems: string[] = [];
+  for (const worker of configs.filter(({ config }) => config.name === 'sts')) {
+    for (const block of blocksOf(worker).filter(candidate => !candidate.preview)) {
+      const vars = EnvVarsSchema.safeParse(block.bindings.vars ?? {});
+      if (!vars.success) {
+        problems.push(`${block.where}: vars do not pass EnvVarsSchema: ${vars.error.message}`);
+        continue;
+      }
+      const expected = STS_ISSUERS[vars.data.STS_ENVIRONMENT];
+      if (vars.data.STS_ISSUER !== expected) {
+        problems.push(
+          `${block.where}: STS_ISSUER is ${vars.data.STS_ISSUER}, expected ${expected}`
+        );
+      }
+      const hyperdrive = new Set((block.bindings.hyperdrive ?? []).map(entry => entry.binding));
+      for (const replica of vars.data.LEASE_REPLICA_SWEEP_BINDINGS) {
+        if (!hyperdrive.has(replica)) {
+          problems.push(
+            `${block.where}: LEASE_REPLICA_SWEEP_BINDINGS names ${replica}, which is no Hyperdrive binding of this block`
+          );
+        }
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Problems with the worker-binding policies: each one's workload is a config here that binds STS
+ * under that top-level name, or is listed in EXTERNAL_WORKLOADS, so a policy whose Worker lives in
+ * another repository is always one the deploy-name rule above protects. Every listed external
+ * workload has a worker-binding policy.
+ */
+export function workerBindingPolicyProblems(
+  configs: readonly WorkerConfig[],
+  policies: readonly Policy[]
+): string[] {
+  const problems: string[] = [];
+  const workloads = policies
+    .filter(policy => policy.identity.kind === 'worker-binding')
+    .map(policy => policy.workload);
+  for (const workload of workloads) {
+    if (EXTERNAL_WORKLOADS.has(workload)) continue;
+    const bindsHere = configs.some(
+      worker => worker.config.name === workload && bindsStsAnywhere(blocksOf(worker))
+    );
+    if (!bindsHere) {
+      problems.push(
+        `policy ${workload} has no config here that binds STS as ${workload}; list it in EXTERNAL_WORKLOADS if another repository holds its config`
+      );
+    }
+  }
+  for (const [workload, repository] of EXTERNAL_WORKLOADS) {
+    if (!workloads.includes(workload)) {
+      problems.push(
+        `EXTERNAL_WORKLOADS lists ${workload} (${repository}), which has no worker-binding policy`
       );
     }
   }

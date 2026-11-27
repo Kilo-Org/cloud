@@ -1,4 +1,4 @@
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import { toUsageRecordWireBody, type UsageRecordRequest } from '@kilocode/usage-contracts';
 
 export const usage: UsageRecordRequest = {
   core: {
@@ -30,10 +30,8 @@ export const usage: UsageRecordRequest = {
     http_x_vercel_ip_latitude: null,
     http_x_vercel_ip_longitude: null,
     http_x_vercel_ja4_digest: null,
-    user_prompt_prefix: '🙂',
-    system_prompt_prefix: null,
     system_prompt_length: null,
-    http_user_agent: null,
+    http_user_agent: 'synthetic-private-user-agent 🙂',
     max_tokens: null,
     has_middle_out_transform: null,
     status_code: 200,
@@ -59,9 +57,11 @@ export const usage: UsageRecordRequest = {
     market_cost: null,
     non_inference_cost: null,
     is_free: null,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
+    system_prompt_kind: null,
   },
   prior_microdollar_usage: 0,
   posthog_distinct_id: null,
 };
+
+/** The usage as sent to the queue or the writer: with the retired metadata keys as null. */
+export const wireUsage = toUsageRecordWireBody(usage);

@@ -62,19 +62,19 @@ export function acceptFolderRead(
 }
 
 /**
- * Resolves each name a workload's policy grants: `/workloads/<workload>` first, then `/shared`
- * (design 4.2). Secrets in deeper folders are never served.
+ * Resolves each name a workload's policy grants: its own folder first (`/workloads/<workload>`, or
+ * `/ci/<workload>` for a GitHub policy), then `/shared` (design 4.2). Secrets in deeper folders are
+ * never served. `own` is the copy of the root folder that holds `ownPath`.
  */
 export function resolveWorkloadSecrets(
-  workload: string,
+  ownPath: string,
   names: readonly string[],
-  workloads: FolderCopy,
+  own: FolderCopy,
   shared: FolderCopy
 ): { secrets: BundleSecrets; missing: string[] } {
-  const own = new Map<string, ManagerEntry>();
-  const ownPath = `/workloads/${workload}`;
-  for (const entry of workloads.entries) {
-    if (entry.path === ownPath) own.set(entry.name, entry);
+  const ownEntries = new Map<string, ManagerEntry>();
+  for (const entry of own.entries) {
+    if (entry.path === ownPath) ownEntries.set(entry.name, entry);
   }
   const common = new Map<string, ManagerEntry>();
   for (const entry of shared.entries) {
@@ -83,7 +83,7 @@ export function resolveWorkloadSecrets(
   const secrets: BundleSecrets = {};
   const missing: string[] = [];
   for (const name of names) {
-    const entry = own.get(name) ?? common.get(name);
+    const entry = ownEntries.get(name) ?? common.get(name);
     if (entry === undefined) missing.push(name);
     else secrets[name] = { value: entry.value, version: entry.version, id: entry.id };
   }

@@ -78,11 +78,7 @@ const context: MicrodollarUsageContext = {
     http_x_vercel_ja4_digest: null,
     http_user_agent: null,
   },
-  promptInfo: {
-    user_prompt_prefix: 'synthetic',
-    system_prompt_prefix: '',
-    system_prompt_length: 0,
-  },
+  promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
   is_free: false,
   custom_llm_pricing: null,
   max_tokens: null,
@@ -209,7 +205,6 @@ test.each([undefined, organizationId])(
         kilo_user_id: user.id,
         cost: 123,
       },
-      metadata: { user_prompt_prefix: header ? null : 'synthetic' },
     });
     if (header)
       expect(hasEffectiveOrganizationAccess).toHaveBeenCalledWith(expect.anything(), {

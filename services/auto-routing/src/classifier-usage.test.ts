@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MirrorPayloadSchema, type MirrorPayload } from '@kilocode/auto-routing-contracts';
-import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
+import { toUsageRecordWireBody, UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import {
   buildClassifierUsage,
   recordClassifierUsage,
@@ -138,8 +138,6 @@ describe('classifier usage identity', () => {
       streamed: false,
       has_tools: false,
       api_kind: payload.input.apiKind,
-      user_prompt_prefix: '',
-      system_prompt_prefix: '',
     });
     expect(usage.posthog_distinct_id).toBeNull();
     expect(JSON.stringify(usage)).not.toContain('private');
@@ -176,8 +174,6 @@ describe('classifier usage identity', () => {
       session_id: 'session1',
       machine_id: 'machine1',
       http_user_agent: 'client1',
-      user_prompt_prefix: null,
-      system_prompt_prefix: null,
     });
   });
 });
@@ -201,7 +197,7 @@ describe('classifier usage delivery', () => {
         costUsd,
         createdAt
       );
-      expect(record).toHaveBeenCalledExactlyOnceWith(expected);
+      expect(record).toHaveBeenCalledExactlyOnceWith(toUsageRecordWireBody(expected));
       expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
     }
   );
@@ -280,7 +276,7 @@ describe('classifier usage delivery', () => {
           'content-type': 'application/json',
           'x-internal-api-key': 'test-internal-secret',
         },
-        body: JSON.stringify(usage),
+        body: JSON.stringify(toUsageRecordWireBody(usage)),
       })
     );
   });

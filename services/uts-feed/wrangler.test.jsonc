@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration for vitest-pool-workers. The tests pass their own signer-keys and feed-reads
+  // bindings; the two bindings below reach this Worker's own FeedReader entrypoint, with and
+  // without a caller.
+  "name": "uts-feed-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": false },
+  },
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "vars": {
+    "UTS_ENVIRONMENT": "development",
+  },
+  "services": [
+    {
+      "binding": "READER",
+      "service": "uts-feed-test",
+      "entrypoint": "FeedReader",
+      "props": { "caller": "o11y" },
+    },
+    {
+      "binding": "PROPLESS_READER",
+      "service": "uts-feed-test",
+      "entrypoint": "FeedReader",
+    },
+  ],
+}

@@ -50,9 +50,8 @@ function defineDefaultContextInfo(): UsageContextInfo {
     http_x_vercel_ip_longitude: -79,
     http_x_vercel_ja4_digest: 'normal_fingerprint',
     provider: 'openrouter',
-    user_prompt_prefix: '<task>Implement a feature',
-    system_prompt_prefix: 'You are Kilo Code, a highly skilled software engineer',
     system_prompt_length: 30000,
+    system_prompt_kind: null,
     http_user_agent: 'OpenAI/JS 1.0.0',
     max_tokens: 12345,
     has_middle_out_transform: true,
@@ -72,8 +71,6 @@ function defineDefaultContextInfo(): UsageContextInfo {
     reasoning_setting: null,
     inference_region: null,
     ttfb_ms: null,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
   };
 }
 
@@ -108,11 +105,7 @@ export function createMockUsageContext(
     fraudHeaders: EmptyFraudDetectionHeaders,
     provider: 'openrouter',
     requested_model: 'test-model',
-    promptInfo: {
-      system_prompt_prefix: '',
-      system_prompt_length: 0,
-      user_prompt_prefix: '',
-    },
+    promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
     max_tokens: null,
     has_middle_out_transform: null,
     isStreaming: false,

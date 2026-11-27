@@ -9,6 +9,7 @@ import {
 } from './kilo-token';
 import type { KiloTokenPayload } from './kilo-token';
 import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
+import { observeSharedVerifierAdmission } from './kilo-token-admission-observation';
 import {
   assertKiloTokenIssuedAt,
   checkKiloTokenAuthorityClaims,
@@ -145,7 +146,9 @@ export async function verifyKiloTokenForResource(
     policyClaims.parse(payload);
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
-  return kiloTokenPayload.parse(payload);
+  const verified = kiloTokenPayload.parse(payload);
+  observeSharedVerifierAdmission('resource', audiencePolicy.audience, payload);
+  return verified;
 }
 
 const verifiedAuth = Symbol('verified-kilo-policy-auth');
@@ -198,6 +201,7 @@ export async function verifyKiloTokenForPolicy(
     claimNames: Object.freeze(Object.keys(payload)),
   } satisfies VerifiedKiloBearerContext);
   verifiedContexts.add(auth);
+  observeSharedVerifierAdmission('policy', audiencePolicy.audience, payload);
   return auth;
 }
 

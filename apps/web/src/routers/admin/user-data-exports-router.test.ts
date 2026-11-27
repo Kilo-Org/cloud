@@ -6,7 +6,7 @@ import {
   setDataExportRecoveryAuditSinkForTest,
   type DataExportRecoveryAuditEvent,
 } from './user-data-export-recovery-audit';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -214,7 +214,7 @@ describe('adminUserDataExportsRouter', () => {
   });
 
   it('requires admin access', async () => {
-    const caller = await createCallerForUser(regularUser.id);
+    const caller = await createSessionCallerForUser(regularUser.id);
 
     await expect(caller.admin.userDataExports.summary()).rejects.toThrow('Admin access required');
     await expect(caller.admin.userDataExports.list({})).rejects.toThrow('Admin access required');
@@ -240,7 +240,9 @@ describe('adminUserDataExportsRouter', () => {
   });
 
   it('summarizes persisted failure, lease, dispatch, cleanup, and email health', async () => {
-    const result = await (await createCallerForUser(admin.id)).admin.userDataExports.summary();
+    const result = await (
+      await createSessionCallerForUser(admin.id)
+    ).admin.userDataExports.summary();
 
     expect(result).toMatchObject({
       active: 2,
@@ -258,7 +260,7 @@ describe('adminUserDataExportsRouter', () => {
   });
 
   it('lists needs-attention exports and supports exact owner email search', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
     const all = await caller.admin.userDataExports.list({ health: 'needs_attention' });
     const searched = await caller.admin.userDataExports.list({
       health: 'all',
@@ -304,7 +306,7 @@ describe('adminUserDataExportsRouter', () => {
 
   it('normalizes out-of-range pages to the first page', async () => {
     const result = await (
-      await createCallerForUser(admin.id)
+      await createSessionCallerForUser(admin.id)
     ).admin.userDataExports.list({
       health: 'all',
       page: 400,
@@ -317,7 +319,7 @@ describe('adminUserDataExportsRouter', () => {
 
   it('rejects pages beyond the bounded offset window', async () => {
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.list({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.list({
         health: 'all',
         page: 401,
       })
@@ -325,7 +327,7 @@ describe('adminUserDataExportsRouter', () => {
   });
 
   it('returns legacy part aggregates, outbox history, and redacted failure details', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const processingDetail = await caller.admin.userDataExports.detail({
       exportId: leasedProcessingExportId,
@@ -355,7 +357,7 @@ describe('adminUserDataExportsRouter', () => {
 
   it('returns the organization subject separately from the requester in detail', async () => {
     const detail = await (
-      await createCallerForUser(admin.id)
+      await createSessionCallerForUser(admin.id)
     ).admin.userDataExports.detail({ exportId: organizationExportId });
 
     expect(detail.user).toMatchObject({ id: owner.id, email: owner.google_user_email });
@@ -371,7 +373,7 @@ describe('adminUserDataExportsRouter', () => {
 
   it('allows an organization retry when its requester has a usable personal export', async () => {
     const result = await (
-      await createCallerForUser(admin.id)
+      await createSessionCallerForUser(admin.id)
     ).admin.userDataExports.cancelAndRetry({
       exportId: organizationExportId,
       expectedGeneration: 0,
@@ -410,7 +412,7 @@ describe('adminUserDataExportsRouter', () => {
     exportIds.push(blocker.id);
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndRetry({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndRetry({
         exportId: organizationExportId,
         expectedGeneration: 0,
       })
@@ -422,7 +424,7 @@ describe('adminUserDataExportsRouter', () => {
 
   it('returns not found for an unknown export', async () => {
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.detail({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.detail({
         exportId: crypto.randomUUID(),
       })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -463,7 +465,7 @@ describe('adminUserDataExportsRouter', () => {
     });
 
     const result = await (
-      await createCallerForUser(admin.id)
+      await createSessionCallerForUser(admin.id)
     ).admin.userDataExports.redispatch({
       exportId: target.id,
       expectedGeneration: 3,
@@ -521,7 +523,7 @@ describe('adminUserDataExportsRouter', () => {
     if (!target) throw new Error('Expected export fixture');
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
         exportId: target.id,
         expectedGeneration: 99,
       })
@@ -547,7 +549,7 @@ describe('adminUserDataExportsRouter', () => {
       .where(eq(kilocode_users.id, recoveryOwner.id));
     try {
       await expect(
-        (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+        (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
           exportId: target.id,
           expectedGeneration: 0,
         })
@@ -576,7 +578,7 @@ describe('adminUserDataExportsRouter', () => {
       .where(eq(kilocode_users.id, recoveryOwner.id));
     try {
       await expect(
-        (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+        (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
           exportId: target.id,
           expectedGeneration: 0,
         })
@@ -602,7 +604,7 @@ describe('adminUserDataExportsRouter', () => {
     exportIds.push(target.id);
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
         exportId: target.id,
         expectedGeneration: 0,
       })
@@ -623,7 +625,7 @@ describe('adminUserDataExportsRouter', () => {
     exportIds.push(target.id);
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.redispatch({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.redispatch({
         exportId: target.id,
         expectedGeneration: 0,
       })
@@ -646,7 +648,7 @@ describe('adminUserDataExportsRouter', () => {
       .where(eq(user_data_exports.id, target.id));
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.redispatch({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.redispatch({
         exportId: target.id,
         expectedGeneration: 0,
       })
@@ -678,7 +680,7 @@ describe('adminUserDataExportsRouter', () => {
     await db.insert(user_data_export_outbox).values({ export_id: target.id, generation: 2 });
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
         exportId: target.id,
         expectedGeneration: 2,
       })
@@ -732,7 +734,7 @@ describe('adminUserDataExportsRouter', () => {
     const key = `exports/${target.id}/kilo-data-export.jsonl.gz`;
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
         exportId: target.id,
         expectedGeneration: 0,
       })
@@ -760,7 +762,7 @@ describe('adminUserDataExportsRouter', () => {
     deletionKeys.push(key);
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndPurge({
         exportId: target.id,
         expectedGeneration: 0,
       })
@@ -793,7 +795,7 @@ describe('adminUserDataExportsRouter', () => {
     exportIds.push(target.id);
 
     const result = await (
-      await createCallerForUser(admin.id)
+      await createSessionCallerForUser(admin.id)
     ).admin.userDataExports.cancelAndRetry({ exportId: target.id, expectedGeneration: 0 });
     exportIds.push(result.replacementExportId);
 
@@ -832,7 +834,7 @@ describe('adminUserDataExportsRouter', () => {
     mockDispatchUserDataExport.mockRejectedValueOnce(new Error('token signing failed'));
 
     const result = await (
-      await createCallerForUser(admin.id)
+      await createSessionCallerForUser(admin.id)
     ).admin.userDataExports.cancelAndRetry({
       exportId: target.id,
       expectedGeneration: 5,
@@ -916,7 +918,7 @@ describe('adminUserDataExportsRouter', () => {
     exportIds.push(target.id, blocker.id);
 
     await expect(
-      (await createCallerForUser(admin.id)).admin.userDataExports.cancelAndRetry({
+      (await createSessionCallerForUser(admin.id)).admin.userDataExports.cancelAndRetry({
         exportId: target.id,
         expectedGeneration: 0,
       })

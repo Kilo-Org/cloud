@@ -1,6 +1,7 @@
 import { api_request_log_2, type User } from '@kilocode/db/schema';
 import type { CustomPricingTiers } from '@kilocode/db/schema-types';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
+import { redactApiRequestLogRequest } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-redaction';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
@@ -62,28 +63,6 @@ export type RewriteModelResponseParams = {
 type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
-
-export function redactApiRequestLogRequest(request: GatewayRequest): Record<string, unknown> {
-  const gateway = request.body.providerOptions?.gateway;
-  if (!gateway?.byok) {
-    return { ...request.body };
-  }
-
-  const redactedByok = Object.fromEntries(
-    Object.entries(gateway.byok).map(([provider, credentials]) => [
-      provider,
-      credentials.map(() => ({ apiKey: '[redacted]' })),
-    ])
-  );
-
-  return {
-    ...request.body,
-    providerOptions: {
-      ...request.body.providerOptions,
-      gateway: { ...gateway, byok: redactedByok },
-    },
-  };
-}
 
 async function createRequestLogCapture(
   response: Response,

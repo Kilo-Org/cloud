@@ -62,7 +62,7 @@ async function workloadBundle(
     secrets: sealed,
     missing: options?.missing ?? [],
     fetchedAt: new Date().toISOString(),
-    policyHash: options?.policyHash ?? (await workloadPolicyHash('o11y')),
+    policyHash: options?.policyHash ?? (await workloadPolicyHash('development', 'o11y')),
     stale: options?.stale ?? false,
   };
 }
@@ -72,6 +72,36 @@ async function read(stub: DurableObjectStub<BundleDO>, ifNoneMatch?: string) {
 }
 
 describe('bundle delivery', () => {
+  it("records a GitHub caller's workflow file, run id and attempt as flat attributes", async () => {
+    const stub = getBundleStub(env, config, 'o11y');
+    await stub.putBundle(await workloadBundle({ O11Y_CF_AE_API_TOKEN: { version: 1 } }));
+    const run = {
+      jobWorkflowRef: 'acme/repo/.github/workflows/release.yml@refs/heads/main',
+      runId: '9001',
+      runAttempt: '2',
+    };
+    expect(await stub.getBundle('o11y', 'development', {}, run)).toMatchObject({ status: 'ok' });
+    const attributes = JSON.parse((await auditRows(stub)).latest ?? '{}').data.attributes;
+    expect(attributes).toMatchObject(run);
+  });
+
+  it('refuses a malformed run at the RPC boundary and appends no row', async () => {
+    const stub = getBundleStub(env, config, 'o11y');
+    await stub.putBundle(await workloadBundle({ O11Y_CF_AE_API_TOKEN: { version: 1 } }));
+    const workflow = 'acme/repo/.github/workflows/release.yml@refs/heads/main';
+    for (const run of [
+      { jobWorkflowRef: workflow, runId: 'not-a-number' },
+      { jobWorkflowRef: 'x'.repeat(600), runId: '9001' },
+      { jobWorkflowRef: workflow, runId: '9001', token: 'eyJ.secret' },
+    ]) {
+      expect(await stub.getBundle('o11y', 'development', {}, run)).toMatchObject({
+        status: 'unavailable',
+        reason: 'internal',
+      });
+    }
+    expect((await auditRows(stub)).count).toBe(0);
+  });
+
   it('serves the sealed bundle and appends one delivery row in the same call', async () => {
     const stub = getBundleStub(env, config, 'o11y');
     await stub.putBundle(
@@ -94,6 +124,7 @@ describe('bundle delivery', () => {
     expect(rows.count).toBe(1);
     expect(rows.latest).toContain('ai.kilo.sts.bundle.delivered');
     expect(rows.latest).not.toContain('value-for-');
+    expect(rows.latest).not.toContain('runId');
 
     const stored = await runInDurableObject(stub, (_instance, state) =>
       state.storage.sql

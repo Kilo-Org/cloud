@@ -1,4 +1,10 @@
-import type { BundleRequest, BundleResult } from '@kilocode/sts-contracts';
+import {
+  JWKS_PATH,
+  type BundleRequest,
+  type BundleResult,
+  type MintResult,
+} from '@kilocode/sts-contracts';
+import { decodeProtectedHeader } from 'jose';
 import { serveBundle, SecretsBroker } from '../../../src/broker';
 import { RefresherDO as StsRefresherDO } from '../../../src/dos/RefresherDO';
 import { SignerDO as StsSignerDO, type ManagerJwks } from '../../../src/dos/SignerDO';
@@ -8,18 +14,49 @@ import { handleRequest, MANAGER_WEBHOOK_PATH } from '../../../src/http';
 import { IdentityVerifier } from '../../../src/identity/verify';
 import { workloadPolicyHash } from '../../../src/policy';
 import { loadPolicies } from '../../../src/policy/load';
+import type { MintAuthority } from '../../../src/tokens/mint';
 import type { FillResult } from '../../../src/types';
 import { createProvider, providerFetch, signToken } from '../../worker/support';
 
-export { BundleDO, DenialDO } from '../../../src/index';
+export { BundleDO, DenialDO, DeployTokenDO, LeaseDO, TokenSignerDO } from '../../../src/index';
 
 /**
  * Test-only Worker for test/runtime; never deployed. `BROKER` binds its own `ProbeBroker`
- * entrypoint with `props.caller`, so a bundle read is a real RPC call into STS's broker code, and
- * `SELF` sends real requests to STS's own HTTP routes in this isolate. The Durable Object classes
- * run in this isolate too, so the counters below see their calls.
+ * entrypoint with `props.caller`, so a bundle read is a real RPC call into STS's broker code;
+ * `MINTER` binds `ProbeMinter` the same way for mint calls, and `SELF` sends real requests to STS's
+ * own HTTP routes in this isolate. The Durable Object classes run in this isolate too, so the
+ * counters below see their calls.
  */
-type ProbeEnv = Env & { BROKER: Service<ProbeBroker>; SELF: Fetcher };
+type ProbeEnv = Env & {
+  BROKER: Service<ProbeBroker>;
+  MINTER: Service<ProbeMinter>;
+  SELF: Fetcher;
+};
+
+/** The shipped scope registry is empty, so the minter checks against this one. */
+const RUNTIME_SCOPES = { 'runtime-target': { scopes: ['runtime-target:probe.read'] } };
+
+const RUNTIME_AUTHORITY: MintAuthority = {
+  scopes: RUNTIME_SCOPES,
+  policies: loadPolicies(
+    {
+      'sts-runtime-probe.yaml': `
+workload: sts-runtime-probe
+environments: [development]
+identity:
+  kind: worker-binding
+secrets: []
+audiences: [runtime-target]
+scopes: ['runtime-target:probe.read']
+`,
+    },
+    { scopeRegistry: RUNTIME_SCOPES }
+  ),
+};
+
+export class ProbeMinter extends SecretsBroker {
+  static override readonly mintAuthority = RUNTIME_AUTHORITY;
+}
 
 /** How long the signer, refresher and identity provider take to answer the calls STS caches. */
 const SLOW_CALL_MS = 500;
@@ -117,7 +154,7 @@ export class RefresherDO extends StsRefresherDO {
         secrets: { AUDIT_RELAY_AXIOM_TOKEN: { value: 'axiom-token', version: 3, id: 'id-axiom' } },
         missing: ['AUDIT_RELAY_SLACK_WEBHOOK_PAGE'],
         fetchedAt: new Date().toISOString(),
-        policyHash: await workloadPolicyHash(workload),
+        policyHash: await workloadPolicyHash('development', workload),
         stale: false,
       },
     };
@@ -131,7 +168,7 @@ async function readBundle(env: ProbeEnv): Promise<Response> {
     secrets: { O11Y_CF_AE_API_TOKEN: { value: 'ae-token', version: 7, id: 'id-ae' } },
     missing: [],
     fetchedAt: new Date().toISOString(),
-    policyHash: await workloadPolicyHash('o11y'),
+    policyHash: await workloadPolicyHash('development', 'o11y'),
     stale: false,
   });
   // A caller that never disposes what it received, then keeps working past the broker's timer.
@@ -178,7 +215,8 @@ function routeRequest(env: ProbeEnv, route: string | null): Request {
   return new Request(`${issuer}${MANAGER_JWKS_PATH}`);
 }
 
-async function buildIdentity(issuer: string): Promise<void> {
+/** The token's `iat` comes from the test so it can check the outcome exactly; it lives 10 minutes. */
+async function buildIdentity(issuer: string, issuedAt: number): Promise<void> {
   const provider = await createProvider(FLY_ISSUER, issuer);
   const local = providerFetch([provider]);
   identity = {
@@ -189,13 +227,17 @@ async function buildIdentity(issuer: string): Promise<void> {
       fetch: async (input: RequestInfo | URL, init?: RequestInit) =>
         await slowCall(calls.identity, () => local.fetch(input, init)),
     }),
-    token: await signToken(provider, {
-      org_id: '1111',
-      org_name: 'acme',
-      app_id: '2222',
-      app_name: 'fly-app',
-      machine_id: 'machine-1',
-    }),
+    token: await signToken(
+      provider,
+      {
+        org_id: '1111',
+        org_name: 'acme',
+        app_id: '2222',
+        app_name: 'fly-app',
+        machine_id: 'machine-1',
+      },
+      { issuedAt, expiresAt: issuedAt + 600 }
+    ),
   };
 }
 
@@ -213,9 +255,12 @@ function isRoute(route: string | null): route is keyof typeof calls {
  * The first request is cancelled while its signer, refresher or provider call is in flight; the
  * second arrives right after and must not depend on the first request's call.
  */
-async function race(env: ProbeEnv, route: string | null): Promise<Response> {
+async function race(env: ProbeEnv, url: URL): Promise<Response> {
+  const route = url.searchParams.get('route');
   if (!isRoute(route)) return new Response('unknown route', { status: 400 });
-  if (route === 'identity') await buildIdentity(readConfig(env).issuer);
+  if (route === 'identity') {
+    await buildIdentity(readConfig(env).issuer, Number(url.searchParams.get('issuedAt')));
+  }
   const first = await env.SELF.fetch(routeRequest(env, route), {
     signal: AbortSignal.timeout(100),
   }).then(
@@ -238,6 +283,52 @@ async function race(env: ProbeEnv, route: string | null): Promise<Response> {
   });
 }
 
+/** The kid of the service-token key set STS serves, fetched as a real request. */
+async function servedKid(env: ProbeEnv): Promise<string | null> {
+  const response = await env.SELF.fetch(`${readConfig(env).issuer}${JWKS_PATH}`);
+  const jwks: { keys: Array<{ kid: string }> } = await response.json();
+  return jwks.keys[0]?.kid ?? null;
+}
+
+/**
+ * Two key-set requests and two mint calls at once, on a cold isolate and a cold token signer:
+ * each must be answered by work of its own, never by a promise another request created.
+ */
+async function coldTokens(env: ProbeEnv): Promise<Response> {
+  const issuer = readConfig(env).issuer;
+  const request = { tokens: [{ audience: 'runtime-target', scope: 'runtime-target:probe.read' }] };
+  const keySet = async () => {
+    const response = await env.SELF.fetch(`${issuer}${JWKS_PATH}`);
+    const jwks: { keys: Array<{ kid: string }> } = await response.json();
+    return { status: response.status, kids: jwks.keys.map(key => key.kid) };
+  };
+  const mint = async () => {
+    const result: MintResult = await env.MINTER.mintTokens(request);
+    if (result.status !== 'ok') return { status: result.status, kids: [] };
+    return {
+      status: result.status,
+      kids: result.tokens.map(token =>
+        token.status === 'issued' ? String(decodeProtectedHeader(token.token).kid) : token.reason
+      ),
+    };
+  };
+  return Response.json(await Promise.all([keySet(), keySet(), mint(), mint()]));
+}
+
+/** Calls the broker's former `mintAuthority()` method through the binding, as any caller could. */
+async function authorityOverRpc(env: ProbeEnv): Promise<Response> {
+  const binding = env.MINTER as unknown as { mintAuthority(): Promise<unknown> };
+  try {
+    await binding.mintAuthority();
+    return Response.json({ reachable: true, error: null });
+  } catch (error) {
+    return Response.json({
+      reachable: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: ProbeEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -248,7 +339,7 @@ export default {
       case '/fill':
         return await readFilled(env, url.searchParams.get('deadlineMs'));
       case '/race':
-        return await race(env, url.searchParams.get('route'));
+        return await race(env, url);
       case '/verify':
         return await verifyIdentity();
       case '/strand':
@@ -260,6 +351,12 @@ export default {
         return new Response('settled');
       case '/fills':
         return new Response(String(fillsBuilt));
+      case '/token-kid':
+        return Response.json({ kid: await servedKid(env) });
+      case '/cold-tokens':
+        return await coldTokens(env);
+      case '/mint-authority':
+        return await authorityOverRpc(env);
       default:
         return new Response('not found', { status: 404 });
     }

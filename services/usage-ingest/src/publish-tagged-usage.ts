@@ -1,13 +1,14 @@
-import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import type { EnkryptUsageQueueMessage, ExaUsageQueueMessage } from '@kilocode/usage-contracts';
 import { logSafely, queueMetrics } from './diagnostics';
+import { authorizePublish, type PublishAuthFields } from './publish-auth';
 import type { Env } from './publish-usage';
 
 type TaggedUsageQueueMessage = EnkryptUsageQueueMessage | ExaUsageQueueMessage;
 
 export type TaggedUsageIngress<Message extends TaggedUsageQueueMessage> = {
   kind: Message['kind'];
+  path: '/enkrypt-usage' | '/exa-usage';
   maxBytes: number;
   /** Wraps a valid bare record in its envelope, or returns the bounded rejection log fields. */
   toMessage(value: unknown): { message: Message } | { rejection: object };
@@ -60,7 +61,8 @@ async function readTaggedBody(
 async function enqueueTaggedUsage(
   env: Env,
   message: TaggedUsageQueueMessage,
-  entryAtMs: number
+  entryAtMs: number,
+  auth: PublishAuthFields
 ): Promise<Response> {
   const usageId = message.record.id;
   const kindFields = { usage_kind: message.kind };
@@ -71,6 +73,7 @@ async function enqueueTaggedUsage(
     ...kindFields,
     publisher_entry_at_ms: entryAtMs,
     before_send_at_ms: beforeSendAtMs,
+    ...auth,
   }));
   const sendStartedAt = performance.now();
   let response: unknown;
@@ -111,20 +114,17 @@ async function enqueueTaggedUsage(
 /**
  * Accepts one bare record of a tagged kind on the path that names it, so only this ingress builds
  * the envelope; an envelope-shaped body is rejected by the strict record schema. The publish
- * secret is checked before the body is read.
+ * credential is checked before the body is read.
  */
 export async function handlePublishTaggedUsage<Message extends TaggedUsageQueueMessage>(
   request: Request,
   env: Env,
   entryAtMs: number,
-  ingress: TaggedUsageIngress<Message>
+  ingress: TaggedUsageIngress<Message>,
+  ctx: ExecutionContext | undefined
 ): Promise<Response> {
-  const secret = env.USAGE_INGEST_PUBLISH_SECRET;
-  if (!secret) return errorResponse('Service unavailable', 503);
-  const authorization = request.headers.get('Authorization');
-  if (!authorization || !timingSafeEqual(authorization, `Bearer ${secret}`)) {
-    return errorResponse('Unauthorized', 401);
-  }
+  const auth = await authorizePublish(request, env, ingress.path, ctx);
+  if (auth instanceof Response) return auth;
 
   const logRejected = (category: string, details: object = {}) =>
     logSafely('warn', () => ({
@@ -141,5 +141,5 @@ export async function handlePublishTaggedUsage<Message extends TaggedUsageQueueM
     return errorResponse('Invalid usage payload', 400);
   }
 
-  return enqueueTaggedUsage(env, parsed.message, entryAtMs);
+  return enqueueTaggedUsage(env, parsed.message, entryAtMs, auth);
 }

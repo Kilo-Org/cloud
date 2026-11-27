@@ -34,7 +34,7 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
@@ -123,7 +123,7 @@ describe('organization SSO router', () => {
   });
 
   test('does not eagerly rotate same-domain credentials when SSO is enabled', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await caller.organizations.sso.updateSsoDomain({
       organizationId: organization.id,
@@ -277,7 +277,7 @@ describe('organization SSO router', () => {
         is_admin: true,
       });
       callers.push(kiloAdmin);
-      const caller = await createCallerForUser(kiloAdmin.id);
+      const caller = await createSessionCallerForUser(kiloAdmin.id);
 
       const result = await caller.organizations.sso.getConfig({
         organizationId: organization.id,
@@ -328,7 +328,7 @@ describe('organization SSO router', () => {
         .returning({ id: support_access_grants.id });
       process.env.SUPPORT_ACCESS_ENABLED = 'true';
       try {
-        const caller = await createCallerForUser(staff.id);
+        const caller = await createSessionCallerForUser(staff.id);
 
         const result = await caller.organizations.sso.getConfig({
           organizationId: organization.id,
@@ -397,7 +397,7 @@ describe('organization SSO router', () => {
     });
 
     test('returns only the identifier of the created WorkOS organization', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('Created SSO Organization', null);
       // The provider object carries `Date` timestamps, which plain tRPC JSON
       // cannot carry as `Date`. Returning the object would hand the client a
@@ -431,7 +431,8 @@ describe('organization SSO router', () => {
         .where(
           and(
             eq(admin_action_audit_logs.action, 'organization.sso.config.delete'),
-            eq(admin_action_audit_logs.target_id, organizationId)
+            eq(admin_action_audit_logs.target_id, organizationId),
+            eq(admin_action_audit_logs.outcome, 'success')
           )
         );
     }
@@ -444,7 +445,7 @@ describe('organization SSO router', () => {
     });
 
     test('releases the SSO domain together with the WorkOS configuration', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('Deleted SSO Organization', 'deleted-sso.test');
       getOrganizationByExternalId.mockResolvedValue({
         id: 'workos_org_deleted',
@@ -478,7 +479,7 @@ describe('organization SSO router', () => {
     });
 
     test('removes a WorkOS configuration that has no recorded domain', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('WorkOS Only Organization', null);
       getOrganizationByExternalId.mockResolvedValue({
         id: 'workos_org_only',
@@ -500,7 +501,7 @@ describe('organization SSO router', () => {
     });
 
     test('lets another organization claim the released domain', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const released = await createSsoOrganization('Released Domain Organization', 'released.test');
       getOrganizationByExternalId.mockResolvedValue({
         id: 'workos_org_released',
@@ -524,7 +525,7 @@ describe('organization SSO router', () => {
     });
 
     test('leaves the SSO state unchanged when the WorkOS deletion fails', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization(
         'WorkOS Failure Organization',
         'workos-failure.test'
@@ -545,8 +546,58 @@ describe('organization SSO router', () => {
       await expect(readAdminActions(target.id)).resolves.toEqual([]);
     });
 
+    test('records the WorkOS deletion when a later step fails, and names it in the failure row', async () => {
+      const caller = await createSessionCallerForUser(admin.id);
+      const target = await createSsoOrganization('Partial Delete Organization', 'partial.test');
+      getOrganizationByExternalId.mockResolvedValue({
+        id: 'workos_org_partial',
+        externalId: target.id,
+        domains: [],
+      });
+      const transaction = jest
+        .spyOn(db, 'transaction')
+        .mockRejectedValueOnce(new Error('database unavailable'));
+
+      try {
+        await expect(
+          caller.organizations.sso.deleteConfig({ organizationId: target.id })
+        ).rejects.toThrow('database unavailable');
+      } finally {
+        transaction.mockRestore();
+      }
+
+      expect(deleteOrganization).toHaveBeenCalledWith('workos_org_partial');
+      await expect(readSsoDomain(target.id)).resolves.toBe('partial.test');
+      const rows = await db
+        .select({
+          outcome: admin_action_audit_logs.outcome,
+          metadata: admin_action_audit_logs.metadata,
+        })
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.action, 'organization.sso.config.delete'),
+            eq(admin_action_audit_logs.target_id, target.id)
+          )
+        );
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          { outcome: 'success', metadata: { workosOrganizationId: 'workos_org_partial' } },
+          {
+            outcome: 'failure',
+            metadata: {
+              workosOrganizationId: 'workos_org_partial',
+              externalDeleted: true,
+              errorCode: 'INTERNAL_SERVER_ERROR',
+            },
+          },
+        ])
+      );
+      expect(rows).toHaveLength(2);
+    });
+
     test('refuses to delete when the organization has no SSO configuration', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('Unconfigured Organization', null);
 
       await expect(
@@ -561,7 +612,7 @@ describe('organization SSO router', () => {
     });
 
     test('releases a leftover SSO domain when the WorkOS configuration is already gone', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('Leftover Domain Organization', 'leftover.test');
 
       await caller.organizations.sso.deleteConfig({ organizationId: target.id });
@@ -575,7 +626,9 @@ describe('organization SSO router', () => {
           message: 'Cleared SSO domain leftover.test',
         },
       ]);
-      await expect(readAdminActions(target.id)).resolves.toEqual([]);
+      await expect(readAdminActions(target.id)).resolves.toEqual([
+        { action: 'organization.sso.config.delete', metadata: null },
+      ]);
       await expect(resolveSsoAuthorityForDomain('leftover.test')).resolves.toEqual({
         status: 'not_required',
         domain: 'leftover.test',
@@ -585,7 +638,7 @@ describe('organization SSO router', () => {
 
   describe('clearSsoDomain', () => {
     test('releases the recorded domain and lets another organization claim it', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('Cleared Domain Organization', 'cleared.test');
 
       await caller.organizations.sso.clearSsoDomain({ organizationId: target.id });
@@ -605,7 +658,7 @@ describe('organization SSO router', () => {
     });
 
     test('writes nothing when the organization records no domain', async () => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const target = await createSsoOrganization('Empty Domain Organization', null);
 
       await caller.organizations.sso.clearSsoDomain({ organizationId: target.id });

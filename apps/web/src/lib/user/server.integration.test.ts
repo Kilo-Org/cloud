@@ -10,8 +10,8 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { createCallerForUser } from '@/routers/test-utils';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { createSessionCallerForUser } from '@/routers/test-utils';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { eq } from 'drizzle-orm';
 
 beforeEach(() => {
@@ -45,7 +45,7 @@ describe('getUserFromAuth', () => {
     const beforeGrant = await getUserFromAuth({ adminOnly: true });
     expect(beforeGrant.authFailedResponse).not.toBeNull();
 
-    const caller = await createCallerForUser(grantingAdmin.id);
+    const caller = await createSessionCallerForUser(grantingAdmin.id);
     await caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: true });
 
     const rotated = await db.query.kilocode_users.findFirst({

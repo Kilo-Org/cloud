@@ -19,7 +19,7 @@ type ClaimedExport = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
 
   const body: unknown = await request.json().catch(() => null);

@@ -5,7 +5,10 @@ import * as z from 'zod';
 import * as gitlabService from '@/lib/integrations/gitlab-service';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   resolveOwner,
   resolveAuthorizedOwner,
@@ -69,8 +72,14 @@ export const gitlabRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Storing an organization credential is membership-only: a staff or
+      // support grant never stands in (SUPPORT_NEVER_KEYS).
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
+        await ensureMemberOrganizationAccess(
+          ctx.user,
+          input.organizationId,
+          ORGANIZATION_BILLING_ROLES
+        );
       }
       const owner = resolveOwner(ctx, input.organizationId);
       return gitlabService.connectWithPAT(owner, input.token, input.instanceUrl, ctx.user.id);

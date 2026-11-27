@@ -7,6 +7,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
+import { CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL } from '@/lib/coding-plans/inventory-credential-encryption';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -183,7 +184,7 @@ export async function processCodingPlanCancellationAtPeriodEnd(
         .update(coding_plan_key_inventory)
         .set({
           status: 'revocation_pending',
-          encrypted_api_key: null,
+          ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
           revocation_requested_at: nowIso,
         })
         .where(eq(coding_plan_key_inventory.id, locked.key_inventory_id));
@@ -450,7 +451,7 @@ export async function processCodingPlanRenewal(
         .update(coding_plan_key_inventory)
         .set({
           status: 'revocation_pending',
-          encrypted_api_key: null,
+          ...CLEARED_CODING_PLAN_INVENTORY_CREDENTIAL,
           revocation_requested_at: nowIso,
         })
         .where(eq(coding_plan_key_inventory.id, row.key_inventory_id));

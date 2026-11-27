@@ -1,5 +1,9 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
-import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  UsageRecordRequestSchema,
+  toUsageRecordWireBody,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
@@ -78,8 +82,6 @@ export async function buildClassifierUsage(
       http_x_vercel_ip_latitude: null,
       http_x_vercel_ip_longitude: null,
       http_x_vercel_ja4_digest: null,
-      user_prompt_prefix: payload.organizationId ? null : '',
-      system_prompt_prefix: payload.organizationId ? null : '',
       system_prompt_length: 0,
       http_user_agent: clean(payload.userAgent),
       max_tokens: null,
@@ -107,8 +109,7 @@ export async function buildClassifierUsage(
       market_cost: Math.round(costUsd * 1_000_000),
       non_inference_cost: null,
       is_free: false,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
+      system_prompt_kind: null,
     },
     prior_microdollar_usage: 0,
     posthog_distinct_id: null,
@@ -157,7 +158,8 @@ export async function recordClassifierUsage(
       env.AUTO_ROUTING_DECISION_CACHE.get(
         env.AUTO_ROUTING_DECISION_CACHE.idFromName(`${identity.scope}:${identity.conversationKey}`)
       ),
-    stub => stub.recordClassifierUsage(usage),
+    // A new Worker can reach a Durable Object still running the previous version.
+    stub => stub.recordClassifierUsage(toUsageRecordWireBody(usage)),
     'recordClassifierUsage'
   );
 }

@@ -6,24 +6,23 @@ import { z } from 'zod';
 
 import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 import { decodeVercelConnection } from '@/lib/byoc/vercel-connection';
 
 const responseHeaders = { 'Cache-Control': 'no-store' };
 
-function isAuthorized(request: NextRequest): boolean {
+async function isAuthorized(request: NextRequest): Promise<boolean> {
   const presented = request.headers.get('x-internal-api-key');
-  return Boolean(
-    INTERNAL_API_SECRET && presented && timingSafeEqual(presented, INTERNAL_API_SECRET)
-  );
+  const expected = presented ? await readInternalApiSecret() : '';
+  return Boolean(expected && presented && timingSafeEqual(presented, expected));
 }
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: responseHeaders });
   }
 

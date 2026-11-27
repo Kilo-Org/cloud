@@ -5,7 +5,6 @@ import {
   fetchWithinBudget,
   readJsonWithinBudget,
 } from '@/lib/bounded-service-fetch';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 /** Security Worker called through this module; used in the client-facing message. */
 export type SecurityWorkerService = 'sync' | 'dismissal' | 'analysis' | 'remediation';
@@ -128,6 +127,8 @@ export function isDefinitiveSecurityWorkerRejection(params: {
 export async function postSecurityWorkerJson(params: {
   url: string;
   service: SecurityWorkerService;
+  /** The caller read and checked it before deciding the Worker is configured. */
+  internalApiSecret: string;
   body: Record<string, unknown>;
 }): Promise<{ response: Response; body: unknown }> {
   const startedAt = Date.now();
@@ -138,7 +139,7 @@ export async function postSecurityWorkerJson(params: {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': params.internalApiSecret,
       },
       body: JSON.stringify(params.body),
     });

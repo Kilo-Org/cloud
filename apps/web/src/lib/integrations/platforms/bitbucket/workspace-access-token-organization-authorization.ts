@@ -1,7 +1,5 @@
 import 'server-only';
 
-import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
-
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { buildBitbucketOrganizationCredentialLockKey } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
@@ -13,6 +11,14 @@ export type BitbucketWorkspaceAccessTokenAuthorizedActor = {
   email: string | null;
   name: string | null;
 };
+
+/**
+ * How the request boundary admitted the actor. `member` needs a locked owner or
+ * billing membership. `staff` means the staff guard already admitted the actor
+ * at the procedure boundary: the transaction re-reads the locked staff role so
+ * a revoked role cannot finish the change, and claims no second proof.
+ */
+export type BitbucketOrganizationManagerAuthority = 'member' | 'staff';
 
 export type BitbucketWorkspaceAccessTokenAuthorizationErrorCode =
   | 'unauthorized'
@@ -41,7 +47,8 @@ export async function lockBitbucketWorkspaceAccessTokenOrganization(
 export async function requireBitbucketWorkspaceAccessTokenOrganizationManager(
   tx: DrizzleTransaction,
   organizationId: string,
-  actorUserId: string
+  actorUserId: string,
+  authority: BitbucketOrganizationManagerAuthority
 ): Promise<BitbucketWorkspaceAccessTokenAuthorizedActor> {
   const [organization] = await tx
     .select({ id: organizations.id })
@@ -72,7 +79,11 @@ export async function requireBitbucketWorkspaceAccessTokenOrganizationManager(
     throw new BitbucketWorkspaceAccessTokenOrganizationAuthorizationError('unauthorized');
   }
 
-  if (!actor.isAdmin || isSupportAccessEnabled()) {
+  if (authority === 'staff') {
+    if (!actor.isAdmin) {
+      throw new BitbucketWorkspaceAccessTokenOrganizationAuthorizationError('unauthorized');
+    }
+  } else {
     const [membership] = await tx
       .select({ id: organization_memberships.id })
       .from(organization_memberships)

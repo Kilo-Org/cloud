@@ -8,7 +8,8 @@
       "securityFinding": "Một phát hiện bảo mật cần được chú ý",
       "securityUpdate": "Một bài kiểm tra bảo mật có bản cập nhật",
       "agentBriefing": "Bản tin tác nhân của bạn đã sẵn sàng",
-      "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
+      "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật",
+      "accountSecurity": "Đã có hoạt động bảo mật trên tài khoản của bạn"
     }
   },
   "agentSession": {
@@ -42,6 +43,46 @@
     },
     "securityFindingSlaBreach": {
       "title": "Vi phạm SLA"
+    },
+    "accountSecurity": {
+      "passkeyAdded": {
+        "title": "Đã thêm khóa truy cập vào tài khoản của bạn"
+      },
+      "passkeyRemoved": {
+        "title": "Đã xóa khóa truy cập khỏi tài khoản của bạn"
+      },
+      "signInMethodLinked": {
+        "title": "Đã thêm phương thức đăng nhập vào tài khoản của bạn"
+      },
+      "signInMethodUnlinked": {
+        "title": "Đã xóa phương thức đăng nhập khỏi tài khoản của bạn"
+      },
+      "deviceSignInApproved": {
+        "title": "Đã phê duyệt đăng nhập thiết bị"
+      },
+      "apiKeyReset": {
+        "title": "Đã đặt lại mã thông báo API"
+      },
+      "browserSessionsRevoked": {
+        "title": "Đã đăng xuất khỏi tất cả trình duyệt"
+      },
+      "deviceSessionRevoked": {
+        "title": "Một thiết bị đã bị đăng xuất khỏi tài khoản của bạn"
+      },
+      "signInResetBySupport": {
+        "title": "Bộ phận hỗ trợ Kilo đã đặt lại đăng nhập"
+      },
+      "newSignIn": {
+        "title": "Đăng nhập mới vào tài khoản của bạn"
+      },
+      "body": {
+        "deviceAndLocation": "Từ {{device}} gần {{location}}. Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
+        "device": "Từ {{device}}. Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
+        "location": "Gần {{location}}. Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
+        "unknown": "Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
+        "selfNamedDevice": "Từ một thiết bị tự đặt tên là \"{{name}}\". Không phải bạn? Hãy kiểm tra bảo mật tài khoản ngay bây giờ.",
+        "support": "Do bộ phận hỗ trợ Kilo thực hiện. Nếu bạn không yêu cầu, hãy liên hệ bộ phận hỗ trợ."
+      }
     }
   },
   "sessionReady": {

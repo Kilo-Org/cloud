@@ -23,11 +23,8 @@ import {
 import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import {
-  adminActionContextFromHeaders,
-  recordElevatedOrganizationAdminAction,
-} from '@/lib/admin/admin-action-audit';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { User } from '@kilocode/db/schema';
 
 type CallbackState = { owner: string; returnTo?: string };
 type CallbackPhase =
@@ -36,7 +33,6 @@ type CallbackPhase =
   | 'token_exchange'
   | 'provider_profile'
   | 'store_integration';
-type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
 function redirectWithStatus(
   state: CallbackState | null,
@@ -54,12 +50,14 @@ function redirectWithStatus(
   return NextResponse.redirect(new URL(path, APP_URL));
 }
 
-async function authorizeOwner(owner: Owner, user: AuthenticatedOAuthUser): Promise<void> {
+// Storing an organization credential is membership-only: OAuth state and staff
+// grants never stand in for an owner or billing membership.
+async function authorizeOwner(owner: Owner, user: User): Promise<void> {
   if (owner.type === 'user') {
     if (owner.id !== user.id) throw new Error('OAuth owner mismatch');
     return;
   }
-  await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+  await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
 }
 
 export async function handleBitbucketOAuthCallback(request: NextRequest): Promise<Response> {
@@ -129,23 +127,6 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
       tokens,
       availableWorkspaces,
     });
-
-    if (owner.type === 'org') {
-      await recordElevatedOrganizationAdminAction(
-        adminActionContextFromHeaders(user, request.headers),
-        {
-          organizationId: owner.id,
-          requiredRoles: ORGANIZATION_BILLING_ROLES,
-          membershipScope: 'direct',
-          action: 'organization.bitbucket.update',
-          message: 'Bitbucket: OAuth connection created',
-          metadata: {
-            operation: 'oauth_connect',
-            integrationId: storedIntegration.integrationId,
-          },
-        }
-      );
-    }
 
     if (storedIntegration.status === 'connected') {
       scheduleBitbucketRepositoryCachePrime({

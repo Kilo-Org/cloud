@@ -8,7 +8,6 @@ import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { requireAdmin } from '../src/admin-middleware';
 import { queryContainerAllocations } from '../src/alerting/container-allocations';
-import { queryContainerApplications } from '../src/alerting/container-capacity-query';
 import { sendAlertNotification, type SloAlertPayload } from '../src/alerting/notify';
 import { queryErrorRates } from '../src/alerting/query';
 import { queryQueueBacklog } from '../src/alerting/queue-backlog-query';
@@ -36,7 +35,7 @@ function storeSecret(value: string, reads: string[], name: string): SecretsStore
       reads.push(name);
       return value;
     },
-  } as SecretsStoreSecret;
+  };
 }
 
 function storeEnv(values: Partial<Record<O11ySecretName, string>>) {
@@ -226,7 +225,9 @@ describe('every o11y secret read site over the STS source', () => {
 
   it('checks the admin token against the bundle value', async () => {
     const { env, reads } = stsOnlyEnv();
-    const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin, c => c.text('ok'));
+    const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin('alertingRead'), c =>
+      c.text('ok')
+    );
     const executionCtx = { waitUntil() {}, passThroughOnException() {}, props: {} };
 
     const allowed = await app.request(
@@ -254,7 +255,9 @@ describe('every o11y secret read site over the STS source', () => {
       const { env: store } = storeEnv({ [name]: '' });
       const { binding } = stsBinding(bundle({ [name]: '' }));
       const env = { ...store, SECRETS_SOURCE: source, STS: binding } as unknown as Env;
-      const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin, c => c.text('ok'));
+      const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin('alertingRead'), c =>
+        c.text('ok')
+      );
       const executionCtx = { waitUntil() {}, passThroughOnException() {}, props: {} };
 
       const withEmpty = await app.request(
@@ -310,10 +313,6 @@ describe('every o11y secret read site over the STS source', () => {
 
   it.each([
     [
-      'container capacity',
-      (env: Env, fetchFn: typeof fetch) => queryContainerApplications(env, fetchFn),
-    ],
-    [
       'container allocations',
       (env: Env, fetchFn: typeof fetch) => queryContainerAllocations(env, fetchFn),
     ],
@@ -332,11 +331,6 @@ describe('every o11y secret read site over the STS source', () => {
   });
 
   it.each([
-    [
-      'container capacity',
-      (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>
-        queryContainerApplications(env, fetchFn, ctx),
-    ],
     [
       'container allocations',
       (env: Env, fetchFn: typeof fetch, ctx: SecretsExecutionContext) =>

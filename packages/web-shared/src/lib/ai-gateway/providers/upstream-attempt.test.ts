@@ -24,9 +24,13 @@ jest.mock('./preferred-provider-order-config', () => ({
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
+import { eq } from 'drizzle-orm';
+import { openai_chatgpt_connections } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { useFakeByokKms } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
@@ -405,36 +409,33 @@ describe('upstream model catalog validation', () => {
     expect(result.type).toBe(type);
   });
 
-  it.each([
-    'direct-byok',
-    'mistral',
-    'inception',
-    'custom',
-    'custom-public',
-    'partner',
-    'dev-tools',
-  ] as const)('does not validate %s models against a gateway catalog', async providerId => {
-    const result = await attempt({
-      providerId,
-      requestedModel: 'not-in-catalog',
-      wireModel: 'provider-specific-model',
-    });
+  it.each(['direct-byok', 'mistral', 'custom', 'custom-public', 'partner', 'dev-tools'] as const)(
+    'does not validate %s models against a gateway catalog',
+    async providerId => {
+      const result = await attempt({
+        providerId,
+        requestedModel: 'not-in-catalog',
+        wireModel: 'provider-specific-model',
+      });
 
-    expect(result.type).toBe('success');
-    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-    expect(isValidVercelModelId).not.toHaveBeenCalled();
-    expect(upstreamRequest).toHaveBeenCalledTimes(1);
-  });
+      expect(result.type).toBe('success');
+      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+      expect(isValidVercelModelId).not.toHaveBeenCalled();
+      expect(upstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;
+  let credentialKeyId: string;
+  const kms = useFakeByokKms();
 
   beforeEach(async () => {
     const user = await insertTestUser({
       google_user_email: `upstream-attempt-${randomUUID()}@example.com`,
     });
     owner = { kiloUserId: user.id, organizationId: null };
-    await saveOpenAiChatGptConnection(
+    ({ credentialKeyId } = await saveOpenAiChatGptConnection(
       owner,
       {
         access_token: ACCESS_TOKEN,
@@ -447,7 +448,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
         status: 'connected',
       },
       user.id
-    );
+    ));
     // The real transform puts the delegated token in this header.
     jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
       extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
@@ -460,7 +461,11 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       dataRegion: null,
       upstreamDurationBudgetMs,
       providerContext: {
-        provider: { type: 'openai-chatgpt', chatGptOwner: owner },
+        provider: {
+          type: 'openai-chatgpt',
+          chatGptOwner: owner,
+          chatGptCredentialKeyId: credentialKeyId,
+        },
         userByok: null,
       } as never,
       requestedModel: 'openai/gpt-6.1-sol',
@@ -493,6 +498,50 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       status: 'error',
       error_message: OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
     });
+  });
+
+  it('passes the 403 on and still disables the connection when the KMS service cannot create a data key', async () => {
+    kms.fail('/data-key');
+
+    const result = await send(
+      jsonResponse(403, {
+        error: {
+          message: 'The ChatGPT user is not eligible for subscription sharing.',
+          code: 'subscription_sharing_user_not_eligible',
+        },
+      })
+    );
+
+    expect(result.type === 'success' && result.response.status).toBe(403);
+    // The refusal cannot be sealed, so the refused credential is deleted: it reads as no
+    // connection.
+    const rows = await db
+      .select({ id: openai_chatgpt_connections.id })
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string));
+    expect(rows).toEqual([]);
+    await expect(getOpenAiChatGptStoredConnection(owner)).resolves.toBeNull();
+  });
+
+  it('deletes the refused credential by its key id when the KMS service cannot open it', async () => {
+    kms.fail('/decrypt');
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await send(
+      jsonResponse(403, {
+        error: {
+          message: 'The ChatGPT user is not eligible for subscription sharing.',
+          code: 'subscription_sharing_user_not_eligible',
+        },
+      })
+    ).finally(() => consoleError.mockRestore());
+
+    expect(result.type === 'success' && result.response.status).toBe(403);
+    const rows = await db
+      .select({ id: openai_chatgpt_connections.id })
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId as string));
+    expect(rows).toEqual([]);
   });
 
   it('keeps the connection on another 403', async () => {

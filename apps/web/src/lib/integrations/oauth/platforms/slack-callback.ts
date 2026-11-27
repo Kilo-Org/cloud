@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
@@ -132,7 +132,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     // connection carries a shared bot token and model policy, so it needs
     // organization management authority, not just membership.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
+      await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_MANAGE_ROLES);
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {

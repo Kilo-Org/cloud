@@ -12,8 +12,18 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureOrganizationAccess,
+  organizationRestAccessContext,
+  StaffRequestRefusal,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import {
+  addAdminAuditMetadata,
+  adminActionContextFromHeaders,
+  runElevatedOrganizationWrite,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
+import type { User } from '@kilocode/db/schema';
 
 function workerResultResponse(result: { status: number; body: unknown }): NextResponse {
   if (result.status >= 400) {
@@ -24,8 +34,9 @@ function workerResultResponse(result: { status: number; body: unknown }): NextRe
   });
 }
 
-function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | null {
+function trpcErrorResponse(error: unknown): NextResponse | null {
   if (!(error instanceof TRPCError)) return null;
+  if (error.cause instanceof StaffRequestRefusal) return error.cause.response;
   const status =
     error.code === 'UNAUTHORIZED'
       ? 401
@@ -40,40 +51,65 @@ function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | nu
 async function resolveOwner(
   request: NextRequest,
   roles?: Parameters<typeof ensureOrganizationAccess>[2]
-): Promise<AutoRoutingModeOwnerQuery | { response: NextResponse<{ error: string }> }> {
-  const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-  if (!user || authFailedResponse) {
+): Promise<{ owner: AutoRoutingModeOwnerQuery; user: User } | { response: NextResponse }> {
+  const auth = await getUserFromAuth({ adminOnly: false });
+  if (!auth.user || auth.authFailedResponse) {
     return { response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
   }
+  const { user } = auth;
 
   const organizationId = request.nextUrl.searchParams.get('organizationId');
   if (organizationId === null) {
-    return { ownerType: 'user', ownerId: user.id };
+    return { owner: { ownerType: 'user', ownerId: user.id }, user };
   }
   if (!z.uuid().safeParse(organizationId).success) {
     return { response: NextResponse.json({ error: 'Invalid organization ID' }, { status: 400 }) };
   }
 
   try {
-    await ensureOrganizationAccess({ user, tokenSource }, organizationId, roles);
+    // Staff without a membership pass only the shared staff guard, with this
+    // request's real credential, method and headers.
+    await ensureOrganizationAccess(
+      organizationRestAccessContext(auth, { headers: request.headers, method: request.method }),
+      organizationId,
+      roles
+    );
   } catch (error) {
     const response = trpcErrorResponse(error);
     if (response) return { response };
     throw error;
   }
-  return { ownerType: 'org', ownerId: organizationId };
+  return { owner: { ownerType: 'org', ownerId: organizationId }, user };
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const owner = await resolveOwner(request);
-  if ('response' in owner) return owner.response;
+  const resolved = await resolveOwner(request);
+  if ('response' in resolved) return resolved.response;
 
-  return workerResultResponse(await getAutoRoutingMode(owner));
+  return workerResultResponse(await getAutoRoutingMode(resolved.owner));
 }
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
-  const owner = await resolveOwner(request, ORGANIZATION_BILLING_ROLES);
-  if ('response' in owner) return owner.response;
+  const resolved = await resolveOwner(request, ORGANIZATION_BILLING_ROLES);
+  if ('response' in resolved) return resolved.response;
+  const { owner, user } = resolved;
+  if (owner.ownerType === 'user') return setMode(request, owner);
+  return runElevatedOrganizationWrite(
+    adminActionContextFromHeaders(user, request.headers),
+    {
+      organizationId: owner.ownerId,
+      requiredRoles: ORGANIZATION_BILLING_ROLES,
+      action: 'organization.auto_routing_mode.set',
+      message: 'Set the auto-routing mode',
+    },
+    () => setMode(request, owner)
+  );
+}
+
+async function setMode(
+  request: NextRequest,
+  owner: AutoRoutingModeOwnerQuery
+): Promise<NextResponse> {
   if (owner.ownerType === 'org') {
     try {
       await requireActiveSubscriptionOrTrial(owner.ownerId);
@@ -98,5 +134,6 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid routing mode' }, { status: 400 });
   }
 
+  addAdminAuditMetadata({ mode: parsed.data });
   return workerResultResponse(await updateAutoRoutingMode({ ...owner, mode: parsed.data }));
 }

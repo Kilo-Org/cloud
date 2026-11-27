@@ -1,0 +1,28 @@
+{
+  "name": "cloudflare-uts-feed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env local",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/uts-feed/src services/uts-feed/test"
+  },
+  "dependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
+    "@kilocode/uts-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "jose": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

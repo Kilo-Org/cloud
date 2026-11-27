@@ -16,9 +16,8 @@ import {
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_connection_attempts } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
-import type { User } from '@kilocode/db/schema';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
 
 function redirect(path: string, error?: string) {
@@ -56,12 +55,10 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
   if (!code || !/^[A-Za-z0-9._~+/-]{1,2048}$/.test(code)) return redirect(path, 'missing_code');
   try {
+    // Binding an organization connection is membership-only: OAuth state and
+    // staff grants never stand in for a manage membership.
     if (attempt.owner_type === 'org') {
-      await ensureOrganizationAccess(
-        { user: user as User },
-        attempt.owner_id,
-        ORGANIZATION_MANAGE_ROLES
-      );
+      await ensureMemberOrganizationAccess(user, attempt.owner_id, ORGANIZATION_MANAGE_ROLES);
     } else if (attempt.owner_id !== user.id) {
       return redirect(path, 'authorization_revoked');
     }
@@ -107,11 +104,7 @@ export async function GET(request: NextRequest) {
       candidate: proof.candidate,
       authorizeOwner: async owner => {
         if (owner.type === 'org') {
-          await ensureOrganizationAccess(
-            { user: user as User },
-            owner.id,
-            ORGANIZATION_MANAGE_ROLES
-          );
+          await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_MANAGE_ROLES);
         } else if (owner.id !== user.id) {
           throw new Error('GitHub connection owner authorization changed');
         }

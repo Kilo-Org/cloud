@@ -24,7 +24,11 @@ vi.mock('../auth.js', () => ({
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
   createRuntimeAuthorization: vi.fn(async () => ({
     authorization: { id: 'authorization-1' },
-    token: 'runtime-token',
+    tokens: {
+      'kilo-api': 'runtime-token',
+      'kilo-gateway': 'gateway-runtime-token',
+      'session-ingest': 'ingest-runtime-token',
+    },
   })),
   sealRuntimeAuthorization: vi.fn(async () => 'runtime-seal'),
 }));
@@ -392,6 +396,11 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
       expectedOldId: 'authorization-1',
       runtimeAuthorizationSeal: 'runtime-seal',
       runtimeToken: 'runtime-token',
+      runtimeTokens: {
+        'kilo-api': 'runtime-token',
+        'kilo-gateway': 'gateway-runtime-token',
+        'session-ingest': 'ingest-runtime-token',
+      },
     });
   });
 

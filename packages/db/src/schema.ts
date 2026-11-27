@@ -148,7 +148,10 @@ import type {
   CustomPricingConfig,
   KiloClawAdminAuditAction,
   AdminActionAuditAction,
+  AdminActionAuditOutcome,
   AdminActionAuditTargetType,
+  AuthAuditAction,
+  AuthAuditOutcome,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
@@ -174,7 +177,9 @@ import type {
   OrganizationSettings,
   AuditLogAction,
   BYOKApiKeyEnvelope,
-  EncryptedData,
+  CustomLlmCredentialsEnvelope,
+  CodingPlanInventoryCredentialEnvelope,
+  OpenAiChatGptConnectionEnvelope,
   ByocCredentialEnvelope,
   ByocSetupStatus,
   ByocUpgradeStatus,
@@ -2770,6 +2775,11 @@ export const payment_methods = pgTable(
   ]
 );
 export type MicrodollarUsage = typeof microdollar_usage.$inferSelect;
+// Storage parameters that Drizzle cannot declare: migration 0384 sets
+// `autovacuum_vacuum_insert_scale_factor = 0` and
+// `autovacuum_vacuum_insert_threshold = 500000`, so insert-triggered vacuum
+// keeps the newest pages all-visible for index-only scans such as the
+// spend-alert hourly rollup. `schema.test.ts` asserts them.
 export const microdollar_usage = pgTable(
   'microdollar_usage',
   {
@@ -2941,6 +2951,7 @@ export const microdollar_usage_metadata = pgTable(
     is_free: boolean(),
     abuse_delay: integer(),
     abuse_downgraded_from: text(),
+    system_prompt_kind_id: integer(),
   },
   table => [
     index('idx_microdollar_usage_metadata_created_at').on(table.created_at),
@@ -3054,6 +3065,16 @@ export const finish_reason = pgTable(
     finish_reason: text().notNull(),
   },
   table => [uniqueIndex('UQ_finish_reason').on(table.finish_reason)]
+);
+
+/** The client guessed from the system prompt, such as `kilo` or `codex`; see `classifySystemPrompt`. */
+export const system_prompt_kind = pgTable(
+  'system_prompt_kind',
+  {
+    system_prompt_kind_id: serial().notNull().primaryKey(),
+    system_prompt_kind: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_system_prompt_kind').on(table.system_prompt_kind)]
 );
 
 export const editor_name = pgTable(
@@ -3174,6 +3195,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   is_free: boolean(),
   abuse_delay: integer(),
   abuse_downgraded_from: text(),
+  system_prompt_kind: text(),
 }).as(sql`
   SELECT
     mu.id,
@@ -3229,7 +3251,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.non_inference_cost,
     meta.is_free,
     meta.abuse_delay,
-    meta.abuse_downgraded_from
+    meta.abuse_downgraded_from,
+    spk.system_prompt_kind
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -3245,6 +3268,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
   LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
+  LEFT JOIN ${system_prompt_kind} spk ON meta.system_prompt_kind_id = spk.system_prompt_kind_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -3252,7 +3276,7 @@ export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
-  encrypted_api_key: jsonb().$type<EncryptedData>(),
+  encrypted_api_key: jsonb().$type<CustomLlmCredentialsEnvelope>(),
 });
 
 export type CustomLlm2 = typeof custom_llm2.$inferSelect;
@@ -8048,7 +8072,8 @@ export const openai_chatgpt_connections = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
+    /** The connection payload, encrypted through the BYOK KMS service. */
+    encrypted_connection_envelope: jsonb().$type<OpenAiChatGptConnectionEnvelope>(),
     is_enabled: boolean().default(true).notNull(),
     /**
      * True for the organization's shared-services connection: one row per
@@ -10203,6 +10228,7 @@ export const admin_action_audit_logs = pgTable(
     target_id: text(),
     message: text().notNull(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    outcome: text().$type<AdminActionAuditOutcome>().default('success').notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -10219,6 +10245,38 @@ export const admin_action_audit_logs = pgTable(
 
 export type AdminActionAuditLog = typeof admin_action_audit_logs.$inferSelect;
 export type NewAdminActionAuditLog = typeof admin_action_audit_logs.$inferInsert;
+
+// Self-service authentication audit log: one row per auth action attempt,
+// success or failure. Rows never hold an email address in clear: the subject
+// is the account id when known, and `subject_email_hash` is a keyed hash that
+// correlates attempts on one address. Rows older than the retention window are
+// pruned by a cron, so the created_at index also serves deletion.
+export const auth_audit_logs = pgTable(
+  'auth_audit_logs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    action: text().$type<AuthAuditAction>().notNull(),
+    outcome: text().$type<AuthAuditOutcome>().notNull(),
+    user_id: text(),
+    method: text(),
+    failure_reason: text(),
+    subject_email_hash: text(),
+    metadata: jsonb().$type<Record<string, unknown>>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_auth_audit_logs_created_at').on(table.created_at),
+    index('IDX_auth_audit_logs_user_id_created_at').on(table.user_id, table.created_at),
+    index('IDX_auth_audit_logs_subject_email_hash_created_at')
+      .on(table.subject_email_hash, table.created_at)
+      .where(sql`${table.subject_email_hash} IS NOT NULL`),
+  ]
+);
+
+export type AuthAuditLog = typeof auth_audit_logs.$inferSelect;
 
 // KiloClaw Access Codes — one-time codes for authenticating browser sessions to the worker
 export const kiloclaw_access_codes = pgTable(
@@ -11066,7 +11124,8 @@ export const coding_plan_key_inventory = pgTable(
     provider_id: text().notNull(),
     upstream_plan_id: text().notNull(),
     upstream_usage_id: text(),
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
+    /** The credential, encrypted through the BYOK KMS service. Null once it is removed. */
+    encrypted_api_key_envelope: jsonb().$type<CodingPlanInventoryCredentialEnvelope>(),
     credential_fingerprint: text().notNull(),
     status: text().$type<CodingPlanCredentialStatus>().notNull().default('available'),
     assigned_to_user_id: text().references(() => kilocode_users.id, {
@@ -12096,6 +12155,48 @@ export const native_attested_keys = pgTable(
 );
 
 export type NativeAttestedKey = typeof native_attested_keys.$inferSelect;
+
+/**
+ * The devices and networks a user has signed in from, so a sign-in from an
+ * unseen device on an unseen network can be noticed. Holds only HMAC-SHA-256
+ * hex digests of the keys, under a key the database does not hold, never a
+ * raw address or cookie value. `key_id` is a fingerprint of that key: only
+ * rows under the current key are read, and the scheduled prune deletes the
+ * others.
+ *
+ * `device` and `network` rows are the sign-in contexts. The single `notice`
+ * row per user records when the last new-sign-in notice was sent
+ * (`last_seen_at`), so the notice is capped per user. The single `history`
+ * row per user and key (`key_hash` = `key_id`) marks that the user has
+ * signed in before; it holds no device or network data. The scheduled prune
+ * deletes device, network, and notice rows not seen for 90 days, and keeps
+ * the history row.
+ */
+export const user_sign_in_contexts = pgTable(
+  'user_sign_in_contexts',
+  {
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    kind: text().notNull().$type<'device' | 'network' | 'notice' | 'history'>(),
+    key_hash: text().notNull(),
+    key_id: text().notNull(),
+    first_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.user_id, table.kind, table.key_hash] }),
+    index('IDX_user_sign_in_contexts_key_kind_last_seen').on(
+      table.key_id,
+      table.kind,
+      table.last_seen_at
+    ),
+    check(
+      'user_sign_in_contexts_kind_check',
+      sql`${table.kind} IN ('device', 'network', 'notice', 'history')`
+    ),
+  ]
+);
 
 // ── W3-B operation ledger and analytics outbox (P1-A-08a / P2-A-04) ──────
 

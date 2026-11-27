@@ -181,14 +181,19 @@ export function createRevocationFeed(
 
   /**
    * Takes `opened` as the copy unless its head does not count: over 30 s old, more than 5 s in the
-   * future, or older than the held head.
+   * future, older than the held head, or signed in the same second as the held head over another
+   * list. `iat` has one-second resolution and two feed objects sign heads, so of two lists signed
+   * in one second neither is known to be the newer; the held one stays until a later head comes.
    */
   function adopt(opened: OpenedFeed, at: number): boolean {
     const signedAt = opened.head.issuedAt * 1000;
     const counts =
       at - signedAt <= FEED_MAX_FETCHED_HEAD_AGE_MS &&
       signedAt - at <= FEED_MAX_FUTURE_MS &&
-      (copy === null || opened.head.issuedAt >= copy.head.issuedAt);
+      (copy === null ||
+        opened.head.issuedAt > copy.head.issuedAt ||
+        (opened.head.issuedAt === copy.head.issuedAt &&
+          opened.head.listHash === copy.head.listHash));
     if (!counts) return false;
     copy = { ...opened, fetchedAt: at, headAt: Math.min(signedAt, at) };
     return true;

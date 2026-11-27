@@ -121,6 +121,7 @@ import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/di
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import { classifySystemPrompt } from '@kilocode/web-shared/lib/ai-gateway/system-prompt-kind';
 
 const posthogClient = PostHogClient();
 
@@ -135,34 +136,27 @@ function promptExtractionReportFields(body: unknown) {
   return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
 }
 
+export function extractSystemPromptText(body: OpenRouterChatCompletionRequest): string {
+  return (body.messages ?? [])
+    .filter(m => m.role === 'system' || m.role === 'developer')
+    .map(extractMessageTextContent)
+    .join('\n');
+}
+
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {
   try {
-    const messages = body.messages ?? [];
-
-    const systemPrompt = messages
-      .filter(m => m.role === 'system' || m.role === 'developer')
-      .map(extractMessageTextContent)
-      .join('\n');
-
-    const system_prompt_prefix = systemPrompt.slice(0, 100);
-    const system_prompt_length = systemPrompt.length;
-
-    const lastUserMessage =
-      messages
-        .filter(m => m.role === 'user')
-        .slice(-1)
-        .map(extractMessageTextContent)[0] ?? '';
-
-    const user_prompt_prefix = lastUserMessage.slice(0, 100);
-
-    return { system_prompt_prefix, system_prompt_length, user_prompt_prefix };
+    const systemPrompt = extractSystemPromptText(body);
+    return {
+      system_prompt_length: systemPrompt.length,
+      system_prompt_kind: classifySystemPrompt(systemPrompt),
+    };
   } catch (e) {
     captureException(e, {
       level: 'warning',
       tags: { source: 'prompt_extraction' },
       extra: promptExtractionReportFields(body),
     });
-    return { system_prompt_prefix: '', system_prompt_length: -1, user_prompt_prefix: '' };
+    return { system_prompt_length: -1, system_prompt_kind: null };
   }
 }
 
@@ -204,8 +198,6 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     reasoning_setting: usageContext.reasoning_setting,
     inference_region: usageContext.inference_region,
     ttfb_ms: usageContext.ttfb_ms,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
   };
 }
 
@@ -218,8 +210,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
  *
  * NULs have been observed in client-populated fields on the LLM gateway hot
  * path: HTTP headers from the VS Code extension (machine_id, session_id,
- * http_user_agent) and prompt-derived fields (system_prompt_prefix,
- * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
+ * http_user_agent) and prompt-derived fields, which are no longer recorded. Sanitizing at the DB boundary is a safety net; once
  * the upstream source is identified via the `console.warn` in
  * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
  * and remove this.
@@ -347,8 +338,6 @@ export async function toInsertableDbUsageRecord(
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
     non_inference_cost: usageStats.nonInferenceCost_mUsd ?? null,
-    abuse_delay: metadataFromContext.abuse_delay,
-    abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
   if (unrecordable.length > 0) {
@@ -360,12 +349,6 @@ export async function toInsertableDbUsageRecord(
       requested_model: usageContextInfo.requested_model,
       provider,
     });
-  }
-
-  if (organization_id) {
-    //never log any sensitive data for orgs
-    metadata.user_prompt_prefix = null;
-    metadata.system_prompt_prefix = null;
   }
 
   // Strip NUL bytes before returning. Postgres `text` columns reject them
@@ -1017,7 +1000,7 @@ export async function insertUsageRecord(
             // it burned three attempts and rebuilt the statement each time.
             if (attempt >= 2 || isUsageRowConflict(error)) throw error;
             // Never log the raw error: its message is the interpolated statement,
-            // roughly 30KB including prompt prefixes and the client IP.
+            // roughly 30KB including the client IP and user agent.
             sentryLogger('insertUsageRecord', 'warning')('insertUsageRecord concurrency failure', {
               usageId: coreUsageFields.id,
               attempt,
@@ -1120,7 +1103,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`vercel_ip_country`, metadataFields.http_x_vercel_ip_country)}
           , ${createUpsertCTE(sql`vercel_ip_city`, metadataFields.http_x_vercel_ip_city)}
           , ${createUpsertCTE(sql`ja4_digest`, metadataFields.http_x_vercel_ja4_digest)}
-          , ${createUpsertCTE(sql`system_prompt_prefix`, metadataFields.system_prompt_prefix)}
           , ${createUpsertCTE(sql`finish_reason`, metadataFields.finish_reason)}
           , ${createUpsertCTE(sql`editor_name`, metadataFields.editor_name)}
           , ${createUpsertCTE(sql`api_kind`, metadataFields.api_kind)}
@@ -1129,12 +1111,12 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
           , ${createUpsertCTE(sql`reasoning_setting`, metadataFields.reasoning_setting)}
           , ${createUpsertCTE(sql`inference_region`, metadataFields.inference_region)}
+          , ${createUpsertCTE(sql`system_prompt_kind`, metadataFields.system_prompt_kind)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
               message_id,
               created_at,
-              user_prompt_prefix,
               vercel_ip_latitude,
               vercel_ip_longitude,
               system_prompt_length,
@@ -1155,15 +1137,12 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               market_cost,
               non_inference_cost,
               is_free,
-              abuse_delay,
-              abuse_downgraded_from,
 
               http_user_agent_id,
               http_ip_id,
               vercel_ip_country_id,
               vercel_ip_city_id,
               ja4_digest_id,
-              system_prompt_prefix_id,
               finish_reason_id,
               editor_name_id,
               api_kind_id,
@@ -1171,13 +1150,13 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               mode_id,
               auto_model_id,
               reasoning_setting_id,
-              inference_region_id
+              inference_region_id,
+              system_prompt_kind_id
             )
             SELECT
               ${metadataFields.id},
               ${metadataFields.message_id ?? '<missing>'},
               ${metadataFields.created_at},
-              ${metadataFields.user_prompt_prefix},
               ${metadataFields.http_x_vercel_ip_latitude},
               ${metadataFields.http_x_vercel_ip_longitude},
               ${metadataFields.system_prompt_length},
@@ -1198,15 +1177,12 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.market_cost},
               ${metadataFields.non_inference_cost},
               ${metadataFields.is_free},
-              ${metadataFields.abuse_delay},
-              ${metadataFields.abuse_downgraded_from},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),
               (SELECT vercel_ip_country_id FROM vercel_ip_country_cte),
               (SELECT vercel_ip_city_id FROM vercel_ip_city_cte),
               (SELECT ja4_digest_id FROM ja4_digest_cte),
-              (SELECT system_prompt_prefix_id FROM system_prompt_prefix_cte),
               (SELECT finish_reason_id FROM finish_reason_cte),
               (SELECT editor_name_id FROM editor_name_cte),
               (SELECT api_kind_id FROM api_kind_cte),
@@ -1214,7 +1190,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte),
               (SELECT reasoning_setting_id FROM reasoning_setting_cte),
-              (SELECT inference_region_id FROM inference_region_cte)
+              (SELECT inference_region_id FROM inference_region_cte),
+              (SELECT system_prompt_kind_id FROM system_prompt_kind_cte)
           )
           , balance_update AS (
             UPDATE kilocode_users
@@ -1787,7 +1764,7 @@ export async function processTokenData(
 
 /**
  * Records or queues usage and reports the same request to bouncer's usage ledger, after the billing
- * cost is final. Chat and transcription reach it through `processTokenData`; FIM, edit,
+ * cost is final. Chat and transcription reach it through `processTokenData`; FIM,
  * embeddings, and SystemOne call it directly.
  *
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its

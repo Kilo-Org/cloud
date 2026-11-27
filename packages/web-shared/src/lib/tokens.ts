@@ -1,45 +1,18 @@
-import type { User } from '@kilocode/db/schema';
-import {
-  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
-  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
-  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
-  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
-  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
-  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
-  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
-  KILO_API_AUDIENCE,
-  KILO_GATEWAY_AUDIENCE,
-  SESSION_INGEST_AUDIENCE,
-  SESSION_INGEST_USER_DELETION_AUDIENCE,
-  USER_DATA_EXPORT_AUDIENCE,
-} from '@kilocode/worker-utils/internal-service-token-audiences';
-import {
-  KILO_TOKEN_MAX_LIFETIME_SECONDS,
-  KILO_TOKEN_VERSION,
-  assertKiloTokenLifetimeWithinCap,
-  kiloTokenPayload,
-} from '@kilocode/worker-utils/kilo-token';
-import {
-  buildModernKiloTokenPayload,
-  isKiloResourceAudienceAllowed,
-} from '@kilocode/worker-utils/kilo-token-policy';
+import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION, kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
+import { isKiloResourceAudienceAllowed } from '@kilocode/worker-utils/kilo-token-policy';
+import { isKiloTokenAdmissionObservationEnabled } from '@kilocode/worker-utils/kilo-token-admission-observation';
+import { observeWebBearerAdmission } from '@kilocode/web-shared/lib/kilo-token-admission';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
   validateCloudAgentAuthorityClaims,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
-import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import {
-  isBoundedInternalServiceTokenIssuanceEnabled,
-  isResourceTokenIssuanceEnabled,
-  NEXTAUTH_SECRET,
-} from '@kilocode/web-shared/lib/config.server';
-
-export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * @deprecated Use `KILO_TOKEN_VERSION`. One test file outside this change holds
@@ -59,158 +32,6 @@ const jwtSigningAlgorithm = 'HS256';
  * treated as the former. Delete this constant once no released client sends it.
  */
 const ANONYMOUS_BEARER_SENTINEL = 'anonymous';
-
-export const BOUNDED_INTERNAL_SERVICE_AUDIENCES = [
-  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
-  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
-  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
-  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
-  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
-  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
-  GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
-  USER_DATA_EXPORT_AUDIENCE,
-  SESSION_INGEST_USER_DELETION_AUDIENCE,
-  SESSION_INGEST_AUDIENCE,
-] as const;
-
-export type BoundedInternalServiceAudience = (typeof BOUNDED_INTERNAL_SERVICE_AUDIENCES)[number];
-
-const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
-  BOUNDED_INTERNAL_SERVICE_AUDIENCES
-);
-
-const THIRTY_DAYS_IN_SECONDS = KILO_TOKEN_MAX_LIFETIME_SECONDS;
-const ONE_HOUR_IN_SECONDS = 60 * 60;
-const FIFTEEN_MINUTES_IN_SECONDS = 15 * 60;
-const FIVE_MINUTES_IN_SECONDS = 5 * 60;
-
-export const TOKEN_EXPIRY = {
-  thirtyDays: THIRTY_DAYS_IN_SECONDS,
-  oneHour: ONE_HOUR_IN_SECONDS,
-  fifteenMinutes: FIFTEEN_MINUTES_IN_SECONDS,
-  fiveMinutes: FIVE_MINUTES_IN_SECONDS,
-} as const;
-
-/**
- * Generate a short-lived JWT for authenticating with internal Cloudflare Worker services
- * (e.g. session-ingest). Carries the minimal fields the workers require: kiloUserId and
- * version, plus an organizationId claim when the caller supplies one. Defaults to a
- * 1-hour expiry.
- *
- * The token has no pepper claim, so Session Ingest accepts it only while it lives at most one
- * hour (`isKiloTokenPepperCurrent`); a longer lifetime would survive a pepper rotation.
- */
-export function generateInternalServiceToken(
-  userId: string,
-  options?: { expiresIn?: number; audience?: string; organizationId?: string }
-): string {
-  const expiresIn = options?.expiresIn ?? ONE_HOUR_IN_SECONDS;
-  assertKiloTokenLifetimeWithinCap(expiresIn);
-  if (expiresIn > ONE_HOUR_IN_SECONDS) {
-    throw new Error('Internal service token lifetime exceeds one hour');
-  }
-  return jwt.sign(
-    {
-      kiloUserId: userId,
-      version: KILO_TOKEN_VERSION,
-      ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
-    },
-    NEXTAUTH_SECRET,
-    {
-      algorithm: jwtSigningAlgorithm,
-      expiresIn,
-      ...(options?.audience ? { audience: options.audience } : {}),
-    }
-  );
-}
-
-export function generateBoundedInternalServiceToken(
-  userId: string,
-  options: {
-    audience: BoundedInternalServiceAudience;
-    expiresIn: number;
-    organizationId?: string;
-  }
-): string {
-  if (!boundedInternalServiceAudienceSet.has(options.audience)) {
-    throw new Error('Unsupported bounded internal service token audience');
-  }
-  const maximumLifetime =
-    options.audience === SESSION_INGEST_AUDIENCE ? ONE_HOUR_IN_SECONDS : FIVE_MINUTES_IN_SECONDS;
-  if (options.expiresIn > maximumLifetime) {
-    throw new Error('Bounded internal service token lifetime exceeds its audience limit');
-  }
-
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload = buildModernKiloTokenPayload({
-    userId,
-    audience: options.audience,
-    issuedAt,
-    expiresAt: issuedAt + options.expiresIn,
-    tokenPurpose: 'internal-service',
-    credentialExchange: false,
-    extra: options.organizationId ? { organizationId: options.organizationId } : undefined,
-  });
-
-  if (isBoundedInternalServiceTokenIssuanceEnabled()) {
-    return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
-  }
-
-  return generateInternalServiceToken(userId, {
-    expiresIn: options.expiresIn,
-    audience:
-      options.audience === SESSION_INGEST_AUDIENCE ||
-      options.audience === GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE
-        ? undefined
-        : options.audience,
-    organizationId: options.organizationId,
-  });
-}
-
-/**
- * Mints an audience-less Kilo API token. The lifetime is always explicit and
- * never exceeds 30 days (`TOKEN_EXPIRY.thirtyDays`); a longer request throws.
- */
-export function generateApiToken(
-  { id, api_token_pepper }: User,
-  extraPayload: JWTTokenExtraPayload | undefined,
-  options: { expiresIn: number }
-) {
-  assertKiloTokenLifetimeWithinCap(options.expiresIn);
-  return jwt.sign(
-    {
-      env: process.env.NODE_ENV,
-      kiloUserId: id,
-      apiTokenPepper: api_token_pepper,
-      version: KILO_TOKEN_VERSION,
-      ...extraPayload,
-    },
-    NEXTAUTH_SECRET,
-    {
-      algorithm: jwtSigningAlgorithm,
-      expiresIn: options.expiresIn,
-    }
-  );
-}
-
-export function generateOrganizationApiToken(
-  user: User,
-  organizationId: string,
-  organizationRole: OrganizationRole
-) {
-  const expiresAt = new Date(Date.now() + FIFTEEN_MINUTES_IN_SECONDS * 1000);
-
-  const token = generateApiToken(
-    user,
-    { organizationId, organizationRole },
-    { expiresIn: FIFTEEN_MINUTES_IN_SECONDS }
-  );
-
-  return {
-    token,
-    expiresAt: expiresAt.toISOString(),
-  };
-}
 
 /**
  * The claims a verified Kilo bearer carries, taken from the shared payload
@@ -292,14 +113,22 @@ export function isRejectedCredentialReason(reason: string | undefined): boolean 
   return reason !== ANONYMOUS_FALL_THROUGH_REASON;
 }
 
+type AuthorizationHeaderOptions = {
+  expectedAudience?: string;
+  runtimeProxyAttestationVerified?: boolean;
+  // Derive from an actual Request URL or fixed route path, never a request header.
+  requestPathname?: string;
+  /**
+   * Set only by the request's admission point (`getUserFromAuth`), so a
+   * second read of the same header, such as the gateway rate-limit key,
+   * does not report the decision twice.
+   */
+  observeAdmission?: boolean;
+};
+
 export function validateAuthorizationHeader(
   headers: Headers,
-  options?: {
-    expectedAudience?: string;
-    runtimeProxyAttestationVerified?: boolean;
-    // Derive from an actual Request URL or fixed route path, never a request header.
-    requestPathname?: string;
-  }
+  options?: AuthorizationHeaderOptions
 ) {
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
@@ -330,11 +159,22 @@ export function validateAuthorizationHeader(
     };
   }
 
+  const policyAudience = options?.expectedAudience ?? KILO_API_AUDIENCE;
+  const result = admitVerifiedToken(payload, policyAudience, options);
+  if (options?.observeAdmission === true && isKiloTokenAdmissionObservationEnabled()) {
+    observeWebBearerAdmission(headers, payload, policyAudience, result.reason ?? 'admitted');
+  }
+  return result;
+}
+
+/** Every check after the signature; the result is the caller's verdict. */
+function admitVerifiedToken(
+  payload: JWTTokenPayload,
+  policyAudience: string,
+  options: AuthorizationHeaderOptions | undefined
+) {
   if (
-    !isKiloResourceAudienceAllowed(payload.aud, {
-      audience: options?.expectedAudience ?? KILO_API_AUDIENCE,
-      mode: 'allow-legacy',
-    })
+    !isKiloResourceAudienceAllowed(payload.aud, { audience: policyAudience, mode: 'allow-legacy' })
   ) {
     const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
@@ -409,149 +249,4 @@ export function validateAuthorizationHeader(
     cloudAgentAuthority,
     cloudAgentRuntimeProxied,
   };
-}
-
-/**
- * Refuse to mint a token while the current pepper is the empty string. A `null`
- * pepper means the account has no pepper, and stays accepted.
- */
-function assertMintablePepper(pepper: string | null, message: string): void {
-  if (pepper !== null && !pepper) {
-    throw new Error(message);
-  }
-}
-
-/** The optional claims `buildModernKiloTokenPayload` accepts beside the core fields. */
-type WorkflowTokenExtra = NonNullable<Parameters<typeof buildModernKiloTokenPayload>[0]['extra']>;
-
-/**
- * Mints a modern Kilo token for a server-side workflow. The invariant skeleton
- * lives here once: the pepper guard that precedes the mint, the issue time, the
- * shared claim set with `credentialExchange: false`, and the HS256 signature.
- * Each caller keeps its policy gate, its expiry clamp, its refusal order, its
- * audience, its extra claims and its error text.
- */
-function signWorkflowKiloToken(options: {
-  user: Pick<User, 'id' | 'api_token_pepper'>;
-  /** The pepper this issuer refuses last, immediately before the mint. */
-  pepper: { value: string | null; message: string };
-  audience: string;
-  expiresIn: number;
-  tokenPurpose: 'internal-service' | 'delegated-workload';
-  extra: WorkflowTokenExtra;
-}): string {
-  assertMintablePepper(options.pepper.value, options.pepper.message);
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload = buildModernKiloTokenPayload({
-    userId: options.user.id,
-    pepper: options.user.api_token_pepper,
-    env: process.env.NODE_ENV,
-    audience: options.audience,
-    issuedAt,
-    expiresAt: issuedAt + options.expiresIn,
-    tokenPurpose: options.tokenPurpose,
-    credentialExchange: false,
-    extra: options.extra,
-  });
-  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
-}
-
-export function generateCloudAgentWorkflowToken(
-  user: User,
-  options: {
-    organizationId?: string;
-    tokenSource: string;
-    botId?: string;
-    createdOnPlatform?: string;
-    expiresIn: number;
-    authorizationUser?: User;
-  }
-): string {
-  const expiresIn = Math.min(options.expiresIn, ONE_HOUR_IN_SECONDS);
-  if (expiresIn <= 0) {
-    throw new Error('Workflow control token expiry must be positive');
-  }
-  if (!isResourceTokenIssuanceEnabled('cloud-agent-next')) {
-    // The audience-less payload keeps its compatibility shape. The one-hour
-    // bound and the positive-lifetime refusal apply to both payloads.
-    return generateApiToken(
-      user,
-      {
-        organizationId: options.organizationId,
-        tokenSource: options.tokenSource,
-        botId: options.botId,
-        createdOnPlatform: options.createdOnPlatform,
-      },
-      { expiresIn }
-    );
-  }
-  assertMintablePepper(
-    user.api_token_pepper,
-    'Workflow control tokens require a current user pepper'
-  );
-  const authorizationUser = options.authorizationUser ?? user;
-  return signWorkflowKiloToken({
-    user,
-    pepper: {
-      value: authorizationUser.api_token_pepper,
-      message: 'Workflow control tokens require a current authorization pepper',
-    },
-    audience: 'cloud-agent-next',
-    expiresIn,
-    tokenPurpose: 'internal-service',
-    extra: {
-      organizationId: options.organizationId,
-      tokenSource: options.tokenSource,
-      botId: options.botId,
-      createdOnPlatform: options.createdOnPlatform,
-      runtimeAdmission: {
-        source: 'automation',
-        authorizationUserId: authorizationUser.id,
-        authorizationPepper: authorizationUser.api_token_pepper,
-      },
-    },
-  });
-}
-
-/**
- * Generates a gateway credential for a server-side workflow. Unlike resource
- * delegation from an HTTP request, queued workflows have no browser bearer
- * token to delegate from. The workflow owner is therefore the authority and
- * the token is deliberately limited to the gateway and one hour.
- */
-export function generateWorkflowGatewayToken(
-  user: User,
-  options: {
-    organizationId?: string;
-    tokenSource: string;
-    expiresIn?: number;
-  }
-): string {
-  const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
-  if (expiresIn <= 0) {
-    throw new Error('Workflow gateway token expiry must be positive');
-  }
-  if (!isResourceTokenIssuanceEnabled('workflow-gateway')) {
-    // The audience-less payload keeps its compatibility shape. The one-hour
-    // bound and the organization claim apply to both payloads.
-    return generateApiToken(
-      user,
-      { organizationId: options.organizationId, tokenSource: options.tokenSource },
-      { expiresIn }
-    );
-  }
-  return signWorkflowKiloToken({
-    user,
-    pepper: {
-      value: user.api_token_pepper,
-      message: 'Workflow gateway tokens require a current user pepper',
-    },
-    audience: KILO_GATEWAY_AUDIENCE,
-    expiresIn,
-    tokenPurpose: 'delegated-workload',
-    extra: {
-      organizationId: options.organizationId,
-      tokenSource: options.tokenSource,
-    },
-  });
 }

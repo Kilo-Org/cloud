@@ -1,4 +1,15 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import {
+  createBearerCallerForUser,
+  createCallerForUser,
+  createSessionCallerForUser,
+} from '@/routers/test-utils';
+import {
+  ALLOWED_ADMIN_ADDRESS,
+  OFF_NETWORK_ADDRESS,
+  withAdminStepUpEnabled,
+  withEnforcedAdminNetwork,
+} from '@/tests/helpers/admin-network.helper';
+import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -70,8 +81,8 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
   createControlTokenForRequest: jest.fn(async () => ({ token: 'test-cloud-agent-control-token' })),
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/tokens');
+jest.mock('@/lib/auth/kilo-token-signing', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/auth/kilo-token-signing');
   return {
     ...actual,
     generateApiToken: jest.fn(() => 'test-api-token'),
@@ -1990,43 +2001,172 @@ describe('cli-sessions-v2-router', () => {
       }
     });
 
-    it('list preserves platform-admin access without organization membership', async () => {
-      const adminSessionId = 'ses_read_auth_admin_1234';
-      await db.insert(cli_sessions_v2).values({
-        session_id: adminSessionId,
-        kilo_user_id: adminUser.id,
-        organization_id: testOrganization.id,
-        created_on_platform: 'cloud-agent',
+    describe('platform-admin view without organization membership', () => {
+      const adminOrganizationSessionId = 'ses_read_auth_admin_1234';
+      const adminPersonalSessionId = 'ses_read_auth_admin_personal_1234';
+      const adminOrganizationGitUrl = 'https://github.com/kilo/admin-organization-repository';
+      const searchTitle = 'admin-cross-org-search';
+      const updatedSince = '2026-01-01T00:00:00.000Z';
+
+      beforeEach(async () => {
+        await db.insert(cli_sessions_v2).values([
+          {
+            session_id: adminOrganizationSessionId,
+            kilo_user_id: adminUser.id,
+            organization_id: testOrganization.id,
+            created_on_platform: 'cloud-agent',
+            title: searchTitle,
+            git_url: adminOrganizationGitUrl,
+          },
+          {
+            session_id: adminPersonalSessionId,
+            kilo_user_id: adminUser.id,
+            created_on_platform: 'cloud-agent',
+            title: searchTitle,
+          },
+        ]);
+        // Another member's session in the same organization.
+        await db
+          .update(cli_sessions_v2)
+          .set({ title: searchTitle })
+          .where(eq(cli_sessions_v2.session_id, organizationSessionId));
       });
 
-      try {
-        const caller = await createCallerForUser(adminUser.id);
-        const result = await caller.cliSessionsV2.list({});
-
-        expect(result.cliSessions.map(session => session.session_id)).toContain(adminSessionId);
-      } finally {
-        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
-      }
-    });
-
-    it('support access removes the platform-admin cross-organization list bypass', async () => {
-      const adminSessionId = 'ses_read_auth_admin_enforce_1234';
-      await db.insert(cli_sessions_v2).values({
-        session_id: adminSessionId,
-        kilo_user_id: adminUser.id,
-        organization_id: testOrganization.id,
-        created_on_platform: 'cloud-agent',
+      afterEach(async () => {
+        await db
+          .delete(cli_sessions_v2)
+          .where(
+            inArray(cli_sessions_v2.session_id, [
+              adminOrganizationSessionId,
+              adminPersonalSessionId,
+            ])
+          );
       });
 
-      enableSupportAccess(true);
-      try {
-        const caller = await createCallerForUser(adminUser.id);
-        const result = await caller.cliSessionsV2.list({});
-        expect(result.cliSessions.map(session => session.session_id)).not.toContain(adminSessionId);
-      } finally {
-        enableSupportAccess(false);
-        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      function expectOrdinaryRows(sessionIds: string[]) {
+        expect(sessionIds).toContain(adminPersonalSessionId);
+        expect(sessionIds).not.toContain(adminOrganizationSessionId);
+        expect(sessionIds).not.toContain(organizationSessionId);
       }
+
+      async function expectOrdinaryDefaultView(
+        caller: Awaited<ReturnType<typeof createCallerForUser>>
+      ) {
+        const listed = await caller.cliSessionsV2.list({});
+        expectOrdinaryRows(listed.cliSessions.map(session => session.session_id));
+
+        const searched = await caller.cliSessionsV2.search({ search_string: searchTitle });
+        expect(searched.results.map(session => session.session_id)).toEqual([
+          adminPersonalSessionId,
+        ]);
+
+        const recent = await caller.cliSessionsV2.recentRepositories({ updatedSince });
+        expect(recent.repositories.map(repository => repository.gitUrl)).not.toContain(
+          adminOrganizationGitUrl
+        );
+      }
+
+      it('keeps the membership predicate for a bearer caller', async () => {
+        await expectOrdinaryDefaultView(await createBearerCallerForUser(adminUser.id));
+      });
+
+      it('serves the ordinary default view to an off-network browser session without a proof', async () => {
+        await withEnforcedAdminNetwork(() =>
+          withAdminStepUpEnabled(async () => {
+            const caller = await createSessionCallerForUser(adminUser.id, {
+              headers: OFF_NETWORK_ADDRESS,
+            });
+            await expectOrdinaryDefaultView(caller);
+          })
+        );
+      });
+
+      it('serves the same ordinary default view with support access on', async () => {
+        enableSupportAccess(true);
+        try {
+          await expectOrdinaryDefaultView(await createSessionCallerForUser(adminUser.id));
+        } finally {
+          enableSupportAccess(false);
+        }
+      });
+
+      it('refuses an explicit organization view from an off-network browser session', async () => {
+        await withEnforcedAdminNetwork(async () => {
+          const caller = await createSessionCallerForUser(adminUser.id, {
+            headers: OFF_NETWORK_ADDRESS,
+          });
+          const refusal = {
+            code: 'FORBIDDEN',
+            message: expect.stringContaining('Cloudflare WARP'),
+          };
+          const organizationId = testOrganization.id;
+
+          await expect(caller.cliSessionsV2.list({ organizationId })).rejects.toMatchObject(
+            refusal
+          );
+          await expect(
+            caller.cliSessionsV2.search({ search_string: searchTitle, organizationId })
+          ).rejects.toMatchObject(refusal);
+          await expect(
+            caller.cliSessionsV2.recentRepositories({ updatedSince, organizationId })
+          ).rejects.toMatchObject(refusal);
+        });
+      });
+
+      it('refuses an explicit organization view without a step-up proof', async () => {
+        await withAdminStepUpEnabled(async () => {
+          const caller = await createSessionCallerForUser(adminUser.id);
+          const error: unknown = await caller.cliSessionsV2
+            .list({ organizationId: testOrganization.id })
+            .catch(caught => caught);
+
+          if (!(error instanceof TRPCError)) throw error;
+          expect(error.code).toBe('FORBIDDEN');
+          expect(error.cause).toBeInstanceOf(StepUpRequiredError);
+          expect(error.cause).toMatchObject({ actionClass: 'support_read' });
+        });
+      });
+
+      it('refuses an explicit organization view from a bearer caller', async () => {
+        const caller = await createBearerCallerForUser(adminUser.id);
+
+        await expect(
+          caller.cliSessionsV2.list({ organizationId: testOrganization.id })
+        ).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+          cause: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+        });
+      });
+
+      it('lets an admitted browser session see its own rows in the explicit organization', async () => {
+        await withEnforcedAdminNetwork(async () => {
+          const caller = await createSessionCallerForUser(adminUser.id, {
+            headers: ALLOWED_ADMIN_ADDRESS,
+          });
+          const organizationId = testOrganization.id;
+
+          const listed = await caller.cliSessionsV2.list({ organizationId });
+          expect(listed.cliSessions.map(session => session.session_id)).toEqual([
+            adminOrganizationSessionId,
+          ]);
+
+          const searched = await caller.cliSessionsV2.search({
+            search_string: searchTitle,
+            organizationId,
+          });
+          expect(searched.results.map(session => session.session_id)).toEqual([
+            adminOrganizationSessionId,
+          ]);
+
+          const recent = await caller.cliSessionsV2.recentRepositories({
+            updatedSince,
+            organizationId,
+          });
+          expect(recent.repositories.map(repository => repository.gitUrl)).toContain(
+            adminOrganizationGitUrl
+          );
+        });
+      });
     });
 
     it('search omits organization sessions after their creator loses membership', async () => {

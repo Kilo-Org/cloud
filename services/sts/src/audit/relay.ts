@@ -1,6 +1,7 @@
 import {
   AUDIT_BATCH_MAX_EVENTS,
   AuditBatchTooLargeError,
+  AuditEventSchema,
   encodeAuditBatch,
   type AuditBatch,
   type AuditEvent,
@@ -23,6 +24,17 @@ export class AuditEventTooLargeError extends Error {
   }
 }
 
+/**
+ * An event the batch schema refuses, such as one with a nested attribute. The relay's encode
+ * would throw on it and stall the stream behind it, so appends refuse it first.
+ */
+export class AuditEventInvalidError extends Error {
+  constructor() {
+    super('audit event does not match the audit event schema');
+    this.name = 'AuditEventInvalidError';
+  }
+}
+
 /** Bounds one alarm's work; a larger backlog is picked up by the next alarm. */
 const MAX_BATCHES_PER_RUN = 20;
 
@@ -34,10 +46,12 @@ const MAX_BATCHES_PER_RUN = 20;
 const ALWAYS_FITS_BYTES = 50_000;
 
 /**
- * Throws `AuditEventTooLargeError` when `event` could not be relayed even as a batch of one.
- * Called before every append, so the relay never meets an event it would have to skip.
+ * Throws `AuditEventInvalidError` when the batch schema would refuse `event`, and
+ * `AuditEventTooLargeError` when it could not be relayed even as a batch of one. Called before
+ * every append, so the relay never meets an event it would have to skip.
  */
 export async function assertRelayable(stream: string, event: AuditEvent): Promise<void> {
+  if (!AuditEventSchema.safeParse(event).success) throw new AuditEventInvalidError();
   if (new TextEncoder().encode(JSON.stringify(event)).byteLength < ALWAYS_FITS_BYTES) return;
   try {
     await encodeAuditBatch({

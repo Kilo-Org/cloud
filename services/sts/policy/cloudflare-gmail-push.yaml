@@ -1,0 +1,4 @@
+# Registration only: services/gmail-push/wrangler.jsonc. No environment, identity or grant.
+workload: cloudflare-gmail-push
+registered: true
+secrets: []

@@ -1,8 +1,11 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { backoffDelayMs } from '../../src/dos/RefresherDO';
+import o11yPolicy from '../../policy/o11y.yaml';
+import { backoffDelayMs, RefresherDO } from '../../src/dos/RefresherDO';
 import { getBundleStub, getRefresherStub, getSignerStub } from '../../src/dos/stubs';
+import { loadPolicies } from '../../src/policy/load';
+import type { FillResult } from '../../src/types';
 import { installManager, secret, stubOfflineNetwork, type MockSecret } from './manager';
 import { resetBundleObject, resetRefresherObject } from './reset';
 import { config, env } from './test-env';
@@ -10,7 +13,7 @@ import { config, env } from './test-env';
 beforeEach(async () => {
   stubOfflineNetwork();
   await resetRefresherObject(getRefresherStub(env, config));
-  for (const workload of ['o11y', 'audit-relay']) {
+  for (const workload of ['o11y', 'audit-relay', 'ci-release']) {
     await resetBundleObject(getBundleStub(env, config, workload));
   }
 });
@@ -285,6 +288,145 @@ describe('manager failures', () => {
   });
 });
 
+describe('the /ci folder', () => {
+  const ciPolicies = loadPolicies({
+    'o11y.yaml': o11yPolicy,
+    'ci-release.yaml': `
+workload: ci-release
+environments: [development]
+identity:
+  kind: github-oidc
+  repository: acme/repo
+  repositoryId: '123'
+  repositoryOwnerId: '456'
+  environment: release
+  jobWorkflowRefs: [acme/repo/.github/workflows/publish.yml@refs/heads/main]
+  events: [workflow_dispatch]
+secrets: [CI_RELEASE_KEY]
+`,
+  });
+  const CI_MANAGER: MockSecret[] = [
+    ...MANAGER,
+    secret('/ci/ci-release', 'CI_RELEASE_KEY', 'ci-key'),
+  ];
+
+  /** The refresher with a GitHub policy in force, so its reads include `/ci`. */
+  class CiRefresherDO extends RefresherDO {
+    static override readonly policies = ciPolicies;
+  }
+
+  /** Runs on a `CiRefresherDO` over the refresher's own storage. */
+  function withCiPolicy<R>(run: (refresher: RefresherDO) => Promise<R>): Promise<R> {
+    return runInDurableObject(getRefresherStub(env, config), async (_instance, state) =>
+      run(new CiRefresherDO(state, env))
+    );
+  }
+
+  function ciBundleRow(): Promise<{ stale: number; fetched_at: string }> {
+    return runInDurableObject(getBundleStub(env, config, 'ci-release'), (_instance, state) =>
+      state.storage.sql
+        .exec<{ stale: number; fetched_at: string }>('SELECT stale, fetched_at FROM bundle')
+        .one()
+    );
+  }
+
+  it('keeps refreshing /workloads and /shared while /ci reads fail, and marks CI bundles stale', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    await withCiPolicy(refresher => refresher.refreshAll());
+    expect(manager.reads.map(read => read.folder).sort()).toEqual(['/ci', '/shared', '/workloads']);
+    const firstCopy = await ciBundleRow();
+    expect(firstCopy.stale).toBe(0);
+
+    manager.setFolderStatus('/ci', 403);
+    manager.setSecrets(
+      CI_MANAGER.map(entry =>
+        entry.name === 'O11Y_CF_AE_API_TOKEN' && entry.path === '/workloads/o11y'
+          ? secret(entry.path, entry.name, 'rotated-token', { version: 2 })
+          : entry
+      )
+    );
+    await withCiPolicy(refresher => refresher.refreshAll());
+
+    expect((await refresherState()).failures).toBe(0);
+    const o11y = await o11yBundle();
+    expect(o11y.stale).toBe(false);
+    expect(o11y.secrets.O11Y_CF_AE_API_TOKEN).toEqual({ value: 'rotated-token', version: 2 });
+    expect(await ciBundleRow()).toEqual({ stale: 1, fetched_at: firstCopy.fetched_at });
+    expect(warn).toHaveBeenCalledWith(
+      'sts: /ci read failed; CI bundles keep their last copy, marked stale',
+      expect.objectContaining({ environment: 'development' })
+    );
+  });
+
+  it('fills other bundles when /ci has never been read, and leaves CI bundles unavailable', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    manager.setFolderStatus('/ci', 403);
+    const ci = await withCiPolicy(async refresher => {
+      await refresher.refreshAll();
+      return await refresher.buildBundle('ci-release');
+    });
+
+    expect(ci).toEqual({ status: 'unavailable' });
+    expect((await refresherState()).failures).toBe(0);
+    const o11y = await o11yBundle();
+    expect(o11y.stale).toBe(false);
+    expect(o11y.secrets.O11Y_CF_AE_API_TOKEN?.value).toBe('ae-token');
+
+    // The next refresh reads /ci again; a fill after it uses that copy.
+    manager.setFolderStatus('/ci', 200);
+    const filled = await withCiPolicy(async refresher => {
+      await refresher.refreshAll();
+      return await refresher.buildBundle('ci-release');
+    });
+    if (filled.status !== 'built') throw new Error(`expected a built bundle, got ${filled.status}`);
+    expect(filled.bundle.stale).toBe(false);
+    expect(filled.bundle.secrets.CI_RELEASE_KEY?.value).toBe('ci-key');
+  });
+
+  it('makes one manager read for repeated CI fills while /ci is refused, and retries after a refresh interval', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    manager.setFolderStatus('/ci', 403);
+
+    const fills = await withCiPolicy(async refresher => {
+      const results: FillResult[] = [];
+      for (let request = 0; request < 5; request += 1) {
+        results.push(await refresher.buildBundle('ci-release'));
+      }
+      return results;
+    });
+    expect(fills).toEqual(Array.from({ length: 5 }, () => ({ status: 'unavailable' })));
+    // One read round: /workloads, /shared and /ci once each.
+    expect(manager.reads.map(read => read.folder).sort()).toEqual(['/ci', '/shared', '/workloads']);
+
+    // Once the last /ci failure is a refresh interval old, a fill may try again.
+    await runInDurableObject(getRefresherStub(env, config), (_instance, state) => {
+      state.storage.sql.exec(
+        'UPDATE refresher_state SET ci_failed_at = ?',
+        Date.now() - 4 * 60 * 1000 - 1
+      );
+    });
+    await withCiPolicy(refresher => refresher.buildBundle('ci-release'));
+    expect(manager.reads.filter(read => read.folder === '/ci')).toHaveLength(2);
+  });
+
+  it('fills a CI bundle stale from the stored /ci copy after a failed /ci read', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = installManager({ secrets: CI_MANAGER });
+    await withCiPolicy(refresher => refresher.refreshAll());
+    manager.setFolderStatus('/ci', 403);
+    const filled = await withCiPolicy(async refresher => {
+      await refresher.refreshAll();
+      return await refresher.buildBundle('ci-release');
+    });
+    if (filled.status !== 'built') throw new Error(`expected a built bundle, got ${filled.status}`);
+    expect(filled.bundle.stale).toBe(true);
+    expect(filled.bundle.secrets.CI_RELEASE_KEY?.value).toBe('ci-key');
+  });
+});
+
 describe('manager webhooks', () => {
   it('merges verified webhook refresh requests into one refresh 30 seconds after the first', async () => {
     installManager({ secrets: MANAGER });
@@ -338,7 +480,14 @@ describe('policy audit stream', () => {
     expect(rows).toHaveLength(1);
     const event = JSON.parse(rows[0]);
     expect(event.type).toBe('ai.kilo.sts.policy.changed');
-    expect([...event.data.attributes.addedWorkloads].sort()).toEqual(['audit-relay', 'o11y']);
+    // Every active policy the refresher applies, and no registration: a workload that activates
+    // its own policy file changes this list without a change here.
+    const policies = RefresherDO.policies;
+    const active = policies.snapshot(config.environment).map(entry => entry.workload);
+    expect(active.length).toBeGreaterThan(0);
+    const added: string[] = event.data.attributes.addedWorkloads;
+    expect([...added].sort()).toEqual([...active].sort());
+    expect(added.filter(workload => policies.registered().includes(workload))).toEqual([]);
     expect(event.data.attributes.removedWorkloads).toEqual([]);
   });
 

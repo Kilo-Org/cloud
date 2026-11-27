@@ -12,8 +12,11 @@ import {
   type SsoDomainAuthority,
 } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import { recordAdminAction, userActionTarget } from '@/lib/admin/admin-action-audit';
+import { recordAuthEvent } from '@/lib/auth/auth-audit';
+import {
+  recordAdminAction,
+  userActionTarget,
+} from '@kilocode/web-shared/lib/admin/admin-action-audit';
 import type { SignInMethodChangeRefusal } from '@/lib/auth/sign-in-method-change-codes';
 
 export type SignInMethodChange = 'link' | 'unlink';
@@ -71,10 +74,11 @@ export async function authorizeSignInMethodChange(params: {
 }
 
 /**
- * Records a sign-in method change in the audit logs. A platform admin's change
- * goes to the admin action log; a change on an account whose domain requires
- * SSO goes to that organization's audit log; every other change is a
- * structured log line. Provider account addresses are never recorded.
+ * Records a sign-in method change in the audit logs. Every change writes an
+ * `auth_audit_logs` row; a platform admin's change also goes to the admin
+ * action log, and a change on an account whose domain requires SSO also goes
+ * to that organization's audit log. Provider account addresses are never
+ * recorded.
  *
  * The change has already happened, so a failed write is reported and never
  * thrown.
@@ -88,6 +92,17 @@ export async function recordSignInMethodChange(params: {
   const { user, change, provider } = params;
   const providerName = AUTH_PROVIDER_DISPLAY_NAMES[provider];
   try {
+    await recordAuthEvent(
+      { ip: params.request?.ip ?? null, route: params.request?.route ?? null },
+      {
+        action: change === 'link' ? 'auth.sign_in_method.link' : 'auth.sign_in_method.unlink',
+        outcome: 'success',
+        userId: user.id,
+        method: provider,
+        email: user.google_user_email,
+      }
+    );
+
     if (user.is_admin) {
       await recordAdminAction(
         {
@@ -105,17 +120,6 @@ export async function recordSignInMethodChange(params: {
               : `Unlinked a ${providerName} sign-in method`,
           metadata: { provider },
         }
-      );
-    } else {
-      logExceptInTest(
-        JSON.stringify({
-          event: 'sign_in_method_change',
-          change,
-          provider,
-          kiloUserId: user.id,
-          ip: params.request?.ip ?? null,
-          route: params.request?.route ?? null,
-        })
       );
     }
 

@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import {
   internalDispatchResponseSchema,
   type GlanceableScopeRefreshRequest,
+  type InternalDispatchAccountSecurityRequest,
   type InternalDispatchAgentBriefingRequest,
   type InternalDispatchLowBalanceRequest,
   type InternalDispatchRequest,
@@ -11,10 +12,8 @@ import {
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications/schemas';
-import {
-  INTERNAL_API_SECRET,
-  NOTIFICATIONS_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { NOTIFICATIONS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 
 type InternalWorkerEndpointSpec = {
@@ -52,12 +51,13 @@ type InternalPostResult =
  * Resolves one worker endpoint behind its three configuration gates, in the
  * order the worker's logs and tests expect: a configured base URL, a base URL
  * that parses as https or loopback http, then an internal API secret. Returns
- * `null` after logging which gate skipped the call, so the caller only has to
- * return its never-rejects value.
+ * `null` after logging which gate skipped the call, or after capturing a secret
+ * that could not be read, so the caller only has to return its never-rejects
+ * value.
  */
-function resolveInternalWorkerEndpoint(
+async function resolveInternalWorkerEndpoint(
   spec: InternalWorkerEndpointSpec
-): InternalWorkerEndpoint | null {
+): Promise<InternalWorkerEndpoint | null> {
   if (!NOTIFICATIONS_WORKER_URL) {
     console.error(
       `[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping ${spec.skipSubject}`
@@ -71,13 +71,22 @@ function resolveInternalWorkerEndpoint(
     );
     return null;
   }
-  if (!INTERNAL_API_SECRET) {
+  let secret: string;
+  try {
+    secret = await readInternalApiSecret();
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'notifications-worker-client', endpoint: spec.tag },
+    });
+    return null;
+  }
+  if (!secret) {
     console.error(
       `[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping ${spec.skipSubject}`
     );
     return null;
   }
-  return { url, secret: INTERNAL_API_SECRET, failureLabel: spec.failureLabel };
+  return { url, secret, failureLabel: spec.failureLabel };
 }
 
 /**
@@ -144,7 +153,7 @@ function sleep(ms: number): Promise<void> {
  * structured warning, never an alert.
  */
 async function dispatchInternal(body: InternalDispatchRequest): Promise<boolean> {
-  const endpoint = resolveInternalWorkerEndpoint(DISPATCH_ENDPOINT);
+  const endpoint = await resolveInternalWorkerEndpoint(DISPATCH_ENDPOINT);
   if (!endpoint) {
     return false;
   }
@@ -308,6 +317,17 @@ export async function dispatchSecurityLifecyclePush(
 }
 
 /**
+ * Dispatches an account-security notice push. Never rejects; returns whether
+ * the worker accepted it, so the caller can report a refused push alongside
+ * the email it sends for the same event.
+ */
+export async function dispatchAccountSecurityPush(
+  input: Omit<InternalDispatchAccountSecurityRequest, 'kind'>
+): Promise<boolean> {
+  return dispatchInternal({ kind: 'account_security', ...input });
+}
+
+/**
  * Ask the notifications worker to rebuild and re-deliver the glanceable
  * snapshot for one scope.
  *
@@ -324,7 +344,7 @@ export async function dispatchSecurityLifecyclePush(
  * card.
  */
 export async function refreshGlanceableScope(input: GlanceableScopeRefreshRequest): Promise<void> {
-  const endpoint = resolveInternalWorkerEndpoint(GLANCEABLE_REFRESH_ENDPOINT);
+  const endpoint = await resolveInternalWorkerEndpoint(GLANCEABLE_REFRESH_ENDPOINT);
   if (!endpoint) {
     return;
   }

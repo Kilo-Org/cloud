@@ -2,7 +2,8 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createTestHarness, unstable_readConfig } from 'wrangler';
 import { expect, it, vi } from 'vitest';
-import { usage } from './usage.test-fixture';
+import { stsStandIn } from './sts-stand-in.test-fixture';
+import { usage, wireUsage } from './usage.test-fixture';
 
 it('consumes a copy published to the staging hedge queue once, and its EU duplicate as duplicate', async () => {
   const writes: unknown[] = [];
@@ -66,6 +67,7 @@ it('consumes a copy published to the staging hedge queue once, and its EU duplic
             queues: { producers: [{ binding: 'USAGE_INGEST_QUEUE', queue: hedgeQueue }] },
           },
         },
+        stsStandIn('staging'),
       ],
     });
     harness = server;
@@ -91,7 +93,7 @@ it('consumes a copy published to the staging hedge queue once, and its EU duplic
       { queue: hedgeQueue, outcome: 'recorded', queue_action: 'ack', usage_id: usage.core.id },
       { queue: mainQueue, outcome: 'duplicate', queue_action: 'ack', usage_id: usage.core.id },
     ]);
-    expect(writes).toEqual([usage, usage]);
+    expect(writes).toEqual([wireUsage, wireUsage]);
   } finally {
     try {
       await harness?.close();

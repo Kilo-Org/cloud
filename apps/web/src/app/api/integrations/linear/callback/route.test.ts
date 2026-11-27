@@ -24,7 +24,7 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { createSignedToken } from '@/lib/signed-token';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
@@ -74,7 +74,7 @@ jest.mock('@/lib/bot/platforms', () => ({
   },
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
@@ -594,7 +594,7 @@ describe('verifyOAuthState (self-check, to keep tests honest)', () => {
   });
 });
 
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedCaptureException = jest.mocked(captureException);
 
 const memberDeniedError = new TRPCError({
@@ -615,7 +615,7 @@ describe('GET /api/integrations/linear/callback organization authority', () => {
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
     mockCancelProviderOAuthAttempt.mockResolvedValue(true);
     mockedVerifyLinearBotLinkState.mockReturnValue(null);
-    mockedEnsureOrganizationAccess.mockResolvedValue('billing_manager');
+    mockedEnsureMemberOrganizationAccess.mockResolvedValue('billing_manager');
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID },
       authFailedResponse: null,
@@ -645,7 +645,7 @@ describe('GET /api/integrations/linear/callback organization authority', () => {
   });
 
   test('requires the organization integration role to complete an organization install', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(memberDeniedError);
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(memberDeniedError);
     const state = createOrgProviderState();
 
     const response = await callLinearCallback(
@@ -656,8 +656,8 @@ describe('GET /api/integrations/linear/callback organization authority', () => {
       response,
       `/organizations/${ORGANIZATION_ID}/integrations/linear?error=permission_required`
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      { user: expect.objectContaining({ id: USER_ID }) },
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       ORGANIZATION_ID,
       ORGANIZATION_BILLING_ROLES
     );
@@ -668,7 +668,7 @@ describe('GET /api/integrations/linear/callback organization authority', () => {
   });
 
   test('reports a lost organization membership with its own error code', async () => {
-    mockedEnsureOrganizationAccess.mockRejectedValue(
+    mockedEnsureMemberOrganizationAccess.mockRejectedValue(
       new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'You do not have access to this organization',
@@ -690,7 +690,7 @@ describe('GET /api/integrations/linear/callback organization authority', () => {
   test.each(['billing_manager', 'admin', 'owner'] as const)(
     'completes an organization install for a %s',
     async role => {
-      mockedEnsureOrganizationAccess.mockResolvedValue(role);
+      mockedEnsureMemberOrganizationAccess.mockResolvedValue(role);
       const state = createOrgProviderState();
 
       const response = await callLinearCallback(
@@ -719,7 +719,7 @@ describe('GET /api/integrations/linear/callback organization authority', () => {
     );
 
     expectRedirectLocation(response, '/integrations/linear?success=installed');
-    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedEnsureMemberOrganizationAccess).not.toHaveBeenCalled();
     expect(mockConsumeProviderOAuthAttempt).toHaveBeenCalledTimes(1);
   });
 });

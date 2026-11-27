@@ -12,11 +12,12 @@ import {
   type RuntimeProxyFence,
 } from './runtime-credential-proxy.js';
 import {
+  classifyRuntimeCredentialProxyPath,
   EXA_PROXY_PATHS,
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
-  runtimeProxyAttestationAudience,
+  type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
 import {
   buildVercelCredentialNetworkPolicy,
@@ -296,14 +297,16 @@ describe('runtime credential proxy', () => {
   });
 
   it('uses the upstream auth plane for the attestation audience', () => {
-    expect(runtimeProxyAttestationAudience('backend', '/api/user')).toBe('kilo-api');
-    expect(runtimeProxyAttestationAudience('ingest', '/api/session')).toBe('session-ingest');
-    expect(runtimeProxyAttestationAudience('exa', '/api/exa/search')).toBe('kilo-gateway');
+    const audience = (route: RuntimeCredentialProxyRoute, pathname: string) =>
+      classifyRuntimeCredentialProxyPath(route, pathname)?.audience;
+    expect(audience('backend', '/api/user')).toBe('kilo-api');
+    expect(audience('ingest', '/api/session')).toBe('session-ingest');
+    expect(audience('exa', '/api/exa/search')).toBe('kilo-gateway');
     for (const pathname of [
       '/api/openrouter/organizations/org_1/models',
       '/api/gateway/organizations/org_1/models',
     ]) {
-      expect(runtimeProxyAttestationAudience('provider', pathname)).toBe('kilo-api');
+      expect(audience('provider', pathname)).toBe('kilo-api');
     }
     for (const pathname of [
       '/api/openrouter/models',
@@ -311,7 +314,7 @@ describe('runtime credential proxy', () => {
       '/api/openrouter/chat/completions',
       '/api/gateway/v1/chat/completions',
     ]) {
-      expect(runtimeProxyAttestationAudience('provider', pathname)).toBe('kilo-gateway');
+      expect(audience('provider', pathname)).toBe('kilo-gateway');
     }
   });
 

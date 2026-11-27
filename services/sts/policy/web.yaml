@@ -1,0 +1,41 @@
+# The web app (Vercel project kilocode-app). Its STS canary route mints usage-ingest:sts.canary
+# with the function's own OIDC token, exchanged for the STS audience (decision D6c). Production
+# STS serves Vercel production, staging STS the custom environment staging, development STS
+# previews (design 6.2); the Vercel development environment is never accepted.
+workload: web
+environments:
+  - development
+  - staging
+  - production
+identity:
+  kind: vercel-oidc
+  teamSlug: kilocode
+  teamId: team_ItxRShuUkJaEd9GmXMEEgunb
+  projectId: prj_AAnAlIuYPrpU0aDbT1kdm0ymL7hR
+  projectName: kilocode-app
+  environments:
+    - production
+    - preview
+    - customEnvironmentId: env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b
+secrets: []
+audiences:
+  - usage-ingest
+scopes:
+  - usage-ingest:sts.canary
+# UTS grants, development only until phase 4's activation go; staging and production are each a
+# key added below. The web app reads the UTS revocation feed (uts-feed), ends or revokes a
+# subject's sessions and credentials (uts), and signs its kilo-web client assertion with
+# UTS_KILO_WEB_CLIENT_KEY (UTS_KILO_WEB_CLIENT_KEY_NEXT during a rotation).
+environmentGrants:
+  development:
+    audiences:
+      - uts-feed
+      - uts
+    scopes:
+      - uts-feed:revocation.read
+      - uts:subjects.revoke
+      - uts:browser-sessions.end
+      - uts:api-credentials.revoke
+    secrets:
+      - UTS_KILO_WEB_CLIENT_KEY
+      - UTS_KILO_WEB_CLIENT_KEY_NEXT

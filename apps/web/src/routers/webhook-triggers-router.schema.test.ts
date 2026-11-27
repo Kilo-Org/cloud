@@ -2,17 +2,14 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import type { SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
+import type { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from './admin-webhook-triggers-router';
 import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { webhookTriggerModeSchema } from '@/lib/webhook-trigger-validation';
-import type {
-  generateCloudAgentWorkflowToken,
-  TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+import type { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
 import type { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -50,7 +47,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   }),
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateCloudAgentWorkflowToken: jest.fn(() => 'test-cloud-agent-token'),
   TOKEN_EXPIRY: { oneHour: 3600 },
 }));
@@ -174,6 +171,10 @@ const triggerConfig: TriggerConfigResponse = {
 };
 
 beforeAll(async () => {
+  // `jest` comes from '@jest/globals', so the `jest.mock` calls above are not
+  // hoisted. Loading tRPC init here, after them, makes the staff admission read
+  // the current row through the mocked database rather than the real one.
+  const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const router = await import('./webhook-triggers-router');
   createCaller = createCallerFactory(router.webhookTriggersRouter);
   WebhookTriggerCreateInput = router.WebhookTriggerCreateInput;
@@ -181,6 +182,20 @@ beforeAll(async () => {
   const adminRouter = await import('./admin-webhook-triggers-router');
   createAdminCaller = createCallerFactory(adminRouter.adminWebhookTriggersRouter);
 });
+
+/**
+ * A staff caller signed in through a browser session whose pepper matches the
+ * primary row, the only provenance the staff admission accepts.
+ */
+function createAdminSessionCaller() {
+  return createAdminCaller({
+    user: { ...user, is_admin: true },
+    credential: 'session',
+    authViaToken: false,
+    webSessionId: 'test-web-session',
+    webSessionPepper: null,
+  });
+}
 
 describe('existing Cloud Agent chat targets', () => {
   const chatId = 'workspace_00000000-0000-4000-8000-000000000003';
@@ -312,9 +327,11 @@ describe('webhook trigger variant inputs', () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
     mockFindAdmin.mockResolvedValue({
+      id: user.id,
       is_admin: true,
       can_view_sessions: true,
       blocked_reason: null,
+      web_session_pepper: null,
     });
   });
 
@@ -339,24 +356,26 @@ describe('webhook trigger variant inputs', () => {
 
   it('requires admin session viewing permission for request logs', async () => {
     mockFindAdmin.mockResolvedValue({
+      id: user.id,
       is_admin: true,
       can_view_sessions: false,
       blocked_reason: null,
+      web_session_pepper: null,
     });
     await expect(
-      createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+      createAdminSessionCaller().getRequestLogs({
         scope: 'user',
         userId: 'target',
         triggerId: 'trigger-id',
         requestId: '00000000-0000-4000-8000-000000000005',
       })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Session viewing access required' });
     expect(mockSelectWhere).not.toHaveBeenCalled();
     expect(mockGetWebhookRequestLogs).not.toHaveBeenCalled();
   });
 
   it('uses the selected personal admin scope rather than the admin owner', async () => {
-    await createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+    await createAdminSessionCaller().getRequestLogs({
       scope: 'user',
       userId: 'target',
       triggerId: 'trigger-id',
@@ -372,7 +391,7 @@ describe('webhook trigger variant inputs', () => {
 
   it('uses the selected organization admin scope', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000001';
-    await createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+    await createAdminSessionCaller().getRequestLogs({
       scope: 'organization',
       organizationId,
       triggerId: 'trigger-id',
@@ -389,7 +408,7 @@ describe('webhook trigger variant inputs', () => {
   it('rejects an admin trigger outside the selected scope before reading logs', async () => {
     mockSelectWhere.mockResolvedValue([]);
     await expect(
-      createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+      createAdminSessionCaller().getRequestLogs({
         scope: 'user',
         userId: 'target',
         triggerId: 'trigger-id',
@@ -1029,7 +1048,7 @@ describe('webhook trigger variant inputs', () => {
 
   it('mints a bounded workflow credential for the Worker capability read', async () => {
     const { generateCloudAgentWorkflowToken } = jest.requireMock(
-      '@kilocode/web-shared/lib/tokens'
+      '@/lib/auth/kilo-token-signing'
     ) as { generateCloudAgentWorkflowToken: jest.Mock };
     const organizationId = '00000000-0000-4000-8000-000000000003';
     mockEnsureOrganizationAccess.mockResolvedValue('member');
@@ -1048,7 +1067,7 @@ describe('webhook trigger variant inputs', () => {
   it('issues a credential that verifies under the Worker audience policy', async () => {
     // requireActual bypasses the module mock so the real issuer mints the token
     // this case then pins against the Worker-side policy validator.
-    const tokens = jest.requireActual('@kilocode/web-shared/lib/tokens') as {
+    const tokens = jest.requireActual('@/lib/auth/kilo-token-signing') as {
       generateCloudAgentWorkflowToken: typeof generateCloudAgentWorkflowToken;
       TOKEN_EXPIRY: typeof TOKEN_EXPIRY;
     };

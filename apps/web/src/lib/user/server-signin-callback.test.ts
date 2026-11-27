@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { createHash, randomUUID } from 'crypto';
+import { setImmediate as nextMacrotask } from 'node:timers/promises';
 
 const cookieStore = new Map<string, { name: string; value: string }>();
 jest.mock('next/headers', () => ({
@@ -61,10 +62,16 @@ import { CLAUDE_OIDC_ISSUER } from '@kilocode/web-shared/lib/auth/claude/config'
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { user_auth_provider, type User } from '@kilocode/db/schema';
+import { auth_audit_logs, user_auth_provider, type User } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { eq } from 'drizzle-orm';
+import {
+  authAuditEmailHash,
+  setAuthActionSinkForTest,
+  type AuthActionEvent,
+} from '@/lib/auth/auth-audit';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
@@ -727,6 +734,31 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     await expect(openAiSharedServicesSignIn()).resolves.toBe('/connected-accounts?linked=openai');
   });
+
+  it('refuses the shared-services connect for a platform admin without a managing membership', async () => {
+    const admin = await insertTestUser({
+      google_user_email: `link-admin-${randomUUID()}@example.com`,
+      web_session_pepper: randomUUID(),
+      is_admin: true,
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: admin.id,
+      targetProvider: 'openai',
+      organizationId: SHARED_SERVICES_ORGANIZATION_ID,
+      chatGptScope: 'shared_services',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({ success: true, user: admin } as never);
+    mockGetUserOrgMemberships.mockResolvedValueOnce([]);
+    mockGetOrganizationById.mockResolvedValueOnce({ parent_organization_id: null } as never);
+    await setOwnerSessionCookie(admin);
+
+    await expect(
+      signIn(openAiLinkCallback('shared-admin@example.com', 'openai-shared-admin-sub') as never)
+    ).resolves.toBe(
+      `/organizations/${SHARED_SERVICES_ORGANIZATION_ID}/byok?openai_error=LINKING-FAILED`
+    );
+  });
 });
 
 describe('authOptions.callbacks.signIn for Claude', () => {
@@ -1091,5 +1123,288 @@ describe('the NextAuth callback for an account link', () => {
       '/connected-accounts'
     );
     expect(cookieStore.get(SESSION_COOKIE)?.value).toBe(sessionBefore);
+  });
+});
+
+describe('sign-in audit rows', () => {
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    cookieStore.clear();
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+    mockCreateOrUpdateUser.mockReset().mockResolvedValue({
+      success: true,
+      user: { id: 'settled-user', blocked_reason: null } as never,
+      isNew: false,
+    });
+    mockGetAccountLinkingSession.mockReset().mockResolvedValue(null);
+    mockResolveSsoAuthorityForDomain.mockReset().mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  afterEach(() => {
+    setAuthActionSinkForTest(null);
+  });
+
+  async function rowsForEmail(email: string) {
+    const hash = authAuditEmailHash(email);
+    if (hash === null) throw new Error('the test environment has no email hash key');
+    return db.select().from(auth_audit_logs).where(eq(auth_audit_logs.subject_email_hash, hash));
+  }
+
+  function googleSignIn(email: string) {
+    return signIn({
+      user: { id: 'x', email, name: 'Audit Google', image: '' },
+      account: { provider: 'google', providerAccountId: `sub-${randomUUID()}`, type: 'oauth' },
+      profile: { email_verified: true, email },
+    } as never);
+  }
+
+  /** The jwt callback NextAuth runs after an accepted signIn: it issues the session. */
+  function issueSession(callback: SignInParams) {
+    return authOptions.callbacks!.jwt!({
+      token: {},
+      ...(callback as object),
+      trigger: 'signIn',
+      isNewUser: false,
+      session: undefined,
+    } as never);
+  }
+
+  it('records a sign-in once its session is issued, with the account and only a hash of the email', async () => {
+    const { account, callback } = await insertAccountWithGoogleIdentity();
+    mockCreateOrUpdateUser.mockResolvedValueOnce({
+      success: true,
+      user: account,
+      isNew: false,
+    } as never);
+    setValidTurnstileCookie();
+
+    await expect(signIn(callback)).resolves.toBe(true);
+    // The signIn callback accepted; no session exists yet, so no row either.
+    expect(await rowsForEmail(account.google_user_email)).toEqual([]);
+
+    await issueSession(callback);
+
+    const rows = await rowsForEmail(account.google_user_email);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'success',
+        user_id: account.id,
+        method: 'google',
+        failure_reason: null,
+      }),
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'success',
+        userId: account.id,
+        ip: '203.0.113.7',
+      }),
+    ]);
+    expect(JSON.stringify({ rows, events })).not.toContain(account.google_user_email.split('@')[0]);
+  });
+
+  it('records a refusal that resolved no account under a hash of the presented address', async () => {
+    const email = `audit-refused-${randomUUID()}@example.com`;
+
+    const result = await googleSignIn(email);
+
+    expect(result).toEqual(expect.stringContaining('TURNSTILE_REQUIRED'));
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    const rows = await rowsForEmail(email);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        user_id: null,
+        method: 'google',
+        failure_reason: 'turnstile_required',
+      }),
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({ outcome: 'failure', failureReason: 'turnstile_required' }),
+    ]);
+    expect(JSON.stringify({ rows, events })).not.toContain(email.split('@')[0]);
+  });
+
+  it('records a magic link that authorize refuses as the log line only, since it names no account', async () => {
+    // A Credentials provider keeps its configured id and authorize under
+    // `options`; next-auth's provider type does not expose that authorize.
+    const provider = authOptions.providers.find(
+      candidate =>
+        'options' in candidate &&
+        typeof candidate.options === 'object' &&
+        candidate.options !== null &&
+        'id' in candidate.options &&
+        candidate.options.id === 'email'
+    ) as unknown as {
+      options: { authorize: (credentials: { token: string }) => Promise<unknown> };
+    };
+
+    await expect(
+      provider.options.authorize({ token: `unknown-${randomUUID()}` })
+    ).resolves.toBeNull();
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        method: 'email',
+        failureReason: 'invalid_token',
+        stored: false,
+        persisted: false,
+      }),
+    ]);
+  });
+
+  it("records a refused link under the linked account's email, not the provider identity's", async () => {
+    const owner = await insertLinkOwner();
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: owner.id,
+      targetProvider: 'openai',
+      webSessionIdHash: OWNER_WEB_SESSION_ID_HASH,
+      createdAt: Date.now(),
+    });
+    await setOwnerSessionCookie(owner, { webSessionId: 'web-session-other-browser' });
+    const providerEmail = `provider-identity-${randomUUID()}@example.net`;
+
+    const result = await signIn(openAiLinkCallback(providerEmail, `openai-${randomUUID()}`));
+
+    expect(result).toBe('/connected-accounts?error=LINKING-FAILED');
+    expect(await rowsForEmail(providerEmail)).toEqual([]);
+    expect(await rowsForEmail(owner.google_user_email)).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in_method.link',
+        outcome: 'failure',
+        user_id: owner.id,
+        failure_reason: 'linking_failed',
+      }),
+    ]);
+  });
+
+  /** An account whose Google identity carries an address other than its primary one. */
+  async function insertAccountWithGoogleIdentity() {
+    const account = await insertTestUser({
+      google_user_email: `primary-${randomUUID()}@example.com`,
+    });
+    const providerEmail = `google-identity-${randomUUID()}@example.com`;
+    const sub = `sub-${randomUUID()}`;
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: account.id,
+      provider: 'google',
+      provider_account_id: sub,
+      email: providerEmail,
+      avatar_url: '',
+      hosted_domain: account.hosted_domain,
+    });
+    const callback = {
+      user: { id: 'x', email: providerEmail, name: 'Audit Google', image: '' },
+      account: { provider: 'google', providerAccountId: sub, type: 'oauth' },
+      profile: { email_verified: true, email: providerEmail },
+    } as never;
+    return { account, providerEmail, callback };
+  }
+
+  it("hashes the account's primary email, not the provider's, once the sign-in resolves the account", async () => {
+    const { account, providerEmail, callback } = await insertAccountWithGoogleIdentity();
+    mockCreateOrUpdateUser.mockResolvedValueOnce({
+      success: true,
+      user: account,
+      isNew: false,
+    } as never);
+    setValidTurnstileCookie();
+
+    await expect(signIn(callback)).resolves.toBe(true);
+    await issueSession(callback);
+
+    expect(await rowsForEmail(providerEmail)).toEqual([]);
+    expect(await rowsForEmail(account.google_user_email)).toEqual([
+      expect.objectContaining({ action: 'auth.sign_in', outcome: 'success', user_id: account.id }),
+    ]);
+  });
+
+  it("hashes the account's primary email on a refusal after the account is resolved", async () => {
+    const { account, providerEmail, callback } = await insertAccountWithGoogleIdentity();
+
+    // No Turnstile cookie: refused after the provider identity named the account.
+    expect(await signIn(callback)).toEqual(expect.stringContaining('TURNSTILE_REQUIRED'));
+
+    expect(await rowsForEmail(providerEmail)).toEqual([]);
+    expect(await rowsForEmail(account.google_user_email)).toEqual([
+      expect.objectContaining({
+        outcome: 'failure',
+        user_id: account.id,
+        failure_reason: 'turnstile_required',
+      }),
+    ]);
+  });
+});
+
+describe('OAuth callback refusals before the signIn callback', () => {
+  let events: AuthActionEvent[];
+
+  beforeEach(() => {
+    events = [];
+    setAuthActionSinkForTest(event => events.push(event));
+  });
+
+  afterEach(() => {
+    setAuthActionSinkForTest(null);
+  });
+
+  async function githubCallback(query: Record<string, string>): Promise<Response> {
+    const url = new URL('http://localhost:3000/api/auth/callback/github');
+    for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
+    const response = await nextAuthHttpHandler(new NextRequest(url), {
+      params: Promise.resolve({ nextauth: ['callback', 'github'] }),
+    });
+    // The logger records the line without blocking NextAuth; let it finish.
+    await nextMacrotask();
+    return response;
+  }
+
+  it('logs a provider error by its code alone, without the error text', async () => {
+    const response = await githubCallback({
+      error: 'access_denied',
+      error_description: 'The user denied the request',
+    });
+
+    expect(response.status).toBe(302);
+    expect(events).toEqual([
+      expect.objectContaining({
+        action: 'auth.sign_in',
+        outcome: 'failure',
+        userId: null,
+        method: 'github',
+        failureReason: 'provider_error',
+        stored: false,
+        ip: '203.0.113.7',
+      }),
+    ]);
+    const logged = JSON.stringify(events);
+    expect(logged).not.toContain('access_denied');
+    expect(logged).not.toContain('denied the request');
+  });
+
+  it('logs a callback whose state check fails', async () => {
+    const response = await githubCallback({ code: 'provider-code', state: 'forged-state' });
+
+    expect(response.status).toBe(302);
+    expect(events).toEqual([
+      expect.objectContaining({
+        method: 'github',
+        failureReason: 'oauth_callback_error',
+        stored: false,
+      }),
+    ]);
+    const logged = JSON.stringify(events);
+    expect(logged).not.toContain('provider-code');
+    expect(logged).not.toContain('forged-state');
   });
 });

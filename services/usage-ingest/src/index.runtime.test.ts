@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { stsStandIn } from './sts-stand-in.test-fixture';
 import { usage } from './usage.test-fixture';
 
 it('starts the configured Worker entry in workerd', async () => {
@@ -13,6 +14,7 @@ it('starts the configured Worker entry in workerd', async () => {
         configPath: new URL('../wrangler.jsonc', import.meta.url),
         secrets: { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret' },
       },
+      stsStandIn(),
     ],
   });
   try {
@@ -88,7 +90,7 @@ it.each(['url', 'secret'])(
       expect(serialized).toContain('invalid_event');
       expect(serialized).not.toContain('usage_ingest_receipt');
       expect(serialized).not.toContain('synthetic-writer-secret');
-      expect(serialized).not.toContain(usage.metadata.user_prompt_prefix);
+      expect(serialized).not.toContain(usage.metadata.http_user_agent);
     } finally {
       try {
         await worker?.dispose();

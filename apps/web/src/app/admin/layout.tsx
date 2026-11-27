@@ -8,53 +8,30 @@ import { BuildInfo } from '@/app/admin/components/BuildInfo';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { AdminStepUpInterstitial } from '@/components/admin/step-up/AdminStepUpInterstitial';
-import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
-import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
-import { stepUpErrorCodeForState } from '@kilocode/web-shared/lib/admin/step-up-guard';
-import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
-import type { StepUpRequirement } from '@/components/admin/step-up/step-up-error';
+import { AdminAccessDenied } from '@/app/admin/components/AdminAccessDenied';
+import { adminNetworkRefusalFor } from '@kilocode/web-shared/lib/admin/admin-network';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const auth = await getUserFromAuth({
-    adminOnly: true,
-    stepUpSurface: 'server-component',
-    skipStepUpGuard: true,
-  });
-  const currentUser = auth.user;
+  // The same staff admission as every admin request: current role, network,
+  // browser session and a live session proof when step-up is on.
+  const auth = await getUserFromAuth({ adminOnly: true, stepUpSurface: 'server-component' });
 
-  if (!currentUser) {
-    return <UnauthorizedPage />;
-  }
-
-  let stepUpRequirement: StepUpRequirement | null = null;
-  if (isAdminStepUpEnabled()) {
-    if (auth.credential !== 'session') {
-      stepUpRequirement = { code: 'BEARER_NOT_ALLOWED' };
-    } else {
-      try {
-        const evaluation = await evaluateStepUp({
-          userId: currentUser.id,
-          webSessionId: auth.webSessionId,
-          actionClass: 'platform_read',
-        });
-        if (evaluation.state.status !== 'fresh') {
-          stepUpRequirement = { code: stepUpErrorCodeForState(evaluation.state) };
-        }
-      } catch (error) {
-        reportStepUpFailure('admin_step_up_layout', error);
-        stepUpRequirement = { code: 'STEP_UP_UNAVAILABLE' };
-      }
+  if (!auth.user) {
+    if (auth.adminNetworkDenial) {
+      return (
+        <AdminAccessDenied message={adminNetworkRefusalFor(auth.adminNetworkDenial).message} />
+      );
     }
-  }
-
-  // One verification surface only: when the session needs step-up, render the
-  // interstitial without the sidebar so no admin query opens a second dialog.
-  if (stepUpRequirement) {
-    return (
-      <main id="main-content" tabIndex={-1}>
-        <AdminStepUpInterstitial requirement={stepUpRequirement} variant="page" />
-      </main>
-    );
+    // One verification surface only: when the session needs step-up, render the
+    // interstitial without the sidebar so no admin query opens a second dialog.
+    if (auth.stepUp) {
+      return (
+        <main id="main-content" tabIndex={-1}>
+          <AdminStepUpInterstitial requirement={{ code: auth.stepUp.code }} variant="page" />
+        </main>
+      );
+    }
+    return <UnauthorizedPage />;
   }
 
   return (

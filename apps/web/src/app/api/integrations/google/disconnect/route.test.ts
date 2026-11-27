@@ -10,9 +10,9 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
-const mockedEnsureOrganizationAccess = jest.fn();
+const mockedEnsureMemberOrganizationAccess = jest.fn();
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: mockedEnsureOrganizationAccess,
+  ensureMemberOrganizationAccess: mockedEnsureMemberOrganizationAccess,
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/kiloclaw/google-oauth-connections');
@@ -119,7 +119,7 @@ describe('POST /api/integrations/google/disconnect', () => {
       response,
       `/organizations/${ORG_ID}/claw/settings?success=google_disconnected`
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith({ id: USER_ID }, ORG_ID);
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
   });
 

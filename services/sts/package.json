@@ -7,14 +7,15 @@
     "dev": "wrangler dev --env local",
     "test": "vitest run && vitest run --config vitest.node.config.ts",
     "test:workers": "vitest run",
-    "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/sts/src services/sts/test"
+    "typecheck": "tsgo --noEmit && tsgo --noEmit -p proof/vercel-exchange/tsconfig.json",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/sts/src services/sts/test services/sts/proof"
   },
   "dependencies": {
     "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "jose": "catalog:",
+    "pg": "8.23.1",
     "yaml": "catalog:",
     "zod": "catalog:"
   },
@@ -22,6 +23,7 @@
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
+    "@types/pg": "8.23.1",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "typescript": "catalog:",

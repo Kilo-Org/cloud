@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decodeJwt } from 'jose';
-import { signModernKiloToken } from './kilo-token-policy.js';
+import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
 import {
+  checkRuntimeAuthorization,
   createRuntimeAuthorization,
   renewRuntimeAuthorization,
+  renewRuntimeToken,
   sealRuntimeAuthorization,
   unsealRuntimeAuthorization,
   RuntimeAuthorizationExpiredError,
@@ -132,20 +134,100 @@ describe('runtime authorization', () => {
     liveDeviceSessions.clear();
   });
   afterEach(() => vi.useRealTimers());
-  it('creates a bound authorization and issues a runtime-only audience token', async () => {
+  it('creates a bound authorization and issues one runtime-only token per destination', async () => {
     const control = await admission();
     const result = await createRuntimeAuthorization({
       ...commonInput,
       token: control.token,
+      audienceMode: 'per-destination',
     });
 
     expect(result.authorization.bindings.userPepperDigest).not.toContain('user-pepper');
-    expect(decodeJwt(result.token)).toMatchObject({
-      aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
-      tokenPurpose: 'delegated-workload',
-      credentialExchange: false,
-      runtimeAuthorization: { id: result.authorization.id, resourceId: 'session' },
+    const destinations = ['kilo-api', 'kilo-gateway', 'session-ingest'] as const;
+    expect(new Set(destinations.map(destination => result.tokens[destination])).size).toBe(3);
+    for (const destination of destinations) {
+      const token = result.tokens[destination];
+      expect(decodeJwt(token)).toMatchObject({
+        aud: destination,
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        runtimeAuthorization: { id: result.authorization.id, resourceId: 'session' },
+        exp: decodeJwt(result.tokens['kilo-api']).exp,
+      });
+      await expect(
+        verifyKiloTokenForPolicy(token, secret, { audience: destination, mode: 'required' })
+      ).resolves.toMatchObject({ userId: 'user' });
+      const others = [...destinations, 'cloud-agent-next'].filter(value => value !== destination);
+      for (const other of others) {
+        await expect(
+          verifyKiloTokenForPolicy(token, secret, { audience: other, mode: 'allow-legacy' })
+        ).rejects.toThrow();
+      }
+    }
+  });
+
+  it('issues the earlier combined token unless per-destination tokens are requested', async () => {
+    const created = await createRuntimeAuthorization({
+      ...commonInput,
+      token: (await admission()).token,
     });
+    const renewed = await renewRuntimeAuthorization({
+      ...commonInput,
+      authorization: created.authorization,
+      audienceMode: 'combined',
+    });
+    const perDestination = await renewRuntimeAuthorization({
+      ...commonInput,
+      authorization: created.authorization,
+      audienceMode: 'per-destination',
+    });
+
+    for (const { tokens } of [created, renewed]) {
+      expect(tokens['kilo-gateway']).toBe(tokens['kilo-api']);
+      expect(tokens['session-ingest']).toBe(tokens['kilo-api']);
+      expect(decodeJwt(tokens['kilo-api']).aud).toEqual([
+        'kilo-api',
+        'kilo-gateway',
+        'session-ingest',
+      ]);
+    }
+    expect(decodeJwt(perDestination.tokens['session-ingest']).aud).toBe('session-ingest');
+    await expect(
+      renewRuntimeAuthorization({
+        ...commonInput,
+        authorization: created.authorization,
+        audienceMode: 'both' as never,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('renews one destination token, or only checks, after the same live checks', async () => {
+    const created = await createRuntimeAuthorization({
+      ...commonInput,
+      token: (await admission()).token,
+    });
+    const renewal = { ...commonInput, authorization: created.authorization };
+    const single = await renewRuntimeToken({
+      ...renewal,
+      audienceMode: 'per-destination',
+      destination: 'kilo-gateway',
+    });
+    expect(decodeJwt(single.token).aud).toBe('kilo-gateway');
+    const combined = await renewRuntimeToken({ ...renewal, destination: 'kilo-gateway' });
+    expect(decodeJwt(combined.token).aud).toEqual(['kilo-api', 'kilo-gateway', 'session-ingest']);
+    await expect(checkRuntimeAuthorization(renewal)).resolves.toBeUndefined();
+
+    principals.set('user', { ...principals.get('user')!, apiTokenPepper: 'rotated-pepper' });
+    for (const attempt of [
+      () => checkRuntimeAuthorization(renewal),
+      () => renewRuntimeToken({ ...renewal, destination: 'kilo-api' }),
+    ]) {
+      await expect(attempt()).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
+    }
+    const expired = new Date(created.authorization.delegationExpiresAt);
+    await expect(checkRuntimeAuthorization({ ...renewal, now: expired })).rejects.toBeInstanceOf(
+      RuntimeAuthorizationExpiredError
+    );
   });
 
   it.each([
@@ -214,7 +296,7 @@ describe('runtime authorization', () => {
       );
       expect(persisted).toEqual(created.authorization);
       const renewed = await renewRuntimeAuthorization({ ...common, authorization: persisted });
-      for (const token of [created.token, renewed.token]) {
+      for (const token of [...Object.values(created.tokens), ...Object.values(renewed.tokens)]) {
         expect(decodeJwt(token)).toMatchObject({
           apiTokenPepper: null,
           tokenPurpose: 'delegated-workload',
@@ -249,7 +331,9 @@ describe('runtime authorization', () => {
     });
 
     expect(cloudAgent.authorization.delegationExpiresAt).toBe('2026-01-02T00:00:00.000Z');
-    expect(decodeJwt(cloudAgent.token).exp).toBe(Date.UTC(2026, 0, 1, 1) / 1000);
+    for (const token of Object.values(cloudAgent.tokens)) {
+      expect(decodeJwt(token).exp).toBe(Date.UTC(2026, 0, 1, 1) / 1000);
+    }
   });
 
   it('accepts a shorter delegation lifetime but never one beyond the resource maximum', async () => {
@@ -291,7 +375,9 @@ describe('runtime authorization', () => {
       now: renewalTime,
     });
 
-    expect(decodeJwt(renewed.token).exp).toBe(Date.UTC(2026, 0, 2) / 1000);
+    for (const token of Object.values(renewed.tokens)) {
+      expect(decodeJwt(token).exp).toBe(Date.UTC(2026, 0, 2) / 1000);
+    }
     expect(renewed.expiresAt).toBe('2026-01-02T00:00:00.000Z');
   });
 
@@ -384,7 +470,9 @@ describe('runtime authorization', () => {
       token: (await admission({ env: 'development' })).token,
     });
     expect(result.authorization.env).toBe('development');
-    expect(decodeJwt(result.token).env).toBe('development');
+    for (const token of Object.values(result.tokens)) {
+      expect(decodeJwt(token).env).toBe('development');
+    }
   });
 
   it('reports an environment mismatch as its own admission diagnostic', async () => {

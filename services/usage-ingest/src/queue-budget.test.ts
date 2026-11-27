@@ -6,7 +6,15 @@ const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href)
 
 it('bounds production EU processing to 450 direct Frankfurt writer calls, 475 with the hedge consumer and 525 with the tagged consumer', () => {
   const production = unstable_readConfig({ config });
-  expect(production.services).toEqual([]);
+  // The only service binding is the STS canary's, which makes no writer call.
+  expect(production.services).toEqual([
+    {
+      binding: 'STS',
+      service: 'sts',
+      entrypoint: 'SecretsBroker',
+      props: { caller: 'usage-ingest' },
+    },
+  ]);
   expect(production.queues.producers).toEqual([
     { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-eu' },
     { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-eu' },
@@ -70,7 +78,14 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 475 wi
 
 it('keeps staging on one EU queue, the hedge queue and the tagged queue (cap 10) with at most 435 concurrent writer calls', () => {
   const staging = unstable_readConfig({ config, env: 'staging' });
-  expect(staging.services).toEqual([]);
+  expect(staging.services).toEqual([
+    {
+      binding: 'STS',
+      service: 'sts-staging',
+      entrypoint: 'SecretsBroker',
+      props: { caller: 'usage-ingest' },
+    },
+  ]);
   expect(staging.vars.USAGE_WRITER_URL).toBe(
     'https://staging-app.kilo.ai/api/internal/usage/record'
   );

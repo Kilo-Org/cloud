@@ -1,7 +1,8 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
-import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
+import { kilocode_users, transactional_email_log, user_auth_provider } from '@kilocode/db/schema';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { inArray } from 'drizzle-orm';
 
 export function defineTestUser(userData: Partial<User> = {}): User {
   const randomUserId = `test-user-${Math.random()}`;
@@ -78,4 +79,19 @@ export async function insertTestUserAndGoogleAuth(userData: Partial<User> = {}):
   });
 
   return insertedUser;
+}
+
+/**
+ * Deletes the outbox rows that reference the given users. A security notice
+ * claims its key in `transactional_email_log` under the user, and that foreign
+ * key blocks deleting the user, so a suite that hard-deletes users it created
+ * clears their rows first.
+ */
+export async function deleteTransactionalEmailLogForUsers(
+  userIds: readonly string[]
+): Promise<void> {
+  if (userIds.length === 0) return;
+  await db
+    .delete(transactional_email_log)
+    .where(inArray(transactional_email_log.user_id, [...userIds]));
 }

@@ -1,0 +1,491 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+import { describe, expect, it } from 'vitest';
+import {
+  cacheTtlSeconds,
+  SharedExchangedToken,
+  type Exchange,
+  type SharedCache,
+  type SharedTokenResult,
+  type SharedTokenSettings,
+} from '../src/vercel/shared-token';
+
+// The D10 algorithm `vercelIdentity` and the proof-run harness use, against stand-ins for
+// the Runtime Cache and the exchange. Proof run 2 measures the real ones; this checks the logic.
+
+const AUDIENCE = 'https://sts.test';
+
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+function unsignedJwt(claims: Record<string, unknown>): string {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode(claims)}.signature`;
+}
+
+const DEPLOYMENT = {
+  owner: 'kilocode',
+  iss: 'https://oidc.vercel.com/kilocode',
+  owner_id: 'team_T1',
+  project_id: 'prj_P1',
+  environment: 'production',
+  deployment_id: 'dpl_D1',
+};
+
+/** The `act` Vercel adds on an exchange: the base token's audience, the team default. */
+const ACT = { iat: nowSeconds(), aud: 'https://vercel.com/kilocode' };
+
+function baseToken(claims: Record<string, unknown> = {}): string {
+  return unsignedJwt({ ...DEPLOYMENT, iat: nowSeconds(), exp: nowSeconds() + 7200, ...claims });
+}
+
+function claimsOf(token: string): Record<string, unknown> {
+  return JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
+}
+
+const BASE_TOKEN = baseToken();
+
+/** A regional Runtime Cache stand-in: entries expire on their TTL, every call takes `latencyMs`. */
+function fakeCache(latencyMs = 5): SharedCache {
+  const entries = new Map<string, { value: unknown; expiresAt: number }>();
+  return {
+    async get(key) {
+      await sleep(latencyMs);
+      const entry = entries.get(key);
+      return entry !== undefined && entry.expiresAt > Date.now()
+        ? structuredClone(entry.value)
+        : null;
+    },
+    async set(key, value, { ttl }) {
+      await sleep(latencyMs);
+      entries.set(key, { value: structuredClone(value), expiresAt: Date.now() + ttl * 1000 });
+    },
+    async delete(key) {
+      await sleep(latencyMs);
+      entries.delete(key);
+    },
+  };
+}
+
+/** The exchange stand-in: `budget` tokens, then 429s, as proof run 1 saw about 100 per burst. */
+function fakeExchange(options: {
+  budget: number;
+  exp?: number;
+  answers?: ('rate_limited' | 'token')[];
+}) {
+  const calls = { attempts: 0, served: 0 };
+  const exchange: Exchange = async base => {
+    calls.attempts += 1;
+    await sleep(50);
+    const scripted = options.answers?.[calls.attempts - 1];
+    if (scripted === 'rate_limited' || (scripted === undefined && calls.served >= options.budget)) {
+      return { kind: 'rate_limited' };
+    }
+    calls.served += 1;
+    const claims = claimsOf(base);
+    return {
+      kind: 'token',
+      token: unsignedJwt({ ...claims, exp: options.exp ?? claims.exp, aud: AUDIENCE, act: ACT }),
+    };
+  };
+  return { calls, exchange };
+}
+
+/** Cold instances: each starts with empty memory, and all share one cache. */
+async function coldWave(
+  instances: number,
+  cache: SharedCache,
+  exchange: Exchange,
+  settings: Partial<SharedTokenSettings> = {},
+  baseFor: (index: number) => string = () => BASE_TOKEN
+): Promise<SharedTokenResult[]> {
+  return await Promise.all(
+    Array.from({ length: instances }, (_, index) =>
+      new SharedExchangedToken(cache, { settings }).get(baseFor(index), AUDIENCE, exchange)
+    )
+  );
+}
+
+function total(results: readonly SharedTokenResult[], key: 'rateLimited' | 'exchangeAttempts') {
+  return results.reduce((sum, result) => sum + result.report[key], 0);
+}
+
+describe('shared exchanged token (D10)', () => {
+  it('serves a 2,500-instance cold wave with about one exchange and no 429', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const results = await coldWave(2_500, fakeCache(), exchange);
+    expect(results.every(result => result.status === 'ok')).toBe(true);
+    expect(calls.attempts).toBeLessThanOrEqual(3);
+    expect(total(results, 'rateLimited')).toBe(0);
+    const slowest = Math.max(...results.map(result => result.report.timeToTokenMs));
+    expect(slowest).toBeLessThan(3_000);
+  }, 15_000);
+
+  it('without claims, exceeds the budget but still serves every instance from the cache after a 429', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const results = await coldWave(2_500, fakeCache(), exchange, { claim: false });
+    expect(results.every(result => result.status === 'ok')).toBe(true);
+    expect(calls.attempts).toBeGreaterThan(100);
+    expect(calls.served).toBe(100);
+    expect(total(results, 'rateLimited')).toBe(calls.attempts - 100);
+  }, 15_000);
+
+  it('does not exchange again after a 429 until the claim marker expires', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100, answers: ['rate_limited'] });
+    const results = await coldWave(50, fakeCache(), exchange, {
+      claimTtlSeconds: 1,
+      deadlineMs: 5_000,
+    });
+    expect(results.every(result => result.status === 'ok')).toBe(true);
+    expect(calls.attempts).toBe(2);
+    expect(total(results, 'rateLimited')).toBe(1);
+  }, 15_000);
+
+  it('keeps a token with 5 minutes left until 60 seconds before exp, without re-exchanging', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100, exp: nowSeconds() + 300 });
+    const cache = fakeCache();
+    const instance = new SharedExchangedToken(cache, { settings: { jitterMs: 1 } });
+    expect((await instance.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('exchanged');
+    expect((await instance.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('memory');
+    const another = new SharedExchangedToken(cache, { settings: { jitterMs: 1 } });
+    expect((await another.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('cache');
+    expect(calls.attempts).toBe(1);
+  });
+
+  it('computes the cache lifetime as exp minus 60 seconds, with no refresh margin', () => {
+    const now = nowSeconds();
+    expect(cacheTtlSeconds(now + 7200, now)).toBe(7140);
+    expect(cacheTtlSeconds(now + 300, now)).toBe(240);
+    expect(cacheTtlSeconds(now + 30, now)).toBeNull();
+  });
+
+  it('on a miss, fails at once with no exchange and no waiting when the base token has under 60 s left', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const expiring = baseToken({ iat: nowSeconds() - 7150, exp: nowSeconds() + 50 });
+    const result = await new SharedExchangedToken(fakeCache()).get(expiring, AUDIENCE, exchange);
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'the base token expires within 60 seconds',
+      report: { exchangeAttempts: 0, cacheReads: 1, waitedMs: 0 },
+    });
+    expect(calls.attempts).toBe(0);
+  });
+
+  it('keeps one key when Vercel renews the base token mid-wave', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const renewed = baseToken({ iat: nowSeconds() + 33, exp: nowSeconds() + 7233 });
+    const cache = fakeCache();
+    const keys = new Set<string>();
+    const recording: SharedCache = {
+      get: async key => {
+        if (!/:(claim|refused)$/.test(key)) keys.add(key);
+        return await cache.get(key);
+      },
+      set: async (key, value, options) => await cache.set(key, value, options),
+      delete: async key => await cache.delete(key),
+    };
+    const results = await coldWave(2_500, recording, exchange, {}, index =>
+      index % 2 === 0 ? BASE_TOKEN : renewed
+    );
+    expect(keys.size).toBe(1);
+    expect(results.every(result => result.status === 'ok')).toBe(true);
+    expect(calls.attempts).toBeLessThanOrEqual(3);
+    expect(total(results, 'rateLimited')).toBe(0);
+    const slowest = Math.max(...results.map(result => result.report.timeToTokenMs));
+    expect(slowest).toBeLessThan(3_000);
+  }, 15_000);
+
+  it('serves a still-valid cached token to an instance holding a newer base token', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const cache = fakeCache();
+    await new SharedExchangedToken(cache).get(BASE_TOKEN, AUDIENCE, exchange);
+    const renewed = baseToken({ iat: nowSeconds() + 600, exp: nowSeconds() + 7800 });
+    const later = await new SharedExchangedToken(cache).get(renewed, AUDIENCE, exchange);
+    expect(later.report.source).toBe('cache');
+    expect(calls.attempts).toBe(1);
+  });
+
+  it('keys deployments apart and ignores a cached token of another deployment', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const shared = new Map<string, unknown>();
+    const cache: SharedCache = {
+      get: async key => shared.get(key) ?? null,
+      set: async (key, value) => void shared.set(key, value),
+      delete: async key => void shared.delete(key),
+    };
+    await new SharedExchangedToken(cache).get(BASE_TOKEN, AUDIENCE, exchange);
+    const other = baseToken({ deployment_id: 'dpl_D2' });
+    const result = await new SharedExchangedToken(cache).get(other, AUDIENCE, exchange);
+    expect(result.report.source).toBe('exchanged');
+    expect(calls.attempts).toBe(2);
+
+    // An entry written under this deployment's key with another deployment's token is a miss.
+    for (const stored of shared.keys()) if (stored.endsWith(':claim')) shared.delete(stored);
+    const [key = ''] = shared.keys();
+    const foreign = unsignedJwt({
+      ...DEPLOYMENT,
+      deployment_id: 'dpl_D9',
+      exp: nowSeconds() + 7200,
+      aud: AUDIENCE,
+      act: ACT,
+    });
+    shared.set(key, { token: foreign, exp: nowSeconds() + 7200 });
+    const third = await new SharedExchangedToken(cache, { settings: { jitterMs: 1 } }).get(
+      BASE_TOKEN,
+      AUDIENCE,
+      exchange
+    );
+    expect(third.status === 'ok' && claimsOf(third.token).deployment_id).toBe('dpl_D1');
+  });
+
+  it('fails a base token without the deployment claims', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const bare = unsignedJwt({ iat: nowSeconds(), exp: nowSeconds() + 7200 });
+    const result = await new SharedExchangedToken(fakeCache()).get(bare, AUDIENCE, exchange);
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'the base token lacks a deployment claim',
+    });
+    expect(calls.attempts).toBe(0);
+  });
+
+  it('never stores nor serves a token without the team issuer or act STS requires', async () => {
+    const shared = new Map<string, unknown>();
+    const cache: SharedCache = {
+      get: async key => shared.get(key) ?? null,
+      set: async (key, value) => void shared.set(key, value),
+      delete: async key => void shared.delete(key),
+    };
+    const exp = nowSeconds() + 7200;
+    const malformed = [
+      { act: undefined },
+      { act: ACT.aud },
+      { act: { aud: 'https://vercel.com/other' } },
+      { act: { ...ACT, act: { aud: 'https://vercel.com/kilocode' } } },
+      { iss: 'https://oidc.vercel.com/other' },
+      { iss: 'https://oidc.vercel.com' },
+    ];
+    const settings = { jitterMs: 1, claim: false };
+    for (const claims of malformed) {
+      shared.clear();
+      const token = unsignedJwt({ ...DEPLOYMENT, exp, aud: AUDIENCE, act: ACT, ...claims });
+      const exchange: Exchange = async () => ({ kind: 'token', token });
+      const instance = new SharedExchangedToken(cache, { settings });
+      expect(await instance.get(BASE_TOKEN, AUDIENCE, exchange)).toMatchObject({
+        status: 'failed',
+        detail: 'the exchanged token is not one STS accepts for this deployment and audience',
+      });
+      expect([...shared.values()]).toEqual([]);
+
+      // The same token written to the cache under this deployment's key is a miss.
+      const { exchange: valid } = fakeExchange({ budget: 100 });
+      await new SharedExchangedToken(cache, { settings }).get(BASE_TOKEN, AUDIENCE, valid);
+      const [key = ''] = shared.keys();
+      shared.set(key, { token, exp });
+      const later = await new SharedExchangedToken(cache, { settings }).get(
+        BASE_TOKEN,
+        AUDIENCE,
+        valid
+      );
+      expect(later).toMatchObject({ status: 'ok', report: { source: 'exchanged' } });
+    }
+  });
+
+  it('does not share entries between key prefixes, in the cache or in memory', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const cache = fakeCache();
+    const instance = new SharedExchangedToken(cache, { settings: { jitterMs: 1 } });
+    const first = await instance.get(BASE_TOKEN, AUDIENCE, exchange, { keyPrefix: 'run-a' });
+    expect(first.report.source).toBe('exchanged');
+    const again = await instance.get(BASE_TOKEN, AUDIENCE, exchange, { keyPrefix: 'run-a' });
+    expect(again.report.source).toBe('memory');
+    const otherRun = await instance.get(BASE_TOKEN, AUDIENCE, exchange, { keyPrefix: 'run-b' });
+    expect(otherRun.report.source).toBe('exchanged');
+    const otherInstance = new SharedExchangedToken(cache, { settings: { jitterMs: 1 } });
+    const fromCache = await otherInstance.get(BASE_TOKEN, AUDIENCE, exchange, {
+      keyPrefix: 'run-b',
+    });
+    expect(fromCache.report.source).toBe('cache');
+    expect(calls.attempts).toBe(2);
+  });
+
+  it('exchanges once per instance when the cache keeps nothing', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const nothing: SharedCache = {
+      get: async () => null,
+      set: async () => {},
+      delete: async () => {},
+    };
+    const results = await coldWave(10, nothing, exchange, { jitterMs: 1 });
+    expect(results.every(result => result.status === 'ok')).toBe(true);
+    expect(calls.attempts).toBe(10);
+  });
+
+  it('fails at once on a 429 when the cache keeps nothing, instead of polling to the deadline', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 0 });
+    const nothing: SharedCache = {
+      get: async () => null,
+      set: async () => {},
+      delete: async () => {},
+    };
+    const [result] = await coldWave(1, nothing, exchange, { jitterMs: 1, deadlineMs: 5_000 });
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'the exchange answered 429 and the shared cache keeps nothing',
+      report: { exchangeAttempts: 1, rateLimited: 1 },
+    });
+    expect(result?.report.timeToTokenMs).toBeLessThan(1_000);
+    expect(calls.attempts).toBe(1);
+  });
+
+  it('fails at the deadline when no token arrives', async () => {
+    const { exchange } = fakeExchange({ budget: 0 });
+    const [result] = await coldWave(1, fakeCache(), exchange, { jitterMs: 1, deadlineMs: 300 });
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'no token before the deadline',
+      report: { exchangeAttempts: 1, rateLimited: 1 },
+    });
+  });
+
+  it('abandons and aborts an exchange still running at the deadline', async () => {
+    let aborted = false;
+    const slow: Exchange = async (_base, _audience, signal) => {
+      signal.addEventListener('abort', () => (aborted = true), { once: true });
+      await sleep(2_000);
+      return { kind: 'token', token: unsignedJwt({ ...DEPLOYMENT, exp: nowSeconds() + 7200 }) };
+    };
+    const [result] = await coldWave(1, fakeCache(), slow, { jitterMs: 1, deadlineMs: 400 });
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'no token before the deadline',
+      report: { exchangeAttempts: 1 },
+    });
+    expect(result?.report.timeToTokenMs).toBeLessThan(600);
+    expect(aborted).toBe(true);
+  });
+
+  it('stops waiting on a cache that answers after the deadline', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const [result] = await coldWave(1, fakeCache(2_000), exchange, {
+      jitterMs: 1,
+      deadlineMs: 300,
+    });
+    expect(result).toMatchObject({
+      status: 'failed',
+      detail: 'no token before the deadline',
+      report: { exchangeAttempts: 0, cacheReads: 1 },
+    });
+    expect(result?.report.timeToTokenMs).toBeLessThan(500);
+    expect(calls.attempts).toBe(0);
+  });
+
+  it('returns the token in hand at the deadline when writing it runs past it, and keeps it in memory', async () => {
+    const { calls, exchange } = fakeExchange({ budget: 100 });
+    const stored = new Map<string, unknown>();
+    // Reads and the claim marker are quick; the token write hangs.
+    const cache: SharedCache = {
+      get: async key => stored.get(key) ?? null,
+      set: async (key, value) => {
+        if (!key.endsWith(':claim')) await sleep(2_000);
+        stored.set(key, value);
+      },
+      delete: async key => void stored.delete(key),
+    };
+    const instance = new SharedExchangedToken(cache, {
+      settings: { jitterMs: 1, deadlineMs: 400 },
+    });
+    const first = await instance.get(BASE_TOKEN, AUDIENCE, exchange);
+    expect(first).toMatchObject({ status: 'ok', report: { source: 'exchanged' } });
+    // The write was cut at the 400 ms deadline instead of taking its 2 s.
+    expect(first.report.timeToTokenMs).toBeGreaterThanOrEqual(390);
+    expect(first.report.timeToTokenMs).toBeLessThan(600);
+    expect((await instance.get(BASE_TOKEN, AUDIENCE, exchange)).report.source).toBe('memory');
+    expect(calls.attempts).toBe(1);
+  });
+
+  describe('a custom environment (step 2b)', () => {
+    /** A cache that records every call: a custom environment must make none. */
+    function watchedCache() {
+      const calls: string[] = [];
+      const inner = fakeCache();
+      const cache: SharedCache = {
+        async get(key) {
+          calls.push(`get ${key}`);
+          return await inner.get(key);
+        },
+        async set(key, value, options) {
+          calls.push(`set ${key}`);
+          await inner.set(key, value, options);
+        },
+        async delete(key) {
+          calls.push(`delete ${key}`);
+          await inner.delete(key);
+        },
+      };
+      return { cache, calls };
+    }
+
+    const STAGING = baseToken({
+      environment: 'staging',
+      custom_environment_id: 'env_AWLwIFdyYSjUqXEoh7aH9E8Kg39b',
+    });
+
+    it('keeps its token in instance memory only, never reading or writing the Runtime Cache', async () => {
+      const { cache, calls } = watchedCache();
+      const { calls: exchanges, exchange } = fakeExchange({ budget: 100 });
+      const instance = new SharedExchangedToken(cache);
+      const first = await instance.get(STAGING, AUDIENCE, exchange);
+      expect(first).toMatchObject({
+        status: 'ok',
+        report: { source: 'exchanged', cacheReads: 0, cacheWrites: 0, waitedMs: 0 },
+      });
+      expect((await instance.get(STAGING, AUDIENCE, exchange)).report.source).toBe('memory');
+      // Another instance shares nothing: it exchanges for itself.
+      const other = await new SharedExchangedToken(cache).get(STAGING, AUDIENCE, exchange);
+      expect(other.report.source).toBe('exchanged');
+      expect(exchanges.attempts).toBe(2);
+      // STS refusing its own token keeps it and writes no refusal marker.
+      expect(first.status === 'ok' && (await instance.invalidate(first.token))).toBe(false);
+      expect(calls).toEqual([]);
+    });
+
+    it('treats an environment other than preview and production as custom even without its id', async () => {
+      const { cache, calls } = watchedCache();
+      const { exchange } = fakeExchange({ budget: 100 });
+      const result = await new SharedExchangedToken(cache).get(
+        baseToken({ environment: 'staging' }),
+        AUDIENCE,
+        exchange
+      );
+      expect(result.report.source).toBe('exchanged');
+      expect(calls).toEqual([]);
+    });
+
+    it('fails at once on a 429, with no poll', async () => {
+      const { cache, calls } = watchedCache();
+      const { exchange } = fakeExchange({ budget: 0 });
+      const result = await new SharedExchangedToken(cache).get(STAGING, AUDIENCE, exchange);
+      expect(result).toMatchObject({
+        status: 'failed',
+        detail: 'the exchange answered 429 and a custom environment shares no token',
+        report: { exchangeAttempts: 1, rateLimited: 1, waitedMs: 0 },
+      });
+      expect(calls).toEqual([]);
+    });
+
+    it('still uses the shared cache for preview and production', async () => {
+      const { cache, calls } = watchedCache();
+      const { exchange } = fakeExchange({ budget: 100 });
+      const preview = baseToken({ environment: 'preview' });
+      await new SharedExchangedToken(cache, { settings: { jitterMs: 1 } }).get(
+        preview,
+        AUDIENCE,
+        exchange
+      );
+      const later = await new SharedExchangedToken(cache).get(preview, AUDIENCE, exchange);
+      expect(later.report.source).toBe('cache');
+      expect(calls.length).toBeGreaterThan(0);
+    });
+  });
+});

@@ -15,7 +15,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   },
 }));
 
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
   generateBoundedInternalServiceToken: (
     userId: string,

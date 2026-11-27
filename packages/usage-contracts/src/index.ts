@@ -80,8 +80,6 @@ const UsageMetadataSchema = z.object({
   http_x_vercel_ip_latitude: z.number().nullable(),
   http_x_vercel_ip_longitude: z.number().nullable(),
   http_x_vercel_ja4_digest: z.string().nullable(),
-  user_prompt_prefix: z.string().nullable(),
-  system_prompt_prefix: z.string().nullable(),
   system_prompt_length: z.number().int().nullable(),
   http_user_agent: z.string().nullable(),
   max_tokens: z.number().int().nullable(),
@@ -113,8 +111,9 @@ const UsageMetadataSchema = z.object({
   // Additive like reasoning_setting: older senders omit it.
   non_inference_cost: bigintAsNumber.nullable().default(null),
   is_free: z.boolean().nullable(),
-  abuse_delay: z.number().nullable(),
-  abuse_downgraded_from: z.string().nullable(),
+  // Additive like reasoning_setting: older senders omit it. Plain text rather than an enum, so a
+  // kind added on a newer sender never rejects the record on an older receiver.
+  system_prompt_kind: z.string().nullable().default(null),
 });
 
 /**
@@ -152,9 +151,11 @@ export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSc
  *
  * - Nullable fields use `.nullable()`. Except for additive rollout fields that
  *   default to null, missing keys are rejected: `JSON.stringify` drops
- *   `undefined`-valued keys, and `null` is load-bearing here. For organization
- *   usage `toInsertableDbUsageRecord` explicitly sets `user_prompt_prefix` and
- *   `system_prompt_prefix` to `null` so prompt text is never persisted.
+ *   `undefined`-valued keys, and `null` is load-bearing here.
+ *   The retired metadata keys `user_prompt_prefix`, `system_prompt_prefix`,
+ *   `abuse_delay`, and `abuse_downgraded_from` are no longer in the schema, so
+ *   a record from an older sender that still carries them parses with them
+ *   stripped and they are never persisted.
  * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
  *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
  *   this holds by construction. It would NOT hold for a value read back out of
@@ -183,6 +184,22 @@ export const UsageRecordRequestSchema = z.object({
 });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;
+
+const RETIRED_USAGE_METADATA = {
+  user_prompt_prefix: null,
+  system_prompt_prefix: null,
+  abuse_delay: null,
+  abuse_downgraded_from: null,
+} as const;
+
+/**
+ * The body to put on the wire for an LLM usage record. Older receivers still require the retired
+ * metadata keys (as null) and new receivers strip them. Remove once every receiver runs a schema
+ * without them.
+ */
+export function toUsageRecordWireBody(request: UsageRecordRequest) {
+  return { ...request, metadata: { ...request.metadata, ...RETIRED_USAGE_METADATA } };
+}
 
 export type LlmUsageQueueMessage = UsageRecordRequest;
 

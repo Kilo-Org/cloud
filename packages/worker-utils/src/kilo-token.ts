@@ -10,6 +10,7 @@ import {
   checkKiloTokenAuthorityClaims,
   verifyKiloTokenSignature,
 } from './kilo-token-verification';
+import { observeSharedVerifierAdmission } from './kilo-token-admission-observation';
 
 export { KILO_TOKEN_VERSION };
 
@@ -29,7 +30,7 @@ const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from
- * generateApiToken() / generateOrganizationApiToken() in src/lib/tokens.ts.
+ * generateApiToken() / generateOrganizationApiToken() in apps/web/src/lib/auth/kilo-token-signing.ts.
  * All optional fields beyond version+kiloUserId default to undefined when absent.
  */
 export const kiloTokenPayload = z.object({
@@ -162,5 +163,9 @@ export async function verifyKiloToken(
     assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 
-  return kiloTokenPayload.parse(payload);
+  const verified = kiloTokenPayload.parse(payload);
+  if (options?.audience !== undefined) {
+    observeSharedVerifierAdmission('exact_audience', options.audience, payload);
+  }
+  return verified;
 }

@@ -23,12 +23,14 @@ import {
 import type * as InstallStateModule from '@/lib/integrations/github/install-state';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   github_install_states,
   kilocode_users,
   organizations,
   platform_integrations,
   type GitHubInstallState,
 } from '@kilocode/db/schema';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -43,7 +45,7 @@ import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 import {
   GITHUB_INSTALLATION_ADMINISTRATION_LISTING,
@@ -99,7 +101,7 @@ jest.mock('@/lib/integrations/github/installation-authorization', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
-  ensureOrganizationAccess: jest.fn(),
+  ensureMemberOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
@@ -154,7 +156,7 @@ const mockedVerifyGitHubInstallationAuthorization = jest.mocked(
 );
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
-const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedEnsureMemberOrganizationAccess = jest.mocked(ensureMemberOrganizationAccess);
 const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
 const mockedObserveGitHubInstallationLifecycle = jest.mocked(observeGitHubInstallationLifecycle);
 const mockedConnectVerifiedGitHubInstallation = jest.mocked(connectVerifiedGitHubInstallation);
@@ -835,8 +837,8 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       expect.objectContaining({ platform: 'github' }),
       expect.anything()
     );
-    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ id: USER_ID }) }),
+    expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
       'org-db-owner',
       ['owner', 'admin']
     );
@@ -854,7 +856,9 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       consumed_at: null,
       created_at: new Date().toISOString(),
     });
-    mockedEnsureOrganizationAccess.mockRejectedValueOnce(new Error('Organization role required'));
+    mockedEnsureMemberOrganizationAccess.mockRejectedValueOnce(
+      new Error('Organization role required')
+    );
 
     const { GET } = await import('./route');
     const response = await GET(
@@ -882,7 +886,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
 
     // Override to return the matching org owner
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -971,7 +975,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     });
 
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -1119,7 +1123,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     });
 
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -1195,7 +1199,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     mockedCreatePending.mockResolvedValue(undefined as never);
 
     jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
-      ensureOrganizationAccess: jest.fn(),
+      ensureMemberOrganizationAccess: jest.fn(),
     }));
 
     const { GET } = await import('./route');
@@ -1884,6 +1888,55 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expect(nonAdminLogs[0][0]).not.toContain('code_absent');
 
     logSpy.mockRestore();
+  });
+
+  test('refuses an organization install by a Kilo admin without a manage membership and records no staff elevation', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const organizationId = randomUUID();
+    mockedGetUserFromAuth.mockResolvedValue({ user: admin, authFailedResponse: null } as never);
+    mockConsumedInstallState({
+      token: INSTALL_STATE_TOKEN,
+      kilo_user_id: admin.id,
+      owner_type: 'org',
+      owner_id: organizationId,
+      github_app_type: 'standard',
+      return_to: `/organizations/${organizationId}/integrations/github#repositories`,
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    });
+    mockedEnsureMemberOrganizationAccess.mockRejectedValueOnce(
+      new Error('Organization role required')
+    );
+
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=install&state=${INSTALL_STATE_TOKEN}&code=abc`
+        ) as never
+      );
+
+      expectRedirectLocation(response, '/?error=installation_failed');
+      expect(mockedEnsureMemberOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ id: admin.id }),
+        organizationId,
+        ['owner', 'admin']
+      );
+      expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+      expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
+      expect(
+        await db
+          .select()
+          .from(admin_action_audit_logs)
+          .where(eq(admin_action_audit_logs.actor_id, admin.id))
+      ).toEqual([]);
+    } finally {
+      await db
+        .delete(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, admin.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, admin.id));
+    }
   });
 });
 

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { generateCloudAgentWorkflowToken } from '@kilocode/web-shared/lib/tokens';
+import { generateCloudAgentWorkflowToken } from '@/lib/auth/kilo-token-signing';
 import { prepareCloudAgentWorkflowUser } from './cloud-agent-workflow-user';
 
 const issuance = { enabled: true };

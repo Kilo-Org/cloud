@@ -1,7 +1,19 @@
 import { describe, expect, test } from 'vitest';
+import { z } from 'zod';
 
 import type { KiloOrganizationId } from './schema-types';
-import { UsageRecordRequestSchema, UsageRecordResponseSchema } from './index';
+import {
+  UsageRecordRequestSchema,
+  UsageRecordResponseSchema,
+  toUsageRecordWireBody,
+} from './index';
+
+const RETIRED_METADATA_KEYS = [
+  'user_prompt_prefix',
+  'system_prompt_prefix',
+  'abuse_delay',
+  'abuse_downgraded_from',
+] as const;
 
 function validCore() {
   return {
@@ -38,8 +50,6 @@ function validMetadata() {
     http_x_vercel_ip_latitude: null,
     http_x_vercel_ip_longitude: null,
     http_x_vercel_ja4_digest: null,
-    user_prompt_prefix: null,
-    system_prompt_prefix: null,
     system_prompt_length: null,
     http_user_agent: null,
     max_tokens: null,
@@ -65,8 +75,7 @@ function validMetadata() {
     reasoning_setting: null as string | null,
     market_cost: null,
     is_free: null,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
+    system_prompt_kind: null,
   };
 }
 
@@ -121,21 +130,16 @@ describe('UsageRecordRequestSchema', () => {
     expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
   });
 
-  // JSON.stringify drops undefined-valued keys. For organization usage,
-  // toInsertableDbUsageRecord sets the prompt prefixes to null precisely so
-  // prompt text is never persisted, so a missing key must fail rather than reach
-  // the INSERT as undefined.
-  test.each([
-    'user_prompt_prefix',
-    'system_prompt_prefix',
-    'http_x_forwarded_for',
-    'api_kind',
-    'finish_reason',
-  ])('rejects metadata with %s absent rather than explicitly null', field => {
-    const request = validRequest();
-    delete (request.metadata as Record<string, unknown>)[field];
-    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
-  });
+  // JSON.stringify drops undefined-valued keys, so a missing key must fail rather
+  // than reach the INSERT as undefined.
+  test.each(['http_x_forwarded_for', 'api_kind', 'finish_reason'])(
+    'rejects metadata with %s absent rather than explicitly null',
+    field => {
+      const request = validRequest();
+      delete (request.metadata as Record<string, unknown>)[field];
+      expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
+    }
+  );
 
   test('rejects a nullable core column that is absent', () => {
     const request = validRequest();
@@ -143,10 +147,56 @@ describe('UsageRecordRequestSchema', () => {
     expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
   });
 
-  test('preserves an explicit null prompt prefix', () => {
-    const parsed = UsageRecordRequestSchema.parse(validRequest());
-    expect(parsed.metadata.user_prompt_prefix).toBeNull();
-    expect(parsed.metadata.system_prompt_prefix).toBeNull();
+  test.each([
+    ['null', null, null, null, null],
+    ['legacy strings', '🙂 hello', 'You are helpful', 12.5, 'anthropic/claude-opus-5'],
+  ])(
+    'accepts and strips the retired metadata keys from an older sender with %s',
+    (_label, userPromptPrefix, systemPromptPrefix, abuseDelay, abuseDowngradedFrom) => {
+      const request = {
+        ...validRequest(),
+        metadata: {
+          ...validMetadata(),
+          user_prompt_prefix: userPromptPrefix,
+          system_prompt_prefix: systemPromptPrefix,
+          abuse_delay: abuseDelay,
+          abuse_downgraded_from: abuseDowngradedFrom,
+        },
+      };
+      const parsed = UsageRecordRequestSchema.parse(request);
+      expect(parsed.metadata).toEqual(UsageRecordRequestSchema.parse(validRequest()).metadata);
+      for (const key of RETIRED_METADATA_KEYS) expect(parsed.metadata).not.toHaveProperty(key);
+    }
+  );
+
+  describe('toUsageRecordWireBody', () => {
+    // The schema before the retirement: older receivers still require these keys.
+    const PreRetirementRequestSchema = UsageRecordRequestSchema.extend({
+      metadata: UsageRecordRequestSchema.shape.metadata.extend({
+        user_prompt_prefix: z.string().nullable(),
+        system_prompt_prefix: z.string().nullable(),
+        abuse_delay: z.number().nullable(),
+        abuse_downgraded_from: z.string().nullable(),
+      }),
+    });
+
+    test('satisfies a receiver that still requires the retired keys', () => {
+      const body = toUsageRecordWireBody(UsageRecordRequestSchema.parse(validRequest()));
+      expect(PreRetirementRequestSchema.safeParse(JSON.parse(JSON.stringify(body))).success).toBe(
+        true
+      );
+      for (const key of RETIRED_METADATA_KEYS) expect(body.metadata[key]).toBeNull();
+    });
+
+    test('is still accepted by the current schema, without the retired keys', () => {
+      const body = toUsageRecordWireBody(UsageRecordRequestSchema.parse(validRequest()));
+      const parsed = UsageRecordRequestSchema.parse(body);
+      for (const key of RETIRED_METADATA_KEYS) expect(parsed.metadata).not.toHaveProperty(key);
+    });
+
+    test('a body without the helper fails the pre-retirement schema', () => {
+      expect(PreRetirementRequestSchema.safeParse(validRequest()).success).toBe(false);
+    });
   });
 
   test('rejects a non-integer cost', () => {

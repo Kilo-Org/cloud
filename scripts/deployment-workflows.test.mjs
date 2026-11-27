@@ -806,12 +806,14 @@ test('every Worker deploy job retries a failed dependency install at most three 
       'deploy-changed',
       'deploy-session-ingest',
       'deploy-cloud-agent-after-session-ingest',
+      'deploy-uts',
+      'deploy-uts-feed-after-uts',
     ]) {
       installRuns.push(
         ...workers.jobs[job].steps.filter(step => (step.run ?? '').includes('pnpm install'))
       );
     }
-    assert.equal(installRuns.length, 4);
+    assert.equal(installRuns.length, 6);
 
     for (const { run } of installRuns) {
       for (const [failures, status, calls, sleeps] of [
@@ -854,6 +856,8 @@ test('every Worker deploy job installs only the Worker closure and the root proj
     ['deploy-changed', '${{ matrix.worker }}'],
     ['deploy-session-ingest', 'services/session-ingest'],
     ['deploy-cloud-agent-after-session-ingest', 'services/cloud-agent-next'],
+    ['deploy-uts', 'services/uts'],
+    ['deploy-uts-feed-after-uts', 'services/uts-feed'],
   ]) {
     const installs = workers.jobs[job].steps.filter(step =>
       (step.run ?? '').includes('pnpm install')
@@ -901,22 +905,6 @@ test('staging and production Worker changes use independent deployment baselines
   assert.match(workers.jobs['detect-changes'].if, /inputs\.worker_matrix == ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
   assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
-  assert.equal(
-    production.jobs['deploy-kiloclaw'],
-    undefined,
-    'production must not run deploy-kiloclaw on the schedule: dispatch it manually'
-  );
-  assert.doesNotMatch(
-    production.jobs['record-deployment'].if,
-    /deploy-kiloclaw/,
-    'production record-deployment must not wait on the manual kiloclaw deploy'
-  );
-  const kiloclaw = workflow('deploy-kiloclaw');
-  assert.ok(
-    Object.hasOwn(kiloclaw.on, 'workflow_dispatch'),
-    'deploy-kiloclaw must be dispatchable manually'
-  );
-  assert.ok(Object.hasOwn(kiloclaw.on.workflow_dispatch.inputs, 'source_sha'));
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
@@ -934,6 +922,83 @@ test('staging and production Worker changes use independent deployment baselines
       deployment.jobs['record-deployment'].steps[0].env.SOURCE_SHA,
       '${{ needs.check-changes.outputs.target_sha }}'
     );
+  }
+});
+
+test('a manual nonproduction deploy requires the named Worker environment before any deploy work', () => {
+  // Without its own env.<target> object Wrangler warns and deploys the top-level
+  // production configuration, so the manual path stops before installing,
+  // publishing a runtime, provisioning or calling Wrangler.
+  const steps = workers.jobs['deploy-manual'].steps;
+  const index = steps.findIndex(step => step.name === 'Require the named Worker environment');
+  const preflight = steps[index];
+  assert.equal(steps[index - 1].name, 'Setup Node.js');
+  assert.equal(preflight.if, "inputs.target_environment != 'production'");
+  assert.deepEqual(preflight.env, {
+    WORKER: '${{ inputs.worker }}',
+    TARGET_ENVIRONMENT: '${{ inputs.target_environment }}',
+  });
+  assert.ok(!preflight.run.includes('${{'), 'inputs reach the shell only through env');
+  for (const earlier of steps.slice(0, index)) {
+    assert.ok(!(earlier.run ?? '').includes('pnpm'), earlier.name);
+    assert.ok(!(earlier.uses ?? '').startsWith('cloudflare/'), earlier.name);
+  }
+  // The matrix skip reads the same checker rather than a second parser.
+  const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
+  assert.ok(
+    detect.run.includes('node scripts/has-named-environment.mjs "$1" "$TARGET_ENVIRONMENT"')
+  );
+  assert.ok(!detect.run.includes('stripJsonComments'));
+
+  const dir = mkdtempSync(join(tmpdir(), 'named-environment-'));
+  try {
+    symlinkSync(fileURLToPath(new URL('.', import.meta.url)), join(dir, 'scripts'));
+    const write = (worker, contents) => {
+      mkdirSync(join(dir, worker), { recursive: true });
+      writeFileSync(join(dir, worker, 'wrangler.jsonc'), contents);
+    };
+    // Comment-looking text, escaped quotes and `,}` inside strings stay literal.
+    write(
+      'services/genuine',
+      '{\n  // top level is production\n  "name": "w", /* note */\n  "env": { "staging": {\n    "name": "w-staging",\n    "route": "https://x.example/* not a comment */ // nor this",\n    "quoted": "a\\\\\\"b,}",\n  }, },\n}\n'
+    );
+    write('services/absent', '{ "name": "w", "env": { "production": {} } }');
+    write('services/no-env', '{ "name": "w", "vars": { "env": { "staging": {} } } }');
+    write('services/not-object', '{ "name": "w", "env": { "staging": true } }');
+    write('services/malformed', '{ "name": "w", "env": { "staging": { ');
+    write('services/unterminated', '{ "env": { "staging": {} } /* never closed ');
+    write('services/merged', '{ "env": { "staging": {} }, "port": 80/**/80 }');
+    write('services/empty-comma', '{ "env": { "staging": {} }, "routes": [,] }');
+    mkdirSync(join(dir, 'services/missing'), { recursive: true });
+
+    const run = (worker, environment = 'staging') =>
+      spawnSync('bash', ['-e', '-c', preflight.run], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: { ...process.env, WORKER: worker, TARGET_ENVIRONMENT: environment },
+      });
+    const admitted = run('services/genuine');
+    assert.equal(admitted.status, 0, admitted.stderr);
+    for (const worker of [
+      'services/absent',
+      'services/no-env',
+      'services/not-object',
+      'services/malformed',
+      'services/missing',
+      'services/unterminated',
+      'services/merged',
+      'services/empty-comma',
+    ]) {
+      const result = run(worker);
+      assert.equal(result.status, 1, worker);
+      assert.match(result.stderr, /refusing to deploy/, worker);
+      assert.doesNotMatch(result.stderr, /Unexpected|ENOENT|"env"/, worker);
+    }
+    assert.equal(run('services/genuine', '').status, 1, 'an empty target fails closed');
+    assert.equal(run('services/genuine', 'constructor').status, 1, 'only own keys count');
+    assert.equal(run('services/genuine', '$(exit 0)').status, 1, 'the target is not evaluated');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -982,6 +1047,10 @@ test('Worker detection and deploy run beside the Vercel chain in both pipelines'
     assert.equal(
       deploy.with.deploy_cloud_agent_after_session_ingest,
       '${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}'
+    );
+    assert.equal(
+      deploy.with.deploy_uts_feed_after_uts,
+      '${{ needs.detect-workers.outputs.deploy-uts-feed-after-uts }}'
     );
     assert.equal(deploy.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
     assert.equal(deploy.with.base_sha, undefined, `${name} deploy call must not run detection`);
@@ -1043,6 +1112,10 @@ test('Worker detection and deploy run beside the Vercel chain in both pipelines'
   assert.equal(
     workers.on.workflow_call.outputs['deploy-cloud-agent-after-session-ingest'].value,
     '${{ jobs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest }}'
+  );
+  assert.equal(
+    workers.on.workflow_call.outputs['deploy-uts-feed-after-uts'].value,
+    '${{ jobs.detect-changes.outputs.deploy-uts-feed-after-uts }}'
   );
   const changed = workers.jobs['deploy-changed'];
   assert.equal(changed.needs, undefined);
@@ -1203,7 +1276,6 @@ test('deployment gate only deploys changes since the last complete run', () => {
       base_sha: deployedSha,
       target_sha: git('rev-parse', 'HEAD'),
       should_deploy: 'true',
-      deploy_kiloclaw: 'false',
     });
     assert.match(
       readFileSync(join(directory, '.git', 'test-summary'), 'utf8'),
@@ -1212,12 +1284,9 @@ test('deployment gate only deploys changes since the last complete run', () => {
 
     writeFileSync(join(directory, 'services/kiloclaw/file'), 'worker');
     commit('worker');
-    assert.equal(runGate(deployedSha).deploy_kiloclaw, 'true');
-    const kiloclawSha = git('rev-parse', 'HEAD');
     mkdirSync(join(directory, 'packages/kiloclaw-secret-catalog'), { recursive: true });
     writeFileSync(join(directory, 'packages/kiloclaw-secret-catalog/file'), 'shared package');
     commit('shared package');
-    assert.equal(runGate(kiloclawSha).deploy_kiloclaw, 'true');
     const greenSha = git('rev-parse', 'HEAD');
     writeFileSync(join(directory, 'apps/web/file'), 'untested');
     commit('untested');
@@ -1335,6 +1404,8 @@ test('every Worker deployment path retries a deploy once', () => {
     ['deploy-changed', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-session-ingest', 'Deploy to Cloudflare Workers', 'deploy'],
     ['deploy-cloud-agent-after-session-ingest', 'Deploy cloud-agent-next', 'deploy-cloud-agent'],
+    ['deploy-uts', 'Deploy uts', 'deploy'],
+    ['deploy-uts-feed-after-uts', 'Deploy uts-feed', 'deploy'],
   ]) {
     const steps = workers.jobs[name].steps;
     const first = steps.findIndex(step => step.name === deployName);
@@ -1409,7 +1480,7 @@ test('the ordered production path takes both workers out of the parallel matrix'
   assert.ok(start >= 0 && end > start, 'the matrix filter must exist');
   const loop = script.slice(start, end + reassignment.length);
 
-  const filter = (changed, ordered) =>
+  const filter = (changed, ordered, utsOrdered = 'false') =>
     execFileSync(
       'bash',
       [
@@ -1420,6 +1491,7 @@ test('the ordered production path takes both workers out of the parallel matrix'
         '-c',
         [
           `DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=${ordered}`,
+          `DEPLOY_UTS_FEED_AFTER_UTS=${utsOrdered}`,
           `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
           loop,
           'printf "%s\\n" "${CHANGED[@]}"',
@@ -1430,7 +1502,6 @@ test('the ordered production path takes both workers out of the parallel matrix'
       .trim()
       .split('\n')
       .filter(Boolean);
-
   assert.deepEqual(filter(['services/session-ingest', 'services/cloud-agent-next'], 'true'), []);
   assert.deepEqual(
     filter(['services/session-ingest', 'services/cloud-agent-next', 'services/scim-sync'], 'true'),
@@ -1441,6 +1512,79 @@ test('the ordered production path takes both workers out of the parallel matrix'
     ['services/session-ingest', 'services/cloud-agent-next'],
     'every other deployment path keeps both workers in the matrix'
   );
+  assert.deepEqual(
+    filter(['services/uts', 'services/uts-feed', 'services/scim-sync'], 'false', 'true'),
+    ['services/scim-sync'],
+    'the ordered UTS path owns both UTS workers'
+  );
+  assert.deepEqual(filter(['services/uts-feed'], 'false', 'false'), ['services/uts-feed']);
+});
+
+test('the UTS feed Worker deploys after the UTS mint Worker job when both change', () => {
+  const detect = workers.jobs['detect-changes'];
+  assert.equal(
+    detect.outputs['deploy-uts-feed-after-uts'],
+    '${{ steps.set-matrix.outputs.deploy-uts-feed-after-uts }}'
+  );
+  assert.equal(workers.on.workflow_call.inputs.deploy_uts_feed_after_uts.default, 'false');
+
+  // The flag is set only when both UTS Workers are among the changed workers.
+  const script = detect.steps.find(step => step.id === 'set-matrix').run;
+  const start = script.indexOf('DEPLOY_UTS_FEED_AFTER_UTS=false');
+  const end = script.indexOf('echo "deploy-uts-feed-after-uts=');
+  assert.ok(start >= 0 && end > start, 'the UTS order decision must exist');
+  const decide = changed =>
+    execFileSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-eo',
+        'pipefail',
+        '-c',
+        [
+          `CHANGED=(${changed.map(dir => `'${dir}'`).join(' ')})`,
+          script.slice(start, end),
+          'echo "$DEPLOY_UTS_FEED_AFTER_UTS"',
+        ].join('\n'),
+      ],
+      { encoding: 'utf8' }
+    ).trim();
+  assert.equal(decide(['services/uts', 'services/uts-feed']), 'true');
+  assert.equal(decide(['services/scim-sync', 'services/uts-feed', 'services/uts']), 'true');
+  assert.equal(decide(['services/uts']), 'false');
+  assert.equal(decide(['services/uts-feed']), 'false');
+  assert.equal(decide(['services/uts-feedback', 'services/uts']), 'false');
+  assert.equal(decide([]), 'false');
+
+  const mint = workers.jobs['deploy-uts'];
+  assert.equal(mint.needs, undefined);
+  assert.equal(
+    mint.if,
+    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_uts_feed_after_uts == 'true'"
+  );
+  assert.equal(mint.environment, '${{ inputs.target_environment }}');
+
+  const feed = workers.jobs['deploy-uts-feed-after-uts'];
+  assert.deepEqual([feed.needs].flat(), ['deploy-uts']);
+  assert.match(feed.if, /deploy_uts_feed_after_uts == 'true'/);
+  assert.match(feed.if, /needs\.deploy-uts\.result == 'success'/);
+  assert.equal(feed.environment, '${{ inputs.target_environment }}');
+
+  for (const [job, dir] of [
+    [mint, 'services/uts'],
+    [feed, 'services/uts-feed'],
+  ]) {
+    const deploys = job.steps.filter(step => step.uses?.startsWith('cloudflare/wrangler-action@'));
+    assert.equal(deploys.length, 2);
+    for (const step of deploys) {
+      assert.equal(step.with.workingDirectory, dir);
+      assert.equal(
+        step.with.command,
+        "${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}"
+      );
+    }
+  }
 });
 
 test('a Pages pin move deploys the output shell beside Pages', t => {

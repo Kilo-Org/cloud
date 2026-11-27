@@ -11,10 +11,17 @@ import {
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 
 let admin: User;
 let nonAdmin: User;
+
+function successAudits() {
+  return db
+    .select()
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.outcome, 'success'));
+}
 
 function makeOptIn(): RequestLoggingOptIn {
   return {
@@ -42,7 +49,7 @@ describe('admin.requestLoggingOptIns', () => {
   it('requires admin access for list, create, and delete without changing state or auditing success', async () => {
     const existing = makeOptIn();
     await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: [existing] });
-    const caller = await createCallerForUser(nonAdmin.id);
+    const caller = await createSessionCallerForUser(nonAdmin.id);
 
     await expect(caller.admin.requestLoggingOptIns.list()).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -59,20 +66,20 @@ describe('admin.requestLoggingOptIns', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
 
     expect(await getRequestLoggingOptIns()).toEqual([existing]);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it('lists no opt-ins when the singleton is absent without auditing a write', async () => {
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(caller.admin.requestLoggingOptIns.list()).resolves.toEqual([]);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it.each(['account', 'organization'] as const)(
     'creates and deletes an %s opt-in with safe actor-attributed audit records',
     async targetType => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
       const targetId =
         targetType === 'account' ? 'oauth/request-logging-target' : crypto.randomUUID();
       const reason = 'Private support details for customer@example.com';
@@ -123,7 +130,7 @@ describe('admin.requestLoggingOptIns', () => {
         google_user_email: 'request-logging-deleting-admin@example.com',
         google_user_name: 'Deleting Admin',
       });
-      const deletingCaller = await createCallerForUser(deletingAdmin.id);
+      const deletingCaller = await createSessionCallerForUser(deletingAdmin.id);
       await expect(
         deletingCaller.admin.requestLoggingOptIns.delete({ id: created.id })
       ).resolves.toEqual({ id: created.id });
@@ -155,7 +162,7 @@ describe('admin.requestLoggingOptIns', () => {
   ])(
     'rejects an %s expiry without persisting an opt-in or success audit',
     async (_label, expiresAt) => {
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.requestLoggingOptIns.create({
@@ -167,14 +174,14 @@ describe('admin.requestLoggingOptIns', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
       expect(await db.select().from(ai_gateway_request_logging_opt_ins)).toEqual([]);
-      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+      expect(await successAudits()).toEqual([]);
     }
   );
 
   it('rejects a duplicate with CONFLICT without changing state or auditing success', async () => {
     const existing = makeOptIn();
     await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: [existing] });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.requestLoggingOptIns.create({
@@ -186,13 +193,13 @@ describe('admin.requestLoggingOptIns', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
 
     expect(await getRequestLoggingOptIns()).toEqual([existing]);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it('rejects a full active list with BAD_REQUEST without changing state or auditing success', async () => {
     const existing = Array.from({ length: 10 }, () => makeOptIn());
     await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: existing });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.requestLoggingOptIns.create({
@@ -206,7 +213,7 @@ describe('admin.requestLoggingOptIns', () => {
     });
 
     expect(await getRequestLoggingOptIns()).toEqual(existing);
-    expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+    expect(await successAudits()).toEqual([]);
   });
 
   it.each([false, true])(
@@ -216,14 +223,14 @@ describe('admin.requestLoggingOptIns', () => {
       if (singletonExists) {
         await db.insert(ai_gateway_request_logging_opt_ins).values({ opt_ins: existing });
       }
-      const caller = await createCallerForUser(admin.id);
+      const caller = await createSessionCallerForUser(admin.id);
 
       await expect(
         caller.admin.requestLoggingOptIns.delete({ id: crypto.randomUUID() })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
       expect(await getRequestLoggingOptIns()).toEqual(existing);
-      expect(await db.select().from(admin_action_audit_logs)).toEqual([]);
+      expect(await successAudits()).toEqual([]);
     }
   );
 });

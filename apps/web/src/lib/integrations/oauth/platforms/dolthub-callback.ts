@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
@@ -118,7 +118,7 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       // The organization row stores the shared DoltHub access token, so
       // installing or replacing it needs the role that governs integrations,
       // not just membership.
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+      await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }

@@ -1,4 +1,4 @@
-import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 
 import {
   byok_api_keys,
@@ -9,10 +9,10 @@ import {
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type { EncryptedData } from '@kilocode/db/schema-types';
 import { inArray, like } from 'drizzle-orm';
 
 import { createByokEnvelope } from '../lib/byok';
+import { sealInventoryCredential } from '../lib/coding-plan-inventory-credential';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
@@ -308,18 +308,6 @@ function credentialFingerprint(plaintext: string, key: Buffer): string {
   return createHmac('sha256', key).update(plaintext).digest('hex');
 }
 
-function encryptCredential(plaintext: string, key: Buffer): EncryptedData {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-
-  return {
-    iv: iv.toString('base64'),
-    data: encrypted.toString('base64'),
-    authTag: cipher.getAuthTag().toString('base64'),
-  };
-}
-
 function seedUserId(scenario: string, slug: UserSlug): string {
   return `dev-seed-coding-plans-${scenario}-${slug}`;
 }
@@ -466,6 +454,16 @@ async function seedScenario(scenario: string, key: Buffer, users: SeedUser[]): P
   const now = new Date();
   const db = getSeedDb();
   const inventoryFixtures = makeInventoryFixtures();
+  const inventoryCredentials = await Promise.all(
+    inventoryFixtures.map(async fixture => {
+      const id = randomUUID();
+      const isSecretRetained = fixture.status === 'available' || fixture.status === 'assigned';
+      const columns = isSecretRetained
+        ? await sealInventoryCredential(id, plaintextCredential(scenario, fixture.slug))
+        : { encrypted_api_key_envelope: null };
+      return { id, slug: fixture.slug, columns };
+    })
+  );
   const byokFixtures = await Promise.all(
     SUBSCRIPTION_FIXTURES.filter(subscription => subscription.status !== 'canceled').map(
       async subscription => {
@@ -505,15 +503,19 @@ async function seedScenario(scenario: string, key: Buffer, users: SeedUser[]): P
     await tx.insert(coding_plan_key_inventory).values(
       inventoryFixtures.map(fixture => {
         const plaintext = plaintextCredential(scenario, fixture.slug);
-        const isSecretRetained = fixture.status === 'available' || fixture.status === 'assigned';
+        const credential = inventoryCredentials.find(candidate => candidate.slug === fixture.slug);
+        if (!credential) {
+          throw new Error(`Missing inventory credential for ${fixture.slug}`);
+        }
         const assignedUser = fixture.assignedToUserSlug
           ? getUser(users, fixture.assignedToUserSlug)
           : null;
         return {
+          id: credential.id,
           plan_id: fixture.planId,
           provider_id: PROVIDER_ID,
           upstream_plan_id: upstreamPlanId(scenario, fixture.slug),
-          encrypted_api_key: isSecretRetained ? encryptCredential(plaintext, key) : null,
+          ...credential.columns,
           credential_fingerprint: credentialFingerprint(plaintext, key),
           status: fixture.status,
           assigned_to_user_id: assignedUser?.id ?? null,
@@ -707,7 +709,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     console.log(
       'Seeded Coding Plan admin fixtures: active, cancellation pending, past due, canceled, and revocation states.'
     );
-    console.log('Placeholder MiniMax credentials are encrypted but invalid for provider traffic.');
+    console.log(
+      'Placeholder MiniMax credentials are KMS-encrypted but invalid for provider traffic.'
+    );
 
     return result;
   } catch (error) {

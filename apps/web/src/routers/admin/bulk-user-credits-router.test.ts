@@ -1,14 +1,14 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createSessionCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { credit_transactions } from '@kilocode/db/schema';
+import { admin_action_audit_logs, credit_transactions } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 describe('bulk user credits router', () => {
   it('allows ordinary admins to match users but not grant credits', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const recipient = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     await expect(
       caller.admin.bulkUserCredits.matchUsers({ emails: [recipient.google_user_email] })
@@ -35,7 +35,7 @@ describe('bulk user credits router', () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipients = await Promise.all([insertTestUser(), insertTestUser()]);
     const missingEmail = `missing-${crypto.randomUUID()}@example.com`;
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     const results = await caller.admin.bulkUserCredits.grantBulkCredits({
       emails: [...recipients.map(user => user.google_user_email), missingEmail],
@@ -74,10 +74,95 @@ describe('bulk user credits router', () => {
     );
   });
 
+  it('records one admin audit row per requested user, failures included', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const recipients = await Promise.all([insertTestUser(), insertTestUser()]);
+    const caller = await createSessionCallerForUser(admin.id);
+
+    await caller.admin.bulkUserCredits.grantBulkCredits({
+      emails: [
+        ...recipients.map(user => user.google_user_email),
+        `missing-${crypto.randomUUID()}@example.com`,
+      ],
+      amountUsd: 3,
+    });
+
+    const rows = await db
+      .select({
+        action: admin_action_audit_logs.action,
+        outcome: admin_action_audit_logs.outcome,
+        target_type: admin_action_audit_logs.target_type,
+        target_id: admin_action_audit_logs.target_id,
+        metadata: admin_action_audit_logs.metadata,
+      })
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+
+    expect(rows).toHaveLength(3);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        ...recipients.map(user => ({
+          action: 'credits.bulk_grant',
+          outcome: 'success',
+          target_type: 'user',
+          target_id: user.id,
+          metadata: { amountUsd: 3, expirationDate: null },
+        })),
+        {
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          target_type: null,
+          target_id: null,
+          metadata: { amountUsd: 3, expirationDate: null, errorCode: 'user_not_found' },
+        },
+      ])
+    );
+  });
+
+  it('records only failure rows when no grant succeeds, without the addresses', async () => {
+    const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
+    const blocked = await insertTestUser({ blocked_reason: 'abuse' });
+    const missingEmail = `missing-${crypto.randomUUID()}@example.com`;
+    const caller = await createSessionCallerForUser(admin.id);
+
+    const results = await caller.admin.bulkUserCredits.grantBulkCredits({
+      emails: [blocked.google_user_email, missingEmail],
+      amountUsd: 3,
+    });
+    expect(results.every(result => !result.success)).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.actor_id, admin.id));
+
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          target_type: 'user',
+          target_id: blocked.id,
+          metadata: { amountUsd: 3, expirationDate: null, errorCode: 'user_blocked' },
+        }),
+        expect.objectContaining({
+          action: 'credits.bulk_grant',
+          outcome: 'failure',
+          target_id: null,
+          metadata: { amountUsd: 3, expirationDate: null, errorCode: 'user_not_found' },
+        }),
+      ])
+    );
+    const stored = JSON.stringify(rows.map(row => [row.target_id, row.message, row.metadata]));
+    expect(stored).not.toContain(blocked.google_user_email);
+    expect(stored).not.toContain(missingEmail);
+  });
+
   it('distinguishes an invalid expiration date from a past one', async () => {
     const admin = await insertTestUser({ is_admin: true, can_manage_credits: true });
     const recipient = await insertTestUser();
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createSessionCallerForUser(admin.id);
 
     async function refusalMessage(expirationDate: string): Promise<string> {
       let message = '';

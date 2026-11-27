@@ -79,10 +79,6 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import type { AutoDecisionRejection } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 
-// FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
-// This allows FIM requests to be tracked consistently with chat requests
-const fimSuffixFakeSysPrompMarkers = { begin: '[FIM_SUFFIX:', end: ']' } as const;
-
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 // Kilo clients show a sign-up prompt for this code and do not retry the request.
 const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
@@ -910,6 +906,38 @@ function describeRequestFields(request: unknown): Record<string, string> {
 }
 
 const ERROR_BODY_DIAGNOSTIC_LIMIT = 16 * 1024;
+const UPSTREAM_ERROR_FIELD_LIMIT = 512;
+
+// The error fields that the common provider error schemas (OpenAI, Anthropic,
+// OpenRouter, Google) carry as short identifiers. Free-text fields such as the
+// message are left out: an upstream can echo request input or a credential there.
+const UPSTREAM_ERROR_FIELDS = {
+  type: 'upstreamErrorType',
+  code: 'upstreamErrorCode',
+  param: 'upstreamErrorParam',
+  status: 'upstreamErrorStatus',
+} as const;
+
+function describeUpstreamError(responseText: string): Record<string, string> {
+  const parsed = parseJson(responseText);
+  if (!('value' in parsed) || !isRecord(parsed.value) || !isRecord(parsed.value.error)) {
+    return {};
+  }
+  const error = parsed.value.error;
+  const fields: Record<string, string> = {};
+  for (const [field, name] of Object.entries(UPSTREAM_ERROR_FIELDS)) {
+    const value = error[field];
+    if (typeof value === 'string' || typeof value === 'number') {
+      fields[name] = String(value).slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
+    }
+  }
+  // OpenRouter names the provider that failed behind its router.
+  const providerName = isRecord(error.metadata) ? error.metadata.provider_name : undefined;
+  if (typeof providerName === 'string') {
+    fields.upstreamProviderName = providerName.slice(0, UPSTREAM_ERROR_FIELD_LIMIT);
+  }
+  return fields;
+}
 
 // An upstream error body can be very large, so only the prefix the diagnostics
 // use is read and the rest of the stream is cancelled.
@@ -970,20 +998,22 @@ export async function captureProxyError(params: {
         ...describeRequestFields(request),
       };
 
+      // Only the length of the body and allowlisted error fields go to Sentry.
+      // The server log also gets a redacted prefix of the body.
+      let logOnlyFields: Record<string, string> = {};
       try {
         const responseText = await readTextPrefix(response.clone(), ERROR_BODY_DIAGNOSTIC_LIMIT);
-        extraErrorData.first4kOfResponse = redactSecretValues(responseText, 4096);
-        const parsed = parseJson(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT));
-        if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
-          const { param, code } = parsed.value.error;
-          if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);
-          if (typeof code === 'string') extraErrorData.upstreamErrorCode = code.slice(0, 512);
-        }
+        extraErrorData.responseBodyReadLength = responseText.length;
+        Object.assign(
+          extraErrorData,
+          describeUpstreamError(responseText.slice(0, ERROR_BODY_DIAGNOSTIC_LIMIT))
+        );
+        logOnlyFields = { first4kOfResponse: redactSecretValues(responseText, 4096) };
       } catch {
         // ignore errors when already handling errors...
       }
 
-      errorExceptInTest(errorMessage, extraErrorData);
+      errorExceptInTest(errorMessage, { ...extraErrorData, ...logOnlyFields });
       if (trackInSentry) {
         captureMessage(errorMessage, {
           level: 'error',
@@ -1040,17 +1070,10 @@ function untrustedProjectId(header: string | null): string | null {
   return projectId;
 }
 
-const wrapFimSuffixIntoSystemPrompt = (() => {
-  const { begin, end } = fimSuffixFakeSysPrompMarkers;
-  const wrapperLen = begin.length + end.length;
-  return (suffix: string) => begin + suffix.slice(0, 100 - wrapperLen) + end;
-})();
-
 export function extractFimPromptInfo(body: { prompt: string; suffix?: string | null }): PromptInfo {
   return {
-    system_prompt_prefix: wrapFimSuffixIntoSystemPrompt(body.suffix || ''), // suffix = context
     system_prompt_length: (body.suffix || '').length + body.prompt.length,
-    user_prompt_prefix: body.prompt.slice(0, 100), // prompt = user input
+    system_prompt_kind: null,
   };
 }
 
@@ -1227,12 +1250,6 @@ const fimResponseSchema = z.object({
   error: upstreamStreamErrorSchema.nullish(),
 });
 
-function computeInceptionFimMicrodollarCost(
-  usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>
-): number {
-  return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
-}
-
 function computeFimMicrodollarCost(
   usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>,
   provider: ProviderType
@@ -1240,8 +1257,6 @@ function computeFimMicrodollarCost(
   switch (provider) {
     case 'mistral':
       return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
-    case 'inception':
-      return computeInceptionFimMicrodollarCost(usage);
     default:
       console.error('Unknown provider for FIM cost calculation', provider);
       return 0;
@@ -1407,156 +1422,6 @@ export function countAndStoreFimUsage(
             usageContext.provider
           )
         : 0;
-    usageStats.market_cost = usageStats.cost_mUsd;
-
-    if (usageContext.is_free || usageContext.user_byok) {
-      usageStats.cost_mUsd = 0;
-      usageStats.cacheDiscount_mUsd = 0;
-    }
-
-    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-  });
-  after(usagePromise);
-  return { statsPromise: usageStatsPromise, usagePromise };
-}
-
-// ============================================================================
-// Edit-Specific Code
-// ============================================================================
-
-type EditMessage = { role: string; content: string };
-
-export function extractEditPromptInfo(body: { messages: EditMessage[] }): PromptInfo {
-  const lastUser = [...body.messages].reverse().find(m => m.role === 'user');
-  const content = lastUser?.content ?? '';
-  return {
-    system_prompt_prefix: '', // /v1/edit/completions bakes its system prompt in server-side
-    system_prompt_length: 0,
-    user_prompt_prefix: content.slice(0, 100),
-  };
-}
-
-const editUsageSchema = fimUsageSchema.extend({ cached_input_tokens: z.number().optional() });
-
-const editResponseSchema = z.object({
-  id: z.string().nullish(),
-  model: z.string().nullish(),
-  usage: editUsageSchema.nullish(),
-  choices: z
-    .array(z.object({ message: z.object({ content: z.string().nullish() }).nullish() }))
-    .nullish(),
-  error: upstreamStreamErrorSchema.nullish(),
-});
-
-type EditUsage = z.infer<typeof editUsageSchema>;
-
-function getEditCacheHitTokens(usage: EditUsage): number {
-  return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
-}
-
-function computeEditMicrodollarCost(usage: EditUsage, provider: ProviderType): number {
-  switch (provider) {
-    case 'inception': {
-      // Inception Mercury Edit 2 published rates (per 1M tokens):
-      //   $0.25 input  →  0.25 mUSD/token
-      //   $0.025 cached input  →  0.025 mUSD/token
-      //   $0.75 output  →  0.75 mUSD/token
-      // Sources:
-      //   https://www.inceptionlabs.ai/models
-      //   https://www.inceptionlabs.ai/blog/introducing-mercury-edit-2
-      // Mercury 2 (chat) shares the same per-token rates.
-      const cacheHitTokens = getEditCacheHitTokens(usage);
-      const uncachedInputTokens = usage.prompt_tokens - cacheHitTokens;
-      return Math.round(
-        uncachedInputTokens * 0.25 + cacheHitTokens * 0.025 + usage.completion_tokens * 0.75
-      );
-    }
-    default:
-      console.error('Unknown provider for edit cost calculation', provider);
-      return 0;
-  }
-}
-
-export function parseEditUsageFromResponse(
-  response: string,
-  provider: ProviderType,
-  statusCode: number
-): MicrodollarUsageStats {
-  const json = editResponseSchema.parse(parseUsageResponse(response, statusCode));
-  const stats = extractEditUsage(json, provider, statusCode);
-  priceEditUsage(stats, json.usage, provider);
-  return stats;
-}
-
-function extractEditUsage(
-  json: z.infer<typeof editResponseSchema>,
-  provider: ProviderType,
-  statusCode: number
-): MicrodollarUsageStats {
-  if (!json.model && !json.error && !json.usage && statusCode < 400) {
-    throw new Error('Unexpected edit response');
-  }
-  const usage = json.usage;
-  const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
-  return {
-    messageId: json.id ?? null,
-    model: json.model ?? null,
-    responseContent: json.choices?.[0]?.message?.content || '',
-    hasError: !json.model || json.error != null || statusCode >= 400,
-    inference_provider: provider,
-    inputTokens: usage?.prompt_tokens ?? 0,
-    outputTokens: usage?.completion_tokens ?? 0,
-    cacheHitTokens,
-    cacheWriteTokens: 0,
-    cost_mUsd: 0,
-    is_byok: null,
-    upstream_id: null,
-    finish_reason: null,
-    latency: null,
-    moderation_latency: null,
-    generation_time: null,
-    streamed: null,
-    cancelled: null,
-    status_code: statusCode,
-  };
-}
-
-function priceEditUsage(
-  stats: MicrodollarUsageStats,
-  usage: EditUsage | null | undefined,
-  provider: ProviderType
-) {
-  stats.cost_mUsd = usage ? computeEditMicrodollarCost(usage, provider) : 0;
-  stats.cacheDiscount_mUsd =
-    usage && provider === 'inception'
-      ? Math.round(getEditCacheHitTokens(usage) * (0.25 - 0.025))
-      : undefined;
-}
-
-export function countAndStoreEditUsage(
-  clonedResponse: Response,
-  usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
-) {
-  debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
-
-  const statusCode = clonedResponse.status;
-  let usage: EditUsage | null | undefined;
-  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
-    if (!clonedResponse.body) return null;
-    const { text, timing } = await readResponseText(
-      clonedResponse.body,
-      usageContext.requestStartedAt
-    );
-    const json = editResponseSchema.parse(parseUsageResponse(text, statusCode));
-    const stats = extractEditUsage(json, usageContext.provider, statusCode);
-    usage = json.usage;
-    return { ...stats, ...timing };
-  });
-
-  const usagePromise = usageStatsPromise.then(usageStats => {
-    requestSpan?.end();
-    priceEditUsage(usageStats, usage, usageContext.provider);
     usageStats.market_cost = usageStats.cost_mUsd;
 
     if (usageContext.is_free || usageContext.user_byok) {
@@ -1752,20 +1617,8 @@ function priceTranscriptionUsage(
   Object.assign(stats, cost);
 }
 
-export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo {
-  const inputStr =
-    body.input == null
-      ? ''
-      : typeof body.input === 'string'
-        ? body.input
-        : Array.isArray(body.input) && typeof body.input[0] === 'string'
-          ? body.input[0]
-          : JSON.stringify(body.input).slice(0, 100);
-  return {
-    system_prompt_prefix: '',
-    system_prompt_length: 0,
-    user_prompt_prefix: inputStr.slice(0, 100),
-  };
+export function extractEmbeddingPromptInfo(): PromptInfo {
+  return { system_prompt_length: 0, system_prompt_kind: null };
 }
 
 /**

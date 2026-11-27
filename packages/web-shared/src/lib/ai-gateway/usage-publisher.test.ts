@@ -17,10 +17,11 @@ import {
   USAGE_ENQUEUE_RETRY_BUDGET_MS,
   USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
 } from './usage-publisher';
-import type {
-  EnkryptUsageWriteInput,
-  ExaUsageRecord,
-  LlmUsageQueueMessage,
+import {
+  toUsageRecordWireBody,
+  type EnkryptUsageWriteInput,
+  type ExaUsageRecord,
+  type LlmUsageQueueMessage,
 } from '@kilocode/usage-contracts';
 import type * as UsagePublisherModule from './usage-publisher';
 
@@ -54,8 +55,6 @@ const payload: LlmUsageQueueMessage = {
     http_x_vercel_ip_latitude: null,
     http_x_vercel_ip_longitude: null,
     http_x_vercel_ja4_digest: null,
-    user_prompt_prefix: '🙂',
-    system_prompt_prefix: null,
     system_prompt_length: null,
     http_user_agent: null,
     max_tokens: null,
@@ -83,8 +82,7 @@ const payload: LlmUsageQueueMessage = {
     market_cost: null,
     non_inference_cost: null,
     is_free: null,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
+    system_prompt_kind: null,
   },
   prior_microdollar_usage: 0,
   posthog_distinct_id: null,
@@ -144,6 +142,8 @@ function expectUnavailableWarning(
   expect(logged).not.toMatch(/Bearer|sensitive|prompt|metadata/);
 }
 
+const wirePayload = toUsageRecordWireBody(payload);
+
 describe('enqueueUsage', () => {
   test.each([
     ['fra1', 'fra1'],
@@ -177,8 +177,8 @@ describe('enqueueUsage', () => {
       ],
     ]);
     expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual([
-      JSON.stringify(payload),
-      JSON.stringify(payload),
+      JSON.stringify(wirePayload),
+      JSON.stringify(wirePayload),
     ]);
   });
   test('preserves the complete payload and ID with dedicated publisher authentication', async () => {
@@ -199,10 +199,16 @@ describe('enqueueUsage', () => {
         'content-type': 'application/json',
         Authorization: 'Bearer synthetic-publisher-secret',
       },
-      body: JSON.stringify(event),
+      body: JSON.stringify(toUsageRecordWireBody(event)),
       signal: expect.any(AbortSignal),
       cache: 'no-store',
       redirect: 'manual',
+    });
+    expect(JSON.parse(mockFetch.mock.calls[0][1]?.body as string).metadata).toMatchObject({
+      user_prompt_prefix: null,
+      system_prompt_prefix: null,
+      abuse_delay: null,
+      abuse_downgraded_from: null,
     });
     expect(timeout).toHaveBeenCalledWith(USAGE_ENQUEUE_TIMEOUT_MS);
     expect(read).not.toHaveBeenCalled();
@@ -338,7 +344,7 @@ describe('enqueueUsage transient retries', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
       for (const [url, init] of mockFetch.mock.calls) {
         expect(url).toBe(config.USAGE_INGEST_URL);
-        expect(init?.body).toBe(JSON.stringify(payload));
+        expect(init?.body).toBe(JSON.stringify(wirePayload));
       }
       expect(mockFetch.mock.calls[0][1]?.signal).not.toBe(mockFetch.mock.calls[1][1]?.signal);
       expect(timeouts.mock.calls).toEqual([
@@ -470,7 +476,7 @@ describe('enqueueUsage transient retries', () => {
           {
             method: 'POST',
             authorization: `Bearer ${config.USAGE_INGEST_PUBLISH_SECRET}`,
-            body: JSON.stringify(payload),
+            body: JSON.stringify(wirePayload),
           },
         ]);
         expect(targetRequests).toBe(0);
@@ -495,7 +501,7 @@ describe('enqueueUsage transient retries', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0.5);
     const delays = jest.spyOn(globalThis, 'setTimeout');
     const event = { ...payload, core: { ...payload.core } };
-    const originalBody = JSON.stringify(event);
+    const originalBody = JSON.stringify(toUsageRecordWireBody(event));
     mockFetch.mockImplementation(async () => {
       event.core.cost++;
       throw new Error('synthetic-publisher-secret sensitive prompt');
@@ -634,7 +640,7 @@ describe('enqueueUsage transient retries', () => {
           kind: 'accepted',
         });
         expect(mockFetch).toHaveBeenCalledTimes(2);
-        expect(bodies).toEqual([JSON.stringify(payload), JSON.stringify(payload)]);
+        expect(bodies).toEqual([JSON.stringify(wirePayload), JSON.stringify(wirePayload)]);
         expect(warn).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledWith('usage enqueue retrying', {
           usageId: payload.core.id,
@@ -760,7 +766,7 @@ describe('bounded CF confirmation policy', () => {
       const elapsed = performance.now() - start;
       expect(elapsed).toBeGreaterThanOrEqual(15_000);
       expect(elapsed).toBeLessThan(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
-      expect(received).toEqual([JSON.stringify(payload)]);
+      expect(received).toEqual([JSON.stringify(wirePayload)]);
       expect(requestAborted).toEqual([false]);
       // The one send is asserted above; `mockFetch` also counts calls made by earlier tests.
       expect(warn).not.toHaveBeenCalled();
@@ -810,8 +816,8 @@ describe('bounded CF confirmation policy', () => {
       // The old policy retried at 10 s. The lost send now waits for its full 20 s window, so the
       // recovered second send starts no earlier than that.
       expect(bodies).toHaveLength(2);
-      expect(bodies[0].body).toBe(JSON.stringify(payload));
-      expect(bodies[1].body).toBe(JSON.stringify(payload));
+      expect(bodies[0].body).toBe(JSON.stringify(wirePayload));
+      expect(bodies[1].body).toBe(JSON.stringify(wirePayload));
       expect(bodies[1].at).toBeGreaterThanOrEqual(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
       expect(elapsed).toBeGreaterThanOrEqual(USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS);
       expect(elapsed).toBeLessThan(USAGE_ENQUEUE_RETRY_BUDGET_MS);
@@ -923,7 +929,7 @@ describe('bounded CF confirmation policy', () => {
     expect(await result).toEqual({ kind: 'accepted' });
     expect(mockFetch).toHaveBeenCalledTimes(4);
     expect(new Set(mockFetch.mock.calls.map(([, init]) => init?.body))).toEqual(
-      new Set([JSON.stringify(payload)])
+      new Set([JSON.stringify(wirePayload)])
     );
   });
 
@@ -1195,7 +1201,7 @@ describe('bounded CF confirmation policy', () => {
             'content-type': 'application/json',
             Authorization: 'Bearer synthetic-publisher-secret',
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(wirePayload),
         })
       );
       expect(timeout.mock.calls).toEqual([[firstTimeoutMs]]);
@@ -1413,7 +1419,7 @@ describe('publisher attempt diagnostics', () => {
       [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
     ]);
     expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual(
-      Array(USAGE_ENQUEUE_MAX_ATTEMPTS).fill(JSON.stringify(payload))
+      Array(USAGE_ENQUEUE_MAX_ATTEMPTS).fill(JSON.stringify(wirePayload))
     );
     expect(warn.mock.calls.map(([message, fields]) => [message, fields])).toEqual(
       ['timeout', 'http_503', 'request_failed'].map((reason, index) => [
@@ -1543,6 +1549,10 @@ describe('publisher attempt diagnostics', () => {
     expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
       'https://usage.example.test/enkrypt-usage',
       'https://usage.example.test/enkrypt-usage',
+    ]);
+    expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual([
+      JSON.stringify(usageWrite),
+      JSON.stringify(usageWrite),
     ]);
     expect(
       attemptRows().map(({ usage_id, usage_kind, attempt, http_status }) => ({

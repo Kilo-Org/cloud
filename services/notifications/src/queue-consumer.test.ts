@@ -12,7 +12,12 @@ type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
 };
 
-function fakeEnv(): Env {
+const OPEN_GATES: [string, { WORKER_ENV: string; NOTIFICATIONS_PUSH_ENABLED: string }][] = [
+  ['staging, switch true', { WORKER_ENV: 'staging', NOTIFICATIONS_PUSH_ENABLED: 'true' }],
+  ['production, switch false', { WORKER_ENV: 'production', NOTIFICATIONS_PUSH_ENABLED: 'false' }],
+];
+
+function fakeEnv(vars: Record<string, unknown> = {}): Env {
   return {
     EXPO_ACCESS_TOKEN: {
       get: vi.fn(async () => 'access-token'),
@@ -20,6 +25,7 @@ function fakeEnv(): Env {
     HYPERDRIVE: {
       connectionString: 'postgres://test',
     },
+    ...vars,
   } as unknown as Env;
 }
 
@@ -74,7 +80,7 @@ describe('receipt queue consumer', () => {
       ],
     });
 
-    await queue(batch, fakeEnv());
+    await queue(batch, fakeEnv(), { waitUntil: vi.fn() });
 
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();
@@ -94,5 +100,40 @@ describe('receipt queue consumer', () => {
       ],
     });
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('ExponentPushToken');
+  });
+
+  it.each([
+    ['absent', {}],
+    ['false', { NOTIFICATIONS_PUSH_ENABLED: 'false' }],
+    ['absent under the STS source', { SECRETS_SOURCE: 'sts' }],
+  ])('acks staging receipt work unread when the switch is %s', async (_label, vars) => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const getBundle = vi.fn();
+    const env = fakeEnv({ WORKER_ENV: 'staging', STS: { getBundle }, ...vars });
+    const { batch, ack, retry } = fakeBatch({
+      ticketTokenPairs: [{ ticketId: 'ticket-1', token: 'ExponentPushToken[staging]' }],
+    });
+
+    await queue(batch, env, { waitUntil: vi.fn() });
+
+    expect(ack).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
+    expect(env.EXPO_ACCESS_TOKEN?.get).not.toHaveBeenCalled();
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(checkPushReceipts).not.toHaveBeenCalled();
+  });
+
+  it.each(OPEN_GATES)('checks receipts in %s', async (_label, vars) => {
+    vi.mocked(checkPushReceipts).mockResolvedValueOnce({ staleTokens: [], receiptErrors: [] });
+    const env = fakeEnv(vars);
+    const pairs = [{ ticketId: 'ticket-1', token: 'ExponentPushToken[device]' }];
+    const { batch, ack, retry } = fakeBatch({ ticketTokenPairs: pairs });
+
+    await queue(batch, env, { waitUntil: vi.fn() });
+
+    expect(env.EXPO_ACCESS_TOKEN?.get).toHaveBeenCalledOnce();
+    expect(checkPushReceipts).toHaveBeenCalledWith(pairs, 'access-token');
+    expect(ack).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
   });
 });

@@ -120,8 +120,8 @@ export function clearClassifierConfigCache(): void {
 // Config reads run before the guarded decision path. A transient KV failure
 // must not turn a best-effort background classification into an HTTP 500, so
 // reads fail closed to the documented default (logged for visibility). The
-// rejected load is not cached — ttlCached evicts it — so the next request
-// retries KV.
+// rejected load is not cached — ttlCached caches only resolved values — so
+// the next request retries KV.
 function failClosed<T>(key: string, fallback: T): (error: unknown) => T {
   return error => {
     console.warn(

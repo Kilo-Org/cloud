@@ -1,16 +1,23 @@
-import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import {
   UsageRecordRequestSchema,
+  toUsageRecordWireBody,
   type EnkryptUsageQueueMessage,
   type ExaUsageQueueMessage,
   type LlmUsageQueueMessage,
   type UsageQueueMessage,
 } from '@kilocode/usage-contracts';
 import { logSafely, queueMetrics } from './diagnostics';
+import {
+  authorizePublish,
+  publishResourceMetadata,
+  type PublishAuthEnv,
+  type PublishAuthFields,
+} from './publish-auth';
 import { handlePublishEnkryptUsage } from './publish-enkrypt-usage';
 import { handlePublishExaUsage } from './publish-exa-usage';
 import { schemaRejectionDetails } from './rejection-diagnostics';
+import { RESOURCE_METADATA_PATH } from './sts';
 
 export type Env = Omit<
   CloudflareEnv,
@@ -23,25 +30,33 @@ export type Env = Omit<
   | 'USAGE_INGEST_HEDGE_DELAY_MS'
   | 'USAGE_INGEST_HEDGE_PERCENT'
   | 'USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED'
-> & {
-  USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
-  USAGE_INGEST_HEDGE_QUEUE?: Queue<UsageQueueMessage>;
-  /** Enkrypt usage and Exa fallback usage; the name predates Exa joining it. */
-  USAGE_INGEST_ENKRYPT_QUEUE: Queue<EnkryptUsageQueueMessage | ExaUsageQueueMessage>;
-  USAGE_INGEST_PUBLISH_SECRET?: string;
-  /**
-   * A Wrangler var per environment. Exactly `true` sends tagged usage to the dedicated queue;
-   * anything else, including absent, keeps the shared queue.
-   */
-  USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED?: string;
-  USAGE_INGEST_PARALLELISM?: string;
-  USAGE_INGEST_HEDGE_MODE?: string;
-  USAGE_INGEST_HEDGE_DELAY_MS?: string;
-  USAGE_INGEST_HEDGE_PERCENT?: string;
-  USAGE_WRITER_URL?: string;
-  USAGE_WRITER_SECRET?: string;
-  USAGE_WRITER_PROTECTION_BYPASS?: string;
-};
+  // `StsEnv` (sts.ts) types the STS binding and vars, `StsCanaryEnv` (sts-canary.ts) the canary's.
+  | 'STS'
+  | 'STS_CANARY_ENABLED'
+  | 'STS_URL'
+  | 'STS_ENVIRONMENT'
+  | 'WEB_STS_CANARY_URL'
+> &
+  PublishAuthEnv & {
+    USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
+    USAGE_INGEST_HEDGE_QUEUE?: Queue<UsageQueueMessage>;
+    /** Enkrypt usage and Exa fallback usage; the name predates Exa joining it. */
+    USAGE_INGEST_ENKRYPT_QUEUE: Queue<EnkryptUsageQueueMessage | ExaUsageQueueMessage>;
+    /**
+     * A Wrangler var per environment. Exactly `true` sends tagged usage to the dedicated queue;
+     * anything else, including absent, keeps the shared queue.
+     */
+    USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED?: string;
+    USAGE_INGEST_PARALLELISM?: string;
+    USAGE_INGEST_HEDGE_MODE?: string;
+    USAGE_INGEST_HEDGE_DELAY_MS?: string;
+    USAGE_INGEST_HEDGE_PERCENT?: string;
+    USAGE_WRITER_URL?: string;
+    USAGE_WRITER_SECRET?: string;
+    USAGE_WRITER_PROTECTION_BYPASS?: string;
+    /** `legacy` (default) or `sts`: the writer credential, `writerAuthMode` in writer-auth.ts. */
+    USAGE_WRITER_AUTH?: string;
+  };
 
 // Queues allow 128,000 bytes including internal metadata; leave 8,000 bytes of headroom.
 export const MAX_USAGE_BYTES = 120_000;
@@ -118,12 +133,8 @@ async function handlePublishUsage(
   entryAtMs: number,
   ctx?: ExecutionContext
 ): Promise<Response> {
-  const secret = env.USAGE_INGEST_PUBLISH_SECRET;
-  if (!secret) return errorResponse('Service unavailable', 503);
-  const authorization = request.headers.get('Authorization');
-  if (!authorization || !timingSafeEqual(authorization, `Bearer ${secret}`)) {
-    return errorResponse('Unauthorized', 401);
-  }
+  const auth = await authorizePublish(request, env, '/usage', ctx);
+  if (auth instanceof Response) return auth;
 
   const body = await readUsageBody(request);
   if (body.error) return body.error;
@@ -137,22 +148,23 @@ async function handlePublishUsage(
     return errorResponse('Invalid usage payload', 400);
   }
 
+  // The queued body, with the retired metadata keys, so a rolled-back consumer still accepts it.
+  const usage = toUsageRecordWireBody(result.data);
   try {
-    if (new TextEncoder().encode(JSON.stringify(result.data)).byteLength > MAX_USAGE_BYTES) {
+    if (new TextEncoder().encode(JSON.stringify(usage)).byteLength > MAX_USAGE_BYTES) {
       return errorResponse('Usage payload too large', 413);
     }
   } catch {
     return errorResponse('Usage payload too large', 413);
   }
 
-  const usage = result.data;
   if (
     hedgeMode(env.USAGE_INGEST_HEDGE_MODE) === 'on' &&
     hedgeEligible(usage.core.id, hedgePercent(env.USAGE_INGEST_HEDGE_PERCENT))
   ) {
-    return publishWithHedge(usage, env, entryAtMs, ctx);
+    return publishWithHedge(usage, env, entryAtMs, auth, ctx);
   }
-  const send = startSend(usage, env, entryAtMs, ctx);
+  const send = startSend(usage, env, entryAtMs, auth, ctx);
   return send instanceof Response ? send : finishSend(send, usage.core.id, entryAtMs);
 }
 
@@ -172,6 +184,7 @@ function startSend(
   usage: LlmUsageQueueMessage,
   env: Env,
   entryAtMs: number,
+  auth: PublishAuthFields,
   ctx: ExecutionContext | undefined
 ): StartedSend | Response {
   const beforeSendAtMs = Date.now();
@@ -180,6 +193,7 @@ function startSend(
     usage_id: usage.core.id,
     publisher_entry_at_ms: entryAtMs,
     before_send_at_ms: beforeSendAtMs,
+    ...auth,
   }));
   const sendStartedAt = performance.now();
   let pending: Promise<unknown>;
@@ -363,10 +377,11 @@ async function publishWithHedge(
   usage: LlmUsageQueueMessage,
   env: Env,
   entryAtMs: number,
+  auth: PublishAuthFields,
   ctx: ExecutionContext | undefined
 ): Promise<Response> {
   const usageId = usage.core.id;
-  const send = startSend(usage, env, entryAtMs, ctx);
+  const send = startSend(usage, env, entryAtMs, auth, ctx);
   if (send instanceof Response) return send;
   const delayMs = hedgeDelayMs(env.USAGE_INGEST_HEDGE_DELAY_MS);
   const main = settleSend(send.pending, send.sendStartedAt);
@@ -403,14 +418,25 @@ export async function handleFetch(
 ): Promise<Response> {
   const entryAtMs = Date.now();
   const pathname = new URL(request.url).pathname;
+  if (pathname === RESOURCE_METADATA_PATH) {
+    const metadata = publishResourceMetadata(env);
+    if (metadata !== null) {
+      if (request.method !== 'GET') {
+        return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
+      }
+      return metadata;
+    }
+  }
   if (pathname !== '/usage' && pathname !== '/enkrypt-usage' && pathname !== '/exa-usage') {
     return new Response('Not Found', { status: 404 });
   }
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
-  if (pathname === '/enkrypt-usage') return handlePublishEnkryptUsage(request, env, entryAtMs);
-  if (pathname === '/exa-usage') return handlePublishExaUsage(request, env, entryAtMs);
+  if (pathname === '/enkrypt-usage') {
+    return handlePublishEnkryptUsage(request, env, entryAtMs, ctx);
+  }
+  if (pathname === '/exa-usage') return handlePublishExaUsage(request, env, entryAtMs, ctx);
 
   return handlePublishUsage(request, env, entryAtMs, ctx);
 }

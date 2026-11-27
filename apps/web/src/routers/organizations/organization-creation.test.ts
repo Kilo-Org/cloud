@@ -14,7 +14,7 @@ import {
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { MAX_ORGANIZATIONS_PER_USER } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { createCallerForUser } from '@/routers/test-utils';
+import { createCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 
 jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_creation'),
@@ -308,7 +308,7 @@ describe('organization creation limit', () => {
     for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER - 1; index++) {
       await createOrganization(`Admin Existing ${index}`, user.id);
     }
-    const caller = await createCallerForUser(user.id);
+    const caller = await createSessionCallerForUser(user.id);
 
     await expect(
       caller.organizations.create({ name: 'Self-service over limit' })

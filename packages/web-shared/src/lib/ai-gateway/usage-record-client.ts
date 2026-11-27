@@ -1,11 +1,15 @@
 import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import type { UsageRecordInsertResult } from './processUsage.types';
-import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  UsageRecordResponseSchema,
+  toUsageRecordWireBody,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 
 /**
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.
@@ -73,7 +77,13 @@ function isRetryableError(error: unknown): boolean {
 export async function recordUsageInPrimaryRegion(
   payload: UsageRecordRequest
 ): Promise<RemoteUsageRecordOutcome> {
-  if (!INTERNAL_API_SECRET) {
+  let internalApiSecret: string;
+  try {
+    internalApiSecret = await readInternalApiSecret();
+  } catch {
+    return { kind: 'unavailable', reason: 'internal_api_secret_unavailable' };
+  }
+  if (!internalApiSecret) {
     return { kind: 'unavailable', reason: 'missing_internal_api_secret' };
   }
   if (!APP_URL) {
@@ -84,7 +94,7 @@ export async function recordUsageInPrimaryRegion(
   }
 
   const url = new URL(USAGE_RECORD_PATH, APP_URL).toString();
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify(toUsageRecordWireBody(payload));
   let lastReason = 'unknown';
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -93,7 +103,7 @@ export async function recordUsageInPrimaryRegion(
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': INTERNAL_API_SECRET,
+          'x-internal-api-key': internalApiSecret,
           'x-usage-write-source': 'region_handoff',
         },
         body,

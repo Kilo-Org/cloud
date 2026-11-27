@@ -14,18 +14,31 @@ const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
  * Renders the server component for a live or an absent connection and returns
  * the markup, or an empty string when the component renders nothing.
  */
-async function renderChatGptUsageLink(hasConnection: boolean): Promise<string> {
+async function renderChatGptUsageLink(
+  hasConnection: boolean,
+  readFailure?: 'kms' | 'database'
+): Promise<string> {
   jest.resetModules();
-  const [store, link, server] = await Promise.all([
+  const [store, link, server, dualWrite] = await Promise.all([
     import('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
     import('@/components/chatgpt/ChatGptUsageLink'),
     import('react-dom/server'),
+    import('@kilocode/web-shared/lib/ai-gateway/byok/kms-credential'),
   ]);
 
   const readConnection = jest.mocked(store.getOpenAiChatGptConnection);
-  readConnection.mockResolvedValue(
-    hasConnection ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>) : null
-  );
+  if (readFailure) {
+    // Built from the module registry the component was loaded from, so `instanceof` holds.
+    readConnection.mockRejectedValue(
+      readFailure === 'kms'
+        ? new dualWrite.CredentialKmsError(new Error('BYOK KMS /decrypt failed'))
+        : new Error('connection timeout')
+    );
+  } else {
+    readConnection.mockResolvedValue(
+      hasConnection ? ({ status: 'connected' } as Awaited<ReturnType<typeof readConnection>>) : null
+    );
+  }
 
   const element = await link.ChatGptUsageLink({ kiloUserId: 'user-1' });
   return element === null ? '' : server.renderToStaticMarkup(element);
@@ -42,5 +55,13 @@ describe('ChatGptUsageLink', () => {
 
   it('renders nothing when the account is not connected', async () => {
     expect(await renderChatGptUsageLink(false)).toBe('');
+  });
+
+  it('renders nothing instead of failing the page when the KMS service cannot open the payload', async () => {
+    expect(await renderChatGptUsageLink(true, 'kms')).toBe('');
+  });
+
+  it('still fails when the database read fails', async () => {
+    await expect(renderChatGptUsageLink(true, 'database')).rejects.toThrow('connection timeout');
   });
 });

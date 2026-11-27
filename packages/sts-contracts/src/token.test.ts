@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
+  STS_O11Y_ALERTING_READ,
+  STS_O11Y_ALERTING_WRITE,
+  STS_O11Y_API_METRICS_WRITE,
+  STS_SECURE_PROXY_FORWARD,
+  STS_SECURITY_SYNC_DISMISS_FINDING,
+  STS_SECURITY_SYNC_MANUAL_SYNC,
+  STS_USAGE_PUBLISH,
+  STS_USAGE_RECORD,
+  STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   isRegisteredStsScope,
   stsScopeRegistryProblems,
   type StsScopeRegistry,
@@ -150,13 +160,64 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('starts empty, so every scope is denied', () => {
-    expect(STS_SCOPE_REGISTRY).toEqual({});
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes and the phase 4 service scopes, so every other scope is denied', () => {
+    expect(STS_SCOPE_REGISTRY).toEqual({
+      web: {
+        scopes: ['web:sts.canary', 'web:usage.record', 'web:security-notifications.dispatch'],
+      },
+      'usage-ingest': { scopes: ['usage-ingest:sts.canary', 'usage-ingest:usage.publish'] },
+      canary: { scopes: ['canary:denied-probe'] },
+      'uts-feed': { scopes: ['uts-feed:revocation.read'] },
+      uts: {
+        scopes: [
+          'uts:subjects.revoke',
+          'uts:browser-sessions.end',
+          'uts:api-credentials.revoke',
+          'uts:token-exchange',
+        ],
+      },
+      'ai-gateway-secure-proxy': { scopes: ['ai-gateway-secure-proxy:request.forward'] },
+      o11y: { scopes: ['o11y:api-metrics.write', 'o11y:alerting.read', 'o11y:alerting.write'] },
+      'security-sync': {
+        scopes: ['security-sync:manual-sync.enqueue', 'security-sync:dismiss-finding.enqueue'],
+      },
+    });
+    expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
+    expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
+    expect(isRegisteredStsScope('canary', 'canary:denied-probe')).toBe(true);
     expect(isRegisteredStsScope('gateway', 'gateway:models.read')).toBe(false);
+    expect(isRegisteredStsScope('web', 'usage-ingest:sts.canary')).toBe(false);
+    expect(isRegisteredStsScope('uts', 'uts-feed:revocation.read')).toBe(false);
+    expect(isRegisteredStsScope('web', 'usage-ingest:usage.publish')).toBe(false);
+    expect(isRegisteredStsScope('usage-ingest', 'web:usage.record')).toBe(false);
+    expect(isRegisteredStsScope('web', 'security-sync:manual-sync.enqueue')).toBe(false);
+    expect(isRegisteredStsScope('security-sync', 'web:security-notifications.dispatch')).toBe(
+      false
+    );
   });
 
   it('lists each shipped scope under its own audience', () => {
     expect(stsScopeRegistryProblems(STS_SCOPE_REGISTRY)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'ai-gateway-secure-proxy:request.forward',
+      'ai-gateway-secure-proxy',
+      STS_SECURE_PROXY_FORWARD,
+    ],
+    ['usage-ingest:usage.publish', 'usage-ingest', STS_USAGE_PUBLISH],
+    ['web:usage.record', 'web', STS_USAGE_RECORD],
+    ['o11y:api-metrics.write', 'o11y', STS_O11Y_API_METRICS_WRITE],
+    ['o11y:alerting.read', 'o11y', STS_O11Y_ALERTING_READ],
+    ['o11y:alerting.write', 'o11y', STS_O11Y_ALERTING_WRITE],
+    ['security-sync:manual-sync.enqueue', 'security-sync', STS_SECURITY_SYNC_MANUAL_SYNC],
+    ['security-sync:dismiss-finding.enqueue', 'security-sync', STS_SECURITY_SYNC_DISMISS_FINDING],
+    ['web:security-notifications.dispatch', 'web', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
+  ])('registers %s under its own audience %s', (scope, audience, pair) => {
+    expect(pair).toEqual({ audience, scope });
+    expect(scopeAudience(pair.scope)).toBe(pair.audience);
+    expect(isRegisteredStsScope(pair.audience, pair.scope)).toBe(true);
   });
 
   it('flags a scope whose prefix is not its audience', () => {

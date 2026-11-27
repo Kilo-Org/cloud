@@ -17,7 +17,7 @@ export function secret(
   };
 }
 
-type Folder = '/workloads' | '/shared';
+type Folder = '/workloads' | '/shared' | '/ci';
 
 export type ManagerMock = {
   loginBodies: unknown[];
@@ -29,6 +29,8 @@ export type ManagerMock = {
   }>;
   setSecrets: (secrets: MockSecret[]) => void;
   setReadStatus: (status: number, headers?: Record<string, string>) => void;
+  /** Answers this status to reads of one folder only; 200 restores it. */
+  setFolderStatus: (folder: Folder, status: number) => void;
   setLoginStatus: (status: number) => void;
   removeFolder: (folder: Folder) => void;
 };
@@ -55,6 +57,7 @@ export function installManager(options: {
   let readStatus = options.readStatus ?? 200;
   let readHeaders: Record<string, string> = {};
   const absent = new Set<Folder>();
+  const folderStatus = new Map<string, number>();
 
   const etagFor = (folder: string): string => `"${folder.slice(1)}-${generation}"`;
 
@@ -68,6 +71,9 @@ export function installManager(options: {
     setReadStatus: (status, headers) => {
       readStatus = status;
       readHeaders = headers ?? {};
+    },
+    setFolderStatus: (folder, status) => {
+      folderStatus.set(folder, status);
     },
     setLoginStatus: status => {
       loginStatus = status;
@@ -99,10 +105,11 @@ export function installManager(options: {
       const folder = url.searchParams.get('secretPath') ?? '/';
       const ifNoneMatch = headers.get('if-none-match');
       mock.reads.push({ folder, url, ifNoneMatch, authorization: headers.get('authorization') });
-      if (readStatus !== 200) {
-        return new Response('read failed', { status: readStatus, headers: readHeaders });
+      const status = folderStatus.get(folder) ?? readStatus;
+      if (status !== 200) {
+        return new Response('read failed', { status, headers: readHeaders });
       }
-      if (absent.has(folder === '/shared' ? '/shared' : '/workloads')) {
+      if (absent.has(folder === '/shared' || folder === '/ci' ? folder : '/workloads')) {
         return Response.json(
           {
             reqId: 'req-1',
@@ -143,7 +150,8 @@ export function installManager(options: {
 
 /**
  * The default for a test that installs no manager: every outbound request fails fast with 503.
- * Background refresher alarms then never reach the network.
+ * Background refresher alarms still run: each manager read fails, the refresher records a failure
+ * and re-arms with backoff. `setup.ts` disarms it after every test.
  */
 export function stubOfflineNetwork(): void {
   vi.unstubAllGlobals();

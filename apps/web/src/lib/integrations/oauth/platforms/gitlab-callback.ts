@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
@@ -120,7 +120,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
       // shared, so the callback asks for the same governing role set the start
       // asked for, and refuses before exchanging a code or writing a row when
       // the caller's role changed in between.
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+      await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(
         new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)

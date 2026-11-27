@@ -104,10 +104,12 @@ const EXTRA_INPUTS = [
   // The ai-gateway build copies these web app files (the build-ai-gateway job
   // in ci.yml).
   [/^apps\/web\/\.env(\.test)?$/, 'apps/ai-gateway'],
-  // The STS repository suite (services/sts/test/repo) reads every Worker config
-  // to check how each one reaches STS and the audit relay, so a config change in
-  // any workspace runs it.
+  // The STS and UTS repository suites (services/sts/test/repo,
+  // services/uts/test/repo) read every Worker config to check how each one
+  // reaches STS, the audit relay and UTS, so a config change in any workspace
+  // runs both.
   [/(^|\/)wrangler[^/]*\.(json|jsonc|toml)$/, 'services/sts'],
+  [/(^|\/)wrangler[^/]*\.(json|jsonc|toml)$/, 'services/uts'],
 ];
 
 // Root paths that no typecheck or lint reads. OWNED is consulted first, so a

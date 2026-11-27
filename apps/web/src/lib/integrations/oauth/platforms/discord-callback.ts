@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
@@ -139,7 +139,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     // connection carries a shared bot token and model policy, so it needs the
     // organization role that governs the integration, not just membership.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_BILLING_ROLES);
+      await ensureMemberOrganizationAccess(user, owner.id, ORGANIZATION_BILLING_ROLES);
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {

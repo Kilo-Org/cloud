@@ -5,10 +5,11 @@ import {
   USAGE_INGEST_URL,
   USAGE_INGEST_PUBLISH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
-import type {
-  EnkryptUsageWriteInput,
-  ExaUsageRecord,
-  LlmUsageQueueMessage,
+import {
+  toUsageRecordWireBody,
+  type EnkryptUsageWriteInput,
+  type ExaUsageRecord,
+  type LlmUsageQueueMessage,
 } from '@kilocode/usage-contracts';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
@@ -140,9 +141,14 @@ export async function enqueueUsage(
   payload: LlmUsageQueueMessage,
   { retryTransientFailures = false }: { retryTransientFailures?: boolean } = {}
 ): Promise<UsageEnqueueOutcome> {
-  return publishToUsageIngest({ usageId: payload.core.id }, USAGE_INGEST_URL, payload, {
-    retryTransientFailures,
-  });
+  return publishToUsageIngest(
+    { usageId: payload.core.id },
+    USAGE_INGEST_URL,
+    toUsageRecordWireBody(payload),
+    {
+      retryTransientFailures,
+    }
+  );
 }
 
 const USAGE_INGEST_PATH = '/usage';
@@ -154,7 +160,7 @@ const EXA_USAGE_INGEST_PATH = '/exa-usage';
  * is its sibling on the same Worker. Any other shape cannot be mapped safely, so it counts as no
  * publisher at all.
  */
-function usageIngestSiblingUrl(
+export function usageIngestSiblingUrl(
   usageIngestUrl: string | undefined,
   siblingPath: string
 ): string | undefined {

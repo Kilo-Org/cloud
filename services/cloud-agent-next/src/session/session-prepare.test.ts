@@ -125,7 +125,12 @@ function modernContext(
     'registration-test-secret'
   );
   vi.mocked(createRuntimeAuthorization).mockResolvedValue({
-    token: 'runtime-token',
+    // A combined issuance: one token value for every destination.
+    tokens: {
+      'kilo-api': 'runtime-token',
+      'kilo-gateway': 'runtime-token',
+      'session-ingest': 'runtime-token',
+    },
     authorization: { id: 'authorization-test' },
     expiresAt: '2099-01-01T00:00:00Z',
   } as Awaited<ReturnType<typeof createRuntimeAuthorization>>);
@@ -8152,6 +8157,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
         environment: 'development',
+        audienceMode: 'combined',
         onAdmissionRejected: expect.any(Function),
         ...(organizationId ? { organizationId } : {}),
         onBindingRejected: expect.any(Function),
@@ -8169,6 +8175,49 @@ describe('createSessionWithLedger clone reconciliation', () => {
       expect(generateSessionIdMock).not.toHaveBeenCalled();
     }
   );
+
+  it('registers per-destination runtime tokens when the rollout selects them', async () => {
+    const input = cloneRequest({
+      options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: 'org-registration-test' },
+    });
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: { ...(await cloneRow({}, input)), organization_id: 'org-registration-test' },
+    });
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 3 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    const stub = makeDoStub();
+    const ctx = modernContext(makeContext(stub), 'org-registration-test');
+    Object.assign(ctx.env, { RUNTIME_TOKEN_AUDIENCE_MODE: 'per-destination' });
+    const tokens = {
+      'kilo-api': 'api-runtime-token',
+      'kilo-gateway': 'gateway-runtime-token',
+      'session-ingest': 'ingest-runtime-token',
+    };
+    vi.mocked(createRuntimeAuthorization).mockResolvedValueOnce({
+      tokens,
+      authorization: { id: 'authorization-test' },
+      expiresAt: '2099-01-01T00:00:00Z',
+    } as Awaited<ReturnType<typeof createRuntimeAuthorization>>);
+    await runCreate(ctx, input);
+    expect(createRuntimeAuthorization).toHaveBeenCalledWith(
+      expect.objectContaining({ audienceMode: 'per-destination' })
+    );
+    expect(stub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          auth: {
+            kiloSessionId: KILO_SESSION_ID,
+            kilocodeToken: 'api-runtime-token',
+            runtimeTokens: tokens,
+          },
+        }),
+      })
+    );
+  });
 
   it('resumes stored clone IDs without inventing a reporting age', async () => {
     const request = cloneRequest();

@@ -6,11 +6,13 @@ import {
   STS_SCOPE_REGISTRY,
   ScopeSchema,
   ServiceTokenClaimsSchema,
+  StsEnvironmentSchema,
   TOKEN_CLOCK_SKEW_SECONDS,
   isRegisteredStsScope,
   scopeAudience,
   type AccessTokenClaims,
   type Actor,
+  type StsEnvironment,
   type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { z } from 'zod';
@@ -37,6 +39,7 @@ import {
   FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS,
   createRevocationFeed,
   maxHeadAgeForLifetime,
+  type FeedRead,
   type RevocationFeed,
   type RevocationFeedSource,
 } from './revocation';
@@ -56,6 +59,8 @@ export type UtsScopeRegistry = (audience: string, scope: string) => UtsScopeEntr
 export type VerifierConfig = {
   /** This service: the one audience it accepts. */
   audience: string;
+  /** The environment this service runs in: the one `env` claim it accepts, from either issuer. */
+  environment: StsEnvironment;
   /** RFC 9728 protected-resource metadata URL, sent in every 401 challenge. */
   resourceMetadataUrl: string;
   sts?: {
@@ -101,7 +106,10 @@ export type AcceptsPats<C> = 'uts' extends keyof C
 export type Route = {
   issuer: IssuerKind;
   scope: string;
-  /** The organization the request acts in, when the route is org-scoped. */
+  /**
+   * The organization the request acts in, when the route is org-scoped: the credential must name
+   * exactly this org. UTS only; STS tokens carry no org.
+   */
   org?: string;
   /** The route needs a live session (`sid`), whatever its scope's registry entry says; UTS only. */
   requiresSession?: boolean;
@@ -142,6 +150,36 @@ export type VerifySuccess =
 
 export type VerifyResult = VerifySuccess | VerifyFailure;
 
+/**
+ * A browser session as UTS answered it to `kilo-web` (`read` or the code exchange): `sid` is its
+ * `session_id` and `issuedAt` its `issued_at`, never a client time.
+ */
+export type BrowserSessionRecord = { sub: string; sid: string; issuedAt: number };
+
+/**
+ * The fields of a UTS access token that the caller verified earlier and kept in a capability it
+ * authenticated itself: `issuedAt` is the token's `iat`, `kid` its header `kid`.
+ */
+export type UtsTokenRecord = BrowserSessionRecord & { kid: string };
+
+/**
+ * What a record check answers. `ok: true` only says the feed revokes nothing about the record; it
+ * grants nothing. `reason` is for the caller's logs and tests.
+ */
+export type RecordCheckResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: 401;
+      reason:
+        | 'invalid_session_record'
+        | 'invalid_record'
+        | 'revoked_session'
+        | 'revoked_key'
+        | 'account_blocked';
+    }
+  | { ok: false; status: 503; reason: 'revocation_unavailable'; retryAfterSeconds?: number };
+
 export type Verifier<RequireAddress extends boolean = true> = {
   /**
    * Checks the bearer credential of `input` (a request or its `Authorization` header value)
@@ -159,6 +197,22 @@ export type Verifier<RequireAddress extends boolean = true> = {
    * request, beside the secrets bundle call; a later `verify` joins the fetches in flight.
    */
   warm(ctx: { waitUntil: WaitUntil }): void;
+  /**
+   * Checks a browser session record against the held revocation feed, with the 60 s head-age limit
+   * of a long-lived credential. Rejects only when the verifier has no UTS issuer.
+   */
+  checkBrowserSession(
+    record: BrowserSessionRecord,
+    ctx: { waitUntil: WaitUntil }
+  ): Promise<RecordCheckResult>;
+  /**
+   * Checks a UTS token record, as `checkBrowserSession` does, plus its signing key. Never feed it a
+   * value the caller did not authenticate. Rejects only when the verifier has no UTS issuer.
+   */
+  checkUtsTokenRecord(
+    record: UtsTokenRecord,
+    ctx: { waitUntil: WaitUntil }
+  ): Promise<RecordCheckResult>;
 };
 
 /** An issuer URL: `https:`, or `http:` on a loopback host for local development. */
@@ -172,12 +226,43 @@ const IssuerUrlSchema = z.url().refine(value => {
 
 const ConfigSchema = z.object({
   audience: AudienceSchema,
+  environment: StsEnvironmentSchema,
   resourceMetadataUrl: z.url().refine(url => !/["\\]/.test(url), 'must not contain quotes'),
   sts: z.object({ issuer: IssuerUrlSchema }).optional(),
   uts: z.object({ issuer: IssuerUrlSchema }).optional(),
 });
 
+/**
+ * The longest `Authorization` value the verifier parses. A longer one is refused before any
+ * split, base64 decode or JSON parse; every Kilo credential is far shorter.
+ */
+export const MAX_AUTHORIZATION_LENGTH = 8_192;
+
 const BEARER = /^Bearer +([^\s]+) *$/i;
+
+const LOWERCASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** How far in the future a record's `issuedAt` may be. */
+export const RECORD_FUTURE_SKEW_SECONDS = 60;
+
+/** `issuedAt`: positive integer seconds, at most `RECORD_FUTURE_SKEW_SECONDS` in the future. */
+const BrowserSessionRecordSchema = z.object({
+  sub: z.string().min(1).max(255),
+  sid: z.string().regex(LOWERCASE_UUID),
+  issuedAt: z
+    .number()
+    .int()
+    .positive()
+    .refine(issuedAt => issuedAt <= Date.now() / 1000 + RECORD_FUTURE_SKEW_SECONDS),
+});
+
+const UtsTokenRecordSchema = BrowserSessionRecordSchema.extend({
+  kid: z.string().max(255).startsWith(UTS_TOKEN_KID_PREFIX),
+});
+
+type RecordRefusal = Extract<RecordCheckResult, { status: 401 }>['reason'];
+
+const refused = (reason: RecordRefusal): RecordCheckResult => ({ ok: false, status: 401, reason });
 
 /** Maps the first schema issue to the §7 row it breaks. */
 function claimsReason(error: z.ZodError): FailureReason {
@@ -224,6 +309,7 @@ type UtsIssuer = {
 export function createVerifier<C extends VerifierConfig>(config: C): Verifier<AcceptsPats<C>> {
   ConfigSchema.parse(config);
   const audience = config.audience;
+  const environment = config.environment;
   const failures = createFailures(config.resourceMetadataUrl);
   const sts: StsIssuer | null =
     config.sts === undefined
@@ -265,6 +351,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     }
     if (route.issuer === 'sts' && route.requiresSession === true) {
       throw new Error('an STS route cannot require a session: STS tokens carry none');
+    }
+    if (route.issuer === 'sts' && route.org !== undefined) {
+      throw new Error('an STS route cannot be org-scoped: STS tokens carry no org');
     }
   }
 
@@ -322,8 +411,14 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     return { ok: true, kid, payload };
   }
 
-  /** Row 6: `exp` in the future, `iat` and `nbf` not in the future, with 60 s of skew. */
+  /**
+   * Row 6: a positive lifetime (`exp` after `iat` and after any `nbf`), then `exp` in the future,
+   * `iat` and `nbf` not in the future, with 60 s of skew.
+   */
   function timeFailure(claims: AccessTokenClaims): VerifyFailure | null {
+    if (claims.exp <= claims.iat || (claims.nbf !== undefined && claims.nbf >= claims.exp)) {
+      return failures.invalidToken('time');
+    }
     const now = Date.now() / 1000;
     if (claims.exp <= now - TOKEN_CLOCK_SKEW_SECONDS) return failures.invalidToken('expired');
     if (claims.iat > now + TOKEN_CLOCK_SKEW_SECONDS)
@@ -334,9 +429,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     return null;
   }
 
-  /** Row 9: a present org claim matches the request org on an org-scoped route. */
+  /** Row 9: on an org-scoped route the credential names exactly the request org. */
   function orgMatches(route: Route, org: string | null | undefined): boolean {
-    return route.org === undefined || org === undefined || org === null || org === route.org;
+    return route.org === undefined || org === route.org;
   }
 
   async function verifyStsToken(
@@ -351,8 +446,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     const parsed = ServiceTokenClaimsSchema.safeParse(signed.payload);
     if (!parsed.success) return failures.invalidToken(claimsReason(parsed.error));
     const claims = parsed.data;
-    // Row 3 on the verified claims.
+    // Row 3 on the verified claims, and the environment this service runs in.
     if (claims.iss !== issuer.issuer) return failures.invalidToken('issuer');
+    if (claims.env !== environment) return failures.invalidToken('environment');
     const late = timeFailure(claims);
     if (late !== null) return late;
 
@@ -365,7 +461,7 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
       return failures.insufficientScope('scope_mismatch', route.scope);
 
     // Rows 10, 11 and 13 do not apply: STS tokens name service subjects and are expiry-bound
-    // (decision Q4); row 9 cannot fail, as the profile refuses an `org` claim.
+    // (decision Q4); row 9 does not apply, as an STS route cannot be org-scoped.
     return {
       ok: true,
       credential: 'access_token',
@@ -388,8 +484,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     const parsed = AccessTokenClaimsSchema.safeParse(signed.payload);
     if (!parsed.success) return failures.invalidToken(claimsReason(parsed.error));
     const claims = parsed.data;
-    // Row 3 on the verified claims.
+    // Row 3 on the verified claims, and the environment this service runs in.
     if (claims.iss !== issuer.issuer) return failures.invalidToken('issuer');
+    if (claims.env !== environment) return failures.invalidToken('environment');
     const late = timeFailure(claims);
     if (late !== null) return late;
 
@@ -399,7 +496,6 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     if (entry === null) return failures.insufficientScope('scope_unknown', route.scope);
     if (claims.scope !== route.scope)
       return failures.insufficientScope('scope_mismatch', route.scope);
-    if (!orgMatches(route, claims.org)) return failures.orgMismatch();
 
     // Row 11: a session-bound route or scope needs a session id.
     if ((route.requiresSession === true || entry.requiresSession) && claims.sid === undefined) {
@@ -421,6 +517,8 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     }
     if (list.revokedKids.has(signed.kid)) return failures.invalidToken('revoked_kid');
     if (list.blockedAccounts.has(claims.sub)) return failures.invalidToken('blocked_account');
+    // Row 9 after the feed, as on the PAT path: a revoked token gets 401 whatever its org.
+    if (!orgMatches(route, claims.org)) return failures.orgMismatch();
 
     return {
       ok: true,
@@ -470,9 +568,10 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
       return failures.unavailable('jwks_unavailable', keys.retryAfterSeconds);
     }
     // A PAT is a long-lived credential: the feed head must be at most 60 s old, even on a cache hit.
-    const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
-    if (read.status === 'unavailable') {
-      return failures.unavailable('feed_unavailable', read.retryAfterSeconds);
+    // This read fails fast before any lookup; the decision below reads the feed again.
+    const early = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
+    if (early.status === 'unavailable') {
+      return failures.unavailable('feed_unavailable', early.retryAfterSeconds);
     }
     const { hash, shared } = await prepared;
     const resolved = await pats.resolve(hash, request, shared);
@@ -487,6 +586,12 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
         break;
     }
     const record = resolved.record;
+    // The shared-cache read or the lookup may have waited: decide on the feed as it is now, so a
+    // revocation installed meanwhile counts and the head is still at most 60 s old.
+    const read = await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
+    if (read.status === 'unavailable') {
+      return failures.unavailable('feed_unavailable', read.retryAfterSeconds);
+    }
     // The feed entry for this PAT id overrides every cache layer; rows 13 and the PAT's own expiry.
     if (read.list.revokedPatIds.has(record.patId)) {
       pats.forget(hash);
@@ -517,6 +622,60 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
     };
   }
 
+  function recordIssuer(): UtsIssuer {
+    if (uts === null)
+      throw new Error('record checks read the UTS feed, but the verifier has no uts');
+    return uts;
+  }
+
+  /**
+   * The held feed list, loaded as on the PAT path (bootstrap when cold, then the key set its head
+   * verifies under), with the 60 s head-age limit.
+   */
+  async function recordFeed(issuer: UtsIssuer, scope: CallScope): Promise<FeedRead> {
+    if (issuer.bootstrap !== null) {
+      const loaded = await issuer.bootstrap.load(scope);
+      if (loaded.status !== 'ready') {
+        return { status: 'unavailable', retryAfterSeconds: loaded.retryAfterSeconds };
+      }
+    }
+    const keys = await issuer.keySet.ready(scope);
+    if (keys.status === 'unavailable') return keys;
+    return await issuer.feed.read(FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS, scope);
+  }
+
+  /** A validated record against the feed: its key when it has one, then the session rule. */
+  async function checkRecord(
+    issuer: UtsIssuer,
+    record: BrowserSessionRecord,
+    kid: string | null,
+    ctx: { waitUntil: WaitUntil }
+  ): Promise<RecordCheckResult> {
+    const scope = newCallScope();
+    try {
+      const read = await recordFeed(issuer, scope);
+      if (read.status === 'unavailable') {
+        return {
+          ok: false,
+          status: 503,
+          reason: 'revocation_unavailable',
+          retryAfterSeconds: read.retryAfterSeconds,
+        };
+      }
+      const list = read.list;
+      if (kid !== null && list.revokedKids.has(kid)) return refused('revoked_key');
+      if (list.revokedSids.has(record.sid)) return refused('revoked_session');
+      const revokedBefore = list.revokedBefore.get(record.sub);
+      if (revokedBefore !== undefined && revokedBefore >= record.issuedAt) {
+        return refused('revoked_session');
+      }
+      if (list.blockedAccounts.has(record.sub)) return refused('account_blocked');
+      return { ok: true };
+    } finally {
+      handOff(scope, ctx.waitUntil);
+    }
+  }
+
   function dispatch(
     token: string,
     route: Route,
@@ -543,6 +702,9 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
       if (authorization === null || authorization.trim() === '') {
         return failures.missingCredential();
       }
+      if (authorization.length > MAX_AUTHORIZATION_LENGTH) {
+        return failures.invalidToken('credential_too_long');
+      }
       const match = BEARER.exec(authorization);
       if (match === null) {
         return /^Bearer\b/i.test(authorization)
@@ -565,6 +727,19 @@ export function createVerifier<C extends VerifierConfig>(config: C): Verifier<Ac
         else uts.keySet.prefetch(scope);
       }
       handOff(scope, ctx.waitUntil);
+    },
+    async checkBrowserSession(record, ctx) {
+      const issuer = recordIssuer();
+      // Malformed input touches no feed.
+      const parsed = BrowserSessionRecordSchema.safeParse(record);
+      if (!parsed.success) return refused('invalid_session_record');
+      return await checkRecord(issuer, parsed.data, null, ctx);
+    },
+    async checkUtsTokenRecord(record, ctx) {
+      const issuer = recordIssuer();
+      const parsed = UtsTokenRecordSchema.safeParse(record);
+      if (!parsed.success) return refused('invalid_record');
+      return await checkRecord(issuer, parsed.data, parsed.data.kid, ctx);
     },
   };
 }

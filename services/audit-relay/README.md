@@ -1,17 +1,34 @@
 # audit-relay
 
 The audit pipeline sink (design sections 8.1, 8.2 and 8.5). Producers commit an audit row with the
-transaction it describes and relay it to the `kilo-audit` queue as one gzipped `AuditBatch` from
-`@kilocode/sts-contracts`. This Worker turns that stream of batches into two sinks:
+transaction it describes and relay it to their own audit queue (`kilo-audit` for STS,
+`kilo-audit-uts` for UTS) as one gzipped `AuditBatch` from `@kilocode/sts-contracts`. This Worker
+turns those streams of batches into two sinks:
 
 - **Axiom** (`kilo-audit`) — the hot, queryable copy, 90 days.
 - **R2** (`kilo-audit-archive`, EU jurisdiction, bucket-lock rule of 400 days) — the immutable
   evidence archive, one gzip object per batch, hash-chained per stream.
 
 It also signs hourly checkpoints over the chain heads and verifies the archive daily and monthly.
-The same Worker serves STS now and UTS later; neither producer lives here.
+The same Worker serves STS and UTS; neither producer lives here.
 
 ## Message path
+
+A queue message names no producer, so the queue does: each producer has its own audit queue per
+environment, and the repository guard (`services/sts/test/repo`) lets only that producer send to
+it. Before any stream sees a batch, the consumer checks it against its queue
+(`src/relay/stream-producer.ts`; a dead-letter queue counts as its queue):
+
+| Queue | Streams it may carry | Event `source` |
+|---|---|---|
+| `kilo-audit[-staging\|-local]` | `sts:<env>:<rest>` | `kilo:sts:<env>` |
+| `kilo-audit-uts[-staging\|-local]` | `uts:<env>:<0-7>`, the 8 UTS audit shards | `kilo:uts:<env>` |
+
+`<env>` is `production`, `staging` or `development` (for `-local`). A batch that fails is refused
+like an undecodable body: its bytes go to `dead-letter/unknown/`, it pages
+(`refused_queue_not_allowed`, `refused_stream_not_allowed` or `refused_source_mismatch`) through
+the unknown bucket's hourly budget, and it is acked. So STS cannot write a UTS stream and UTS
+cannot write an STS stream.
 
 One `StreamDO` per audit stream (`idFromName(stream)`) is the single writer for that stream. It
 holds the head `{ seq, hash }` and decides what a batch means before any sink is touched:
@@ -174,6 +191,38 @@ A batch lost at its final delivery stalls its stream: every later batch gap-retr
 To recover, re-send the stored object's bytes to the main queue as a `bytes` message; the
 StreamDO archives the missing batch and dedupes the rest.
 
+## STS token events
+
+STS's service-token events travel this path like every other event (design 8.3); the relay
+treats them as opaque rows. Shapes are built in `services/sts/src/audit/events.ts`;
+`test/token-events.test.ts` here decodes, archives and ingests them, and STS's
+`test/worker/token-audit-events.test.ts` proves the builders pass the producer-side check
+(`assertRelayable`: the event schema, flat attributes only, and the single-message size) at their
+largest (8 audiences, 63-character names, 127-character scopes). No event carries a token.
+
+| Type | Stream | OCSF class / activity | Outcome | Attributes |
+|---|---|---|---|---|
+| `ai.kilo.sts.token.issued` | `sts:<env>:tokens:<shard>` | API Activity 6003 / Create 1 | `success`, actor `workload` | `workload`, `environment`, `identity` (`worker-binding`, `vercel`, `github`, `fly`), `kid`, `issuedAt`, `expiresAt`, `lifetimeSeconds`, `attestationCapped`, `tokenCount`, and the parallel lists `jtis`, `audiences`, `scopes` (one row per mint call) |
+| `ai.kilo.sts.token.denied` | `sts:<env>:denials` | API Activity 6003 / Create 1 | `denied`, `outcomeDetail` = reason; actor `workload` (binding) or `service` (HTTP) | `environment`, `channel`, `reason`, `workload` (the actor), `audience` and `scope` (absent for a whole-call refusal), `count` and `windowStart` (identical denials merged per minute), `overflow`, `claims` (stable identity claims as `name=value`) |
+| `ai.kilo.sts.token_key.rotated` | `sts:<env>:tokens:<shard>` | API Activity 6003 / Update 3, Delete 4 for `removed` | `success`, `outcomeDetail` = change; actor `system` | `environment`, `change` (`created`, `published`, `activated`, `removed`), `kid`, plus `activatesAt`, `retiredKid` or `lastTokenExpiresAt` |
+| `ai.kilo.sts.token_key.revoked` | `sts:<env>:tokens:<shard>` | API Activity 6003 / Delete 4 | `success`, `outcomeDetail` `emergency removal`; actor `system` | `environment`, `kid`, `state`, `cause` (`listed`, `same_ring`), `replacementKid` |
+
+Mints and denials for one workload in Axiom (`kilo-audit`; nested fields are flattened with dots):
+
+```kusto
+['kilo-audit']
+| where type in ('ai.kilo.sts.token.issued', 'ai.kilo.sts.token.denied')
+| where ['data.attributes.workload'] == 'web'
+| project _time, source, type, outcome = ['data.outcome'], reason = ['data.attributes.reason'],
+    audiences = ['data.attributes.audiences'], audience = ['data.attributes.audience'],
+    scopes = ['data.attributes.scopes'], count = ['data.attributes.count']
+| order by _time desc
+```
+
+Who minted tokens for one audience: `| where type == 'ai.kilo.sts.token.issued' | mv-expand
+audience = ['data.attributes.audiences'] | where audience == 'usage-ingest' | summarize mints =
+count() by bin(_time, 5m), workload = tostring(['data.attributes.workload'])`.
+
 ## Checkpoints and verification
 
 - Hourly (`0 * * * *`): the registry's heads are serialised as
@@ -227,7 +276,7 @@ StreamDO archives the missing batch and dedupes the rest.
 | `AUDIT_VERIFIER` | `VerifierDO`, the daily and full verification passes and the verified anchor |
 | `AUDIT_ARCHIVE` | R2 `kilo-audit-archive` (staging `kilo-audit-archive-staging`), bound with `"jurisdiction": "eu"` because the buckets are created in the EU jurisdiction; the local binding is miniflare's simulated bucket and has none |
 | `STS` | service `sts` (`sts-staging`), entrypoint `SecretsBroker`, `props.caller` = `audit-relay` in every environment (each STS deployment serves one environment) |
-| Queue consumer | `kilo-audit` → DLQ `kilo-audit-dlq` (staging `kilo-audit-staging` / `kilo-audit-staging-dlq`) |
+| Queue consumer | `kilo-audit` → DLQ `kilo-audit-dlq` and `kilo-audit-uts` → DLQ `kilo-audit-uts-dlq` (staging `kilo-audit-staging` / `kilo-audit-staging-dlq`, `kilo-audit-uts-staging` / `kilo-audit-uts-staging-dlq`) |
 | `AXIOM_DATASET` | `kilo-audit` (staging `kilo-audit-staging`, local `kilo-audit-local`) |
 | `AXIOM_URL` | `https://api.axiom.co` |
 | `AUDIT_ENVIRONMENT` | `production` / `staging` / `local` |
@@ -262,19 +311,21 @@ stream-wide hot-copy failure and owes its rows to Axiom until the token can be r
 of owed rows per stream per day). Without the Slack webhook, every page fails and only the
 `audit_relay.page_failed` log line remains.
 
-1. **Queues and the DLQ** with a 14-day message retention (the consumer attachment comes from
-   `wrangler.jsonc`). STS starts sending audit events within 5 minutes of its own deploy, which
-   can come before this Worker's; a message older than the retention is dropped and its stream
-   stalls behind a gap, so merge this Worker within the retention:
+1. **Queues and the DLQs** with a 14-day message retention (the consumer attachment comes from
+   `wrangler.jsonc`). STS starts sending audit events within 5 minutes of its own deploy, and UTS
+   within 5 seconds of its identity store being bound, either of which can come before this
+   Worker's; a message older than the retention is dropped and its stream stalls behind a gap, so
+   merge this Worker within the retention:
 
    ```sh
-   for queue in kilo-audit kilo-audit-dlq kilo-audit-staging kilo-audit-staging-dlq; do
+   for queue in kilo-audit kilo-audit-dlq kilo-audit-staging kilo-audit-staging-dlq \
+     kilo-audit-uts kilo-audit-uts-dlq kilo-audit-uts-staging kilo-audit-uts-staging-dlq; do
      pnpm exec wrangler queues create "$queue"
      pnpm exec wrangler queues update "$queue" --message-retention-period-secs 1209600
    done
    ```
 
-   Verify: `pnpm exec wrangler queues info kilo-audit` (and the other three) prints the queue, and
+   Verify: `pnpm exec wrangler queues info kilo-audit` (and the other seven) prints the queue, and
    the Queues API shows `message_retention_period: 1209600` for each.
 
 2. **R2 bucket in the EU jurisdiction with lock rules** on the archive, the checkpoints and the

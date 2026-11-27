@@ -1,27 +1,25 @@
 import 'server-only';
+import { headers } from 'next/headers';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
-import {
-  organizationTarget,
-  recordKiloAdminElevation,
-  type AdminAccessSurface,
-} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import type { AdminAccessSurface } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import type { AdminNetworkDenialReason } from '@kilocode/web-shared/lib/admin/admin-network';
+import type { StepUpRequirementPayload } from '@kilocode/web-shared/lib/admin/privileged-access';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   effectiveMembershipRole,
-  loadEffectiveMembershipRows,
-  loadEffectiveMembershipRowsWithOrganization,
-  observeMembershipRole,
-  resolveOrganizationAccess,
+  organizationRestAccessContext,
+  resolveOrganizationAccessAndFetchOrg,
+  StaffRequestRefusal,
+  type OrganizationAccessWithOrganization,
 } from '@kilocode/web-shared/routers/organizations/utils';
+import { loadEffectiveMembershipRowsWithOrganization } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import {
   findSupportAllowEntry,
-  isSupportAccessEnabled,
   isSupportAccessReason,
   supportStandInRole,
   type OrganizationAccess,
@@ -31,18 +29,24 @@ import {
 } from '@kilocode/web-shared/lib/admin/support-access';
 import { TRPCError } from '@trpc/server';
 import z from 'zod';
+import type { StepUpRequirement } from '@/components/admin/step-up/step-up-error';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
 /**
+ * The surfaces this helper serves: it authenticates from the request's own
+ * headers and cookies, so it is never a tRPC procedure.
+ */
+type OrganizationRequestSurface = Exclude<AdminAccessSurface, 'trpc'>;
+
+/**
  * The caller-facing surface and the support-allowlist surface share one
  * vocabulary today, but they are separate declarations. `Record` makes a new
- * `AdminAccessSurface` member a typecheck error here until it is mapped, so an
- * audit surface can never reach the allowlist lookup unchecked.
+ * request surface a typecheck error here until it is mapped, so an audit
+ * surface can never reach the allowlist lookup unchecked.
  */
-const SUPPORT_SURFACE_BY_ADMIN_SURFACE: Record<AdminAccessSurface, SupportSurface> = {
+const SUPPORT_SURFACE_BY_REQUEST_SURFACE: Record<OrganizationRequestSurface, SupportSurface> = {
   rest: 'rest',
-  trpc: 'trpc',
   'server-component': 'server-component',
 };
 
@@ -64,13 +68,30 @@ export type OrgAccessDenial = {
 };
 
 type DataOrNextError<T> = CustomResult<
-  { data: T; nextResponse?: never; denial?: never },
+  {
+    data: T;
+    nextResponse?: never;
+    denial?: never;
+    stepUp?: never;
+    adminNetworkDenial?: never;
+  },
   {
     data?: never;
     nextResponse: NextResponse<{ error: string }>;
     denial?: OrgAccessDenial;
+    /** Set when a staff admission asked for step-up; a page renders the gate from it. */
+    stepUp?: StepUpRequirement;
+    /** Set when the admin network allowlist refused a staff admission. */
+    adminNetworkDenial?: AdminNetworkDenialReason;
   }
 >;
+
+/** The page-gate shape of a step-up refusal; the gate treats a missing binding as none. */
+function stepUpRequirementFrom(
+  payload: StepUpRequirementPayload | undefined
+): StepUpRequirement | undefined {
+  return payload && { ...payload, binding: payload.binding ?? undefined };
+}
 
 export async function getAuthorizedOrgContext(
   id: Organization['id'],
@@ -84,34 +105,47 @@ export async function getAuthorizedOrgContext(
      * and layouts pass `'server-component'`. It labels the audit event the admin
      * branch emits and selects the surface the support-allowlist lookup matches.
      */
-    surface?: AdminAccessSurface;
+    surface?: OrganizationRequestSurface;
     /** The actual Request method when the caller has one. */
     requestMethod?: string;
+    /**
+     * The request's headers when the caller has the Request. Defaults to the
+     * current request scope's headers. Used for the authentication and any
+     * staff admission.
+     */
+    requestHeaders?: Headers;
     /**
      * Exact allowlist key for a support grant. Omitted means support is never
      * accepted here, even when support access is on.
      */
     supportKey?: string | null;
-    /** Required for a REST write; REST reads default to `support_read`. */
+    /** Overrides the class from the method: GET/HEAD and server components read, others write. */
     requiredActionClass?: SupportActionClass;
+    /**
+     * Admit only a caller whose own membership gives an allowed role: no staff
+     * branch, no support grant and no elevation record. A caller without such
+     * a role gets the ordinary 404. Credential issuers use it.
+     */
+    membershipOnly?: boolean;
   } = {}
 ): Promise<DataOrNextError<AuthorizedOrgData>> {
   const { getUserFromAuthOverride, surface, requestMethod } = options;
   const auditSurface = surface ?? 'rest';
-  const supportSurface = SUPPORT_SURFACE_BY_ADMIN_SURFACE[auditSurface];
+  const supportSurface = SUPPORT_SURFACE_BY_REQUEST_SURFACE[auditSurface];
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
       : getUserFromAuth;
 
-  const { authFailedResponse, user, tokenSource, internalApiUse, cloudAgentAuthority } =
-    await getUserFromAuthFn({
-      adminOnly: false,
-      requestMethod,
-    });
-  if (authFailedResponse) {
-    return { success: false, nextResponse: authFailedResponse };
+  const auth = await getUserFromAuthFn({
+    adminOnly: false,
+    requestMethod,
+    requestHeaders: options.requestHeaders,
+  });
+  if (auth.authFailedResponse) {
+    return { success: false, nextResponse: auth.authFailedResponse };
   }
+  const { user } = auth;
   const { success, data, error } = UUIDSchema.safeParse(id);
   if (!success) {
     return {
@@ -121,49 +155,8 @@ export async function getAuthorizedOrgContext(
   }
   const organizationId = data;
 
-  if (user.is_admin && !isSupportAccessEnabled()) {
-    // Parent ordering: record the elevation before awaiting the organization
-    // lookup, so a missing/deleted organization or a DB error is still
-    // attributed.
-    const organizationResult = getOrganizationById(organizationId).then(
-      value => ({ ok: true as const, value }),
-      error => ({ ok: false as const, error })
-    );
-    const observation = await observeMembershipRole(
-      () => loadEffectiveMembershipRows(user.id, organizationId),
-      roles
-    );
-    await recordKiloAdminElevation(
-      {
-        user,
-        tokenSource,
-        internalApiUse,
-        delegatedWorkload: cloudAgentAuthority !== undefined,
-        auditSurface,
-        auditMethod: requestMethod,
-      },
-      {
-        reason: 'organization_access_rest',
-        target: organizationTarget(organizationId),
-        ...observation,
-      }
-    );
-    const lookup = await organizationResult;
-    if (!lookup.ok) throw lookup.error;
-    const organization = lookup.value;
-    if (!organization) {
-      const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-      return { success: false, nextResponse: res };
-    }
-    return successResult({
-      data: {
-        user: { ...user, role: 'owner' },
-        organization,
-        access: { kind: 'legacy_admin', role: 'owner' },
-      },
-    });
-  }
-
+  // A qualifying membership authorizes on its own, staff included, and never
+  // reaches the staff admission.
   const memberRows = await loadEffectiveMembershipRowsWithOrganization(user.id, organizationId);
   const memberRole = effectiveMembershipRole(memberRows, roles);
   if (memberRole) {
@@ -179,7 +172,7 @@ export async function getAuthorizedOrgContext(
     }
   }
 
-  if (!user.is_admin) {
+  if (!user.is_admin || options.membershipOnly) {
     warnInSentry(
       `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
     );
@@ -187,24 +180,15 @@ export async function getAuthorizedOrgContext(
     return { success: false, nextResponse: res };
   }
 
-  const organization = await getOrganizationById(organizationId);
-  if (!organization) {
-    const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-    return { success: false, nextResponse: res };
-  }
-
-  let access: OrganizationAccess;
+  const requestHeaders = options.requestHeaders ?? (await headers());
+  let resolved: OrganizationAccessWithOrganization;
   try {
-    access = await resolveOrganizationAccess(
-      {
-        user,
-        tokenSource,
-        internalApiUse,
-        trpcType: requestMethod,
-        auditSurface,
-        auditMethod: requestMethod,
-        delegatedWorkload: cloudAgentAuthority !== undefined,
-      },
+    resolved = await resolveOrganizationAccessAndFetchOrg(
+      organizationRestAccessContext(auth, {
+        headers: requestHeaders,
+        method: requestMethod,
+        surface: auditSurface,
+      }),
       organizationId,
       {
         roles,
@@ -213,11 +197,20 @@ export async function getAuthorizedOrgContext(
         requiredActionClass: options.requiredActionClass,
         auditReason: 'organization_access_rest',
         membershipRows: memberRows,
-        organizationIsLive: true,
       }
     );
   } catch (accessError) {
     if (accessError instanceof TRPCError) {
+      // The staff admission's own answer (401, 403, or a step-up requirement)
+      // goes back unchanged, never as a generic 404.
+      if (accessError.cause instanceof StaffRequestRefusal) {
+        return {
+          success: false,
+          nextResponse: accessError.cause.response,
+          stepUp: stepUpRequirementFrom(accessError.cause.stepUp),
+          adminNetworkDenial: accessError.cause.adminNetworkDenial,
+        };
+      }
       warnInSentry(
         `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
       );
@@ -248,9 +241,11 @@ export async function getAuthorizedOrgContext(
     throw accessError;
   }
 
+  // A staff grant acts with the primary row its admission re-read.
+  const { access, organization } = resolved;
   return successResult({
     data: {
-      user: { ...user, role: roleForAccess(access, supportSurface, options.supportKey) },
+      user: { ...resolved.user, role: roleForAccess(access, supportSurface, options.supportKey) },
       organization,
       access,
     },

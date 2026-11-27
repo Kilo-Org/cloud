@@ -10,8 +10,14 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { PageContainer } from '@/components/layouts/PageContainer';
+import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 
-export default function CreditCategoriesDocsPage() {
+export default async function CreditCategoriesDocsPage() {
+  const adminAccess = await requireAdminPage();
+  if (!adminAccess.user) {
+    return <AdminStepUpGate requirement={adminAccess.stepUp} />;
+  }
+
   const markdownContent = generatePromoCreditCategoriesMarkdown(promoCreditCategories);
 
   const breadcrumbs = (

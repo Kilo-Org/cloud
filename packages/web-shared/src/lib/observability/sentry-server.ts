@@ -6,6 +6,7 @@
 import { httpIntegration, init } from '@sentry/nextjs';
 import { RESTRICTED_DATA_COLLECTION } from '@kilocode/web-shared/lib/observability/sentry-data-collection';
 import {
+  dropTraceTransactionName,
   scrubSentryBreadcrumb,
   scrubSentryEvent,
 } from '@kilocode/web-shared/lib/observability/sentry-event-scrub';
@@ -27,6 +28,18 @@ function isDrizzleQueryError(error: unknown): error is DrizzleQueryError {
     'params' in error &&
     typeof error.query === 'string'
   );
+}
+
+function findDrizzleQueryError(error: unknown): DrizzleQueryError | undefined {
+  const seen = new Set<Error>();
+  while (error instanceof Error && !seen.has(error)) {
+    if (isDrizzleQueryError(error)) {
+      return error;
+    }
+    seen.add(error);
+    error = error.cause;
+  }
+  return undefined;
 }
 
 function causeTypeName(cause: NonNullable<DrizzleQueryError['cause']>): string {
@@ -98,11 +111,17 @@ export function initServerSentry(): void {
     return;
   }
 
-  init({
+  const client = init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
     // Tracing is fully disabled.
     tracesSampleRate: 0,
+    // An incoming `sentry-trace` header with a positive decision outranks the
+    // rate; a sampler outranks the header, so no transaction or span is built.
+    // Spans stream by default and skip beforeSend, so every span name is also
+    // ignored in case one is still started.
+    tracesSampler: () => 0,
+    ignoreSpans: [/.*/],
 
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
@@ -129,8 +148,7 @@ export function initServerSentry(): void {
     ],
 
     beforeSend(event, hint) {
-      const error = hint.originalException;
-      if (isTRPC4xxError(error)) {
+      if (isTRPC4xxError(hint.originalException)) {
         return null;
       }
 
@@ -140,7 +158,8 @@ export function initServerSentry(): void {
       // `error.cause`). Rewrite the primary exception so the reported error
       // reflects the cause without input values, keep only the parameterized
       // query in a context, and group by SQLSTATE and cause type.
-      if (isDrizzleQueryError(error)) {
+      const error = findDrizzleQueryError(hint.originalException);
+      if (error) {
         const cause = error.cause;
         const pgCode = cause?.code;
         event.fingerprint = [
@@ -162,8 +181,11 @@ export function initServerSentry(): void {
         // the rewritten primary exception.
         const values = event.exception?.values;
         if (values && values.length > 0) {
-          const primaryException =
-            values.find(isDrizzleWrapperException) ?? values[values.length - 1];
+          const rootException = values[values.length - 1];
+          const primaryException = values.find(isDrizzleWrapperException) ?? rootException;
+          if (primaryException !== rootException) {
+            primaryException.mechanism = rootException.mechanism;
+          }
           if (cause) {
             primaryException.type = causeTypeName(cause);
             primaryException.value = withoutDatabaseInput(
@@ -184,4 +206,5 @@ export function initServerSentry(): void {
 
     beforeBreadcrumb: scrubSentryBreadcrumb,
   });
+  client?.on('createDsc', dropTraceTransactionName);
 }

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { getAuthorizedOrgContext } from './organization-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -11,15 +11,32 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
 import { eq, isNotNull } from 'drizzle-orm';
 import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { User } from '@kilocode/db/schema';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  OFF_NETWORK_ADDRESS,
+  withAdminStepUpEnabled,
+  withEnforcedAdminNetwork,
+} from '@/tests/helpers/admin-network.helper';
+
+// The REST staff admission reads the request headers for the network check.
+// The global `jest` (not the `@jest/globals` binding) lets SWC hoist this mock
+// above the imports, so the code under test sees it.
+let mockRequestHeaders = new Headers();
+jest.mock('next/headers', () => ({ headers: async () => mockRequestHeaders }));
 
 function enableSupportAccess(enabled: boolean) {
   if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
   else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
+/** A browser-session sign-in; the staff admission refuses any other credential. */
+function sessionAuth(user: User): typeof getUserFromAuth {
+  return async () => ({ user, authFailedResponse: null, credential: 'session' });
 }
 
 describe('getAuthorizedOrgContext', () => {
@@ -38,6 +55,7 @@ describe('getAuthorizedOrgContext', () => {
 
   afterEach(async () => {
     enableSupportAccess(false);
+    mockRequestHeaders = new Headers();
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(support_access_grant_events);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -57,13 +75,8 @@ describe('getAuthorizedOrgContext', () => {
     test('should allow admin users without checking organization membership', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
 
-      const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
-        user: adminUser,
-        authFailedResponse: null,
-      });
-
       const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-        getUserFromAuthOverride: mockGetUserFromAuth,
+        getUserFromAuthOverride: sessionAuth(adminUser),
       });
 
       expect(result.success).toBe(true);
@@ -80,7 +93,7 @@ describe('getAuthorizedOrgContext', () => {
 
       try {
         const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+          getUserFromAuthOverride: sessionAuth(adminUser),
           surface: 'server-component',
         });
         expect(result.success).toBe(true);
@@ -97,7 +110,7 @@ describe('getAuthorizedOrgContext', () => {
       });
     });
 
-    test('records the elevation and still succeeds when the membership query throws', async () => {
+    test('fails closed when the membership query throws', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
       const events: AdminAccessEvent[] = [];
       setAdminAccessSinkForTest(event => events.push(event));
@@ -121,49 +134,43 @@ describe('getAuthorizedOrgContext', () => {
         });
       });
 
-      let result: Awaited<ReturnType<typeof getAuthorizedOrgContext>>;
       try {
-        result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
-        });
+        await expect(
+          getAuthorizedOrgContext(testOrganizationId, undefined, {
+            getUserFromAuthOverride: sessionAuth(adminUser),
+          })
+        ).rejects.toThrow('membership query failed');
       } finally {
         selectSpy.mockRestore();
         setAdminAccessSinkForTest(null);
       }
-
-      expect(result.success).toBe(true);
-      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
-        kind: 'kilo_admin_elevation',
-        membershipRole: null,
-        wouldPassWithoutAdmin: null,
-      });
+      expect(events).toHaveLength(0);
     });
 
-    test('records the elevation before returning 404 for a missing organization', async () => {
+    test('returns 404 for a missing organization before any step-up or elevation', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
       const events: AdminAccessEvent[] = [];
       setAdminAccessSinkForTest(event => events.push(event));
       try {
-        const result = await getAuthorizedOrgContext(crypto.randomUUID(), undefined, {
-          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
-        });
+        const result = await withAdminStepUpEnabled(() =>
+          getAuthorizedOrgContext(crypto.randomUUID(), undefined, {
+            getUserFromAuthOverride: sessionAuth(adminUser),
+            requestMethod: 'POST',
+          })
+        );
         expect(result.success).toBe(false);
-        if (!result.success) expect(result.nextResponse.status).toBe(404);
+        if (!result.success) {
+          expect(result.nextResponse.status).toBe(404);
+          expect(result.stepUp).toBeUndefined();
+        }
       } finally {
         setAdminAccessSinkForTest(null);
       }
-      expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
-        reason: 'organization_access_rest',
-      });
+      expect(events.filter(event => event.kind === 'kilo_admin_elevation')).toHaveLength(0);
     });
 
     test('should allow admin users even if they are not in organization_memberships', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
-
-      const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
-        user: adminUser,
-        authFailedResponse: null,
-      });
 
       const memberships = await db
         .select()
@@ -172,7 +179,7 @@ describe('getAuthorizedOrgContext', () => {
       expect(memberships).toHaveLength(0);
 
       const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-        getUserFromAuthOverride: mockGetUserFromAuth,
+        getUserFromAuthOverride: sessionAuth(adminUser),
       });
 
       expect(result.success).toBe(true);
@@ -185,13 +192,8 @@ describe('getAuthorizedOrgContext', () => {
     test('should allow admin users with specific role requirements', async () => {
       const adminUser = await insertTestUser({ is_admin: true });
 
-      const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
-        user: adminUser,
-        authFailedResponse: null,
-      });
-
       const result = await getAuthorizedOrgContext(testOrganizationId, ['owner'], {
-        getUserFromAuthOverride: mockGetUserFromAuth,
+        getUserFromAuthOverride: sessionAuth(adminUser),
       });
 
       expect(result.success).toBe(true);
@@ -199,6 +201,131 @@ describe('getAuthorizedOrgContext', () => {
         expect(result.data.user).toEqual({ ...adminUser, role: 'owner' });
         expect(result.data.organization.id).toBe(testOrganizationId);
       }
+    });
+
+    test('an admin with a qualifying membership keeps the real role without admission', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganizationId,
+        kilo_user_id: adminUser.id,
+        role: 'member',
+      });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+
+      try {
+        // A bearer credential would be refused by the staff admission.
+        const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.user.role).toBe('member');
+          expect(result.data.access).toEqual({ kind: 'member', role: 'member' });
+        }
+      } finally {
+        setAdminAccessSinkForTest(null);
+      }
+      expect(events).toHaveLength(0);
+    });
+
+    test('a bearer admin gets the staff refusal, not a 404', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: async () => ({ user: adminUser, authFailedResponse: null }),
+        requestMethod: 'GET',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.nextResponse.status).toBe(403);
+        expect(result.stepUp).toMatchObject({ code: 'BEARER_NOT_ALLOWED' });
+        await expect(result.nextResponse.json()).resolves.toMatchObject({
+          error: 'BEARER_NOT_ALLOWED',
+        });
+      }
+    });
+
+    test('an off-network admin gets the network refusal, not a 404', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+      mockRequestHeaders = new Headers(OFF_NETWORK_ADDRESS);
+
+      const result = await withEnforcedAdminNetwork(() =>
+        getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: sessionAuth(adminUser),
+          requestMethod: 'GET',
+        })
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.nextResponse.status).toBe(403);
+        expect(result.stepUp).toBeUndefined();
+        expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      }
+    });
+
+    test('a staff grant acts with the primary row its admission re-read', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+
+      const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+        getUserFromAuthOverride: sessionAuth({ ...adminUser, google_user_name: 'Stale Name' }),
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.user).toEqual({ ...adminUser, role: 'owner' });
+      }
+    });
+
+    test('with step-up on, a staff page render returns the step-up requirement', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+
+      const result = await withAdminStepUpEnabled(() =>
+        getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: sessionAuth(adminUser),
+          surface: 'server-component',
+        })
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.nextResponse.status).toBe(403);
+        expect(result.stepUp).toMatchObject({ code: 'SESSION_UNBOUND' });
+      }
+    });
+
+    test('membershipOnly never reaches the staff branch', async () => {
+      const adminUser = await insertTestUser({ is_admin: true });
+      const events: AdminAccessEvent[] = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+
+      try {
+        const refused = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: sessionAuth(adminUser),
+          membershipOnly: true,
+        });
+        expect(refused.success).toBe(false);
+        if (!refused.success) expect(refused.nextResponse.status).toBe(404);
+
+        await db.insert(organization_memberships).values({
+          organization_id: testOrganizationId,
+          kilo_user_id: adminUser.id,
+          role: 'admin',
+        });
+        const admitted = await getAuthorizedOrgContext(testOrganizationId, undefined, {
+          getUserFromAuthOverride: sessionAuth(adminUser),
+          membershipOnly: true,
+        });
+        expect(admitted.success).toBe(true);
+        if (admitted.success) {
+          expect(admitted.data.access).toEqual({ kind: 'member', role: 'admin' });
+        }
+      } finally {
+        setAdminAccessSinkForTest(null);
+      }
+      expect(events).toHaveLength(0);
     });
   });
 
@@ -484,15 +611,19 @@ describe('getAuthorizedOrgContext', () => {
       expires_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
     });
 
+    // The defaults route passes its own `request.method`; a request without a
+    // known method is treated as a write, which this read grant never covers.
     const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-      getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+      getUserFromAuthOverride: sessionAuth(admin),
       supportKey: '/api/organizations/[id]/defaults',
+      requestMethod: 'GET',
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.user.role).toBe('member');
-      expect(result.data.access.kind).toBe('support');
+      expect(result.data.user).toEqual({ ...admin, role: 'member' });
+      expect(result.data.access).toMatchObject({ kind: 'support', actionClass: 'support_read' });
+      expect(result.data.organization.id).toBe(testOrganizationId);
     }
   });
 
@@ -514,8 +645,9 @@ describe('getAuthorizedOrgContext', () => {
     });
 
     const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-      getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+      getUserFromAuthOverride: sessionAuth(admin),
       supportKey: '/api/organizations/[id]/user-tokens',
+      requestMethod: 'GET',
     });
 
     expect(result.success).toBe(false);
@@ -537,7 +669,7 @@ describe('getAuthorizedOrgContext', () => {
     const admin = await insertTestUser({ is_admin: true });
 
     const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-      getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+      getUserFromAuthOverride: sessionAuth(admin),
       surface: 'server-component',
       supportKey: '/api/organizations/[id]/defaults',
     });
@@ -579,7 +711,7 @@ describe('getAuthorizedOrgContext', () => {
     });
     try {
       const result = await getAuthorizedOrgContext(testOrganizationId, undefined, {
-        getUserFromAuthOverride: async () => ({ user: admin, authFailedResponse: null }),
+        getUserFromAuthOverride: sessionAuth(admin),
         supportKey: '/api/organizations/[id]/defaults',
       });
       expect(result.success).toBe(false);

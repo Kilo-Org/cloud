@@ -29,6 +29,7 @@ import {
   BitbucketWorkspaceAccessTokenOrganizationAuthorizationError,
   lockBitbucketWorkspaceAccessTokenOrganization as acquireOrganizationCredentialLock,
   requireBitbucketWorkspaceAccessTokenOrganizationManager,
+  type BitbucketOrganizationManagerAuthority,
   type BitbucketWorkspaceAccessTokenAuthorizedActor as AuthorizedActor,
 } from './workspace-access-token-organization-authorization';
 
@@ -80,6 +81,13 @@ export type DisconnectBitbucketWorkspaceAccessTokenInput = {
   organizationId: string;
   actorUserId: string;
   integrationId: string;
+  authority: BitbucketOrganizationManagerAuthority;
+  /**
+   * Effects that must precede the credential delete, such as disabling Code
+   * Reviewer. They run only after the actor's authority is confirmed and
+   * outside the credential transaction; the locked recheck still gates the delete.
+   */
+  beforeDisconnect?: () => Promise<void>;
 };
 
 export type BitbucketWorkspaceAccessTokenMutationResult = {
@@ -125,13 +133,15 @@ function requireCredentialEncryptionKey(): CredentialEncryptionKey {
 async function requireOrganizationManager(
   tx: DrizzleTransaction,
   organizationId: string,
-  actorUserId: string
+  actorUserId: string,
+  authority: BitbucketOrganizationManagerAuthority
 ): Promise<AuthorizedActor> {
   try {
     return await requireBitbucketWorkspaceAccessTokenOrganizationManager(
       tx,
       organizationId,
-      actorUserId
+      actorUserId,
+      authority
     );
   } catch (error) {
     if (error instanceof BitbucketWorkspaceAccessTokenOrganizationAuthorizationError) {
@@ -143,9 +153,12 @@ async function requireOrganizationManager(
 
 async function preauthorizeOrganizationManager(
   organizationId: string,
-  actorUserId: string
+  actorUserId: string,
+  authority: BitbucketOrganizationManagerAuthority
 ): Promise<void> {
-  await db.transaction(tx => requireOrganizationManager(tx, organizationId, actorUserId));
+  await db.transaction(tx =>
+    requireOrganizationManager(tx, organizationId, actorUserId, authority)
+  );
 }
 
 function encryptAccessToken(input: {
@@ -216,11 +229,17 @@ export async function disconnectBitbucketWorkspaceAccessToken(
   input: DisconnectBitbucketWorkspaceAccessTokenInput
 ): Promise<{ integrationId: string }> {
   const organizationId = canonicalizeOrganizationId(input.organizationId);
-  await preauthorizeOrganizationManager(organizationId, input.actorUserId);
+  await preauthorizeOrganizationManager(organizationId, input.actorUserId, input.authority);
+  await input.beforeDisconnect?.();
 
   return db.transaction(async tx => {
     await acquireOrganizationCredentialLock(tx, organizationId);
-    const actor = await requireOrganizationManager(tx, organizationId, input.actorUserId);
+    const actor = await requireOrganizationManager(
+      tx,
+      organizationId,
+      input.actorUserId,
+      input.authority
+    );
     const [integration] = await tx
       .select({
         id: platform_integrations.id,
@@ -279,7 +298,8 @@ export async function rotateBitbucketWorkspaceAccessToken(
   input: RotateBitbucketWorkspaceAccessTokenInput
 ): Promise<BitbucketWorkspaceAccessTokenMutationResult> {
   const organizationId = canonicalizeOrganizationId(input.organizationId);
-  await preauthorizeOrganizationManager(organizationId, input.actorUserId);
+  // Issuing a credential is membership-only: no staff grant stands in.
+  await preauthorizeOrganizationManager(organizationId, input.actorUserId, 'member');
   const [observed] = await db
     .select({
       integrationId: platform_integrations.id,
@@ -333,7 +353,7 @@ export async function rotateBitbucketWorkspaceAccessToken(
 
   return db.transaction(async tx => {
     await acquireOrganizationCredentialLock(tx, organizationId);
-    const actor = await requireOrganizationManager(tx, organizationId, input.actorUserId);
+    const actor = await requireOrganizationManager(tx, organizationId, input.actorUserId, 'member');
     const [current] = await tx
       .select({
         integrationId: platform_integrations.id,
@@ -448,7 +468,8 @@ export async function connectBitbucketWorkspaceAccessToken(
   input: ConnectBitbucketWorkspaceAccessTokenInput
 ): Promise<BitbucketWorkspaceAccessTokenMutationResult> {
   const organizationId = canonicalizeOrganizationId(input.organizationId);
-  await preauthorizeOrganizationManager(organizationId, input.actorUserId);
+  // Issuing a credential is membership-only: no staff grant stands in.
+  await preauthorizeOrganizationManager(organizationId, input.actorUserId, 'member');
   const validation = await validateBitbucketWorkspaceAccessToken({
     accessToken: input.accessToken,
   });
@@ -471,7 +492,7 @@ export async function connectBitbucketWorkspaceAccessToken(
 
   return db.transaction(async tx => {
     await acquireOrganizationCredentialLock(tx, organizationId);
-    const actor = await requireOrganizationManager(tx, organizationId, input.actorUserId);
+    const actor = await requireOrganizationManager(tx, organizationId, input.actorUserId, 'member');
 
     const [currentBitbucketIntegration] = await tx
       .select({ id: platform_integrations.id })

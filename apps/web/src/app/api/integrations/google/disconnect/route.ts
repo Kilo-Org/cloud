@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import {
   clearKiloClawGoogleOAuthConnection,
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Disconnect revokes stored OAuth credentials, so authenticated owners can perform it after billing access expires.
-    const { user, tokenSource, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL), 303);
     }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         );
       }
       organizationId = parsedOrgId.data;
-      await ensureOrganizationAccess({ user, tokenSource }, organizationId);
+      await ensureMemberOrganizationAccess(user, organizationId);
     }
 
     const instance = organizationId

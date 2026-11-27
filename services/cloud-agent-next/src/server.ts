@@ -71,12 +71,13 @@ import {
 } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
+  classifyRuntimeCredentialProxyPath,
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
-  runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { runtimeTokenFitsDestination } from './session/runtime-authorization-persistence.js';
 import { readBoundedBody } from './utils/read-bounded-body.js';
 import {
   encodeCloudAgentSessionScopeV2ViewHeaders,
@@ -592,7 +593,7 @@ async function forwardRuntimeCredentialProxy(
   handle: string,
   claims: RuntimeProxyHandleClaims,
   route: RuntimeCredentialProxyRoute,
-  path: string
+  pathname: string
 ): Promise<Response> {
   if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
   const correlation = { sessionId: claims.sessionId, kiloSessionId: claims.kiloSessionId };
@@ -600,7 +601,7 @@ async function forwardRuntimeCredentialProxy(
     runtimeProxyRequestShape({
       route,
       method: c.req.method,
-      path,
+      path: pathname,
       organizationId,
       kiloSessionId: claims.kiloSessionId,
     });
@@ -614,8 +615,15 @@ async function forwardRuntimeCredentialProxy(
     });
     return c.text('Not found', 404);
   };
+  // Decode the path once. The destination below and every route allowlist read
+  // this decoded path, so the token audience always matches the upstream.
+  const classified = classifyRuntimeCredentialProxyPath(route, pathname);
+  if (!classified) return rejectRoute(undefined);
+  const { path, audience: destination } = classified;
   let bodyText: string | undefined;
-  if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
+  // Session creation reads its body only on the literal path, as before. An
+  // encoded alias gets no body, so every create allowlist refuses it.
+  if (route === 'ingest' && pathname === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
     if (bodyText === undefined) return rejectRoute(undefined);
   }
@@ -631,7 +639,8 @@ async function forwardRuntimeCredentialProxy(
       session =>
         session.resolveRuntimeCredentialProxyGrant(
           handle,
-          parseRuntimeProxyOriginProof(c.req.header(RUNTIME_PROXY_ORIGIN_HEADER))
+          parseRuntimeProxyOriginProof(c.req.header(RUNTIME_PROXY_ORIGIN_HEADER)),
+          destination
         ),
       'resolveRuntimeCredentialProxyGrant'
     );
@@ -639,6 +648,15 @@ async function forwardRuntimeCredentialProxy(
     return c.text('Credential unavailable', 503);
   }
   if (!credential) return c.text('Unauthorized', 401);
+  if (!runtimeTokenFitsDestination(credential.token, destination)) {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: 'token',
+      request: requestShape(credential.organizationId),
+      ...correlation,
+    });
+    return c.text('Credential unavailable', 503);
+  }
   const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
   const targets = derivedTargets.success
     ? derivedTargets.targets
@@ -699,13 +717,12 @@ async function forwardRuntimeCredentialProxy(
   if (!upstream) return rejectRoute(credential.organizationId);
   try {
     // The route allowlist is resolved above before a proof is issued.
-    const audience = runtimeProxyAttestationAudience(route, path);
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
         return value;
       }),
-      audience,
+      audience: destination,
       bearer: credential.token,
       ...credential.runtimeAuthorization,
     });

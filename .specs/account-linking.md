@@ -119,7 +119,13 @@ way, including Apple from connected accounts.
 3. The system MUST NOT send the notice for the test login.
 4. A notice send failure MUST NOT fail the link.
 5. The notice MUST name the provider and the linked identity, and MUST
-   tell the reader to remove the method if they did not add it.
+   tell the reader to remove the method if they did not add it, except
+   for enterprise SSO (rule 6).
+6. When an enterprise SSO sign-in settles onto the account, the notice
+   MUST say every browser was signed out, MUST name the other sign-in
+   methods it removed when there were any, and MUST tell the reader to
+   contact support instead of removing the method, since they cannot
+   remove the SSO method themselves.
 
 ### Mobile contract
 
@@ -172,3 +178,9 @@ None.
 - Created for pending account linking.
 - Added confirmation before attach, host-only cookie, link-code binding,
   send cap, and device approval consent.
+
+### 2026-11-26 -- Enterprise SSO notice
+
+- Security notice rule 6 now covers every enterprise SSO settlement,
+  including one that replaced only an earlier SSO row, and reports the
+  browser sign-out apart from the replaced methods.

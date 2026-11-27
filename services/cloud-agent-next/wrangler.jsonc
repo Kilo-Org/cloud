@@ -58,6 +58,9 @@
     // Deployment environment shared with the token minters' `env` claim
     // (`process.env.NODE_ENV` on the web app): admission refused on mismatch.
     "ENVIRONMENT": "production",
+    // Runtime token audiences: `per-destination` mints one token per service;
+    // `combined` keeps the earlier multi-audience token as the rollout fallback.
+    "RUNTIME_TOKEN_AUDIENCE_MODE": "combined",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "GITHUB_APP_SLUG": "kiloconnect",
     "GITHUB_APP_BOT_USER_ID": "240665456",
@@ -370,18 +373,21 @@
       // Do not inherit the top-level custom-domain route. `wrangler dev` takes its
       // origin host from the first route, which would hide the preview Host.
       "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
       "triggers": {
-        "crons": ["17 2 * * *", "*/5 * * * *"],
+        "crons": [],
       },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
       "vars": {
         "ENVIRONMENT": "development",
+        "RUNTIME_TOKEN_AUDIENCE_MODE": "per-destination",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
         "GITHUB_APP_SLUG": "kiloconnect-development",

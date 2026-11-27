@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { createDelegatedResourceToken } from '@/lib/auth/resource-delegation';
-import { generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
+import { generateOrganizationApiToken } from '@/lib/auth/kilo-token-signing';
+import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { POST } from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -10,7 +11,11 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@/lib/organizations/organization-auth', () => ({
   getAuthorizedOrgContext: jest.fn(async () => ({
     success: true,
-    data: { user: { id: 'oauth/test-user', role: 'member' }, organization: { name: 'Test' } },
+    data: {
+      user: { id: 'oauth/test-user', role: 'member' },
+      organization: { name: 'Test' },
+      access: { kind: 'member', role: 'member' },
+    },
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => ({
@@ -23,7 +28,7 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
   canIssueLegacyOrganizationToken: jest.fn(async () => true),
   createDelegatedResourceToken: jest.fn(async () => ({ token: 'delegated', expiresAt: 'expiry' })),
 }));
-jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+jest.mock('@/lib/auth/kilo-token-signing', () => ({
   generateOrganizationApiToken: jest.fn(() => ({ token: 'legacy', expiresAt: 'expiry' })),
 }));
 
@@ -64,6 +69,10 @@ it('retains legacy session issuance while the family gate is false', async () =>
   const response = await POST(request, { params: Promise.resolve({ id: 'org' }) });
   expect(response.status).toBe(200);
   expect(generateOrganizationApiToken).toHaveBeenCalled();
+  expect(getAuthorizedOrgContext).toHaveBeenCalledWith('org', undefined, {
+    requestMethod: 'POST',
+    membershipOnly: true,
+  });
   expect(createDelegatedResourceToken).not.toHaveBeenCalled();
 });
 

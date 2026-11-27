@@ -53,6 +53,9 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const { organizationId, before, after, action, actorEmail, fuzzySearch, startTime, endTime } =
         input;
 
+      // Staff actor details follow the access this procedure already admitted.
+      const callerReadsStaffActors = canCallerReadStaffAuditActors(ctx.organizationAccess);
+
       // Build the where conditions for pagination and filtering
       const whereConditions = [eq(organization_audit_logs.organization_id, organizationId)];
 
@@ -107,8 +110,6 @@ export const organizationAuditLogRouter = createTRPCRouter({
       const hasMore = logs.length > PAGE_SIZE;
       const resultLogs = hasMore ? logs.slice(0, PAGE_SIZE) : logs;
 
-      // Staff actor details follow the caller's platform permission.
-      const callerReadsStaffActors = await canCallerReadStaffAuditActors(ctx.user.id);
       const maskedLogs = maskKiloAdminActors(resultLogs, callerReadsStaffActors);
 
       // Determine pagination flags

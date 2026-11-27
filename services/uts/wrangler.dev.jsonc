@@ -1,0 +1,79 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The UTS mint Worker for local development only: `wrangler dev -c wrangler.dev.jsonc`. Only this
+  // config runs the development entry, which adds the local signing route (src/dev.ts). It cannot
+  // be deployed: Wrangler runs the build command below before every dev, deploy and version
+  // upload, with WRANGLER_COMMAND set to the command, and the command fails unless that is `dev`.
+  // The deployed config is wrangler.jsonc.
+  "name": "uts-local",
+  "main": "src/dev-index.ts",
+  "compatibility_date": "2026-06-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "build": {
+    "command": "test \"$WRANGLER_COMMAND\" = dev || { echo 'wrangler.dev.jsonc runs only under wrangler dev; deploy wrangler.jsonc' >&2; exit 1; }",
+  },
+  "dev": {
+    "port": 8800,
+    "local_protocol": "http",
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": false },
+  },
+  "vars": {
+    "UTS_ENVIRONMENT": "development",
+    // workerd enforces no data residency, so local development keeps objects unscoped.
+    "DO_JURISDICTION": "none",
+    "PAT_LOOKUP_CONNECTIONS": "34",
+    // A run on another port names its origin with `--var WEBAUTHN_ORIGINS:<origin>`.
+    "WEBAUTHN_RP_ID": "localhost",
+    "WEBAUTHN_ORIGINS": "http://localhost:8800",
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
+      { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
+      { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+      { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
+      { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
+      { "name": "UTS_LOGIN_ROTATION_DO", "class_name": "UtsLoginRotationDO" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
+    { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
+    { "tag": "v5", "new_sqlite_classes": ["UtsManagerAuthDO"] },
+    { "tag": "v6", "new_sqlite_classes": ["UtsLoginRotationDO"] },
+  ],
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-local" }] },
+  // No schedule locally; run the cron by hand with `wrangler dev --test-scheduled` and
+  // `curl "http://127.0.0.1:8800/__scheduled?cron=*+*+*+*+*"`.
+  "triggers": { "crons": [] },
+  // The local identity store (`pnpm db:up`). The UTS logins have no password in the repo: set
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE,
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_PAT and
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_IDENTITY_STORE_REPLICA to URLs with the
+  // passwords you gave uts_app_a, uts_pat_a and uts_reader_a (README, "Local development").
+  "hyperdrive": [
+    {
+      "binding": "IDENTITY_STORE",
+      "id": "uts-local-identity-store",
+      "localConnectionString": "postgres://uts_app_a@127.0.0.1:55432/uts",
+    },
+    {
+      "binding": "IDENTITY_STORE_PAT",
+      "id": "uts-local-identity-store-pat",
+      "localConnectionString": "postgres://uts_pat_a@127.0.0.1:55432/uts",
+    },
+    {
+      "binding": "IDENTITY_STORE_REPLICA",
+      "id": "uts-local-identity-store-replica",
+      "localConnectionString": "postgres://uts_reader_a@127.0.0.1:55432/uts",
+    },
+  ],
+}

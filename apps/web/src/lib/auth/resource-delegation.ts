@@ -29,7 +29,7 @@ import {
   NEXTAUTH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@/lib/auth/kilo-token-signing';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
@@ -511,9 +511,12 @@ export async function createDelegatedResourceToken(
   }
   let organizationRole = options?.organizationRole;
   if (options?.organizationId) {
-    // Explicit delegation follows REST organization access, including inherited and global-admin access.
+    // Explicit delegation follows real organization membership, direct or inherited; a platform-admin
+    // or support grant never stands in for the role a credential carries.
     // Control-token callers retain the direct-membership check in getResourceDelegationAuthority.
-    const context = await getAuthorizedOrgContext(options.organizationId);
+    const context = await getAuthorizedOrgContext(options.organizationId, undefined, {
+      membershipOnly: true,
+    });
     if (!context.success || context.data.user.id !== authority.user.id) {
       forbidden('Unauthorized organization resource delegation request');
     }

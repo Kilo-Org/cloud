@@ -2,12 +2,10 @@ import { and, eq, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import {
-  INTERNAL_API_SECRET,
-  SESSION_INGEST_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { SESSION_SYNC_WORKER_URL } from '@/lib/web-config.server';
@@ -154,7 +152,11 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
   const userId = request.user_id;
   if (!userId) return { kind: 'needs_attention', errorCode: 'legacy_identity_unresolved' };
 
-  if (!SESSION_INGEST_WORKER_URL || !SESSION_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
+  if (!SESSION_INGEST_WORKER_URL || !SESSION_SYNC_WORKER_URL) {
+    return configurationMissing();
+  }
+  const internalApiSecret = await readInternalApiSecret();
+  if (!internalApiSecret) {
     return configurationMissing();
   }
 
@@ -169,7 +171,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
       {
         method: 'POST',
         headers: {
-          'X-Internal-Secret': INTERNAL_API_SECRET,
+          'X-Internal-Secret': internalApiSecret,
         },
       }
     );

@@ -182,6 +182,7 @@ jobs:
     with:
       worker_matrix: ${{ needs.detect-workers.outputs.matrix }}
       deploy_cloud_agent_after_session_ingest: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}
+      deploy_uts_feed_after_uts: ${{ needs.detect-workers.outputs.deploy-uts-feed-after-uts }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 
@@ -200,10 +201,6 @@ jobs:
     with:
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
-
-  # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
-  # the scheduled pipeline. It runs manually via workflow_dispatch from the
-  # Actions tab.
 
   record-deployment:
     needs:

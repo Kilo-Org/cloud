@@ -43,6 +43,7 @@ import {
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
   getUserFromSessionForCredentialIssuanceOrRedirect,
+  getUserFromSessionForStepUp,
 } from './server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -61,11 +62,11 @@ import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { resetAdminNetworkConfigForTest } from '@kilocode/web-shared/lib/admin/admin-network';
 import {
-  generateApiToken,
-  generateInternalServiceToken,
-  TOKEN_EXPIRY,
-} from '@kilocode/web-shared/lib/tokens';
+  signTestApiToken,
+  signTestInternalServiceToken,
+} from '@kilocode/web-shared/tests/helpers/api-token.helper';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -74,7 +75,13 @@ import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { KILO_TOKEN_VERSION, signKiloToken } from '@kilocode/worker-utils/kilo-token';
+import { KILO_TOKEN_ADMISSION_OBSERVATION_FLAG } from '@kilocode/worker-utils/kilo-token-admission-observation';
+import { gatewayRateLimitKey } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import {
+  KILO_TOKEN_MAX_LIFETIME_SECONDS,
+  KILO_TOKEN_VERSION,
+  signKiloToken,
+} from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -447,7 +454,7 @@ describe('getUserFromAuth', () => {
       });
       mockHeaders.mockResolvedValue(
         new Headers({
-          authorization: `${scheme} ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          authorization: `${scheme} ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         })
       );
 
@@ -465,7 +472,7 @@ describe('getUserFromAuth', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        authorization: `Bearer  ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        authorization: `Bearer  ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -674,7 +681,7 @@ describe('getUserFromAuth', () => {
       user.id,
       0
     );
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -697,7 +704,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -728,7 +735,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -758,7 +765,7 @@ describe('getUserFromAuth', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -793,7 +800,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -825,7 +832,7 @@ describe('getUserFromAuth', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -849,7 +856,7 @@ describe('getUserFromAuth', () => {
     await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -871,7 +878,7 @@ describe('getUserFromAuth', () => {
       0
     );
     await markOrganizationAsDeleted(organization.id);
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -895,7 +902,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -921,7 +928,7 @@ describe('getUserFromAuth', () => {
           .values({ organization_id: parent.id, kilo_user_id: user.id, role });
         mockHeaders.mockResolvedValue(
           new Headers({
-            Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+            Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
             [ORGANIZATION_ID_HEADER]: child.id,
           })
         );
@@ -945,7 +952,7 @@ describe('getUserFromAuth', () => {
         .values({ organization_id: parent.id, kilo_user_id: user.id, role: 'member' });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -974,7 +981,7 @@ describe('getUserFromAuth', () => {
       await markOrganizationAsDeleted(parent.id);
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
           [ORGANIZATION_ID_HEADER]: child.id,
         })
       );
@@ -999,7 +1006,7 @@ describe('getUserFromAuth', () => {
     );
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         [ORGANIZATION_ID_HEADER]: organization.id,
       })
     );
@@ -1027,7 +1034,7 @@ describe('getUserFromAuth', () => {
       .set({ sso_domain: ssoDomain })
       .where(eq(organizations.id, organization.id));
 
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1045,10 +1052,10 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId: session!.id },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1072,10 +1079,10 @@ describe('getUserFromAuth', () => {
         revoked_reason: 'logout',
       })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId: session!.id },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1095,10 +1102,10 @@ describe('getUserFromAuth', () => {
       .insert(device_sessions)
       .values({ kilo_user_id: user.id })
       .returning({ id: device_sessions.id });
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId: session!.id },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1146,7 +1153,7 @@ describe('getUserFromAuth', () => {
 
   test('rejects a short-lived internal assertion without a pepper claim for an account with a pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: 'claimless-peppered-pepper' });
-    const token = generateInternalServiceToken(user.id, { expiresIn: 300 });
+    const token = signTestInternalServiceToken(user.id, { expiresIn: 300 });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1158,7 +1165,7 @@ describe('getUserFromAuth', () => {
 
   test('rejects an audience-less internal assertion without a pepper claim for an account without a pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateInternalServiceToken(user.id);
+    const token = signTestInternalServiceToken(user.id);
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
@@ -1170,7 +1177,7 @@ describe('getUserFromAuth', () => {
 
   test('revokes a user token when the pepper rotates from null to a value', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
     expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
 
@@ -1191,10 +1198,10 @@ describe('getUserFromAuth', () => {
       api_token_pepper: 'pre-rotation-pepper',
     });
     const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(
+    const token = signTestApiToken(
       user,
       { deviceSessionId },
-      { expiresIn: TOKEN_EXPIRY.thirtyDays }
+      { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS }
     );
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
@@ -1294,7 +1301,7 @@ describe('browser sessions by deployment', () => {
       const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         })
       );
 
@@ -1358,7 +1365,7 @@ describe('credential issuance authentication guards', () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -1422,7 +1429,7 @@ describe('credential issuance authentication guards', () => {
     const user = await insertTestUser({ api_token_pepper: 'generic-bearer-pepper' });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
       })
     );
 
@@ -1557,9 +1564,9 @@ describe('credential exchange bearer authentication guard', () => {
     }
   );
 
-  test('authorizes a 30-day token minted by generateApiToken', async () => {
+  test('authorizes a 30-day token in the generateApiToken shape', async () => {
     const user = await insertTestUser({ api_token_pepper: 'thirty-day-api-pepper' });
-    const token = generateApiToken(user, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(user, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS });
 
     const result = await getUserFromBearerForCredentialExchange(
       new Headers({ authorization: `Bearer ${token}` }),
@@ -2065,7 +2072,7 @@ describe('binary step-up enforcement (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(admin, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         'x-pathname': '/admin/api/private-users',
       })
     );
@@ -2096,14 +2103,266 @@ describe('binary step-up enforcement (REST)', () => {
     });
   });
 
-  it('skips enforcement only for the layout escape hatch', async () => {
+  it('enforces step-up on a server-component page and reports the requirement', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    const admin = await sessionAdmin();
+    await sessionAdmin();
+    // `proxy.ts` forwards the page request's path and method, so a page render
+    // is an admin read.
+    mockHeaders.mockResolvedValue(new Headers({ 'x-pathname': '/admin', 'x-http-method': 'GET' }));
+    evaluateStepUp.mockResolvedValueOnce({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    });
 
-    const result = await getUserFromAuth({ adminOnly: true, skipStepUpGuard: true });
+    const result = await getUserFromAuth({ adminOnly: true, stepUpSurface: 'server-component' });
+
+    expect(evaluateStepUp).toHaveBeenCalledTimes(1);
+    expect(evaluateStepUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webSessionId: 'step-up-web-session',
+        actionClass: 'platform_read',
+        operation: expect.objectContaining({ surface: 'server-component', route: '/admin' }),
+      })
+    );
+    expect(result.user).toBeNull();
+    expect(result.stepUp).toMatchObject({
+      code: 'MFA_REQUIRED',
+      actionClass: 'platform_read',
+      purpose: 'session',
+    });
+  });
+
+  it('refuses a bearer credential with BEARER_NOT_ALLOWED when off', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await insertTestUser({
+      google_user_email: `step-up-bearer-off-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: 'step-up-bearer-off-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${signTestApiToken(admin, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
+        'x-pathname': '/admin/api/private-users',
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: true });
 
     expect(evaluateStepUp).not.toHaveBeenCalled();
+    expect(result.user).toBeNull();
+    expect(await errorCode(result)).toMatchObject({
+      success: false,
+      error: 'BEARER_NOT_ALLOWED',
+      stepUp: { code: 'BEARER_NOT_ALLOWED' },
+    });
+  });
+
+  it('returns the primary row for an admin browser session', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    const admin = await sessionAdmin();
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user).toMatchObject({ id: admin.id, is_admin: true });
+    expect(result.credential).toBe('session');
+  });
+});
+
+describe('admin network allowlist (REST)', () => {
+  const originalVercel = process.env.VERCEL;
+  const originalNetworks = process.env.ADMIN_ALLOWED_NETWORKS;
+  const originalSwitch = process.env.ADMIN_STEP_UP_ENABLED;
+
+  beforeEach(() => {
+    process.env.VERCEL = '1';
+    process.env.ADMIN_ALLOWED_NETWORKS = '203.0.113.0/24';
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    resetAdminNetworkConfigForTest();
+  });
+
+  afterEach(() => {
+    const env: Record<string, string | undefined> = process.env;
+    for (const [key, value] of [
+      ['VERCEL', originalVercel],
+      ['ADMIN_ALLOWED_NETWORKS', originalNetworks],
+      ['ADMIN_STEP_UP_ENABLED', originalSwitch],
+    ] as const) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
+    resetAdminNetworkConfigForTest();
+    mockHeaders.mockReset();
+    mockGetServerSession.mockReset();
+  });
+
+  async function sessionUser(isAdmin: boolean, clientAddress: string) {
+    const user = await insertTestUser({
+      google_user_email: `network-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: isAdmin,
+      web_session_pepper: 'network-session-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        'x-pathname': '/admin/api/users',
+        'x-vercel-forwarded-for': clientAddress,
+        'x-forwarded-for': '203.0.113.7',
+      })
+    );
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'network-session-pepper',
+      webSessionId: 'network-web-session',
+    });
+    return user;
+  }
+
+  async function bearerAdmin(
+    clientAddress: string | null,
+    extraHeaders: Record<string, string> = {}
+  ) {
+    const admin = await insertTestUser({
+      google_user_email: `network-bearer-${crypto.randomUUID()}@kilocode.ai`,
+      hosted_domain: 'kilocode.ai',
+      is_admin: true,
+      api_token_pepper: 'network-bearer-pepper',
+    });
+    const token = signTestApiToken(admin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        'x-pathname': '/api/private/users',
+        ...(clientAddress === null ? {} : { 'x-vercel-forwarded-for': clientAddress }),
+        ...extraHeaders,
+      })
+    );
+    return admin;
+  }
+
+  it('refuses an off-network admin on Vercel with a retryable 403', async () => {
+    await sessionUser(true, '198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(await (result.authFailedResponse as Response).json()).toMatchObject({
+      success: false,
+      error: expect.stringContaining('Cloudflare WARP'),
+    });
+  });
+
+  it('refuses an off-network admin session on the step-up route', async () => {
+    await sessionUser(true, '198.51.100.1');
+
+    const result = await getUserFromSessionForStepUp();
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+  });
+
+  it('admits an admin inside the allowlist', async () => {
+    const admin = await sessionUser(true, '203.0.113.7');
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
     expect(result.user?.id).toBe(admin.id);
+  });
+
+  it('keeps the non-admin refusal for a non-admin off the network', async () => {
+    await sessionUser(false, '198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: true });
+
+    expect(result.adminNetworkDenial).toBeUndefined();
+    expect(await (result.authFailedResponse as Response).json()).toMatchObject({
+      error: 'Access denied (nonadmin)',
+    });
+  });
+
+  it('does not check the network for a non-admin route', async () => {
+    const user = await sessionUser(false, '198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user?.id).toBe(user.id);
+  });
+
+  it('refuses an admin personal API key off-network', async () => {
+    await bearerAdmin('198.51.100.1');
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBe('outside-allowlist');
+    expect((result.authFailedResponse as Response).status).toBe(403);
+  });
+
+  it('refuses an admin personal API key from inside the allowlist', async () => {
+    await bearerAdmin('203.0.113.7');
+
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(result.user).toBeNull();
+    expect(result.adminNetworkDenial).toBeUndefined();
+    expect(result.stepUp).toMatchObject({ code: 'BEARER_NOT_ALLOWED' });
+  });
+
+  describe('audit events', () => {
+    let events: AdminAccessEvent[];
+
+    beforeEach(() => {
+      events = [];
+      setAdminAccessSinkForTest(event => events.push(event));
+    });
+
+    afterEach(() => {
+      setAdminAccessSinkForTest(null);
+    });
+
+    it('emits exactly one denied privileged_access event for a refused bearer admin', async () => {
+      const admin = await bearerAdmin('198.51.100.1', { 'x-forwarded-for': '192.0.2.9' });
+
+      const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+      expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'privileged_access',
+        surface: 'rest',
+        credential: 'human_bearer',
+        outcome: 'denied',
+        kiloUserId: admin.id,
+        route: '/api/private/users',
+        method: 'GET',
+        wouldBlock: true,
+        ip: '198.51.100.1',
+      });
+    });
+
+    it('records a null address, not x-forwarded-for, when the trusted header is missing', async () => {
+      await bearerAdmin(null, { 'x-forwarded-for': '203.0.113.7' });
+
+      const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+      expect(result.adminNetworkDenial).toBe('no-client-address');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ outcome: 'denied', ip: null });
+    });
+
+    it('emits no admin_access event for a refused session admin', async () => {
+      await sessionUser(true, '198.51.100.1');
+
+      const result = await getUserFromAuth({ adminOnly: true });
+
+      expect(result.adminNetworkDenial).toBe('outside-allowlist');
+      expect(events).toEqual([]);
+    });
   });
 });
 
@@ -2142,7 +2401,7 @@ describe('step-up refusal telemetry (REST)', () => {
     });
     mockHeaders.mockResolvedValue(
       new Headers({
-        Authorization: `Bearer ${generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+        Authorization: `Bearer ${signTestApiToken(admin, undefined, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         'x-pathname': pathname,
         'x-forwarded-for': '203.0.113.9, 10.0.0.1',
       })
@@ -2195,144 +2454,58 @@ describe('step-up refusal telemetry (REST)', () => {
     });
   });
 
-  test('records exactly one succeeded event when the API token passes', async () => {
+  test('refuses an API token with the switch off as well', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'false';
     const admin = await bearerAdmin();
 
     const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
 
-    expect(result.user?.id).toBe(admin.id);
+    expect(result.user).toBeNull();
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(evaluateStepUp).not.toHaveBeenCalled();
     expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
     expect(events[1]).toMatchObject({
       kind: 'privileged_access',
       credential: 'human_bearer',
-      outcome: 'succeeded',
+      outcome: 'denied',
       actionClass: 'platform_read',
       actionId: 'rest.admin.safetyIdentifiers',
+      kiloUserId: admin.id,
     });
     expect(
-      events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
+      events.filter(event => event.kind === 'privileged_access' && event.outcome === 'succeeded')
     ).toHaveLength(0);
   });
 
-  test('skips the guard and reports wouldBlock false when the credential kind is exempted', async () => {
+  test('refuses an API token on the support user lookup, which has no exemption', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
     runStepUpGuard.mockClear();
-    const admin = await bearerAdmin('/api/private/users');
+    await bearerAdmin('/api/private/users');
 
-    const result = await getUserFromAuth({
-      adminOnly: true,
-      requestMethod: 'GET',
-      stepUpExemptCredentials: ['human_bearer'],
-    });
+    const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
 
-    expect(result.user?.id).toBe(admin.id);
     expect(runStepUpGuard).not.toHaveBeenCalled();
+    expect(await (result.authFailedResponse as Response).json()).toMatchObject({
+      error: 'BEARER_NOT_ALLOWED',
+      stepUp: { code: 'BEARER_NOT_ALLOWED', actionClass: 'support_read' },
+    });
     expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
-    for (const event of events) {
-      expect(event).toMatchObject({
-        credential: 'human_bearer',
-        authVia: 'token',
-        wouldBlock: false,
-      });
-    }
-    expect(events[1]).toMatchObject({ outcome: 'succeeded', actionId: 'rest.private.users' });
+    expect(events[1]).toMatchObject({
+      outcome: 'denied',
+      actionId: 'rest.private.users',
+      wouldBlock: true,
+    });
   });
 
-  test('still enforces the guard when the exemption names a different credential kind', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    runStepUpGuard.mockClear();
-    await bearerAdmin('/api/private/users');
-
-    const result = await getUserFromAuth({
-      adminOnly: true,
-      requestMethod: 'GET',
-      stepUpExemptCredentials: ['delegated_workload', 'service_assertion'],
-    });
-
-    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
-    expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
-  });
-
-  test('never exempts a browser session, whatever the exemption list names', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    runStepUpGuard.mockClear();
-    await sessionAdmin();
-    evaluateStepUp.mockResolvedValueOnce({
-      state: { status: 'not_enrolled' },
-      proof: null,
-      passkeyCount: 0,
-    });
-
-    const result = await getUserFromAuth({
-      adminOnly: true,
-      requestMethod: 'GET',
-      // The type forbids 'session'; the runtime check must hold if a caller
-      // gets past it anyway.
-      stepUpExemptCredentials: [
-        'session' as never,
-        'human_bearer',
-        'delegated_workload',
-        'service_assertion',
-      ],
-    });
-
-    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
-    expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
-    expect(events[0]).toMatchObject({ credential: 'session', wouldBlock: false });
-  });
-
-  test('ignores the exemption on a write-class request', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    runStepUpGuard.mockClear();
-    await bearerAdmin('/api/private/users');
-
-    const result = await getUserFromAuth({
-      adminOnly: true,
-      requestMethod: 'POST',
-      stepUpExemptCredentials: ['human_bearer'],
-    });
-
-    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
-    expect(runStepUpGuard).toHaveBeenCalledWith(
-      expect.objectContaining({ actionClass: 'platform_write' })
-    );
-    expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
-  });
-
-  test('ignores the exemption on an operation-bound class', async () => {
-    process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    runStepUpGuard.mockClear();
-    await bearerAdmin('/admin/api/users/add-credit');
-
-    const result = await getUserFromAuth({
-      adminOnly: true,
-      requestMethod: 'POST',
-      stepUpExemptCredentials: ['human_bearer'],
-    });
-
-    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
-    const { actionClass } = runStepUpGuard.mock.calls[0][0] as { actionClass: string };
-    expect(['sensitive_write', 'support_write', 'worker_admin']).toContain(actionClass);
-    expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
-  });
-
-  test('keeps wouldBlock true when a server-component layout skips the guard for a bearer request', async () => {
+  test('reports the bearer requirement to a server-component page', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
     runStepUpGuard.mockClear();
     await bearerAdmin('/admin');
 
-    await getUserFromAuth({
-      adminOnly: true,
-      stepUpSurface: 'server-component',
-      skipStepUpGuard: true,
-    });
+    const result = await getUserFromAuth({ adminOnly: true, stepUpSurface: 'server-component' });
 
     expect(runStepUpGuard).not.toHaveBeenCalled();
+    expect(result.stepUp).toMatchObject({ code: 'BEARER_NOT_ALLOWED' });
     expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
     for (const event of events) {
       expect(event).toMatchObject({ wouldBlock: true });
@@ -2361,11 +2534,11 @@ describe('step-up refusal telemetry (REST)', () => {
       stepUpSurface: 'server-component',
     });
 
-    expect(result.user).not.toBeNull();
+    expect(result.user).toBeNull();
     expect(events.map(event => event.surface)).toEqual(['server-component', 'server-component']);
     expect(events[1]).toMatchObject({
       kind: 'privileged_access',
-      outcome: 'succeeded',
+      outcome: 'denied',
       actionClass: 'platform_read',
       actionId: 'serverComponent.admin',
       route: '/admin',
@@ -2373,26 +2546,28 @@ describe('step-up refusal telemetry (REST)', () => {
     });
   });
 
-  test('records a failed event for an unexpected guard throw', async () => {
+  test('fails closed on an unexpected guard throw and keeps the admin guard event', async () => {
     process.env.ADMIN_STEP_UP_ENABLED = 'true';
-    await bearerAdmin();
+    await sessionAdmin();
     runStepUpGuard.mockRejectedValueOnce(new Error('unexpected guard failure'));
 
     const result = await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
 
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await (result.authFailedResponse as Response).json()).toEqual({
+    const body = await (result.authFailedResponse as Response).json();
+    expect(body).toEqual({
       success: false,
       error: 'STEP_UP_UNAVAILABLE',
+      stepUp: {
+        code: 'STEP_UP_UNAVAILABLE',
+        actionClass: 'platform_read',
+        purpose: 'session',
+        maxAgeSeconds: 1800,
+        binding: null,
+      },
     });
-    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
-    expect(events[1]).toMatchObject({
-      kind: 'privileged_access',
-      credential: 'human_bearer',
-      outcome: 'failed',
-      actionClass: 'platform_read',
-      actionId: 'rest.admin.safetyIdentifiers',
-    });
+    expect(result.stepUp).toEqual(body.stepUp);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
   });
 
   test('leaves a session step-up refusal on the admin guard event', async () => {
@@ -2423,7 +2598,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     setAdminAccessSinkForTest(null);
   });
 
-  test('emits one rest/token event for an authorized admin via API token', async () => {
+  test('emits the guard event and one denial for an admin API token', async () => {
     const admin = await insertTestUser({
       google_user_email: `rest-admin-${crypto.randomUUID()}@kilocode.ai`,
       hosted_domain: 'kilocode.ai',
@@ -2431,7 +2606,9 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_super_admin: true,
       api_token_pepper: 'rest-admin-pepper',
     });
-    const token = generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(admin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
     mockHeaders.mockResolvedValue(
       new Headers({
         Authorization: `Bearer ${token}`,
@@ -2442,7 +2619,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
 
     const result = await getUserFromAuth({ adminOnly: true });
 
-    expect(result.user?.id).toBe(admin.id);
+    expect(result.user).toBeNull();
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({
       event: 'admin_access',
@@ -2462,7 +2639,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
     expect(events[1]).toMatchObject({
       kind: 'privileged_access',
       credential: 'human_bearer',
-      outcome: 'succeeded',
+      outcome: 'denied',
       actionClass: 'sensitive_write',
       route: '/admin/api/safety-identifiers',
       kiloUserId: admin.id,
@@ -2481,7 +2658,7 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       });
       mockHeaders.mockResolvedValue(
         new Headers({
-          Authorization: `Bearer ${generateApiToken(user, extra, { expiresIn: TOKEN_EXPIRY.thirtyDays })}`,
+          Authorization: `Bearer ${signTestApiToken(user, extra, { expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS })}`,
         })
       );
 
@@ -2502,7 +2679,9 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: false,
       api_token_pepper: 'rest-nonadmin-pepper',
     });
-    const token = generateApiToken(nonAdmin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(nonAdmin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: true });
@@ -2523,12 +2702,139 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
       is_admin: true,
       api_token_pepper: 'rest-admin-noemit-pepper',
     });
-    const token = generateApiToken(admin, undefined, { expiresIn: TOKEN_EXPIRY.thirtyDays });
+    const token = signTestApiToken(admin, undefined, {
+      expiresIn: KILO_TOKEN_MAX_LIFETIME_SECONDS,
+    });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
 
     expect(result.user?.id).toBe(admin.id);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('gateway admission observation at the real call sites', () => {
+  const ADDRESS = '203.0.113.7';
+  const originalFlag = process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG];
+  let log: { mock: { calls: unknown[][] } };
+
+  function admissionLines(): string[] {
+    return log.mock.calls
+      .map(([line]) => String(line))
+      .filter(line => line.includes('"kilo_token_admission"'));
+  }
+
+  function setFlag(value: string | undefined) {
+    if (value === undefined) delete process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG];
+    else process.env[KILO_TOKEN_ADMISSION_OBSERVATION_FLAG] = value;
+  }
+
+  // The order a gateway route runs: the account cap first, then authentication.
+  async function gatewayRequest(token: string) {
+    const requestHeaders = new Headers({ authorization: `Bearer ${token}` });
+    mockHeaders.mockResolvedValue(requestHeaders);
+    const accountKey = gatewayRateLimitKey(requestHeaders, ADDRESS);
+    const linesAfterKey = admissionLines().length;
+    const auth = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    return { accountKey, linesAfterKey, auth };
+  }
+
+  async function multiAudienceUser(aud: string[]) {
+    const user = await insertTestUser({ api_token_pepper: `observe-${crypto.randomUUID()}` });
+    const token = signPolicyClaims({
+      version: KILO_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud,
+    });
+    return { user, token };
+  }
+
+  beforeEach(() => {
+    log = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    setFlag(originalFlag);
+  });
+
+  test('observes an eligible gateway bearer once, at authentication only', async () => {
+    const { user, token } = await multiAudienceUser([KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE]);
+
+    setFlag(undefined);
+    const off = await gatewayRequest(token);
+    expect(admissionLines()).toEqual([]);
+
+    setFlag('true');
+    const on = await gatewayRequest(token);
+
+    expect(off.accountKey).toBe(user.id);
+    expect(on.accountKey).toBe(off.accountKey);
+    expect(off.auth.user?.id).toBe(user.id);
+    expect(on.auth.user?.id).toBe(off.auth.user?.id);
+    expect(on.auth.authFailedResponse).toBeNull();
+    // The cap reads the same header but must not report the decision again.
+    expect(on.linesAfterKey).toBe(0);
+    const written = admissionLines();
+    expect(written.map(line => JSON.parse(line) as unknown)).toEqual([
+      {
+        event: 'kilo_token_admission',
+        v: 1,
+        boundary: 'web_bearer',
+        policy_audience: 'kilo-gateway',
+        outcome: 'admitted',
+        multi: true,
+        control: false,
+        aud_set: 'kilo-api+kilo-gateway',
+        issuer: 'unknown',
+        cohort: 'not_internal_bot',
+        client: 'unknown',
+      },
+    ]);
+    for (const forbidden of [token, user.id, String(user.api_token_pepper), ADDRESS]) {
+      expect(written.join('\n')).not.toContain(forbidden);
+    }
+  });
+
+  test('refuses a multi-audience bearer without the gateway audience and reports it once', async () => {
+    const { token } = await multiAudienceUser([KILO_API_AUDIENCE, 'kilo-session-ingest']);
+    setFlag('true');
+
+    const { accountKey, linesAfterKey, auth } = await gatewayRequest(token);
+
+    expect(accountKey).toBe(`anon:${ADDRESS}`);
+    expect(auth.user).toBeNull();
+    expect(auth.authFailedResponse?.status).toBe(401);
+    expect(linesAfterKey).toBe(0);
+    expect(admissionLines().map(line => JSON.parse(line) as unknown)).toEqual([
+      expect.objectContaining({ policy_audience: 'kilo-gateway', outcome: 'audience_not_allowed' }),
+    ]);
+  });
+
+  test('reports nothing for a bearer that fails signature verification', async () => {
+    const user = await insertTestUser({ api_token_pepper: `observe-${crypto.randomUUID()}` });
+    const token = signPolicyClaims(
+      {
+        version: KILO_TOKEN_VERSION,
+        kiloUserId: user.id,
+        apiTokenPepper: user.api_token_pepper,
+        env: process.env.NODE_ENV,
+        aud: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+      },
+      'not-the-signing-secret'
+    );
+    setFlag('true');
+
+    const { accountKey, auth } = await gatewayRequest(token);
+
+    expect(accountKey).toBe(`anon:${ADDRESS}`);
+    expect(auth.user).toBeNull();
+    expect(auth.authFailedResponse?.status).toBe(401);
+    expect(admissionLines()).toEqual([]);
   });
 });

@@ -1,11 +1,16 @@
 export {
+  MAX_AUTHORIZATION_LENGTH,
+  RECORD_FUTURE_SKEW_SECONDS,
   createVerifier,
   type AcceptsPats,
+  type BrowserSessionRecord,
   type Caller,
   type IssuerKind,
+  type RecordCheckResult,
   type Route,
   type UtsScopeEntry,
   type UtsScopeRegistry,
+  type UtsTokenRecord,
   type Verifier,
   type VerifierConfig,
   type VerifyContext,
@@ -22,18 +27,21 @@ export {
 export type { WaitUntil } from './flight';
 export {
   JWKS_FETCH_TIMEOUT_MS,
+  JWKS_JITTER,
   JWKS_MAX_RETRY_MS,
   JWKS_MAX_STALE_MS,
   JWKS_REFRESH_AFTER_MS,
   JWKS_RETRY_MS,
   JWKS_STALE_WAIT_MS,
   JWKS_TTL_MS,
+  KEY_SET_OLDEST_AGE_HEADER,
   UNKNOWN_KID_REFRESH_INTERVAL_MS,
   UTS_FEED_KID_PREFIX,
   UTS_TOKEN_KID_PREFIX,
   httpJwksSource,
   type FetchLike,
   type JwksSource,
+  type KeySetAges,
 } from './jwks';
 export {
   FEED_FETCH_TIMEOUT_MS,
@@ -61,12 +69,14 @@ export {
   type UtsBootstrapSource,
 } from './bootstrap';
 export {
+  MAX_PENDING_LOOKUPS,
   PAT_LOOKUPS_PER_SECOND_PER_ADDRESS,
   PAT_LOOKUP_TIMEOUT_MS,
   PAT_MAX_STALE_MS,
   PAT_NEGATIVE_TTL_MS,
   PAT_POSITIVE_TTL_MS,
   PAT_RETRY_MS,
+  PAT_SHARED_CACHE_TIMEOUT_MS,
   PatRecordSchema,
   type PatCacheKey,
   type PatCacheKeys,

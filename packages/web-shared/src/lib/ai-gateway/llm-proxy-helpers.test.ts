@@ -10,7 +10,7 @@ import type { Provider } from './providers/types';
 import { createUserOpenRouterProvider } from './providers/definitions/openrouter';
 import { createUserVercelAiGatewayProvider } from './providers/definitions/vercel';
 
-// `countAndStoreEditUsage` schedules the usage write through `next/server`'s
+// `countAndStoreFimUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
 // it with an immediate invocation so the test can await the work synchronously.
 jest.mock('next/server', () => ({
@@ -72,11 +72,9 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 import {
   captureProxyError,
-  countAndStoreEditUsage,
   countAndStoreFimUsage,
   countAndStoreEmbeddingUsage,
   countAndStoreTranscriptionUsage,
-  extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
   extractReasoningSetting,
@@ -86,7 +84,6 @@ import {
   lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
-  parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
   requestedLogprobs,
   requestedSamples,
@@ -329,175 +326,11 @@ describe('getOrganizationProviderPrivacy', () => {
 });
 
 describe('extractEmbeddingPromptInfo', () => {
-  it('should extract prefix from a single string input', () => {
-    const result = extractEmbeddingPromptInfo({ input: 'Hello world' });
-
-    expect(result.user_prompt_prefix).toBe('Hello world');
-    expect(result.system_prompt_prefix).toBe('');
-    expect(result.system_prompt_length).toBe(0);
-  });
-
-  it('should extract the first element from a string array input', () => {
-    const result = extractEmbeddingPromptInfo({ input: ['First sentence', 'Second sentence'] });
-
-    expect(result.user_prompt_prefix).toBe('First sentence');
-  });
-
-  it('should fall back to JSON.stringify for an empty array', () => {
-    const result = extractEmbeddingPromptInfo({ input: [] });
-
-    expect(result.user_prompt_prefix).toBe('[]');
-  });
-
-  it('should fall back to JSON.stringify for a number array (token input)', () => {
-    const result = extractEmbeddingPromptInfo({ input: [1, 2, 3] });
-
-    expect(result.user_prompt_prefix).toBe('[1,2,3]');
-  });
-
-  it('should fall back to JSON.stringify for a nested number array (token batch)', () => {
-    const result = extractEmbeddingPromptInfo({
-      input: [
-        [1, 2],
-        [3, 4],
-      ],
+  it('should always return a zero system_prompt_length', () => {
+    expect(extractEmbeddingPromptInfo()).toEqual({
+      system_prompt_length: 0,
+      system_prompt_kind: null,
     });
-
-    expect(result.user_prompt_prefix).toBe('[[1,2],[3,4]]');
-  });
-
-  it('should truncate long string input to 100 characters', () => {
-    const longInput = 'x'.repeat(200);
-    const result = extractEmbeddingPromptInfo({ input: longInput });
-
-    expect(result.user_prompt_prefix).toHaveLength(100);
-    expect(result.user_prompt_prefix).toBe('x'.repeat(100));
-  });
-
-  it('should truncate long first element of string array to 100 characters', () => {
-    const longInput = 'y'.repeat(200);
-    const result = extractEmbeddingPromptInfo({ input: [longInput] });
-
-    expect(result.user_prompt_prefix).toHaveLength(100);
-  });
-
-  it('should always return empty system_prompt_prefix and zero system_prompt_length', () => {
-    const result = extractEmbeddingPromptInfo({ input: 'any input' });
-
-    expect(result.system_prompt_prefix).toBe('');
-    expect(result.system_prompt_length).toBe(0);
-  });
-});
-
-describe('extractEditPromptInfo', () => {
-  it('uses zero system prompt length because edit has no explicit system prompt', () => {
-    const result = extractEditPromptInfo({
-      messages: [{ role: 'user', content: '<|code_to_edit|>const a = 1<|/code_to_edit|>' }],
-    });
-
-    expect(result.system_prompt_prefix).toBe('');
-    expect(result.system_prompt_length).toBe(0);
-    expect(result.user_prompt_prefix).toBe('<|code_to_edit|>const a = 1<|/code_to_edit|>');
-  });
-});
-
-describe('parseEditUsageFromResponse', () => {
-  it('prices cached Inception input tokens at the discounted rate', () => {
-    const result = parseEditUsageFromResponse(
-      JSON.stringify({
-        id: 'edit-123',
-        model: 'mercury-edit-2',
-        usage: {
-          prompt_tokens: 100_000,
-          cached_input_tokens: 90_000,
-          completion_tokens: 0,
-          total_tokens: 100_000,
-        },
-        choices: [],
-      }),
-      'inception',
-      200
-    );
-
-    expect(result.inputTokens).toBe(100_000);
-    expect(result.cacheHitTokens).toBe(90_000);
-    expect(result.cost_mUsd).toBe(4_750);
-    expect(result.cacheDiscount_mUsd).toBe(20_250);
-  });
-
-  it('falls back to flat Inception pricing when cached_input_tokens is absent', () => {
-    const result = parseEditUsageFromResponse(
-      JSON.stringify({
-        id: 'edit-456',
-        model: 'mercury-edit-2',
-        usage: {
-          prompt_tokens: 1_000,
-          completion_tokens: 100,
-          total_tokens: 1_100,
-        },
-        choices: [{ message: { role: 'assistant', content: 'edited' } }],
-      }),
-      'inception',
-      200
-    );
-
-    expect(result.cacheHitTokens).toBe(0);
-    expect(result.cost_mUsd).toBe(Math.round(1_000 * 0.25 + 100 * 0.75));
-    expect(result.cacheDiscount_mUsd).toBe(0);
-    expect(result.hasError).toBe(false);
-  });
-
-  it('returns zero cost when usage is absent', () => {
-    const result = parseEditUsageFromResponse(
-      JSON.stringify({
-        id: 'edit-789',
-        model: 'mercury-edit-2',
-        choices: [],
-      }),
-      'inception',
-      200
-    );
-
-    expect(result.inputTokens).toBe(0);
-    expect(result.outputTokens).toBe(0);
-    expect(result.cacheHitTokens).toBe(0);
-    expect(result.cost_mUsd).toBe(0);
-    expect(result.cacheDiscount_mUsd).toBeUndefined();
-  });
-
-  it('flags an error and zero cost on upstream 4xx responses', () => {
-    const result = parseEditUsageFromResponse(
-      JSON.stringify({ error: { message: 'bad request' } }),
-      'inception',
-      400
-    );
-
-    expect(result.hasError).toBe(true);
-    expect(result.cost_mUsd).toBe(0);
-    expect(result.model).toBeNull();
-  });
-
-  it('clamps cached_input_tokens that exceed prompt_tokens', () => {
-    const result = parseEditUsageFromResponse(
-      JSON.stringify({
-        id: 'edit-clamp',
-        model: 'mercury-edit-2',
-        usage: {
-          prompt_tokens: 1_000,
-          cached_input_tokens: 5_000,
-          completion_tokens: 0,
-          total_tokens: 1_000,
-        },
-        choices: [],
-      }),
-      'inception',
-      200
-    );
-
-    // Without the clamp, uncachedInputTokens would be negative and produce a
-    // negative cost. The clamp pins cacheHitTokens at prompt_tokens.
-    expect(result.cacheHitTokens).toBe(1_000);
-    expect(result.cost_mUsd).toBe(25);
   });
 });
 
@@ -890,13 +723,9 @@ describe('countAndStoreFimUsage', () => {
     return {
       api_kind: 'fim_completions',
       kiloUserId: 'user-fim-test',
-      provider: 'inception',
-      requested_model: 'inception/mercury-edit-2',
-      promptInfo: {
-        system_prompt_prefix: '',
-        system_prompt_length: 0,
-        user_prompt_prefix: '',
-      },
+      provider: 'mistral',
+      requested_model: 'mistralai/codestral-2508',
+      promptInfo: { system_prompt_length: 0, system_prompt_kind: null },
       max_tokens: 100,
       has_middle_out_transform: null,
       fraudHeaders: {},
@@ -926,7 +755,7 @@ describe('countAndStoreFimUsage', () => {
     return new Response(
       JSON.stringify({
         id: 'fim-test',
-        model: 'mercury-edit-2',
+        model: 'codestral-2508',
         usage: {
           prompt_tokens: 1_000,
           completion_tokens: 100,
@@ -943,25 +772,8 @@ describe('countAndStoreFimUsage', () => {
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
 
-  it('bills the Inception model', async () => {
+  it('bills the Codestral model', async () => {
     countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(), undefined);
-
-    await new Promise(resolve => setImmediate(resolve));
-
-    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(325);
-    expect(stats.market_cost).toBe(325);
-  });
-
-  it('bills other FIM models', async () => {
-    countAndStoreFimUsage(
-      makeUpstreamResponse(),
-      makeUsageContext({
-        provider: 'mistral',
-        requested_model: 'mistralai/codestral-2508',
-      }),
-      undefined
-    );
 
     await new Promise(resolve => setImmediate(resolve));
 
@@ -981,7 +793,7 @@ describe('countAndStoreFimUsage', () => {
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(0);
     expect(stats.cacheDiscount_mUsd).toBe(0);
-    expect(stats.market_cost).toBe(325);
+    expect(stats.market_cost).toBe(390);
   });
 
   it('accounts for a malformed successful response instead of dropping the request', async () => {
@@ -1028,7 +840,7 @@ describe('countAndStoreFimUsage', () => {
     countAndStoreFimUsage(
       new Response(
         `data: ${malformedEvent}\n\n` +
-          'data: {"id":"fim-recovered","model":"mercury-edit-2","choices":[{"text":"completion"}],"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\n' +
+          'data: {"id":"fim-recovered","model":"codestral-2508","choices":[{"text":"completion"}],"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\n' +
           'data: [DONE]\n\n'
       ),
       makeUsageContext({ isStreaming: true }),
@@ -1043,7 +855,7 @@ describe('countAndStoreFimUsage', () => {
         responseContent: 'completion',
         inputTokens: 1000,
         outputTokens: 100,
-        cost_mUsd: 325,
+        cost_mUsd: 390,
       }),
       expect.anything()
     );
@@ -1053,7 +865,7 @@ describe('countAndStoreFimUsage', () => {
       tags: { source: 'usage_stream_parsing' },
       extra: {
         messageId: 'fim-recovered',
-        model: 'mercury-edit-2',
+        model: 'codestral-2508',
         malformedEventCount: 1,
         ...readError,
       },
@@ -1071,7 +883,7 @@ describe('countAndStoreFimUsage', () => {
       new Response(
         'data: {"error":null}\n\n' +
           'data: {}\n\n' +
-          'data: {"id":"fim-ok","model":"mercury-edit-2","error":null,"usage":{"prompt_tokens":1000,"completion_tokens":100},"choices":[]}\n\n'
+          'data: {"id":"fim-ok","model":"codestral-2508","error":null,"usage":{"prompt_tokens":1000,"completion_tokens":100},"choices":[]}\n\n'
       ),
       makeUsageContext({ isStreaming: true }),
       undefined
@@ -1079,7 +891,7 @@ describe('countAndStoreFimUsage', () => {
     await waitForUsageWrite();
 
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ hasError: false, cost_mUsd: 325 }),
+      expect.objectContaining({ hasError: false, cost_mUsd: 390 }),
       expect.anything()
     );
     expect(captureException).not.toHaveBeenCalled();
@@ -1123,7 +935,7 @@ describe('countAndStoreFimUsage', () => {
     jest.mocked(captureMessage).mockClear();
     countAndStoreFimUsage(
       new Response(
-        'data: {"id":"fim-partial","model":"mercury-edit-2","choices":[{"text":"partial"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n' +
+        'data: {"id":"fim-partial","model":"codestral-2508","choices":[{"text":"partial"}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n' +
           'data: {"error":{"code":503,"message":"overloaded"}}\n\n'
       ),
       makeUsageContext({ isStreaming: true }),
@@ -1138,7 +950,7 @@ describe('countAndStoreFimUsage', () => {
         responseContent: 'partial',
         inputTokens: 1000,
         outputTokens: 100,
-        cost_mUsd: 325,
+        cost_mUsd: 390,
         status_code: 503,
       }),
       expect.anything()
@@ -1150,7 +962,7 @@ describe('countAndStoreFimUsage', () => {
   it('still reports a successful FIM stream without usage', async () => {
     jest.mocked(captureMessage).mockClear();
     countAndStoreFimUsage(
-      new Response('data: {"model":"mercury-edit-2","choices":[]}\n\n'),
+      new Response('data: {"model":"codestral-2508","choices":[]}\n\n'),
       makeUsageContext({ isStreaming: true }),
       undefined
     );
@@ -1176,7 +988,7 @@ describe('countAndStoreFimUsage', () => {
 
     it('measures a JSON response from the request start', async () => {
       const body = clock.bodyArrivingAt([
-        [400, '{"id":"fim-test","model":"mercury-edit-2",'],
+        [400, '{"id":"fim-test","model":"codestral-2508",'],
         [450, '"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100},'],
         [460, '"choices":[{"text":"completion"}]}'],
       ]);
@@ -1189,7 +1001,11 @@ describe('countAndStoreFimUsage', () => {
       await waitForUsageWrite();
 
       const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-      expect(stats).toMatchObject({ latency: 300, generation_time: 60, cost_mUsd: 325 });
+      expect(stats).toMatchObject({
+        latency: 300,
+        generation_time: 60,
+        cost_mUsd: 390,
+      });
     });
 
     it('measures a streamed response by its SSE events', async () => {
@@ -1313,7 +1129,6 @@ describe.each<{
   countUsage: typeof countAndStoreFimUsage;
 }>([
   { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
-  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
   { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
   { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
 ])('$apiKind upstream error accounting', ({ apiKind, countUsage }) => {
@@ -1330,7 +1145,7 @@ describe.each<{
       const context = {
         ...createMockUsageContext('user-id', 'user@example.com', 0),
         api_kind: apiKind,
-        provider: 'inception',
+        provider: 'mistral',
         status_code: status,
       } satisfies MicrodollarUsageContext;
 
@@ -1418,22 +1233,17 @@ describe.each<{
   countUsage: typeof countAndStoreFimUsage;
 }>([
   { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
-  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
   { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
   { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
 ])('$apiKind usage recovery', ({ apiKind, countUsage }) => {
   const makeContext = (): MicrodollarUsageContext => ({
     ...createMockUsageContext('usage-user', 'unused@example.com', 0),
     api_kind: apiKind,
-    provider: 'inception',
+    provider: 'mistral',
     status_code: 200,
     usageId: 'usage-recovery-id',
     organizationId: 'usage-organization',
-    promptInfo: {
-      system_prompt_prefix: 'private-prompt',
-      user_prompt_prefix: 'private-prompt',
-      system_prompt_length: 14,
-    },
+    promptInfo: { system_prompt_length: 14, system_prompt_kind: null },
   });
 
   const validPayload = {
@@ -1548,7 +1358,7 @@ describe.each<{
           usageId: 'usage-recovery-id',
           kiloUserId: context.kiloUserId,
           organizationId: context.organizationId,
-          provider: 'inception',
+          provider: 'mistral',
           messageId: 'generation-recovery',
           ...error,
         },
@@ -1631,146 +1441,6 @@ describe.each<{
       expect(mockedProcessTokenData).not.toHaveBeenCalled();
     });
   }
-});
-
-describe('countAndStoreEditUsage', () => {
-  function makeUsageContext(
-    overrides: Partial<MicrodollarUsageContext> = {}
-  ): MicrodollarUsageContext {
-    return {
-      api_kind: 'edit_completions',
-      kiloUserId: 'user-edit-test',
-      provider: 'inception',
-      requested_model: 'inception/mercury-edit-2',
-      promptInfo: {
-        system_prompt_prefix: '',
-        system_prompt_length: 0,
-        user_prompt_prefix: '',
-      },
-      max_tokens: 100,
-      has_middle_out_transform: null,
-      fraudHeaders: {},
-      isStreaming: false,
-      organizationId: undefined,
-      prior_microdollar_usage: 0,
-      posthog_distinct_id: undefined,
-      project_id: null,
-      status_code: 200,
-      editor_name: null,
-      machine_id: null,
-      user_byok: false,
-      is_free: false,
-      has_tools: false,
-      feature: null,
-      session_id: null,
-      mode: null,
-      auto_model: null,
-      reasoning_setting: null,
-      inference_region: null,
-      ttfb_ms: null,
-      ...overrides,
-    } as MicrodollarUsageContext;
-  }
-
-  function makeUpstreamResponse(payload: unknown): Response {
-    return new Response(JSON.stringify(payload), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
-  }
-
-  beforeEach(() => {
-    mockedLogMicrodollarUsage.mockClear();
-    mockedLogMicrodollarUsage.mockResolvedValue(null);
-  });
-
-  it.each([
-    { user_byok: true, is_free: false },
-    { user_byok: false, is_free: true },
-  ])('zeros costs for BYOK or free requests: %j', async overrides => {
-    const response = makeUpstreamResponse({
-      id: 'edit-byok',
-      model: 'mercury-edit-2',
-      usage: {
-        prompt_tokens: 100_000,
-        cached_input_tokens: 90_000,
-        completion_tokens: 0,
-        total_tokens: 100_000,
-      },
-      choices: [],
-    });
-
-    countAndStoreEditUsage(response, makeUsageContext(overrides), undefined);
-
-    // Allow the async usage parse + after() callback to settle.
-    await new Promise(resolve => setImmediate(resolve));
-
-    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
-    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(0);
-    expect(stats.cacheDiscount_mUsd).toBe(0);
-    // The pre-zeroed value is preserved in `market_cost` for reporting.
-    expect(stats.market_cost).toBe(4_750);
-  });
-
-  it('bills non-BYOK requests', async () => {
-    const response = makeUpstreamResponse({
-      id: 'edit-paid',
-      model: 'mercury-edit-2',
-      usage: {
-        prompt_tokens: 100_000,
-        cached_input_tokens: 90_000,
-        completion_tokens: 0,
-        total_tokens: 100_000,
-      },
-      choices: [],
-    });
-
-    countAndStoreEditUsage(response, makeUsageContext({ user_byok: false }), undefined);
-
-    await new Promise(resolve => setImmediate(resolve));
-
-    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
-    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(4_750);
-    expect(stats.cacheDiscount_mUsd).toBe(20_250);
-    expect(stats.market_cost).toBe(4_750);
-  });
-
-  it('measures the response from the request start', async () => {
-    const clockSpy = clock.install();
-    try {
-      const body = clock.bodyArrivingAt([
-        [500, '{"id":"edit-timed","model":"mercury-edit-2",'],
-        [540, '"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15},"choices":[]}'],
-      ]);
-
-      countAndStoreEditUsage(
-        new Response(body),
-        makeUsageContext({ requestStartedAt: 200 }),
-        undefined
-      );
-      await waitForUsageWrite();
-    } finally {
-      clockSpy.mockRestore();
-    }
-
-    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats).toMatchObject({ messageId: 'edit-timed', latency: 300, generation_time: 40 });
-  });
-
-  it('logs errored usage when the upstream body is missing', async () => {
-    const bodylessResponse = new Response(null, { status: 502 });
-
-    countAndStoreEditUsage(bodylessResponse, makeUsageContext({ status_code: 502 }), undefined);
-
-    await new Promise(resolve => setImmediate(resolve));
-
-    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 502 }),
-      expect.anything()
-    );
-  });
 });
 
 describe('parseEmbeddingUsageFromResponse', () => {
@@ -2116,11 +1786,13 @@ describe('captureProxyError', () => {
         model: 'vendor/model',
       });
 
-      expect(await capturedErrorData()).toMatchObject({
+      const data = await capturedErrorData();
+      expect(data).toMatchObject({
         status,
         model: 'vendor/model',
-        first4kOfResponse: '{"error":"upstream unavailable"}',
+        responseBodyReadLength: JSON.stringify({ error: 'upstream unavailable' }).length,
       });
+      expect(data.first4kOfResponse).toBe('{"error":"upstream unavailable"}');
       expect(mockedErrorExceptInTest).toHaveBeenCalledWith(
         `openrouter returned error ${status}`,
         expect.anything()
@@ -2163,7 +1835,7 @@ describe('captureProxyError', () => {
       byokProviderIds: 'opencode-go',
       requestFields: 'messages,model,reasoning',
       messageFields: 'content,reasoning,role',
-      first4kOfResponse: '{"error":"unknown field"}',
+      responseBodyReadLength: '{"error":"unknown field"}'.length,
     });
     expect(JSON.stringify(data)).not.toContain('secret');
   });
@@ -2307,48 +1979,87 @@ describe('captureProxyError', () => {
       )
     );
 
-    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data.upstreamErrorParam).toBe('a'.repeat(512));
     expect(data.upstreamErrorCode).toBe('b'.repeat(512));
   });
 
-  it('redacts secret-shaped values in the logged response', async () => {
-    const fakeKey = 'sk-or-v1-fake0000000000000000000000';
-    const fakeJwt = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU';
-    const data = await captureResponsesError(
-      {},
-      Response.json(
-        { error: { message: `invalid key ${fakeKey}`, echo: `Bearer ${fakeJwt}` } },
-        { status: 401 }
-      )
-    );
-
-    expect(data.first4kOfResponse).toBe(
-      '{"error":{"message":"invalid key [Filtered]","echo":"Bearer [Filtered]"}}'
-    );
-  });
-
   it.each([
-    ['a JWT', 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlIn0.ZmFrZS1zaWduYXR1cmU'],
-    ['a provider key', 'sk-or-v1-fake0000000000000000000000'],
-  ])('drops the part of %s that the 4k limit cuts', async (_name, secret) => {
-    const data = await captureResponsesError(
-      {},
-      new Response(`${'x '.repeat(2045)} ${secret}`, { status: 400 })
-    );
+    [
+      'OpenAI',
+      {
+        error: {
+          message: 'm',
+          type: 'invalid_request_error',
+          param: 'model',
+          code: 'model_not_found',
+        },
+      },
+      {
+        upstreamErrorType: 'invalid_request_error',
+        upstreamErrorParam: 'model',
+        upstreamErrorCode: 'model_not_found',
+      },
+    ],
+    [
+      'Anthropic',
+      { type: 'error', error: { type: 'overloaded_error', message: 'm' } },
+      { upstreamErrorType: 'overloaded_error' },
+    ],
+    [
+      'OpenRouter',
+      {
+        error: { code: 402, message: 'm', metadata: { provider_name: 'Fake Provider', raw: 'x' } },
+      },
+      { upstreamErrorCode: '402', upstreamProviderName: 'Fake Provider' },
+    ],
+    [
+      'Google',
+      { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'm' } },
+      { upstreamErrorCode: '429', upstreamErrorStatus: 'RESOURCE_EXHAUSTED' },
+    ],
+  ])('extracts the %s error schema fields', async (_provider, body, expected) => {
+    const data = await captureResponsesError({}, Response.json(body, { status: 400 }));
 
-    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2045)} [Truncated]`);
+    expect(data).toMatchObject(expected);
   });
 
-  it('redacts only the first 4k of a long response', async () => {
-    const started = performance.now();
-    const data = await captureResponsesError(
-      {},
-      new Response('eyJ-'.repeat(50_000), { status: 400 })
-    );
+  it('sends Sentry no upstream response text and logs only a redacted prefix', async () => {
+    const fakeKey = ['sk', '-proj-', 'fake'.repeat(8)].join('');
+    const body = {
+      error: {
+        message: `invalid key ${fakeKey} for user`,
+        echo: `Bearer ${fakeKey}`,
+        code: 'invalid_api_key',
+      },
+    };
+    await captureProxyError({
+      errorMessage: 'openai returned error 401',
+      user: { id: 'synthetic-user' },
+      request: {},
+      response: Response.json(body, { status: 401 }),
+      organizationId: undefined,
+      model: 'openai/gpt-6.1-sol',
+      trackInSentry: true,
+    });
 
-    expect(performance.now() - started).toBeLessThan(50);
-    expect(data.first4kOfResponse).toBe('[Truncated]');
+    const logged = await capturedErrorData();
+    expect(logged.first4kOfResponse).toBe(
+      '{"error":{"message":"invalid key [Filtered] for user","echo":"Bearer [Filtered]","code":"invalid_api_key"}}'
+    );
+    expect(JSON.stringify(logged)).not.toContain(fakeKey);
+
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    const sentExtra = jest.mocked(captureMessage).mock.calls[0]?.[1];
+    expect(sentExtra).toMatchObject({
+      extra: {
+        upstreamErrorCode: 'invalid_api_key',
+        responseBodyReadLength: JSON.stringify(body).length,
+      },
+    });
+    const sent = JSON.stringify(sentExtra);
+    expect(sent).not.toContain('first4kOfResponse');
+    expect(sent).not.toContain(fakeKey);
+    expect(sent).not.toContain('invalid key');
   });
 
   it('reads only a bounded prefix of a large error body', async () => {
@@ -2370,7 +2081,7 @@ describe('captureProxyError', () => {
     const data = await captureResponsesError({}, response);
     await response.body?.cancel();
 
-    expect(data.first4kOfResponse).toBe(`${'x '.repeat(2048)}[Truncated]`);
+    expect(String(data.first4kOfResponse)).toBe(`${'x '.repeat(2048)}[Truncated]`);
     expect(pulledChunks).toBeLessThan(8);
     expect(cancelled).toBe(true);
   });
@@ -2382,7 +2093,6 @@ describe('captureProxyError', () => {
     );
     const data = await captureResponsesError({}, response);
 
-    expect(data.first4kOfResponse).toBe('{"padding":"[Truncated]');
     expect(data).not.toHaveProperty('upstreamErrorParam');
     expect(data).not.toHaveProperty('upstreamErrorCode');
     expect(await response.json()).toMatchObject({ error: { param: 'input' } });

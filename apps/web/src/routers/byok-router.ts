@@ -5,7 +5,10 @@ import {
   canManageOrganization,
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ensureMemberOrganizationAccess,
+  ensureOrganizationAccess,
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
   MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
@@ -564,9 +567,10 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, provider_id, api_key } = input;
 
-      // If organizationId provided, verify owner/billing access
+      // Storing an organization credential needs a real owner or billing-manager
+      // membership: no staff admission or support grant stands in.
       const organizationRole = organizationId
-        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        ? await ensureMemberOrganizationAccess(ctx.user, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
       await rejectUnavailableExperimentalProvider(provider_id, organizationId);
@@ -671,9 +675,10 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, id, api_key } = input;
 
-      // If organizationId provided, verify owner/billing access
+      // Replacing an organization credential needs a real owner or billing-manager
+      // membership: no staff admission or support grant stands in.
       const organizationRole = organizationId
-        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        ? await ensureMemberOrganizationAccess(ctx.user, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
       // Verify key exists and belongs to the organization or user
@@ -1079,9 +1084,10 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, id } = input;
 
-      // If organizationId provided, verify owner/billing access
+      // Removing an organization credential needs a real owner or billing-manager
+      // membership: no staff admission or support grant stands in.
       if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
+        await ensureMemberOrganizationAccess(ctx.user, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
       // Verify key exists and belongs to the organization or user

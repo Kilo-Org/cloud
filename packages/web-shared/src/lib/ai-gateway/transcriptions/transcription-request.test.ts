@@ -32,17 +32,10 @@ describe('TranscriptionRequestSchema', () => {
 });
 
 describe('extractTranscriptionPromptInfo', () => {
-  it('describes audio format without including encoded audio', () => {
-    const body = TranscriptionRequestSchema.parse({
-      model: 'openai/gpt-4o-mini-transcribe',
-      input_audio: { data: 'a'.repeat(200), format: 'wav' },
-      language: 'en',
-    });
-
-    expect(extractTranscriptionPromptInfo(body)).toEqual({
-      system_prompt_prefix: '',
+  it('returns a zero system_prompt_length', () => {
+    expect(extractTranscriptionPromptInfo()).toEqual({
       system_prompt_length: 0,
-      user_prompt_prefix: 'audio/wav language=en',
+      system_prompt_kind: null,
     });
   });
 });

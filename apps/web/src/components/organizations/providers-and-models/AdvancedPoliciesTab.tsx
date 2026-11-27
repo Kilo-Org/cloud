@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { LockableContainer } from '@/components/organizations/LockableContainer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -14,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { inferRouterOutputs } from '@trpc/server';
+import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
 import {
@@ -37,6 +39,7 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
   const id = useId();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const isReadOnly = useOrganizationReadOnly(organizationId);
 
   const mutationCallbacks = {
     onSuccess: async () => {
@@ -67,25 +70,27 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <div className="flex min-h-11 items-center gap-3">
-              <Switch
-                id={`${id}-new-models`}
-                checked={settings.disable_new_models}
-                disabled={!canEdit || newModelsMutation.isPending}
-                aria-describedby={`${id}-new-models-help`}
-                onCheckedChange={checked =>
-                  newModelsMutation.mutate({ organizationId, disable_new_models: checked })
-                }
-              />
-              <Label htmlFor={`${id}-new-models`}>Disable new models by default</Label>
+          <LockableContainer>
+            <div className="space-y-2">
+              <div className="flex min-h-11 items-center gap-3">
+                <Switch
+                  id={`${id}-new-models`}
+                  checked={settings.disable_new_models}
+                  disabled={!canEdit || isReadOnly || newModelsMutation.isPending}
+                  aria-describedby={`${id}-new-models-help`}
+                  onCheckedChange={checked =>
+                    newModelsMutation.mutate({ organizationId, disable_new_models: checked })
+                  }
+                />
+                <Label htmlFor={`${id}-new-models`}>Disable new models by default</Label>
+              </div>
+              <p id={`${id}-new-models-help`} className="text-muted-foreground ml-12 text-sm">
+                {settings.disable_new_models
+                  ? 'Models that become available, such as newly released models or models an enabled provider starts serving, are added to the disabled models on the Models tab and recorded in the audit log. Enable them on the Models tab.'
+                  : 'Models that become available from enabled providers can be used right away. Turn this on to disable them until an admin enables them on the Models tab.'}
+              </p>
             </div>
-            <p id={`${id}-new-models-help`} className="text-muted-foreground ml-12 text-sm">
-              {settings.disable_new_models
-                ? 'Models that become available, such as newly released models or models an enabled provider starts serving, are added to the disabled models on the Models tab and recorded in the audit log. Enable them on the Models tab.'
-                : 'Models that become available from enabled providers can be used right away. Turn this on to disable them until an admin enables them on the Models tab.'}
-            </p>
-          </div>
+          </LockableContainer>
         </CardContent>
       </Card>
 
@@ -93,7 +98,7 @@ export function AdvancedPoliciesTab({ organizationId, canEdit, settings }: Props
         <GatewayPoliciesCard
           id={id}
           settings={settings}
-          disabled={!canEdit || mutation.isPending}
+          disabled={!canEdit || isReadOnly || mutation.isPending}
           onChange={input => mutation.mutate({ organizationId, ...input })}
         />
       )}
@@ -136,60 +141,64 @@ function GatewayPoliciesCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
-        <div className="max-w-md space-y-2">
-          <Label htmlFor={`${id}-region`}>Inference region</Label>
-          <Select
-            value={settings.data_region ?? GLOBAL_REGION}
-            disabled={disabled}
-            onValueChange={value =>
-              onChange({
-                data_region:
-                  value === GLOBAL_REGION ? null : OrganizationDataRegionSchema.parse(value),
-              })
-            }
-          >
-            <SelectTrigger
-              id={`${id}-region`}
-              aria-describedby={`${id}-region-help`}
-              className="min-h-11 w-full"
+        <LockableContainer>
+          <div className="max-w-md space-y-2">
+            <Label htmlFor={`${id}-region`}>Inference region</Label>
+            <Select
+              value={settings.data_region ?? GLOBAL_REGION}
+              disabled={disabled}
+              onValueChange={value =>
+                onChange({
+                  data_region:
+                    value === GLOBAL_REGION ? null : OrganizationDataRegionSchema.parse(value),
+                })
+              }
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={GLOBAL_REGION} className="min-h-11">
-                Global
-              </SelectItem>
-              {OrganizationDataRegionSchema.options.map(region => (
-                <SelectItem key={region} value={region} className="min-h-11">
-                  {ORGANIZATION_DATA_REGION_NAMES[region]}
+              <SelectTrigger
+                id={`${id}-region`}
+                aria-describedby={`${id}-region-help`}
+                className="min-h-11 w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={GLOBAL_REGION} className="min-h-11">
+                  Global
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p id={`${id}-region-help`} className="text-muted-foreground text-sm">
-            Keeps model inference in the selected region. Requests run only through the Vercel AI
-            Gateway, in that region. A model that is not available there returns an error instead of
-            running elsewhere.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex min-h-11 items-center gap-3">
-            <Switch
-              id={`${id}-openrouter`}
-              checked={openRouterOn}
-              disabled={disabled || !!regionName}
-              aria-describedby={`${id}-openrouter-help`}
-              onCheckedChange={checked => onChange({ disable_openrouter: !checked })}
-            />
-            <Label htmlFor={`${id}-openrouter`}>Allow OpenRouter</Label>
+                {OrganizationDataRegionSchema.options.map(region => (
+                  <SelectItem key={region} value={region} className="min-h-11">
+                    {ORGANIZATION_DATA_REGION_NAMES[region]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p id={`${id}-region-help`} className="text-muted-foreground text-sm">
+              Keeps model inference in the selected region. Requests run only through the Vercel AI
+              Gateway, in that region. A model that is not available there returns an error instead
+              of running elsewhere.
+            </p>
           </div>
-          <p id={`${id}-openrouter-help`} className="text-muted-foreground ml-12 text-sm">
-            {regionName
-              ? 'OpenRouter is off while an inference region is selected, because it cannot keep requests in a region.'
-              : 'When off, requests go through the Vercel AI Gateway. A model the Vercel AI Gateway does not offer returns an error.'}
-          </p>
-        </div>
+        </LockableContainer>
+
+        <LockableContainer>
+          <div className="space-y-2">
+            <div className="flex min-h-11 items-center gap-3">
+              <Switch
+                id={`${id}-openrouter`}
+                checked={openRouterOn}
+                disabled={disabled || !!regionName}
+                aria-describedby={`${id}-openrouter-help`}
+                onCheckedChange={checked => onChange({ disable_openrouter: !checked })}
+              />
+              <Label htmlFor={`${id}-openrouter`}>Allow OpenRouter</Label>
+            </div>
+            <p id={`${id}-openrouter-help`} className="text-muted-foreground ml-12 text-sm">
+              {regionName
+                ? 'OpenRouter is off while an inference region is selected, because it cannot keep requests in a region.'
+                : 'When off, requests go through the Vercel AI Gateway. A model the Vercel AI Gateway does not offer returns an error.'}
+            </p>
+          </div>
+        </LockableContainer>
 
         <div className="space-y-2">
           <h3 className="text-sm font-medium">What these policies do not cover</h3>

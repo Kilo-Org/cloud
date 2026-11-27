@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { EXA_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
 import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
 
   // Record cost asynchronously after sending the response
   const cloned = response.clone();
-  const usageId = crypto.randomUUID();
+  const usageId = createUsageId();
   const occurredAt = new Date().toISOString();
   after(async () => {
     if (response.status >= 400) {

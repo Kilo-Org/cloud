@@ -1,12 +1,14 @@
 import type { AppEnv, InboundEmailQueueMessage } from './types';
+import { readKiloclawInboundEmailSecret } from './secrets';
 
 const PERMANENT_DELIVERY_STATUSES = new Set([400, 404, 410, 422]);
 
 export async function deliverInboundEmail(
   message: InboundEmailQueueMessage,
-  env: AppEnv
+  env: AppEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
-  const internalApiSecret = await env.INTERNAL_API_SECRET.get();
+  const internalApiSecret = await readKiloclawInboundEmailSecret(env, 'INTERNAL_API_SECRET', ctx);
   const response = await env.KILOCLAW.fetch(
     new Request('https://kiloclaw/api/platform/inbound-email', {
       method: 'POST',
@@ -39,9 +41,10 @@ export async function deliverInboundEmail(
 
 export async function handleQueue(
   batch: MessageBatch<InboundEmailQueueMessage>,
-  env: AppEnv
+  env: AppEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
   for (const message of batch.messages) {
-    await deliverInboundEmail(message.body, env);
+    await deliverInboundEmail(message.body, env, ctx);
   }
 }

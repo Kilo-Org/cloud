@@ -143,11 +143,11 @@ export type Env = {
   /** `on` runs the login rotation job from the cron; absent or `off` keeps it off. */
   LOGIN_ROTATION?: string;
   /**
-   * The STS secrets broker, bound as caller `uts` in staging and production. It delivers the
-   * rotation job's two secrets (src/rotation/secrets.ts).
+   * The STS secrets broker, to be bound as caller `uts` once STS has a `uts` policy. It delivers the
+   * rotation job's Hyperdrive switch token (src/rotation/secrets.ts).
    */
   STS?: BundleBinding;
-  /** Development only: JSON of the rotation secrets a local run uses instead of STS. */
+  /** Development only: JSON with the switch token a local run uses instead of STS. */
   UTS_LOCAL_SECRETS?: string;
   /** Development only: origin of a stand-in Cloudflare API for the local end-to-end run. */
   CLOUDFLARE_API_BASE_URL?: string;

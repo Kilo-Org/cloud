@@ -5,15 +5,26 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 /**
  * https://developers.cloudflare.com/api/resources/hyperdrive/subresources/configs/methods/get/:
- * the fields of a config's origin the job reads. The API never returns the password.
+ * the fields of a config's origin the job reads, and the names of any other origin fields (such as
+ * an Access client id), which a PATCH of the origin would drop.
  */
-const OriginSchema = z.object({
-  scheme: z.enum(['postgres', 'postgresql']),
-  host: z.string().min(1),
-  port: z.number().int().positive(),
-  database: z.string().min(1),
-  user: z.string().min(1),
-});
+const OriginSchema = z
+  .object({
+    scheme: z.enum(['postgres', 'postgresql']),
+    host: z.string().min(1),
+    port: z.number().int().positive(),
+    database: z.string().min(1),
+    user: z.string().min(1),
+  })
+  .loose()
+  .transform(({ scheme, host, port, database, user, ...rest }) => ({
+    scheme,
+    host,
+    port,
+    database,
+    user,
+    otherFields: Object.keys(rest),
+  }));
 
 const ConfigResponseSchema = z.object({
   success: z.literal(true),
@@ -55,9 +66,10 @@ export class HyperdriveClient {
   }
 
   /**
-   * Points the config at `user` with `password`, keeping its host, port and database, then reads
-   * it back and checks the user. Hyperdrive keeps its open pool and opens new connections with the
-   * new login, so queries in flight do not fail.
+   * Points the config at `user` with `password`, keeping its scheme, host, port and database, then
+   * reads the config back with a GET and checks the user. It refuses an origin with fields it does
+   * not rebuild, which the PATCH would drop. Hyperdrive keeps its open pool and opens new
+   * connections with the new login.
    */
   async switchLogin(
     configId: string,
@@ -65,6 +77,12 @@ export class HyperdriveClient {
     user: string,
     password: string
   ): Promise<HyperdriveSwitch> {
+    if (current.otherFields.length > 0) {
+      return {
+        status: 'refused',
+        detail: `config origin holds fields the switch does not rebuild: ${current.otherFields.join(', ')}`,
+      };
+    }
     // https://developers.cloudflare.com/api/resources/hyperdrive/subresources/configs/methods/edit/
     const patched = await this.#call(configId, {
       method: 'PATCH',
@@ -80,10 +98,11 @@ export class HyperdriveClient {
       }),
     });
     if (patched.status !== 'answered') return patched;
-    const after = await this.#origin(patched.response);
+    await patched.response.body?.cancel();
+    const after = await this.read(configId);
     if (after.status !== 'ok') return after;
     if (after.origin.user !== user) {
-      return { status: 'unreachable', detail: 'config did not report the new login' };
+      return { status: 'refused', detail: 'config did not report the new login after the PATCH' };
     }
     return { status: 'switched' };
   }

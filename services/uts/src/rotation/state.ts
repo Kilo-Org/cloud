@@ -5,7 +5,7 @@ import { SealedSchema } from './vault';
 const PoolSchema = z.enum(ROTATION_POOLS);
 const LoginSchema = z.enum(LOGIN_NAMES);
 const TimeSchema = z.number().int().nonnegative();
-const SecretNameSchema = z.string().regex(/^[a-z][a-z0-9_]{0,62}_[0-9]{8}$/);
+const SecretNameSchema = z.string().regex(/^[a-z][a-z0-9_]{0,62}_[0-9]{8}_[0-9]{6}$/);
 
 /** The login one cycle rotates, in the pool whose config it then switches to. */
 const CycleFields = { pool: PoolSchema, login: LoginSchema, startedAt: TimeSchema };
@@ -31,14 +31,17 @@ export const JobStateSchema = z.discriminatedUnion('phase', [
     secretName: SecretNameSchema,
     nextAttemptAt: TimeSchema,
   }),
-  /** The manager holds the secret as a change request that waits for a secret admin. */
+  /**
+   * The manager holds the secret as a change request that waits for a secret admin. `lastAlertAt`
+   * is the last overdue alert, at most one a day; null before the first.
+   */
   z.strictObject({
     phase: z.literal('awaiting_approval'),
     ...CycleFields,
     secretName: SecretNameSchema,
     requestedAt: TimeSchema,
     nextCheckAt: TimeSchema,
-    overdueAlerted: z.boolean(),
+    lastAlertAt: TimeSchema.nullable(),
   }),
   /** The secret exists in the manager; the config switch waits for its window or a retry. */
   z.strictObject({

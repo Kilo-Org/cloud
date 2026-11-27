@@ -2,6 +2,8 @@ import type { ManagerClient } from '../manager/client';
 import { rotationSecretName } from '../manager/client';
 import {
   type LoginName,
+  type OriginPin,
+  originMatches,
   POOL_LOGINS,
   ROTATION_POOLS,
   type RotationPool,
@@ -14,13 +16,14 @@ import {
   type HyperdriveSwitch,
 } from './hyperdrive';
 import type { AlterResult, DirectTarget } from './postgres';
-import type { LoginSeeds } from './secrets';
 import type { JobState, RotationState, StoredRotation } from './state';
 import type { Sealed } from './vault';
 
 /** Everything the job reaches outside its own state; the rotation object wires the real ones. */
 export type RotationPorts = {
   now(): number;
+  /** The origin each pool's config must hold before it receives a password (`ORIGIN_PINS`). */
+  pins: Readonly<Record<RotationPool, OriginPin>>;
   readConfig(pool: RotationPool): Promise<HyperdriveRead>;
   switchLogin(
     pool: RotationPool,
@@ -34,8 +37,10 @@ export type RotationPorts = {
     current: string,
     pending: string
   ): Promise<AlterResult>;
-  manager: Pick<ManagerClient, 'createIdentityStoreSecret' | 'describeIdentityStoreSecret'>;
-  loginSeeds(): Promise<LoginSeeds>;
+  manager: Pick<
+    ManagerClient,
+    'createIdentityStoreSecret' | 'describeIdentityStoreSecret' | 'readLoginSeed'
+  >;
   newPassword(): string;
   seal(login: LoginName, password: string): Promise<Sealed>;
   open(login: LoginName, sealed: Sealed): Promise<string>;
@@ -95,18 +100,50 @@ function lastSwitch(state: RotationState): number | null {
   return times.length === 0 ? null : Math.max(...times);
 }
 
+/**
+ * The pool a new cycle takes: the due pool that switched longest ago (never switched counts as
+ * oldest), so a pool that is due again never keeps the next one waiting.
+ */
+export function duePool(
+  state: RotationState,
+  timing: RotationTiming,
+  now: number
+): RotationPool | undefined {
+  const [pool] = ROTATION_POOLS.filter(candidate => {
+    const switched = state.switchedAt[candidate];
+    return switched === undefined || now - switched >= timing.periodMs;
+  }).sort((left, right) => (state.switchedAt[left] ?? -1) - (state.switchedAt[right] ?? -1));
+  return pool;
+}
+
+/** Whether a run at `now` has a transition to make; the object builds no client otherwise. */
+export function isDue(state: RotationState, timing: RotationTiming, now: number): boolean {
+  const job = state.job;
+  switch (job.phase) {
+    case 'idle':
+      return job.nextAttemptAt <= now && duePool(state, timing, now) !== undefined;
+    case 'altering':
+    case 'storing':
+    case 'switching':
+      return job.nextAttemptAt <= now;
+    case 'awaiting_approval':
+    case 'lost':
+      return job.nextCheckAt <= now;
+  }
+}
+
+const ORIGIN_MISMATCH: Failure = {
+  status: 'refused',
+  detail: 'config origin differs from the pinned origin',
+};
+
 async function startCycle(
   state: RotationState,
   ports: RotationPorts,
   timing: RotationTiming,
   now: number
 ): Promise<Step> {
-  // The due pool that switched longest ago goes first (never switched counts as oldest), so a pool
-  // that is due again never keeps the next one waiting.
-  const [pool] = ROTATION_POOLS.filter(candidate => {
-    const switched = state.switchedAt[candidate];
-    return switched === undefined || now - switched >= timing.periodMs;
-  }).sort((left, right) => (state.switchedAt[left] ?? -1) - (state.switchedAt[right] ?? -1));
+  const pool = duePool(state, timing, now);
   if (pool === undefined) return { state, wait: true };
   const read = await ports.readConfig(pool);
   if (read.status !== 'ok') {
@@ -126,29 +163,17 @@ async function startCycle(
   const login = read.origin.user === first ? second : first;
   let logins = state.logins;
   if (logins[login] === undefined) {
-    let seeds: LoginSeeds;
-    try {
-      seeds = await ports.loginSeeds();
-    } catch {
-      const nextAttemptAt = failureWait(
-        { status: 'refused', detail: 'login seeds did not parse' },
-        timing,
-        now,
-        { step: 'seed', pool, login }
-      );
+    // The object holds no password for the idle login: read its seed from `/db-switch/uts`.
+    const seed = await ports.manager.readLoginSeed(login);
+    if (seed.status !== 'present') {
+      const failure: Failure =
+        seed.status === 'missing'
+          ? { status: 'refused', detail: 'idle login has no password and no seed' }
+          : seed;
+      const nextAttemptAt = failureWait(failure, timing, now, { step: 'seed', pool, login });
       return { state: withJob(state, { phase: 'idle', nextAttemptAt }), wait: true };
     }
-    const seed = seeds[login];
-    if (seed === undefined) {
-      const nextAttemptAt = failureWait(
-        { status: 'refused', detail: 'idle login has no password and no seed' },
-        timing,
-        now,
-        { step: 'seed', pool, login }
-      );
-      return { state: withJob(state, { phase: 'idle', nextAttemptAt }), wait: true };
-    }
-    logins = { ...logins, [login]: await ports.seal(login, seed) };
+    logins = { ...logins, [login]: await ports.seal(login, seed.value) };
     log('log', 'seed_adopted', { pool, login });
   }
   const pending = await ports.seal(login, ports.newPassword());
@@ -175,6 +200,16 @@ async function alter(
   if (primary.status !== 'ok') {
     return {
       state: withJob(state, { ...job, nextAttemptAt: failureWait(primary, timing, now, fields) }),
+      wait: true,
+    };
+  }
+  // The ALTER sends the current and the pending password: only to the pinned primary.
+  if (!originMatches(ports.pins.app, primary.origin)) {
+    return {
+      state: withJob(state, {
+        ...job,
+        nextAttemptAt: failureWait(ORIGIN_MISMATCH, timing, now, fields),
+      }),
       wait: true,
     };
   }
@@ -279,7 +314,7 @@ async function store(
           secretName: job.secretName,
           requestedAt: now,
           nextCheckAt: now + timing.approvalCheckMs,
-          overdueAlerted: false,
+          lastAlertAt: null,
         }),
         wait: true,
       };
@@ -325,15 +360,32 @@ async function checkApproval(
       wait: true,
     };
   }
-  const overdue = now - job.requestedAt >= timing.approvalAlertMs;
-  if (overdue && !job.overdueAlerted) {
-    log('error', 'approval_overdue', { ...fields, waitingMs: now - job.requestedAt });
+  const waitingMs = now - job.requestedAt;
+  if (waitingMs >= timing.approvalExpiryMs) {
+    // A rejected or expired change request never appears: ask again under a new name with the
+    // same password, which the login already has.
+    log('error', 'approval_expired', { ...fields, waitingMs });
+    return {
+      state: withJob(state, {
+        phase: 'storing',
+        pool: job.pool,
+        login: job.login,
+        startedAt: job.startedAt,
+        secretName: rotationSecretName(job.login, new Date(now)),
+        nextAttemptAt: now,
+      }),
+      wait: false,
+    };
   }
+  const alertDue =
+    waitingMs >= timing.approvalAlertMs &&
+    (job.lastAlertAt === null || now - job.lastAlertAt >= timing.approvalAlertMs);
+  if (alertDue) log('error', 'approval_overdue', { ...fields, waitingMs });
   return {
     state: withJob(state, {
       ...job,
       nextCheckAt: now + timing.approvalCheckMs,
-      overdueAlerted: job.overdueAlerted || overdue,
+      lastAlertAt: alertDue ? now : job.lastAlertAt,
     }),
     wait: true,
   };
@@ -357,6 +409,16 @@ async function switchConfig(
   if (read.status !== 'ok') {
     return {
       state: withJob(state, { ...job, nextAttemptAt: failureWait(read, timing, now, fields) }),
+      wait: true,
+    };
+  }
+  // The PATCH sends the new password: only to a config that still holds its pinned origin.
+  if (!originMatches(ports.pins[job.pool], read.origin)) {
+    return {
+      state: withJob(state, {
+        ...job,
+        nextAttemptAt: failureWait(ORIGIN_MISMATCH, timing, now, fields),
+      }),
       wait: true,
     };
   }
@@ -396,14 +458,13 @@ async function recover(
   now: number
 ): Promise<Step> {
   const fields = { step: 'recover', pool: job.pool, login: job.login };
-  let seed: string | undefined;
-  try {
-    seed = (await ports.loginSeeds())[job.login];
-  } catch {
-    seed = undefined;
-  }
-  if (seed === undefined) {
-    log('error', 'login_lost', { ...fields, sinceMs: now - job.since });
+  const seed = await ports.manager.readLoginSeed(job.login);
+  if (seed.status !== 'present') {
+    log('error', 'login_lost', {
+      ...fields,
+      sinceMs: now - job.since,
+      seed: seed.status === 'missing' ? 'missing' : seed.detail,
+    });
     return {
       state: withJob(state, { ...job, nextCheckAt: now + timing.approvalCheckMs }),
       wait: true,
@@ -414,7 +475,7 @@ async function recover(
   return {
     state: {
       ...state,
-      logins: { ...state.logins, [job.login]: await ports.seal(job.login, seed) },
+      logins: { ...state.logins, [job.login]: await ports.seal(job.login, seed.value) },
       job: {
         phase: 'altering',
         pool: job.pool,

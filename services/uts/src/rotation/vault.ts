@@ -8,8 +8,11 @@ export const SealedSchema = z.strictObject({
 export type Sealed = z.infer<typeof SealedSchema>;
 
 /**
- * The stored key: generated inside the rotation object and never sent anywhere (design E6). workerd
- * exports empty JWK members of other key types too, so the parse keeps only the AES ones.
+ * The stored key, generated inside the rotation object (design E6). It sits in the same object
+ * storage as the sealed passwords, so sealing keeps passwords out of storage dumps and traces only;
+ * anyone who can read that storage can read both. The object never sends the key anywhere and
+ * imports it as non-extractable. workerd exports empty JWK members of other key types too, so the
+ * parse keeps only the AES ones.
  */
 export const StoredVaultKeySchema = z.object({
   kty: z.literal('oct'),

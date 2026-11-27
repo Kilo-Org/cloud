@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { createServer, type Socket } from 'node:net';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { alterLoginPassword, type DirectTarget } from '../../src/rotation/postgres';
+import {
+  alterLoginPassword,
+  type DirectTarget,
+  directClientConfig,
+} from '../../src/rotation/postgres';
 import { scramVerifier } from '../../src/rotation/scram';
 import { adminUrl, withAdmin } from './connection';
 
@@ -64,5 +69,75 @@ describe('the direct ALTER of the login rotation', () => {
       status: 'unreachable',
       detail: 'connection failed',
     });
+  });
+});
+
+describe('the direct session settings', () => {
+  it('never connect to a host other than loopback without verified TLS', () => {
+    for (const host of ['db.example.test', '10.0.0.5', '2001:db8::1', 'localhost.example.test']) {
+      expect(directClientConfig({ host, port: 5432, database: 'postgres' }, LOGIN).ssl).toEqual({
+        rejectUnauthorized: true,
+      });
+    }
+    for (const host of ['127.0.0.1', 'localhost']) {
+      expect(directClientConfig({ host, port: 5432, database: 'postgres' }, LOGIN).ssl).toBe(false);
+    }
+  });
+});
+
+/**
+ * A loopback server that answers every startup with one authentication request, then records
+ * whether the client sent a password message ('p') in reply.
+ */
+async function authServer(
+  request: Buffer
+): Promise<{ port: number; passwordSent: () => boolean; close: () => void }> {
+  let passwordSent = false;
+  const sockets: Socket[] = [];
+  const server = createServer(socket => {
+    sockets.push(socket);
+    let started = false;
+    socket.on('data', chunk => {
+      if (!started) {
+        started = true;
+        socket.write(request);
+        return;
+      }
+      if (chunk[0] === 0x70) passwordSent = true;
+    });
+  });
+  const listening = Promise.withResolvers<void>();
+  server.listen(0, '127.0.0.1', listening.resolve);
+  await listening.promise;
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('no port');
+  return {
+    port: address.port,
+    passwordSent: () => passwordSent,
+    close: () => {
+      for (const socket of sockets) socket.destroy();
+      server.close();
+    },
+  };
+}
+
+describe('a server that does not ask for SCRAM-SHA-256', () => {
+  it.each([
+    ['cleartext', Buffer.from([0x52, 0, 0, 0, 8, 0, 0, 0, 3])],
+    ['MD5', Buffer.from([0x52, 0, 0, 0, 12, 0, 0, 0, 5, 1, 2, 3, 4])],
+  ])('gets no %s password and is refused', async (_method, request) => {
+    const server = await authServer(request);
+    try {
+      const result = await alterLoginPassword(
+        { host: '127.0.0.1', port: server.port, database: 'postgres' },
+        LOGIN,
+        'current-password',
+        'pending-password'
+      );
+      expect(result).toEqual({ status: 'refused', detail: 'server did not ask for SCRAM-SHA-256' });
+      expect(server.passwordSent()).toBe(false);
+    } finally {
+      server.close();
+    }
   });
 });

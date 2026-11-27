@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SecretDescription, SecretWrite } from '../../src/manager/client';
+import type { SecretDescription, SecretWrite, SeedRead } from '../../src/manager/client';
 import {
   DEPLOYED_TIMING,
   developmentTiming,
   type LoginName,
+  type OriginPin,
+  originMatches,
   type RotationPool,
   type RotationTiming,
 } from '../../src/rotation/config';
@@ -14,13 +16,13 @@ import type {
 } from '../../src/rotation/hyperdrive';
 import {
   advance,
+  isDue,
   nextSwitchWindow,
   type RotationPorts,
   type RotationStore,
   runRotation,
 } from '../../src/rotation/job';
 import type { AlterResult } from '../../src/rotation/postgres';
-import type { LoginSeeds } from '../../src/rotation/secrets';
 import {
   INITIAL_ROTATION,
   type RotationState,
@@ -36,7 +38,10 @@ const DAY = 24 * HOUR;
 const START = Date.UTC(2026, 10, 27, 3, 0, 0);
 const TIMING: RotationTiming = { ...DEPLOYED_TIMING };
 
-const SEEDS: LoginSeeds = {
+/** The seeds in the stand-in manager's `/db-switch/uts`, one per login. */
+type Seeds = Partial<Record<LoginName, string>>;
+
+const SEEDS: Seeds = {
   uts_app_a: 'seed-app-a',
   uts_app_b: 'seed-app-b',
   uts_pat_a: 'seed-pat-a',
@@ -48,6 +53,7 @@ const SEEDS: LoginSeeds = {
 /** A stand-in identity store, manager and Cloudflare API behind the job's ports. */
 class World {
   now = START;
+  pins: Record<RotationPool, OriginPin> = { app: PINNED, pat: PINNED, reader: PINNED };
   /** The password each login really has. */
   passwords = new Map<LoginName, string>([
     ['uts_app_a', 'seed-app-a'],
@@ -66,7 +72,8 @@ class World {
   hyperdrivePasswords = new Map<string, string>();
   secrets = new Map<string, string>();
   pendingApprovals = new Map<string, string>();
-  seeds: LoginSeeds = { ...SEEDS };
+  seeds: Seeds = { ...SEEDS };
+  seedOverride: SeedRead | null = null;
   approvalPolicy = false;
   alterOverride: AlterResult | null = null;
   readOverride: HyperdriveRead | null = null;
@@ -86,6 +93,7 @@ class World {
   ports(): RotationPorts {
     return {
       now: () => this.now,
+      pins: this.pins,
       readConfig: async pool => {
         this.calls.push(`read:${pool}`);
         return this.readOverride ?? { status: 'ok', origin: { ...this.configs[pool] } };
@@ -123,8 +131,12 @@ class World {
           if (this.describeOverride !== null) return this.describeOverride;
           return this.secrets.has(name) ? { status: 'present' } : { status: 'missing' };
         },
+        readLoginSeed: async login => {
+          if (this.seedOverride !== null) return this.seedOverride;
+          const value = Object.entries(this.seeds).find(([name]) => name === login)?.[1];
+          return value === undefined ? { status: 'missing' } : { status: 'present', value };
+        },
       },
-      loginSeeds: async () => this.seeds,
       newPassword: () => `new-password-${(this.counter += 1)}`,
       seal: (login, password) => this.vault.seal(login, password),
       open: (login, sealed) => this.vault.open(login, sealed),
@@ -133,8 +145,22 @@ class World {
 }
 
 function origin(user: string): HyperdriveOrigin {
-  return { scheme: 'postgres', host: 'db.example.test', port: 5432, database: 'postgres', user };
+  return {
+    scheme: 'postgres',
+    host: 'db.example.test',
+    port: 5432,
+    database: 'postgres',
+    user,
+    otherFields: [],
+  };
 }
+
+const PINNED: OriginPin = {
+  kind: 'exact',
+  host: 'db.example.test',
+  port: 5432,
+  database: 'postgres',
+};
 
 class MemoryStore implements RotationStore {
   stored: StoredRotation = INITIAL_ROTATION;
@@ -191,7 +217,7 @@ describe('a full cycle', () => {
     expect(result).toEqual({ status: 'ran', phase: 'idle', steps: 4 });
     expect(world.passwords.get('uts_app_b')).toBe('new-password-1');
     expect(world.passwords.get('uts_app_a')).toBe('seed-app-a');
-    expect(world.secrets.get('uts_app_b_20261127')).toBe('new-password-1');
+    expect(world.secrets.get('uts_app_b_20261127_030000')).toBe('new-password-1');
     expect(world.configs.app.user).toBe('uts_app_b');
     expect(world.hyperdrivePasswords.get('uts_app_b')).toBe('new-password-1');
     expect(store.stored.state.switchedAt).toEqual({ app: START });
@@ -237,6 +263,18 @@ describe('the idle login without a password', () => {
     expect(logged('error', 'refused')).toBe(true);
   });
 
+  it('retries a minute later when the seed read fails, without starting the cycle', async () => {
+    world.seedOverride = {
+      status: 'unreachable',
+      detail: 'manager request failed',
+      retryAfterMs: null,
+    };
+    await run();
+    expect(job()).toEqual({ phase: 'idle', nextAttemptAt: START + MINUTE });
+    expect(store.stored.state.logins).toEqual({});
+    expect(logged('warn', 'retry')).toBe(true);
+  });
+
   it('alternates a -> b -> a when both seeds are present', async () => {
     await run();
     expect(world.configs.app.user).toBe('uts_app_b');
@@ -254,7 +292,7 @@ describe('the idle login without a password', () => {
     expect(world.configs.app.user).toBe('uts_app_a');
     expect(world.passwords.get('uts_app_a')).toBe('new-password-4');
     expect(world.hyperdrivePasswords.get('uts_app_a')).toBe('new-password-4');
-    expect(world.secrets.get('uts_app_a_20261227')).toBe('new-password-4');
+    expect(world.secrets.get('uts_app_a_20261227_030000')).toBe('new-password-4');
     expect(world.passwords.get('uts_app_b')).toBe('new-password-1');
   });
 });
@@ -264,7 +302,7 @@ describe('approval pending', () => {
     world.approvalPolicy = true;
   });
 
-  it('waits for the change request, checks hourly, alerts once after 24 hours, then switches', async () => {
+  it('waits for the change request, checks hourly, alerts once a day after 24 hours, then switches', async () => {
     await run();
     expect(job()).toMatchObject({
       phase: 'awaiting_approval',
@@ -280,21 +318,24 @@ describe('approval pending', () => {
     await run();
     expect(job()).toMatchObject({
       phase: 'awaiting_approval',
-      overdueAlerted: false,
+      lastAlertAt: null,
       nextCheckAt: START + 2 * HOUR,
     });
 
     world.now = START + DAY;
     await run();
-    expect(job()).toMatchObject({ overdueAlerted: true });
+    expect(job()).toMatchObject({ lastAlertAt: START + DAY });
     expect(logs.filter(line => line.includes('approval_overdue'))).toHaveLength(1);
     world.now += HOUR;
     await run();
     expect(logs.filter(line => line.includes('approval_overdue'))).toHaveLength(1);
+    world.now = START + 2 * DAY;
+    await run();
+    expect(logs.filter(line => line.includes('approval_overdue'))).toHaveLength(2);
 
     world.approve();
     // The approval landed outside the window: the switch waits for 02:00 UTC.
-    world.now += HOUR;
+    world.now = START + 2 * DAY + 2 * HOUR;
     await run();
     expect(job()).toMatchObject({ phase: 'switching' });
     const switching = job();
@@ -320,6 +361,35 @@ describe('approval pending', () => {
       nextCheckAt: START + 2 * HOUR + MINUTE,
     });
   });
+
+  it('asks again under a new name with the same password after 72 hours without the secret', async () => {
+    await run();
+    const first = 'uts_app_b_20261127_030000';
+    expect(world.pendingApprovals.has(first)).toBe(true);
+    // The secret admin rejected the request: it never appears.
+    world.pendingApprovals.clear();
+    world.now = START + 3 * DAY;
+    await run();
+    const second = 'uts_app_b_20261130_030000';
+    expect(logged('error', 'approval_expired')).toBe(true);
+    expect(job()).toMatchObject({
+      phase: 'awaiting_approval',
+      secretName: second,
+      requestedAt: START + 3 * DAY,
+    });
+    expect(world.pendingApprovals.get(second)).toBe('new-password-1');
+    expect(world.passwords.get('uts_app_b')).toBe('new-password-1');
+    // A late approval of the first name does not count: only this request's name does.
+    world.secrets.set(first, 'new-password-1');
+    world.now += HOUR;
+    await run();
+    expect(job()).toMatchObject({ phase: 'awaiting_approval', secretName: second });
+    world.approve();
+    // 02:00 UTC the next day, inside the switch window.
+    world.now = START + 4 * DAY - HOUR;
+    await run();
+    expect(world.configs.app.user).toBe('uts_app_b');
+  });
 });
 
 describe('describe missing', () => {
@@ -328,7 +398,7 @@ describe('describe missing', () => {
     await run();
     expect(job()).toMatchObject({ phase: 'storing', nextAttemptAt: START + MINUTE });
     // The create landed, but its answer was lost.
-    world.secrets.set('uts_app_b_20261127', 'new-password-1');
+    world.secrets.set('uts_app_b_20261127_030000', 'new-password-1');
     world.createOverride = null;
     world.now += MINUTE;
     world.calls = [];
@@ -445,7 +515,7 @@ describe('partial progress', () => {
     await run();
     expect(world.calls).toContain('alter:uts_app_b');
     expect(world.passwords.get('uts_app_b')).toBe('new-password-1');
-    expect(world.secrets.get('uts_app_b_20261127')).toBe('new-password-1');
+    expect(world.secrets.get('uts_app_b_20261127_030000')).toBe('new-password-1');
     expect(world.configs.app.user).toBe('uts_app_b');
   });
 });
@@ -483,10 +553,61 @@ describe('timing', () => {
       switchSpacingMs: 2000,
       approvalCheckMs: 2000,
       approvalAlertMs: 48_000,
+      approvalExpiryMs: 144_000,
       retryMs: 2000,
       refusedRetryMs: 2000,
       offPeakUtcHours: null,
     });
+  });
+});
+
+describe('the pinned origins', () => {
+  it('refuses the ALTER when the primary config points at another host, and sends no password', async () => {
+    world.configs.app = { ...origin('uts_app_a'), host: 'attacker.example.test' };
+    await run();
+    expect(job()).toMatchObject({ phase: 'altering', nextAttemptAt: START + HOUR });
+    expect(world.calls.filter(call => call.startsWith('alter:'))).toEqual([]);
+    expect(logs.some(line => line.includes('config origin differs from the pinned origin'))).toBe(
+      true
+    );
+  });
+
+  it('refuses the PATCH when the pool config moved to another database before the switch', async () => {
+    world.switchOverride = { status: 'unreachable', detail: 'cloudflare request failed' };
+    await run();
+    expect(job()).toMatchObject({ phase: 'switching' });
+    world.switchOverride = null;
+    world.configs.app = { ...origin('uts_app_a'), database: 'other' };
+    world.now += MINUTE;
+    world.calls = [];
+    await run();
+    expect(world.calls).toEqual(['read:app']);
+    expect(job()).toMatchObject({ phase: 'switching', nextAttemptAt: START + MINUTE + HOUR });
+  });
+
+  it('compares host, port and database exactly, and admits only loopback for a loopback pin', () => {
+    const target = { host: 'db.example.test', port: 5432, database: 'postgres' };
+    expect(originMatches(PINNED, target)).toBe(true);
+    expect(originMatches(PINNED, { ...target, port: 6543 })).toBe(false);
+    expect(originMatches({ kind: 'loopback' }, { ...target, host: '127.0.0.1' })).toBe(true);
+    expect(originMatches({ kind: 'loopback' }, target)).toBe(false);
+  });
+});
+
+describe('a run with nothing due', () => {
+  it('is recognised before any client is built', async () => {
+    expect(isDue(INITIAL_ROTATION.state, TIMING, START)).toBe(true);
+    world.approvalPolicy = true;
+    await run();
+    expect(isDue(store.stored.state, TIMING, START + MINUTE)).toBe(false);
+    expect(isDue(store.stored.state, TIMING, START + HOUR)).toBe(true);
+    const allSwitched: RotationState = {
+      logins: {},
+      switchedAt: { app: START, pat: START, reader: START },
+      job: { phase: 'idle', nextAttemptAt: 0 },
+    };
+    expect(isDue(allSwitched, TIMING, START + DAY)).toBe(false);
+    expect(isDue(allSwitched, TIMING, START + 30 * DAY)).toBe(true);
   });
 });
 

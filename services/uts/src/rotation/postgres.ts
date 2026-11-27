@@ -29,38 +29,77 @@ function sqlState(error: unknown): string | null {
 type Session = { status: 'open'; client: pg.Client } | { status: 'auth_failed' };
 
 /**
- * One direct session as `login`. Production and staging require TLS; development connects to a
- * loopback Postgres without it, and refuses any other host in plaintext.
+ * The `pg` client settings of one direct session. A loopback host (development only; the origin
+ * pins admit no other) connects in plaintext; every other host requires TLS with certificate
+ * verification, and no setting here turns that off.
+ */
+export function directClientConfig(target: DirectTarget, login: string): pg.ClientConfig {
+  const loopback = target.host === '127.0.0.1' || target.host === 'localhost';
+  return {
+    host: target.host,
+    port: target.port,
+    database: target.database,
+    user: login,
+    ssl: loopback ? false : { rejectUnauthorized: true },
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    application_name: 'uts-login-rotation',
+  };
+}
+
+/** A server that asked for the password in clear text or as MD5 instead of SCRAM-SHA-256. */
+class NotScramError extends Error {
+  override readonly name = 'NotScramError';
+}
+
+/**
+ * One direct session as `login`. The password goes only into a SCRAM-SHA-256 exchange: `pg` reads
+ * it through the function below, which refuses once the server has asked for a cleartext or MD5
+ * password, so neither form ever leaves the Worker.
  */
 async function openSession(
   target: DirectTarget,
   login: string,
   password: string
 ): Promise<Session> {
-  const loopback = target.host === '127.0.0.1' || target.host === 'localhost';
+  let notScram = false;
   const client = new pg.Client({
-    host: target.host,
-    port: target.port,
-    database: target.database,
-    user: login,
-    password,
-    ssl: loopback ? false : { rejectUnauthorized: true },
-    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
-    application_name: 'uts-login-rotation',
+    ...directClientConfig(target, login),
+    password: async () => {
+      if (notScram) throw new NotScramError('server did not ask for SCRAM-SHA-256');
+      return password;
+    },
   });
+  // These listeners run before the client's own, which then asks the function above.
+  const refuse = () => {
+    notScram = true;
+  };
+  client.connection.once('authenticationCleartextPassword', refuse);
+  client.connection.once('authenticationMD5Password', refuse);
   try {
     await client.connect();
     return { status: 'open', client };
   } catch (error) {
     await client.end().catch(() => undefined);
+    if (notScram)
+      throw new DirectConnectionError('server did not ask for SCRAM-SHA-256', 'refused');
     const state = sqlState(error);
     if (state !== null && AUTH_SQLSTATE.test(state)) return { status: 'auth_failed' };
-    throw new DirectConnectionError(state === null ? 'connection failed' : `SQLSTATE ${state}`);
+    throw new DirectConnectionError(
+      state === null ? 'connection failed' : `SQLSTATE ${state}`,
+      'unreachable'
+    );
   }
 }
 
 class DirectConnectionError extends Error {
   override readonly name = 'DirectConnectionError';
+
+  constructor(
+    message: string,
+    readonly status: 'unreachable' | 'refused'
+  ) {
+    super(message);
+  }
 }
 
 /**
@@ -113,7 +152,7 @@ export async function alterLoginPassword(
     }
   } catch (error) {
     if (error instanceof DirectConnectionError) {
-      return { status: 'unreachable', detail: error.message };
+      return { status: error.status, detail: error.message };
     }
     throw error;
   }

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type Env, readConfig } from '../../src/env';
 import { getLoginRotationStub } from '../../src/dos/stubs';
-import {
-  DEPLOYED_TIMING,
-  HYPERDRIVE_CONFIG_IDS,
-  rotationSettings,
-} from '../../src/rotation/config';
+import { HYPERDRIVE_CONFIG_IDS, rotationSettings } from '../../src/rotation/config';
 import { loginRotationStep } from '../../src/scheduled';
 import { config, env } from './test-env';
 
@@ -57,10 +53,11 @@ describe('the login rotation switch', () => {
         baseUrl: 'http://127.0.0.1:9563',
         configIds: HYPERDRIVE_CONFIG_IDS.development,
       },
+      pins: { app: { kind: 'loopback' }, pat: { kind: 'loopback' }, reader: { kind: 'loopback' } },
     });
   });
 
-  it('uses the Cloudflare API, Infisical and the deployed timing in production, and STS for its secrets', () => {
+  it('stays misconfigured in production until STS is bound and the origins are pinned', () => {
     const production: Env = {
       ...env,
       UTS_ENVIRONMENT: 'production',
@@ -73,20 +70,16 @@ describe('the login rotation switch', () => {
     };
     expect(rotationSettings(production, readConfig(production))).toEqual({
       status: 'misconfigured',
-      missing: ['STS'],
+      missing: ['STS', 'ORIGIN_PINS'],
     });
     const bound: Env = {
       ...production,
       STS: { getBundle: () => Promise.reject(new Error('unused')) },
     };
-    expect(rotationSettings(bound, readConfig(bound))).toMatchObject({
-      status: 'on',
-      timing: DEPLOYED_TIMING,
-      manager: { baseUrl: 'https://eu.infisical.com' },
-      cloudflare: {
-        baseUrl: 'https://api.cloudflare.com',
-        configIds: HYPERDRIVE_CONFIG_IDS.production,
-      },
+    // Staging and production pin no identity-store origin before the rotation phase.
+    expect(rotationSettings(bound, readConfig(bound))).toEqual({
+      status: 'misconfigured',
+      missing: ['ORIGIN_PINS'],
     });
     expect(() =>
       readConfig({ ...production, CLOUDFLARE_API_BASE_URL: 'http://127.0.0.1:1' })

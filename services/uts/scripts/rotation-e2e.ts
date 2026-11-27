@@ -111,6 +111,9 @@ const CreateSchema = z.strictObject({
 const managerSecrets = new Map<string, string>();
 const changeRequests = new Map<string, { value: string; openedAt: number }>();
 let changeRequestCount = 0;
+/** The login seeds in `/db-switch/uts`, and how often each was read. */
+const seedFolder = new Map<string, string>();
+const seedReads = new Map<string, number>();
 
 async function manager(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const url = new URL(request.url ?? '/', `http://127.0.0.1:${MANAGER_PORT}`);
@@ -147,6 +150,17 @@ async function manager(request: IncomingMessage, response: ServerResponse): Prom
     return send(response, 200, {
       approval: { id: `approval-${changeRequestCount}`, status: 'open' },
     });
+  }
+  if (url.searchParams.get('secretPath') === '/db-switch/uts') {
+    // The seed read of decision Q88: a value, from this folder only.
+    if (url.searchParams.get('viewSecretValue') !== 'true') {
+      return send(response, 400, { message: 'seed read asks for the value' });
+    }
+    seedReads.set(name, (seedReads.get(name) ?? 0) + 1);
+    const seed = seedFolder.get(name);
+    return seed === undefined
+      ? send(response, 404, { message: 'Secret not found' })
+      : send(response, 200, { secret: { id: name, secretKey: name, secretValue: seed } });
   }
   if (
     url.searchParams.get('secretPath') !== '/admin/identity-store' ||
@@ -382,10 +396,8 @@ async function main(): Promise<void> {
   // An env file's values are Worker secrets to wrangler dev, which never prints them; a `--var`
   // value is printed in the binding list.
   const envFile = join(WORK, 'rotation.env');
-  const localSecrets = JSON.stringify({
-    UTS_HYPERDRIVE_SWITCH_TOKEN: SWITCH_TOKEN,
-    UTS_IDENTITY_STORE_LOGIN_SEEDS: JSON.stringify(seeds),
-  });
+  const localSecrets = JSON.stringify({ UTS_HYPERDRIVE_SWITCH_TOKEN: SWITCH_TOKEN });
+  for (const login of LOGIN_NAMES) seedFolder.set(login, seeds[login]);
   writeFileSync(envFile, `UTS_LOCAL_SECRETS='${localSecrets}'\n`, { mode: 0o600 });
   const log = createWriteStream(join(WORK, 'mint.log'));
   worker = spawn(
@@ -491,6 +503,13 @@ async function main(): Promise<void> {
     check(
       changeRequestCount === rotated.length,
       `3. ${changeRequestCount} change requests for ${rotated.length} rotations`
+    );
+    const reads = Object.fromEntries(seedReads);
+    console.log(`   seed reads from /db-switch/uts: ${JSON.stringify(reads)}`);
+    check(
+      JSON.stringify(Object.keys(reads).sort()) === JSON.stringify([...rotated].sort()) &&
+        Object.values(reads).every(count => count === 1),
+      '3. each rotated login read its seed from /db-switch/uts once, and no other login read one'
     );
 
     const phase = PhaseSchema.parse(await (await fetch(`${MINT}/__dev/rotation`)).json());

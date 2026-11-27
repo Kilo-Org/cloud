@@ -43,8 +43,8 @@
     "WEBAUTHN_RP_ID": "app.kilo.ai",
     "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
     // The identity-store login rotation (src/rotation/config.ts) ships off; turning it on here
-    // belongs to the later rotation phase, after STS delivers UTS_HYPERDRIVE_SWITCH_TOKEN and
-    // UTS_IDENTITY_STORE_LOGIN_SEEDS (README, "Login rotation").
+    // belongs to the later rotation phase, after STS delivers UTS_HYPERDRIVE_SWITCH_TOKEN, the login
+    // seeds sit in /db-switch/uts and the origins are pinned (README, "Login rotation").
     "LOGIN_ROTATION": "off",
     // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
     // UTS_TURNSTILE_SITE_KEY are added here, after the secrets SIGNIN_EMAIL_HASH_KEY,

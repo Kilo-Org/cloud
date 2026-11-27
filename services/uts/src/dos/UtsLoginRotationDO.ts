@@ -3,10 +3,10 @@ import { type Env, readConfig, type UtsConfig } from '../env';
 import { rotationManager } from '../manager/key-set';
 import { rotationSettings } from '../rotation/config';
 import { HyperdriveClient } from '../rotation/hyperdrive';
-import { type RotationStore, type RunResult, runRotation } from '../rotation/job';
+import { isDue, type RotationStore, type RunResult, runRotation } from '../rotation/job';
 import { alterLoginPassword } from '../rotation/postgres';
 import { newLoginPassword } from '../rotation/scram';
-import { rotationSecrets } from '../rotation/secrets';
+import { switchToken } from '../rotation/secrets';
 import { INITIAL_ROTATION, StoredRotationSchema } from '../rotation/state';
 import { createVaultKey, StoredVaultKeySchema, Vault } from '../rotation/vault';
 import { loginRotationObjectId } from './stubs';
@@ -56,26 +56,31 @@ export class UtsLoginRotationDO extends DurableObject<Env> {
       if (settings.status === 'misconfigured') {
         return { status: 'misconfigured', reason: `missing ${settings.missing.join(', ')}` };
       }
+      // Most runs have nothing due: they read the state and return without building any client.
+      const store = this.#store();
+      const stored = await store.load();
+      if (!isDue(stored.state, settings.timing, Date.now())) {
+        return { status: 'ran', phase: stored.state.job.phase, steps: 0 };
+      }
       const manager = rotationManager(this.env, this.#config);
       if (manager === null) return { status: 'misconfigured', reason: 'no manager' };
       const vault = await this.#vault();
-      const secrets = rotationSecrets(this.env, this.#config);
       const hyperdrive = new HyperdriveClient({
         baseUrl: settings.cloudflare.baseUrl,
         accountId: settings.cloudflare.accountId,
-        token: () => secrets.switchToken(),
+        token: () => switchToken(this.env, this.#config),
       });
       const { configIds } = settings.cloudflare;
       return await runRotation(
-        this.#store(),
+        store,
         {
           now: () => Date.now(),
+          pins: settings.pins,
           readConfig: pool => hyperdrive.read(configIds[pool]),
           switchLogin: (pool, current, login, password) =>
             hyperdrive.switchLogin(configIds[pool], current, login, password),
           alter: alterLoginPassword,
           manager,
-          loginSeeds: () => secrets.loginSeeds(),
           newPassword: newLoginPassword,
           seal: (login, password) => vault.seal(login, password),
           open: (login, sealed) => vault.open(login, sealed),

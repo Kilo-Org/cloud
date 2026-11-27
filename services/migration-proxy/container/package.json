@@ -1,0 +1,19 @@
+{
+  "name": "@kilocode/migration-proxy-container",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The migration proxy's container: one Postgres session per run (services/migration-proxy, contract §1). A standalone package outside the pnpm workspace, with its own lockfile and exact pins.",
+  "type": "module",
+  "packageManager": "pnpm@11.1.2+sha512.415a1cc25974731e75455c1468371be74c5aa5fb7621b50d4056d222451609f11412f23fd602e6169f1e060466641f798597e1be961a10688836a67b16569499",
+  "engines": {
+    "node": "24.22.1"
+  },
+  "scripts": {
+    "start": "node src/server.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  }
+}

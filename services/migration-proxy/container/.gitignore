@@ -1,0 +1,2 @@
+# The root .gitignore ignores *.pem; the bundled CA is a public certificate and must be committed.
+!ca-bundle.pem

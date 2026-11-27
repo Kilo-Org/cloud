@@ -1,0 +1,30 @@
+{
+  "name": "cloudflare-migration-proxy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run && vitest run --config vitest.node.config.ts",
+    "test:container": "vitest run --config vitest.container.config.ts",
+    "typecheck": "tsgo --noEmit && tsgo --noEmit -p container/tsconfig.json",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/migration-proxy/src services/migration-proxy/test services/migration-proxy/container/src",
+    "cf-typegen": "wrangler types --include-env=false"
+  },
+  "dependencies": {
+    "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "8.23.1",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "pg": "8.23.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

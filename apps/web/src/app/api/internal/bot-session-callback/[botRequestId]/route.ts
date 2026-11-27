@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { isLegacyBotCallbackTokenAllowed, matchBotCallbackToken } from '@/lib/bot/callback-token';
+import { callerLabel, observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   bot_requests,
@@ -823,6 +824,18 @@ export async function POST(
     if (tokenMatch === 'legacy' && !isLegacyBotCallbackTokenAllowed(requestRow.created_at)) {
       logCallback('Rejecting callback signed with the compatibility derivation', { botRequestId });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (tokenMatch === 'legacy') {
+      // The compatibility derivation authenticates under the same `CALLBACK_TOKEN_SECRET`, so it is
+      // an internal shared secret (design section 9.4, item 9); counted only after the cutoff gate
+      // above accepted it.
+      observeInternalAuth(
+        'web',
+        'bot_session_callback',
+        'legacy_shared_secret',
+        callerLabel(req.headers.get('x-kilo-caller'))
+      );
     }
 
     const completedStepCount = Math.max(callbackStepCount, requestRow.steps?.length ?? 0);

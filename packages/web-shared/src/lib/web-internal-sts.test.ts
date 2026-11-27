@@ -58,11 +58,14 @@ beforeEach(() => {
   secretRead.mockReset().mockResolvedValue('installed-internal-secret');
   installInternalApiSecretRead(secretRead);
   globalThis.fetch = fetchMock as unknown as typeof fetch;
+  // As `apps/ai-gateway/next.config.mjs` inlines it; a `kilocode-app` test deletes it.
+  process.env.KILO_STS_WORKLOAD = 'ai-gateway';
 });
 
 afterEach(() => {
   globalThis.__kilocodeInternalApiSecretRead = undefined;
   globalThis.fetch = nativeFetch;
+  delete process.env.KILO_STS_WORKLOAD;
   delete process.env.VERCEL_ENV;
   delete process.env.VERCEL_TARGET_ENV;
   jest.restoreAllMocks();
@@ -112,6 +115,36 @@ describe('webInternalSenderCredential', () => {
     // Outside Vercel the deployment's STS environment is development.
     expect(mintedToken).toHaveBeenCalledWith('development', STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ);
     expect(secretRead).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing under sts outside the ai-gateway build, never asking for a self-audience token', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    delete process.env.KILO_STS_WORKLOAD;
+    await expect(
+      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+        legacySecret: secretRead,
+        auth: 'sts',
+      })
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'not_ai_gateway' });
+    expect(mintedToken).not.toHaveBeenCalled();
+    expect(secretRead).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('[web-internal-sts] no credential for a web internal route', {
+      audience: 'web',
+      scope: 'web:usage.region-handoff.record',
+      reason: 'not_ai_gateway',
+    });
+  });
+
+  it('keeps the legacy secret outside the ai-gateway build while the switch is unset', async () => {
+    delete process.env.KILO_STS_WORKLOAD;
+    await expect(
+      webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, { legacySecret: secretRead })
+    ).resolves.toEqual({
+      kind: 'ready',
+      header: 'x-internal-api-key',
+      value: 'installed-internal-secret',
+    });
+    expect(mintedToken).not.toHaveBeenCalled();
   });
 
   it('sends nothing for an unknown switch value', async () => {
@@ -263,5 +296,23 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
       getAuthoritativeClaudeBillingState({ kind: 'personal', kiloUserId: 'owner' })
     ).rejects.toThrow('Claude payer-state authentication is not configured');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a kilocode-app build hands nothing off and asks STS for nothing', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    delete process.env.KILO_STS_WORKLOAD;
+    await expect(
+      recordUsageInPrimaryRegion({ core: { id: randomUUID() } } as unknown as UsageRecordRequest)
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'credential_not_ai_gateway' });
+    await expect(
+      recordEnkryptUsageInPrimaryRegion({ id: randomUUID() } as unknown as EnkryptUsageWriteInput)
+    ).resolves.toBe(false);
+    await expect(
+      getAuthoritativeClaudeBillingState({ kind: 'personal', kiloUserId: 'owner' })
+    ).rejects.toThrow('Claude payer-state authentication is not configured');
+    expect(mintedToken).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(secretRead).not.toHaveBeenCalled();
   });
 });

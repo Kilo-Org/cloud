@@ -34,9 +34,10 @@
     "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
     // The credential of the classifier's usage writes to `/api/internal/usage/record` (decision
-    // D59): `sts` sends a `web:usage.classifier.record` STS service token over the `STS` binding,
-    // `legacy` the `INTERNAL_API_SECRET` as `x-internal-api-key`. Rollback is `legacy`.
-    "WEB_INTERNAL_AUTH": "sts",
+    // D59): `legacy` (also when unset) sends `INTERNAL_API_SECRET` as `x-internal-api-key`; `sts`
+    // a `web:usage.classifier.record` STS service token over the `STS` binding. Switch to `sts`
+    // only after the route accepts STS tokens and the Worker has its `STS` binding.
+    "WEB_INTERNAL_AUTH": "legacy",
     "KILO_AI_GATEWAY_BASE_URL": "https://ai-gateway.kilo.ai",
   },
   "durable_objects": {

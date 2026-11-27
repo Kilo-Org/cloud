@@ -11,9 +11,10 @@ import {
  * the shared internal API secret moves to STS service tokens, one scope per sender boundary).
  *
  * `WEB_INTERNAL_AUTH` is the sender's switch and its rollback (decision D59):
- * - absent, empty or `sts`: an STS service token for the route's scope, minted over the Worker's
- *   `STS` binding and sent as `Authorization: Bearer`. The legacy secret is never read.
- * - `legacy`: the route's legacy shared-secret header, exactly as before this switch existed.
+ * - absent, empty or `legacy`: the route's legacy shared-secret header, exactly as before this
+ *   switch existed. The switch to `sts` is a later config change, once the receiver accepts both.
+ * - `sts`: an STS service token for the route's scope, minted over the Worker's `STS` binding
+ *   and sent as `Authorization: Bearer`. The legacy secret is never read.
  * Any other value sends nothing.
  */
 export type WebInternalAuthMode = 'sts' | 'legacy';
@@ -25,8 +26,8 @@ export type WebInternalAuthEnv = {
 };
 
 export function webInternalAuthMode(value: string | undefined): WebInternalAuthMode | null {
-  if (value === undefined || value === '' || value === 'sts') return 'sts';
-  return value === 'legacy' ? 'legacy' : null;
+  if (value === undefined || value === '' || value === 'legacy') return 'legacy';
+  return value === 'sts' ? 'sts' : null;
 }
 
 /**

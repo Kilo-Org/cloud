@@ -5,9 +5,10 @@ import { WEB_INTERNAL_SENDER_AUTH } from '@kilocode/web-shared/lib/config.server
 import type { StsTokenFailure } from '@kilocode/web-shared/lib/sts-service-tokens';
 
 /**
- * The credential `apps/web` and `apps/ai-gateway` present to the web app's own `/api/internal/*`
- * routes (design 6.5: the shared internal API secret moves to STS service tokens, one scope per
- * sender boundary).
+ * The credential `apps/ai-gateway` presents to the web app's own `/api/internal/*` routes (design
+ * 6.5: the shared internal API secret moves to STS service tokens, one scope per sender boundary).
+ * These senders run only in the US region, where only `kilocode-ai-gateway` is deployed; the
+ * Frankfurt `kilocode-app` writes and reads its primary directly.
  *
  * `WEB_INTERNAL_SENDER_AUTH`, the senders' switch and their rollback (decision D59), set per
  * Vercel project:
@@ -15,7 +16,9 @@ import type { StsTokenFailure } from '@kilocode/web-shared/lib/sts-service-token
  *   switch existed. The switch to `sts` is a later config change, once the receiver accepts both.
  * - `sts`: an STS service token minted from this deployment's own STS environment
  *   (`stsEnvironmentOfDeployment`) with its Vercel identity, in `Authorization: Bearer`. The
- *   internal secret is never read.
+ *   internal secret is never read. Only the `ai-gateway` workload can hold these scopes, since
+ *   STS refuses a token for the caller's own audience: a build without `KILO_STS_WORKLOAD=ai-gateway`
+ *   (inlined by `apps/ai-gateway/next.config.mjs`) sends nothing rather than ask for one.
  * Any other value sends nothing.
  */
 
@@ -41,6 +44,8 @@ export function webInternalSenderMode(value: string | undefined): WebInternalSen
 export type WebInternalSenderFailure =
   /** `WEB_INTERNAL_SENDER_AUTH` holds a value other than `sts` or `legacy`. */
   | 'auth_misconfigured'
+  /** `sts` outside the `ai-gateway` build: `kilocode-app` is the audience itself. */
+  | 'not_ai_gateway'
   /** This deployment has no STS environment (`stsEnvironmentOfDeployment` refused it). */
   | 'no_sts_environment'
   /** STS or the Vercel identity gave no token. */
@@ -78,6 +83,7 @@ export async function webInternalSenderCredential(
       ? { kind: 'ready', header: 'x-internal-api-key', value: secret }
       : unavailable(target, 'secret_missing');
   }
+  if (process.env.KILO_STS_WORKLOAD !== 'ai-gateway') return unavailable(target, 'not_ai_gateway');
   // Loaded only under `sts`, so a `legacy` deployment never evaluates the token client, the
   // secrets transport or the Vercel OIDC exchange.
   const { stsEnvironmentOfDeployment } =

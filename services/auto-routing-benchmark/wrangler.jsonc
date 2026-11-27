@@ -27,10 +27,11 @@
     // that call apps/web internal endpoints use app.kilo.ai.
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
     // The credential of the pool-pins, usage-receipts, production-profile and grader usage-record
-    // calls to the web app's `/api/internal/*` routes (decision D59): `sts` sends an STS service
-    // token, one scope per route, over the `STS` binding; `legacy` the `INTERNAL_API_SECRET` as
-    // before. Rollback is `legacy`. The `/api/internal/bot-token` mint keeps its own secret.
-    "WEB_INTERNAL_AUTH": "sts",
+    // calls to the web app's `/api/internal/*` routes (decision D59): `legacy` (also when unset)
+    // sends `INTERNAL_API_SECRET_PROD` as before; `sts` an STS service token, one scope per route,
+    // over the `STS` binding. Switch to `sts` only after the routes accept STS tokens and the
+    // Worker has its `STS` binding. The `/api/internal/bot-token` mint keeps its own secret.
+    "WEB_INTERNAL_AUTH": "legacy",
     // Gateway base URL injected into the benchmark container as the kilo
     // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
     // .dev.vars.example) so the decider benchmark runs fully locally.

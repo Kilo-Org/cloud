@@ -449,7 +449,7 @@ export const CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 = getEnvVariable(
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
 export const O11Y_API_METRICS_SENDER_AUTH = getEnvVariable('O11Y_API_METRICS_SENDER_AUTH');
-// The credential the web app and the AI Gateway present to the web app's own /api/internal/*
+// The credential the AI Gateway's US-region senders present to the web app's own /api/internal/*
 // routes (web-internal-sts.ts): absent, empty or `legacy` sends the internal secret; `sts` an STS
 // service token.
 export const WEB_INTERNAL_SENDER_AUTH = getEnvVariable('WEB_INTERNAL_SENDER_AUTH');

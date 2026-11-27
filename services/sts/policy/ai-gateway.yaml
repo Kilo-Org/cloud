@@ -1,11 +1,14 @@
-# The AI gateway (Vercel project kilocode-ai-gateway, apps/ai-gateway). Its authenticated UTS
-# HTTPS feed transport reads the revocation feed with a uts-feed token minted from the function's
-# own OIDC token, exchanged for the STS audience. Development only until phase 4's activation go:
-# development STS serves the project's previews (design 6.2); staging (custom environment
-# env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV) and production are added to both environment lists then.
+# The AI gateway (Vercel project kilocode-ai-gateway, apps/ai-gateway). It mints each service token
+# with the function's own OIDC token, exchanged for the STS audience. Production STS serves Vercel
+# production, staging STS the custom environment staging, development STS previews (design 6.2);
+# the Vercel development environment is never accepted. The grants below cover the three
+# dual-accept receivers it calls: the LLM and Enkrypt usage publish to usage-ingest, the API-metrics
+# write to o11y, and the provider forward to the AI Gateway Secure Proxy.
 workload: ai-gateway
 environments:
   - development
+  - staging
+  - production
 identity:
   kind: vercel-oidc
   teamSlug: kilocode
@@ -13,9 +16,24 @@ identity:
   projectId: prj_cFtsRYRBCm4qa8D35LC2j183FohC
   projectName: kilocode-ai-gateway
   environments:
+    - production
     - preview
+    - customEnvironmentId: env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV
 secrets: []
 audiences:
-  - uts-feed
+  - usage-ingest
+  - o11y
+  - ai-gateway-secure-proxy
 scopes:
-  - uts-feed:revocation.read
+  - usage-ingest:usage.publish
+  - o11y:api-metrics.write
+  - ai-gateway-secure-proxy:request.forward
+# The authenticated UTS HTTPS feed transport reads the revocation feed with a uts-feed token.
+# Development only until phase 4's activation go; staging and production are each a key added
+# below.
+environmentGrants:
+  development:
+    audiences:
+      - uts-feed
+    scopes:
+      - uts-feed:revocation.read

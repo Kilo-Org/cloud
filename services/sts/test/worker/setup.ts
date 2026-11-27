@@ -36,7 +36,7 @@ afterEach(async () => {
   while (quiet < QUIET_CHECKS) {
     if (Date.now() > deadline) {
       throw new Error(
-        `refresher alarm still re-arming ${SETTLE_DEADLINE_MS} ms after the test; teardown cannot disarm it, and the next test file may hang`,
+        `refresher alarm still re-arming ${SETTLE_DEADLINE_MS} ms after the test; teardown cannot disarm it, and the next test file may hang`
       );
     }
     quiet = (await deleteRefresherAlarm()) ? 0 : quiet + 1;

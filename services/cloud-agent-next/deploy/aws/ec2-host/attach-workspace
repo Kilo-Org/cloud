@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+umask 077
+volume=$1
+action=$2
+mountpoint=/var/lib/kilo-ec2/workspace
+expected_serial=$(printf '%s' "$volume" | tr -d '-')
+link=/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_"$expected_serial"
+
+[ "$(id -u)" = 0 ]
+for attempt in $(seq 1 15); do
+  [ ! -b "$link" ] || break
+  sleep 1
+done
+[ -b "$link" ]
+device=$(readlink -f "$link")
+[ "$(lsblk -dn -o SERIAL "$device" | tr -d ' ')" = "$expected_serial" ]
+[ "$(lsblk -dn -o TYPE "$device")" = disk ]
+[ -z "$(lsblk -nr -o MOUNTPOINTS "$device" | tr -d '[:space:]')" ]
+mkdir -p "$mountpoint"
+! findmnt --mountpoint "$mountpoint" >/dev/null
+
+filesystem=$(blkid -s TYPE -o value "$device" || true)
+if [ -z "$filesystem" ] && [ "$action" = initialize ]; then
+  [ -z "$(wipefs --noheadings --output TYPE "$device")" ]
+  mkfs.ext4 -q -L kilo-ec2-data "$device"
+else
+  [ "$filesystem" = ext4 ]
+fi
+
+mount -t ext4 -o nodev,nosuid,noatime "$device" "$mountpoint"
+trap 'umount "$mountpoint"' EXIT
+[ "$(findmnt -no SOURCE --mountpoint "$mountpoint")" = "$device" ]
+if [ "$action" = initialize ] && [ ! -e "$mountpoint/.layout" ]; then
+  printf '%s\n' kilo-ec2-overlay2-v1 > "$mountpoint/.layout"
+fi
+[ "$(cat "$mountpoint/.layout")" = kilo-ec2-overlay2-v1 ]
+rm -f "$mountpoint/.clean-stop"
+trap - EXIT

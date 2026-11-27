@@ -1,0 +1,13 @@
+{
+  "data-root": "/var/lib/kilo-ec2/workspace/docker",
+  "exec-root": "/run/kilo-ec2/docker",
+  "pidfile": "/run/kilo-ec2/dockerd.pid",
+  "hosts": ["unix:///run/kilo-ec2/docker.sock"],
+  "storage-driver": "overlay2",
+  "features": { "containerd-snapshotter": false },
+  "bip": "192.168.251.1/28",
+  "ipv6": false,
+  "ip-masq": false,
+  "icc": false,
+  "log-driver": "none"
+}

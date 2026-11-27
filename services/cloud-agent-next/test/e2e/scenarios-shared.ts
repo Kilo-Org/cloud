@@ -39,6 +39,7 @@ import {
 } from './client.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
+import { workerAccessHeaders } from './worker-access.js';
 import type { CapabilityName, ScenarioEnvironment } from './scenario-capabilities.js';
 import { FAILURE_SHARED_SCENARIOS } from './scenarios-shared-failures.js';
 import { CALLBACK_SHARED_SCENARIOS } from './scenarios-shared-callbacks.js';
@@ -905,7 +906,9 @@ export function classifyAuthProbe(
 /**
  * Send one probe with its own deadline, so a hung request cannot stall the
  * probe set. The deadline is a parameter only so a test can observe the abort;
- * the scenario always uses the module bound.
+ * the scenario always uses the module bound. On the deployed stack the probe
+ * also carries the Access service token, so it reaches the fake LLM's own
+ * bearer checks; an Access login redirect is a refusal, never followed.
  */
 export async function sendAuthProbe(
   probe: AuthProbe,
@@ -914,7 +917,8 @@ export async function sendAuthProbe(
   try {
     const response = await fetch(probe.url, {
       method: probe.method,
-      headers: probe.headers,
+      headers: { ...workerAccessHeaders(probe.url), ...probe.headers },
+      redirect: 'manual',
       signal: AbortSignal.timeout(timeoutMs),
     });
     return { status: response.status };

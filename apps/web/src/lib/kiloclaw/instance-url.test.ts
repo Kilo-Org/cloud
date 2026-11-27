@@ -1,6 +1,10 @@
 import { describe, it, expect, jest } from '@jest/globals';
 import { workerUrlForInstance } from './instance-url';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '@kilocode/worker-utils/sandbox-id';
+import {
+  resolveInstanceUrlTemplate,
+  resolveLegacyWorkerUrl,
+} from '@kilocode/web-shared/lib/config.server';
 
 const LEGACY = 'https://claw.kilo.ai';
 const TEMPLATE = 'https://{label}.kiloclaw.ai';
@@ -111,15 +115,17 @@ describe('workerUrlForInstance', () => {
     ).toBe(LEGACY);
   });
 
-  it('uses the hardcoded default when fallback is empty', () => {
-    expect(
-      workerUrlForInstance({
-        sandboxId: null,
-        controllerCapabilitiesVersion: 2,
-        template: '',
-        fallback: '',
-      })
-    ).toBe('https://claw.kilo.ai');
+  it('returns no URL when the legacy host is needed but not configured', () => {
+    for (const fallback of ['', null]) {
+      expect(
+        workerUrlForInstance({
+          sandboxId: null,
+          controllerCapabilitiesVersion: 2,
+          template: '',
+          fallback,
+        })
+      ).toBeNull();
+    }
   });
 
   it('works with dev-parity templates (http + port)', () => {
@@ -132,5 +138,70 @@ describe('workerUrlForInstance', () => {
         fallback: 'http://localhost:8795',
       })
     ).toBe('http://i-550e8400e29b41d4a716446655440000.kiloclaw.localhost:8795');
+  });
+});
+
+// The two callers (personal and organization getStatus) pass the config-resolved values, so these
+// run the same pipeline: KILOCLAW_INSTANCE_URL_TEMPLATE and KILOCLAW_API_URL through config.server,
+// then workerUrlForInstance.
+describe('workerUrlForInstance with deployment-resolved inputs', () => {
+  const production = { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' };
+  const preview = { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' };
+  const v2Sandbox = sandboxIdFromInstanceId('550e8400-e29b-41d4-a716-446655440000');
+  const unlabelledSandbox = sandboxIdFromUserId('a'.repeat(39));
+
+  function resolve(
+    env: typeof production | typeof preview,
+    templateVar: string | undefined,
+    apiUrl: string | undefined,
+    sandboxId: string | null,
+    controllerCapabilitiesVersion: number | null
+  ) {
+    return workerUrlForInstance({
+      sandboxId,
+      controllerCapabilitiesVersion,
+      template: resolveInstanceUrlTemplate(templateVar, env),
+      fallback: resolveLegacyWorkerUrl(apiUrl, env),
+    });
+  }
+
+  it('keeps production per-instance and legacy hosts', () => {
+    expect(resolve(production, undefined, undefined, v2Sandbox, 2)).toBe(
+      'https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
+    );
+    expect(resolve(production, undefined, undefined, v2Sandbox, 1)).toBe('https://claw.kilo.ai');
+    expect(resolve(production, 'legacy', 'https://claw.kilosessions.ai', v2Sandbox, 2)).toBe(
+      'https://claw.kilosessions.ai'
+    );
+  });
+
+  it.each([undefined, '', 'https://claw.kilo.ai', 'https://claw.kilosessions.ai'])(
+    'returns no production URL in preview without a template (KILOCLAW_API_URL %j)',
+    apiUrl => {
+      expect(resolve(preview, undefined, apiUrl, v2Sandbox, 2)).toBeNull();
+      expect(resolve(preview, 'legacy', apiUrl, v2Sandbox, 2)).toBeNull();
+      expect(resolve(preview, 'https://{label}.kiloclaw.ai', apiUrl, v2Sandbox, 2)).toBeNull();
+    }
+  );
+
+  it.each([undefined, 'https://claw.kilo.ai'])(
+    'returns no production URL in preview for v1 or unlabelled instances (KILOCLAW_API_URL %j)',
+    apiUrl => {
+      const template = 'https://{label}.claw-preview.example.test';
+      expect(resolve(preview, template, apiUrl, v2Sandbox, 1)).toBeNull();
+      expect(resolve(preview, template, apiUrl, v2Sandbox, null)).toBeNull();
+      expect(resolve(preview, template, apiUrl, unlabelledSandbox, 2)).toBeNull();
+      expect(resolve(preview, template, apiUrl, null, 2)).toBeNull();
+    }
+  );
+
+  it('uses explicit non-production per-instance and legacy targets in preview', () => {
+    const template = 'https://{label}.claw-preview.example.test';
+    const legacy = 'https://claw-preview.example.test';
+    expect(resolve(preview, template, legacy, v2Sandbox, 2)).toBe(
+      'https://i-550e8400e29b41d4a716446655440000.claw-preview.example.test'
+    );
+    expect(resolve(preview, template, legacy, v2Sandbox, 1)).toBe(legacy);
+    expect(resolve(preview, template, legacy, unlabelledSandbox, 2)).toBe(legacy);
   });
 });

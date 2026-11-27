@@ -39,7 +39,7 @@ export type InternalAuthMethod = 'legacy_shared_secret' | 'sts';
 /** Receives each line this module would log; see `observeInternalAuth`. */
 export type InternalAuthSink = (line: InternalAuthLine) => void;
 
-/** The AE dataset both Workers without Logpush write, and `o11y` reads back. */
+/** The AE dataset the two Workers without Logpush write, and `o11y` reads back. */
 export const INTERNAL_AUTH_COUNTER_DATASET = 'kilo_internal_auth';
 
 /** The part of a Workers Analytics Engine binding this module uses. */

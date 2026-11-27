@@ -146,21 +146,9 @@ describe('sink and Analytics Engine delivery', () => {
     const seen: unknown[] = [];
     const sink = (line: unknown) => seen.push(line);
 
-    observeInternalAuth(
-      'usage-ingest',
-      'usage_publish',
-      'legacy_shared_secret',
-      'ai-gateway',
-      sink
-    );
+    observeInternalAuth('usage-ingest', 'usage_publish', 'legacy_shared_secret', 'ai-gateway', sink);
     vi.setSystemTime(new Date(START.getTime() + 60_000));
-    observeInternalAuth(
-      'usage-ingest',
-      'usage_publish',
-      'legacy_shared_secret',
-      'ai-gateway',
-      sink
-    );
+    observeInternalAuth('usage-ingest', 'usage_publish', 'legacy_shared_secret', 'ai-gateway', sink);
 
     // The eager line and the remainder, identical to what the console got.
     expect(seen).toEqual(lines());

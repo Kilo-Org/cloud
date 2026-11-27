@@ -29,6 +29,7 @@ import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
 import type { FakeScenarioStatus } from './fake-llm-server.js';
+import { workerAccessHeaders } from './worker-access.js';
 
 /**
  * Which tRPC surface the driver exercises.
@@ -199,6 +200,7 @@ export async function trpcCall<T>(
     : (config.bearerToken ??
       mintApiToken(config.user, config.nextAuthSecret, 60 * 60, config.kilocodeOrganizationId));
   const headers: Record<string, string> = {
+    ...workerAccessHeaders(url.href),
     'Content-Type': 'application/json',
     Authorization: `Bearer ${bearer}`,
   };
@@ -214,7 +216,8 @@ export async function trpcCall<T>(
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;
   }
-  const fetchOpts: RequestInit = { method, headers, signal: opts?.signal };
+  // An Access login redirect is a refusal, never a page to follow.
+  const fetchOpts: RequestInit = { method, headers, signal: opts?.signal, redirect: 'manual' };
   if (method === 'POST') {
     fetchOpts.body = JSON.stringify(input);
   } else {
@@ -984,14 +987,19 @@ export async function deleteSession(
 }
 
 /**
- * Headers for the fake LLM `/test/*` side channel.
+ * Request options for the fake LLM `/test/*` side channel.
  *
  * The token comes from `resolveFakeAdminToken()` — the same resolver the local
  * Node fake server uses — so one `FAKE_LLM_ADMIN_TOKEN` value reaches both ends.
- * A deployed fake Worker needs the driver's value configured as its secret.
+ * A deployed fake Worker needs the driver's value configured as its secret. On
+ * the deployed stack the request also carries the Access service token, and an
+ * Access login redirect is a refusal, never a page to follow.
  */
-function fakeControlHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${resolveFakeAdminToken()}` };
+function fakeControlInit(url: string): { headers: Record<string, string>; redirect: 'manual' } {
+  return {
+    headers: { ...workerAccessHeaders(url), Authorization: `Bearer ${resolveFakeAdminToken()}` },
+    redirect: 'manual',
+  };
 }
 
 /**
@@ -1005,7 +1013,7 @@ export async function releaseGate(
   signal?: AbortSignal
 ): Promise<void> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/release?tag=${encodeURIComponent(tag)}`;
-  const res = await fetch(url, { method: 'POST', signal, headers: fakeControlHeaders() });
+  const res = await fetch(url, { method: 'POST', signal, ...fakeControlInit(url) });
   if (!res.ok) {
     throw new Error(`releaseGate(${tag}) failed: ${res.status} ${res.statusText}`);
   }
@@ -1022,7 +1030,7 @@ export type FakeWaitersSnapshot = {
 
 export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersSnapshot> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/waiters`;
-  const res = await fetch(url, { headers: fakeControlHeaders() });
+  const res = await fetch(url, fakeControlInit(url));
   if (!res.ok) {
     throw new Error(`fetchFakeWaiters failed: ${res.status} ${res.statusText}`);
   }
@@ -1042,7 +1050,7 @@ export async function fetchFakeRequests(
   const scope = resolveFakeScope();
   const query = scope === undefined ? '' : `?scope=${encodeURIComponent(scope)}`;
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests${query}`;
-  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
+  const res = await fetch(url, { ...fakeControlInit(url), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
   }
@@ -1059,7 +1067,7 @@ export async function fetchFakeLastPrompt(
   signal?: AbortSignal
 ): Promise<string> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/last-prompt`;
-  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
+  const res = await fetch(url, { ...fakeControlInit(url), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeLastPrompt failed: ${res.status} ${res.statusText}`);
   }
@@ -1073,7 +1081,7 @@ export async function fetchFakeScenarioStatus(
   signal?: AbortSignal
 ): Promise<FakeScenarioStatus> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/scenario-status?tag=${encodeURIComponent(tag)}`;
-  const response = await fetch(url, { headers: fakeControlHeaders(), signal });
+  const response = await fetch(url, { ...fakeControlInit(url), signal });
   if (!response.ok) {
     throw new Error(`fetchFakeScenarioStatus(${tag}) failed: ${response.status}`);
   }
@@ -1136,7 +1144,7 @@ export async function waitForGateEngaged(
   while (Date.now() < deadline) {
     if (signal?.aborted) return false;
     try {
-      const res = await fetch(url, { headers: fakeControlHeaders(), signal });
+      const res = await fetch(url, { ...fakeControlInit(url), signal });
       if (res.ok) {
         const body = (await res.json()) as { engaged?: boolean };
         if (body.engaged === true) return true;
@@ -1362,7 +1370,8 @@ export function openStream(
 
   function openSocket(ticket: string): void {
     const generation = ++currentGeneration;
-    const ws = new WebSocket(buildUrl(ticket));
+    const target = buildUrl(ticket);
+    const ws = new WebSocket(target, { headers: workerAccessHeaders(target) });
     currentWs = ws;
     let opened = false;
 

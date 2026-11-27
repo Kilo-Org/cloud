@@ -60,6 +60,7 @@ const mockGetWorkerTrigger = jest.fn<typeof getWorkerTriggerType>();
 const mockUpdateWorkerTrigger = jest.fn<typeof updateWorkerTriggerType>();
 const mockInvokeWorkerScheduledTrigger = jest.fn<typeof invokeWorkerScheduledTriggerType>();
 const mockListWorkerRequests = jest.fn<typeof listWorkerRequestsType>();
+const mockIsWebhookAgentConfigured = jest.fn(() => true);
 const mockDbInsert = jest.fn();
 const mockDbUpdate = jest.fn();
 const mockDbDelete = jest.fn();
@@ -124,6 +125,9 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => {
 
 jest.mock('@/lib/webhook-agent/webhook-agent-client', () => ({
   buildInboundUrl: jest.fn(() => 'https://inbound'),
+  isWebhookAgentConfigured: mockIsWebhookAgentConfigured,
+  webhookTriggersUnavailable: () =>
+    new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'Webhook triggers are unavailable' }),
   createWorkerTrigger: mockCreateWorkerTrigger,
   getWorkerTrigger: mockGetWorkerTrigger,
   updateWorkerTrigger: mockUpdateWorkerTrigger,
@@ -594,6 +598,26 @@ describe('webhook trigger variant inputs', () => {
       'trigger-id',
       expect.objectContaining({ variant: undefined })
     );
+  });
+
+  it('writes nothing when the webhook agent worker is not configured', async () => {
+    mockIsWebhookAgentConfigured.mockReturnValueOnce(false);
+
+    await expect(createCaller({ user }).create(createInput)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockDbDelete).not.toHaveBeenCalled();
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('invokes nothing when the webhook agent worker is not configured', async () => {
+    mockIsWebhookAgentConfigured.mockReturnValueOnce(false);
+
+    await expect(createCaller({ user }).invoke({ triggerId: 'trigger-id' })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+    });
+    expect(mockInvokeWorkerScheduledTrigger).not.toHaveBeenCalled();
   });
 
   it('keeps bot execution as the default for organization triggers', async () => {

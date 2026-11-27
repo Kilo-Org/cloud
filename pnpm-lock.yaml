@@ -2275,6 +2275,9 @@ importers:
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts
+      '@kilocode/uts-contracts':
+        specifier: workspace:*
+        version: link:../uts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../worker-utils
@@ -2701,6 +2704,9 @@ importers:
       hono:
         specifier: 4.13.16
         version: 4.13.16
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.17
       jsonc-parser:
         specifier: 3.3.1
         version: 3.3.1
@@ -2931,6 +2937,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts
@@ -3017,6 +3026,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3631,6 +3643,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3714,6 +3729,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts

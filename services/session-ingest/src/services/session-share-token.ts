@@ -26,6 +26,8 @@ import {
 import { z } from 'zod';
 
 import type { Env } from '../env';
+import { readSessionIngestSecret, type SessionIngestSecretsEnv } from '../secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 export const SESSION_SHARE_TOKEN_ISSUER = 'kilo-session-ingest';
 export const SESSION_SHARE_TOKEN_AUDIENCE = 'kilo-session-share';
@@ -95,8 +97,7 @@ export type ResolvedSessionShare = {
   contentCutoffMs: number | null;
 };
 
-export type SessionShareTokenEnv = {
-  SESSION_SHARE_JWT_SECRET_PROD: Pick<Env['SESSION_SHARE_JWT_SECRET_PROD'], 'get'>;
+export type SessionShareTokenEnv = SessionIngestSecretsEnv & {
   SESSION_SHARE_TOKEN_MIN_IAT: string | undefined;
   HYPERDRIVE: Pick<Env['HYPERDRIVE'], 'connectionString'>;
 };
@@ -119,10 +120,13 @@ function parseMinimumIat(rawValue: string | undefined): number {
   return parsed;
 }
 
-async function getSessionShareSecret(env: SessionShareTokenEnv): Promise<string> {
-  const secret = await env.SESSION_SHARE_JWT_SECRET_PROD.get();
+async function getSessionShareSecret(
+  env: SessionShareTokenEnv,
+  ctx?: SecretsExecutionContext
+): Promise<string> {
+  const secret = await readSessionIngestSecret(env, 'SESSION_SHARE_JWT_SECRET', ctx);
   if (!secret) {
-    throw new Error('SESSION_SHARE_JWT_SECRET_PROD is not configured');
+    throw new Error('SESSION_SHARE_JWT_SECRET is not configured');
   }
   return secret;
 }
@@ -130,9 +134,10 @@ async function getSessionShareSecret(env: SessionShareTokenEnv): Promise<string>
 export async function signSessionShareToken(
   env: SessionShareTokenEnv,
   params: { sessionId: string; publicId: string } & Partial<SessionShareOptions>,
-  options: SessionShareTokenOptions = {}
+  options: SessionShareTokenOptions = {},
+  ctx?: SecretsExecutionContext
 ): Promise<string> {
-  const secret = await getSessionShareSecret(env);
+  const secret = await getSessionShareSecret(env, ctx);
   const nowMs = getNowMs(options);
   const issuedAt = Math.floor(nowMs / 1000);
   const shareOptions = sessionShareOptionsSchema.parse({
@@ -160,9 +165,10 @@ export async function signSessionShareToken(
 export async function verifySessionShareToken(
   env: SessionShareTokenEnv,
   token: string,
-  options: SessionShareTokenOptions = {}
+  options: SessionShareTokenOptions = {},
+  ctx?: SecretsExecutionContext
 ): Promise<SessionShareTokenPayload | null> {
-  const secret = await getSessionShareSecret(env);
+  const secret = await getSessionShareSecret(env, ctx);
   const minimumIat = parseMinimumIat(env.SESSION_SHARE_TOKEN_MIN_IAT);
   const nowMs = getNowMs(options);
 
@@ -188,9 +194,10 @@ export async function verifySessionShareToken(
 export async function resolveSessionShareToken(
   env: SessionShareTokenEnv,
   token: string,
-  options: SessionShareTokenOptions = {}
+  options: SessionShareTokenOptions = {},
+  ctx?: SecretsExecutionContext
 ): Promise<ResolvedSessionShare | null> {
-  const payload = await verifySessionShareToken(env, token, options);
+  const payload = await verifySessionShareToken(env, token, options, ctx);
   if (!payload?.jti) {
     return null;
   }

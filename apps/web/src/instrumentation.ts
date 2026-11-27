@@ -10,6 +10,10 @@ export async function register() {
     const { installSelectedInternalApiSecretRead } =
       await import('@kilocode/web-shared/lib/sts-secret-reader');
     installSelectedInternalApiSecretRead();
+    // Names this app in `x-kilo-caller` on every Bouncer call; BOUNCER_STS_TOKENS is checked per
+    // call (`bouncer/sts-auth.ts`), and unset sends the legacy key alone.
+    const { installBouncerAuth } = await import('@kilocode/web-shared/lib/bouncer/sts-auth');
+    installBouncerAuth('kilocode-app');
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {

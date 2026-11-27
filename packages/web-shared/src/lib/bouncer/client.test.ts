@@ -1,4 +1,4 @@
-import { beforeAll, afterEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, afterEach, describe, expect, it, jest } from '@jest/globals';
 
 const mockConfigState = { bouncerUrl: 'https://bouncer.example.com' as string | null };
 
@@ -24,6 +24,7 @@ let usageEventWireBody: typeof BouncerClient.usageEventWireBody;
 let normalizeJa4: typeof BouncerClient.normalizeJa4;
 let signupDecide: typeof BouncerClient.signupDecide;
 let chargeDecide: typeof BouncerClient.chargeDecide;
+let releaseDecideLease: typeof BouncerClient.releaseDecideLease;
 
 beforeAll(() => {
   ({
@@ -35,6 +36,7 @@ beforeAll(() => {
     normalizeJa4,
     signupDecide,
     chargeDecide,
+    releaseDecideLease,
   } = jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
@@ -741,5 +743,112 @@ describe('parseBouncerCreditEventBody ja4', () => {
     });
     expect(parsed).not.toBeNull();
     expect(parsed).not.toHaveProperty('ja4');
+  });
+});
+
+describe('STS headers from the installed Bouncer auth', () => {
+  const installedAuth = jest.fn<(scope: string) => Promise<Record<string, string>>>();
+
+  beforeEach(() => {
+    installedAuth.mockImplementation(async scope => ({
+      'x-kilo-caller': 'kilocode-app',
+      authorization: `Bearer token-for-${scope}`,
+    }));
+    globalThis.__kilocodeBouncerAuth = installedAuth;
+    mockFetch.mockResolvedValue(Response.json({ enforced: false, spendWatch: false, flags: [] }));
+  });
+
+  afterEach(() => {
+    globalThis.__kilocodeBouncerAuth = undefined;
+    installedAuth.mockReset();
+  });
+
+  function sent(): { path: string; headers: Headers } {
+    const [url, init] = mockFetch.mock.calls[0] ?? [];
+    return { path: (url as URL).pathname, headers: new Headers(init?.headers) };
+  }
+
+  it.each([
+    [
+      'decide',
+      () => decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 }),
+      '/api/v1/decide',
+      'bouncer:decide',
+    ],
+    [
+      'charge-decide',
+      () =>
+        chargeDecide({
+          requestId: 'r',
+          accountId: 'user:u',
+          userId: 'u',
+          stage: 'checkout',
+          flow: 'topup',
+        }),
+      '/api/v1/charge-decide',
+      'bouncer:decide',
+    ],
+    [
+      'release',
+      () => releaseDecideLease({ requestId: 'r', accountId: 'user:u' }),
+      '/api/v1/release',
+      'bouncer:decide',
+    ],
+    [
+      'usage-event',
+      () =>
+        reportUsageEvent({
+          requestId: 'r',
+          tier: 'anonymous',
+          ip: '203.0.113.7',
+          inputTokens: 1,
+          outputTokens: 2,
+          clientAttributed: false,
+          hasTools: false,
+          requestedLogprobs: false,
+        }),
+      '/api/v1/usage-event',
+      'bouncer:usage.write',
+    ],
+    [
+      'credit-event',
+      () => deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-sts', userId: 'user-1' }),
+      '/api/v2/credit-event',
+      'bouncer:usage.write',
+    ],
+    [
+      'signup-decide',
+      () => signupDecide({ operationId: 'signup:operation-1', ip: '203.0.113.7' }),
+      '/api/v1/signup-decide',
+      'bouncer:signup.decide',
+    ],
+  ] as const)(
+    '%s asks for %s and sends it with the legacy key',
+    async (_name, call, path, scope) => {
+      await call();
+      expect(installedAuth).toHaveBeenCalledWith(scope);
+      const { path: sentPath, headers } = sent();
+      expect(sentPath).toBe(path);
+      expect(headers.get('authorization')).toBe(`Bearer token-for-${scope}`);
+      expect(headers.get('x-kilo-caller')).toBe('kilocode-app');
+      expect(headers.get('x-internal-api-key')).toBe('test-internal-secret');
+      expect(headers.get('content-type')).toBe('application/json');
+    }
+  );
+
+  it('sends neither the caller nor a bearer when nothing is installed', async () => {
+    globalThis.__kilocodeBouncerAuth = undefined;
+    await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
+    const { headers } = sent();
+    expect(headers.get('authorization')).toBeNull();
+    expect(headers.get('x-kilo-caller')).toBeNull();
+    expect(headers.get('x-internal-api-key')).toBe('test-internal-secret');
+  });
+
+  it('asks for no token when the endpoint is unconfigured', async () => {
+    mockConfigState.bouncerUrl = null;
+    await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
+    expect(installedAuth).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

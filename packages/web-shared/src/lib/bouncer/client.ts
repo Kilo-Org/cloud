@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 
 import * as z from 'zod';
 
+import { bouncerAuthHeaders, type BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth';
 import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
@@ -25,6 +26,10 @@ import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-
  * delivered. Webhooks and store notifications never call them: they only enqueue to the outbox.
  * Signup admission returns null on an unavailable or invalid verdict. The caller rejects signup
  * with a retryable error before creating a Stripe customer or account.
+ *
+ * Every call sends `x-internal-api-key`; an app that installed `BouncerAuth` (`sts-auth.ts`) also
+ * names itself in `x-kilo-caller` and, with `BOUNCER_STS_TOKENS=on`, sends the route's STS token
+ * as `Authorization: Bearer`. A missing token never stops a call.
  */
 
 /** Bouncer keeps ids to 128 characters. */
@@ -461,16 +466,18 @@ type PostResult =
  * The request URL comes from the shared endpoint helper, so it derives from the value the transport
  * rule accepted instead of from concatenation. A configured endpoint that carries a trailing
  * separator therefore still reaches the worker's own path, and a value outside the rule, or a
- * missing key, is `unconfigured` and sends nothing.
+ * missing key, is `unconfigured` and sends nothing. The STS headers are read alongside the key;
+ * that read never fails and waits at most `BOUNCER_TOKEN_WAIT_MS` (`sts-auth.ts`).
  */
 async function postWithResult(
-  path: string,
+  path: BouncerApiPath,
   body: unknown,
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<PostResult> {
   const endpoint = parseInternalServiceEndpoint(BOUNCER_URL, path);
   if (!endpoint) return { ok: false, kind: 'unconfigured' };
+  const authHeaders = bouncerAuthHeaders(BOUNCER_PATH_SCOPES[path]);
   let internalApiSecret: string;
   try {
     internalApiSecret = await readInternalApiSecret();
@@ -478,11 +485,16 @@ async function postWithResult(
     return failedWithoutResponse(error);
   }
   if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
+  const auth = await authHeaders;
   const timeout = AbortSignal.timeout(timeoutMs);
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': internalApiSecret },
+      headers: {
+        ...auth,
+        'content-type': 'application/json',
+        'x-internal-api-key': internalApiSecret,
+      },
       body: JSON.stringify(body),
       signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
       cache: 'no-store',
@@ -518,7 +530,7 @@ function failedWithoutResponse(error: unknown): PostResult {
  * verdict-shaped callers read a JSON body; a body-less/non-JSON success resolves to null.
  */
 async function post(
-  path: string,
+  path: BouncerApiPath,
   body: unknown,
   timeoutMs: number,
   signal?: AbortSignal
@@ -552,6 +564,24 @@ const DECIDE_PATH = '/api/v1/decide';
 const CHARGE_DECIDE_PATH = '/api/v1/charge-decide';
 const SIGNUP_DECIDE_PATH = '/api/v1/signup-decide';
 const RELEASE_PATH = '/api/v1/release';
+
+type BouncerApiPath =
+  | typeof CREDIT_EVENT_PATH
+  | typeof USAGE_EVENT_PATH
+  | typeof DECIDE_PATH
+  | typeof CHARGE_DECIDE_PATH
+  | typeof SIGNUP_DECIDE_PATH
+  | typeof RELEASE_PATH;
+
+/** The STS scope Bouncer requires on each route (`ROUTE_SCOPES` in bouncer's `src/api-auth.ts`). */
+const BOUNCER_PATH_SCOPES: Readonly<Record<BouncerApiPath, BouncerScope>> = {
+  [CREDIT_EVENT_PATH]: 'bouncer:usage.write',
+  [USAGE_EVENT_PATH]: 'bouncer:usage.write',
+  [DECIDE_PATH]: 'bouncer:decide',
+  [CHARGE_DECIDE_PATH]: 'bouncer:decide',
+  [SIGNUP_DECIDE_PATH]: 'bouncer:signup.decide',
+  [RELEASE_PATH]: 'bouncer:decide',
+};
 
 const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {
   'store.purchase': true,
@@ -671,7 +701,7 @@ export async function deliverUsageEventWireBody(
 }
 
 async function deliverWireBody(
-  path: string,
+  path: BouncerApiPath,
   body: Record<string, unknown>,
   timeoutMs: number,
   signal?: AbortSignal

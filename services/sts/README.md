@@ -781,8 +781,8 @@ Preconditions on the GitHub side, which STS cannot check:
 - **Immutable subjects.** The repository must issue the immutable subject format: repositories
   created after 2026-07-15 do, an older one needs the opt-in in its (or its organization's) OIDC
   settings (https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens).
-  A name-only subject (`repo:<owner>/<repo>:...`) is refused, and so is a customized subject
-  template.
+  A name-only subject (`repo:<owner>/<repo>:...`) is refused, except on `legacySubject` policies
+  (design Q62a), and so is a customized subject template.
 - **Legacy subject (Kilo-Org/kilocode only, decision 2026-11-27).** `identity.legacySubject: true`
   accepts the default subject as well; the loader refuses it on any policy whose repository, id and
   owner id are not `Kilo-Org/kilocode`, `946087422` and `201822503`
@@ -792,7 +792,9 @@ Preconditions on the GitHub side, which STS cannot check:
   upgrade: when npm fixes #9969, add the Azure federated credential for
   `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main`, turn on use_immutable_subject
   for kilocode, prove oidc_check on main and v2, then delete the exception (the flag, its loader
-  allowance and the constant).
+  allowance and the constant). The credential's subject must match the signing job's real
+  subject: `...:environment:<env>` instead if that job runs in a GitHub environment; the kilocode
+  CI owner checks this at upgrade time.
 - **Protected environment.** STS trusts the `environment` claim; the GitHub environment's branch
   rule (`main`) and its required reviewers are what make that claim mean something.
 - **Environment names** use only letters, digits, `.`, `_` and `-`, and the workflow spells them

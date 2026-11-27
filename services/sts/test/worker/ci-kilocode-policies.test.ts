@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IdentityVerifier, type VerifyOutcome } from '../../src/identity/verify';
 import { policyIndex } from '../../src/policy';
+import { loadPolicies } from '../../src/policy/load';
 import { bundleFolder } from '../../src/policy/schema';
 import { createProvider, providerFetch, signToken, type TestProvider } from './support';
 
@@ -297,7 +298,10 @@ describe('shipped Kilo-Org/kilocode policies', () => {
       ];
       for (const ids of changes) {
         const outcome = await verify({ ...base, ...ids });
-        expect(outcome, JSON.stringify(ids)).toMatchObject({ status: 'denied' });
+        expect(outcome, JSON.stringify(ids)).toMatchObject({
+          status: 'denied',
+          reason: 'unknown_workload',
+        });
         expect(outcome).not.toMatchObject({ workload: 'ci-kilocode-release' });
       }
     });
@@ -316,6 +320,48 @@ describe('shipped Kilo-Org/kilocode policies', () => {
           status: 'denied',
           reason: 'identity_rejected',
         });
+      }
+    });
+
+    it('accepts the ref form on a kilocode policy without an environment, and only with its ids', async () => {
+      // A test policy with kilocode's ids and no GitHub environment (staging, which allows that).
+      const policies = loadPolicies({
+        'ci-kilocode-ref.yaml': `
+workload: ci-kilocode-ref
+environments: [staging]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '${REPOSITORY_ID}'
+  repositoryOwnerId: '${OWNER_ID}'
+  legacySubject: true
+  jobWorkflowRefs: [${pinned('nightly.yml')}]
+  events: [schedule]
+secrets: [APP_SECRET]
+`,
+      });
+      const github = await createProvider(GITHUB_ISSUER, STS_ISSUER);
+      const verifier = new IdentityVerifier({
+        policies: policies.all(),
+        environment: 'staging',
+        issuer: STS_ISSUER,
+        fetch: providerFetch([github]).fetch,
+      });
+      const { environment: _environment, ...base } = claims('', 'nightly.yml', 'schedule');
+      const body = { ...base, sub: 'repo:Kilo-Org/kilocode:ref:refs/heads/main' };
+      expect(await verifier.verify(await signToken(github, body))).toMatchObject({
+        status: 'verified',
+        workload: 'ci-kilocode-ref',
+      });
+      const changes: Record<string, string>[] = [
+        { repository_id: '1395255492' },
+        { repository_owner_id: '1' },
+      ];
+      for (const ids of changes) {
+        expect(
+          await verifier.verify(await signToken(github, { ...body, ...ids })),
+          JSON.stringify(ids)
+        ).toMatchObject({ status: 'denied', reason: 'unknown_workload' });
       }
     });
   });

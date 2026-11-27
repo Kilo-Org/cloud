@@ -340,20 +340,31 @@ describe('recipient rule', () => {
     expect(stored).toEqual([]);
   });
 
-  it('makes Mailgun refuse a recipient that is not a plain address, as a second layer', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('makes Mailgun drop each recipient that is not a plain address, as a second layer', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { calls, fetcher } = standIns();
     const { UTS_MAIL_ALLOWED_RECIPIENTS: _allowList, ...productionVars } = MAIL_ENV;
     const mail = readSignInConfig(productionVars, { ...config, environment: 'production' }).mail;
     const transport = noticeEmailTransport(mail, fetcher);
     if (transport === null) throw new Error('mail settings are on');
     const notice = { subject: 'New sign-in', text: 'A new sign-in to your account.' };
-    for (const to of [['x <victim@example.net>'], ['owner@example.com', 'a,b@example.net']]) {
-      expect(await transport({ ...notice, to })).toBe('permanent_failure');
-    }
+    // Nothing valid left: no call.
+    expect(await transport({ ...notice, to: ['x <victim@example.net>'] })).toBe('no_target');
     expect(calls).toEqual([]);
-    expect(await transport({ ...notice, to: ['Owner@Example.com'] })).toBe('sent');
-    expect(formOf(calls[0]).getAll('to')).toEqual(['Owner@Example.com']);
+    // One valid, one not: the valid one goes out alone, in its own letter case.
+    expect(await transport({ ...notice, to: ['Owner@Example.com', 'a,b@example.net'] })).toBe(
+      'sent'
+    );
+    expect(calls).toHaveLength(1);
+    const form = formOf(calls[0]);
+    expect(form.getAll('to')).toEqual(['Owner@Example.com']);
+    expect(JSON.parse(String(form.get('recipient-variables')))).toEqual({
+      'Owner@Example.com': {},
+    });
+    const logged = errors.mock.calls.flat().join('\n');
+    expect(logged).toContain('"dropped":1');
+    expect(logged).not.toContain('victim@example.net');
+    expect(logged).not.toContain('a,b@example.net');
   });
 
   it('lets the notice email go only to allowed addresses, and to none answers no_target', async () => {

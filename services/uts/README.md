@@ -629,11 +629,13 @@ so a network shared with the owner cannot lock the owner out. A wrong code count
 network first, in one upsert that adds one only while the network is under 30, so concurrent
 guesses wait on the network's row and cannot pass the limit.
 
-The start and the code entry take only a plain addr-spec in lower case (`src/signin/email/address.ts`:
-no display name, comment, quoting, comma, semicolon or space; the domain follows the SSO domain
-rule), so one mailbox has one spelling and one set of per-address limits, and Mailgun, which reads
-`to` as an address list, cannot be handed a second address. `mailgunEmail` refuses any other
-recipient again before it calls Mailgun.
+The start and the code entry take only a plain addr-spec in lower case
+(`src/signin/email/address.ts`: no display name, comment, quoting, comma, semicolon or space; the
+domain follows the SSO domain rule), so one mailbox has one spelling and one set of per-address
+limits, and Mailgun, which reads `to` as an address list, cannot be handed a second address.
+`mailgunEmail` checks each recipient again before it calls Mailgun: it drops every address that
+is not a plain addr-spec (in any letter case), logs only how many it dropped
+(`uts.mail.recipient_invalid`), sends to the rest, and answers `no_target` when none is left.
 
 **Mail sender.** The email sign-in is offered only where a sender is wired
 (`src/signin/email/delivery.ts`):

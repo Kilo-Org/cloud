@@ -69,8 +69,8 @@ const EXPECTED_ROWS: readonly CopierRow[] = [
  * The entry the `dev` block reads, by binding. It has to exist in the account's Secrets Store
  * before `wrangler deploy --env dev` works, and it may not hold a production value: a config that
  * binds STS may not read a production-named store secret from a non-production block
- * (worker-configs.ts). Nothing else is bound there: no dev-scoped Analytics Engine token can be
- * minted, so dev runs that proxy off (src/worker.ts, `secretConfigured`).
+ * (worker-configs.ts). Nothing else is bound there: no dev-scoped Analytics Engine token has been
+ * minted, so dev runs that proxy off (src/worker.ts, `readSecretState`).
  */
 const EXPECTED_DEV_ENTRIES: readonly { binding: string; secret_name: string }[] = [
   { binding: 'GF_SECRET_KEY', secret_name: 'GF_SECRET_KEY_DEV' },

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
 import {
   readKiloOpsSecret,
+  readSecretState,
   secretConfigured,
   secretsSource,
   type KiloOpsSecretName,
@@ -80,7 +81,7 @@ describe('secretConfigured', () => {
     );
   });
 
-  it('says unconfigured exactly where the read says unconfigured', async () => {
+  it('agrees with the read on the shape the dev block deploys', async () => {
     // The shape the `dev` block deploys: the Grafana key only, no Analytics Engine token.
     const dev = { GF_SECRET_KEY: storeSecret('grafana').secret };
 
@@ -89,6 +90,44 @@ describe('secretConfigured', () => {
       /CF_ANALYTICS_API_KEY is not configured/
     );
     expect(secretConfigured(dev, 'GF_SECRET_KEY')).toBe(true);
+  });
+});
+
+describe('readSecretState', () => {
+  it('reports off where the deployment binds no source, without reading', async () => {
+    const dev = { GF_SECRET_KEY: storeSecret('grafana').secret };
+
+    expect(await readSecretState(dev, 'O11Y_CF_AE_API_TOKEN')).toEqual({ state: 'off' });
+  });
+
+  it('returns the value a configured source serves', async () => {
+    expect(
+      await readSecretState({ CF_ANALYTICS_API_KEY: 'plain' }, 'O11Y_CF_AE_API_TOKEN')
+    ).toEqual({ state: 'value', value: 'plain' });
+  });
+
+  it('reports a failed read, not off, when a configured source refuses', async () => {
+    const failing = {
+      get: async () => {
+        throw new Error('store unavailable');
+      },
+    };
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await readSecretState({ GF_SECRET_KEY: failing }, 'GF_SECRET_KEY')).toEqual({
+      state: 'failed',
+    });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('fails closed on an unknown source instead of throwing at its caller', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await readSecretState({ SECRETS_SOURCE: 'infisical' }, 'GF_SECRET_KEY')).toEqual({
+      state: 'failed',
+    });
+    logged.mockRestore();
   });
 });
 

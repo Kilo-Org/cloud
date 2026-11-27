@@ -123,10 +123,11 @@
           "binding": "GF_SECRET_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           // A fresh random Grafana secret key for dev deployments only. The dev block binds no
-          // Analytics Engine token: no dev-scoped Cloudflare API token can be minted, and a
-          // non-production block of a config that binds STS reads no production-named store secret
+          // Analytics Engine token: none has been minted for dev, and a non-production block of a
+          // config that binds STS reads no production-named store secret
           // (services/sts/test/repo/worker-configs.ts), so dev runs the analytics proxy off and
-          // src/worker.ts answers "not configured" for it.
+          // src/worker.ts answers "not configured" for it. Adding a `_DEV` entry and its dev
+          // binding turns the proxy back on with no code change.
           "secret_name": "GF_SECRET_KEY_DEV",
         },
       ],

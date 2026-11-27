@@ -1,8 +1,7 @@
 import { Container, ContainerProxy } from '@cloudflare/containers';
-import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { Hono } from 'hono';
 import { withCloudflareAccess } from './cf-access.middleware';
-import { readKiloOpsSecret, secretConfigured, type KiloOpsSecretName } from './secrets';
+import { readSecretState } from './secrets';
 
 export { ContainerProxy };
 
@@ -30,8 +29,8 @@ export class GrafanaContainer extends Container<Env> {
       state.status !== 'running' && state.status !== 'healthy' && state.status !== 'stopping';
 
     if (needsStart) {
-      const gfSecretKey = await resolveSecret(this.env, 'GF_SECRET_KEY', this.ctx);
-      if (!gfSecretKey) {
+      const gfSecretKey = await readSecretState(this.env, 'GF_SECRET_KEY', this.ctx);
+      if (gfSecretKey.state !== 'value' || !gfSecretKey.value) {
         return new Response('Grafana secrets unavailable; cannot start container', {
           status: 503,
         });
@@ -41,7 +40,7 @@ export class GrafanaContainer extends Container<Env> {
         // proxies to the real Cloudflare AE SQL API and injects the token.
         CF_CLICKHOUSE_URL: `http://${AE_PROXY_HOST}/client/v4/accounts/${this.env.CF_ACCOUNT_ID}/analytics_engine/sql`,
         CF_ACCOUNT_ID: this.env.CF_ACCOUNT_ID,
-        GF_SECURITY_SECRET_KEY: gfSecretKey,
+        GF_SECURITY_SECRET_KEY: gfSecretKey.value,
       };
     }
 
@@ -62,15 +61,6 @@ GrafanaContainer.outboundByHost = {
       return new Response('method not allowed', { status: 405 });
     }
 
-    // The `dev` block binds no Analytics Engine token — no dev-scoped Cloudflare API token can be
-    // minted, and a production-named store secret may not be read from a non-production block — so
-    // that deployment runs this proxy off. Answer that as a missing feature, not as a broken read.
-    if (!secretConfigured(env, 'O11Y_CF_AE_API_TOKEN')) {
-      return new Response('Analytics Engine proxy is not configured for this deployment', {
-        status: 503,
-      });
-    }
-
     // Interception runs in the containers package's `ContainerProxy` WorkerEntrypoint, whose
     // outbound handler receives no `ExecutionContext`, so this read cannot hand a bundle
     // revalidation to `waitUntil`. A refresh started between the 240 s revalidate point and the
@@ -79,8 +69,17 @@ GrafanaContainer.outboundByHost = {
     // off, never beyond the 24 h stale cap. So the cost after that point is a slower read, not a
     // fetch per request and not an unboundedly stale bundle. The DO's own `GF_SECRET_KEY` read
     // passes `this.ctx`.
-    const token = await resolveSecret(env, 'O11Y_CF_AE_API_TOKEN');
-    if (!token) {
+    const token = await readSecretState(env, 'O11Y_CF_AE_API_TOKEN');
+    if (token.state === 'off') {
+      // The `dev` block binds no Analytics Engine token: none has been minted for dev, and a
+      // production-named store secret may not be read from a non-production block. That deployment
+      // therefore runs this proxy off; adding a `_DEV` store entry and its dev binding turns it
+      // back on with no code change. Answer it as a missing feature, not a broken read.
+      return new Response('Analytics Engine proxy is not configured for this deployment', {
+        status: 503,
+      });
+    }
+    if (token.state !== 'value' || !token.value) {
       return new Response('Analytics Engine token unavailable', { status: 503 });
     }
 
@@ -89,7 +88,7 @@ GrafanaContainer.outboundByHost = {
     target.search = src.search;
 
     const headers = new Headers(request.headers);
-    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Authorization', `Bearer ${token.value}`);
     headers.delete('host');
 
     // Buffer the body (empty for GET) to avoid the Workers `fetch`
@@ -102,19 +101,6 @@ GrafanaContainer.outboundByHost = {
 
 function getGrafanaContainerStub(env: Env, country: string) {
   return env.GRAFANA_CONTAINER.get(env.GRAFANA_CONTAINER.idFromName(`grafana-${country}`));
-}
-
-async function resolveSecret(
-  env: Env,
-  name: KiloOpsSecretName,
-  ctx?: SecretsExecutionContext
-): Promise<string | null> {
-  try {
-    return await readKiloOpsSecret(env, name, ctx);
-  } catch (err) {
-    console.error('[resolveSecret] secret read failed:', err instanceof Error ? err.message : err);
-    return null;
-  }
 }
 
 const app = new Hono<KiloOpsEnv>();

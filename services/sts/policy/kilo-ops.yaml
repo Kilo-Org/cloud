@@ -9,8 +9,9 @@
 # Before `wrangler deploy --env dev` works, the Secrets Store needs `GF_SECRET_KEY_DEV` (a new
 # random Grafana key); the dev block reads that name because a non-production block of a config that
 # binds STS may not read a production-named store secret. Never copy the production value. The dev
-# block binds no Analytics Engine token (none can be minted for dev), so it runs that proxy off:
-# src/worker.ts answers "not configured" there and production is unchanged.
+# block binds no Analytics Engine token (none has been minted for dev), so it runs that proxy off:
+# src/worker.ts answers "not configured" there, and a `_DEV` entry plus its dev binding turns the
+# proxy back on with no code change.
 workload: kilo-ops
 environments:
   - production

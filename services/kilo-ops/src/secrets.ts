@@ -90,3 +90,28 @@ export async function readKiloOpsSecret(
   }
   return typeof value === 'string' ? value : value.get();
 }
+
+/** What one read produced, for a caller that has to answer its own HTTP. */
+export type SecretRead = { state: 'value'; value: string } | { state: 'off' } | { state: 'failed' };
+
+/**
+ * One read, classified: `off` when this deployment binds no source for the name, so the feature it
+ * feeds is not deployed here; `failed` when a configured source refused the read. Neither returns a
+ * value, and a caller tells them apart so an absent feature does not read as a broken one.
+ */
+export async function readSecretState(
+  env: KiloOpsSecretsEnv,
+  name: KiloOpsSecretName,
+  ctx?: SecretsExecutionContext
+): Promise<SecretRead> {
+  try {
+    if (!secretConfigured(env, name)) return { state: 'off' };
+    return { state: 'value', value: await readKiloOpsSecret(env, name, ctx) };
+  } catch (err) {
+    console.error(
+      '[readSecretState] secret read failed:',
+      err instanceof Error ? err.message : err
+    );
+    return { state: 'failed' };
+  }
+}

@@ -419,6 +419,22 @@ describe('the UTS configs themselves', () => {
     ]);
   });
 
+  it('accept secrets-store, the shared rollback value, and fail an unknown source', () => {
+    const withSource = (source: string) =>
+      utsConfigProblems(
+        mintWith(raw => ({
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), SECRETS_SOURCE: source },
+        }))
+      );
+    expect(withSource('secrets-store')).toEqual([]);
+    expect(withSource('foo')).toEqual([
+      expect.stringContaining(
+        '(top level): SECRETS_SOURCE resolves to foo; it must be one of worker, secrets-store, sts'
+      ),
+    ]);
+  });
+
   it('fail the development entry in any config but the development config', () => {
     const local = {
       name: 'uts-local',

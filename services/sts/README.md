@@ -471,6 +471,33 @@ Workloads with a policy, all over `worker-binding`:
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
 
+GitHub Actions workloads (`github-oidc`, production only, `refs/heads/main`, each workflow file
+pinned to `@refs/heads/main`; see [GitHub Actions callers](#github-actions-callers)). All are in
+`Kilo-Org/kilocode` (repository id `946087422`, owner id `201822503`) and grant no token, lease or
+deploy token; their bundles are `/ci/<workload>`:
+
+| Workload | GitHub environment | Workflow files | Events |
+|---|---|---|---|
+| `ci-kilocode-release` | `release` | `publish.yml` | `workflow_dispatch` |
+| `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
+| `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
+| `ci-kilocode-scan-notify` | `automation` | `security-findings-notify.yml` | `schedule`, `workflow_dispatch` |
+| `ci-kilocode-community` | `automation` | `community-sweep.yml` | `schedule`, `workflow_dispatch` |
+| `ci-kilocode-notify` | `automation` | `outdated-kilo-deps.yml`, `stale-alerts-report.yml`, `stale-bot-pr-notify.yml`, `v2-upstream-release-notify.yml` | `schedule`, `workflow_dispatch` |
+| `ci-kilocode-opencode-watch` | `automation` | `watch-opencode-releases.yml` | `schedule`, `workflow_dispatch` |
+
+`Kilo-Org/kilocode` predates GitHub's immutable subjects and has not opted in yet, so STS refuses
+its tokens (`identity_rejected`) until it does. No policy admits the `v2` branch or `release-v2`.
+
+Two kilocode-side rules hold these policies to what they name:
+
+- None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
+  carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
+  `main` that called it with a listed event would get the bundle.
+- The GitHub environments `automation`, `release` and `release-jetbrains` admit deployments from
+  `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
+  what makes it mean `main`.
+
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
 review covers its STS binding; this repository refuses any config that deploys under the name.
@@ -756,8 +783,8 @@ copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,0
 a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
 cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
 has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
-push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
-minutes, or 2,880 a day per environment.
+push per GitHub policy per refresh: with the 7 kilocode policies, 7 `BundleDO` calls every 4
+minutes, or 2,520 a day in production.
 
 ## Database leases
 

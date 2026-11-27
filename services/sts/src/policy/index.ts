@@ -4,6 +4,13 @@ import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import autoRoutingBenchmarkPolicy from '../../policy/auto-routing-benchmark.yaml';
 import autoRoutingPolicy from '../../policy/auto-routing.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
+import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
+import ciKilocodeNotifyPolicy from '../../policy/ci-kilocode-notify.yaml';
+import ciKilocodeOpencodeWatchPolicy from '../../policy/ci-kilocode-opencode-watch.yaml';
+import ciKilocodeReleaseJetbrainsPolicy from '../../policy/ci-kilocode-release-jetbrains.yaml';
+import ciKilocodeReleasePolicy from '../../policy/ci-kilocode-release.yaml';
+import ciKilocodeScanNotifyPolicy from '../../policy/ci-kilocode-scan-notify.yaml';
 import cloudAgentNextPolicy from '../../policy/cloud-agent-next.yaml';
 import cloudflareGmailPushPolicy from '../../policy/cloudflare-gmail-push.yaml';
 import cloudflareScimSyncPolicy from '../../policy/cloudflare-scim-sync.yaml';
@@ -42,6 +49,13 @@ const sources: Record<PolicyFile, string> = {
   'auto-routing.yaml': autoRoutingPolicy,
   'auto-routing-benchmark.yaml': autoRoutingBenchmarkPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
+  'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,
+  'ci-kilocode-notify.yaml': ciKilocodeNotifyPolicy,
+  'ci-kilocode-opencode-watch.yaml': ciKilocodeOpencodeWatchPolicy,
+  'ci-kilocode-release-jetbrains.yaml': ciKilocodeReleaseJetbrainsPolicy,
+  'ci-kilocode-release.yaml': ciKilocodeReleasePolicy,
+  'ci-kilocode-scan-notify.yaml': ciKilocodeScanNotifyPolicy,
   'cloud-agent-next.yaml': cloudAgentNextPolicy,
   'cloudflare-gmail-push.yaml': cloudflareGmailPushPolicy,
   'cloudflare-scim-sync.yaml': cloudflareScimSyncPolicy,

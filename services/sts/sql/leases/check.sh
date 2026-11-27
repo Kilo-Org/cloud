@@ -268,6 +268,7 @@ pass 'the replica admin holds none of the lease role rights while the lease live
 # duration and the statement of every error: the admin logins' role settings turn all three off for
 # their own sessions. A failed creation's error carries no password either. Another login's
 # statement in the same log shows that the check sees logged statements.
+MARK=$(secret)
 super -c "alter system set log_statement = 'all'" -c 'alter system set log_min_duration_statement = 0' \
   -c 'select pg_reload_conf()' >/dev/null
 sleep 1

@@ -56,14 +56,10 @@ import {
 } from 'jose';
 import pg from 'pg';
 import { z } from 'zod';
-import { isLoopbackHost } from './connection';
+import { localDatabaseUrl } from './e2e-store';
 
-const adminUrl = z.url().parse(process.env.UTS_E2E_ADMIN_URL);
-const appUrl = z.url().parse(process.env.UTS_E2E_APP_URL);
-for (const url of [adminUrl, appUrl]) {
-  if (!isLoopbackHost(new URL(url)))
-    throw new Error('the end-to-end run uses a local database only');
-}
+const adminUrl = localDatabaseUrl('UTS_E2E_ADMIN_URL').toString();
+const appUrl = localDatabaseUrl('UTS_E2E_APP_URL').toString();
 const PORT = z.coerce
   .number()
   .int()

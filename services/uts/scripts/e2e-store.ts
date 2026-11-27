@@ -26,19 +26,23 @@ export type E2eStore = {
   urls: { app: string; pat: string; reader: string };
 };
 
-function adminUrl(): URL {
-  const raw = z
-    .url({ protocol: /^postgres(ql)?$/ })
-    .parse(process.env.UTS_E2E_ADMIN_URL ?? DEFAULT_ADMIN_URL);
+/**
+ * `process.env[name]` (or `fallback`) as the URL of a local Postgres login: a loopback host, no
+ * query parameter (`pg` reads TLS and other settings from it, so a parameter could point a local
+ * run elsewhere or weaken it), and a password. Throws otherwise. Every end-to-end script reads its
+ * database URLs through this.
+ */
+export function localDatabaseUrl(name: string, fallback?: string): URL {
+  const raw = z.url({ protocol: /^postgres(ql)?$/ }).parse(process.env[name] ?? fallback);
   const url = new URL(raw);
   if (!isLoopbackHost(url)) {
-    throw new Error(`UTS_E2E_ADMIN_URL must name a loopback host, not ${url.hostname}`);
+    throw new Error(`${name} must name a loopback host, not ${url.hostname}`);
   }
   if (url.search !== '') {
-    throw new Error('UTS_E2E_ADMIN_URL must not carry query parameters');
+    throw new Error(`${name} must not carry query parameters`);
   }
   if (url.password === '') {
-    throw new Error('UTS_E2E_ADMIN_URL needs the admin login and its password');
+    throw new Error(`${name} needs the login and its password`);
   }
   return url;
 }
@@ -51,7 +55,7 @@ function loginUrl(base: URL, login: string, password: string): string {
 }
 
 export async function openE2eStore(database: string): Promise<E2eStore> {
-  const base = adminUrl();
+  const base = localDatabaseUrl('UTS_E2E_ADMIN_URL', DEFAULT_ADMIN_URL);
   const cluster = new pg.Client({ connectionString: base.toString() });
   await cluster.connect();
   try {

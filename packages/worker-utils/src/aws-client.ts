@@ -34,6 +34,7 @@ export function createAwsClient(input: {
   region: string;
   service: string;
   fetch?: AwsFetch;
+  readErrorCode?: (response: Response) => Promise<string | undefined>;
 }) {
   const region = awsRegion(input.region);
   const signer = new AwsClient({
@@ -62,13 +63,20 @@ export function createAwsClient(input: {
       }
       if (response.ok) return response;
       const header = response.headers.get('x-amzn-errortype')?.split(':', 1)[0];
-      // AWS does not consistently return a typed header. Status remains authoritative.
+      const candidate = header ?? (await input.readErrorCode?.(response).catch(() => undefined));
       const code =
-        header && /^[A-Za-z][A-Za-z0-9]{0,80}$/.test(header) ? header : 'RequestRejected';
-      await response.body?.cancel();
+        candidate && /^[A-Za-z][A-Za-z0-9_.-]{0,80}$/.test(candidate)
+          ? candidate
+          : 'RequestRejected';
+      if (!response.bodyUsed) await response.body?.cancel();
       throw new AwsRequestError(response.status, code);
     },
-    async signedUrl(url: URL, method: 'GET' | 'PUT', expiresInSeconds: number): Promise<string> {
+    async signedUrl(
+      url: URL,
+      method: 'GET' | 'PUT',
+      expiresInSeconds: number,
+      headers: HeadersInit = {}
+    ): Promise<string> {
       if (!Number.isInteger(expiresInSeconds) || expiresInSeconds < 1 || expiresInSeconds > 3600)
         throw new Error('Invalid AWS URL lifetime');
       if (
@@ -78,13 +86,22 @@ export function createAwsClient(input: {
         throw new Error('AWS credentials expire before the signed URL');
       const target = new URL(url);
       target.searchParams.set('X-Amz-Expires', String(expiresInSeconds));
-      return (await signer.sign(target.toString(), { method, aws: { signQuery: true } })).url;
+      return (
+        await signer.sign(target.toString(), {
+          method,
+          headers,
+          aws: { signQuery: true, allHeaders: true },
+        })
+      ).url;
     },
   };
 }
 
-export async function readAwsResponse(response: Response, maximumBytes = 65_536): Promise<string> {
-  if (!response.body) return '';
+export async function readAwsResponseBytes(
+  response: Response,
+  maximumBytes = 65_536
+): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array();
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -108,7 +125,11 @@ export async function readAwsResponse(response: Response, maximumBytes = 65_536)
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(bytes);
+  return bytes;
+}
+
+export async function readAwsResponse(response: Response, maximumBytes = 65_536): Promise<string> {
+  return new TextDecoder().decode(await readAwsResponseBytes(response, maximumBytes));
 }
 
 export async function assumeAwsRole(input: {
@@ -117,6 +138,7 @@ export async function assumeAwsRole(input: {
   roleArn: string;
   externalId?: string;
   fetch?: AwsFetch;
+  signal?: AbortSignal;
 }): Promise<AwsCredentials> {
   const roleArn = z
     .string()
@@ -135,6 +157,7 @@ export async function assumeAwsRole(input: {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
+    signal: input.signal,
   });
   const xml = await readAwsResponse(response);
   function field(name: string): string {

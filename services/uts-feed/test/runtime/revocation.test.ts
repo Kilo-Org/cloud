@@ -14,6 +14,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readConfig, type Env } from '../../src/env';
 import { handleRequest } from '../../src/http';
+import { resetFeedVerifier } from '../../src/https-auth';
 import { resetIsolate } from '../../src/jwks';
 import { readerJwks } from '../../src/reader';
 import {
@@ -24,6 +25,7 @@ import {
   serveHead,
   serveList,
 } from '../../src/revocation';
+import { TEST_STS_ISSUER, serveStsKeySet, stsToken } from './sts';
 
 // The pool's env carries the two FeedReader bindings `wrangler.test.jsonc` declares.
 const readers = poolEnv as unknown as {
@@ -232,18 +234,33 @@ describe('list', () => {
 
 describe('routes', () => {
   const signerKeys: SignerKeysBinding = { signerKeys: async () => null };
+  /** The HTTPS feed's switch on, with the stand-in STS of `./sts` as its issuer. */
+  const HTTPS_ON = { FEED_HTTPS_ENABLED: 'true', STS_URL: TEST_STS_ISSUER };
+
+  beforeEach(async () => {
+    resetFeedVerifier();
+    await serveStsKeySet();
+  });
+
+  /** A GET with a valid STS token of the web app, the first workload the feed admits. */
+  async function send(path: string, env: Env) {
+    const ctx = createExecutionContext();
+    const request = new Request(`http://localhost:8801${path}`, {
+      headers: { Authorization: `Bearer ${await stsToken()}` },
+    });
+    const response = await handleRequest(request, env, ctx);
+    await waitOnExecutionContext(ctx);
+    return response;
+  }
 
   async function get(path: string, reads: FeedReadsBinding, environment = 'development') {
-    const env: Env = {
+    return await send(path, {
       UTS_ENVIRONMENT: environment,
       UTS_MINT: signerKeys,
       UTS_FEED_READS: reads,
       CF_VERSION_METADATA: VERSION,
-    };
-    const ctx = createExecutionContext();
-    const response = await handleRequest(new Request(`http://localhost:8801${path}`), env, ctx);
-    await waitOnExecutionContext(ctx);
-    return response;
+      ...(environment === 'development' ? HTTPS_ON : {}),
+    });
   }
 
   it('serve the head and the list over HTTPS in development', async () => {
@@ -264,17 +281,20 @@ describe('routes', () => {
     expect(response.headers.get('Retry-After')).toBe('5');
   });
 
-  it('answer 404 in staging and production until the caller check exists', async () => {
-    const reads = feedReads([okHead()], [okList]).binding;
+  it('answer 503 with Retry-After in staging and production, where the switch is off', async () => {
+    const reads = feedReads([okHead()], [okList]);
     for (const environment of ['staging', 'production']) {
       for (const path of [
         '/revocation/head',
         `/revocation/list/${listHash}`,
         '/revocation/bootstrap',
       ]) {
-        expect((await get(path, reads, environment)).status).toBe(404);
+        const response = await get(path, reads.binding, environment);
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Retry-After')).toBe('60');
       }
     }
+    expect(reads.calls).toEqual([]);
   });
 
   it('answer the bootstrap with the key set, the head and the list it covers', async () => {
@@ -290,19 +310,13 @@ describe('routes', () => {
         feeds: [0, 1].map(feed => ({ feed, status: 'unavailable' })),
       },
     };
-    const env: Env = {
+    const response = await send('/revocation/bootstrap', {
       UTS_ENVIRONMENT: 'development',
       UTS_MINT: { signerKeys: async () => answer },
       UTS_FEED_READS: feedReads([okHead('abc')], [okList]).binding,
       CF_VERSION_METADATA: VERSION,
-    };
-    const ctx = createExecutionContext();
-    const response = await handleRequest(
-      new Request('http://localhost:8801/revocation/bootstrap'),
-      env,
-      ctx
-    );
-    await waitOnExecutionContext(ctx);
+      ...HTTPS_ON,
+    });
     expect(response.status).toBe(200);
     const body = UtsBootstrapWireSchema.parse(await response.json());
     expect(body.head).toEqual(named('abc'));
@@ -333,19 +347,13 @@ describe('routes', () => {
         })),
       },
     };
-    const env: Env = {
+    const response = await send('/revocation/bootstrap', {
       UTS_ENVIRONMENT: 'development',
       UTS_MINT: { signerKeys: async () => answer },
       UTS_FEED_READS: feedReads([okHead('abc')], [okList]).binding,
       CF_VERSION_METADATA: VERSION,
-    };
-    const ctx = createExecutionContext();
-    const response = await handleRequest(
-      new Request('http://localhost:8801/revocation/bootstrap'),
-      env,
-      ctx
-    );
-    await waitOnExecutionContext(ctx);
+      ...HTTPS_ON,
+    });
     const body = UtsBootstrapWireSchema.parse(await response.json());
     expect(body.key_ages.newest).toBeLessThanOrEqual(1);
     expect(body.key_ages.oldest).toBeGreaterThanOrEqual(3600);

@@ -16,6 +16,8 @@ export type BootstrapRead =
       jwks: Record<string, unknown>;
       keyAges: KeySetAges;
       head: string;
+      /** The head's `iat`, in seconds, for the head-age header of the HTTPS answer. */
+      headIssuedAt: number;
       list: Uint8Array<ArrayBuffer>;
     }
   | { status: 'unavailable' }
@@ -48,6 +50,7 @@ export async function serveBootstrap(
       oldest: Math.floor(keySet.oldestAgeMs / 1000),
     },
     head: head.head,
+    headIssuedAt: head.issuedAt,
     list: list.bytes,
   };
 }

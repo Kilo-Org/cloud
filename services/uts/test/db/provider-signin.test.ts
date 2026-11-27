@@ -1,7 +1,8 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { AuditEventSchema } from '@kilocode/sts-contracts';
 import type pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { IdentityStore } from '../../src/db/client';
 import {
@@ -16,8 +17,8 @@ import type { NetworkContext } from '../../src/signin/store';
 import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
 /**
- * The provider, SSO and email sign-in functions (migration 0009) through the Worker's own
- * statements (`src/signin/providers/store.ts`), run as the app login. The Worker checks the
+ * The provider, SSO and email sign-in functions (migrations 0009 and 0018) through the Worker's
+ * own statements (`src/signin/providers/store.ts`), run as the app login. The Worker checks the
  * provider's answer before these statements; here the identities are fixtures. Fixtures other
  * slices write (accounts, SSO connections and domains, sessions, gate passes) are inserted as the
  * owner.
@@ -588,6 +589,11 @@ describe('email sign-in', () => {
   /** The binder each sent email's browser holds, by link. */
   const binders = new Map<string, string>();
 
+  // Every case enters codes from the same client network; each starts with a fresh network count.
+  beforeEach(async () => {
+    await owner.query('DELETE FROM uts.network_email_code_failures');
+  });
+
   async function sendEmail(email: string, code = '123456') {
     const link = token();
     const binder = token();
@@ -603,14 +609,14 @@ describe('email sign-in', () => {
     return { link, result };
   }
 
-  async function enter(email: string, code: string) {
+  async function enter(email: string, code: string, from: NetworkContext = network) {
     const sessionToken = token();
     const result = await store.verifyEmailCode({
       environment,
       emailHash: keyed('kilo-uts-email', email),
       codeHash: keyed('kilo-uts-email-code', `${email}:${code}`),
       sessionTokenHash: sha256(sessionToken),
-      network,
+      network: from,
       newAccountId: newAccountId(),
     });
     return { result, sessionToken };
@@ -629,6 +635,28 @@ describe('email sign-in', () => {
       newAccountId: newAccountId(),
     });
   }
+
+  it('refuses a code entry without a code hash, and leaves the code pending (migration 0022)', async () => {
+    const email = address();
+    await sendEmail(email);
+    expect(
+      await sqlStateOf(() =>
+        app.query('SELECT * FROM uts.verify_email_code($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9)', [
+          environment,
+          keyed('kilo-uts-email', email),
+          sha256(token()),
+          network.userAgent,
+          network.clientIp,
+          network.asn,
+          network.country,
+          network.city,
+          newAccountId(),
+        ])
+      )
+    ).toBe('22004');
+    const { result } = await enter(email, '123456');
+    expect(result.outcome).toBe('signed_in');
+  });
 
   it('refuses guesses across older codes: a new email exhausts every earlier code', async () => {
     const email = address();
@@ -807,6 +835,104 @@ describe('email sign-in', () => {
     await sendEmail(email);
     expect((await enter(email, '123456')).result).toMatchObject({ outcome: 'account_blocked' });
   });
+
+  it('refuses every code entry of a network past 30 wrong codes an hour, and keeps links working', async () => {
+    // Six addresses, five wrong codes each: the network's 30, though no address hit its own stop.
+    for (let round = 0; round < 6; round += 1) {
+      const email = address();
+      await sendEmail(email);
+      for (let entry = 0; entry < 5; entry += 1) await enter(email, '000000');
+    }
+    const counted = await owner.query(
+      'SELECT client_network::text AS network, failures FROM uts.network_email_code_failures'
+    );
+    expect(counted.rows).toEqual([{ network: '192.0.2.0/24', failures: 30 }]);
+
+    const email = address();
+    const accountId = await accountWithEmail(email);
+    const { link } = await sendEmail(email);
+    // Another address of the /24: refused before any code is read, even the right one.
+    const nearby = { ...network, clientIp: '192.0.2.200' };
+    expect((await enter(email, '123456', nearby)).result).toEqual({ outcome: 'network_limited' });
+    const stored = await owner.query(
+      'SELECT status, attempts FROM uts.email_codes WHERE email = $1',
+      [email]
+    );
+    expect(stored.rows).toEqual([{ status: 'pending', attempts: 0 }]);
+    // A rate-limited refusal writes no audit row (decision Q56), and counts nothing more.
+    expect(await auditRows(accountId)).toEqual([]);
+    expect(
+      (await owner.query('SELECT failures FROM uts.network_email_code_failures')).rows
+    ).toEqual([{ failures: 30 }]);
+    // Another network still enters codes, and the owner's link still signs in.
+    const elsewhere = { ...network, clientIp: '2001:db8:7:1::5' };
+    expect((await enter(email, '000000', elsewhere)).result).toMatchObject({
+      outcome: 'invalid_code',
+      entriesLeft: 4,
+    });
+    expect(await follow(link)).toMatchObject({ outcome: 'signed_in', signedIn: { accountId } });
+
+    // Once the hour has passed, the network enters codes again and its count starts over.
+    await owner.query(
+      `UPDATE uts.network_email_code_failures SET window_started_at = now() - interval '61 minutes'
+       WHERE client_network = '192.0.2.0/24'`
+    );
+    const later = address();
+    await sendEmail(later);
+    expect((await enter(later, '000000')).result).toMatchObject({ outcome: 'invalid_code' });
+    const restarted = await owner.query(
+      `SELECT failures FROM uts.network_email_code_failures WHERE client_network = '192.0.2.0/24'`
+    );
+    expect(restarted.rows).toEqual([{ failures: 1 }]);
+  });
+
+  it('refuses a wrong code that would pass 30 while another entry of the network holds the count', async () => {
+    await owner.query(
+      `INSERT INTO uts.network_email_code_failures (client_network, failures, window_started_at)
+       VALUES ('192.0.2.0/24', 29, now())`
+    );
+    const first = address();
+    const second = address();
+    await sendEmail(first);
+    await sendEmail(second);
+    // One entry counts the 30th wrong code in a transaction that stays open, so it holds the row.
+    const holding = await db.connect('uts_app_b');
+    const holdingStore = identityStoreProviderSignIn(new IdentityStore(holding));
+    await holding.query('BEGIN');
+    const held = await holdingStore.verifyEmailCode({
+      environment,
+      emailHash: keyed('kilo-uts-email', first),
+      codeHash: keyed('kilo-uts-email-code', `${first}:000000`),
+      sessionTokenHash: sha256(token()),
+      network,
+      newAccountId: newAccountId(),
+    });
+    expect(held).toMatchObject({ outcome: 'invalid_code' });
+    // The other entry passed the probe (it saw 29) and waits on the row in the upsert.
+    const waiting = enter(second, '000000');
+    await sleep(300);
+    await holding.query('COMMIT');
+    expect((await waiting).result).toEqual({ outcome: 'network_limited' });
+    const counted = await owner.query(
+      `SELECT failures FROM uts.network_email_code_failures WHERE client_network = '192.0.2.0/24'`
+    );
+    expect(counted.rows).toEqual([{ failures: 30 }]);
+    const untouched = await owner.query('SELECT attempts FROM uts.email_codes WHERE email = $1', [
+      second,
+    ]);
+    expect(untouched.rows).toEqual([{ attempts: 0 }]);
+  });
+
+  it('counts a wrong code without a client address against no network', async () => {
+    const email = address();
+    await sendEmail(email);
+    const unknown = { ...network, clientIp: null };
+    expect((await enter(email, '000000', unknown)).result).toMatchObject({
+      outcome: 'invalid_code',
+    });
+    const counted = await owner.query('SELECT 1 FROM uts.network_email_code_failures');
+    expect(counted.rowCount).toBe(0);
+  });
 });
 
 describe('concurrent sign-ins', () => {
@@ -879,6 +1005,9 @@ describe('privileges and maintenance', () => {
       await sqlStateOf(() => app.query('UPDATE uts.email_code_limits SET sent_in_hour = 0'))
     ).toBe('42501');
     expect(await sqlStateOf(() => app.query('SELECT 1 FROM uts.sign_in_flows'))).toBe('42501');
+    expect(await sqlStateOf(() => app.query('SELECT 1 FROM uts.network_email_code_failures'))).toBe(
+      '42501'
+    );
   });
 
   it('refuses a return path to another origin in the stored flow', async () => {
@@ -910,6 +1039,28 @@ describe('privileges and maintenance', () => {
       sha256(flow.state),
     ]);
     expect(left.rowCount).toBe(0);
+  });
+
+  it('deletes network counts of wrong email codes whose hour has passed', async () => {
+    await owner.query(
+      `INSERT INTO uts.network_email_code_failures (client_network, failures, window_started_at)
+       VALUES ('198.51.100.0/24', 3, now() - interval '2 hours'),
+              ('203.0.113.0/24', 3, now() - interval '10 minutes')`
+    );
+    const result = await app.query<{ kind: string; deleted: number }>(
+      'SELECT * FROM uts.maintain_provider_sign_in_rows()'
+    );
+    expect(result.rows.map(row => row.kind)).toEqual([
+      'sign_in_flows',
+      'sign_in_emails',
+      'email_code_limits',
+      'network_email_code_failures',
+    ]);
+    const left = await owner.query(
+      `SELECT client_network::text AS network FROM uts.network_email_code_failures
+       WHERE client_network IN ('198.51.100.0/24', '203.0.113.0/24')`
+    );
+    expect(left.rows).toEqual([{ network: '203.0.113.0/24' }]);
   });
 });
 

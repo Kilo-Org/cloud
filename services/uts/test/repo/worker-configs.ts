@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import {
   UTS_ENDPOINTS,
   UTS_FEED_READER_ENTRYPOINT,
@@ -48,6 +49,7 @@ export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>
   ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
   ['UtsFeedDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
   ['UtsAuditRelayDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsManagerAuthDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
 ]);
 
 /** The mint Worker entrypoints the feed Worker binds, each once per block. */
@@ -89,6 +91,26 @@ const UTS_AUDIT_QUEUES: Readonly<Record<UtsEnvironment, string>> = {
   development: 'kilo-audit-uts-local',
 };
 
+/**
+ * The identity store's three Hyperdrive configs in each deployed environment (README "Deploys"):
+ * the primary, the PAT lookup config and the read replica. A deployed block binds exactly these,
+ * never a local connection string.
+ */
+export const IDENTITY_STORE_HYPERDRIVE: Readonly<
+  Record<'production' | 'staging', Readonly<Record<string, string>>>
+> = {
+  production: {
+    IDENTITY_STORE: '314ea5eee7314e09b59728ff5453e9d9',
+    IDENTITY_STORE_PAT: 'f041609cd77043d7b81bdd9265f46cec',
+    IDENTITY_STORE_REPLICA: '4194e3ece2b442e381ec6d82f9bc0dcf',
+  },
+  staging: {
+    IDENTITY_STORE: '5dd523ea0fa447ebaf442a0300d8f848',
+    IDENTITY_STORE_PAT: '48227f1c669742618bb7bc6adf9a416c',
+    IDENTITY_STORE_REPLICA: '5fa4d303a52e4274a9750b20e2f507f0',
+  },
+};
+
 // Prefix match, wider than the deployment lists on purpose: a name that only looks like UTS
 // fails here instead of slipping past an exact-name list.
 const isUtsName = (name: string) => name === 'uts' || name.startsWith('uts-');
@@ -126,6 +148,15 @@ const RouteSchema = z.union([
 const BindingsShape = {
   vars: z.record(z.string(), z.unknown()).optional(),
   services: z.array(ServiceBindingSchema).optional(),
+  hyperdrive: z
+    .array(
+      z.looseObject({
+        binding: z.string(),
+        id: z.string(),
+        localConnectionString: z.string().optional(),
+      })
+    )
+    .optional(),
   queues: z
     .looseObject({
       producers: z.array(z.looseObject({ binding: z.string(), queue: z.string() })).optional(),
@@ -149,7 +180,12 @@ const BindingsShape = {
     .array(z.looseObject({ outbound: ServiceReferenceSchema.optional() }))
     .optional(),
   observability: z
-    .looseObject({ traces: z.looseObject({ enabled: z.boolean().optional() }).optional() })
+    .looseObject({
+      head_sampling_rate: z.number().optional(),
+      logs: z.looseObject({ head_sampling_rate: z.number().optional() }).optional(),
+      traces: z.looseObject({ enabled: z.boolean().optional() }).optional(),
+      redact_query_string: z.boolean().optional(),
+    })
     .optional(),
 };
 
@@ -493,6 +529,28 @@ function auditQueueProblems(
     : [`${where}: produces to ${produced || 'nothing'}; expected ${expected}`];
 }
 
+function hyperdriveProblems(
+  where: string,
+  bindings: Bindings,
+  environment: 'production' | 'staging'
+): string[] {
+  const bound = (bindings.hyperdrive ?? [])
+    .map(config =>
+      config.localConnectionString === undefined
+        ? `${config.binding}=${config.id}`
+        : `${config.binding}=${config.id} with a local connection string`
+    )
+    .sort()
+    .join(', ');
+  const expected = Object.entries(IDENTITY_STORE_HYPERDRIVE[environment])
+    .map(([binding, id]) => `${binding}=${id}`)
+    .sort()
+    .join(', ');
+  return bound === expected
+    ? []
+    : [`${where}: binds Hyperdrive ${bound || 'nothing'}; expected ${expected}`];
+}
+
 /** Problems with the development config; `utsConfigProblems` lists its rules. */
 function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
@@ -519,11 +577,45 @@ function devConfigProblems(dev: WorkerConfig): string[] {
 }
 
 /**
- * The mint Worker's configs, every one of which runs the jose verification path. The rule below
+ * The feed Worker's HTTPS switch and STS issuer in one block: `FEED_HTTPS_ENABLED` is absent (off)
+ * or exactly `true`, and `STS_URL`, when set, is the STS issuer of the block's own environment, so
+ * a deployed block can never accept another environment's service tokens. A loopback stand-in is
+ * set only on the command line of a local run, never here.
+ */
+function feedHttpsProblems(block: Block): string[] {
+  const problems: string[] = [];
+  const vars = block.bindings.vars ?? {};
+  const enabled = vars.FEED_HTTPS_ENABLED;
+  if (enabled !== undefined && enabled !== 'true') {
+    problems.push(
+      `${block.where}: FEED_HTTPS_ENABLED is ${JSON.stringify(enabled)}; it is exactly "true" or absent (off)`
+    );
+  }
+  const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+  if (
+    vars.STS_URL !== undefined &&
+    (environment === undefined || vars.STS_URL !== STS_ISSUERS[environment])
+  ) {
+    problems.push(
+      `${block.where}: STS_URL is ${JSON.stringify(vars.STS_URL)}; it must be the STS issuer of ${String(environment)}`
+    );
+  }
+  return problems;
+}
+
+/**
+ * The configs that run the jose verification path: every mint Worker config, and the feed
+ * Worker's, which verifies STS tokens for its HTTPS feed (`@kilocode/verify`). The rule below
  * covers only these: asserted repo-wide it would fail Workers that reach jose through a package
  * with an older date, such as services/ai-attribution, which is not this rule's subject.
  */
-const JOSE_CONFIGS: ReadonlySet<string> = new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]);
+const JOSE_CONFIGS: ReadonlySet<string> = new Set([
+  MINT_CONFIG,
+  MINT_DEV_CONFIG,
+  MINT_TEST_CONFIG,
+  FEED_CONFIG,
+  FEED_TEST_CONFIG,
+]);
 
 /**
  * The first compatibility date that carries workerd's fix for jose's verification path: jose's
@@ -569,13 +661,22 @@ function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
 }
 
 /**
+ * The largest head sample of the feed Worker's logs: each HTTPS feed read is one invocation, so the
+ * approved log budget allows 1 to 5 percent of them.
+ */
+export const FEED_MAX_LOG_SAMPLING_RATE = 0.05;
+
+/**
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
  * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
- * its objects in the `eu` jurisdiction, and places its fetch handler next to the identity store;
+ * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store, and
+ * keeps query strings (a provider callback's authorization code) out of its logs;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
- * without placement, binds no Durable Object, and binds each mint entrypoint once; and every
+ * without placement, binds no Durable Object, binds each mint entrypoint once, keeps at most a
+ * `FEED_MAX_LOG_SAMPLING_RATE` head sample of its logs, and turns its HTTPS feed on only with
+ * `FEED_HTTPS_ENABLED` exactly `true` and the STS issuer of its own environment; and every
  * jose-verifying config lists `unhandled_rejection_after_microtask_checkpoint` exactly when its
  * compatibility date is before 2026-03-03, the date the flag became workerd's default (jose#892).
  */
@@ -609,6 +710,9 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       // batches the audit relay reads as UTS streams (services/audit-relay/src/relay).
       if (environment !== undefined && !block.preview) {
         problems.push(...auditQueueProblems(block.where, block.bindings, environment));
+        if (environment === 'production' || environment === 'staging') {
+          problems.push(...hyperdriveProblems(block.where, block.bindings, environment));
+        }
       }
       const main = block.block?.main ?? mint.config.main;
       if (main !== MINT_DEPLOYED_ENTRY) {
@@ -622,6 +726,14 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       if (block.placementRegion !== MINT_PLACEMENT_REGION) {
         problems.push(
           `${block.where}: placement.region resolves to ${String(block.placementRegion)}; expected ${MINT_PLACEMENT_REGION}`
+        );
+      }
+      // A provider callback's query carries its authorization code; no log may keep it.
+      const redacted = (block.block?.observability ?? mint.config.observability)
+        ?.redact_query_string;
+      if (redacted !== true) {
+        problems.push(
+          `${block.where}: observability.redact_query_string resolves to ${String(redacted)}; it must be true`
         );
       }
     }
@@ -656,6 +768,17 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
           `${block.where}: binds the mint Worker at ${mintEntrypoints.join(', ') || 'no entrypoint'}; expected ${MINT_ENTRYPOINTS.join(' and ')} once each`
         );
       }
+      // Cloudflare samples logs at `logs.head_sampling_rate`, else the observability-wide rate,
+      // else keeps every invocation.
+      const observability = block.block?.observability ?? feed.config.observability;
+      const logRate =
+        observability?.logs?.head_sampling_rate ?? observability?.head_sampling_rate ?? 1;
+      if (logRate > FEED_MAX_LOG_SAMPLING_RATE) {
+        problems.push(
+          `${block.where}: observability.logs.head_sampling_rate resolves to ${logRate}; the feed Worker keeps at most ${FEED_MAX_LOG_SAMPLING_RATE} of its invocation logs`
+        );
+      }
+      problems.push(...feedHttpsProblems(block));
     }
   }
   // The test configs run only in the Workers test pool; each deploys only its own name, so neither

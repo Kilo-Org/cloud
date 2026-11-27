@@ -133,6 +133,16 @@ export const PAGES_DEV_TOOLS_USE_SCOPE = 'pages-dev:tools.use';
 export const KILO_MCP_CATALOG_CONSENT_TEXT =
   "Read your Kilo tool catalog and Kilo's global preferred models and model provider names through Kilo MCP";
 
+/** The audience of the AI gateway (`apps/ai-gateway`), the one gateway user resource. */
+export const KILO_GATEWAY_AUDIENCE = 'kilo-gateway';
+/**
+ * Use the AI gateway as the token's subject: inference and the authenticated model catalog and
+ * model validation reads. It adds no organization: the gateway checks the organization a request
+ * names against the subject's membership itself, and no actor (`act`) or legacy org-model
+ * expansion is carried.
+ */
+export const KILO_GATEWAY_INFERENCE_SCOPE = 'kilo-gateway:inference';
+
 /** Scopes that change credentials. No PAT or bot key may carry one, so a PAT never makes a PAT. */
 export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
   UTS_PATS_MANAGE_SCOPE,
@@ -243,15 +253,16 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   }),
   'kilo-api:feedback.write': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
   'kilo-api:credits.redeem': firstPartyScope(KILO_API_AUDIENCE, [CLI], { requiresSession: true }),
-  // Phase 4 Batch B (2026-11-26): the caller's own sessions in session ingest.
+  // Phase 4 Batch B (2026-11-26): the caller's own sessions in session ingest. Each token comes
+  // from a CLI or web grant, so it names its session in `sid`.
   'session-ingest:sessions.read': firstPartyScope('session-ingest', [CLI, BFF], {
-    requiresSession: false,
+    requiresSession: true,
   }),
   'session-ingest:sessions.write': firstPartyScope('session-ingest', [CLI, BFF], {
-    requiresSession: false,
+    requiresSession: true,
   }),
   'session-ingest:live.connect': firstPartyScope('session-ingest', [CLI, BFF], {
-    requiresSession: false,
+    requiresSession: true,
   }),
   'session-ingest:sessions.share': firstPartyScope('session-ingest', [BFF], {
     requiresSession: true,
@@ -304,6 +315,27 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
     requiresSession: true,
     lifetimeSeconds: SHORT_LIFETIME_SECONDS,
   }),
+  // The AI gateway. The CLI (which the IDE extensions run) calls it for inference; the mobile app
+  // reads its model catalog with the user's bearer. The web app reaches the gateway only through
+  // its rewrites, where the gateway ignores the browser session, so `kilo-web` is not listed. A
+  // PAT and an org bot key may carry it: they replace the long-lived API key that the gateway's
+  // OpenAI-compatible API takes today (decision Q4).
+  [KILO_GATEWAY_INFERENCE_SCOPE]: {
+    audience: KILO_GATEWAY_AUDIENCE,
+    maxLifetimeSeconds: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
+    allowedClients: [CLI, MOBILE],
+    subjects: { kind: 'any_user' },
+    thirdPartySafe: false,
+    stepUp: false,
+    patEligible: true,
+    privileged: false,
+    requiresSession: false,
+    requiresOrgClaim: false,
+    delegable: false,
+    issuance: 'grant',
+    delegatesTo: [],
+    consentText: null,
+  },
   // Kilo MCP (design 5.9). A third-party grant names its consent family in `sid`, not a session.
   [KILO_MCP_CATALOG_READ_SCOPE]: {
     audience: KILO_MCP_AUDIENCE,

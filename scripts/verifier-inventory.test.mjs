@@ -444,6 +444,27 @@ const EXCEPTIONS = {
     signals: { primitive: 1, 'auth-library-import': 1 },
     pins: ["const DEVELOPMENT_STS_ISSUER = 'http://localhost:8825';", 'DEV_STS_JWKS_URL'],
   },
+  'services/uts/src/sts-callers.ts': {
+    reason:
+      'UTS, the issuer (design section 5): its deployed entry admits STS service tokens for the uts audience on the broker exchange and the /internal/ routes, through the phase 2 library under per-environment workload allow-lists; not a phase 4 surface',
+    signals: { 'verify-library': 1 },
+    pins: ['audience: UTS_ACCOUNT_AUDIENCE', 'export const STS_CALLER_WORKLOADS'],
+  },
+  'services/uts/src/attest/app-attest.ts': {
+    reason:
+      'Third party: UTS mobile attestation (design section 5.5) checks an Apple App Attest certificate chain to the Apple root and the device key assertion of the kilo-mobile code exchange; not a Kilo credential',
+    signals: { primitive: 2 },
+    pins: [
+      "{ name: 'ECDSA', hash }, key, signature, subject.signed",
+      "{ name: 'ECDSA', hash: 'SHA-256' }, key, raw, nonce",
+    ],
+  },
+  'services/uts-feed/src/https-auth.ts': {
+    reason:
+      'UTS feed Worker (design section 5.6): the HTTPS revocation feed admits STS service tokens for the uts-feed audience through the phase 2 library under UTS_FEED_HTTPS_WORKLOADS; not a phase 4 surface',
+    signals: { 'verify-library': 1 },
+    pins: ['audience: UTS_FEED_AUDIENCE', 'UTS_FEED_HTTPS_WORKLOADS'],
+  },
   'packages/trpc/src/agent-profiles-mobile.ts': {
     reason: 'Mobile tRPC router composition: createTRPCRouter only; requests run in apps/web',
     signals: { 'web-shared-import': 1 },

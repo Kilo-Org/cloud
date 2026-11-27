@@ -14,8 +14,8 @@ import {
   UTS_APP_EVENTS_SCOPE,
   UTS_AUTHORITY_PATH_PREFIX,
   UTS_AUTHORITY_SCOPE,
-  UTS_CONNECTION_CONFLICT_RETRY_SECONDS,
   UTS_INTERNAL_WORKLOADS,
+  UTS_AUTHORITY_CONFLICT_RETRY_SECONDS,
   UTS_SUBJECT_OPERATIONS,
   UTS_SUBJECT_OPERATIONS_PATH_PREFIX,
 } from '@kilocode/uts-contracts';
@@ -37,8 +37,8 @@ import { NO_VERIFIER_RETRY_SECONDS, type ServiceTokenVerifier } from './service-
 /**
  * The `/internal/` routes of the mint Worker, for the web app's outbox (README, "Subject
  * operations and identity import"). Every route takes `POST` with a JSON body and an STS token
- * for audience `uts` with the route's scope from a listed workload. While no verifier is deployed
- * (`noServiceTokenVerifier`), or the identity store is not bound, every route answers
+ * for audience `uts` with the route's scope from a listed workload. While the STS check cannot
+ * run (the STS key set does not answer), or the identity store is not bound, every route answers
  * `503 temporarily_unavailable` with `Retry-After`, never 500 and never a write.
  */
 export type InternalDeps = {
@@ -147,7 +147,7 @@ function authorityResponse(result: AuthorityResult): Response {
       return jsonResponse(result, 200);
     case 'retry_later':
       return jsonResponse(result, 409, {
-        'Retry-After': String(UTS_CONNECTION_CONFLICT_RETRY_SECONDS),
+        'Retry-After': String(UTS_AUTHORITY_CONFLICT_RETRY_SECONDS),
       });
     case 'invalid_request':
       return invalidRequest();
@@ -193,6 +193,15 @@ async function routeResponse(
   }
 }
 
+/**
+ * A valid token for the route's scope from a caller that may not call it: a bare 403, since the
+ * scope is not what the caller lacks.
+ */
+function workloadRefused(scope: string, workload: string | null): Response {
+  console.warn(JSON.stringify({ event: 'uts.internal.workload_refused', scope, workload }));
+  return jsonResponse({ error: 'insufficient_scope' }, 403);
+}
+
 /** Answers an `/internal/` route, or null for any other path. */
 export async function handleInternalRequest(
   request: Request,
@@ -218,14 +227,13 @@ export async function handleInternalRequest(
       });
     case 'unavailable':
       return unavailable(check.retryAfterSeconds);
+    case 'workload_refused':
+      return workloadRefused(scope, check.workload);
     case 'verified':
       break;
   }
   const workloads: readonly string[] = UTS_INTERNAL_WORKLOADS;
-  if (!workloads.includes(check.workload)) {
-    console.warn(JSON.stringify({ event: 'uts.internal.workload_refused', scope }));
-    return jsonResponse({ error: 'insufficient_scope' }, 403);
-  }
+  if (!workloads.includes(check.workload)) return workloadRefused(scope, check.workload);
   if (deps.subjects === null) return unavailable(NO_VERIFIER_RETRY_SECONDS);
   const body: unknown = await request.json().catch(() => undefined);
   return await routeResponse(route, body, deps.subjects, check.workload);

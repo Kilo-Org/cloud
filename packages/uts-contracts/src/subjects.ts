@@ -295,8 +295,22 @@ export const MembershipSyncRequestSchema = z.strictObject({
 });
 
 /**
+ * A domain an organization verified, as WorkOS lists it: lower-case labels of 1-63 letters, digits
+ * and hyphens that neither start nor end with a hyphen, at most 253 characters in all, and a last
+ * label of 2-63 letters or a punycode label (`xn--…`). The app lower-cases each domain before it
+ * sends it. One domain this refuses refuses the organization's whole sync (`400`).
+ */
+export const SsoDomainSchema = z
+  .string()
+  .max(253)
+  .regex(
+    /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{0,58}[a-z0-9])$/
+  );
+
+/**
  * An organization's SSO setup: the WorkOS organization whose `externalId` is this app
- * organization, its connections (a connection left out becomes inactive), and the SSO policy.
+ * organization, its connections (a connection left out becomes inactive), its verified domains
+ * (the set replaces the organization's domains; a domain left out is deleted), and the SSO policy.
  * `source_version` is the organization's own authority version.
  */
 export const SsoOrganizationSyncRequestSchema = z.strictObject({
@@ -309,6 +323,10 @@ export const SsoOrganizationSyncRequestSchema = z.strictObject({
     .array(WorkosIdSchema)
     .max(16)
     .refine(ids => new Set(ids).size === ids.length, 'each connection once'),
+  verified_domains: z
+    .array(SsoDomainSchema)
+    .max(100)
+    .refine(domains => new Set(domains).size === domains.length, 'each domain once'),
   enforcement: z.enum(['off', 'optional', 'required']),
 });
 
@@ -320,10 +338,10 @@ export type AuthorityKind = z.infer<typeof AuthorityKindSchema>;
  * `applied`, `already_applied` (the same `operation_id`, an effect that already holds, or a
  * source version older than one UTS applied) and `no_subject` are 200. `retry_later` (409,
  * `Retry-After: 30`) writes nothing, and the outbox retries it: with `connection_conflict`, a
- * WorkOS connection is still active in another organization, until that organization's sync
- * releases it; with `email_taken`, another account still holds the address, until the email sync
- * that moves that account away arrives (deliveries of two subjects' syncs can arrive in either
- * order).
+ * WorkOS connection is still active in another organization; with `domain_conflict`, a domain is
+ * still verified by another organization (each until that organization's sync releases it); with
+ * `email_taken`, another account still holds the address, until the email sync that moves that
+ * account away arrives (deliveries of two subjects' syncs can arrive in either order).
  */
 export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -332,13 +350,16 @@ export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   }),
   z.strictObject({
     outcome: z.literal('retry_later'),
-    error: z.enum(['connection_conflict', 'email_taken']),
+    error: z.enum(['connection_conflict', 'domain_conflict', 'email_taken']),
     operation_id: z.uuid(),
   }),
 ]);
 
-/** Seconds an authority sync waits before its retry: a connection or an address to be released. */
-export const UTS_CONNECTION_CONFLICT_RETRY_SECONDS = 30;
+/**
+ * Seconds an authority sync waits before its retry: for another organization to release a
+ * connection or a domain, or for another account to release an address.
+ */
+export const UTS_AUTHORITY_CONFLICT_RETRY_SECONDS = 30;
 export type AuthorityAnswer = z.infer<typeof AuthorityAnswerSchema>;
 
 /**

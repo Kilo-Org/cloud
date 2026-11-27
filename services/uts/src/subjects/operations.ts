@@ -204,6 +204,7 @@ async function syncOf(
           orgId: request.app_organization_id,
           workosOrganizationId: request.workos_organization_id,
           workosConnectionIds: request.workos_connection_ids,
+          verifiedDomains: request.verified_domains,
           enforcement: request.enforcement,
         })
       );

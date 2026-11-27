@@ -214,6 +214,20 @@ backfill adds an entry no publish carried, that the feed serves from feed object
 that the head stays under 20 seconds old, and that every head verifies under a feed key of the key
 set, over HTTPS and over the `FeedReader` binding.
 
+The HTTPS feed answers only an admitted STS workload (`services/uts-feed/README.md`,
+"Authenticated HTTPS feed"), so every run that reads it over HTTPS (`feed-e2e.ts`,
+`subjects-e2e.ts`, `feed-https-e2e.ts`) starts a stand-in STS (`scripts/fake-sts.ts`: a synthetic
+key set on `UTS_E2E_STS_PORT`) and reads as the `web` workload; the feed Worker runs with
+`--var STS_URL:http://127.0.0.1:<that port>`. `scripts/feed-https-e2e.ts` takes
+`UTS_E2E_FEED_URL`, `UTS_E2E_ADMIN_URL`, `UTS_E2E_STS_PORT` and, optionally,
+`UTS_E2E_FEED_OFF_URL` (a feed Worker run with `--var FEED_HTTPS_ENABLED:false`). It checks the
+refusals (no token 401; another workload, audience or scope 403; another environment, an expired
+token or an unknown key 401), the head, list and bootstrap for `web` and `ai-gateway`, a 304
+for an unchanged head and a held list, `@kilocode/verify` running over the transport (one
+bootstrap per cold start, then the head and list calls of one minute while a revocation changes
+the list, and the revoked subject refused), the CPU of the caller check, and the 503 of the
+switched-off Worker.
+
 Two runs bring up their own Workers and a fresh identity-store database, so neither needs a
 `wrangler dev` server running: `scripts/keyset-e2e.ts` and `scripts/relay-e2e.ts`. Both take
 `UTS_E2E_ADMIN_URL`, the admin login of `scripts/local-db.sh up`, on a loopback host and without
@@ -229,10 +243,13 @@ when a check fails. Both stop their Workers when they end, also on SIGINT (exit 
 state directory, and runs the key-set proof: 36 keys with `Age` and `Kilo-Key-Set-Oldest-Age`
 under 17 seconds and cache windows that end with the 24-hour hold, no private key part, RFC 8414
 metadata, a token signed through `/__dev/sign` that verifies with jose while a tampered one does
-not, a restart that keeps the same kids without bootstrapping a signer, an intruder Worker whose
-binding carries another caller that gets no keys, the held set while the mint Worker is down,
-signer 03's rotated keys standing beside signer 07's held ones from a restarted shard, and a cold
-start of both Workers over a shard that stored signer 07's keys.
+not, every key-set shard storing the signers' keys (a reader Worker in one `wrangler dev` with the
+mint Worker asks each shard by name), a restart that keeps the same kids without bootstrapping a
+signer, an intruder Worker whose binding carries another caller that gets no keys, the held set
+while the mint Worker is down, signer 03's rotated keys standing beside signer 07's held ones from
+a restarted shard, a cold start of both Workers over whichever shard the mint Worker draws, each of
+which stored signer 07's keys, and a warm feed isolate that keeps signer 07's keys from its own
+copy once no shard holds stored keys.
 
 `scripts/relay-e2e.ts` runs the mint Worker and the audit relay consumer in one `wrangler dev`
 over two configs (`--env local`) with the local queue and the consumer's R2 archive, and runs the
@@ -347,6 +364,89 @@ about ceil(N / 5,000) cron cycles (about 20 at 100k); the operator path retries 
 rather than treating it as a failure. Once it succeeds, no family comes back. The batches write
 no audit row; the operator action that blocks or unblocks the client writes it.
 
+## Mobile attestation
+
+`kilo-mobile` needs device attestation at its code exchange (design 5.5, decision Q67): iOS App
+Attest and Android Play Integrity (`src/attest/`, migration 0017). The client is served only
+where the environment's attestation config is complete (`src/attest/config.ts`); anything less
+refuses it at `/authorize` with `unauthorized_client` and logs `uts.attestation.misconfigured`
+with the names (never the values) of what is missing. Development with no attestation value at
+all serves it without attestation, for the local tests.
+
+| Name | Kind | Value |
+|---|---|---|
+| `ATTEST_APPLE_TEAM_ID` | var | the Apple Developer team id (10 characters) |
+| `ATTEST_APPLE_BUNDLE_ID` | var | the iOS bundle id; with the team id it is the App ID whose SHA-256 is the RP ID hash |
+| `ATTEST_PLAY_INTEGRITY_PACKAGE_NAME` | var | the Android package name |
+| `ATTEST_PLAY_INTEGRITY_CERT_DIGESTS` | var | comma-separated SHA-256 digests of the accepted app signing certificates (Play Console hex, with or without colons, or base64url) |
+| `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` | secret | the JSON key of a Google service account allowed to call `decodeIntegrityToken` in the Cloud project linked to the app |
+| `ATTEST_DEV_ENDPOINTS` | development only | a stand-in App Attest root and Play Integrity origin on loopback; set anywhere else it refuses the client |
+
+The Apple App Attestation Root CA is pinned in code (`APPLE_APP_ATTEST_ROOT`, checked by its
+SHA-256). Google's token endpoint and API URLs are fixed; the key file's `token_uri` is ignored.
+
+**App contract.** The challenge is the lowercase hex SHA-256 of
+`kilo-uts-attestation-v1:<code>` (`@kilocode/uts-contracts` `attestation.ts`), with the code as the
+redirect delivered it. The token request adds:
+
+| `attestation_type` | `attestation_key_id` | `attestation` |
+|---|---|---|
+| `app_attest_key` (the install holds no key for UTS: first sign-in, or after `attestation_required`) | the new key's id, standard base64 | `attestKey(keyId, challenge)`, standard base64 |
+| `app_attest_assertion` (every other sign-in) | the stored key's id | `generateAssertion(keyId, challenge)`, standard base64 |
+| `play_integrity` | absent | the token of a standard request whose `requestHash` is the challenge itself (`requestIntegrityCheckAsync(challenge)`), as returned |
+
+App Attest signs `SHA-256(UTF-8(challenge))` as its client data hash. Once `attestKey` ran for a
+key, the app stores its id and sends only assertions for it, also when the attestation's answer
+was lost; it attests a new key only after `attestation_required`. An exchange without an
+attestation, an assertion of a key UTS does not hold, or an attestation of a key UTS holds
+already answers `attestation_required` (400) and leaves the code usable while its 60 seconds
+last. A refused attestation answers `invalid_grant` and the code never exchanges. A dependency
+failure answers 503 with `Retry-After`; the app retries the same exchange. A retry of an attested
+exchange (same code, verifier and DPoP key, a fresh proof) needs no attestation and gets the same
+grant. UTS treats the Play Integrity token as opaque (base64url characters and dots, at most 16
+KiB); `decodeIntegrityToken` decides.
+
+**Checks.** App Attest: the chain to the pinned root with each certificate valid now, the nonce
+`SHA-256(authData || clientDataHash)` in the credential certificate, the key id as the SHA-256 of
+its key, the App ID hash, counter 0, the production AAGUID (development also accepts
+`appattestdevelop`), the credential id, and the COSE key equal to the certificate's; an assertion's
+signature over `SHA-256(authenticatorData || clientDataHash)`, its App ID hash, and a counter above
+the stored one. Play Integrity: `requestHash`, the package (request and app), a verdict under 5
+minutes old, `PLAY_RECOGNIZED`, an accepted signing certificate and `MEETS_DEVICE_INTEGRITY`.
+
+**Statements and calls per mobile sign-in.** `uts.claim_code_attestation` checks the code against
+the request (client, redirect URI, PKCE challenge, DPoP key, lifetime) before any verification, so
+a request without a valid code reaches no verifier and no Google call; it claims the code for one
+verification at a time (taken over after 15 seconds), and returns the stored key for an assertion.
+`uts.settle_code_attestation` stores a new key, moves an assertion's counter only upward, refuses
+(one `token.denied` audit row with the reason, and the code is dead), drops the claim for a key
+stored already, or releases the claim after a retryable failure; a settle of a claim another
+request took over changes nothing. Within an isolate a second request for a code in verification
+answers 503 before its first await. The exchange statement then runs as for any first-party
+client, behind a backstop: the trigger `authorization_codes_require_attestation` refuses to
+consume a `kilo-mobile` code (SQLSTATE 23514) unless it is attested or, in development without
+attestation config only, marked exempt (`uts.exempt_code_attestation`, refused in every other
+environment; it trusts the Worker's `UTS_ENVIRONMENT`, so a production deploy misconfigured as
+development would mark codes exempt and the backstop would not catch it; `test/repo` holds the
+trigger's client list equal to the attestation-required clients). Per mobile sign-in: 3 statements (claim, settle, exchange) instead of 1, a retry of
+an attested exchange 2, development without config 2 (exempt, exchange); for Android one
+`decodeIntegrityToken` call plus one token exchange per isolate per hour; no Durable Object hop
+beyond the signer call; no queue message; one audit row per refusal. After a Google 429 each
+isolate answers 503 without calling Google for the `Retry-After` (60 seconds without one, at most
+5 minutes). The config is parsed once per isolate. Refresh is unchanged. App Attest keys stay
+until 400 days after their last use (`uts.maintain_attestation_rows()`, minute cron); a code's
+attestation goes with its code.
+
+Deliberate deferrals (decision Q86): the Play licensing verdict is not checked, and the App
+Attest receipt is not stored or sent to Apple's fraud-metric service.
+
+`scripts/attest-e2e.ts` (`UTS_E2E_ADMIN_URL`, `UTS_E2E_PORT`, default 9490) runs the mint Worker
+with a complete config and stand-ins for Apple and Google in their real formats, and a second
+mint Worker with one value missing: it checks an admitted key attestation, assertion and Play
+Integrity verdict, refused replays, repeated counters, missing attestations, wrong packages,
+unrecognized apps and other signers, one decode per code across a retry, the refusal by default,
+and that no credential value reaches an audit row.
+
 ## Third-party clients, consent and the broker exchange
 
 Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata Document
@@ -460,13 +560,22 @@ development entry only):
 
 Resource indicators (RFC 8707) are exact strings: `urn:kilo:service:<audience>`, or an origin of
 the environment's table in `UTS_RESOURCE_ORIGINS` (`@kilocode/uts-contracts`), which maps each
-origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`), the
-`*.kiloapps.io` origins of ai-attribution, session-sync, notifications, events and chat, and the
-`*.kilosessions.ai` origins of session ingest, data export, the git token service and the cloud
-agent; staging lists only `https://staging-app.kilo.ai` and its issuer; development lists loopback
-origins only. An origin in the table does not activate a service: the service proves its caller
-first. `protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table.
-Another environment's origin, a path, a trailing slash or a query answers `invalid_target`.
+origin to its audience. Production lists the web app (`kilo-api`), the issuer (`uts`), the AI
+gateway (`https://ai-gateway.kilo.ai`, `kilo-gateway`), the `*.kiloapps.io` origins of
+ai-attribution, session-sync, notifications, events and chat, and the `*.kilosessions.ai` origins
+of session ingest, data export, the git token service and the cloud agent; staging lists only
+`https://staging-app.kilo.ai`, `https://staging-ai-gateway.kilo.ai` and its issuer; development
+lists loopback origins only (the AI gateway on `http://localhost:3010`). The gateway's origin is
+the one its deploy targets and the web app's rewrites name; a request that reaches it through
+`/api/gateway` on the web app still names that origin, never one read from `Host`. An origin in
+the table does not activate a service: the service proves its caller first.
+`protectedResourceMetadataFor` builds a resource's RFC 9728 metadata from the same table. Another
+environment's origin, a path, a trailing slash or a query answers `invalid_target`.
+
+`kilo-gateway:inference` is the gateway's one scope: inference and the authenticated model catalog
+and validation reads, for the CLI and the mobile app, 10 minutes, no step-up, no session, no
+organization claim, no actor. A PAT or an org bot key may carry it. The gateway checks the
+organization a request names against the subject itself.
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|
@@ -569,9 +678,10 @@ provider, SSO or email sign-in ends in a browser session (`__Host-uts_session`, 
 returns to the page that offered it, so an authorization request then issues its code
 (`src/signin/handoff.ts`).
 
-The passkey's relying-party id is the app host (`WEBAUTHN_RP_ID`), so on the issuer host a passkey
-ceremony needs the browser's WebAuthn related-origin support (design 5.14). The page script
-(`src/signin/script.ts`) asks `PublicKeyCredential.getClientCapabilities()`, and treats a
+In production the passkey's relying-party id is the app host (`WEBAUTHN_RP_ID`), so on the issuer
+host a passkey ceremony needs the browser's WebAuthn related-origin support (design 5.14). Staging
+uses its own passkey domain, the issuer host itself, so its ceremonies need no related origin. The
+page script (`src/signin/script.ts`) asks `PublicKeyCredential.getClientCapabilities()`, and treats a
 `SecurityError` from the ceremony the same way: without support, the passkey controls are hidden
 and the page says why and points to the other methods. The add-a-passkey page refuses in the same
 way, before it asks for a challenge when the browser has already answered. The passkey pages'
@@ -584,8 +694,8 @@ for the related-origin check.
 | `GET /signin/oauth/<provider>/callback` (`POST` for Apple, `form_post`) | Exchanges the code, checks the identity, then consumes the flow and signs in or links | `uts.complete_provider_sign_in` |
 | `POST /signin/sso/start` | The address's domain picks the org's one active WorkOS connection | `uts.start_sign_in_flow` |
 | `GET /signin/sso/callback` | Buys the WorkOS profile; its connection and domain must be the flow's | `uts.complete_provider_sign_in` |
-| `POST /signin/email/start` | Stores the email (link hash, keyed code hash), then sends it through the mail port | `uts.start_email_sign_in` |
-| `POST /signin/email/code` | Checks the newest code for the address; the fifth wrong entry exhausts it | `uts.verify_email_code` |
+| `POST /signin/email/start` | With Mailgun: refuses an address outside the recipient rule, then checks the Turnstile token; stores the email (link hash, keyed code hash), then sends it through the mail port | `uts.start_email_sign_in` |
+| `POST /signin/email/code` | Checks the newest code for the address; the fifth wrong entry exhausts it; a network past 30 wrong codes an hour is refused | `uts.verify_email_code` |
 | `GET /signin/email/link` | A confirmation page only, so a mail scanner changes nothing | none |
 | `POST /signin/email/link` | Signs in with the link, once | `uts.complete_email_link` |
 
@@ -603,20 +713,29 @@ The endpoints are fixed in `src/signin/providers/specs.ts`, checked against each
 OpenID Connect discovery document or API reference; nothing is discovered per request. An ID
 token is verified against the provider's key set (signature, `iss`, `aud`, `exp`, `iat` and the
 flow's `nonce`); `jose` keeps each key set per isolate for 10 minutes (`cacheMaxAge`) and
-refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`).
+refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`). UTS sends the
+nonce to every OpenID Connect provider. Each spec's `idTokenNonce` says whether the ID token must
+carry it: `required` refuses a token without it; `if_present` (LinkedIn only, whose ID token has
+no `nonce`) accepts a token without it, and both refuse a token with another nonce. Without PKCE
+or a nonce, the state and the flow's binder cookie still stop a forged callback. They do not stop
+a stolen LinkedIn code injected into the thief's own flow: LinkedIn accepts a code for 30 minutes
+(its authorization code lifetime), so that is the replay window of a code that leaks. The mint
+Worker's logs keep no query string (`observability.redact_query_string`, held by the repo check),
+so a callback's code never reaches the invocation logs, and the callback page sends
+`Referrer-Policy: same-origin`.
 
-| Provider | Protocol | PKCE | Client authentication | Scopes | Proof of the address |
-|---|---|---|---|---|---|
-| Google | OpenID Connect | S256 | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
-| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | `client_secret_basic` | `openid profile email` | `email_verified` |
-| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
-| Anaconda | OpenID Connect | S256 | `client_secret_post` | `openid profile email` | `email_verified` |
-| Apple | OpenID Connect, `response_mode=form_post` | none offered | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
-| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
-| GitLab | OpenID Connect | S256 | `client_secret_post` | `openid email` | `email_verified` |
-| Discord | OAuth 2; `/users/@me` | S256 | `client_secret_post` | `identify email` | `verified` |
-| LinkedIn | OpenID Connect | none offered | `client_secret_post` | `openid profile email` | `email_verified` |
-| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
+| Provider | Protocol | PKCE | ID-token `nonce` | Client authentication | Scopes | Proof of the address |
+|---|---|---|---|---|---|---|
+| Google | OpenID Connect | S256 | required | `client_secret_post` | `openid email profile` | `email_verified` and a `@gmail.com` address or an `hd` claim |
+| OpenAI | OpenID Connect, `resource` `https://api.openai.com/v1` | S256 | required | `client_secret_basic` | `openid profile email` | `email_verified` |
+| Anthropic (Claude) | OpenID Connect, ES256 ID tokens | S256 | required | `private_key_jwt` in a JSON body (no client secret exists) | `openid email profile` | `email_verified`, which Claude may leave out |
+| Anaconda | OpenID Connect | S256 | required | `client_secret_post` | `openid profile email` | `email_verified` |
+| Apple | OpenID Connect, `response_mode=form_post` | none offered | required | ES256 client secret JWT, 5 minutes | `email` | `email_verified` (Apple sends `"true"`) |
+| GitHub | OAuth 2, no OpenID Connect; `/user` and `/user/emails` | S256 | no ID token | `client_secret_post` | `read:user user:email` | the primary address is `verified` |
+| GitLab | OpenID Connect | S256 | required | `client_secret_post` | `openid email` | `email_verified` |
+| Discord | OAuth 2; `/users/@me` | S256 | no ID token | `client_secret_post` | `identify email` | `verified` |
+| LinkedIn | OpenID Connect | none offered | if present | `client_secret_post` | `openid profile email` | `email_verified` |
+| WorkOS SSO | WorkOS SSO API, `connection` set | none (confidential client) | no ID token | API key | none | the verified domain; links by email only in a domain that requires SSO (see below) |
 
 ### Accounts and linking (design 5.2)
 
@@ -661,9 +780,53 @@ sign-in emails an hour; the code emails are never capped by it. The link page na
 (`p…@example.com`). The email start sets a binder cookie, like a flow's; a link opened in a browser
 without it says so and signs in only after a second confirmation, so a link someone else asked
 for cannot sign the reader into that person's account in one click. The address and the code are
-stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`. Deployed Workers wire no mail sender
-yet (`src/signin/email/mailer.ts`), so the email sign-in is offered only where one is wired; the
-development entry records each message (`GET /__dev/mail?to=`).
+stored as HMAC-SHA-256 values under `SIGNIN_EMAIL_HASH_KEY`.
+
+A client network (an IPv4 /24 or an IPv6 /48; an IPv4-mapped IPv6 address counts as its IPv4
+address) may enter 30 wrong sign-in codes an hour over all addresses
+(`uts.network_email_code_failures`, migration 0018), as for wrong device user codes. Past that,
+every code entry from the network is refused before any code is read (`network_limited`, 429):
+nothing is counted and no audit row is written (decision Q56), and the email's link still works,
+so a network shared with the owner cannot lock the owner out. A wrong code counts against the
+network first, in one upsert that adds one only while the network is under 30, so concurrent
+guesses wait on the network's row and cannot pass the limit.
+
+The start and the code entry take only a plain addr-spec in lower case
+(`src/signin/email/address.ts`: no display name, comment, quoting, comma, semicolon or space; the
+domain follows the SSO domain rule), so one mailbox has one spelling and one set of per-address
+limits, and Mailgun, which reads `to` as an address list, cannot be handed a second address.
+`mailgunEmail` checks each recipient again before it calls Mailgun: it drops every address that
+is not a plain addr-spec (in any letter case), logs only how many it dropped
+(`uts.mail.recipient_invalid`), sends to the rest, and answers `no_target` when none is left.
+
+**Mail sender.** The email sign-in is offered only where a sender is wired
+(`src/signin/email/delivery.ts`):
+
+- Mailgun, where `SIGNIN_EMAIL_HASH_KEY` and every mail setting are set (Configuration below). The
+  sign-in page then carries Cloudflare Turnstile's widget in the email form (its CSP adds
+  `https://challenges.cloudflare.com` to `script-src` and `frame-src`), and the start, in this
+  order: takes one anonymous-write slot; checks the form's `cf-turnstile-response` once with
+  siteverify (`src/signin/email/turnstile.ts`: the token must pass for action `email-sign-in` on
+  the issuer's host; a refused token answers 400, a siteverify that fails or does not answer within
+  3 s 503, a refused secret 500); outside production refuses an address that
+  `UTS_MAIL_ALLOWED_RECIPIENTS` does not list (403, no row, no message; after Turnstile, so the
+  allow-list cannot be probed without passing it); stores the email; and sends one plain-text
+  message (link, code, expiry; tracking off; Mailgun gets 10 s). A Mailgun 429 or 5xx answers 503,
+  any other refusal 502. Log lines carry outcomes, Cloudflare's error codes and setting names,
+  never the token, the key, the secret or the address.
+- The development entry's recording port (`GET /__dev/mail?to=`), when no mail setting is set. It
+  sends nothing, so it needs no Turnstile check.
+
+With neither, the routes answer 404 and the page does not offer email; with a partial or invalid
+mail setting they answer 500 and log `uts.signin.misconfigured` with the names.
+
+Cost per email start with Mailgun: one siteverify call and, once it passed, one
+`uts.start_email_sign_in` statement and one Mailgun `POST /v3/<domain>/messages`; no audit row and
+no queue message (an unauthenticated write names no account). A refusal by the recipient rule
+costs the siteverify call only; a refused address form or the anonymous-write limit makes no
+network call and no statement. A code entry is still one `uts.verify_email_code` statement; the
+network count adds one primary-key probe, and one upsert on a wrong code. Neither route is on a
+section 3 hot path.
 
 Open items before deploy:
 
@@ -672,15 +835,14 @@ Open items before deploy:
   authorizations, and SSO starts 60 a minute in their own window, because an org's staff often
   share one egress address. A refused start answers the sign-in page's message page with 429 and
   `Retry-After`.
-- Before a mail sender is wired: past the code cap every sign-in email still carries the link, so
-  an address can be sent many emails. Wiring a sender needs first a Turnstile check on the email
-  start form (its secret is production configuration) and a per-network counter of wrong email
-  code entries (the per-address counter alone lets one network guess across many addresses). A
-  total cap per address is not used, because anyone could then spend the owner's emails and lock
-  the owner out.
-- The UTS cron (slice 3.9) must call `uts.maintain_provider_sign_in_rows()` beside
-  `uts.maintain_sign_in_rows()` before any environment offers these methods; without it flow and
-  email rows grow without bound.
+- Past the code cap every sign-in email carries only the link, and at most 5 such link-only emails
+  go to an address in its hour (migration 0020); the Turnstile check and the anonymous-write limit
+  bound the rest. The code emails themselves have no total cap, because anyone could then spend
+  the owner's emails and lock the owner out; a link already sent keeps working past the link-only
+  cap. A code entry without a code hash raises 22004 (migration 0022).
+- The minute cron calls `uts.maintain_provider_sign_in_rows()` beside
+  `uts.maintain_sign_in_rows()` (`src/audit/maintenance.ts`), so flow, email and network-count
+  rows do not grow without bound.
 
 ### Configuration
 
@@ -693,7 +855,22 @@ not offered and its routes answer 500 (`uts.signin.misconfigured` log line, name
 | Apple | `SIGNIN_APPLE_CLIENT_ID` (services id), `SIGNIN_APPLE_TEAM_ID`, `SIGNIN_APPLE_KEY_ID` | `SIGNIN_APPLE_PRIVATE_KEY` (P-256, PKCS #8 PEM) |
 | Anthropic | `SIGNIN_ANTHROPIC_CLIENT_ID`, `SIGNIN_ANTHROPIC_ASSERTION_{AUDIENCE,ISSUER,SUBJECT,KEY_ID}` | `SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY` (P-256) |
 | WorkOS SSO | `SIGNIN_WORKOS_CLIENT_ID` | `SIGNIN_WORKOS_API_KEY` |
-| Email | none | `SIGNIN_EMAIL_HASH_KEY` (32 bytes, base64url) |
+| Email | `UTS_MAILGUN_DOMAIN` (the sending domain), `UTS_MAIL_FROM` (`Name <local@domain>` on that domain), `UTS_TURNSTILE_SITE_KEY`; outside production also `UTS_MAIL_ALLOWED_RECIPIENTS` | `SIGNIN_EMAIL_HASH_KEY` (32 bytes, base64url), `UTS_MAILGUN_SENDING_KEY` (a Domain Sending Key: messages on that domain only), `UTS_TURNSTILE_SECRET_KEY` |
+
+The five mail settings (`UTS_MAILGUN_SENDING_KEY`, `UTS_MAILGUN_DOMAIN`, `UTS_MAIL_FROM`,
+`UTS_TURNSTILE_SITE_KEY`, `UTS_TURNSTILE_SECRET_KEY`) are one switch for the sign-in mail and the
+notice email: mail never leaves without the Turnstile check guarding the form that sends it.
+`SIGNIN_EMAIL_HASH_KEY` gates only the email sign-in, not notices: with the mail settings on and
+the hash key missing or invalid, the sign-in routes answer 500 while notice email still goes out. The
+sender must sit on the sending domain (SPF and DKIM alignment), and Mailgun is called on its US API
+host. `UTS_MAIL_ALLOWED_RECIPIENTS` is a comma-separated list of exact addresses
+(`tester@example.com`) and whole domains (`@example.com`, no subdomains); staging and development
+must set it, and production must not (either mistake makes the mail settings misconfigured). The
+three vars are the switch: the secrets alone turn nothing on, so set `SIGNIN_EMAIL_HASH_KEY`,
+`UTS_MAILGUN_SENDING_KEY` and `UTS_TURNSTILE_SECRET_KEY` with `wrangler secret put` first, then
+deploy the vars in `wrangler.jsonc`; vars without both secrets make the routes answer 500. The
+Turnstile widget lists the issuer host (`uts-staging.kiloapps.io`, `uts.kiloapps.io`) as its
+hostname.
 
 `SIGNIN_DEV_ENDPOINTS` (development only, loopback URLs only) points providers at local
 stand-ins. Each registration lists the callback of its environment's issuer:
@@ -784,11 +961,19 @@ waiting past the 24-hour limit. Then it runs one retention step (`uts.maintain_n
 rows of each kind): known devices and networks unseen for 90 days, and finished notices with
 their attempts 400 days after they were written.
 
-The minute cron (`src/scheduled.ts`) runs one `sweepNotices` pass after its maintenance steps.
-No deployed environment has a push or email provider wired yet, so the deployed cron passes no
-transports: each out-of-band channel settles as `not_configured`, every notice shows in-app, and
-the retention step runs. The account API's credential notice port stays null in the deployed entry
-until a real transport exists.
+The minute cron (`src/scheduled.ts`, `noticeStep`) runs one `sweepNotices` pass after its
+maintenance steps. No deployed environment has a push provider wired yet, so push settles as
+`not_configured`. Email goes through Mailgun where the mail settings are on (Configuration under
+"Sign-in providers, SSO and email"), behind the recipient rule: outside production an address that
+`UTS_MAIL_ALLOWED_RECIPIENTS` does not list is dropped without sending, and a message left with no
+address is `no_target` (`uts.mail.recipient_refused` log line, a count only). With no mail setting
+at all email settles as `not_configured` too. With a partial or invalid mail setting (a deploy
+error) the step claims nothing and runs only the retention step: a round then would settle every
+due notice's email as `not_configured` for good, so the notices stay pending, and go out once the
+settings are fixed within their 24 hours. Every notice shows in-app either way. With the mail
+settings on, the account API's credential notice port delivers a created PAT's or bot key's notice
+at once (claim, one Mailgun call, finish, in `waitUntil`); otherwise it stays null and the cron
+delivers the notice.
 
 | Channel | Provider | Adapter |
 |---|---|---|
@@ -815,8 +1000,8 @@ and the security view before and after `/revoke`.
 
 ## Subject operations and identity import
 
-Design 5.2 and 5.6, migration 0014. The web app keeps owning some account authority until its
-cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
+Design 5.2 and 5.6, migrations 0014 to 0016. The web app keeps owning some account authority
+until its cutover (blocks, deletions, recoveries, email changes, organization SSO and memberships). It
 enqueues each write in the same transaction as the app's own write, and its outbox sends it to UTS.
 Each call is one statement with its audit row (actor: the calling workload; the app's own actor
 string in `requestedBy`). It answers 200 only once a vouching feed object took the entries the
@@ -903,11 +1088,21 @@ account still holds as its primary email or `email` method answers `409 retry_la
 `membership` adds, changes or (with `role: null`) removes a membership through
 `uts.remove_org_member`, ordered by the subject's version, and a newer sync that changes nothing
 still raises the row's version; `sso-organization` writes the SSO policy,
-the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
-by the organization's own version; a connection active in another organization never moves
-(`409 retry_later connection_conflict`, `Retry-After: 30`, nothing written, also when another
-organization's sync takes it during this one). The authority check behind the legacy bridge and
-`sso_app_organization` is `uts.sso_app_organization` through `src/subjects/authority.ts`: verified
+the WorkOS organization whose `externalId` is the app organization, its connections and its
+verified domains (`verified_domains`: lower case, each once, at most 100), ordered by the
+organization's own version. The domain set replaces the organization's: a domain left out is
+deleted, so `POST /signin/sso/start` answers that SSO is not set up for it; the audit row counts the
+domains and names none (migration 0015). Domains follow `SsoDomainSchema` in the contract and in
+the table check (migration 0016), and the sync inserts connections and domains in sorted order, so
+two organizations' syncs never deadlock. A connection active in another organization never moves
+(`409 retry_later connection_conflict`), nor does a domain verified by another organization
+(`409 retry_later domain_conflict`); both carry `Retry-After: 30`, write nothing, and apply also
+when another organization's sync takes the connection or domain during this one. A sync older than
+the version already applied is `already_applied` without these checks, so a late older sync never
+waits on a connection or domain that moved on. UTS holds no DNS challenge for a synced domain (the
+app verified it through WorkOS), so `dns_challenge_hash` is required only while a domain is
+pending. The authority check behind the legacy bridge and `sso_app_organization` is
+`uts.sso_app_organization` through `src/subjects/authority.ts`: verified
 only when the connection is active, belongs to that WorkOS organization, maps to the app
 organization, and the active account holds an active membership there.
 
@@ -1037,13 +1232,25 @@ production sets 32 (cap 96), the PAT config's 20 percent of `max_connections` 16
 config's connection limit changes the var in the same deploy. Staging and production refuse to
 start without a valid var; development may leave it out (cap 100).
 
+Staging and production bind all three configs in `wrangler.jsonc`; both identity stores hold
+migrations 0000 to 0014. `test/repo` fails a deployed block whose Hyperdrive bindings differ from
+`IDENTITY_STORE_HYPERDRIVE` in `test/repo/worker-configs.ts`, or that names a local connection
+string. Apply a new migration to both stores before the deploy that needs it.
+
+The deployed entry checks STS tokens with `@kilocode/verify` against the environment's STS issuer
+(`STS_ISSUERS`), audience `uts` (`src/sts-callers.ts`). `STS_CALLER_WORKLOADS` lists the workloads
+each environment admits on the broker exchange and the `/internal/` routes; production lists none.
+An unreadable STS key set answers 503, never an admission.
+
 ### Provisioning per environment
 
 | Setting | Kind | Value |
 |---|---|---|
 | `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
-| `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
-| `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
+| `IDENTITY_STORE_PAT` | Hyperdrive binding | The PAT lookup config (logins `uts_pat_a`, `uts_pat_b`); unset, no PAT lookup is served |
+| `IDENTITY_STORE_REPLICA` | Hyperdrive binding | The read-replica config (logins `uts_reader_a`, `uts_reader_b`) for the account views |
+| `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
+| `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
 
 ## Identity store
@@ -1091,6 +1298,55 @@ session that changes them: it ends every session of a UTS login whose transactio
 transaction ends within about 90 seconds (30 seconds plus the cron period). The relay's horizon is
 the oldest open transaction of the whole server, so the alert on an unrelayed row older than 60
 seconds covers sessions of other logins and in other databases.
+
+### Manager login for rotation copies
+
+After a rotation, UTS writes the new password to `/admin/identity-store` in the secrets manager as
+a new secret named `<login>_<YYYYMMDD>` (design 5.2). It logs in as `uts-rotation-<environment>`
+with Infisical JWT Auth, the way STS logs in as its own identity:
+
+- One object, `<environment>:manager-auth` in the `eu` jurisdiction (`src/dos/UtsManagerAuthDO.ts`),
+  holds an ECDSA P-256 login key. It generates the key at the first login and never exports the
+  private half. It is not a token signer key.
+- `GET /manager-auth/.well-known/jwks.json` on the issuer host serves the public half. Before the
+  first login the set is empty; while the object fails it answers 503 with `Retry-After: 30`, never
+  500. An isolate keeps the key set for 60 seconds, and an empty set or a failure for 5 seconds, so
+  a client that polls the route reaches the one key object at most once per window. A login JWT
+  signed in an isolate drops that isolate's empty set, so its next read asks the object again. A
+  manager read that reaches another isolate can still get the empty set for up to 5 seconds after
+  the first login; that login is refused and the next rotation run logs in again.
+- A login JWT lives 2 minutes, with issuer `<issuer>/manager-auth`, subject
+  `uts:<environment>:rotation` and audience `https://eu.infisical.com/identities/<identity id>`.
+  The identity ids are in `src/manager/config.ts`.
+- `ManagerClient` (`src/manager/client.ts`) exchanges the JWT at
+  `/api/v1/auth/jwt-auth/login` and only creates and describes secrets in `/admin/identity-store`.
+  A create under the folder's change policy answers `approval_pending`.
+
+`pnpm exec tsx scripts/manager-auth-e2e.ts` runs the mint Worker under `wrangler dev` with a
+stand-in manager on loopback (`UTS_E2E_PORT`, default 9470, and +1, +2). The stand-in fetches the key
+set and verifies the login JWT against it, as Infisical does. The run uses no real manager.
+
+#### Emergency removal of the manager login key (runbook)
+
+The login key has no rotation yet. If its storage may be exposed, or UTS must stop writing to the
+manager at once:
+
+1. Cut UTS off in Infisical: remove the JWT Auth method of `uts-rotation-<environment>`, or point
+   it at another key set, and revoke the identity's access tokens. Infisical then refuses every
+   login JWT this key signs; a token issued before lives at most 10 minutes. Until step 3, UTS
+   cannot write recovery copies to `/admin/identity-store`.
+2. Wipe the key: the Worker has no route that deletes it, so ship a reviewed change that renames
+   the class in code (for example `UtsManagerAuthDO` to `UtsManagerAuthV2DO`), points the
+   `UTS_MANAGER_AUTH_DO` binding of every environment at the new name, and adds one migration tag
+   with `deleted_classes: ["UtsManagerAuthDO"]` and `new_sqlite_classes` for the new name. Do not
+   use `renamed_classes`, which keeps the stored key. A delete migration removes every object of
+   the class with its storage
+   (https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/).
+   The next login creates a fresh key.
+3. Restore the JWT Auth method in Infisical with the same key-set URL, issuer, subject and
+   audience, and check that `GET /manager-auth/.well-known/jwks.json` lists only the new `kid`
+   after the first login. An isolate of the old version can serve the old set for up to 60
+   seconds, and the answer allows HTTP caches the same 60 seconds.
 
 ### Platform roles
 

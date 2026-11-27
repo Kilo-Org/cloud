@@ -1,6 +1,7 @@
 import type { UtsNoticeKind } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { NOTICE_ATTEMPT_OUTCOMES } from '../db/enums';
+import { isMailAddress } from '../signin/email/address';
 
 /**
  * The push and email providers UTS sends notices through (design 5.13): Expo push through the
@@ -151,19 +152,30 @@ export type MailgunConfig = {
 /**
  * Email through Mailgun's messages API, as plain text only, so no message holds an HTML anchor.
  * Tracking is off, so Mailgun rewrites nothing into a link. `recipient-variables` makes Mailgun send
- * each address its own message. `fetcher` is the global `fetch` in a Worker and a fake in tests.
+ * each address its own message. Mailgun reads `to` as an address list, so a recipient that is not
+ * a plain addr-spec in any letter case (`isMailAddress`) is dropped before the call (a display
+ * name or a comma could otherwise reach another mailbox), as `guardedEmail` drops an address the
+ * recipient rule refuses; a message left with no address is `no_target`. `fetcher` is the global
+ * `fetch` in a Worker and a fake in tests.
  */
 export function mailgunEmail(config: MailgunConfig, fetcher: typeof fetch): EmailTransport {
   const url = `${config.baseUrl}/v3/${encodeURIComponent(config.domain)}/messages`;
   const authorization = `Basic ${btoa(`api:${config.apiKey}`)}`;
   return async message => {
+    const to = message.to.filter(address => isMailAddress(address.toLowerCase()));
+    if (to.length < message.to.length) {
+      console.error(
+        JSON.stringify({
+          event: 'uts.mail.recipient_invalid',
+          dropped: message.to.length - to.length,
+        })
+      );
+    }
+    if (to.length === 0) return 'no_target';
     const form = new FormData();
     form.set('from', config.from);
-    for (const address of message.to) form.append('to', address);
-    form.set(
-      'recipient-variables',
-      JSON.stringify(Object.fromEntries(message.to.map(a => [a, {}])))
-    );
+    for (const address of to) form.append('to', address);
+    form.set('recipient-variables', JSON.stringify(Object.fromEntries(to.map(a => [a, {}]))));
     form.set('subject', message.subject);
     form.set('text', message.text);
     form.set('o:tracking', 'no');

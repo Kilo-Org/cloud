@@ -1,6 +1,7 @@
 import { createExecutionContext } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleRequest } from '../../src/http';
+import type { EmailSignIn } from '../../src/signin/email/delivery';
 import type { SignInEmail } from '../../src/signin/email/mailer';
 import { handleEmailRequest } from '../../src/signin/email/routes';
 import { type SignInMethods, flowCookieName } from '../../src/signin/flows';
@@ -23,7 +24,21 @@ const HASH_KEY = 'A'.repeat(43);
 
 type Call = { method: keyof ProviderSignInStore; input: unknown };
 
-function methodsWith(implementation: Partial<ProviderSignInStore>, mail: SignInEmail[] = []) {
+function methodsWith(
+  implementation: Partial<ProviderSignInStore>,
+  mail: SignInEmail[] = [],
+  email: EmailSignIn = {
+    status: 'on',
+    hashKey: new Uint8Array(32),
+    delivery: {
+      kind: 'recording',
+      mailer: async message => {
+        mail.push(message);
+        return 'sent';
+      },
+    },
+  }
+) {
   const calls: Call[] = [];
   const record =
     <Input, Output>(method: keyof ProviderSignInStore, run?: (input: Input) => Promise<Output>) =>
@@ -55,10 +70,7 @@ function methodsWith(implementation: Partial<ProviderSignInStore>, mail: SignInE
       config
     ),
     store: work => work(store),
-    mailer: async message => {
-      mail.push(message);
-      return 'sent';
-    },
+    email,
   };
   return { methods, calls };
 }
@@ -133,6 +145,39 @@ describe('provider routes', () => {
       methods
     );
     expect(response?.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses a LinkedIn callback without the binder cookie of its state', async () => {
+    // LinkedIn has neither PKCE nor an ID-token nonce (src/signin/providers/specs.ts): the binder
+    // cookie of the flow's state is what ties its callback to the browser that started it.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { methods: base, calls } = methodsWith({});
+    const methods: SignInMethods = {
+      ...base,
+      settings: readSignInConfig(
+        {
+          SIGNIN_LINKEDIN_CLIENT_ID: 'linkedin-client',
+          SIGNIN_LINKEDIN_CLIENT_SECRET: 'linkedin-synthetic',
+          SIGNIN_EMAIL_HASH_KEY: HASH_KEY,
+        },
+        config
+      ),
+    };
+    const path = '/signin/oauth/linkedin/callback';
+    const state = 'S'.repeat(43);
+    const otherFlow = flowCookieName(await sha256('T'.repeat(43)));
+    for (const cookie of [null, `${otherFlow}=${'B'.repeat(43)}`]) {
+      const response = await handleProviderRequest(
+        new Request(`${ISSUER}${path}?code=c&state=${state}`, {
+          headers: cookie === null ? {} : { Cookie: cookie },
+        }),
+        path,
+        methods
+      );
+      expect(response?.status).toBe(400);
+    }
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(calls).toEqual([]);
   });
@@ -346,7 +391,7 @@ describe('sign-in page', () => {
       returnTo: '/authorize?client_id=kilo-cli&state=a"b',
       rpId: 'app.kilo.ai',
       providers: [{ provider: 'google', name: 'Google' }],
-      email: true,
+      email: { turnstileSiteKey: null },
       sso: true,
     });
     const html = await response.text();

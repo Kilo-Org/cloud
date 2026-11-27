@@ -55,12 +55,14 @@ describe('signerOfObjectId', () => {
     endpoints: UTS_ENDPOINTS.production,
     jurisdiction: 'eu',
     relyingParty: { rpId: 'app.kilo.ai', origins: ['https://uts.kiloapps.io'] },
+    managerBaseUrl: null,
   };
   const development: UtsConfig = {
     environment: 'development',
     endpoints: UTS_ENDPOINTS.development,
     jurisdiction: 'none',
     relyingParty: { rpId: 'localhost', origins: ['http://localhost:8800'] },
+    managerBaseUrl: null,
   };
 
   const refused = (reason: string) => ({ status: 'refused', reason });

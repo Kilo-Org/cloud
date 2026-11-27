@@ -336,6 +336,55 @@ describe('OpenID Connect identity', () => {
     });
   });
 
+  it('lets LinkedIn leave the nonce out but never send another, and keeps it required for Google', async () => {
+    const linkedin = testSpec({ idTokenNonce: oidcSpec('linkedin').idTokenNonce });
+    const google = testSpec({ idTokenNonce: oidcSpec('google').idTokenNonce });
+    expect([linkedin.idTokenNonce, google.idTokenNonce]).toEqual(['if_present', 'required']);
+    // LinkedIn still gets the nonce on the authorization request.
+    expect(
+      authorizationUrl(PROVIDER_SPECS.linkedin, 'client-1', REDIRECT, FLOW).searchParams.get(
+        'nonce'
+      )
+    ).toBe('nonce-value');
+
+    oidcStandIn(linkedin, await idToken({ sub: 'member-1' }));
+    expect(await providerIdentity(linkedin, secret, callback)).toMatchObject({
+      status: 'ok',
+      identity: { subject: 'member-1' },
+    });
+    vi.restoreAllMocks();
+    oidcStandIn(linkedin, await idToken({ sub: 'member-1', nonce: 'n-1' }));
+    expect(await providerIdentity(linkedin, secret, callback)).toMatchObject({ status: 'ok' });
+    vi.restoreAllMocks();
+    oidcStandIn(linkedin, await idToken({ sub: 'member-1', nonce: 'other' }));
+    expect(await providerIdentity(linkedin, secret, callback)).toMatchObject({
+      status: 'failed',
+      failure: { kind: 'refused', reason: 'id_token_nonce' },
+    });
+    vi.restoreAllMocks();
+    oidcStandIn(google, await idToken({ sub: 'user-1' }));
+    expect(await providerIdentity(google, secret, callback)).toMatchObject({
+      status: 'failed',
+      failure: { kind: 'refused', reason: 'id_token_ERR_JWT_CLAIM_VALIDATION_FAILED' },
+    });
+  });
+
+  it('requires the nonce from every OpenID Connect provider except LinkedIn', () => {
+    const rules: Record<string, OidcSpec['idTokenNonce']> = {};
+    for (const [name, spec] of Object.entries(PROVIDER_SPECS)) {
+      if (spec.protocol === 'oidc') rules[name] = spec.idTokenNonce;
+    }
+    expect(rules).toEqual({
+      google: 'required',
+      openai: 'required',
+      anthropic: 'required',
+      anaconda: 'required',
+      apple: 'required',
+      gitlab: 'required',
+      linkedin: 'if_present',
+    });
+  });
+
   it('answers a provider outage as retryable and a refused code as final', async () => {
     const spec = testSpec();
     oidcStandIn(spec, '', 503);

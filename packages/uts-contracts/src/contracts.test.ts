@@ -29,6 +29,7 @@ import {
   AccountImportRequestSchema,
   AppUserCreatedEventSchema,
   reasonAllowed,
+  SsoDomainSchema,
   SsoOrganizationSyncRequestSchema,
   SubjectOperationRequestSchema,
   UTS_CREATED_ACCOUNT_ID,
@@ -44,8 +45,12 @@ import {
   httpsFeedSources,
   RevocationListWireSchema,
   UTS_BOOTSTRAP_PATH,
+  UTS_FEED_AUDIENCE,
+  UTS_FEED_HEAD_AGE_HEADER,
   UTS_FEED_HEAD_PATH,
+  UTS_FEED_HTTPS_WORKLOADS,
   UTS_FEED_LIST_PATH_PREFIX,
+  UTS_FEED_READ_SCOPE,
   UTS_FEED_READER_ENTRYPOINT,
   UTS_FEED_READS_ENTRYPOINT,
   type FeedReaderBinding,
@@ -59,6 +64,8 @@ import {
   type FeedKeysEntry,
   type SignerKeysEntry,
 } from './signer-keys';
+import { audienceOfResource, resourceOriginOf } from './oauth';
+import { KILO_GATEWAY_AUDIENCE, KILO_GATEWAY_INFERENCE_SCOPE, utsScopeEntry } from './scopes';
 
 const THUMBPRINT = 'A'.repeat(43);
 
@@ -91,6 +98,27 @@ describe('UTS endpoints', () => {
     expect(UTS_JWKS_MAX_AGE_SECONDS).toBe(300);
     expect(UTS_JWKS_STALE_IF_ERROR_SECONDS).toBe(86400);
     expect(UTS_JWKS_OLDEST_AGE_HEADER).toBe('Kilo-Key-Set-Oldest-Age');
+  });
+});
+
+describe('the AI gateway resource', () => {
+  it('has one fixed origin per environment, naming kilo-gateway and its one scope', () => {
+    const origins = {
+      production: 'https://ai-gateway.kilo.ai',
+      staging: 'https://staging-ai-gateway.kilo.ai',
+      development: 'http://localhost:3010',
+    } as const;
+    for (const environment of ['production', 'staging', 'development'] as const) {
+      expect(resourceOriginOf(environment, KILO_GATEWAY_AUDIENCE)).toBe(origins[environment]);
+      expect(audienceOfResource(origins[environment], environment)).toBe('kilo-gateway');
+      expect(audienceOfResource('urn:kilo:service:kilo-gateway', environment)).toBe('kilo-gateway');
+      for (const other of ['production', 'staging', 'development'] as const) {
+        if (other !== environment) {
+          expect(audienceOfResource(origins[other], environment)).toBeNull();
+        }
+      }
+    }
+    expect(utsScopeEntry(KILO_GATEWAY_INFERENCE_SCOPE)?.audience).toBe('kilo-gateway');
   });
 });
 
@@ -458,6 +486,65 @@ describe('revocation feed shapes', () => {
     );
     await expect(failing.feed.head(signal)).rejects.toThrow('HTTP 503');
   });
+
+  it('ask for the head with the last ETag, answer a 304 with the held head, and keep the newest', async () => {
+    const sent: Array<string | undefined> = [];
+    const answers: Array<() => Response> = [
+      () => new Response('head.one.x', { headers: { etag: 'W/"1-a"' } }),
+      () => new Response(null, { status: 304, headers: { etag: 'W/"1-a"' } }),
+      () => new Response('head.two.x', { headers: { etag: 'W/"2-a"' } }),
+    ];
+    const sources = httpsFeedSources('https://feed.example', async (_url, init) => {
+      sent.push(init.headers['if-none-match']);
+      const answer = answers.shift();
+      if (answer === undefined) throw new Error('no answer');
+      return answer();
+    });
+    const signal = new AbortController().signal;
+    expect(await sources.feed.head(signal)).toBe('head.one.x');
+    expect(await sources.feed.head(signal)).toBe('head.one.x');
+    expect(await sources.feed.head(signal)).toBe('head.two.x');
+    expect(sent).toEqual([undefined, 'W/"1-a"', 'W/"1-a"']);
+
+    // A 304 to a request that sent no ETag is a failed fetch.
+    const bare = httpsFeedSources(
+      'https://feed.example',
+      async () => new Response(null, { status: 304 })
+    );
+    await expect(bare.feed.head(signal)).rejects.toThrow('HTTP 304');
+
+    // A late answer to an earlier request never replaces the head a later request read.
+    const late = Promise.withResolvers<Response>();
+    const order: Array<() => Promise<Response>> = [
+      () => late.promise,
+      async () => new Response('head.new.x', { headers: { etag: 'W/"9-b"' } }),
+    ];
+    const seen: Array<string | undefined> = [];
+    const racing = httpsFeedSources('https://feed.example', async (_url, init) => {
+      seen.push(init.headers['if-none-match']);
+      const next = order.shift();
+      if (next === undefined) return new Response(null, { status: 304 });
+      return await next();
+    });
+    const first = racing.feed.head(signal);
+    expect(await racing.feed.head(signal)).toBe('head.new.x');
+    late.resolve(new Response('head.old.x', { headers: { etag: 'W/"8-b"' } }));
+    expect(await first).toBe('head.old.x');
+    expect(await racing.feed.head(signal)).toBe('head.new.x');
+    expect(seen).toEqual([undefined, undefined, 'W/"9-b"']);
+  });
+
+  it('name the STS audience, scope and admitted workloads of the HTTPS feed', () => {
+    expect(UTS_FEED_AUDIENCE).toBe('uts-feed');
+    expect(UTS_FEED_READ_SCOPE).toBe('uts-feed:revocation.read');
+    // The STS policy's workload names (decision Q84); the gateway's policy is p2's, not yet here.
+    expect(UTS_FEED_HTTPS_WORKLOADS).toEqual({
+      production: [],
+      staging: ['web', 'ai-gateway'],
+      development: ['web', 'ai-gateway'],
+    });
+    expect(UTS_FEED_HEAD_AGE_HEADER).toBe('Kilo-Feed-Head-Age');
+  });
 });
 
 describe('AuthorizationServerMetadataSchema', () => {
@@ -570,7 +657,7 @@ describe('subject operation contracts', () => {
     ).toBe(false);
   });
 
-  it('refuse an SSO organization sync that names a connection twice', () => {
+  it('refuse an SSO organization sync that names a connection or a domain twice, or a bad domain', () => {
     const sync = {
       operation_id: '00000000-0000-4000-8000-000000000003',
       actor: 'system:scim',
@@ -578,15 +665,63 @@ describe('subject operation contracts', () => {
       app_organization_id: '00000000-0000-4000-8000-000000000004',
       workos_organization_id: 'org_1',
       workos_connection_ids: ['conn_1', 'conn_2'],
+      verified_domains: ['example.com', 'eu.example-corp.co.uk'],
       enforcement: 'required',
     };
     expect(SsoOrganizationSyncRequestSchema.safeParse(sync).success).toBe(true);
+    expect(
+      SsoOrganizationSyncRequestSchema.safeParse({ ...sync, verified_domains: [] }).success
+    ).toBe(true);
     expect(
       SsoOrganizationSyncRequestSchema.safeParse({
         ...sync,
         workos_connection_ids: ['conn_1', 'conn_1'],
       }).success
     ).toBe(false);
+    const { verified_domains: _domains, ...withoutDomains } = sync;
+    expect(SsoOrganizationSyncRequestSchema.safeParse(withoutDomains).success).toBe(false);
+    for (const verified_domains of [
+      ['example.com', 'example.com'],
+      ['Example.com'],
+      ['localhost'],
+      ['example.com.'],
+      [`${'a'.repeat(64)}.example.com`],
+      [`${'a.'.repeat(126)}com`],
+      Array.from({ length: 101 }, (_, index) => `d${index}.example.com`),
+    ]) {
+      expect(
+        SsoOrganizationSyncRequestSchema.safeParse({ ...sync, verified_domains }).success
+      ).toBe(false);
+    }
+  });
+
+  it('accept punycode domains and refuse a label that starts or ends with a hyphen', () => {
+    for (const domain of [
+      'example.xn--p1ai',
+      'xn--80ak6aa92e.com',
+      'a-b.example.com',
+      'a.bc',
+      `${'a'.repeat(63)}.example.com`,
+      `example.xn--${'a'.repeat(59)}`,
+      '0.example.org',
+    ]) {
+      expect(SsoDomainSchema.safeParse(domain).success, domain).toBe(true);
+    }
+    for (const domain of [
+      '-a.example.com',
+      'a-.example.com',
+      'example.-com',
+      'example.com-',
+      'example.xn--',
+      'example.xn--p1ai-',
+      `example.xn--${'a'.repeat(60)}`,
+      'example.c0m',
+      'example.b',
+      'a..example.com',
+      '.example.com',
+    ]) {
+      expect(SsoDomainSchema.safeParse(domain).success, domain).toBe(false);
+    }
   });
 
   it('describe the user-created event the app consumes', () => {

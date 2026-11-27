@@ -117,6 +117,8 @@ export type VerifyCodeResult =
   | { outcome: 'signed_in'; returnTo: string; signedIn: SignedIn }
   | { outcome: 'invalid_code'; entriesLeft: number; returnTo: string | null }
   | { outcome: 'codes_stopped' }
+  /** The client network entered 30 wrong codes this hour (design 5.3); nothing was counted. */
+  | { outcome: 'network_limited' }
   | { outcome: 'code_locked'; returnTo: string }
   | { outcome: AccountRefusal; returnTo: string };
 
@@ -216,6 +218,7 @@ const VerifyCodeRowSchema = z.discriminatedUnion('outcome', [
     code_return_to: z.string().nullable(),
   }),
   z.object({ outcome: z.literal('codes_stopped') }),
+  z.object({ outcome: z.literal('network_limited') }),
   z.object({ outcome: z.enum(['code_locked', ...ACCOUNT_REFUSALS]), code_return_to: z.string() }),
 ]);
 
@@ -352,7 +355,9 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
           returnTo: row.code_return_to,
         };
       }
-      if (row.outcome === 'codes_stopped') return { outcome: 'codes_stopped' };
+      if (row.outcome === 'codes_stopped' || row.outcome === 'network_limited') {
+        return { outcome: row.outcome };
+      }
       return { outcome: row.outcome, returnTo: row.code_return_to };
     },
 

@@ -21,13 +21,20 @@ import { type PatProbeDeps, handlePatProbe } from './pat/probe';
 import { jsonResponse } from './responses';
 import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
+import { credentialNotices } from './notices/credential';
+import { noticesAccess } from './notices/store';
+import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
 import type { SignInMailer } from './signin/email/mailer';
+import { signInConfigFor } from './signin/providers/config';
 import { subjectDeps } from './subjects/deps';
 import { handleInternalRequest } from './subjects/routes';
-import { type ServiceTokenVerifier, noServiceTokenVerifier } from './subjects/service-tokens';
+import type { ServiceTokenVerifier } from './subjects/service-tokens';
 import type { MetadataFetcher } from './third-party/metadata';
 import type { SignerAccess } from './token/mint';
 import type { StsCallerVerifier } from './exchange/endpoint';
+import { MANAGER_JWKS_PATH } from './manager/config';
+import { managerKeySet } from './manager/key-set';
+import { deployedStsCallers } from './sts-callers';
 
 /**
  * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
@@ -35,43 +42,55 @@ import type { StsCallerVerifier } from './exchange/endpoint';
  * registry, a recording mail port for the email sign-in, a metadata fetch that serves the local
  * end-to-end run's client documents, a stand-in STS token verifier of the broker exchange and a
  * stand-in STS token check for the `/internal/` routes (src/dev.ts). The deployed options are the
- * sign-in pages, the grant's signer, the registry alone, no mail port, the platform `fetch`, no STS
- * token verifier (the broker exchange waits for `@kilocode/verify`) and no STS token check, so
- * every `/internal/` route answers 503 until the mint Worker carries `@kilocode/verify`.
+ * sign-in pages, the grant's signer, the registry alone, no recording mail port (mail goes through
+ * Mailgun where the mail settings are on, src/signin/email/delivery.ts), the platform `fetch`, and
+ * the STS checks of `@kilocode/verify` with this environment's caller allow-lists
+ * (src/sts-callers.ts).
  */
 export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
   scopes: ScopeRegistry;
-  mailer: SignInMailer | null;
+  recordingMailer: SignInMailer | null;
   serviceTokens: ServiceTokenVerifier;
   metadataFetcher: MetadataFetcher;
   stsCallers: StsCallerVerifier | null;
 };
 
-const DEPLOYED: MintOptions = {
+/** The deployed options; the STS checks need the request's context (`deployedStsCallers`). */
+const DEPLOYED: Omit<MintOptions, 'serviceTokens' | 'stsCallers'> = {
   authorizationHandoff: null,
   signer: null,
   scopes: utsScopeEntry,
-  mailer: null,
-  serviceTokens: noServiceTokenVerifier,
+  recordingMailer: null,
   metadataFetcher: (url, init) => fetch(url, init),
-  stsCallers: null,
 };
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
 const probeWindows: AddressWindows = new Map();
 
-/** The account API is served once the identity store's primary config is bound. */
+/**
+ * The account API is served once the identity store's primary config is bound. A created
+ * credential's notice goes out at once by email where the mail settings are on (push has no
+ * deployed provider yet); elsewhere the minute cron settles it.
+ */
 function accountDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): AccountDeps | null {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return null;
+  const email = noticeEmailTransport(signInConfigFor(env, config).mail, platformFetch);
   return {
     config,
     account: work =>
       withIdentityStore(binding.connectionString, ctx, store => work(identityStoreAccount(store))),
     keys: shardAccessTokenKeys(env, config),
-    notices: null,
+    notices:
+      email === null
+        ? null
+        : credentialNotices({
+            notices: noticesAccess(binding.connectionString, ctx),
+            transports: { push: null, email },
+            now: () => new Date(),
+          }),
     publish: feedPublisher(env, config, ctx),
     context: ctx,
     nowSeconds: () => Math.floor(Date.now() / 1000),
@@ -97,8 +116,8 @@ function probeDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): PatProbe
  * applies to fetch handlers only, not to RPC methods or named entrypoints (design 5.2). It serves
  * the issuer metadata; the OAuth endpoints, the sign-in pages, the device grant and the tickets
  * once the identity store is bound (src/oauth/routes.ts); the `/internal/` routes of the web app's
- * outbox (src/subjects/routes.ts), which answer 503 until both an STS token check and the identity
- * store exist; and the account API (src/account/routes.ts) and the PAT probe route
+ * outbox (src/subjects/routes.ts), which answer 503 until the identity store exists; and the
+ * account API (src/account/routes.ts) and the PAT probe route
  * (src/pat/probe.ts) once their identity-store configs are bound. Signer keys are served by the
  * `SignerKeys` entrypoint (src/signer-keys.ts), PAT lookups for verifiers by the `PatLookup`
  * entrypoint (src/pat/entrypoint.ts) and Worker subject operations by the `SubjectRevocation`
@@ -108,11 +127,18 @@ export async function handleRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  options: MintOptions = DEPLOYED
+  options: MintOptions | null = null
 ): Promise<Response> {
   const config = readConfig(env);
   const { pathname } = new URL(request.url);
-  const oauth = oauthService(env, ctx, config, options);
+  const mint = options ?? { ...DEPLOYED, ...deployedStsCallers(config, ctx) };
+  if (pathname === MANAGER_JWKS_PATH) {
+    if (request.method !== 'GET') {
+      return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
+    }
+    return await managerKeySet(env, config);
+  }
+  const oauth = oauthService(env, ctx, config, mint);
   if (pathname === UTS_AUTHORIZATION_SERVER_METADATA_PATH) {
     if (request.method !== 'GET') {
       return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'GET' });
@@ -143,7 +169,7 @@ export async function handleRequest(
     return webClientUnavailable();
   }
   const internal = await handleInternalRequest(request, pathname, {
-    serviceTokens: options.serviceTokens,
+    serviceTokens: mint.serviceTokens,
     subjects: subjectDeps(env, ctx, config),
   });
   if (internal !== null) return internal;

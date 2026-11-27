@@ -1,4 +1,4 @@
-import { UtsFeedIndexSchema } from '@kilocode/uts-contracts';
+import { encodeBase64Url, UtsFeedIndexSchema } from '@kilocode/uts-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import { devMetadataFetcher, devStsCallers } from './dev-clients';
@@ -7,6 +7,8 @@ import type { DevUtsFeedDO } from './dev-feed';
 import { getFeedStub, getSignerStub } from './dos/stubs';
 import type { SignResult } from './dos/UtsSignerDO';
 import { readConfig, type Env, type UtsConfig } from './env';
+import { rotationSecretName } from './manager/client';
+import { rotationManager } from './manager/key-set';
 import { identityStoreBinding } from './grants/binding';
 import { handleRequest } from './http';
 import { signerForGrant } from './keys/signer-choice';
@@ -42,7 +44,9 @@ import type { SignerAccess } from './token/mint';
  *   scope.
  * * The email sign-in's mail port records each message in the isolate instead of sending it, and
  *   `GET /__dev/mail?to=<address>` answers the newest message for that address (its link and code
- *   are synthetic local values), for the email end-to-end run.
+ *   are synthetic local values), for the email end-to-end run. It needs no Turnstile check, as it
+ *   sends nothing; with the mail settings set (and `SIGNIN_DEV_ENDPOINTS` naming local Mailgun and
+ *   Turnstile stand-ins) the entry uses the deployed Mailgun sender and Turnstile check instead.
  * * The notice routes under `/__dev/notices/` and the security view with a development caller
  *   check (`src/dev-notices.ts`).
  * * The `/internal/` routes take a stand-in STS token, `uts-dev-sts:<workload>:<scope>`, for the
@@ -92,6 +96,27 @@ async function handleDevTicketRedeem(
 /** The synthetic account the development hand-off signs in. */
 export const DEV_ACCOUNT_ID = 'dev:uts-local';
 
+/**
+ * `POST /__dev/manager/write` runs the rotation job's manager steps against the stand-in manager
+ * that `MANAGER_BASE_URL` names: it logs in with a login JWT from the manager login key object,
+ * creates the secret of a rotation of `uts_app_a` today with a random synthetic value, and
+ * describes it. The answer carries only the steps' statuses.
+ */
+export const DEV_MANAGER_WRITE_PATH = '/__dev/manager/write';
+
+async function devManagerWrite(request: Request, env: Env, config: UtsConfig): Promise<Response> {
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
+  }
+  const manager = rotationManager(env, config);
+  if (manager === null) return jsonResponse({ error: 'no_manager' }, 400);
+  const name = rotationSecretName('uts_app_a', new Date());
+  const value = encodeBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+  const created = await manager.createIdentityStoreSecret(name, value);
+  const described = await manager.describeIdentityStoreSecret(name);
+  return jsonResponse({ name, created, described }, 200);
+}
+
 const outbox = new Map<string, SignInEmail>();
 
 const recordingMailer: SignInMailer = async message => {
@@ -129,7 +154,7 @@ const DEV_STS_TOKEN = /^Bearer uts-dev-sts:([a-z0-9-]{1,64}):([a-z][a-z0-9-]*:[a
 /**
  * The development stand-in for the STS token check of the `/internal/` routes: the bearer names
  * its workload and its one scope in clear, and proves nothing. Only this module, which no deploy
- * bundles, passes it; the deployed check refuses every call until `@kilocode/verify` lands.
+ * bundles, passes it; the deployed check is `@kilocode/verify` (src/sts-callers.ts).
  */
 export const developmentServiceTokens: ServiceTokenVerifier = async (authorization, scope) => {
   if (authorization === null) return { status: 'missing' };
@@ -184,6 +209,9 @@ export async function handleDevRequest(
   if (pathname === DEV_TICKET_REDEEM_PATH) {
     return await handleDevTicketRedeem(request, env, ctx, config);
   }
+  if (pathname === DEV_MANAGER_WRITE_PATH) {
+    return await devManagerWrite(request, env, config);
+  }
   if (pathname !== DEV_SIGN_PATH) {
     // `Kilo-Dev-Signing: unavailable` makes every signer call of the request fail after the grant
     // statement, as a signer object that does not answer would, for the retry check of the local
@@ -199,7 +227,7 @@ export async function handleDevRequest(
           : await developmentHandoff(authorization, pending),
       signer,
       scopes: developmentScopes,
-      mailer: recordingMailer,
+      recordingMailer,
       serviceTokens: developmentServiceTokens,
       metadataFetcher: devMetadataFetcher(env) ?? ((url, init) => fetch(url, init)),
       stsCallers: devStsCallers(env),

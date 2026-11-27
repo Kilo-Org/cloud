@@ -96,16 +96,54 @@ Transports (`@kilocode/uts-contracts`, the shapes of `@kilocode/verify`'s ports)
   own deployed name as `props.caller`; `services/uts/test/repo` fails any other caller value. A
   binding without a caller is refused; a failed read answers `unavailable` with
   `retryAfterSeconds: 5`. `feedReaderSources(binding)` adapts it to the verifier's ports.
-- HTTPS (`httpsFeedSources(origin)`): `GET /revocation/head` (`application/jwt`),
-  `GET /revocation/list/<hash>`, `GET /revocation/bootstrap` (`{jwks, head, list}`, the list as
-  base64url of its exact bytes); 503 with `Retry-After: 5` when no object answers, 500 on a
-  deploy error. These paths are served in development only: the feed names accounts and grants,
-  and staging and production answer them 404 until this Worker verifies the caller's STS audience
-  token (design 5.6). Opening them is an open budget item (design 3, "Revocation feed").
+- HTTPS (`httpsFeedSources(origin, fetcher)`): `GET /revocation/head` (`application/jwt`),
+  `GET /revocation/list/<hash>`, `GET /revocation/bootstrap` (`{jwks, key_ages, head, list}`, the
+  list as base64url of its exact bytes); 503 with `Retry-After: 5` when no object answers, 500 on
+  a deploy error. The fetcher adds the caller's STS token to every request.
+
+### Authenticated HTTPS feed
+
+The feed names accounts and grants, so the HTTPS paths answer only a Vercel or Fly workload that
+proves itself with an STS service token (design 5.6, `src/https-auth.ts`). The key set stays
+public.
+
+- **Switch.** `FEED_HTTPS_ENABLED` must be exactly `true` and `STS_URL` must be the STS issuer of
+  this Worker's environment (`STS_ISSUERS`; development also takes a bare loopback origin, for the
+  local runs). Otherwise the three paths answer `503 temporarily_unavailable` with
+  `Retry-After: 60` before any token check or feed read, never 500. Production and staging set
+  neither (`services/uts/test/repo` checks both blocks and refuses any value but `true` or another
+  environment's issuer); the local block sets both.
+- **Caller check.** `@kilocode/verify` checks `Authorization: Bearer <STS token>` against the STS
+  key set (`httpJwksSource(STS_URL)`, one verifier per isolate): audience `uts-feed`, scope
+  `uts-feed:revocation.read`, environment, expiry, signature. Then the token's workload must be in
+  `UTS_FEED_HTTPS_WORKLOADS` for this environment: `web` and `ai-gateway` in development and
+  staging, none in production until activation. No token: 401 with a Bearer challenge; another
+  audience or scope, or a workload not listed: 403; another issuer or environment, an expired or
+  badly signed token: 401; an unreachable STS key set: 503 with `Retry-After`. A refusal logs
+  `uts_feed.https.refused` with the reason and workload, never the token. Nothing is read from a
+  feed object before the check passes.
+- **Caching.** Every answer is `private`, so no shared cache keeps one:
+  - head: `no-cache`, a weak `ETag` `W/"<iat>-<list hash>"` and `Kilo-Feed-Head-Age` (seconds
+    since the head's `iat`); an `If-None-Match` that matches answers 304 with no body.
+    `httpsFeedSources` sends the last `ETag` it read and answers a 304 with the held head.
+  - list: `max-age=600, immutable` and the hash as a strong `ETag`; a matching `If-None-Match`
+    answers 304 without reading a feed object.
+  - bootstrap: `no-store`, with `Age`, `Kilo-Key-Set-Oldest-Age` and `Kilo-Feed-Head-Age`.
+- **Cost.** Every request, a 304 included, is one billed Worker invocation: the request carries
+  `Authorization` and the answer is `private`, so no Cloudflare cache answers it in front of the
+  Worker. Per verifier instance a head read at most every 10 seconds, a list read only when the
+  head names a new list, and one bootstrap per cold start; the monthly arithmetic is in design 3
+  ("Revocation feed"). Invocation logs keep a 5 percent head sample
+  (`observability.logs.head_sampling_rate` 0.05, inherited by every block), so logs do not grow
+  the bill with every read; `services/uts/test/repo` refuses a rate above 0.05. The refusal log
+  lines above are sampled the same way.
 
 ## Local development
 
 `pnpm dev` runs `wrangler dev --env local` on port 8801; run the mint Worker (`services/uts`,
-`pnpm dev`, which runs `wrangler.dev.jsonc`) on port 8800 beside it. `test/fixtures/e2e` holds a
-verifier Worker for the local end-to-end run of the feed (`services/uts/scripts/feed-e2e.ts`);
-nothing deploys it.
+`pnpm dev`, which runs `wrangler.dev.jsonc`) on port 8800 beside it. The local block's HTTPS feed
+accepts tokens of the local STS (`http://localhost:8825`); the end-to-end runs replace it with
+their own stand-in (`--var STS_URL:http://127.0.0.1:<port>`, `services/uts/scripts/fake-sts.ts`).
+`test/fixtures/e2e` holds a verifier Worker for the local end-to-end run of the feed
+(`services/uts/scripts/feed-e2e.ts`); nothing deploys it. `services/uts/scripts/feed-https-e2e.ts`
+runs the HTTPS feed's callers, refusals, 304s and the verification library over it.

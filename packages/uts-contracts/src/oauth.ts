@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { UTS_ENDPOINTS, type UtsEnvironment } from './environment';
-import { KILO_API_AUDIENCE, KILO_MCP_AUDIENCE, UTS_ACCOUNT_AUDIENCE } from './scopes';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+  KILO_MCP_AUDIENCE,
+  UTS_ACCOUNT_AUDIENCE,
+} from './scopes';
 import { UTS_MAX_TOKENS_PER_CALL, UtsAudienceSchema, UtsScopeSchema } from './token';
 
 /** Paths of the mint Worker's OAuth endpoints on the issuer origin (design 5.4). */
@@ -43,11 +48,18 @@ export function resourceOfAudience(audience: string): string {
  *   `https://mcp.kiloapps.io/mcp` (RFC 9728 resource of the MCP endpoint), matched exactly like
  *   every other entry, so no other path, prefix or trailing slash of that origin names it.
  *   `pages-dev` is the Pages deployment that authenticates against the production web app.
- * - Staging: the staging web app and the staging issuer only. Another staging origin joins once a
- *   deployment of that Worker on it is confirmed.
+ * - Staging: the staging web app, the staging AI gateway and the staging issuer only. Another
+ *   staging origin joins once a deployment of that Worker on it is confirmed.
  * - Development: loopback only: the local web app on its default port (`PORT` unset), the local
- *   issuer, each Worker on its local development port (session ingest on 8821, since its default
- *   port is the issuer's), and the local Kilo MCP endpoint `http://localhost:8815/mcp`.
+ *   AI gateway on its `dev:start` port (`KILO_PORT_OFFSET` unset), the local issuer, each Worker on
+ *   its local development port (session ingest on 8821, since its default port is the issuer's),
+ *   and the local Kilo MCP endpoint `http://localhost:8815/mcp`.
+ *
+ * The AI gateway (`kilo-gateway`) has one canonical origin per environment, the one its deploy
+ * targets and `apps/web/ai-gateway-rewrites.mjs` name: `https://ai-gateway.kilo.ai` and
+ * `https://staging-ai-gateway.kilo.ai`. A request that reaches the gateway through a web app
+ * rewrite (`/api/gateway`, `/api/openrouter`) or under another host still names this origin: the
+ * table is fixed here and never read from a request's `Host`.
  */
 export const UTS_RESOURCE_ORIGINS: Readonly<
   Record<UtsEnvironment, Readonly<Record<string, string>>>
@@ -66,13 +78,16 @@ export const UTS_RESOURCE_ORIGINS: Readonly<
     'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
     'https://mcp.kiloapps.io/mcp': KILO_MCP_AUDIENCE,
     'https://pages-dev.kiloapps.io': 'pages-dev',
+    'https://ai-gateway.kilo.ai': KILO_GATEWAY_AUDIENCE,
   },
   staging: {
     'https://staging-app.kilo.ai': KILO_API_AUDIENCE,
+    'https://staging-ai-gateway.kilo.ai': KILO_GATEWAY_AUDIENCE,
     [UTS_ENDPOINTS.staging.issuer]: UTS_ACCOUNT_AUDIENCE,
   },
   development: {
     'http://localhost:3000': KILO_API_AUDIENCE,
+    'http://localhost:3010': KILO_GATEWAY_AUDIENCE,
     [UTS_ENDPOINTS.development.issuer]: UTS_ACCOUNT_AUDIENCE,
     'http://localhost:8787': 'ai-attribution',
     'http://localhost:8817': 'session-sync',
@@ -134,6 +149,12 @@ export const OAUTH_ERROR_CODES = [
   'invalid_session',
   /** RFC 9470: the scope needs a fresher sign-in; `WWW-Authenticate` carries `max_age`. */
   'insufficient_user_authentication',
+  /**
+   * The `kilo-mobile` code exchange (`attestation.ts`) carried no device attestation, or an App
+   * Attest assertion whose key UTS does not hold: attest a new key and send the exchange again
+   * while the code lasts.
+   */
+  'attestation_required',
 ] as const;
 export type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 

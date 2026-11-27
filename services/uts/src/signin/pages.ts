@@ -7,41 +7,54 @@ import {
   type UtsOAuthProvider,
   utsProviderStartPath,
 } from '@kilocode/uts-contracts';
+import { TURNSTILE_ACTION, TURNSTILE_RESPONSE_FIELD } from './email/turnstile';
 import type { PendingDevice, UserCodeSource } from './store';
 
 /**
  * The sign-in pages on the issuer origin (design 5.14). They are plain HTML with one same-origin
  * script (src/signin/script.ts), which runs the WebAuthn ceremonies and the device decision; no
- * inline script, no third-party resource, no framing. Every value a page shows is escaped.
+ * inline script and no framing of the pages. The one third-party resource is Cloudflare
+ * Turnstile's widget on a sign-in page that offers the email sign-in through Mailgun (design 5.3).
+ * Every value a page shows is escaped.
  */
+
+/** Turnstile's script; Cloudflare requires this exact URL, never a proxied or cached copy. */
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
+const TURNSTILE_SCRIPT = `${TURNSTILE_ORIGIN}/turnstile/v0/api.js`;
 
 /**
  * `form-action` also governs where a form submission redirects, so a page whose form ends in an
  * app's redirect names that URI's scheme beside `'self'`.
  *
  * A page that runs a passkey ceremony also names `https://<rpId>/.well-known/webauthn` in
- * `connect-src`. The relying-party id is the app host, not the page's host, so the browser fetches
- * that URL itself to check that the page's origin is a related origin (WebAuthn Level 3, section
- * 5.11.1). The specification does not say whether the page's policy governs that fetch (w3c/webauthn
- * issue 2408). Chromium checks the URL and every redirect against the page's enforced `connect-src`
- * (components/webauthn/core/browser/remote_validation.cc) and today only counts a refusal; a page
- * that names the URL keeps working when a browser enforces the check. In development the
- * relying-party id is the page's own host, the browser fetches nothing, and the entry is inert.
+ * `connect-src`. In production the relying-party id is the app host, not the page's host, so the
+ * browser fetches that URL itself to check that the page's origin is a related origin (WebAuthn
+ * Level 3, section 5.11.1). The specification does not say whether the page's policy governs that
+ * fetch (w3c/webauthn issue 2408). Chromium checks the URL and every redirect against the page's
+ * enforced `connect-src` (components/webauthn/core/browser/remote_validation.cc) and today only
+ * counts a refusal; a page that names the URL keeps working when a browser enforces the check. In
+ * staging and development the relying-party id is the page's own host, the browser fetches
+ * nothing, and the entry is inert.
+ *
+ * A page with the Turnstile widget adds `https://challenges.cloudflare.com` to `script-src` and
+ * `frame-src`, the two directives Cloudflare documents for the widget's script and frame.
  *
  * No `Permissions-Policy` is needed: the default allowlist of `publickey-credentials-get` and
  * `publickey-credentials-create` is `'self'`, which allows a top-level page. The allowlist names
  * the origins of frames, not relying parties, and the pages refuse every frame.
  */
-function contentSecurityPolicy(formAction: string, rpId: string | null): string {
+function contentSecurityPolicy(formAction: string, rpId: string | null, turnstile = false): string {
   const connect = rpId === null ? "'self'" : `'self' https://${rpId}/.well-known/webauthn`;
-  return `default-src 'none'; script-src 'self'; connect-src ${connect}; img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
+  const script = turnstile ? `'self' ${TURNSTILE_ORIGIN}` : "'self'";
+  const frame = turnstile ? ` frame-src ${TURNSTILE_ORIGIN};` : '';
+  return `default-src 'none'; script-src ${script};${frame} connect-src ${connect}; img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
-function securityHeaders(rpId: string | null) {
+function securityHeaders(rpId: string | null, turnstile = false) {
   return {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
-    'Content-Security-Policy': contentSecurityPolicy("'self'", rpId),
+    'Content-Security-Policy': contentSecurityPolicy("'self'", rpId, turnstile),
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
     // No referrer leaves for another origin. `no-referrer` would also make a browser send
@@ -74,7 +87,8 @@ function render(
   pageName: string,
   body: string,
   status: number,
-  passkey: PasskeyUse | null
+  passkey: PasskeyUse | null,
+  turnstile = false
 ): Response {
   const rpId = passkey === null ? '' : ` data-rp-id="${escapeHtml(passkey.rpId)}"`;
   const notice =
@@ -88,7 +102,7 @@ function render(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <script src="${UTS_SIGNIN_SCRIPT_PATH}" defer></script>
-</head>
+${turnstile ? `<script src="${TURNSTILE_SCRIPT}" async defer></script>\n` : ''}</head>
 <body data-page="${escapeHtml(pageName)}"${rpId}>
 <main>
 <h1>${escapeHtml(title)}</h1>
@@ -99,7 +113,10 @@ ${notice}${body}
 </body>
 </html>
 `;
-  return new Response(html, { status, headers: securityHeaders(passkey?.rpId ?? null) });
+  return new Response(html, {
+    status,
+    headers: securityHeaders(passkey?.rpId ?? null, turnstile),
+  });
 }
 
 /** One page: `page` names what the script wires up (`data-page`). */
@@ -114,7 +131,11 @@ export type SignInChoices = {
   /** The relying-party id of the passkey sign-in (`WEBAUTHN_RP_ID`). */
   rpId: string;
   providers: readonly { provider: UtsOAuthProvider; name: string }[];
-  email: boolean;
+  /**
+   * The email sign-in, or null when it is not offered. `turnstileSiteKey` puts Cloudflare's
+   * Turnstile widget in the form; it is null only for the development entry's recording port.
+   */
+  email: { turnstileSiteKey: string | null } | null;
   /** Whether the page offers SSO, which starts with the user's work address. */
   sso: boolean;
 };
@@ -140,12 +161,17 @@ export function signInPage(choices: SignInChoices): Response {
         .join('')}</ul>`
     );
   }
-  if (choices.email) {
+  if (choices.email !== null) {
+    const siteKey = choices.email.turnstileSiteKey;
+    const widget =
+      siteKey === null
+        ? ''
+        : `<div class="cf-turnstile" data-sitekey="${escapeHtml(siteKey)}" data-action="${TURNSTILE_ACTION}" data-response-field-name="${TURNSTILE_RESPONSE_FIELD}"></div>\n`;
     parts.push(`<form method="post" action="${UTS_EMAIL_START_PATH}">
 <input type="hidden" name="return_to" value="${returnTo}">
 <label for="email-address">Email address</label>
 <input id="email-address" name="email" type="email" autocomplete="email" maxlength="320" required>
-<button type="submit">Email me a sign-in link and code</button>
+${widget}<button type="submit">Email me a sign-in link and code</button>
 </form>`);
   }
   if (choices.sso) {
@@ -156,13 +182,20 @@ export function signInPage(choices: SignInChoices): Response {
 <button type="submit">Sign in with SSO</button>
 </form>`);
   }
-  const otherMethods = choices.providers.length > 0 || choices.email || choices.sso;
-  return render('Sign in to Kilo', 'sign-in', parts.join('\n'), 200, {
-    rpId: choices.rpId,
-    unavailable: otherMethods
-      ? 'This browser cannot use a Kilo passkey on this page. Sign in another way below.'
-      : 'This browser cannot use a Kilo passkey on this page. Update the browser or use another one.',
-  });
+  const otherMethods = choices.providers.length > 0 || choices.email !== null || choices.sso;
+  return render(
+    'Sign in to Kilo',
+    'sign-in',
+    parts.join('\n'),
+    200,
+    {
+      rpId: choices.rpId,
+      unavailable: otherMethods
+        ? 'This browser cannot use a Kilo passkey on this page. Sign in another way below.'
+        : 'This browser cannot use a Kilo passkey on this page. Update the browser or use another one.',
+    },
+    choices.email !== null && choices.email.turnstileSiteKey !== null
+  );
 }
 
 /**

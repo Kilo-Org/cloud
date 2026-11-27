@@ -5,8 +5,10 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
+import type { AttestEnv } from './attest/config';
 import type { UtsAuditRelayDO } from './dos/UtsAuditRelayDO';
 import type { UtsKeySetDO } from './dos/UtsKeySetDO';
+import type { UtsManagerAuthDO } from './dos/UtsManagerAuthDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 import type { UtsFeedDO } from './feed/UtsFeedDO';
 import type { SignInEnv } from './signin/providers/config';
@@ -46,6 +48,7 @@ const EnvVarsSchema = z
       .string()
       .transform(value => value.split(','))
       .pipe(z.array(OriginSchema).min(1).max(4)),
+    MANAGER_BASE_URL: OriginSchema.optional(),
   })
   .refine(
     vars => (vars.UTS_ENVIRONMENT === 'development') === (vars.DO_JURISDICTION === 'none'),
@@ -62,15 +65,20 @@ const EnvVarsSchema = z
           vars.WEBAUTHN_ORIGINS.every(origin => new URL(origin).hostname === 'localhost')
         : vars.WEBAUTHN_ORIGINS.every(origin => origin.startsWith('https://')),
     'WebAuthn runs on https origins, and on localhost only in development'
+  )
+  .refine(
+    vars => vars.UTS_ENVIRONMENT === 'development' || vars.MANAGER_BASE_URL === undefined,
+    'only development names its manager; staging and production use Infisical Cloud'
   );
 
 /** Design 3: at most 100 PAT lookups in flight per mint isolate. */
 export const MAX_PAT_LOOKUPS_IN_FLIGHT = 100;
 
 /**
- * The WebAuthn relying party of the sign-in pages (design 5.14). `rpId` is the app host whose
- * passkeys users hold; `origins` are the pages that run the ceremonies, the issuer origin in a
- * deployed environment, which the app host lists as a WebAuthn related origin.
+ * The WebAuthn relying party of the sign-in pages (design 5.14). `rpId` is the host whose passkeys
+ * users hold: the app host in production, the issuer host in staging and development; `origins` are
+ * the pages that run the ceremonies, the issuer origin in a deployed environment, which the
+ * production app host lists as a WebAuthn related origin.
  */
 export type RelyingParty = { rpId: string; origins: readonly string[] };
 
@@ -79,6 +87,8 @@ export type UtsConfig = {
   endpoints: UtsEndpoints;
   jurisdiction: 'eu' | 'none';
   relyingParty: RelyingParty;
+  /** Development only: the stand-in manager's origin (src/manager/config.ts). */
+  managerBaseUrl: string | null;
 };
 
 export type Env = {
@@ -97,6 +107,8 @@ export type Env = {
    * feed Worker reads heads and lists through the `FeedReads` entrypoint (src/feed/reads.ts).
    */
   UTS_FEED_DO: DurableObjectNamespace<UtsFeedDO>;
+  /** The one object that holds the manager login key (src/dos/UtsManagerAuthDO.ts). */
+  UTS_MANAGER_AUTH_DO: DurableObjectNamespace<UtsManagerAuthDO>;
   /**
    * The identity store's primary Hyperdrive config, bound once the environment's identity store is
    * provisioned. `identityStoreBinding` (src/grants/binding.ts) is the only reader.
@@ -116,6 +128,8 @@ export type Env = {
   IDENTITY_STORE_REPLICA?: Hyperdrive;
   WEBAUTHN_RP_ID: string;
   WEBAUTHN_ORIGINS: string;
+  /** Development only: origin of a stand-in secrets manager for the local end-to-end run. */
+  MANAGER_BASE_URL?: string;
   /**
    * The HMAC key of RFC 8628 user codes, 32 bytes in base64url, a Worker secret. The device grant
    * is served only where it is set (src/signin/device/user-code.ts).
@@ -134,7 +148,8 @@ export type Env = {
   KILO_WEB_BRIDGE_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
-} & SignInEnv;
+} & SignInEnv &
+  AttestEnv;
 
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`
@@ -154,6 +169,7 @@ export function readConfig(env: Env): UtsConfig {
     endpoints: UTS_ENDPOINTS[vars.UTS_ENVIRONMENT],
     jurisdiction: vars.DO_JURISDICTION,
     relyingParty: { rpId: vars.WEBAUTHN_RP_ID, origins: vars.WEBAUTHN_ORIGINS },
+    managerBaseUrl: vars.MANAGER_BASE_URL ?? null,
   };
 }
 

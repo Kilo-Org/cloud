@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import { UTS_SUBJECT_REVOCATION_ENTRYPOINT } from '@kilocode/uts-contracts';
+import { JWKS_JITTER, JWKS_RETRY_MS } from '@kilocode/verify';
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { generateKeyPair, SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
 import * as devEntry from '../../src/dev-index';
 import * as deployedEntry from '../../src/index';
@@ -52,17 +55,44 @@ describe('SubjectRevocation entrypoint', () => {
 });
 
 describe('deployed /internal/ routes', () => {
-  it('answer 503 temporarily_unavailable while the mint Worker carries no STS token check', async () => {
-    const response = await env.DEFAULT_MINT.fetch(
-      `${config.endpoints.issuer}/internal/subjects/revoke`,
-      {
-        method: 'POST',
-        headers: { Authorization: 'Bearer uts-dev-sts:web:uts:subjects.revoke' },
-        body: JSON.stringify(body()),
-      }
-    );
+  const revoke = (authorization: string) =>
+    env.DEFAULT_MINT.fetch(`${config.endpoints.issuer}/internal/subjects/revoke`, {
+      method: 'POST',
+      headers: { Authorization: authorization },
+      body: JSON.stringify(body()),
+    });
+
+  it('refuse the development stand-in token: the deployed entry checks STS tokens with @kilocode/verify', async () => {
+    const response = await revoke('Bearer uts-dev-sts:web:uts:subjects.revoke');
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'invalid_token' });
+  });
+
+  it('answer 503 temporarily_unavailable with the wait verify names, and write nothing, while the STS key set cannot be read', async () => {
+    // The development STS issuer has no key set in the test pool, so the fetch fails.
+    const { privateKey } = await generateKeyPair('EdDSA', { crv: 'Ed25519' });
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      client_id: 'web',
+      req: 'web',
+      scope: 'uts:subjects.revoke',
+      env: 'development',
+    })
+      .setProtectedHeader({ alg: 'EdDSA', typ: 'at+jwt', kid: 'sts-test-0' })
+      .setIssuer(STS_ISSUERS.development)
+      .setAudience('uts')
+      .setSubject('service:web')
+      .setJti(randomUUID())
+      .setIssuedAt(now)
+      .setExpirationTime(now + 300)
+      .sign(privateKey);
+    const response = await revoke(`Bearer ${token}`);
     expect(response.status).toBe(503);
-    expect(response.headers.get('Retry-After')).toBe('60');
+    // verify names what is left of its wait (at most JWKS_RETRY_MS plus JWKS_JITTER), never the
+    // route's own default.
+    const retryAfter = Number(response.headers.get('Retry-After'));
+    expect(retryAfter).toBeGreaterThanOrEqual(1);
+    expect(retryAfter).toBeLessThanOrEqual(Math.ceil((JWKS_RETRY_MS * (1 + JWKS_JITTER)) / 1000));
     expect(await response.json()).toEqual({ error: 'temporarily_unavailable' });
   });
 });

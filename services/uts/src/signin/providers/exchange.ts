@@ -21,7 +21,8 @@ import type { ProviderIdentity } from './store';
  * provider token; only the checked identity leaves.
  *
  * * OpenID Connect: the ID token from the token endpoint is verified against the provider's key
- *   set (signature, `iss`, `aud` = client id, `exp`, `iat`, and `nonce` = the flow's nonce).
+ *   set (signature, `iss`, `aud` = client id, `exp`, `iat`, and `nonce` = the flow's nonce; a
+ *   provider whose spec says `idTokenNonce: 'if_present'` may leave `nonce` out, never send another).
  *   `createRemoteJWKSet` keeps each key set in the isolate for 10 minutes (`cacheMaxAge`) and
  *   refetches it on an unknown `kid` at most once per 30 seconds (`cooldownDuration`), so an
  *   isolate fetches a provider's key set at most once per 10 minutes plus those refetches, and
@@ -227,7 +228,7 @@ function keySet(jwksUri: string): JWTVerifyGetKey {
 
 const IdTokenClaimsSchema = z.looseObject({
   sub: z.string().min(1).max(512),
-  nonce: z.string(),
+  nonce: z.string().optional(),
   email: z.string().optional(),
   email_verified: z.union([z.boolean(), z.enum(['true', 'false'])]).optional(),
   hd: z.string().min(1).optional(),
@@ -243,7 +244,8 @@ async function verifyIdToken(
       issuer: [...spec.endpoints.issuers],
       audience: clientId,
       algorithms: [...spec.idTokenAlgorithms],
-      requiredClaims: ['sub', 'iat', 'exp', 'nonce'],
+      requiredClaims:
+        spec.idTokenNonce === 'required' ? ['sub', 'iat', 'exp', 'nonce'] : ['sub', 'iat', 'exp'],
       clockTolerance: 60,
     });
     return payload;
@@ -292,7 +294,9 @@ async function oidcIdentity(
   );
   const payload = await verifyIdToken(spec, credentials.clientId, tokens.id_token);
   const claims = parse(IdTokenClaimsSchema, payload, 'id_token_claims');
-  if (claims.nonce !== nonce) throw new ProviderError('refused', 'id_token_nonce');
+  const nonceHolds =
+    claims.nonce === undefined ? spec.idTokenNonce === 'if_present' : claims.nonce === nonce;
+  if (!nonceHolds) throw new ProviderError('refused', 'id_token_nonce');
   const email = normalizeEmail(claims.email);
   return {
     subject: claims.sub,

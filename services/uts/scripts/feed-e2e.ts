@@ -11,6 +11,8 @@
  *   UTS_E2E_FEED_URL    the feed Worker, such as http://127.0.0.1:8941
  *   UTS_E2E_READER_URL  the verifier Worker, such as http://127.0.0.1:8942
  *   UTS_E2E_ADMIN_URL   admin login to the identity-store database (loopback only)
+ *   UTS_E2E_STS_PORT    loopback port of the run's stand-in STS (`scripts/fake-sts.ts`); the feed
+ *                       Worker runs with `--var STS_URL:http://127.0.0.1:<port>`
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -38,6 +40,7 @@ import {
 import pg from 'pg';
 import { z } from 'zod';
 import { isLoopbackHost } from './connection';
+import { startFakeSts } from './fake-sts';
 
 const base = z.url().parse(process.env.UTS_E2E_BASE_URL);
 const feedUrl = z.url().parse(process.env.UTS_E2E_FEED_URL);
@@ -53,7 +56,9 @@ const CALLBACK = 'http://127.0.0.1:4100/callback';
  * 5 s, given up after 10 s) and the data center's cache adds 5 s.
  */
 const HEAD_AGE_BOUND_S = 20;
-const sources = httpsFeedSources(feedUrl);
+// The HTTPS feed answers only an admitted STS workload; the run reads it as the web app.
+const sts = await startFakeSts(z.coerce.number().int().parse(process.env.UTS_E2E_STS_PORT));
+const sources = httpsFeedSources(feedUrl, sts.fetcher('web'));
 let failed = 0;
 
 function log(step: string, detail: unknown, ok = true) {
@@ -289,6 +294,7 @@ async function main() {
   );
 
   await admin.end();
+  await sts.close();
   console.log(`${failed} failed`);
   process.exitCode = failed === 0 ? 0 : 1;
 }

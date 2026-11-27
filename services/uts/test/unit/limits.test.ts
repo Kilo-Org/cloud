@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { anonymousWriteRefusal, anonymousWriteRetryAfter } from '../../src/signin/limits';
-import { anonymousWriter } from '../../src/signin/network';
+import { anonymousWriter, requestNetwork } from '../../src/signin/network';
 
 /**
  * The isolate's anonymous sign-in write limit (design 3, "Anonymous sign-in writes"). The windows
@@ -27,6 +27,26 @@ describe('anonymous writer', () => {
     expect(anonymousWriter('1::2:3:4:5:6:7')).toBe('1:0:2::/48');
     expect(anonymousWriter('::ffff:192.0.2.1')).toBe('0:0:0::/48');
     expect(anonymousWriter(null)).toBeNull();
+  });
+});
+
+describe('client address', () => {
+  const clientIp = (header: string) =>
+    requestNetwork(new Request('https://uts.test/', { headers: { 'CF-Connecting-IP': header } }))
+      .clientIp;
+
+  it('reads an IPv4-mapped IPv6 address as its IPv4 address, so it groups by that /24', () => {
+    expect(clientIp('::ffff:192.0.2.1')).toBe('192.0.2.1');
+    expect(clientIp('::FFFF:c000:0201')).toBe('192.0.2.1');
+    expect(clientIp('0:0:0:0:0:ffff:198.51.100.7')).toBe('198.51.100.7');
+  });
+
+  it('keeps other addresses as they are and drops what is not an address', () => {
+    expect(clientIp('192.0.2.77')).toBe('192.0.2.77');
+    expect(clientIp('2001:db8::1')).toBe('2001:db8::1');
+    expect(clientIp('::1')).toBe('::1');
+    expect(clientIp('64:ff9b::192.0.2.1')).toBe('64:ff9b::192.0.2.1');
+    expect(clientIp('not an address')).toBeNull();
   });
 });
 

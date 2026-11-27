@@ -2,12 +2,14 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import { UTS_MINT_DEPLOYMENTS } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
+  FEED_MAX_LOG_SAMPLING_RATE,
   FEED_TEST_CONFIG,
   JOSE_UNHANDLED_REJECTION_DATE,
   JOSE_UNHANDLED_REJECTION_FLAG,
@@ -310,12 +312,50 @@ describe('the UTS configs themselves', () => {
 
   it('fail traces enabled in any block', () => {
     const problems = utsConfigProblems(
-      mintWith(raw => ({ ...raw, observability: { enabled: true, traces: { enabled: true } } }))
+      mintWith(raw => ({
+        ...raw,
+        observability: { enabled: true, traces: { enabled: true }, redact_query_string: true },
+      }))
     );
     expect(problems.length).toBeGreaterThanOrEqual(2);
     expect(problems.every(problem => problem.includes('traces.enabled resolves to true'))).toBe(
       true
     );
+  });
+
+  it('fail a mint block whose logs keep query strings, where a callback carries its code', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        observability: { enabled: true, traces: { enabled: false } },
+      }))
+    );
+    expect(problems).toEqual([
+      `${MINT_CONFIG} (top level): observability.redact_query_string resolves to undefined; it must be true`,
+      `${MINT_CONFIG} (env.staging): observability.redact_query_string resolves to undefined; it must be true`,
+    ]);
+    const staging = utsConfigProblems(
+      mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        return {
+          ...raw,
+          env: {
+            ...env,
+            staging: {
+              ...env.staging,
+              observability: {
+                enabled: true,
+                traces: { enabled: false },
+                redact_query_string: false,
+              },
+            },
+          },
+        };
+      })
+    );
+    expect(staging).toEqual([
+      `${MINT_CONFIG} (env.staging): observability.redact_query_string resolves to false; it must be true`,
+    ]);
   });
 
   it('fail a deployed mint block without the eu jurisdiction or the Frankfurt placement', () => {
@@ -480,12 +520,21 @@ describe('the UTS configs themselves', () => {
     ],
   });
 
+  // The feed Worker verifies STS tokens with jose for its HTTPS feed (src/https-auth.ts), so its
+  // configs follow the same rule.
+  const JOSE_BLOCKS: ReadonlyMap<string, readonly string[]> = new Map([
+    [MINT_CONFIG, ['(top level)', '(env.staging)']],
+    [MINT_DEV_CONFIG, ['(top level)']],
+    [MINT_TEST_CONFIG, ['(top level)']],
+    [FEED_CONFIG, ['(top level)', '(env.staging)', '(env.local)']],
+    [FEED_TEST_CONFIG, ['(top level)']],
+  ]);
+
   it('fail a jose-verifying config that drops below the fix without listing the flag', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const [path, blocks] of JOSE_BLOCKS) {
       const problems = utsConfigProblems(
         configWith(path, raw => ({ ...raw, compatibility_date: '2025-06-01' }))
       );
-      const blocks = path === MINT_CONFIG ? ['(top level)', '(env.staging)'] : ['(top level)'];
       expect(problems.map(problem => problem.split(':')[0])).toEqual(
         blocks.map(block => `${path} ${block}`)
       );
@@ -496,18 +545,17 @@ describe('the UTS configs themselves', () => {
   });
 
   it('accept a jose-verifying config before the fix that lists the flag', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const path of JOSE_BLOCKS.keys()) {
       const problems = utsConfigProblems(configWith(path, raw => withFlag(raw, '2025-06-01')));
       expect(problems).toEqual([]);
     }
   });
 
   it('fail a jose-verifying config that lists the flag where workerd makes it the default', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const [path, blocks] of JOSE_BLOCKS) {
       const problems = utsConfigProblems(
         configWith(path, raw => withFlag(raw, JOSE_UNHANDLED_REJECTION_DATE))
       );
-      const blocks = path === MINT_CONFIG ? ['(top level)', '(env.staging)'] : ['(top level)'];
       expect(problems.map(problem => problem.split(':')[0])).toEqual(
         blocks.map(block => `${path} ${block}`)
       );
@@ -516,7 +564,7 @@ describe('the UTS configs themselves', () => {
   });
 
   it('fail a jose-verifying config that leaves the compatibility date out', () => {
-    for (const path of [MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG]) {
+    for (const path of JOSE_BLOCKS.keys()) {
       const problems = utsConfigProblems(
         configWith(path, ({ compatibility_date: _date, ...raw }) => raw)
       );
@@ -525,5 +573,91 @@ describe('the UTS configs themselves', () => {
         problems.every(problem => problem.includes('compatibility_date resolves to undefined'))
       ).toBe(true);
     }
+  });
+
+  it('leave the HTTPS feed off in staging and production, and on only in the local block', () => {
+    const feed = configAt(FEED_CONFIG).config;
+    const varsOf = (vars: Record<string, unknown> | undefined) => ({
+      enabled: vars?.FEED_HTTPS_ENABLED,
+      sts: vars?.STS_URL,
+    });
+    expect(varsOf(feed.vars)).toEqual({ enabled: undefined, sts: undefined });
+    expect(varsOf(feed.env?.staging?.vars)).toEqual({ enabled: undefined, sts: undefined });
+    expect(varsOf(feed.env?.local?.vars)).toEqual({
+      enabled: 'true',
+      sts: STS_ISSUERS.development,
+    });
+  });
+
+  it('fail a feed switch that is not exactly true, and an STS issuer of another environment', () => {
+    const edited = (top: Record<string, unknown>, staging: Record<string, unknown>) =>
+      configWith(FEED_CONFIG, raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const stagingVars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        return {
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), ...top },
+          env: { ...env, staging: { ...env.staging, vars: { ...stagingVars, ...staging } } },
+        };
+      });
+    expect(utsConfigProblems(edited({ FEED_HTTPS_ENABLED: 'yes' }, {}))).toEqual([
+      expect.stringContaining(`${FEED_CONFIG} (top level): FEED_HTTPS_ENABLED`),
+    ]);
+    expect(
+      utsConfigProblems(
+        edited(
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.staging },
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.staging }
+        )
+      )
+    ).toEqual([expect.stringContaining(`${FEED_CONFIG} (top level): STS_URL`)]);
+    expect(
+      utsConfigProblems(
+        edited(
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.production },
+          { STS_URL: 'http://localhost:8825' }
+        )
+      )
+    ).toEqual([expect.stringContaining(`${FEED_CONFIG} (env.staging): STS_URL`)]);
+  });
+
+  it('keep the feed logs at a 5 percent head sample in every block, and fail a larger or missing one', () => {
+    expect(configAt(FEED_CONFIG).config.observability?.logs?.head_sampling_rate).toBe(
+      FEED_MAX_LOG_SAMPLING_RATE
+    );
+    const withObservability = (observability: Record<string, unknown>) =>
+      configWith(FEED_CONFIG, raw => ({ ...raw, observability }));
+    const blocks = ['(top level)', '(env.staging)', '(env.local)'];
+    expect(
+      utsConfigProblems(
+        withObservability({ enabled: true, logs: { enabled: true }, traces: { enabled: false } })
+      )
+    ).toEqual(
+      blocks.map(
+        where =>
+          `${FEED_CONFIG} ${where}: observability.logs.head_sampling_rate resolves to 1; the feed Worker keeps at most 0.05 of its invocation logs`
+      )
+    );
+    expect(
+      utsConfigProblems(
+        withObservability({
+          enabled: true,
+          head_sampling_rate: 0.01,
+          logs: { enabled: true, head_sampling_rate: 0.1 },
+          traces: { enabled: false },
+        })
+      )
+    ).toEqual(
+      blocks.map(where =>
+        expect.stringContaining(
+          `${FEED_CONFIG} ${where}: observability.logs.head_sampling_rate resolves to 0.1`
+        )
+      )
+    );
+    expect(
+      utsConfigProblems(
+        withObservability({ enabled: true, head_sampling_rate: 0.01, traces: { enabled: false } })
+      )
+    ).toEqual([]);
   });
 });

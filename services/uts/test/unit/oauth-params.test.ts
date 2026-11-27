@@ -3,6 +3,7 @@ import {
   UTS_SCOPE_REGISTRY,
   audienceOfResource,
   protectedResourceMetadataFor,
+  resourceOriginOf,
 } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import { clientServedIn, identifyClient, isRegisteredRedirect } from '../../src/oauth/clients';
@@ -187,6 +188,38 @@ describe('request parameters', () => {
     expect(audienceOfResource(origin, 'production')).toBeNull();
   });
 
+  it.each([
+    ['production', 'https://ai-gateway.kilo.ai'],
+    ['staging', 'https://staging-ai-gateway.kilo.ai'],
+    ['development', 'http://localhost:3010'],
+  ] as const)(
+    'map the one AI gateway origin of %s to kilo-gateway, and refuse every other gateway host',
+    (environment, origin) => {
+      expect(audienceOfResource(origin, environment)).toBe('kilo-gateway');
+      expect(resourceOriginOf(environment, 'kilo-gateway')).toBe(origin);
+      expect(
+        Object.entries(UTS_RESOURCE_ORIGINS[environment]).filter(
+          ([, audience]) => audience === 'kilo-gateway'
+        )
+      ).toEqual([[origin, 'kilo-gateway']]);
+      for (const other of [
+        // The web app's rewrites and the client's legacy base reach the gateway, but they are
+        // not its resource: a token names the gateway's own origin whatever host relayed it.
+        'https://app.kilo.ai/api/gateway',
+        'https://api.kilo.ai',
+        'https://api.kilo.ai/api/gateway/v1',
+        `${origin}/api/v1`,
+        `${origin}/`,
+        origin.toUpperCase(),
+      ]) {
+        expect(audienceOfResource(other, environment)).toBeNull();
+      }
+      for (const [elsewhere, origins] of Object.entries(UTS_RESOURCE_ORIGINS)) {
+        if (elsewhere !== environment) expect(Object.hasOwn(origins, origin)).toBe(false);
+      }
+    }
+  );
+
   it('hold exactly the agreed origins, loopback in development only', () => {
     expect(UTS_RESOURCE_ORIGINS).toEqual({
       production: {
@@ -203,13 +236,16 @@ describe('request parameters', () => {
         'https://cloud-agent-next.kilosessions.ai': 'cloud-agent-next',
         'https://mcp.kiloapps.io/mcp': 'kilo-mcp',
         'https://pages-dev.kiloapps.io': 'pages-dev',
+        'https://ai-gateway.kilo.ai': 'kilo-gateway',
       },
       staging: {
         'https://staging-app.kilo.ai': 'kilo-api',
+        'https://staging-ai-gateway.kilo.ai': 'kilo-gateway',
         'https://uts-staging.kiloapps.io': 'uts',
       },
       development: {
         'http://localhost:3000': 'kilo-api',
+        'http://localhost:3010': 'kilo-gateway',
         'http://localhost:8800': 'uts',
         'http://localhost:8787': 'ai-attribution',
         'http://localhost:8817': 'session-sync',
@@ -272,6 +308,13 @@ describe('request parameters', () => {
     });
     expect(protectedResourceMetadataFor('staging', 'event-service', 'Kilo events')).toBeNull();
     expect(protectedResourceMetadataFor('production', 'gateway', 'Kilo gateway')).toBeNull();
+    expect(protectedResourceMetadataFor('staging', 'kilo-gateway', 'Kilo AI gateway')).toEqual({
+      resource: 'https://staging-ai-gateway.kilo.ai',
+      authorization_servers: ['https://uts-staging.kiloapps.io'],
+      scopes_supported: ['kilo-gateway:inference'],
+      bearer_methods_supported: ['header'],
+      resource_name: 'Kilo AI gateway',
+    });
     expect(protectedResourceMetadataFor('production', 'kilo-mcp', 'Kilo MCP')).toEqual({
       resource: 'https://mcp.kiloapps.io/mcp',
       authorization_servers: ['https://uts.kiloapps.io'],
@@ -339,14 +382,14 @@ describe('clients', () => {
     expect(allowed('http://127.0.0.1:4100/callback')).toBe(false);
   });
 
-  it('serve the mobile app, which needs device attestation, in development only', () => {
+  it('serve the mobile app, which needs device attestation, only where the policy allows it', () => {
     const mobile = identifyClient('kilo-mobile');
     const cli = identifyClient('kilo-cli');
     if (mobile.kind !== 'first_party' || cli.kind !== 'first_party') throw new Error('first-party');
-    expect(clientServedIn(mobile.client, 'development')).toBe(true);
-    expect(clientServedIn(mobile.client, 'staging')).toBe(false);
-    expect(clientServedIn(mobile.client, 'production')).toBe(false);
-    expect(clientServedIn(cli.client, 'production')).toBe(true);
+    expect(clientServedIn(mobile.client, 'verified')).toBe(true);
+    expect(clientServedIn(mobile.client, 'unattested_development')).toBe(true);
+    expect(clientServedIn(mobile.client, 'refused')).toBe(false);
+    expect(clientServedIn(cli.client, 'refused')).toBe(true);
   });
 });
 

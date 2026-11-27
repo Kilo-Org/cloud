@@ -69,12 +69,16 @@ export type SsoOrganizationSyncInput = SyncCommon & {
   orgId: string;
   workosOrganizationId: string;
   workosConnectionIds: readonly string[];
+  verifiedDomains: readonly string[];
   enforcement: 'off' | 'optional' | 'required';
 };
 
 export type SyncRow =
   | { outcome: 'applied' | 'already_applied' | 'no_subject'; feedEntries: FeedEntry[] }
-  | { outcome: 'retry_later'; error: 'connection_conflict' | 'email_taken' };
+  | {
+      outcome: 'retry_later';
+      error: 'connection_conflict' | 'domain_conflict' | 'email_taken';
+    };
 
 export type SubjectStore = {
   applyOperation(input: OperationInput): Promise<OperationRow>;
@@ -131,7 +135,10 @@ const MembershipRowSchema = z.object({
 
 const SsoRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.enum(['applied', 'already_applied']) }),
-  z.object({ outcome: z.literal('retry_later'), error: z.literal('connection_conflict') }),
+  z.object({
+    outcome: z.literal('retry_later'),
+    error: z.enum(['connection_conflict', 'domain_conflict']),
+  }),
 ]);
 
 const AppEventRowSchema = z.object({
@@ -238,13 +245,14 @@ export function identityStoreSubjects(store: IdentityStore): SubjectStore {
 
     async syncSsoOrganization(input) {
       const row = await one(
-        'SELECT result.outcome, result.error FROM uts.sync_sso_organization($1, $2, $3, $4, $5, $6, $7, $8, $9) AS result',
+        'SELECT result.outcome, result.error FROM uts.sync_sso_organization($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) AS result',
         [
           input.environment,
           input.operationId,
           input.orgId,
           input.workosOrganizationId,
           input.workosConnectionIds,
+          input.verifiedDomains,
           input.enforcement,
           input.actor,
           input.workload,

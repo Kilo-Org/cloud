@@ -1,4 +1,4 @@
-import type { UtsEnvironment } from '@kilocode/uts-contracts';
+import type { AttestationPolicy } from '../attest/config';
 import { matchesPrivateUseRedirect } from '../signin/native/redirect';
 import { oauthError } from './errors';
 import type { Params } from './params';
@@ -29,9 +29,10 @@ export type FirstPartyClient = {
   /** Whether the client may sign in with the RFC 8628 device grant (design 5.5). */
   deviceGrant: boolean;
   /**
-   * `required`: design 5.5 asks the client for device attestation (App Attest, Play Integrity),
-   * which UTS does not verify yet, so the authorization endpoint serves the client in development
-   * only and refuses it in staging and production (`clientServedIn`). `none`: no attestation.
+   * `required`: design 5.5 asks the client for device attestation (App Attest, Play Integrity) at
+   * each code exchange (src/attest/gate.ts), so the authorization endpoint serves the client only
+   * where the environment's attestation policy allows it (`clientServedIn`). `none`: no
+   * attestation.
    */
   attestation: 'required' | 'none';
 };
@@ -39,9 +40,10 @@ export type FirstPartyClient = {
 /**
  * The first-party clients (design 5.5): the CLI, which the VS Code and JetBrains extensions drive,
  * with the device grant as its fallback, and the mobile app, which signs in through the system
- * browser. A client joins this list when it moves to UTS.
+ * browser. A client joins this list when it moves to UTS. Exported for `test/repo`, which holds the
+ * attestation-required ids equal to the backstop trigger's list (migration 0017).
  */
-const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
+export const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
   [
     'kilo-cli',
     {
@@ -67,12 +69,16 @@ const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
 ]);
 
 /**
- * Whether the authorization endpoint serves `client` in `environment`. A client that needs device
- * attestation is served only in development until UTS verifies attestation, so no staging or
- * production grant exists for it; every later step (refresh, tickets) needs such a grant.
+ * Whether the authorization endpoint serves `client` under the environment's attestation policy.
+ * A client that needs device attestation is refused wherever the attestation config is not
+ * complete (src/attest/config.ts), so no grant exists for it there; every later step (refresh,
+ * tickets) needs such a grant.
  */
-export function clientServedIn(client: FirstPartyClient, environment: UtsEnvironment): boolean {
-  return client.attestation === 'none' || environment === 'development';
+export function clientServedIn(
+  client: FirstPartyClient,
+  attestation: AttestationPolicy['kind']
+): boolean {
+  return client.attestation === 'none' || attestation !== 'refused';
 }
 
 /** The shape `uts.third_party_clients` enforces: an HTTPS URL with a path and no query. */

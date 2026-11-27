@@ -1,3 +1,5 @@
+import { UTS_ATTESTATION_TYPES } from '@kilocode/uts-contracts';
+
 /**
  * The identity store's enum types, in their database order. `test/db/schema-drift.test.ts` fails
  * when one of these differs from the migrated schema.
@@ -145,6 +147,9 @@ export const SUBJECT_OPERATIONS = [
   'sso_organization_sync',
 ] as const;
 
+/** Where a code's attestation stands (migration 0017). */
+export const ATTESTATION_STATES = ['verifying', 'attested', 'refused', 'exempt'] as const;
+
 /** Each enum by its type name in the `uts` schema. */
 export const IDENTITY_STORE_ENUMS = {
   account_status: ACCOUNT_STATUSES,
@@ -185,4 +190,6 @@ export const IDENTITY_STORE_ENUMS = {
   notice_attempt_outcome: NOTICE_ATTEMPT_OUTCOMES,
   sign_in_session_kind: SIGN_IN_SESSION_KINDS,
   subject_operation: SUBJECT_OPERATIONS,
+  attestation_type: UTS_ATTESTATION_TYPES,
+  attestation_state: ATTESTATION_STATES,
 } as const;

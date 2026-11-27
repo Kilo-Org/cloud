@@ -12,6 +12,8 @@
  *   UTS_E2E_BASE_URL   the mint Worker, such as http://127.0.0.1:9220
  *   UTS_E2E_FEED_URL   the feed Worker, such as http://127.0.0.1:9222
  *   UTS_E2E_ADMIN_URL  admin login to the identity-store database (loopback only)
+ *   UTS_E2E_STS_PORT   loopback port of the run's stand-in STS (`scripts/fake-sts.ts`), whose
+ *                      tokens the feed Worker accepts with `--var STS_URL:http://127.0.0.1:<port>`
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -26,6 +28,7 @@ import {
 import { SignJWT, calculateJwkThumbprint, decodeJwt, exportJWK, generateKeyPair } from 'jose';
 import pg from 'pg';
 import { z } from 'zod';
+import { startFakeSts } from './fake-sts';
 import { localDatabaseUrl } from './e2e-store';
 
 const base = z.url().parse(process.env.UTS_E2E_BASE_URL);
@@ -37,7 +40,8 @@ const issuer = UTS_ENDPOINTS.development.issuer;
 const ACCOUNT = 'dev:uts-local';
 const CLI_CALLBACK = 'http://127.0.0.1:4100/callback';
 const MOBILE_CALLBACK = 'com.kilocode.kiloapp:/oauth/callback';
-const sources = httpsFeedSources(feedUrl);
+const sts = await startFakeSts(z.coerce.number().int().parse(process.env.UTS_E2E_STS_PORT));
+const sources = httpsFeedSources(feedUrl, sts.fetcher('web'));
 const secrets: string[] = [];
 let failed = 0;
 let version = 0;
@@ -537,8 +541,9 @@ async function main() {
     outcomeOf(recovery.at(-1)) === 'applied' && (await cli.refresh()) !== 200
   );
 
-  // Authority sync: SSO organization and membership.
+  // Authority sync: SSO organization (with its verified domain) and membership.
   const org = randomUUID();
+  const ssoDomain = `e2e-${randomBytes(4).toString('hex')}.example.org`;
   const sso = await internal(
     '/internal/authority/sso-organization',
     {
@@ -548,9 +553,14 @@ async function main() {
       app_organization_id: org,
       workos_organization_id: 'org_e2e',
       workos_connection_ids: ['conn_e2e'],
+      verified_domains: [ssoDomain],
       enforcement: 'optional',
     },
     'uts:authority.sync'
+  );
+  const ssoDomains = await admin.query<{ domain: string; status: string }>(
+    'SELECT domain, status::text FROM uts.sso_domains WHERE org_id = $1',
+    [org]
   );
   const member = await internal(
     '/internal/authority/membership',
@@ -576,13 +586,17 @@ async function main() {
     'uts:authority.sync'
   );
   log(
-    'authority sync: SSO setup, membership, a stale email',
+    'authority sync: SSO setup with its domain, membership, a stale email',
     {
       sso: sso.body,
+      ssoDomains: ssoDomains.rows,
       membership: member.body,
       email: email.body,
     },
     outcomeOf(sso) === 'applied' &&
+      ssoDomains.rows.length === 1 &&
+      ssoDomains.rows[0]?.domain === ssoDomain &&
+      ssoDomains.rows[0]?.status === 'verified' &&
       outcomeOf(member) === 'applied' &&
       outcomeOf(email) === 'already_applied'
   );
@@ -678,6 +692,7 @@ async function main() {
     leaked === 0
   );
   await admin.end();
+  await sts.close();
   log('result', { failed });
   if (failed > 0) process.exitCode = 1;
 }

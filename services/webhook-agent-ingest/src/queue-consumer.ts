@@ -18,7 +18,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
-import { getSecretValue } from './util/secret';
+import { readSecret, SecretSourceUnavailableError } from './secrets';
 import { deliverExistingChatMessage, ExistingChatDeliveryError } from './existing-chat-delivery';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
@@ -389,8 +389,8 @@ async function processWebhookMessage(
     const { token } = await getOrMintToken(env, triggerConfig);
 
     const [internalApiSecret, callbackTokenSecret] = await Promise.all([
-      getSecretValue(env.INTERNAL_API_SECRET),
-      getSecretValue(env.CALLBACK_TOKEN_SECRET),
+      readSecret(env, 'INTERNAL_API_SECRET'),
+      readSecret(env, 'CALLBACK_TOKEN_SECRET'),
     ]);
 
     if (!cloudAgentSessionId) {
@@ -649,8 +649,12 @@ async function processWebhookMessage(
         throw new Error(initiateAction.errorMessage);
     }
   } catch (error) {
+    // A failed `sts` read happens before the send, so it is a known, retryable failure with a
+    // fixed message, not an unconfirmed delivery.
     const isUnexpectedChatError =
-      isExistingChatDelivery && !(error instanceof ExistingChatDeliveryError);
+      isExistingChatDelivery &&
+      !(error instanceof ExistingChatDeliveryError) &&
+      !(error instanceof SecretSourceUnavailableError);
     const errorMessage = isUnexpectedChatError
       ? 'Could not confirm delivery to the target Cloud Agent chat. Check the chat before retrying.'
       : error instanceof Error

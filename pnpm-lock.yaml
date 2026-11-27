@@ -4057,6 +4057,9 @@ importers:
       '@kilocode/kilo-chat':
         specifier: workspace:*
         version: link:../../packages/kilo-chat
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

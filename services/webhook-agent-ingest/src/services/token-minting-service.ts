@@ -11,9 +11,9 @@ import {
   type WorkerDb,
 } from '../db/queries.js';
 import { logger } from '../util/logger.js';
-import { getSecretValue } from '../util/secret.js';
+import { readSecret, type WebhookSecretsSelection } from '../secrets.js';
 
-export type TokenMintingEnv = {
+export type TokenMintingEnv = WebhookSecretsSelection & {
   HYPERDRIVE: { connectionString: string };
   NEXTAUTH_SECRET: SecretsStoreSecret | string; // Same secret used by kilocode-backend
   ENVIRONMENT: string;
@@ -64,7 +64,7 @@ export class TokenMintingService {
 
   private async getJwtSecret(): Promise<string> {
     if (!this.jwtSecret) {
-      this.jwtSecret = await getSecretValue(this.env.NEXTAUTH_SECRET);
+      this.jwtSecret = await readSecret(this.env, 'NEXTAUTH_SECRET');
     }
     return this.jwtSecret;
   }

@@ -11,6 +11,7 @@ const config: UtsConfig = {
   endpoints: UTS_ENDPOINTS.staging,
   jurisdiction: 'eu',
   relyingParty: { rpId: 'staging-app.kilo.ai', origins: ['https://uts-staging.kiloapps.io'] },
+  managerBaseUrl: null,
 };
 
 const vars = {

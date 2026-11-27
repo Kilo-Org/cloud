@@ -740,9 +740,10 @@ or the auto-routing benchmark, gets one short-lived UTS access token for that ac
   `access_block`): the statement then refuses every mint, and the block puts `subject` and
   `blocked_account` entries on the revocation feed for 70 minutes, past the longest bot token. A
   verifier refuses an issued token once its feed copy holds them (about 41 seconds in the worst
-  case), and answers 503 rather than accept a token over 10 minutes old once the head is over 60
-  seconds old. Removing the policy stops new tokens only. `test/runtime/bot-token.test.ts` proves
-  the refusal with `@kilocode/verify`; `test/db/bot-token.test.ts` proves the block's entries.
+  case), and answers 503 rather than accept a token whose lifetime is over 10 minutes once the head
+  is over 60 seconds old. Removing the policy stops new tokens only.
+  `test/runtime/bot-token.test.ts` proves the refusal with `@kilocode/verify`;
+  `test/db/bot-token.test.ts` proves the block's entries.
 - **Audit and cost.** Refusals before the statement (caller, body, account, scope) write a
   `uts.bot_token.refused` or `uts.internal.workload_refused` log line and cost no statement.
   Otherwise one statement, `uts.mint_bot_token` (migration 0026), reads the account and its

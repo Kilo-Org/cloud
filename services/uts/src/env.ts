@@ -197,6 +197,11 @@ export type Env = {
    * absent keeps it off, and any other value keeps it off and is logged.
    */
   HOME_WIDGET_GRANT_ENABLED?: string;
+  /**
+   * The CI token exchange's trust policies (src/ci/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the exchange off; a value that breaks a rule keeps it off and is logged.
+   */
+  CI_TOKEN_POLICIES?: string;
 } & SignInEnv &
   AttestEnv;
 

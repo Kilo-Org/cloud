@@ -197,6 +197,7 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     },
     thirdParty: unexpectedStore,
     exchange: null,
+    ci: { status: 'off' },
     // The runtime pool runs in development without attestation config (src/attest/config.ts):
     // a kilo-mobile exchange only marks its code exempt first.
     attestation: { kind: 'unattested_development', store: exemptOnlyStore },

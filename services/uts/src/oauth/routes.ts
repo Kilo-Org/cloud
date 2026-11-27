@@ -22,6 +22,10 @@ import type { HandleWindows } from '../bff/limits';
 import { handleBrowserSessionRequest } from '../bff/routes';
 import { webSessionAccess } from '../bff/store';
 import { handleWebClientToken } from '../bff/token';
+import type { CiExchangeService } from '../ci/exchange';
+import { githubKeys, newGithubKeyState } from '../ci/github-keys';
+import { ciPolicies } from '../ci/policy';
+import { ciTokenAccess } from '../ci/store';
 import type { Env, UtsConfig } from '../env';
 import type { ExchangeService } from '../exchange/endpoint';
 import { isolateSignerKeys, newKeyCopyState, shardSignerKeys } from '../exchange/keys';
@@ -107,6 +111,8 @@ export type OAuthDeps = {
   exchange: ExchangeService | null;
   /** The home-widget exchange's switch (src/home-widget/exchange.ts). */
   homeWidget: HomeWidgetService;
+  /** The CI token exchange (src/ci/); off unless `CI_TOKEN_POLICIES` lists trust policies. */
+  ci: CiExchangeService;
   /** Device attestation of `kilo-mobile` (src/attest/gate.ts). */
   attestation: AttestationService;
 };
@@ -132,6 +138,29 @@ const metadataFailures: ThirdPartyClientsDeps['failures'] = new Map();
 const metadataFetches: ThirdPartyClientsDeps['inFlight'] = new Map();
 const exchangeKeys = newKeyCopyState();
 const exchangeWindows = newExchangeWindows();
+/** Per isolate: GitHub's OIDC key set and the CI exchange's denied-row times (src/ci/). */
+const githubKeyState = newGithubKeyState();
+const ciDeniedAudits = new Map<string, number>();
+
+/** The CI exchange of this environment's `CI_TOKEN_POLICIES`, over the isolate's state. */
+function ciExchange(
+  env: Env,
+  config: UtsConfig,
+  scopes: ScopeRegistry,
+  connectionString: string,
+  ctx: ExecutionContext
+): CiExchangeService {
+  const policies = ciPolicies(env, config.environment, scopes);
+  if (policies.status !== 'on') return policies;
+  return {
+    status: 'on',
+    policies: policies.policies,
+    keys: githubKeys(githubKeyState, (input, init) => fetch(input, init), Date.now),
+    store: ciTokenAccess(connectionString, ctx),
+    deniedAudits: ciDeniedAudits,
+    now: Date.now,
+  };
+}
 
 /**
  * `options.signer` null uses the grant's signer object; only the development entry passes another
@@ -226,6 +255,7 @@ export function oauthService(
               now: Date.now,
             },
       homeWidget: homeWidgetService(env),
+      ci: ciExchange(env, config, scopes, binding.connectionString, ctx),
       attestation: attestationService(
         env,
         config,

@@ -26,16 +26,20 @@
 -- * `uts.issue_ticket` refuses a widget grant: a ticket carries no scope, so a ticket of a widget
 --   grant could open more than the widget's one scope.
 --
--- Locks: every path takes the app grant's row lock before the widget grant's. The exchange locks
--- the app grant (`FOR NO KEY UPDATE`) and then may end the previous widget; `uts.end_grant` of an
--- app grant revokes it (its row lock) before its widget; `uts.end_grant` of a widget grant locks
--- its app grant (`FOR NO KEY UPDATE`) before it touches the widget. So a device-revoke loop over
--- both grants, in either order, and a concurrent exchange never wait on each other in a cycle; an
--- end of the app grant waits for an exchange in flight and then sees and ends the new widget
--- grant, and two exchanges of one app grant run one after the other. A personal app grant that
--- names an organization also locks the membership row (`FOR SHARE`), so a member removal that
--- arrives at the same time waits for the widget grant and then revokes it with the member's other
--- org-bound grants (design 5.8).
+-- Locks: every path takes the account row before the membership row, the membership row before
+-- the app grant, and the app grant before its widget grant. The exchange reads the app grant's
+-- account and organization without a lock, then locks the account (`FOR KEY SHARE`, the lock the
+-- widget grant's insert would take through its foreign key), then, for a personal app grant that
+-- names an organization, the membership row (`FOR SHARE`), and only then the app grant
+-- (`FOR NO KEY UPDATE`), which it checks again from scratch. A subject operation or a membership
+-- sync locks the account (`FOR UPDATE`) and a member removal the membership row before either
+-- reaches `uts.end_grant`; `uts.end_grant` of an app grant revokes it (its row lock) before its
+-- widget, and of a widget grant locks the app grant (`FOR NO KEY UPDATE`) before the widget. So
+-- no two of these, a device-revoke loop over both grants in either order included, wait on each
+-- other in a cycle. An end of the app grant waits for an exchange in flight and then sees and
+-- ends the new widget grant; a membership removal or subject operation that arrives while an
+-- exchange holds its first lock waits for it and then revokes the new widget grant; two
+-- exchanges of one app grant run one after the other (design 5.8).
 
 SET LOCAL ROLE uts_owner;
 
@@ -304,11 +308,28 @@ DECLARE
   created_in_hour integer;
   oldest_in_hour timestamptz;
   replaced_id uuid;
+  located record;
 BEGIN
   PERFORM uts.require_inputs('uts.exchange_home_widget_grant',
     p_environment IS NOT NULL AND p_parent_token_hash IS NOT NULL AND p_parent_grant_id IS NOT NULL
     AND p_client_id IS NOT NULL AND p_dpop_jkt IS NOT NULL AND p_dpop_jti IS NOT NULL
     AND p_widget_grant_id IS NOT NULL AND p_widget_token_hash IS NOT NULL AND p_scope IS NOT NULL);
+  -- Locks in the order account, membership, app grant (see the header). The app grant's account
+  -- and organization come first, read without a lock; every check below runs on the row read
+  -- under the app grant's lock, since the grant may change before that lock is taken.
+  SELECT grant_row.account_id, grant_row.org_id INTO located
+  FROM uts.refresh_grants AS grant_row WHERE grant_row.token_hash = p_parent_token_hash;
+  IF NOT FOUND THEN
+    outcome := 'invalid_grant';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+  PERFORM 1 FROM uts.accounts AS account WHERE account.id = located.account_id FOR KEY SHARE;
+  IF located.org_id IS NULL AND p_org_id IS NOT NULL THEN
+    PERFORM 1 FROM uts.org_memberships AS membership
+    WHERE membership.org_id = p_org_id AND membership.account_id = located.account_id
+    FOR SHARE;
+  END IF;
   SELECT grant_row.id, grant_row.account_id, grant_row.device_session_id, grant_row.client_id,
     grant_row.client_class, grant_row.dpop_jkt, grant_row.allowed_scopes, grant_row.org_id,
     grant_row.idle_expires_at, grant_row.expires_at, grant_row.status AS grant_status,

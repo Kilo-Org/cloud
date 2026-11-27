@@ -14,6 +14,7 @@ import {
   type ProofBinding,
   identityStoreGrants,
 } from '../../src/grants/store';
+import { type SubjectStore, identityStoreSubjects } from '../../src/subjects/store';
 import { TestDatabase, insertAccount, insertDeviceSession, sqlStateOf } from './harness';
 
 /**
@@ -350,6 +351,96 @@ describe('the home-widget exchange', () => {
     expect((await grantRow(parent.grantId)).status).toBe('active');
     await holder.end();
     await ender.end();
+  });
+
+  /**
+   * An exchange held at its app-grant lock (by `holder`) after it took the account and membership
+   * locks, and `revoking`, a statement on another app connection that starts meanwhile. Releasing
+   * the holder must let both finish, the revoking one last, with no deadlock (40P01).
+   */
+  async function exchangeThenRevoke(
+    parent: AppGrant,
+    exchangeOverrides: Partial<HomeWidgetExchangeInput>,
+    revoking: (subjects: SubjectStore) => Promise<{ outcome: string }>
+  ) {
+    const holder = await db.connectAsOwner();
+    const other = await db.connect('uts_app_a');
+    await holder.query('BEGIN');
+    await holder.query('SELECT 1 FROM uts.refresh_grants WHERE id = $1 FOR NO KEY UPDATE', [
+      parent.grantId,
+    ]);
+    const exchange = widgetExchange(parent, exchangeOverrides);
+    const exchanged = grants.exchangeHomeWidget(exchange.input);
+    await sleep(200);
+    let revokeSettled = false;
+    const revoked = revoking(identityStoreSubjects(new IdentityStore(other))).finally(() => {
+      revokeSettled = true;
+    });
+    await sleep(200);
+    expect(revokeSettled).toBe(false);
+    await holder.query('COMMIT');
+    const [exchangeResult, revokeResult] = await Promise.all([exchanged, revoked]);
+    await holder.end();
+    await other.end();
+    return { exchange, exchangeResult, revokeResult };
+  }
+
+  it('lets a membership removal that arrives during an exchange wait for it, then revoke the new widget', async () => {
+    const parent = await appGrant();
+    const orgId = randomUUID();
+    await member(parent.accountId, orgId);
+    const old = await issuedWidget(parent, { orgId });
+    const { exchange, exchangeResult, revokeResult } = await exchangeThenRevoke(
+      parent,
+      { orgId },
+      subjects =>
+        subjects.syncMembership({
+          environment,
+          workload: 'web',
+          operationId: randomUUID(),
+          actor: 'system:scim',
+          sourceVersion: 2,
+          subject: parent.accountId,
+          orgId,
+          role: null,
+        })
+    );
+    expect(exchangeResult.outcome).toBe('issued');
+    expect(revokeResult.outcome).toBe('applied');
+    expect(await grantRow(exchange.grantId)).toMatchObject({
+      status: 'revoked',
+      revoke_reason: 'member_removed',
+    });
+    expect(await grantRow(old.grantId)).toMatchObject({
+      status: 'revoked',
+      revoke_reason: 'replaced',
+    });
+    expect((await grantRow(parent.grantId)).status).toBe('active');
+  });
+
+  it('lets a subject operation that arrives during an exchange wait for it, then revoke the new widget', async () => {
+    const parent = await appGrant();
+    await issuedWidget(parent);
+    const { exchange, exchangeResult, revokeResult } = await exchangeThenRevoke(
+      parent,
+      {},
+      subjects =>
+        subjects.applyOperation({
+          environment,
+          workload: 'web',
+          operation: 'end-device-sessions',
+          operationId: randomUUID(),
+          subject: parent.accountId,
+          reason: 'apple_consent_revoked',
+          actor: 'admin:staff-1',
+          sourceVersion: 1,
+        })
+    );
+    expect(exchangeResult.outcome).toBe('issued');
+    expect(revokeResult.outcome).toBe('applied');
+    expect((await grantRow(exchange.grantId)).status).toBe('revoked');
+    expect((await grantRow(parent.grantId)).status).toBe('revoked');
+    expect(await sessionStatus(parent.sessionId)).toBe('revoked');
   });
 
   it('makes a revoke of the app grant wait for an exchange in flight, and refuses it after', async () => {

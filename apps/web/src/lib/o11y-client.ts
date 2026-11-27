@@ -1,8 +1,18 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import {
+  O11Y_ALERTING_SENDER_AUTH,
   O11Y_KILO_GATEWAY_CLIENT_SECRET,
   O11Y_SERVICE_URL,
 } from '@kilocode/web-shared/lib/config.server';
+import {
+  O11Y_STS_ORIGINS,
+  o11yStsEnvironmentOf,
+  type O11yStsEnvironment,
+  type VercelRuntime,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics-sender';
+import type { O11yAlertingToken } from './o11y-alerting-sts';
+
+/** The client of o11y's `/alerting/*` admin routes, for the admin alerts router. */
 
 export class O11yRequestError extends Error {
   status: number;
@@ -10,6 +20,93 @@ export class O11yRequestError extends Error {
   constructor(message: string, status: number) {
     super(message);
     this.status = status;
+  }
+}
+
+/**
+ * `O11Y_ALERTING_SENDER_AUTH`, the credential switch of this client, set on `kilocode-app`:
+ * - unset, empty or `legacy`: `O11Y_KILO_GATEWAY_CLIENT_SECRET` in `X-O11Y-ADMIN-TOKEN`, as before;
+ * - `sts`, Vercel production only: only an STS service token in `Authorization: Bearer`, scoped to
+ *   the method (`o11y-alerting-sts.ts`), only to o11y's production origin; never the secret. A
+ *   process outside Vercel (local development) uses development STS and o11y's local origin.
+ * Any other value, `sts` on staging or a preview (o11y has none), or an `O11Y_SERVICE_URL` that is
+ * not o11y's origin under `sts` refuses every request with an error the admin page shows. o11y must
+ * accept STS before this moves to `sts`; rollback is this switch back to `legacy`.
+ */
+const O11yAlertingSenderAuthSchema = z.preprocess(
+  value => (value === '' ? undefined : value),
+  z.enum(['legacy', 'sts']).default('legacy')
+);
+
+type O11yAlertingRefusal = 'invalid_auth' | 'sts_production_only' | 'origin_mismatch';
+
+export type O11yAlertingSender =
+  | { kind: 'legacy'; secret: string }
+  | { kind: 'sts'; environment: O11yStsEnvironment }
+  | { kind: 'refused'; reason: O11yAlertingRefusal };
+
+export function resolveO11yAlertingSender(config: {
+  auth: string | undefined;
+  serviceUrl: string;
+  secret: string | undefined;
+  runtime: VercelRuntime;
+}): O11yAlertingSender {
+  const auth = O11yAlertingSenderAuthSchema.safeParse(config.auth);
+  if (!auth.success) return { kind: 'refused', reason: 'invalid_auth' };
+  if (auth.data === 'legacy') return { kind: 'legacy', secret: config.secret || '' };
+  const environment = o11yStsEnvironmentOf(config.runtime);
+  if (environment === null) return { kind: 'refused', reason: 'sts_production_only' };
+  const origin = URL.canParse(config.serviceUrl) ? new URL(config.serviceUrl).origin : null;
+  if (origin !== O11Y_STS_ORIGINS[environment]) {
+    return { kind: 'refused', reason: 'origin_mismatch' };
+  }
+  return { kind: 'sts', environment };
+}
+
+const REFUSAL_MESSAGES: Readonly<Record<O11yAlertingRefusal, string>> = {
+  invalid_auth: 'O11Y_ALERTING_SENDER_AUTH must be legacy or sts',
+  sts_production_only: 'O11Y_ALERTING_SENDER_AUTH=sts is for Vercel production only',
+  origin_mismatch: "O11Y_SERVICE_URL is not o11y's origin for STS",
+};
+
+const sender = resolveO11yAlertingSender({
+  auth: O11Y_ALERTING_SENDER_AUTH,
+  serviceUrl: O11Y_SERVICE_URL,
+  secret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+  runtime: process.env,
+});
+
+export type O11yAlertingMethod = 'GET' | 'PUT' | 'DELETE';
+
+/** The credential header of one request; throws `O11yRequestError` rather than send without one. */
+async function credentialHeaders(method: O11yAlertingMethod): Promise<Record<string, string>> {
+  switch (sender.kind) {
+    case 'legacy':
+      return { 'X-O11Y-ADMIN-TOKEN': sender.secret };
+    case 'refused':
+      console.error('o11y alerting: invalid sender configuration; request refused', {
+        reason: sender.reason,
+      });
+      throw new O11yRequestError(REFUSAL_MESSAGES[sender.reason], 500);
+    case 'sts': {
+      let read: O11yAlertingToken;
+      try {
+        // Loaded only under `sts`, so a `legacy` deployment never evaluates the token client or
+        // the Vercel OIDC exchange.
+        const { o11yAlertingToken } = await import('./o11y-alerting-sts');
+        read = await o11yAlertingToken(sender.environment, method);
+      } catch (error) {
+        read = {
+          kind: 'failed',
+          failure: { errorName: error instanceof Error ? error.name : typeof error },
+        };
+      }
+      if (read.kind === 'failed') {
+        console.error('o11y alerting: no STS token; request refused', read.failure);
+        throw new O11yRequestError('No STS service token for o11y alerting; try again', 503);
+      }
+      return { Authorization: `Bearer ${read.token}` };
+    }
   }
 }
 
@@ -24,16 +121,10 @@ function getO11yUrl(pathname: string, searchParams?: URLSearchParams): string {
   return url.toString();
 }
 
-function authHeaders(): HeadersInit {
-  return {
-    'X-O11Y-ADMIN-TOKEN': O11Y_KILO_GATEWAY_CLIENT_SECRET || '',
-  };
-}
-
 type FetchO11yJsonParams<T> = {
   path: string;
   schema: z.ZodSchema<T>;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: O11yAlertingMethod;
   body?: unknown;
   searchParams?: URLSearchParams;
   errorMessage: string;
@@ -49,13 +140,16 @@ export async function fetchO11yJson<T>({
   errorMessage,
   parseErrorMessage,
 }: FetchO11yJsonParams<T>): Promise<T> {
-  const response = await fetch(getO11yUrl(path, searchParams), {
+  const url = getO11yUrl(path, searchParams);
+  const response = await fetch(url, {
     method,
     headers: {
-      ...authHeaders(),
+      ...(await credentialHeaders(method)),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
+    // The credential is for this origin only; a redirect never carries it elsewhere.
+    redirect: 'error',
   });
 
   if (!response.ok) {

@@ -90,6 +90,12 @@ export function runsToCheck(runs, since, repository) {
   );
 }
 
+/** A job that has not started running deploys nothing, whatever its `started_at` says. */
+const NOT_RUNNING_JOB_STATUSES = ['queued', 'waiting', 'pending', 'requested'];
+
+/** A finished job that ran its steps; a cancelled, skipped or timed-out one gives no span. */
+const RAN_JOB_CONCLUSIONS = ['success', 'failure'];
+
 /**
  * The STS deploy jobs of the given runs: `{ environment, from, to, url }`, each a time span (ms)
  * a deployment made by that job falls in. `environment` is null for a run of the manual workflow,
@@ -100,8 +106,9 @@ export function deployJobSpans(runs, now) {
   for (const { run, jobs } of runs) {
     if (!(run.path in DEPLOY_WORKFLOWS)) continue;
     for (const job of jobs) {
-      if (!STS_DEPLOY_JOB.test(job.name) || !job.started_at || job.conclusion === 'skipped')
-        continue;
+      if (!STS_DEPLOY_JOB.test(job.name) || !job.started_at) continue;
+      if (NOT_RUNNING_JOB_STATUSES.includes(job.status)) continue;
+      if (job.status === 'completed' && !RAN_JOB_CONCLUSIONS.includes(job.conclusion)) continue;
       spans.push({
         environment: DEPLOY_WORKFLOWS[run.path],
         from: Date.parse(job.started_at) - JOB_MARGIN_BEFORE_MS,

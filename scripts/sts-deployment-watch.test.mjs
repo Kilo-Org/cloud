@@ -36,12 +36,19 @@ function run(path, jobs) {
   return { run: { id: 1, path }, jobs };
 }
 
-function job(name, started, completed, conclusion = 'success') {
+function job(
+  name,
+  started,
+  completed,
+  conclusion = completed ? 'success' : null,
+  status = completed ? 'completed' : 'in_progress'
+) {
   return {
     name,
     started_at: started,
     completed_at: completed,
     conclusion,
+    status,
     html_url: `https://x/${name}`,
   };
 }
@@ -235,6 +242,35 @@ test('a manual Worker deploy of STS covers either environment', () => {
   assert.deepEqual(
     unexpectedDeployments([deployment('staging', '2026-11-27T11:51:00Z')], spans, SINCE),
     []
+  );
+});
+
+test('a queued or waiting job, or a finished one that did not run, gives no span', () => {
+  const sts = 'deploy-workers / Deploy services/sts';
+  const spansOf = jobs =>
+    deployJobSpans([run('.github/workflows/deploy-production.yml', jobs)], NOW);
+  assert.deepEqual(spansOf([job(sts, '2026-11-27T11:50:00Z', null, null, 'queued')]), []);
+  assert.deepEqual(spansOf([job(sts, '2026-11-27T11:50:00Z', null, null, 'waiting')]), []);
+  for (const conclusion of ['cancelled', 'skipped', 'timed_out', 'neutral']) {
+    assert.deepEqual(
+      spansOf([job(sts, '2026-11-27T11:50:00Z', '2026-11-27T11:52:00Z', conclusion)]),
+      []
+    );
+  }
+});
+
+test('an in-progress job, and a finished one that succeeded or failed, gives a span', () => {
+  const sts = 'deploy-workers / Deploy services/sts';
+  const spansOf = jobs =>
+    deployJobSpans([run('.github/workflows/deploy-production.yml', jobs)], NOW);
+  assert.equal(spansOf([job(sts, '2026-11-27T11:50:00Z', null)]).length, 1);
+  assert.equal(
+    spansOf([job(sts, '2026-11-27T11:50:00Z', '2026-11-27T11:52:00Z', 'success')]).length,
+    1
+  );
+  assert.equal(
+    spansOf([job(sts, '2026-11-27T11:50:00Z', '2026-11-27T11:52:00Z', 'failure')]).length,
+    1
   );
 });
 

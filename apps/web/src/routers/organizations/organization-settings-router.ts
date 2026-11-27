@@ -27,6 +27,9 @@ import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restric
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { modelsByProvider, organization_new_models_baselines } from '@kilocode/db/schema';
+import { desc, eq, sql } from 'drizzle-orm';
+import { lockSnapshotPublicationShared } from '@/lib/providers/openrouter/snapshot-lock';
 import {
   MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
   OrganizationBrowserAllowedOriginSchema,
@@ -209,10 +212,24 @@ async function assertActiveOrganizationAutoTargetsAllowed(
 const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
   provider_allow_list: z.array(z.string()).optional(),
   model_deny_list: z.array(z.string()).optional(),
+  model_deny_list_base: z.array(z.string()).optional(),
 });
 
 function dedupeModels(values: string[]): string[] {
   return [...new Set(values.map(value => normalizeModelId(value)))];
+}
+
+// Applies the client's edits (submitted vs. the base it started from) onto the
+// current list, so denies added concurrently (for example by provider sync) survive.
+function mergeModelDenyList(current: string[], base: string[], submitted: string[]): string[] {
+  const normalizedBase = new Set(dedupeModels(base));
+  const normalizedSubmitted = new Set(dedupeModels(submitted));
+  const removed = new Set([...normalizedBase].filter(model => !normalizedSubmitted.has(model)));
+  const added = [...normalizedSubmitted].filter(model => !normalizedBase.has(model));
+  return dedupeModels([
+    ...current.filter(model => !removed.has(normalizeModelId(model))),
+    ...added,
+  ]);
 }
 
 async function validateOrganizationDefaultModel(
@@ -546,10 +563,13 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, disable_new_models } = input;
       const updatedSettings = await db.transaction(async tx => {
+        // The baseline must name the snapshot that is current when the policy turns on. Waiting
+        // for an in-flight publication keeps a model it adds from slipping past both.
+        await lockSnapshotPublicationShared(tx);
         let previousSettings: OrganizationSettings = {};
         const settings = await mutateOrganizationSettings(
           organizationId,
-          organization => {
+          async organization => {
             if (organization.plan !== 'enterprise') {
               throw new TRPCError({
                 code: 'FORBIDDEN',
@@ -557,11 +577,36 @@ export const organizationsSettingsRouter = createTRPCRouter({
               });
             }
             previousSettings = organization.settings;
-            return { ...organization.settings, disable_new_models };
+            const nextSettings = { ...organization.settings, disable_new_models };
+            // The policy counts as an active model policy, which rules out auto tiers.
+            if (disable_new_models && !organization.settings.disable_new_models) {
+              await assertActiveOrganizationAutoTargetsAllowed(organization, nextSettings, tx);
+            }
+            return nextSettings;
           },
           tx
         );
         const changed = !!previousSettings.disable_new_models !== disable_new_models;
+        if (!disable_new_models) {
+          await tx
+            .delete(organization_new_models_baselines)
+            .where(eq(organization_new_models_baselines.organization_id, organizationId));
+        } else if (changed) {
+          const [latest] = await tx
+            .select({ id: modelsByProvider.id })
+            .from(modelsByProvider)
+            .orderBy(desc(modelsByProvider.id))
+            .limit(1);
+          if (latest) {
+            await tx
+              .insert(organization_new_models_baselines)
+              .values({ organization_id: organizationId, snapshot_id: latest.id })
+              .onConflictDoUpdate({
+                target: organization_new_models_baselines.organization_id,
+                set: { snapshot_id: latest.id, updated_at: sql`now()` },
+              });
+          }
+        }
         await createAuditLog({
           action: 'organization.settings.change',
           actor_email: ctx.user.google_user_email,
@@ -582,7 +627,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .input(UpdateAllowListsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, provider_allow_list, model_deny_list } = input;
+      const { organizationId, provider_allow_list, model_deny_list, model_deny_list_base } = input;
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
@@ -614,7 +659,14 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 normalizeInferenceProviderIds(provider_allow_list);
             }
             if (model_deny_list !== undefined) {
-              settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
+              settingsUpdate.model_deny_list =
+                model_deny_list_base === undefined
+                  ? dedupeModels(model_deny_list)
+                  : mergeModelDenyList(
+                      currentSettings.model_deny_list ?? [],
+                      model_deny_list_base,
+                      model_deny_list
+                    );
             }
             if (
               (provider_allow_list !== undefined || model_deny_list !== undefined) &&

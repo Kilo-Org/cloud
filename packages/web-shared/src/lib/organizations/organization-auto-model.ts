@@ -272,7 +272,12 @@ export async function validateOrganizationAutoTarget(
       };
     }
 
-    if (hasActiveModelRestrictions(restrictions)) {
+    // Auto tiers are exempt from model policy, so they would also route to models the
+    // `disable_new_models` policy disables.
+    if (
+      hasActiveModelRestrictions(restrictions) ||
+      (organization.plan === 'enterprise' && organization.settings.disable_new_models)
+    ) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' cannot use an auto tier while the organization has an active model policy. Choose a concrete allowed model instead.`,

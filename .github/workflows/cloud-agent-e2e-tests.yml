@@ -1,23 +1,19 @@
 name: Cloud Agent E2E tests
 
+# e2e runs only from main: the cloud-agent-e2e environment admits main alone,
+# and the job refuses any other ref.
 on:
   workflow_dispatch:
     inputs:
-      worker_url:
-        description: 'HTTPS URL of the Access-protected e2e Worker hostname; empty uses vars.CLOUD_AGENT_E2E_WORKER_URL'
-        required: false
-        type: string
-        default: ''
       fake_llm_url:
         description: 'HTTPS URL of the deployed fake-LLM Worker'
         required: true
         type: string
         default: 'https://fake-llm.engineering-e11.workers.dev'
       backend_url:
-        description: 'HTTPS URL of the Kilo backend that issues stream tickets'
+        description: 'HTTPS URL of the non-production Kilo backend that issues control tokens and stream tickets'
         required: true
         type: string
-        default: 'https://api.kilo.ai'
       only:
         description: 'Comma-separated scenario names to run; empty runs every scenario'
         required: false
@@ -31,21 +27,15 @@ on:
   # The nightly workflow calls this after it deploys the e2e stack.
   workflow_call:
     inputs:
-      worker_url:
-        description: 'HTTPS URL of the Access-protected e2e Worker hostname; empty uses vars.CLOUD_AGENT_E2E_WORKER_URL'
-        required: false
-        type: string
-        default: ''
       fake_llm_url:
         description: 'HTTPS URL of the deployed fake-LLM Worker'
         required: false
         type: string
         default: 'https://fake-llm.engineering-e11.workers.dev'
       backend_url:
-        description: 'HTTPS URL of the Kilo backend that issues stream tickets'
-        required: false
+        description: 'HTTPS URL of the non-production Kilo backend that issues control tokens and stream tickets'
+        required: true
         type: string
-        default: 'https://api.kilo.ai'
       only:
         description: 'Comma-separated scenario names to run; empty runs every scenario'
         required: false
@@ -74,9 +64,8 @@ concurrency:
 jobs:
   e2e:
     # Guard: this workflow_dispatch is reachable from a fork, and the job uses
-    # admin secrets to exercise the production backend. Only the canonical repo
-    # may run it.
-    if: github.repository == 'Kilo-Org/cloud'
+    # admin secrets. Only the canonical repo's main may run it.
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
     outputs:
       failed: ${{ steps.summarize.outputs.failed }}
       summary: ${{ steps.summarize.outputs.summary }}
@@ -91,9 +80,10 @@ jobs:
       # Its only hostname sits behind a Cloudflare Access application whose
       # policy admits one service token, which the driver sends on every
       # request to the Worker and registers on callback targets.
-      WORKER_URL: ${{ inputs.worker_url || vars.CLOUD_AGENT_E2E_WORKER_URL }}
+      E2E_WORKER_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
+      WORKER_URL: https://${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
       FAKE_LLM_URL: ${{ inputs.fake_llm_url || 'https://fake-llm.engineering-e11.workers.dev' }}
-      E2E_BACKEND_URL: ${{ inputs.backend_url || 'https://api.kilo.ai' }}
+      E2E_BACKEND_URL: ${{ inputs.backend_url }}
       # Secrets are exposed as environment variables only; never echoed.
       E2E_USER_TOKEN: ${{ secrets.E2E_USER_TOKEN }}
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
@@ -104,34 +94,33 @@ jobs:
       E2E_PARALLEL: ${{ inputs.parallel || '4' }}
       E2E_ONLY: ${{ inputs.only }}
     steps:
-      # Inert until the Access hostname and its service token exist: refuse a
-      # missing or public Worker address and missing credentials before any
-      # request leaves the runner.
+      # Inert until the Access hostname, its service token and a non-production
+      # backend exist: refuse each missing piece before any request leaves the
+      # runner.
       - name: Check the closed Worker path
         run: |
           set -euo pipefail
-          if [ -z "$WORKER_URL" ]; then
-            echo "::error::Set vars.CLOUD_AGENT_E2E_WORKER_URL (or the worker_url input) to the Access-protected hostname"
+          if [[ ! "$E2E_WORKER_HOSTNAME" =~ ^[a-z0-9.-]+$ ]] || [[ "$E2E_WORKER_HOSTNAME" == *workers.dev ]]; then
+            echo "::error::Set vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME in the cloud-agent-e2e environment to the Access-protected hostname"
             exit 1
           fi
-          host="$(node -e 'const u = new URL(process.env.WORKER_URL); if (u.protocol !== "https:" || u.pathname !== "/" || u.search || u.username || u.password) process.exit(1); process.stdout.write(u.hostname)')" || {
-            echo "::error::WORKER_URL must be a bare https:// origin"
-            exit 1
-          }
-          case "$host" in
-            *.workers.dev)
-              echo "::error::WORKER_URL must be the Access-protected hostname, not workers.dev"
-              exit 1
-              ;;
-          esac
           if [ -z "$E2E_ACCESS_CLIENT_ID" ] || [ -z "$E2E_ACCESS_CLIENT_SECRET" ]; then
             echo "::error::Set E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET in the cloud-agent-e2e environment"
             exit 1
           fi
+          case "$E2E_BACKEND_URL" in
+            https://api.kilo.ai | https://api.kilo.ai/ | https://app.kilo.ai | https://app.kilo.ai/ | "")
+              echo "::error::backend_url must be a non-production backend that signs with NEXTAUTH_SECRET_DEV"
+              exit 1
+              ;;
+          esac
 
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+
+      - name: Check that Access refuses an anonymous request
+        run: services/cloud-agent-next/test/e2e/deploy/check-access-closed.sh "$E2E_WORKER_HOSTNAME"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0

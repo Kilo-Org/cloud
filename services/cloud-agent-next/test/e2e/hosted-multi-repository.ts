@@ -33,6 +33,7 @@ const STAGING_HOST_DENYLIST = new Set([
   'cloud-agent-next.kilosessions.ai',
   'cloud-agent-e2e-test.engineering-e11.workers.dev',
   'cloud-agent-e2e-test.kilosessions.ai',
+  'cloud-agent-e2e.kiloapps.io',
   'kilocode.ai',
   'app.kilocode.ai',
   'api.kilocode.ai',

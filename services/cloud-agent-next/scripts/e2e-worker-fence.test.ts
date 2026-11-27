@@ -1,69 +1,25 @@
-// Fences the deployed e2e Worker config: rendered from this package's production
-// wrangler.jsonc, it may bind no production resource and must have no public
-// address. Production is every resource a top-level (or env.production) block of a
-// direct services/*/wrangler.{json,jsonc} binds, plus the prepared runtime
-// configuration the renderer reads. Failures name the field only.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath, URL } from 'node:url';
+// Renders the deployed e2e Worker config from this package's production
+// wrangler.jsonc and runs the fence that deploy-e2e-worker.sh runs on the file it
+// deploys (test/e2e/deploy/e2e-worker-fence.mjs).
+import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import { parse } from 'jsonc-parser';
 import { describe, expect, it } from 'vitest';
 import { renderRuntimeTarget } from './runtime-target.js';
 import { buildE2eWorkerConfig } from '../test/e2e/deploy/render-e2e-worker-config.mjs';
+import { collectProduction, violations } from '../test/e2e/deploy/e2e-worker-fence.mjs';
 
-type Binding = Record<string, unknown>;
-type WorkerConfig = {
-  name?: string;
-  workers_dev?: boolean;
-  preview_urls?: boolean;
-  logpush?: boolean;
-  route?: unknown;
+type RenderedConfig = Record<string, unknown> & {
   routes?: unknown[];
-  triggers?: { crons?: string[] };
-  services?: Binding[];
-  hyperdrive?: Binding[];
-  r2_buckets?: Binding[];
-  kv_namespaces?: Binding[];
-  d1_databases?: Binding[];
-  queues?: { producers?: Binding[]; consumers?: Binding[] };
-  secrets_store_secrets?: Binding[];
-  durable_objects?: { bindings?: Binding[] };
   vars?: Record<string, unknown>;
-  env?: Record<string, WorkerConfig>;
-  [key: string]: unknown;
+  secrets_store_secrets?: unknown[];
+  queues?: { consumers?: Array<Record<string, unknown>> };
 };
 
-type Production = {
-  hosts: string[];
-  scripts: Set<string>;
-  hyperdrive: Set<string>;
-  r2: Set<string>;
-  kv: Set<string>;
-  d1: Set<string>;
-  queues: Set<string>;
-};
-
-// Account resources outside the kinds above. The e2e Worker needs none of them,
-// so any entry is a finding.
-const FORBIDDEN_BINDING_KEYS = [
-  'ai',
-  'analytics_engine_datasets',
-  'browser',
-  'dispatch_namespaces',
-  'images',
-  'mtls_certificates',
-  'pipelines',
-  'send_email',
-  'tail_consumers',
-  'unsafe',
-  'vectorize',
-  'workflows',
-];
-const NONPRODUCTION_SECRET = /_(DEV|STAGING)$/;
 const PROBE_HOST = 'cloud-agent-e2e.fence-probe.test';
+const access = { aud: 'a'.repeat(64), teamDomain: 'fence-probe.cloudflareaccess.com' };
 
-const servicesDir = fileURLToPath(new URL('../../', import.meta.url));
-const source = parse(readFileSync(join(servicesDir, 'cloud-agent-next', 'wrangler.jsonc'), 'utf8'));
+const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
 const prepared = renderRuntimeTarget({
   config: source,
   environment: 'production',
@@ -74,129 +30,59 @@ const prepared = renderRuntimeTarget({
     baseImage:
       'registry.cloudflare.com/' + 'c'.repeat(32) + '/kilo-runtime-base@sha256:' + 'd'.repeat(64),
   },
-}) as WorkerConfig;
+});
+const production = collectProduction([prepared]);
 
-const routesOf = (config: WorkerConfig): unknown[] =>
-  config.routes ?? (config.route ? [config.route] : []);
-const routeField = (route: unknown, key: 'pattern' | 'custom_domain'): unknown =>
-  typeof route === 'object' && route !== null && key in route ? Reflect.get(route, key) : undefined;
-const text = (value: unknown): string => (typeof value === 'string' ? value : '');
-const hostOf = (route: unknown): string =>
-  text(typeof route === 'string' ? route : routeField(route, 'pattern'))
-    .replace(/^[a-z]+:\/\//i, '')
-    .split('/')[0]
-    .toLowerCase();
-function hostsOverlap(a: string, b: string): boolean {
-  const matches = (host: string, other: string) =>
-    new RegExp(`^${host.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`).test(other);
-  return a === b || matches(a, b) || matches(b, a);
-}
-const values = (entries: Binding[] | undefined, key: string): string[] =>
-  (entries ?? []).map(entry => text(entry[key]).toLowerCase());
-const queuesOf = (config: WorkerConfig): string[] => [
-  ...values(config.queues?.producers, 'queue'),
-  ...values(config.queues?.consumers, 'queue'),
-];
-
-function productionOf(configs: WorkerConfig[]): Production {
-  return {
-    hosts: configs.flatMap(config => routesOf(config).map(hostOf)),
-    scripts: new Set(configs.map(config => String(config.name ?? '').toLowerCase())),
-    hyperdrive: new Set(configs.flatMap(config => values(config.hyperdrive, 'id'))),
-    r2: new Set(configs.flatMap(config => values(config.r2_buckets, 'bucket_name'))),
-    kv: new Set(configs.flatMap(config => values(config.kv_namespaces, 'id'))),
-    d1: new Set(configs.flatMap(config => values(config.d1_databases, 'database_id'))),
-    queues: new Set(configs.flatMap(queuesOf)),
-  };
-}
-
-const production = productionOf([
-  prepared,
-  ...readdirSync(servicesDir, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .flatMap(entry =>
-      ['wrangler.json', 'wrangler.jsonc']
-        .map(file => join(servicesDir, entry.name, file))
-        .filter(path => existsSync(path))
-    )
-    .flatMap(path => {
-      const config = parse(readFileSync(path, 'utf8')) as WorkerConfig;
-      return config.env?.production ? [config, config.env.production] : [config];
-    }),
-]);
-
-function violations(config: WorkerConfig, fixed: Production): string[] {
-  const found: string[] = [];
-  const routes = routesOf(config);
-  if (config.workers_dev !== false) found.push('workers_dev: must be false');
-  if (config.preview_urls !== false) found.push('preview_urls: must be false');
-  if ((config.triggers?.crons ?? []).length > 0) found.push('triggers.crons: must be empty');
-  if (config.logpush === true) found.push('logpush: must be off');
-  if (routes.length > 1) found.push('routes: at most the one Access custom domain');
-  for (const route of routes) {
-    const host = hostOf(route);
-    if (routeField(route, 'custom_domain') !== true) found.push('routes: only a custom domain');
-    if (host.includes('*')) found.push('routes: wildcard host');
-    if (host.endsWith('workers.dev')) found.push('routes: workers.dev host');
-    if (fixed.hosts.some(owned => hostsOverlap(owned, host))) {
-      found.push('routes: overlaps a production host');
-    }
-  }
-  const workerUrl = config.vars?.WORKER_URL;
-  const expectedUrl = routes.length === 1 ? `https://${hostOf(routes[0])}` : undefined;
-  if (workerUrl !== expectedUrl) found.push('vars.WORKER_URL: must be the custom domain or absent');
-  for (const service of values(config.services, 'service')) {
-    if (fixed.scripts.has(service)) found.push(`services: production Worker ${service}`);
-  }
-  for (const binding of config.durable_objects?.bindings ?? []) {
-    const script = text(binding.script_name).toLowerCase();
-    if (script && fixed.scripts.has(script)) {
-      found.push(`durable_objects ${text(binding.name)}: production Worker ${script}`);
-    }
-  }
-  const resources: Array<[string, string[], Set<string>]> = [
-    ['hyperdrive', values(config.hyperdrive, 'id'), fixed.hyperdrive],
-    ['r2_buckets', values(config.r2_buckets, 'bucket_name'), fixed.r2],
-    ['kv_namespaces', values(config.kv_namespaces, 'id'), fixed.kv],
-    ['d1_databases', values(config.d1_databases, 'database_id'), fixed.d1],
-    ['queues', queuesOf(config), fixed.queues],
-  ];
-  for (const [field, used, owned] of resources) {
-    for (const value of used) if (owned.has(value)) found.push(`${field}: production ${value}`);
-  }
-  for (const secret of config.secrets_store_secrets ?? []) {
-    const name = text(secret.secret_name);
-    if (!NONPRODUCTION_SECRET.test(name)) found.push(`secrets_store_secrets: ${name}`);
-  }
-  for (const key of FORBIDDEN_BINDING_KEYS) {
-    const value = config[key];
-    if (value !== undefined && !(Array.isArray(value) && value.length === 0)) {
-      found.push(`${key}: not allowed`);
-    }
-  }
-  return found;
-}
-
-const render = (workerHostname?: string) =>
+const render = (workerHostname?: string): RenderedConfig =>
   buildE2eWorkerConfig(prepared, {
-    ...(workerHostname === undefined ? {} : { workerHostname }),
+    ...(workerHostname === undefined ? {} : { workerHostname, access }),
     kiloOpenRouterBase: 'https://fake.fence-probe.test/api/openrouter',
-  }) as WorkerConfig;
+  });
 
 describe('deployed e2e Worker fence', () => {
   it('binds no production resource and has no public address', () => {
-    expect(violations(render(), production)).toEqual([]);
-    expect(render().routes).toBeUndefined();
+    const config = render();
+    expect(violations(config, production)).toEqual([]);
+    expect(config.routes).toBeUndefined();
+    expect(config.vars?.WORKER_URL).toBeUndefined();
   });
 
   it('reaches its Access hostname through one custom domain and nothing else', () => {
     const config = render(PROBE_HOST);
     expect(violations(config, production)).toEqual([]);
     expect(config.routes).toEqual([{ pattern: PROBE_HOST, custom_domain: true }]);
-    expect(config.vars?.WORKER_URL).toBe(`https://${PROBE_HOST}`);
+    expect(config.vars).toMatchObject({
+      WORKER_URL: `https://${PROBE_HOST}`,
+      E2E_ACCESS_AUD: access.aud,
+      E2E_ACCESS_TEAM_DOMAIN: access.teamDomain,
+    });
   });
 
-  it('refuses a hostname that is public or overlaps production', () => {
+  // Intended switch: production binds the production-labelled signing secret;
+  // the e2e Worker binds only the development key.
+  it('binds only the development signing key', () => {
+    expect(render().secrets_store_secrets).toEqual([
+      {
+        binding: 'NEXTAUTH_SECRET',
+        store_id: '342a86d9e3a94da698e82d0c6e2a36f0',
+        secret_name: 'NEXTAUTH_SECRET_DEV',
+      },
+    ]);
+  });
+
+  it('drops a dead-letter queue the source adds to the callback consumer', () => {
+    // The production source has no callback dead-letter queue today; add one.
+    const withDeadLetter = structuredClone(prepared) as typeof prepared & {
+      queues: { consumers: Array<Record<string, unknown>> };
+    };
+    withDeadLetter.queues.consumers[0].dead_letter_queue = 'cloud-agent-next-callback-queue-dlq';
+    const config = buildE2eWorkerConfig(withDeadLetter, {
+      kiloOpenRouterBase: 'https://fake.fence-probe.test/api/openrouter',
+    }) as RenderedConfig;
+    expect(config.queues?.consumers?.[0]).not.toHaveProperty('dead_letter_queue');
+  });
+
+  it('refuses a hostname that is public or overlaps production, or lacks Access', () => {
     for (const host of [
       'cloud-agent-e2e-test.engineering-e11.workers.dev',
       'cloud-agent.kiloapps.ai',
@@ -206,23 +92,61 @@ describe('deployed e2e Worker fence', () => {
     ]) {
       expect(() => render(host), host).toThrow(/E2E_WORKER_HOSTNAME/);
     }
+    for (const partial of [
+      { ...access, aud: '' },
+      { ...access, teamDomain: 'example.com' },
+    ]) {
+      expect(() =>
+        buildE2eWorkerConfig(prepared, {
+          workerHostname: PROBE_HOST,
+          access: partial,
+          kiloOpenRouterBase: 'https://fake.fence-probe.test/api/openrouter',
+        })
+      ).toThrow(/E2E_ACCESS_/);
+    }
   });
 
-  it('flags every production binding and public address of the source config', () => {
+  it('flags every key outside the allowlist and every production queue or secret', () => {
     const found = violations(prepared, production);
     for (const expected of [
       'workers_dev: must be false',
       'triggers.crons: must be empty',
-      'logpush: must be off',
-      'routes: overlaps a production host',
-      'services: production Worker git-token-service',
-      'hyperdrive: production 624ec80650dd414199349f4e217ddb10',
-      'r2_buckets: production cloud-agent-runtime-fence-probe',
-      'queues: production cloud-agent-next-callback-queue',
-      'secrets_store_secrets: INTERNAL_API_SECRET_PROD',
+      'logpush: not allowed',
+      'services: not allowed',
+      'hyperdrive: not allowed',
+      'r2_buckets: not allowed',
       'ai: not allowed',
+      'routes: overlaps a production host',
+      'queues: production cloud-agent-next-callback-queue',
+      'queues: production cloud-agent-next-report-queue-dlq',
+      'secrets_store_secrets: INTERNAL_API_SECRET_PROD',
     ]) {
       expect(found).toContain(expected);
     }
+    const extra = {
+      ...render(),
+      vpc_services: [{ binding: 'VPC', service_id: 'x' }],
+      ratelimits: [{ name: 'LIMIT', namespace_id: '1' }],
+      worker_loaders: [{ binding: 'LOADER' }],
+      services: [],
+    };
+    expect(violations(extra, production)).toEqual([
+      'vpc_services: not allowed',
+      'ratelimits: not allowed',
+      'worker_loaders: not allowed',
+      'services: not allowed',
+    ]);
+  });
+
+  it('flags a development environment and a route without Access', () => {
+    const config = render(PROBE_HOST);
+    const vars: Record<string, unknown> = { ...config.vars, ENVIRONMENT: 'development' };
+    delete vars.E2E_ACCESS_AUD;
+    delete vars.E2E_ACCESS_TEAM_DOMAIN;
+    expect(violations({ ...config, vars }, production)).toEqual([
+      'vars.ENVIRONMENT: must not be development',
+      'vars.E2E_ACCESS_AUD: required with a route',
+      'vars.E2E_ACCESS_TEAM_DOMAIN: required with a route',
+    ]);
   });
 });

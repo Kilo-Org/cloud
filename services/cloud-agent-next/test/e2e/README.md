@@ -733,13 +733,16 @@ The deployed profile drives a real deployed Cloudflare stack instead of the
 local Docker harness. See [`deploy/README.md`](./deploy/README.md) for the full
 deploy reference.
 
-The deployed profile is paused. Both e2e Workers verify control tokens and
-stream tickets with the development signing key (`NEXTAUTH_SECRET_DEV`), while
-the production backend at `https://api.kilo.ai` signs them with the production
-key, so a run against it fails and the nightly schedule is off. Running it again
-needs a backend that signs with `NEXTAUTH_SECRET_DEV` and a personal token issued
-by that backend; see
-[Why the deployed profile is paused](./deploy/README.md#why-the-deployed-profile-is-paused).
+The deployed profile is paused. The e2e Worker binds no production resource and
+has no public address; it is reachable only through an Access-protected custom
+domain and refuses requests without a valid Access assertion. Running it again
+needs that Access application and its service token, staging replacements for
+the production Hyperdrive, Session Ingest, usage meter and runtime bucket, and a
+backend that signs with `NEXTAUTH_SECRET_DEV` plus a personal token issued by it;
+see
+[Why the deployed profile is paused](./deploy/README.md#why-the-deployed-profile-is-paused)
+and [Closed CI path](./deploy/README.md#closed-ci-path). The stack deploys and
+runs only from `main`.
 
 Two Workers, in deploy order:
 
@@ -748,7 +751,7 @@ Two Workers, in deploy order:
    `test/e2e/deploy/deploy-fake-llm.sh deploy`.
 2. `cloud-agent-e2e-test` — private render of this package's Worker;
    deploy second with
-   `FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
+   `FAKE_LLM_BASE_URL=<base> E2E_WORKER_HOSTNAME=cloud-agent-e2e.kiloapps.io E2E_ACCESS_AUD=<aud> E2E_ACCESS_TEAM_DOMAIN=engineering-e11.cloudflareaccess.com E2E_ACCESS_CLIENT_ID=<id> E2E_ACCESS_CLIENT_SECRET=<secret> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
    Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
    redeploy without it keeps the deployed Worker secret.
 
@@ -1001,10 +1004,13 @@ attempt fails, the matrix reports a failure.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
-and `workflow_call`. The `cloud-agent-e2e-nightly` workflow deploys the e2e stack
-and then calls it. Its daily 03:37 UTC schedule is paused with the deployed
-profile (see above), so it runs only on manual dispatch. The tests workflow runs
-`e2e:parallel` as one job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
+and `workflow_call`, from `main` only. The `cloud-agent-e2e-nightly` workflow deploys the e2e stack
+and then calls it with `backend_url` from the repository variable
+`CLOUD_AGENT_E2E_BACKEND_URL`. Its daily 03:37 UTC schedule is paused with the deployed
+profile (see above), so it runs only on manual dispatch. The tests workflow takes
+the Worker hostname from `CLOUD_AGENT_E2E_WORKER_HOSTNAME`, requires a
+non-production `backend_url`, checks that Access refuses an anonymous request,
+runs `e2e:parallel` as one job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
 `E2E_PARALLEL`; `only` selects scenarios. Job failure is the runner's exit code.
 The workflow keeps its workflow-level `concurrency` only. Use `run.ts <name> _`
 for a focused single scenario.

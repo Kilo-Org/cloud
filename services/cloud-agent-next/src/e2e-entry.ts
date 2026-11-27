@@ -1,17 +1,20 @@
 /**
  * e2e-only Worker entrypoint.
  *
- * It mounts the `/__e2e/*` inspect surface and otherwise forwards every request
- * (and queue/scheduled event) to the production Worker unchanged. Production
- * keeps `main = src/index.ts`; this file is referenced only by the rendered e2e
- * config and the dedicated Workers test config, so no production route,
- * dependency or secret changes and the surface is unreachable on the production
- * Worker by construction.
+ * It refuses every request that did not pass the Cloudflare Access application
+ * in front of the e2e hostname (`e2e-surface/access-gate.ts`), mounts the
+ * `/__e2e/*` inspect surface, and otherwise forwards every request (and
+ * queue/scheduled event) to the production Worker unchanged. Production keeps
+ * `main = src/index.ts`; this file is referenced only by the rendered e2e config
+ * and the dedicated Workers test config, so no production route, dependency or
+ * secret changes and the surface is unreachable on the production Worker by
+ * construction.
  */
 
 import production from './index.js';
 import { e2eSurfaceApp } from './e2e-surface/app.js';
 import { withSelfAccessCredentials } from './e2e-surface/access-credentials.js';
+import { refuseWithoutAccess } from './e2e-surface/access-gate.js';
 import { ContainersOutbound as ProductionContainersOutbound } from './sandbox-containers/containers-outbound.js';
 import type { Env } from './types.js';
 
@@ -44,7 +47,9 @@ function isE2eSurfacePath(pathname: string): boolean {
 }
 
 export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const refusal = await refuseWithoutAccess(request, env);
+    if (refusal !== null) return refusal;
     const url = new URL(request.url);
     if (isE2eSurfacePath(url.pathname)) {
       return e2eSurfaceApp.fetch(request, env, ctx);

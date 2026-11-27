@@ -216,7 +216,8 @@ export async function trpcCall<T>(
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;
   }
-  const fetchOpts: RequestInit = { method, headers, signal: opts?.signal };
+  // An Access login redirect is a refusal, never a page to follow.
+  const fetchOpts: RequestInit = { method, headers, signal: opts?.signal, redirect: 'manual' };
   if (method === 'POST') {
     fetchOpts.body = JSON.stringify(input);
   } else {

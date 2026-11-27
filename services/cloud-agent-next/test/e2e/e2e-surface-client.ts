@@ -195,6 +195,8 @@ export async function fetchAllocation(
 ): Promise<AllocationInspection> {
   const response = await fetch(allocationUrl(options.surfaceUrl, cloudAgentSessionId), {
     headers: surfaceHeaders(options),
+    // An Access login redirect is a refusal, never a page to follow.
+    redirect: 'manual',
     ...(options.signal ? { signal: options.signal } : {}),
   });
   if (!response.ok) {
@@ -259,6 +261,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
     const response = await fetch(`${base}/__e2e/callbacks`, {
       method: 'POST',
       headers: surfaceHeaders(options),
+      redirect: 'manual',
       ...((signal ?? options.signal) ? { signal: signal ?? options.signal } : {}),
     });
     if (!response.ok) {
@@ -275,6 +278,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
     const effective = signal ?? options.signal;
     const response = await fetch(`${base}/__e2e/callbacks/${encodeURIComponent(token)}`, {
       headers: surfaceHeaders(options),
+      redirect: 'manual',
       ...(effective ? { signal: effective } : {}),
     });
     if (!response.ok) {
@@ -292,8 +296,11 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
       const minted = await mint(signal);
       return {
         callbackUrl: minted.callbackUrl,
-        // Delivery to the Worker's own origin passes the same Access application.
-        callbackHeaders: workerAccessHeaders(),
+        // Delivery to the Worker's own origin passes the same Access
+        // application; the token never goes to any other origin.
+        ...(new URL(minted.callbackUrl).origin === new URL(base).origin
+          ? { callbackHeaders: workerAccessHeaders() }
+          : {}),
         records: recordsSignal => records(minted.token, recordsSignal ?? signal),
         waitFor: async (predicate, timeoutMs, waitSignal) => {
           const effective = waitSignal ?? signal ?? options.signal;
@@ -315,6 +322,7 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
             {
               method: 'DELETE',
               headers: surfaceHeaders(options),
+              redirect: 'manual',
               signal: AbortSignal.timeout(CLOSE_TIMEOUT_MS),
             }
           );

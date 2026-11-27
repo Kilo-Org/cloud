@@ -160,9 +160,30 @@ export function requireE2eWorkerHostname(hostname, sourceConfig) {
   return hostname;
 }
 
-/** Only the callback queue, renamed to the e2e queue; every other queue is production's. */
+/**
+ * The Access application in front of the hostname: its audience tag and team
+ * domain. The e2e entry refuses every request whose `Cf-Access-Jwt-Assertion`
+ * does not verify against them.
+ */
+export function requireE2eAccess(access) {
+  if (!/^[a-f0-9]{64}$/.test(access?.aud ?? '')) {
+    throw new Error('E2E_ACCESS_AUD must be the Access application audience tag (64 hex).');
+  }
+  if (!/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(access?.teamDomain ?? '')) {
+    throw new Error('E2E_ACCESS_TEAM_DOMAIN must be <team>.cloudflareaccess.com.');
+  }
+  return access;
+}
+
+/**
+ * Only the callback queue, renamed to the e2e queue; every other queue is
+ * production's. A dead-letter queue would be production's too, so it is dropped.
+ */
 function callbackQueueOnly(queues) {
-  const rename = entry => ({ ...entry, queue: CALLBACK_QUEUE_E2E });
+  const rename = ({ dead_letter_queue: _deadLetterQueue, ...entry }) => ({
+    ...entry,
+    queue: CALLBACK_QUEUE_E2E,
+  });
   return {
     producers: (queues?.producers ?? []).filter(p => p.queue === CALLBACK_QUEUE).map(rename),
     consumers: (queues?.consumers ?? []).filter(c => c.queue === CALLBACK_QUEUE).map(rename),
@@ -173,13 +194,14 @@ function callbackQueueOnly(queues) {
  * Render the deployed e2e Worker. It owns its Durable Objects, container and
  * callback queue, binds only the development signing key, and has no public
  * address: `workers.dev` and preview URLs are off, and the only possible route is
- * the optional Access-protected custom domain.
+ * the optional custom domain, which requires its Access application.
  */
 export function buildE2eWorkerConfig(sourceConfig, overrides) {
-  const { workerHostname, kiloOpenRouterBase } = overrides;
+  const { workerHostname, access, kiloOpenRouterBase } = overrides;
   const source = structuredClone(sourceConfig);
   const hostname =
     workerHostname === undefined ? undefined : requireE2eWorkerHostname(workerHostname, source);
+  const verifiedAccess = hostname === undefined ? undefined : requireE2eAccess(access);
 
   /** @type {Record<string, any>} */
   const config = {
@@ -284,9 +306,13 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
   };
   // Without its hostname the Worker has no address, so it must not inherit
-  // production's.
+  // production's, and the e2e entry refuses every request.
   if (hostname === undefined) delete vars.WORKER_URL;
-  else vars.WORKER_URL = `https://${hostname}`;
+  else {
+    vars.WORKER_URL = `https://${hostname}`;
+    vars.E2E_ACCESS_AUD = verifiedAccess.aud;
+    vars.E2E_ACCESS_TEAM_DOMAIN = verifiedAccess.teamDomain;
+  }
   config.vars = vars;
 
   config.secrets_store_secrets = [structuredClone(E2E_SIGNING_SECRET)];
@@ -475,6 +501,10 @@ if (isMain) {
   } else {
     const fakeLlmBaseUrl = process.env.FAKE_LLM_BASE_URL;
     const workerHostname = process.env.E2E_WORKER_HOSTNAME || undefined;
+    const access = {
+      aud: process.env.E2E_ACCESS_AUD ?? '',
+      teamDomain: process.env.E2E_ACCESS_TEAM_DOMAIN ?? '',
+    };
 
     if (!fakeLlmBaseUrl) {
       console.error('FAKE_LLM_BASE_URL is required (https://<fake-host>/api/openrouter).');
@@ -522,6 +552,7 @@ if (isMain) {
     try {
       rendered = buildE2eWorkerConfig(sourceConfig, {
         workerHostname,
+        access,
         kiloOpenRouterBase,
       });
     } catch (error) {

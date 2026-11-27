@@ -1,20 +1,11 @@
 name: Cloud Agent E2E deploy
 
+# e2e deploys only from main: the job refuses any other ref, the
+# cloud-agent-e2e environment admits main alone, and the commit must be on
+# origin/main before any step receives a secret.
 on:
   workflow_dispatch:
-    inputs:
-      runtime_source_sha:
-        description: 'Main SHA whose published runtime to use (for a branch run); empty uses the run SHA'
-        required: false
-        type: string
-        default: ''
   workflow_call:
-    inputs:
-      runtime_source_sha:
-        description: 'Main SHA whose published runtime to use; empty uses the run SHA'
-        required: false
-        type: string
-        default: ''
 
 permissions:
   contents: read
@@ -28,8 +19,8 @@ concurrency:
 jobs:
   deploy:
     # Guard: this workflow_dispatch is reachable from a fork, and the job
-    # deploys Workers with admin secrets. Only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud'
+    # deploys Workers with admin secrets. Only the canonical repo's main may run it.
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # The Access service token lives only in this environment. Its deployment
     # branch policy keeps it to main.
@@ -37,33 +28,36 @@ jobs:
     # Runtime preparation may wait up to 45 minutes for the exact-SHA handoff.
     timeout-minutes: 75
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
-      E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
-      # The renderer gives the Worker this one custom domain and nothing public;
-      # the deploy uploads the Access service token as Worker secrets so sandbox
-      # requests to the Worker's own origin pass the Access application.
+      # The renderer gives the Worker this one custom domain and nothing public.
       E2E_WORKER_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
-      E2E_ACCESS_CLIENT_ID: ${{ secrets.E2E_ACCESS_CLIENT_ID }}
-      E2E_ACCESS_CLIENT_SECRET: ${{ secrets.E2E_ACCESS_CLIENT_SECRET }}
-      # Runtime publication runs only for main SHAs. A branch run can borrow the
-      # runtime of a main SHA; the Worker and fake LLM still deploy from the run SHA.
-      RUNTIME_SOURCE_SHA: ${{ inputs.runtime_source_sha || github.sha }}
+      E2E_ACCESS_AUD: ${{ vars.CLOUD_AGENT_E2E_ACCESS_AUD }}
+      E2E_ACCESS_TEAM_DOMAIN: ${{ vars.CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN }}
     steps:
-      # Inert until the Access hostname and its service token exist.
+      # Inert until the Access application, its service token and the variables
+      # exist. Only whether each secret is set reaches this step, never a value.
       - name: Check the closed Worker path
+        env:
+          HAS_ACCESS_TOKEN: ${{ secrets.E2E_ACCESS_CLIENT_ID != '' && secrets.E2E_ACCESS_CLIENT_SECRET != '' }}
         run: |
           set -euo pipefail
-          if [ -z "$E2E_WORKER_HOSTNAME" ] || [ -z "$E2E_ACCESS_CLIENT_ID" ] || [ -z "$E2E_ACCESS_CLIENT_SECRET" ]; then
-            echo "::error::Set vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME and the E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET secrets in the cloud-agent-e2e environment"
+          if [ -z "$E2E_WORKER_HOSTNAME" ] || [ -z "$E2E_ACCESS_AUD" ] || [ -z "$E2E_ACCESS_TEAM_DOMAIN" ] || [ "$HAS_ACCESS_TOKEN" != "true" ]; then
+            echo "::error::Set CLOUD_AGENT_E2E_WORKER_HOSTNAME, CLOUD_AGENT_E2E_ACCESS_AUD, CLOUD_AGENT_E2E_ACCESS_TEAM_DOMAIN and the E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET secrets in the cloud-agent-e2e environment"
             exit 1
           fi
 
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          ref: ${{ env.RUNTIME_SOURCE_SHA }}
           lfs: true
+
+      - name: Require a commit on main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=500 origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on origin/main"
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -85,43 +79,32 @@ jobs:
       - name: Prepare downloaded Cloud Agent runtime
         working-directory: services/cloud-agent-next
         env:
-          SOURCE_SHA: ${{ env.RUNTIME_SOURCE_SHA }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
           RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # Read-only: lets preparation stop waiting once the SHA's publication has failed.
           GITHUB_TOKEN: ${{ github.token }}
-        run: pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
-
-      - name: Switch to the run SHA
-        if: env.RUNTIME_SOURCE_SHA != github.sha
-        env:
-          RUN_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          generated=services/cloud-agent-next/wrangler.runtime-generated.json
-          mv "$generated" "$RUNNER_TEMP/wrangler.runtime-generated.json"
-          git fetch --no-tags --depth=1 origin "$RUN_SHA"
-          # The prepared config is rendered from the runtime SHA's Worker config.
-          # Borrowing it is only valid when the run SHA has the same config.
-          if ! git diff --quiet "$RUNTIME_SOURCE_SHA" "$RUN_SHA" -- \
-            services/cloud-agent-next/wrangler.jsonc \
-            services/cloud-agent-next/runtime-targets.json; then
-            echo "::error::wrangler.jsonc or runtime-targets.json differs from the runtime SHA"
-            exit 1
-          fi
-          git checkout --detach "$RUN_SHA"
-          pnpm install --frozen-lockfile
-          mv "$RUNNER_TEMP/wrangler.runtime-generated.json" "$generated"
+        run: pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$GITHUB_SHA"
 
       - name: Deploy fake-LLM Worker
         working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
         run: test/e2e/deploy/deploy-fake-llm.sh deploy
 
+      # The Access service token reaches only this step: the deploy ships it as
+      # Worker secrets so sandbox requests to the Worker's own origin pass Access,
+      # then checks that Access refuses an anonymous request.
       - name: Deploy Cloud Agent e2e Worker
         working-directory: services/cloud-agent-next
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
+          E2E_ACCESS_CLIENT_ID: ${{ secrets.E2E_ACCESS_CLIENT_ID }}
+          E2E_ACCESS_CLIENT_SECRET: ${{ secrets.E2E_ACCESS_CLIENT_SECRET }}
           FAKE_LLM_BASE_URL: ${{ env.FAKE_LLM_WORKER_URL }}/api/openrouter
         run: test/e2e/deploy/deploy-e2e-worker.sh deploy

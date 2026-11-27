@@ -4,6 +4,7 @@ import type { TRPCContext } from '../types.js';
 import { projectTrpcErrorData } from '../trpc-error.js';
 import { validateScopedWorkerPreparation } from '../cloud-agent-authority.js';
 import { assertCloudAgentManagementRequest } from '../cloud-agent-child-management.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 
 export const t = initTRPC.context<TRPCContext>().create({
   errorFormatter({ shape, error }) {
@@ -96,13 +97,18 @@ export const cloudAgentAuthorityProcedure = t.procedure.use(
 export const internalApiProtectedProcedure = t.procedure.use(
   async ({ ctx, next, path, getRawInput }) => {
     const internalApiKey = ctx.request.headers.get('x-internal-api-key');
-    if (!ctx.env.INTERNAL_API_SECRET) {
+    const expected = await readCloudAgentNextSecret(
+      ctx.env,
+      'INTERNAL_API_SECRET',
+      ctx.executionCtx
+    ).catch(() => undefined);
+    if (!expected) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Internal API secret not configured',
       });
     }
-    if (!internalApiKey || !timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET)) {
+    if (!internalApiKey || !timingSafeEqual(internalApiKey, expected)) {
       throw new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'Invalid or missing internal API key',

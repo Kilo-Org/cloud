@@ -2,7 +2,8 @@ import { TRPCError } from '@trpc/server';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { DEFAULT_BACKEND_URL } from '../../constants.js';
 import { getPgDb } from '../../db/pg.js';
 import { logger } from '../../logger.js';
@@ -76,11 +77,15 @@ export const refreshHostedWorkspacePullRequest = protectedProcedure
       }
     }
 
-    const refresh = await requestWorkspacePullRequestRefresh(ctx.env, {
-      workspaceId: input.workspaceId,
-      userId: workspace.userId,
-      organizationId: workspace.organizationId,
-    });
+    const refresh = await requestWorkspacePullRequestRefresh(
+      ctx.env,
+      {
+        workspaceId: input.workspaceId,
+        userId: workspace.userId,
+        organizationId: workspace.organizationId,
+      },
+      ctx.executionCtx
+    );
     const summaries = await readWorkspacePullRequestSummaries(ctx.env, {
       userId: ctx.userId,
       workspaces: [{ workspaceId: input.workspaceId }],
@@ -96,7 +101,8 @@ export const refreshHostedWorkspacePullRequest = protectedProcedure
 
 async function requestWorkspacePullRequestRefresh(
   env: Env,
-  body: { workspaceId: string; userId: string; organizationId: string | null }
+  body: { workspaceId: string; userId: string; organizationId: string | null },
+  ctx?: SecretsExecutionContext
 ): Promise<RefreshResult> {
   const backendUrl = (env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL)
     .trim()
@@ -107,7 +113,8 @@ async function requestWorkspacePullRequestRefresh(
     sts: env.STS,
     url,
     token: WEB_HOSTED_WORKSPACE_PR_REFRESH,
-    legacySecret: () => resolveSecret(env.INTERNAL_API_SECRET),
+    legacySecret: () => readCloudAgentNextSecret(env, 'INTERNAL_API_SECRET', ctx),
+    ctx,
   });
   if (credential.kind === 'unavailable') {
     logger

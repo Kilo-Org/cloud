@@ -515,6 +515,7 @@ describe('BYOC_LOOKUP_SENDER_AUTH=sts', () => {
 
   function stsEnv() {
     const STS = {
+      getBundle: vi.fn(),
       mintTokens: vi.fn(async (request: MintRequest) => ({
         status: 'ok' as const,
         tokens: request.tokens.map(({ audience, scope }) => ({

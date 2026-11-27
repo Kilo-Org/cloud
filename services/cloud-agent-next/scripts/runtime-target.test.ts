@@ -281,20 +281,11 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
     binding: 'RUNTIME_RELEASE_BUCKET',
     bucket_name: release.bucket,
   });
-});
-
-it('renders a deployed E2E Worker that binds no STS and sets no sender switch', () => {
-  const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
-  expect(source.services).toContainEqual(expect.objectContaining({ service: 'sts' }));
-  const output = buildE2eWorkerConfig(
-    renderRuntimeTarget({ config: source, environment: 'production', startup, release }),
-    {
-      workerUrl: 'https://e2e.example.test',
-      kiloOpenRouterBase: 'https://fake.example.test/api/openrouter',
-    }
-  );
-  expect(output.services).not.toContainEqual(expect.objectContaining({ service: 'sts' }));
-  expect(output.services.length).toBe(source.services.length - 1);
+  // The E2E Worker is renamed, so it may not keep the broker binding whose props.caller names the
+  // production Worker, and it may not inherit a later flip to the `sts` source.
+  expect(output.services ?? []).not.toContainEqual(expect.objectContaining({ binding: 'STS' }));
+  expect(output.vars).toMatchObject({ SECRETS_SOURCE: 'secrets-store' });
+  // No outbound credential switch is set, so every edge keeps its shared credential.
   for (const name of [
     'BYOC_LOOKUP_SENDER_AUTH',
     'PR_REFRESH_SENDER_AUTH',

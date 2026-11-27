@@ -87,7 +87,13 @@ describe('getAnalysisCreditAdmission over the worker transport', () => {
     const response = await fetchWorker(getRequest({ organizationId: ORGANIZATION_ID }));
 
     expect(response.status).toBe(200);
-    expect(validateBalanceOnly).toHaveBeenCalledWith(TOKEN, ORGANIZATION_ID, env);
+    // The worker transport hands the route a real execution context, so the read's context is one.
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      TOKEN,
+      ORGANIZATION_ID,
+      env,
+      expect.anything()
+    );
   });
 
   it('refuses a POST because the procedure is a query', async () => {

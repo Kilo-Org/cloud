@@ -8,7 +8,8 @@ import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
-import { resolveSecret } from './auth.js';
+import { readCloudAgentNextSecret } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 const MIN_BALANCE_DOLLARS = 1;
 
@@ -36,11 +37,13 @@ export type BalanceOnlyResult =
  * @param token - The already-validated JWT token
  * @param orgId - Optional organization ID for org-specific balance check
  * @param env - Worker environment with secrets and bindings
+ * @param ctx - The invocation's context, for a secret read's bundle revalidation
  */
 export async function validateBalanceOnly(
   token: string,
   orgId: string | undefined,
-  env: Env
+  env: Env,
+  ctx?: SecretsExecutionContext
 ): Promise<BalanceOnlyResult> {
   const backendUrl = env.KILOCODE_BACKEND_BASE_URL || DEFAULT_BACKEND_URL;
 
@@ -64,7 +67,7 @@ export async function validateBalanceOnly(
   const balancePath = isControlToken ? '/api/cloud-agent-next/balance' : '/api/profile/balance';
   if (claims !== null && typeof claims === 'object' && claims.runtimeAuthorization !== undefined) {
     try {
-      const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+      const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
       if (!secret) throw new Error();
       const verified = await verifyKiloTokenForPolicy(token, secret, {
         audience: 'kilo-api',

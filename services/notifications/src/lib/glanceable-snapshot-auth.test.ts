@@ -276,4 +276,22 @@ describe('glanceable snapshot request under sts', () => {
       ).buildSnapshot(USER_ID, 'org-fixture')
     ).toBe('access_denied');
   });
+
+  it('never follows a redirect and keeps the cards on a 3xx', async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init: RequestInit) =>
+        new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    expect(
+      await glanceableDeliveryDeps(
+        serviceEnv(mintBinding(issue)) as never,
+        lifetime()
+      ).buildSnapshot(USER_ID, 'org-fixture')
+    ).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]?.redirect).toBe('manual');
+  });
 });

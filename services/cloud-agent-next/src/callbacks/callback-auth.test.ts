@@ -11,6 +11,10 @@ const REVIEW_URL = 'https://app.kilo.ai/api/internal/code-review-status/review_1
 const WEBHOOK_URL = 'https://hooks.kilosessions.ai/api/callbacks/execution';
 const SAA_URL =
   'https://security-auto-analysis.kilosessions.ai/internal/security-analysis-callback/0f0e-1?attempt=a';
+const WEB_REMEDIATION_URL =
+  'https://app.kilo.ai/api/internal/security-remediation-callback/attempt-1?attempt=a';
+const SAA_REMEDIATION_URL =
+  'https://security-auto-analysis.kilosessions.ai/internal/security-remediation-callback/attempt-1?attempt=a';
 
 const payload: ExecutionCallbackPayload = {
   sessionId: 'session-1',
@@ -59,6 +63,8 @@ describe('callbackRouteOf', () => {
     [REVIEW_URL, 'web:code-review.agent-callback'],
     [WEBHOOK_URL, 'webhook-agent-ingest:execution.callback'],
     [SAA_URL, 'security-auto-analysis:analysis.callback'],
+    [WEB_REMEDIATION_URL, 'web:security-remediation.callback'],
+    [SAA_REMEDIATION_URL, 'security-auto-analysis:remediation.callback'],
   ])('maps %s to %s', (url, scope) => {
     expect(callbackRouteOf(url)?.scope).toBe(scope);
   });
@@ -228,5 +234,89 @@ describe('deliverCallbackJob under sts', () => {
 
     expect(result).toEqual({ type: 'retry', delaySeconds: 60 });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('maps the remediation callbacks to their own scopes and receiver switches', async () => {
+    const STS = mintBinding();
+    const env = { STS, CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS: 'sts' };
+
+    expect(
+      await callbackAuth(env, { url: SAA_REMEDIATION_URL, headers: { 'X-Callback-Token': 'd' } })
+    ).toEqual({
+      kind: 'headers',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${MINTED}` },
+    });
+    expect(
+      await callbackAuth(env, { url: WEB_REMEDIATION_URL, headers: { 'X-Callback-Token': 'd' } })
+    ).toEqual({
+      kind: 'headers',
+      headers: { 'Content-Type': 'application/json', 'X-Callback-Token': 'd' },
+    });
+    expect(STS.mintTokens).toHaveBeenCalledWith({
+      tokens: [
+        {
+          audience: 'security-auto-analysis',
+          scope: 'security-auto-analysis:remediation.callback',
+        },
+      ],
+    });
+  });
+});
+
+describe('deliverCallbackJob responses', () => {
+  const sender = { env: {} };
+
+  it('never follows a redirect and fails the delivery on a 3xx', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, { status: 302, headers: { location: 'https://elsewhere.test/' } })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await deliverCallbackJob({ url: BOT_URL }, payload, 1, sender);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      BOT_URL,
+      expect.objectContaining({ redirect: 'manual' })
+    );
+    expect(result).toMatchObject({ type: 'failed' });
+  });
+
+  it.each([401, 403])('retries a %i that challenges the credential like a 5xx', async status => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(null, {
+            status,
+            headers: { 'www-authenticate': 'Bearer error="insufficient_scope"' },
+          })
+      )
+    );
+
+    expect(await deliverCallbackJob({ url: REVIEW_URL }, payload, 1, sender)).toEqual({
+      type: 'retry',
+      delaySeconds: 60,
+    });
+  });
+
+  it('drops a 403 without a challenge and a challenged refusal after the last attempt', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 403 }))
+    );
+    expect(await deliverCallbackJob({ url: REVIEW_URL }, payload, 1, sender)).toMatchObject({
+      type: 'failed',
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(null, { status: 403, headers: { 'www-authenticate': 'Bearer' } })
+      )
+    );
+    expect(await deliverCallbackJob({ url: REVIEW_URL }, payload, 5, sender)).toMatchObject({
+      type: 'failed',
+    });
   });
 });

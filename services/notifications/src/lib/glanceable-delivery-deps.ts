@@ -80,6 +80,9 @@ export function glanceableDeliveryDeps(
           ...auth.headers,
         },
         body: JSON.stringify({ userId, organizationId }),
+        // A redirect would carry the credential to wherever it points; a 3xx is a failed read
+        // below (not `ok`, not a 403), so the cards stay.
+        redirect: 'manual',
       });
       if (!response.ok) {
         console.warn('Glanceable snapshot route failed', { status: response.status });

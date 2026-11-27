@@ -4,7 +4,11 @@ import type {
   ServiceTokenRequest,
   ServiceTokensExecutionContext,
 } from '@kilocode/service-token-client';
-import { readStsToken, senderAuth, type StsTokenUnavailableReason } from './sts-service-tokens.js';
+import {
+  readStsToken,
+  senderAuth,
+  type StsTokenUnavailableReason,
+} from '@kilocode/worker-utils/sts-sender';
 
 /**
  * The scopes this Worker presents to the web app's private routes. Audience `web`; STS grants
@@ -70,9 +74,10 @@ function isWebProductionUrl(url: string): boolean {
 
 /**
  * The credential of one request to `url` under the edge's switch value `auth`
- * (`sts-service-tokens.ts`): an STS token for `token` when the URL is on a web production origin,
- * or the internal API secret that `legacySecret` resolves in `x-internal-api-key`. A failed or
- * empty legacy read is `internal_secret_missing`; nothing here ever throws.
+ * (`@kilocode/worker-utils/sts-sender`): an STS token for `token` when the URL is on a web
+ * production origin, or the internal API secret that `legacySecret` resolves in
+ * `x-internal-api-key`. A failed or empty legacy read is `internal_secret_missing`; nothing here
+ * ever throws.
  */
 export async function webInternalCredential(input: {
   auth: string | undefined;
@@ -100,4 +105,23 @@ export async function webInternalCredential(input: {
   return read.kind === 'token'
     ? { kind: 'headers', headers: { authorization: `Bearer ${read.token}` } }
     : read;
+}
+
+/**
+ * For a sequence of requests to `url` that needs several scopes: under `sts`, asks for every token
+ * at once, so the token client sends them in one batched mint and each later request finds its
+ * token held. Under any other switch value, or for a URL off the web production origins, it does
+ * nothing. A failure is left to the request that needs the token, which reports it.
+ */
+export async function prefetchWebInternalTokens(input: {
+  auth: string | undefined;
+  sts: MintBinding | undefined;
+  url: string;
+  tokens: readonly ServiceTokenRequest[];
+  ctx?: ServiceTokensExecutionContext;
+}): Promise<void> {
+  if (senderAuth(input.auth) !== 'sts' || input.sts === undefined) return;
+  if (!isWebProductionUrl(input.url)) return;
+  const { sts, ctx } = input;
+  await Promise.all(input.tokens.map(token => readStsToken(sts, token, ctx)));
 }

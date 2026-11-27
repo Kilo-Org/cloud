@@ -113,6 +113,14 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   delete config.env;
   delete config.routes;
 
+  // The STS broker authorizes on `props.caller`, which must equal the Worker's own name, and this
+  // render renames the Worker. The E2E Worker therefore loses the binding, so it reads no bundle
+  // and mints no service token, and `SECRETS_SOURCE` is pinned below so a production flip to `sts`
+  // cannot reach it through the inherited vars. A rendered config is not covered by
+  // services/sts/test/repo/worker-configs.ts, so the render does this itself.
+  config.services = (config.services ?? []).filter(binding => binding.binding !== 'STS');
+  if (config.services.length === 0) delete config.services;
+
   const removedContainerClasses = new Set(
     (config.containers ?? [])
       .map(entry => entry.class_name)
@@ -178,9 +186,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
 
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);
-  // The production config binds production STS as `cloud-agent-next`. An e2e Worker is not that
-  // workload: it binds no STS, so it can mint no production token.
-  config.services = (config.services ?? []).filter(binding => binding.service !== 'sts');
 
   config.vars = {
     ...config.vars,
@@ -198,6 +203,10 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // The suite runs every scenario through one funded test account, so its own
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
+    // The rendered Worker holds no `STS` binding (dropped above), and its secrets come from the
+    // legacy bindings this stack deploys. Pinning the source keeps it on them even after the
+    // production manifest flips to `sts`.
+    SECRETS_SOURCE: 'secrets-store',
   };
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];

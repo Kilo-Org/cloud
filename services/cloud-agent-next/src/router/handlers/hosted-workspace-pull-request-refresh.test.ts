@@ -1,4 +1,5 @@
 import type { MintRequest } from '@kilocode/sts-contracts';
+import * as stsSender from '@kilocode/worker-utils/sts-sender';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env, TRPCContext } from '../../types.js';
 import type * as workspacePullRequestModule from '../../session/workspace-pull-request.js';
@@ -19,6 +20,11 @@ vi.mock('../../session/workspace-pull-request.js', async importOriginal => {
 vi.mock('@kilocode/worker-utils', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, hasOrganizationAccess: mocks.hasOrganizationAccess };
+});
+// The real token reader, observed for the invocation context it receives.
+vi.mock('@kilocode/worker-utils/sts-sender', async importOriginal => {
+  const actual = await importOriginal<typeof stsSender>();
+  return { ...actual, readStsToken: vi.fn(actual.readStsToken) };
 });
 
 const userId = 'oauth/google:workspace-owner';
@@ -75,6 +81,7 @@ function fixture(
     workspace?: Record<string, unknown> | null;
     summary?: unknown;
     env?: Record<string, unknown>;
+    executionCtx?: { waitUntil(promise: Promise<unknown>): void };
   } = {}
 ) {
   const getCloudAgentWorkspace = vi.fn(async () =>
@@ -95,6 +102,7 @@ function fixture(
     userId,
     authToken: 'authenticated-user-token',
     request: new Request('https://worker.test/trpc/refreshHostedWorkspacePullRequest'),
+    ...(options.executionCtx === undefined ? {} : { executionCtx: options.executionCtx }),
   } satisfies TRPCContext;
 
   mocks.read.mockResolvedValue(
@@ -283,6 +291,7 @@ describe('refreshHostedWorkspacePullRequest', () => {
     it('presents only the refresh token to the web origin', async () => {
       fetchMock.mockResolvedValueOnce(backendResponse({ status: 'refreshed', retryAt: null }));
       const STS = stsBinding('issued');
+      const executionCtx = { waitUntil: vi.fn() };
       const test = fixture({
         summary: pullRequest(),
         env: {
@@ -290,6 +299,7 @@ describe('refreshHostedWorkspacePullRequest', () => {
           STS,
           KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
         },
+        executionCtx,
       });
 
       const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
@@ -298,6 +308,11 @@ describe('refreshHostedWorkspacePullRequest', () => {
       expect(STS.mintTokens).toHaveBeenCalledWith({
         tokens: [WEB_HOSTED_WORKSPACE_PR_REFRESH],
       });
+      expect(vi.mocked(stsSender.readStsToken)).toHaveBeenLastCalledWith(
+        STS,
+        WEB_HOSTED_WORKSPACE_PR_REFRESH,
+        executionCtx
+      );
       expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
         'content-type': 'application/json',
         authorization: `Bearer ${MINTED}`,

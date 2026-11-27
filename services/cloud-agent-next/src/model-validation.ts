@@ -6,7 +6,8 @@ import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
-import { resolveSecret } from './auth.js';
+import { readCloudAgentNextSecret } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import { modelValidationAudience } from './model-validation-audience.js';
@@ -48,6 +49,8 @@ type ModelValidationResult =
 
 export type AssertKiloModelAvailableInput = {
   env: ModelValidationEnv;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   submittedModel: string | undefined | null;
   originalToken?: string;
   originalOrganizationId?: string;
@@ -281,7 +284,8 @@ async function validateFromOverrideSource(
 async function attestCatalogContext(
   env: ModelValidationEnv,
   context: EffectiveCatalogContext,
-  selectedUrl: string
+  selectedUrl: string,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (!context.token) return;
   const encodedBase = catalogBaseUrlEncodedInToken(context.token);
@@ -296,7 +300,7 @@ async function attestCatalogContext(
   // Only the exact configured backend route may receive a runtime proof or bearer.
   if (encodedBase || selectedUrl !== officialValidationUrl(env, context.organizationId))
     throw deny();
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) throw deny();
   try {
     const audience = modelValidationAudience(env, context.organizationId);
@@ -336,7 +340,7 @@ export async function assertKiloModelAvailable(
     : input.env.KILO_OPENROUTER_BASE
       ? buildKiloOverrideValidationUrl(input.env.KILO_OPENROUTER_BASE, context.organizationId)
       : officialValidationUrl(input.env, context.organizationId);
-  await attestCatalogContext(input.env, context, selectedUrl);
+  await attestCatalogContext(input.env, context, selectedUrl, input.ctx);
   const result = tokenSelectedBaseUrl
     ? await validateFromOverrideSource(input.env, tokenSelectedBaseUrl, modelId, context, true)
     : input.env.KILO_OPENROUTER_BASE

@@ -130,6 +130,7 @@ describe('AWS BYOC connection authority', () => {
     const MINTED = 'minted.byoc.token';
     function mintBinding() {
       return {
+        getBundle: vi.fn(),
         mintTokens: vi.fn(async (request: MintRequest) => ({
           status: 'ok' as const,
           tokens: request.tokens.map(({ audience, scope }) => ({

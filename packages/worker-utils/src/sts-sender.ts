@@ -9,8 +9,8 @@ import {
 import { z } from 'zod';
 
 /**
- * The credential switch of each outbound edge that moves from a shared secret to an STS service
- * token (design 6.5, decision D59). The exact lowercase values are `sts` and `legacy`:
+ * The credential switch of a Worker's outbound edge that moves from a shared secret to an STS
+ * service token (design 6.5, decision D59). The exact lowercase values are `legacy` and `sts`:
  * - unset, empty or `legacy`: the shared credential the edge sent before its switch existed;
  * - `sts`: only an STS token for the receiver's audience and the edge's scope, in
  *   `Authorization: Bearer`, minted over the `STS` binding and sent only to the receiver's
@@ -54,7 +54,8 @@ function tokensFor(binding: MintBinding): ServiceTokens {
 
 /**
  * The token for `request`: held, or one mint over the binding within the client's attempt timeout
- * and backoff. Never throws and never carries a token in its failure.
+ * and backoff. `ctx` is the invocation (Worker request, queue batch or Durable Object): a renewal
+ * runs under its `waitUntil`. Never throws and never carries a token in its failure.
  */
 export async function readStsToken(
   binding: MintBinding | undefined,

@@ -47,17 +47,22 @@ export function classifyCallbackError(
   );
 }
 
+/** One delivery's outcome. `retryable` marks a refusal that redelivery can fix whatever its status. */
+export type TargetResult = { ok: boolean; status?: number; error?: string; retryable?: boolean };
+
 async function deliverToTarget(
   target: CallbackTarget,
   payload: ExecutionCallbackPayload,
   headers: Record<string, string>
-): Promise<{ ok: boolean; status?: number; error?: string }> {
+): Promise<TargetResult> {
   try {
     const requestInit: RequestInit = {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+      // A redirect would carry the callback's credential to wherever it points.
+      redirect: 'manual',
     };
     const response = await fetch(target.url, requestInit);
 
@@ -71,8 +76,17 @@ async function deliverToTarget(
       })
       .info('Callback HTTP response received');
 
-    return response.ok
-      ? { ok: true, status: response.status }
+    if (response.ok) return { ok: true, status: response.status };
+    if (response.status >= 300 && response.status < 400) {
+      return { ok: false, status: response.status, error: 'Callback target redirected' };
+    }
+    // A challenge refuses this Worker's credential (an expired token, a grant or receiver switch
+    // not live yet), not the callback itself: redeliver it like a 5xx.
+    const challenged =
+      (response.status === 401 || response.status === 403) &&
+      response.headers.has('www-authenticate');
+    return challenged
+      ? { ok: false, status: response.status, retryable: true }
       : { ok: false, status: response.status };
   } catch (err) {
     logger
@@ -121,7 +135,7 @@ export async function deliverCallbackJob(
 }
 
 export function classifyCallbackDelivery(
-  result: { ok: boolean; status?: number; error?: string },
+  result: TargetResult,
   payload: CallbackDeliveryIdentity,
   attempts: number
 ): DeliveryResult {
@@ -129,7 +143,10 @@ export function classifyCallbackDelivery(
     return { type: 'success' };
   }
 
-  if (attempts < CALLBACK_DELIVERY_MAX_ATTEMPTS && shouldRetry(result.status)) {
+  if (
+    attempts < CALLBACK_DELIVERY_MAX_ATTEMPTS &&
+    (result.retryable === true || shouldRetry(result.status))
+  ) {
     const delaySeconds = BASE_BACKOFF_SECONDS * 2 ** (attempts - 1);
     logger
       .withFields({

@@ -135,7 +135,7 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   'security-sync': {
     scopes: [STS_SECURITY_SYNC_MANUAL_SYNC.scope, STS_SECURITY_SYNC_DISMISS_FINDING.scope],
   },
-  [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.audience]: {
+  'community-contributions-dashboard': {
     scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],
   },
 };

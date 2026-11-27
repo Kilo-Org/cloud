@@ -806,7 +806,7 @@ describe('phase 4 service scopes and CI scopes under the shipped policies', () =
     }
   });
 
-  it('covers the opencode sync sender, which runs in production only', () => {
+  it('covers the opencode sync sender in production', () => {
     expect(shipped).toContainEqual(
       expect.objectContaining({
         environment: 'production',

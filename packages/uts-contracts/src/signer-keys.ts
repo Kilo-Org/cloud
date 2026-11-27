@@ -84,10 +84,12 @@ function kidsOf(entries: readonly KeyEntry[]): string[] {
 
 /**
  * The signer-keys answer: every signer and every feed object exactly once, and no `kid` twice.
- * The feed Worker publishes both kinds in the UTS key set (design 5.6, 5.7).
+ * The feed Worker publishes both kinds in the UTS key set (design 5.6, 5.7). A top-level field the
+ * schema does not name is dropped rather than refused, so a mint Worker that adds one does not
+ * break a feed Worker of an earlier release during a deploy or after a rollback of either.
  */
 export const SignerKeysAnswerSchema = z
-  .strictObject({
+  .object({
     signers: z
       .array(SignerKeysEntrySchema)
       .length(UTS_SIGNER_COUNT)
@@ -95,9 +97,9 @@ export const SignerKeysAnswerSchema = z
         signers => new Set(signers.map(entry => entry.signer)).size === UTS_SIGNER_COUNT,
         'every signer exactly once'
       ),
-    // Optional for one release, so a mint Worker without feed objects and a feed Worker that
-    // expects them keep serving signer keys during a rolling deploy or a rollback of either one.
-    // An answer without it holds no feed keys; the feed Worker keeps any it holds.
+    // Present only when the request asks for it (`SignerKeysRequest`): a feed Worker of the
+    // release before feed objects parses the answer strictly and would refuse it. An answer
+    // without it holds no feed keys; the feed Worker keeps any it holds.
     feeds: z
       .array(FeedKeysEntrySchema)
       .length(UTS_FEED_COUNT)
@@ -120,17 +122,26 @@ export type SignerKeysAnswer = z.infer<typeof SignerKeysAnswerSchema>;
  * under its name or jurisdiction, a deploy error that no retry fixes.
  */
 export const SignerKeysReadSchema = z.discriminatedUnion('status', [
-  z.strictObject({ status: z.literal('answered'), answer: SignerKeysAnswerSchema }),
+  z.object({ status: z.literal('answered'), answer: SignerKeysAnswerSchema }),
   z.strictObject({ status: z.literal('refused') }),
   z.strictObject({ status: z.literal('misconfigured') }),
 ]);
 export type SignerKeysRead = z.infer<typeof SignerKeysReadSchema>;
 
 /**
- * The `SignerKeys` entrypoint as the feed Worker's binding exposes it. The result crosses a
- * deploy boundary, so the caller validates it with `SignerKeysReadSchema`. workerd gives the
- * object an RPC call returns a disposer, and the call stays open until it runs, so the caller
- * disposes the result once it holds the validated copy.
+ * What a feed Worker asks for in a signer-keys read: `feeds: true` adds the feed objects' keys.
+ * A feed Worker of the release before feed objects sends no request and parses the answer as an
+ * object of `signers` alone, so the mint Worker leaves `feeds` out for it. A mint Worker of that
+ * release ignores the request and answers without `feeds`, which the schema accepts.
+ */
+export const SignerKeysRequestSchema = z.object({ feeds: z.literal(true).optional() });
+export type SignerKeysRequest = z.infer<typeof SignerKeysRequestSchema>;
+
+/**
+ * The `SignerKeys` entrypoint as the feed Worker's binding exposes it. The request and the result
+ * cross a deploy boundary, so each side validates what it receives (`SignerKeysRequestSchema`,
+ * `SignerKeysReadSchema`). workerd gives the object an RPC call returns a disposer, and the call
+ * stays open until it runs, so the caller disposes the result once it holds the validated copy.
  * https://developers.cloudflare.com/workers/runtime-apis/rpc/lifecycle/
  */
-export type SignerKeysBinding = { signerKeys(): Promise<unknown> };
+export type SignerKeysBinding = { signerKeys(request?: SignerKeysRequest): Promise<unknown> };

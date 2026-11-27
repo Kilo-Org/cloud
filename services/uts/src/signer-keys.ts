@@ -3,6 +3,7 @@ import {
   UTS_FEED_COUNT,
   UTS_SIGNER_COUNT,
   UTS_SIGNER_KEYS_HOLD_MS,
+  SignerKeysRequestSchema,
   UtsPublicJwkSchema,
   type FeedKeysEntry,
   type SignerKeysAnswer,
@@ -379,20 +380,27 @@ export async function readThroughIsolateShard(
 /**
  * One signer-keys read for the binding whose props are `props`, answered by key-set shard
  * `shard`. It answers only the feed Worker of the mint Worker's own environment (`callerOf`). Any
- * other caller, or a binding without props, gets `refused` without a shard call.
+ * other caller, or a binding without props, gets `refused` without a shard call. The feed objects'
+ * keys go only to a caller whose request asks for them (`SignerKeysRequest`); a request that is
+ * missing or not valid gets the signer keys alone, the answer every feed Worker release accepts.
  */
 export async function signerKeysRead(
   env: Env,
   config: UtsConfig,
   props: unknown,
-  shard: number
+  shard: number,
+  request: unknown
 ): Promise<SignerKeysRead> {
   const caller = callerOf(props);
   if (caller !== FEED_DEPLOYMENTS[config.environment]) {
     console.warn(JSON.stringify({ event: 'uts.signer_keys.refused', caller }));
     return { status: 'refused' };
   }
-  return await readKeySetShard(env, config, shard);
+  const read = await readKeySetShard(env, config, shard);
+  if (read.status !== 'answered' || SignerKeysRequestSchema.safeParse(request).data?.feeds) {
+    return read;
+  }
+  return { status: 'answered', answer: { signers: read.answer.signers } };
 }
 
 /**
@@ -430,9 +438,9 @@ export async function readKeySetShard(
  * keeps every other config from binding the mint Worker.
  */
 export class SignerKeys extends WorkerEntrypoint<Env> implements SignerKeysBinding {
-  async signerKeys(): Promise<SignerKeysRead> {
+  async signerKeys(request?: unknown): Promise<SignerKeysRead> {
     return await readThroughIsolateShard(shard =>
-      signerKeysRead(this.env, readConfig(this.env), this.ctx.props, shard)
+      signerKeysRead(this.env, readConfig(this.env), this.ctx.props, shard, request)
     );
   }
 }

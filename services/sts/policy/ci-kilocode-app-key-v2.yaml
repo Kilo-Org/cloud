@@ -1,0 +1,25 @@
+# The kilocode v2 line's progress-commit job (kilo-v2.yml on v2, push only), which opens the
+# migration progress-map pull request with a Kilo Maintainer app installation token (manager
+# ruling M76, the pattern of M62's v2 publish rule). A production policy off main: the loader
+# admits it only as the exact GITHUB_PRODUCTION_REF_EXCEPTIONS entry in src/policy/schema.ts, so
+# any change here must change that entry too. ci-kilocode-app-key (main) is a separate policy.
+# legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
+# GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
+workload: ci-kilocode-app-key-v2
+environments:
+  - production
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  legacySubject: true
+  environment: automation
+  refs:
+    - refs/heads/v2
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/kilo-v2.yml@refs/heads/v2
+  events:
+    - push
+secrets:
+  - KILOCODE_MAINTAINER_APP_KEY

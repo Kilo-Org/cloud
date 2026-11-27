@@ -610,8 +610,8 @@ test('successful main CI selects the tested deployment SHA', () => {
   );
   assert.equal(ci.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 
-  for (const job of ['db-gate', 'stage-app']) {
-    assert.equal(production.jobs[job].needs, 'check-changes');
+  for (const job of ['db-gate', 'stage-app', 'vercel-cli']) {
+    assert.ok([production.jobs[job].needs].flat().includes('check-changes'), job);
     assert.match(production.jobs[job].if, /should_deploy == 'true'/);
   }
   for (const job of ['db-gate', 'deploy-app', 'deploy-workers']) {
@@ -664,7 +664,8 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
 
 test('ai-gateway deploys with each scheduled release and its promotion waits for the gate', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
-  assert.equal(stageAiGateway.needs, 'check-changes');
+  assert.deepEqual(stageAiGateway.needs, ['check-changes', 'vercel-cli']);
+  assert.equal(stageAiGateway.with.vercel_cli_artifact, '${{ needs.vercel-cli.outputs.artifact }}');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
   assert.equal(stageAiGateway.with.target_environment, 'production');
   assert.equal(stageAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
@@ -673,16 +674,17 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   assert.equal(stageAiGateway.secrets, undefined);
 
   const promoteAiGateway = production.jobs['promote-ai-gateway'];
-  assert.deepEqual(promoteAiGateway.needs, ['stage-ai-gateway', 'db-gate']);
+  assert.deepEqual(promoteAiGateway.needs, ['stage-ai-gateway', 'db-gate', 'vercel-cli']);
   assert.deepEqual(promoteAiGateway.with, {
     deployment_url: '${{ needs.stage-ai-gateway.outputs.deployment_url }}',
     axiom_annotation_dataset: 'vercel',
     axiom_expected_project: 'kilocode-ai-gateway',
+    vercel_cli_artifact: '${{ needs.vercel-cli.outputs.artifact }}',
   });
   assert.equal(promoteAiGateway.secrets, undefined);
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
-  assert.equal(deployAiGateway.needs, 'check-changes');
+  assert.deepEqual(deployAiGateway.needs, ['check-changes', 'vercel-cli']);
   assert.equal(deployAiGateway.with.target_environment, 'staging');
   assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
@@ -788,9 +790,15 @@ test('one database gate per deployment checks out, installs and migrates once', 
   // target on their own: a custom environment cannot hold the traffic switch
   // until the gate finishes, so they run beside it. The Worker deploy and the
   // release record below keep the gate, so a failed migration still stops them.
+  // They also need the run's Vercel CLI job, which needs only the lookup.
   for (const job of ['deploy-app', 'deploy-ai-gateway']) {
-    assert.equal(staging.jobs[job].needs, 'check-changes', `${job} must start beside db-gate`);
+    assert.deepEqual(
+      staging.jobs[job].needs,
+      ['check-changes', 'vercel-cli'],
+      `${job} must start beside db-gate`
+    );
   }
+  assert.equal(staging.jobs['vercel-cli'].needs, 'check-changes');
   // Production names the gate result explicitly so a skipped gate cannot let the
   // Worker deploy run ahead of the migrations; staging relies on the default
   // needs-success behaviour for the same gate.

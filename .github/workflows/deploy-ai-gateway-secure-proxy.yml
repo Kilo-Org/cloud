@@ -30,8 +30,16 @@ jobs:
             exit 1
           fi
 
-  stage-secure-proxy:
+  # The Vercel CLI for both calls below, installed without id-token.
+  vercel-cli:
     needs: verify-main
+    # Guard: privileged workflow. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
+    permissions: {}
+    uses: ./.github/workflows/install-vercel-cli.yml
+
+  stage-secure-proxy:
+    needs: [verify-main, vercel-cli]
     # Guard: privileged workflow. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud'
     # Ceiling for the called workflow: its stage job reads the STS bundle.
@@ -43,9 +51,10 @@ jobs:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY_SECURE_PROXY
       vercel_token_key: VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY
+      vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
 
   promote-secure-proxy:
-    needs: stage-secure-proxy
+    needs: [stage-secure-proxy, vercel-cli]
     # Guard: privileged workflow. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud'
     # Ceiling for the called workflow: its promote job reads the STS bundle.
@@ -55,3 +64,4 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-secure-proxy.outputs.deployment_url }}
+      vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}

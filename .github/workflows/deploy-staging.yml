@@ -94,8 +94,17 @@ jobs:
   # exists only while a migration outlasts the deploy, bounded by the gate's
   # timeout. A failed migration still fails db-gate, which stops the Worker
   # deploy and the release record below.
-  deploy-app:
+  # One Vercel CLI per run, installed without id-token as soon as the gate
+  # opens, for both stage calls below.
+  vercel-cli:
     needs: check-changes
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    permissions: {}
+    uses: ./.github/workflows/install-vercel-cli.yml
+
+  deploy-app:
+    needs: [check-changes, vercel-cli]
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     # Ceiling for the called workflow: its stage job reads the STS bundle.
@@ -107,10 +116,11 @@ jobs:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
       vercel_token_key: VERCEL_TOKEN_APP
+      vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
 
   deploy-ai-gateway:
-    needs: check-changes
+    needs: [check-changes, vercel-cli]
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     # Ceiling for the called workflow: its stage job reads the STS bundle.
@@ -122,6 +132,7 @@ jobs:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
       vercel_token_key: VERCEL_TOKEN_AI_GATEWAY
+      vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
 
   # Worker change detection reads only the SHAs check-changes publishes, so this
@@ -151,8 +162,8 @@ jobs:
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
     # workflow inherits repo secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
-    # Ceiling for the called workflow: its Cloud Agent source map upload reads
-    # the STS bundle; every other job there declares no id-token.
+    # Ceiling for the called workflow, which GitHub checks for every job in it;
+    # its Cloud Agent source map upload reads the STS bundle.
     permissions:
       contents: read
       actions: read

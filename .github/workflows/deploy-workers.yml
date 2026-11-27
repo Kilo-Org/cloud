@@ -253,6 +253,7 @@ jobs:
           path: ${{ runner.temp }}/cloud-agent-sentry.tgz
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
   # The detection-only call: a deploy call passes `worker_matrix`, so this job
   # skips there and no caller runs the diff twice.
@@ -592,6 +593,7 @@ jobs:
           path: ${{ runner.temp }}/cloud-agent-sentry.tgz
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
   deploy-session-ingest:
     # Guard: this reusable workflow can be invoked from a fork, and the job
@@ -772,22 +774,23 @@ jobs:
           path: ${{ runner.temp }}/cloud-agent-sentry.tgz
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
   # Uploads the source maps a Cloud Agent deploy above handed over, with the
   # Sentry token from STS. Best-effort, like the step it replaces: the called
   # job continues on error, so a failed upload never fails the deploy.
   upload-cloud-agent-sentry:
     needs: [deploy-manual, deploy-changed, deploy-cloud-agent-after-session-ingest]
-    # Runs whenever this call deploys cloud-agent-next; a deploy that did not
-    # hand over its maps leaves the called job nothing to upload.
+    # Runs only after a deploy job that deployed cloud-agent-next succeeded. A
+    # matrix with a failed leg skips the upload of that run.
     if: >-
       ${{
         !cancelled() &&
         github.repository == 'Kilo-Org/cloud' &&
         (
-          inputs.worker == 'services/cloud-agent-next' ||
-          contains(inputs.worker_matrix, '"services/cloud-agent-next"') ||
-          inputs.deploy_cloud_agent_after_session_ingest == 'true'
+          (inputs.worker == 'services/cloud-agent-next' && needs.deploy-manual.result == 'success') ||
+          (contains(inputs.worker_matrix, '"services/cloud-agent-next"') && needs.deploy-changed.result == 'success') ||
+          (inputs.deploy_cloud_agent_after_session_ingest == 'true' && needs.deploy-cloud-agent-after-session-ingest.result == 'success')
         )
       }}
     permissions:

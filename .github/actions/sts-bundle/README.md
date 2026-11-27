@@ -103,11 +103,19 @@ it as an artifact, and the reader job reads the bundle first, then downloads and
 the tool by its path, without a package manager and without adding it to `PATH`.
 
 - `stage-vercel-deployment.yml` `stage` and `promote-vercel-deployment.yml` `promote`: the pinned
-  Vercel CLI, installed by the `cli` job. Exposure: the runtime code of the pinned CLI version and
-  of the dependencies npm resolves for it at install time, as before this change.
-- `cloud-agent-sentry-sourcemaps.yml` `upload`: the native `sentry-cli` binary of the lockfile and
-  the maps the deploy job validated (`stageSentryUploads` in
-  `services/cloud-agent-next/scripts/sentry-source-maps.ts`). Exposure: that binary.
+  Vercel CLI, installed once per run by the caller's `vercel-cli` job
+  (`install-vercel-cli.yml`, no `id-token`). Exposure: the runtime code of the pinned CLI version
+  and of the dependencies npm resolves for it at install time, as before this change. The `stage`
+  job checks out the deployed commit, so it loads this action from a side checkout of the run's
+  own commit (`sts-action/`) and reads the bundle before the deployed commit reaches the runner.
+- `cloud-agent-sentry-sourcemaps.yml` `upload`: the maps and the argument lists the deploy job
+  staged (`stageSentryUploads` in `services/cloud-agent-next/scripts/sentry-source-maps.ts`). The
+  job runs only a `sentry-cli` binary that it fetches itself and checks against the integrity
+  `pnpm-lock.yaml` records for the platform package at the run's commit (and that equals the
+  handed-over one), and it refuses an argument list that is not a source map upload or that names
+  `--url`, `--auth-token` or `--header`. Exposure: what the staged files and argument lists carry,
+  that is the runtime code of the cloud-agent-next deploy job that produced them, including the
+  packages its lockfile pins and its build.
 - `kilo-app-release.yml` `preflight` and `build-and-submit`: `eas-cli` from the `kilo-app...`
   closure the `app-workspace` job installs. `eas-cli` evaluates `app.config.ts`, so the exposure is
   the runtime code of the packages this lockfile pins for the app, as in the e2e exception.

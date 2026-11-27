@@ -456,13 +456,15 @@ jobs:
       - name: Pack the installed closure
         run: |
           find . -path ./.git -prune -o -type d -name node_modules -prune -print0 |
-            tar --null -T - -czf "$RUNNER_TEMP/kilo-app-node-modules.tgz"
+            tar --null -T - -I 'zstd -T0 -3' -cf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kilo-app-node-modules
-          path: ${{ runner.temp }}/kilo-app-node-modules.tgz
+          path: ${{ runner.temp }}/kilo-app-node-modules.tar.zst
           retention-days: 1
+          overwrite: true
+          compression-level: 0
           if-no-files-found: error
 
   preflight:
@@ -503,7 +505,7 @@ jobs:
           path: ${{ runner.temp }}
 
       - name: Unpack the installed closure
-        run: tar -xzf "$RUNNER_TEMP/kilo-app-node-modules.tgz" -C "$GITHUB_WORKSPACE"
+        run: tar -I zstd -xf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" -C "$GITHUB_WORKSPACE"
 
       - name: Verify EAS production environment
         working-directory: apps/mobile
@@ -586,7 +588,7 @@ jobs:
           path: ${{ runner.temp }}
 
       - name: Unpack the installed closure
-        run: tar -xzf "$RUNNER_TEMP/kilo-app-node-modules.tgz" -C "$GITHUB_WORKSPACE"
+        run: tar -I zstd -xf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" -C "$GITHUB_WORKSPACE"
 
       - name: Build iOS and Android
         working-directory: apps/mobile

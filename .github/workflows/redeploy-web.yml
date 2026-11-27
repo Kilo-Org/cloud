@@ -30,8 +30,15 @@ jobs:
             exit 1
           fi
 
-  stage-app:
+  # The Vercel CLI for both calls below, installed without id-token.
+  vercel-cli:
     needs: verify-main
+    if: github.repository == 'Kilo-Org/cloud'
+    permissions: {}
+    uses: ./.github/workflows/install-vercel-cli.yml
+
+  stage-app:
+    needs: [verify-main, vercel-cli]
     if: github.repository == 'Kilo-Org/cloud'
     # Ceiling for the called workflow: its stage job reads the STS bundle.
     permissions:
@@ -42,9 +49,10 @@ jobs:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
       vercel_token_key: VERCEL_TOKEN_APP
+      vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
 
   promote-app:
-    needs: stage-app
+    needs: [stage-app, vercel-cli]
     if: github.repository == 'Kilo-Org/cloud'
     # Ceiling for the called workflow: its promote job reads the STS bundle.
     permissions:
@@ -54,3 +62,4 @@ jobs:
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
       axiom_annotation_dataset: kilocode-app
+      vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}

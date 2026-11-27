@@ -66,17 +66,48 @@ jobs:
         if: steps.download.outcome == 'success'
         env:
           SENTRY_AUTH_TOKEN: ${{ steps.sts.outputs.SENTRY_AUTH_TOKEN }}
+        # The binary the deploy job handed over must equal the one in the
+        # lockfile's platform package, which this job fetches and checks against
+        # the lockfile integrity of this run's own commit; only that verified
+        # binary runs. Each argument list must be a source map upload and may
+        # not redirect the token (--url, --auth-token, --header).
         run: |
           set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
           stage="$RUNNER_TEMP/cloud-agent-sentry"
-          mkdir "$stage"
+          mkdir "$stage" "$RUNNER_TEMP/sentry-cli-package"
           tar -xzf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$stage"
+
+          version=$(sed -nE "s/^  '@sentry\/cli': ([0-9]+\.[0-9]+\.[0-9]+)$/\1/p" pnpm-workspace.yaml | head -n 1)
+          case "$RUNNER_ARCH" in
+            X64) platform=linux-x64 ;;
+            ARM64) platform=linux-arm64 ;;
+            *) fail "no Sentry CLI platform package for $RUNNER_ARCH" ;;
+          esac
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "no @sentry/cli catalog version in pnpm-workspace.yaml"
+          integrity=$(awk -v key="  '@sentry/cli-$platform@$version':" '$0 == key { getline; print; exit }' pnpm-lock.yaml |
+            sed -nE 's/.*integrity: (sha512-[A-Za-z0-9+\/=]+).*/\1/p')
+          [[ -n $integrity ]] || fail "pnpm-lock.yaml has no integrity for @sentry/cli-$platform@$version"
+          curl -fsSL --proto '=https' --max-time 120 -o "$RUNNER_TEMP/sentry-cli.tgz" \
+            "https://registry.npmjs.org/@sentry/cli-$platform/-/cli-$platform-$version.tgz"
+          actual="sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/sentry-cli.tgz" | base64 -w0)"
+          [[ $actual == "$integrity" ]] || fail "@sentry/cli-$platform@$version does not match the lockfile integrity"
+          tar -xzf "$RUNNER_TEMP/sentry-cli.tgz" -C "$RUNNER_TEMP/sentry-cli-package" package/bin/sentry-cli
+          cli="$RUNNER_TEMP/sentry-cli-package/package/bin/sentry-cli"
+          cmp -s "$cli" "$stage/sentry-cli" || fail "the handed-over sentry-cli is not the lockfile's binary"
+          chmod 0755 "$cli"
+
           cd "$stage"
           count=$(jq 'length' uploads.json)
           for ((i = 0; i < count; i++)); do
             args=()
             while IFS= read -r -d '' arg; do
+              case "$arg" in
+                --url | --url=* | --auth-token | --auth-token=* | --header | --header=*)
+                  fail "upload $i names $arg" ;;
+              esac
               args+=("$arg")
             done < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' uploads.json)
-            ./sentry-cli "${args[@]}"
+            [[ ${args[0]-} == sourcemaps && ${args[1]-} == upload ]] || fail "upload $i is not a source map upload"
+            "$cli" "${args[@]}"
           done

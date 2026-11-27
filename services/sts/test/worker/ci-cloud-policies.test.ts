@@ -409,6 +409,7 @@ describe('shipped Kilo-Org/cloud CI bundle policies', () => {
       workload?: string;
       environments?: string;
       repositoryId?: string;
+      repositoryOwnerId?: string;
       environment?: string | null;
       refs?: string;
       workflows?: string;
@@ -422,7 +423,7 @@ identity:
   kind: github-oidc
   repository: Kilo-Org/cloud
   repositoryId: '${overrides.repositoryId ?? REPOSITORY_ID}'
-  repositoryOwnerId: '${OWNER_ID}'
+  repositoryOwnerId: '${overrides.repositoryOwnerId ?? OWNER_ID}'
 ${overrides.environment === null ? '' : `  environment: ${overrides.environment ?? 'production'}\n`}  refs: ${overrides.refs ?? `[${MAIN}]`}
   jobWorkflowRefs: ${overrides.workflows ?? `[${pinned('promote-vercel-deployment.yml')}]`}
   events: ${overrides.events ?? '[workflow_run, schedule, workflow_dispatch]'}
@@ -449,6 +450,11 @@ ${overrides.extra ?? ''}`;
       ['no GitHub environment', { environment: null }],
       ['no secret', { secrets: '[]' }],
       ['a token grant', { extra: "audiences: [web]\nscopes: ['web:sts.canary']" }],
+      ['another repository owner id', { repositoryOwnerId: '1' }],
+      [
+        'an environment grant',
+        { extra: 'environmentGrants:\n  production:\n    secrets: [OTHER_TOKEN]' },
+      ],
     ])('refuses workflow_run with other events in production with %s', (_name, overrides) => {
       expect(load(carveOutPolicy(overrides))).toThrow(/workflow_run/);
     });
@@ -462,6 +468,18 @@ ${overrides.extra ?? ''}`;
           })
         )
       ).toThrow(/workflow_run|accepts only refs\/heads\/main/);
+    });
+
+    // A dynamic grant takes the policy out of the carve-out; migration-run would make it a
+    // trigger-only policy, which holds no secret, so the loader refuses it either way.
+    it('refuses a carve-out policy with a dynamic grant', () => {
+      expect(load(carveOutPolicy({ extra: 'dynamic:\n  - grant: migration-run' }))).toThrow(
+        /migration-run|workflow_run|secret/
+      );
+    });
+
+    it('refuses a carve-out policy with no event', () => {
+      expect(load(carveOutPolicy({ events: '[]' }))).toThrow(/does not match the policy schema/);
     });
   });
 });

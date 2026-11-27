@@ -20,6 +20,7 @@ export const CLOUD_WORKFLOW_FILES = [
   'explorer-ios-release.yml',
   'extension-ci.yml',
   'extension-store-release.yml',
+  'install-vercel-cli.yml',
   'kilo-app-changelog-history.yml',
   'kilo-app-ci.yml',
   'kilo-app-release.yml',

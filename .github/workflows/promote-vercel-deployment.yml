@@ -17,91 +17,21 @@ on:
         required: false
         type: string
         default: 'kilocode-app'
+      vercel_cli_artifact:
+        description: 'Artifact of this run that holds the packed Vercel CLI (install-vercel-cli.yml)'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-env:
-  VERCEL_VERSION: '59.5.0'
-
 jobs:
-  # Installs the pinned Vercel CLI without id-token and hands it to the promote
-  # job, which installs nothing (.github/actions/sts-bundle/README.md, rules
-  # for a calling job).
-  cli:
-    # Guard: only the canonical repo may run this workflow.
-    if: github.repository == 'Kilo-Org/cloud'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    permissions: {}
-    outputs:
-      artifact: ${{ steps.artifact.outputs.name }}
-    steps:
-      # One run promotes several deployments, so the artifact is named after the
-      # deployment URL the stage workflow checked.
-      - name: Name the CLI artifact
-        id: artifact
-        env:
-          DEPLOYMENT_URL: ${{ inputs.deployment_url }}
-        run: echo "name=vercel-cli-promote-$(printf '%s' "$DEPLOYMENT_URL" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-
-      # The installed tree is ~265 MB (~77 MB compressed), so the cache only pays
-      # off when the prefix holds a runnable copy of the pinned version. A miss, or
-      # a cache failure, costs the registry install and never blocks a deploy. An
-      # entry that fails the check below is not replaced under an unchanged key, so
-      # it costs that install in every job until the key changes.
-      - name: Restore Vercel CLI
-        id: vercel-cli-cache
-        continue-on-error: true
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: ${{ runner.temp }}/vercel-cli
-          # vercel@59.5.0 installs one @vercel/vc-native-<os>-<arch> optional
-          # dependency, so an entry from another architecture cannot be reused.
-          key: ${{ runner.os }}-${{ runner.arch }}-vercel-cli-${{ env.VERCEL_VERSION }}
-
-      - name: Install Vercel CLI
-        env:
-          VERCEL_CLI_PREFIX: ${{ runner.temp }}/vercel-cli
-          CACHE_HIT: ${{ steps.vercel-cli-cache.outputs.cache-hit }}
-        run: |
-          manifest="$VERCEL_CLI_PREFIX/lib/node_modules/vercel/package.json"
-          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
-
-          # A miss, a different version, or a tree the CLI cannot start from takes
-          # the registry path.
-          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$VERCEL_VERSION" ] \
-            && "$VERCEL_CLI_PREFIX/bin/vercel" --version >/dev/null 2>&1; then
-            echo "Restored vercel@$installed from the cache"
-          else
-            echo "Installing vercel@$VERCEL_VERSION"
-            rm -rf "$VERCEL_CLI_PREFIX"
-            npm install --global --prefix "$VERCEL_CLI_PREFIX" "vercel@$VERCEL_VERSION" --no-audit --no-fund
-            installed=$(node -p "require('$manifest').version")
-            if [ "$installed" != "$VERCEL_VERSION" ]; then
-              echo "::error::Resolved vercel@$installed but the pinned version is $VERCEL_VERSION"
-              exit 1
-            fi
-          fi
-          "$VERCEL_CLI_PREFIX/bin/vercel" --version
-
-      # Symlinks and file modes survive only inside an archive.
-      - name: Pack Vercel CLI
-        run: tar -czf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli" .
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ steps.artifact.outputs.name }}
-          path: ${{ runner.temp }}/vercel-cli.tgz
-          retention-days: 1
-          if-no-files-found: error
-
-  # Reads the Vercel and Axiom tokens from STS, then promotes and annotates
-  # with the CLI the cli job installed. The Vercel token's consumer is the CLI
-  # itself, so its runtime code runs with the tokens; the job installs nothing
-  # and runs no package manager. Policy: ci-vercel-promote, D53/M112.
+  # Reads the Vercel and Axiom tokens from STS, then promotes and annotates with
+  # the CLI the caller's install-vercel-cli.yml job installed. The Vercel token's
+  # consumer is the CLI itself, so its runtime code runs with the tokens; the job
+  # installs nothing and runs no package manager. Policy: ci-vercel-promote,
+  # D53/M112.
   promote:
-    needs: cli
     # Guard: this reusable workflow promotes a Vercel deployment to production
     # with a production credential. This is defense-in-depth: callers must guard
     # their own jobs, because a job-level `if:` turns an unguarded call on a fork
@@ -144,7 +74,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: ${{ needs.cli.outputs.artifact }}
+          name: ${{ inputs.vercel_cli_artifact }}
           path: ${{ runner.temp }}
 
       # The CLI stays off PATH, so no later step resolves another command from it.
@@ -152,11 +82,7 @@ jobs:
         run: |
           mkdir "$RUNNER_TEMP/vercel-cli"
           tar -xzf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli"
-          installed=$("$RUNNER_TEMP/vercel-cli/bin/vercel" --version 2>/dev/null | tail -n 1)
-          if [[ "$installed" != *"$VERCEL_VERSION"* ]]; then
-            echo "::error::The handed-over Vercel CLI is not vercel@$VERCEL_VERSION"
-            exit 1
-          fi
+          "$RUNNER_TEMP/vercel-cli/bin/vercel" --version
 
       - name: Promote Vercel deployment
         # The stage workflow checks the form of this URL before it publishes it

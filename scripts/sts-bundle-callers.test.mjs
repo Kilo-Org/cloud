@@ -12,7 +12,9 @@ import { load } from 'js-yaml';
 
 const WORKFLOWS = new URL('../.github/workflows/', import.meta.url);
 const POLICIES = new URL('../services/sts/policy/', import.meta.url);
-const ACTION = './.github/actions/sts-bundle';
+// The action from the run's checkout, or from a side checkout of the run's commit
+// where the job's main checkout is another commit (stage-vercel-deployment.yml).
+const ACTIONS = ['./.github/actions/sts-bundle', './sts-action/.github/actions/sts-bundle'];
 const MAIN = 'refs/heads/main';
 
 const workflows = Object.fromEntries(
@@ -104,7 +106,7 @@ const INSTALLER_ACTIONS = /^(pnpm\/action-setup|oven-sh\/setup-bun|actions\/cach
 const TRUSTED_BEFORE_READ =
   /^(useblacksmith\/checkout|actions\/checkout|actions\/setup-node)@[0-9a-f]{40}$/;
 
-const isRead = step => step.uses === ACTION;
+const isRead = step => ACTIONS.includes(step.uses);
 const environmentName = job =>
   typeof job.environment === 'object' ? job.environment?.name : job.environment;
 
@@ -237,6 +239,13 @@ test('each reusable workflow that reads a bundle keeps exactly its reviewed call
         if (job.uses === `./.github/workflows/${file}`) {
           callers.push(`${caller}#${name}`);
           assert.equal(job.secrets, undefined, `${caller}#${name} passes no secret`);
+          if (file !== 'cloud-agent-sentry-sourcemaps.yml') {
+            // The Vercel CLI comes from this run's install-vercel-cli.yml job, which holds no id-token.
+            assert.equal(job.with.vercel_cli_artifact, '${{ needs.vercel-cli.outputs.artifact }}');
+            const install = document.jobs['vercel-cli'];
+            assert.equal(install.uses, './.github/workflows/install-vercel-cli.yml', caller);
+            assert.deepEqual(install.permissions, {}, `${caller}: the CLI install holds no token`);
+          }
           assert.equal(job.permissions?.['id-token'], 'write', `${caller}#${name} grants id-token`);
         }
       }
@@ -249,6 +258,28 @@ test('each reusable workflow that reads a bundle keeps exactly its reviewed call
       assert.equal(job.permissions?.['id-token'], reads ? 'write' : undefined, `${file}#${name}`);
     }
   }
+});
+
+test('the shared Vercel CLI install holds no id-token and is only called', () => {
+  const install = workflows['install-vercel-cli.yml'];
+  assert.deepEqual(Object.keys(install.on), ['workflow_call']);
+  assert.deepEqual(install.permissions, {});
+  for (const job of Object.values(install.jobs)) {
+    assert.deepEqual(job.permissions, {});
+    assert.ok(!(job.steps ?? []).some(isRead));
+  }
+});
+
+test('the stage job reads its bundle with the action of the run commit, before the deployed commit', () => {
+  const steps = workflows['stage-vercel-deployment.yml'].jobs.stage.steps;
+  const side = steps.findIndex(step => step.with?.path === 'sts-action');
+  assert.equal(steps[side].with.ref, '${{ github.sha }}');
+  assert.equal(steps[side].with['sparse-checkout'], '.github/actions/sts-bundle');
+  const read = steps.findIndex(isRead);
+  const source = steps.findIndex(
+    step => step.with?.ref === '${{ inputs.source_sha || github.sha }}'
+  );
+  assert.ok(side < read && read < source, 'side checkout, read, then the deployed commit');
 });
 
 test('each stage caller requests a project token its environment policy holds', () => {

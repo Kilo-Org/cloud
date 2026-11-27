@@ -47,8 +47,41 @@ import {
  * final state.
  */
 
-type Run = typeof runs.$inferSelect;
-type RunUpdate = Partial<typeof runs.$inferInsert>;
+type RunRow = typeof runs.$inferSelect;
+type RunValues = Partial<Omit<typeof runs.$inferInsert, 'id' | 'state' | 'phase'>>;
+
+/** The state and phase pairs a run can be in (contract §4); nothing else is ever written. */
+type Stage =
+  | { state: 'pending'; phase: 'fetching' | 'reviewing' | 'starting' | 'probing' }
+  | { state: 'running'; phase: 'migrating' }
+  | { state: 'succeeded' | 'failed'; phase: 'done' };
+type Run = Omit<RunRow, 'state' | 'phase'> & Stage;
+type ActiveRun = Run & { state: 'pending' | 'running' };
+
+const PENDING_PHASES: readonly string[] = ['fetching', 'reviewing', 'starting', 'probing'];
+
+/** A stored run, checked to be in one of the stages above. */
+function asRun(row: RunRow): Run {
+  const { state, phase } = row;
+  const valid =
+    (state === 'pending' && PENDING_PHASES.includes(phase)) ||
+    (state === 'running' && phase === 'migrating') ||
+    ((state === 'succeeded' || state === 'failed') && phase === 'done');
+  if (!valid) throw new Error(`run ${row.id} is in no known stage: ${state}/${phase}`);
+  // Checked just above: the pair is one of Stage's.
+  return row as Run;
+}
+
+function isActive(run: Run | null): run is ActiveRun {
+  return run !== null && (run.state === 'pending' || run.state === 'running');
+}
+
+/** Lost ticks before `container_lost`: the contract's 2 with the container down, more while it is up. */
+const LOST_TICKS_DOWN = 2;
+const LOST_TICKS_UP = 8;
+const APPLY_DEADLINE_MS = 30_000;
+const PRUNE_EVERY_MS = 60 * 60 * 1000;
+const RELAY_BACKOFF_MAX_MS = 5 * 60 * 1000;
 
 /** The documented maximum (§1); the 15-second alarm keeps the object active during a run. */
 export const INACTIVITY_TIMEOUT_MS = 21_600_000;
@@ -137,6 +170,10 @@ export class MigrationRunDO extends DurableObject<Env> {
   private chain: Promise<unknown> = Promise.resolve();
   /** A step finished a phase: the next alarm comes at once instead of after the 15 s tick. */
   private nextPhaseReady = false;
+  /** When rows past retention were last pruned; pruning runs at most hourly. */
+  private prunedAt = 0;
+  /** Consecutive failed audit relays; the retry backs off from 5 s to 5 minutes. */
+  private relayFailures = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -158,7 +195,11 @@ export class MigrationRunDO extends DurableObject<Env> {
 
   async getRun(id: string): Promise<RunView | null> {
     const row = this.db.select().from(runs).where(eq(runs.id, id)).get();
-    return row === undefined ? null : this.view(row);
+    if (row === undefined) return null;
+    // CI polls every 20 s: re-arm a lost alarm while the run is active, which staging, with no
+    // cron, relies on.
+    if (row.state === 'pending' || row.state === 'running') await this.ensureAlarm(Date.now());
+    return this.view(row);
   }
 
   /** `run_denied`, at most one per reason and actor per minute (§7). */
@@ -215,7 +256,11 @@ export class MigrationRunDO extends DurableObject<Env> {
       }
     }
     await this.relay(stream);
-    this.prune(Date.now());
+    const pruneNow = Date.now();
+    if (pruneNow >= this.prunedAt + PRUNE_EVERY_MS) {
+      this.prune(pruneNow);
+      this.prunedAt = pruneNow;
+    }
     await this.scheduleNext(config.ok ? config.config : null);
   }
 
@@ -299,11 +344,13 @@ export class MigrationRunDO extends DurableObject<Env> {
         }
       }
     } catch (error) {
-      if (!(error instanceof GithubUnavailableError)) throw error;
+      // A malformed GitHub answer is GitHub being unavailable too, not a server error.
+      if (!(error instanceof GithubUnavailableError) && !(error instanceof z.ZodError)) throw error;
       return {
         kind: 'unavailable',
         reason: 'github_unavailable',
-        retryAfterSeconds: retryAfter(error, now),
+        retryAfterSeconds:
+          error instanceof GithubUnavailableError ? retryAfter(error, now) : GITHUB_RETRY_SECONDS,
       };
     }
 
@@ -350,7 +397,7 @@ export class MigrationRunDO extends DurableObject<Env> {
 
   // ---- the run's alarm (§5 steps 4-5, §6) ----
 
-  private async tick(run: Run, config: ProxyConfig, now: number): Promise<void> {
+  private async tick(run: ActiveRun, config: ProxyConfig, now: number): Promise<void> {
     if (now >= run.createdAt + config.runDeadlineSeconds * 1000) {
       await this.containerFetch('/cancel', { method: 'POST' }).catch(() => null);
       await this.finish(run, config, failure('deadline_exceeded'));
@@ -366,12 +413,10 @@ export class MigrationRunDO extends DurableObject<Env> {
       case 'probing':
       case 'migrating':
         return await this.pollStep(run, config, now);
-      case 'done':
-        return;
     }
   }
 
-  private async fetchStep(run: Run, config: ProxyConfig, now: number): Promise<void> {
+  private async fetchStep(run: ActiveRun, config: ProxyConfig, now: number): Promise<void> {
     if (run.githubRetryAt !== null && now < run.githubRetryAt) return;
     let progressed = false;
     const github = cachedGithub(this.db, this.github(config), run.createdAt, Date.now, () => {
@@ -405,7 +450,7 @@ export class MigrationRunDO extends DurableObject<Env> {
         files = Object.fromEntries(
           parsed.entries.map(entry => [`${entry.tag}.sql`, sqlBlobs.get(`${entry.tag}.sql`) ?? ''])
         );
-        this.update(run.id, { journalBlob, files });
+        if (this.record(run, { journalBlob, files }) === null) return;
       }
 
       // Every stored sha, not an IN list: a statement binds at most 100 parameters, and the cache
@@ -449,27 +494,21 @@ export class MigrationRunDO extends DurableObject<Env> {
       if (invalidText) return await this.finish(run, config, failure('journal_invalid'));
       const nowStored = storedShas();
       if (needed.every(sha => nowStored.has(sha))) {
-        this.update(run.id, {
-          phase: 'reviewing',
-          stalledAlarms: 0,
-          progressAt: Date.now(),
-          githubRetryAt: null,
-        });
-        this.nextPhaseReady = true;
+        this.toReviewing(run);
         return;
       }
     } catch (error) {
       if (!(error instanceof GithubUnavailableError)) throw error;
-      if (error.retryAt !== null) this.update(run.id, { githubRetryAt: error.retryAt });
+      if (error.retryAt !== null) this.record(run, { githubRetryAt: error.retryAt });
     }
     if (progressed) {
-      this.update(run.id, { stalledAlarms: 0, progressAt: Date.now() });
+      this.record(run, { stalledAlarms: 0, progressAt: Date.now() });
       return;
     }
     const stalled = run.stalledAlarms + 1;
     if (stalled >= MAX_STALLED_ALARMS)
       return await this.finish(run, config, failure('github_unavailable'));
-    this.update(run.id, { stalledAlarms: stalled });
+    this.record(run, { stalledAlarms: stalled });
   }
 
   /**
@@ -484,7 +523,9 @@ export class MigrationRunDO extends DurableObject<Env> {
     if ((await gitBlobSha(bytes)) !== sha) throw new GithubUnavailableError('blob hash mismatch');
     let content: string;
     try {
-      content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes);
+      // The BOM stays: the bytes, BOM included, are what the blob id and the container's
+      // reviewed-blob check hash.
+      content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
     } catch {
       return undefined;
     }
@@ -496,7 +537,7 @@ export class MigrationRunDO extends DurableObject<Env> {
     return content;
   }
 
-  private async reviewStep(run: Run, config: ProxyConfig, now: number): Promise<void> {
+  private async reviewStep(run: ActiveRun, config: ProxyConfig, now: number): Promise<void> {
     if (run.githubRetryAt !== null && now < run.githubRetryAt) {
       if (now - run.progressAt > REVIEW_STALL_MS) {
         await this.finish(run, config, failure('github_unavailable'));
@@ -558,14 +599,8 @@ export class MigrationRunDO extends DurableObject<Env> {
           })
         );
       }
-      this.update(run.id, {
-        phase: 'starting',
-        reviewBase,
-        reviewed: passed,
-        progressAt: Date.now(),
-        stalledAlarms: 0,
-        githubRetryAt: null,
-      });
+      const started = this.toStarting(run, { reviewBase, reviewed: passed });
+      if (started === null) return;
       await this.appendAudit(config.environment, {
         type: 'reviewCheckPassed',
         outcome: 'success',
@@ -579,12 +614,11 @@ export class MigrationRunDO extends DurableObject<Env> {
           ),
         },
       });
-      this.nextPhaseReady = true;
     } catch (error) {
       if (!(error instanceof GithubUnavailableError)) throw error;
-      const update: RunUpdate = error.retryAt === null ? {} : { githubRetryAt: error.retryAt };
-      if (progressed) update.progressAt = Date.now();
-      this.update(run.id, update);
+      const values: RunValues = error.retryAt === null ? {} : { githubRetryAt: error.retryAt };
+      if (progressed) values.progressAt = Date.now();
+      this.record(run, values);
       if (!progressed && now - run.progressAt > REVIEW_STALL_MS) {
         await this.finish(run, config, failure('github_unavailable'));
       }
@@ -602,12 +636,12 @@ export class MigrationRunDO extends DurableObject<Env> {
   }
 
   private async reviewFailed(
-    run: Run,
+    run: ActiveRun,
     config: ProxyConfig,
     reviewBase: string,
     failures: string[]
   ): Promise<void> {
-    this.update(run.id, { reviewBase });
+    this.record(run, { reviewBase });
     await this.appendAudit(config.environment, {
       type: 'reviewCheckFailed',
       outcome: 'failure',
@@ -616,10 +650,19 @@ export class MigrationRunDO extends DurableObject<Env> {
     });
   }
 
-  private async startStep(run: Run, config: ProxyConfig, now: number): Promise<void> {
+  private async startStep(run: ActiveRun, config: ProxyConfig, now: number): Promise<void> {
     const container = this.container();
-    if (container === undefined)
+    if (container === undefined) {
       return await this.finish(run, config, failure('container_start_failed'));
+    }
+    /** A start or `/apply` that did not land: it counts toward `container_start_failed`. */
+    const stall = async (): Promise<void> => {
+      const stalled = run.stalledAlarms + 1;
+      if (stalled >= MAX_STALLED_ALARMS) {
+        return await this.finish(run, config, failure('container_start_failed'));
+      }
+      this.record(run, { stalledAlarms: stalled });
+    };
     let startedAt = run.containerStartedAt;
     if (startedAt === null) {
       try {
@@ -630,15 +673,10 @@ export class MigrationRunDO extends DurableObject<Env> {
           'migration-proxy: container start refused',
           error instanceof Error ? error.message : 'unknown'
         );
-        const stalled = run.stalledAlarms + 1;
-        if (stalled >= MAX_STALLED_ALARMS) {
-          return await this.finish(run, config, failure('container_start_failed'));
-        }
-        this.update(run.id, { stalledAlarms: stalled });
-        return;
+        return await stall();
       }
       startedAt = now;
-      this.update(run.id, { containerStartedAt: startedAt });
+      if (this.record(run, { containerStartedAt: startedAt }) === null) return;
     }
     if (!(await this.waitReady(CONTAINER_READY_WAIT_MS))) {
       if (now - startedAt > CONTAINER_START_LIMIT_MS) {
@@ -648,14 +686,7 @@ export class MigrationRunDO extends DurableObject<Env> {
     }
     if (run.applySent) return;
     const password = await this.secret(DB_PASSWORD).catch(() => null);
-    if (password === null) {
-      const stalled = run.stalledAlarms + 1;
-      if (stalled >= MAX_STALLED_ALARMS) {
-        return await this.finish(run, config, failure('container_start_failed'));
-      }
-      this.update(run.id, { stalledAlarms: stalled });
-      return;
-    }
+    if (password === null) return await stall();
     const files: Record<string, string> = {};
     for (const [name, sha] of Object.entries(run.files ?? {})) {
       files[name] = this.db.select().from(blobs).where(eq(blobs.sha, sha)).get()?.content ?? '';
@@ -681,9 +712,10 @@ export class MigrationRunDO extends DurableObject<Env> {
         files,
         reviewed: (run.reviewed ?? []).map(item => ({ path: item.path, blob: item.blob ?? '' })),
       }),
+      signal: AbortSignal.timeout(APPLY_DEADLINE_MS),
     }).catch(() => null);
     if (response?.status === 202) {
-      this.update(run.id, { applySent: true, phase: 'probing', stalledAlarms: 0 });
+      this.toProbing(run);
       return;
     }
     if (response?.status === 409) {
@@ -691,9 +723,11 @@ export class MigrationRunDO extends DurableObject<Env> {
       await container.destroy().catch(() => {});
       return await this.finish(run, config, failure('container_start_failed'));
     }
+    // No answer in time, or any other status: the container did not take the run.
+    await stall();
   }
 
-  private async pollStep(run: Run, config: ProxyConfig, now: number): Promise<void> {
+  private async pollStep(run: ActiveRun, config: ProxyConfig, now: number): Promise<void> {
     const response = await this.containerFetch('/status', {
       signal: AbortSignal.timeout(STATUS_DEADLINE_MS),
     }).catch(() => null);
@@ -702,35 +736,43 @@ export class MigrationRunDO extends DurableObject<Env> {
         ? StatusSchema.safeParse(await response.json().catch(() => null))
         : null;
     if (parsed?.success !== true || parsed.data.runId !== run.id) {
-      // container_lost only after two consecutive ticks with the container down and no status.
-      const running = this.container()?.running === true;
-      const lostTicks = running ? 0 : run.lostTicks + 1;
-      if (lostTicks >= 2) return await this.finish(run, config, failure('container_lost'));
-      this.update(run.id, { lostTicks });
+      // No status, `no_run`, or another run's status: a lost tick, whether or not the container
+      // still runs; a running container that stops answering gets more ticks.
+      const lostTicks = run.lostTicks + 1;
+      const limit = this.container()?.running === true ? LOST_TICKS_UP : LOST_TICKS_DOWN;
+      if (lostTicks >= limit) return await this.finish(run, config, failure('container_lost'));
+      this.record(run, { lostTicks });
       return;
     }
     const status = parsed.data;
-    const update: RunUpdate = { lostTicks: 0, heartbeatAt: now };
-    // The pair is stored before anything else uses it (§2).
-    if (status.pair !== null) this.recordPair(status.pair, run.id, now);
-    if (status.pair !== null && run.startedAt === null) {
-      update.state = 'running';
-      update.phase = 'migrating';
-      update.startedAt = now;
+    let current: Run | null = run;
+    if (status.pair !== null && run.phase === 'probing') {
+      // The probe passed. The run's own pair is stored, once, before anything else uses it (§2).
+      this.recordPair(status.pair, run.id, now);
+      current = this.toRunning(run, now);
     }
-    if (status.pending !== null) update.pending = status.pending;
-    if (status.cleanup !== null && run.terminatedSessions === null) {
-      update.terminatedSessions = status.cleanup.terminated;
-      update.unexpectedSessions = status.cleanup.unexpected;
+    if (!isActive(current)) return;
+    const values: RunValues = { lostTicks: 0, heartbeatAt: now };
+    if (status.pending !== null) values.pending = status.pending;
+    const cleanup = current.terminatedSessions === null ? status.cleanup : null;
+    if (cleanup !== null) {
+      values.terminatedSessions = cleanup.terminated;
+      values.unexpectedSessions = cleanup.unexpected;
+    }
+    const known = new Set(current.applied.map(item => item.tag));
+    const fresh = status.applied.filter(item => !known.has(item.tag));
+    if (fresh.length > 0) values.applied = [...current.applied, ...fresh];
+    current = this.record(current, values);
+    if (!isActive(current)) return;
+    // Audited only once the write landed, so a late answer leaves no row.
+    if (cleanup !== null) {
       await this.appendAudit(config.environment, {
         type: 'sessionTerminated',
         outcome: 'success',
         actor: SYSTEM_ACTOR,
-        attributes: { runId: run.id, count: status.cleanup.terminated },
+        attributes: { runId: run.id, count: cleanup.terminated },
       });
     }
-    const known = new Set(run.applied.map(item => item.tag));
-    const fresh = status.applied.filter(item => !known.has(item.tag));
     for (const item of fresh) {
       await this.appendAudit(config.environment, {
         type: 'migrationApplied',
@@ -745,13 +787,10 @@ export class MigrationRunDO extends DurableObject<Env> {
         },
       });
     }
-    if (fresh.length > 0) update.applied = [...run.applied, ...fresh];
-    this.update(run.id, update);
     if (status.phase !== 'done') return;
-    const latest = this.db.select().from(runs).where(eq(runs.id, run.id)).get() ?? run;
     const reported = status.failure;
     await this.finish(
-      latest,
+      current,
       config,
       reported === null
         ? null
@@ -766,16 +805,22 @@ export class MigrationRunDO extends DurableObject<Env> {
     );
   }
 
-  /** A final state: stored, audited, and the container destroyed. */
-  private async finish(run: Run, config: ProxyConfig, outcome: RunFailure | null): Promise<void> {
+  /**
+   * A final state: stored only if the run is still where `run` says, then audited, and the
+   * container destroyed. A run another step already finished is left alone.
+   */
+  private async finish(
+    run: ActiveRun,
+    config: ProxyConfig,
+    outcome: RunFailure | null
+  ): Promise<void> {
     const now = Date.now();
-    const latest = this.db.select().from(runs).where(eq(runs.id, run.id)).get() ?? run;
-    this.update(run.id, {
-      state: outcome === null ? 'succeeded' : 'failed',
-      phase: 'done',
-      finishedAt: now,
-      failure: outcome,
-    });
+    const done = this.transition(
+      run,
+      { state: outcome === null ? 'succeeded' : 'failed', phase: 'done' },
+      { finishedAt: now, failure: outcome }
+    );
+    if (done === null) return;
     await this.appendAudit(config.environment, {
       type: 'runFinished',
       outcome: outcome === null ? 'success' : 'failure',
@@ -788,10 +833,10 @@ export class MigrationRunDO extends DurableObject<Env> {
         sqlstate: outcome?.sqlstate,
         migrationTag: outcome?.migrationTag,
         invalidIndexes: outcome?.indexes === undefined ? undefined : capped(outcome.indexes),
-        unexpectedSessions: latest.unexpectedSessions,
+        unexpectedSessions: done.unexpectedSessions,
         retryable: outcome?.retryable,
-        appliedCount: latest.applied.length,
-        pendingTags: capped(latest.pending),
+        appliedCount: done.applied.length,
+        pendingTags: capped(done.pending),
         durationSeconds: Math.round((now - run.createdAt) / 1000),
       },
     });
@@ -921,29 +966,92 @@ export class MigrationRunDO extends DurableObject<Env> {
     return result;
   }
 
-  private activeRun(): Run | undefined {
-    return this.db
+  private activeRun(): ActiveRun | undefined {
+    const row = this.db
       .select()
       .from(runs)
       .where(inArray(runs.state, [...ACTIVE_STATES]))
       .orderBy(desc(runs.seq))
       .limit(1)
       .get();
+    const run = row === undefined ? null : asRun(row);
+    return isActive(run) ? run : undefined;
   }
 
   private newestRun(state?: 'succeeded'): Run | undefined {
-    return this.db
+    const row = this.db
       .select()
       .from(runs)
       .where(state === undefined ? undefined : eq(runs.state, state))
       .orderBy(desc(runs.seq))
       .limit(1)
       .get();
+    return row === undefined ? undefined : asRun(row);
   }
 
-  private update(id: string, values: RunUpdate): void {
-    if (Object.keys(values).length === 0) return;
-    this.db.update(runs).set(values).where(eq(runs.id, id)).run();
+  // ---- run transitions: each write lands only while the run is where the caller read it ----
+
+  /**
+   * Writes `values` (and the new stage `to`) only if the run is still at `run`'s stage. Null means
+   * another step moved it first: the caller holds a late result, which is dropped.
+   */
+  private transition(run: ActiveRun, to: Stage | null, values: RunValues): Run | null {
+    const row = this.db
+      .update(runs)
+      .set({ ...values, ...(to ?? {}) })
+      .where(and(eq(runs.id, run.id), eq(runs.state, run.state), eq(runs.phase, run.phase)))
+      .returning()
+      .get();
+    if (row === undefined) {
+      console.warn(
+        `migration-proxy: dropped a late result for run ${run.id} at ${run.state}/${run.phase}`
+      );
+      return null;
+    }
+    return asRun(row);
+  }
+
+  /** A write within the run's current stage. */
+  private record(run: ActiveRun, values: RunValues): Run | null {
+    return this.transition(run, null, values);
+  }
+
+  private toReviewing(run: ActiveRun): Run | null {
+    if (run.phase !== 'fetching') return null;
+    this.nextPhaseReady = true;
+    return this.transition(
+      run,
+      { state: 'pending', phase: 'reviewing' },
+      { stalledAlarms: 0, progressAt: Date.now(), githubRetryAt: null }
+    );
+  }
+
+  private toStarting(
+    run: ActiveRun,
+    values: Pick<RunValues, 'reviewBase' | 'reviewed'>
+  ): Run | null {
+    if (run.phase !== 'reviewing') return null;
+    this.nextPhaseReady = true;
+    return this.transition(
+      run,
+      { state: 'pending', phase: 'starting' },
+      { ...values, stalledAlarms: 0, progressAt: Date.now(), githubRetryAt: null }
+    );
+  }
+
+  private toProbing(run: ActiveRun): Run | null {
+    if (run.phase !== 'starting') return null;
+    return this.transition(
+      run,
+      { state: 'pending', phase: 'probing' },
+      { applySent: true, stalledAlarms: 0 }
+    );
+  }
+
+  /** The probe passed: the run is `running` from now (§4). */
+  private toRunning(run: ActiveRun, startedAt: number): Run | null {
+    if (run.phase !== 'probing') return null;
+    return this.transition(run, { state: 'running', phase: 'migrating' }, { startedAt });
   }
 
   private recordPair(
@@ -1005,7 +1113,10 @@ export class MigrationRunDO extends DurableObject<Env> {
     const active = this.activeRun() !== undefined;
     if (active) candidates.push(this.nextPhaseReady ? now : now + TICK_MS);
     this.nextPhaseReady = false;
-    if (this.audit.hasUnrelayed()) candidates.push(now + AUDIT_RETRY_MS);
+    if (this.audit.hasUnrelayed()) {
+      const backoff = Math.min(RELAY_BACKOFF_MAX_MS, AUDIT_RETRY_MS * 2 ** this.relayFailures);
+      candidates.push(now + backoff);
+    }
     // A sample waits for the run to end; the run's own ticks keep the object awake till then.
     if (!active && config !== null && config.sampleMinutes > 0) {
       candidates.push(Math.max(now + 1_000, this.nextSampleAt(config)));
@@ -1027,7 +1138,9 @@ export class MigrationRunDO extends DurableObject<Env> {
     if (stream === null) return;
     try {
       await this.audit.relay(stream);
+      this.relayFailures = 0;
     } catch (error) {
+      this.relayFailures = Math.min(this.relayFailures + 1, 10);
       console.error(
         'migration-proxy: audit relay failed',
         error instanceof Error ? error.name : 'unknown'
@@ -1074,7 +1187,7 @@ export class MigrationRunDO extends DurableObject<Env> {
     return this.githubClient.client;
   }
 
-  private view(row: Run): RunView {
+  private view(row: RunRow): RunView {
     const iso = (at: number | null) => (at === null ? null : new Date(at).toISOString());
     return {
       id: row.id,

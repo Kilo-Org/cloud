@@ -52,6 +52,8 @@ export class FakeGithub {
   calls: string[] = [];
   /** Answers instead of the repository while set: a status code, with headers. */
   outage: { status: number; headers?: Record<string, string> } | null = null;
+  /** Answers compare calls with a body that is not GitHub's shape, when set. */
+  malformedCompare = false;
   /** Fails `blob` fetches after this many succeeded, to exercise resumable fetches. */
   blobBudget: number | null = null;
 
@@ -147,6 +149,7 @@ export class FakeGithub {
     const path = url.pathname.slice(repo.length);
     let match: RegExpExecArray | null;
     if ((match = /^\/compare\/([^.]+)\.\.\.(.+)$/.exec(path))) {
+      if (this.malformedCompare) return json({ status: 'sideways' });
       const base = this.resolve(match[1]);
       const head = this.resolve(match[2]);
       if (!this.commits.has(base) || !this.commits.has(head)) return notFound();

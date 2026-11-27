@@ -250,9 +250,6 @@ describe('a run', () => {
         await proxy.object.alarm();
       expect(run(proxy)?.phase).toBe('migrating');
       proxy.container.status = null;
-      // Status failing while the container still runs is not a loss.
-      await proxy.object.alarm();
-      expect(run(proxy)).toMatchObject({ state: 'running', lost_ticks: 0 });
       proxy.container.running = false;
       await proxy.object.alarm();
       expect(run(proxy)).toMatchObject({ state: 'running', lost_ticks: 1 });
@@ -366,6 +363,92 @@ describe('the container (§1)', () => {
   it('does not touch the timeout when no container runs', async () => {
     await withProxy({ containerRunning: false }, async proxy => {
       expect(proxy.log).toEqual(['blockConcurrencyWhile']);
+    });
+  });
+});
+
+describe('late results and silent containers (§6)', () => {
+  async function migrating(proxy: Proxy) {
+    const { head } = await readyRun(proxy);
+    await post(proxy, head);
+    for (let alarm = 0; alarm < 8 && run(proxy)?.phase !== 'migrating'; alarm += 1)
+      await proxy.object.alarm();
+    expect(run(proxy)?.phase).toBe('migrating');
+  }
+
+  it('drops a late status: a finished run is never overwritten by a stale tick', async () => {
+    await withProxy({}, async proxy => {
+      await migrating(proxy);
+      // A tick waits on a slow /status that will report success...
+      const gate = Promise.withResolvers<void>();
+      proxy.container.statusGate = gate.promise;
+      proxy.container.status = runId => doneStatus(runId);
+      const slow = proxy.object.alarm();
+      await new Promise(resolve => setTimeout(resolve, 20));
+      // ...while another tick passes the deadline and finishes the run.
+      proxy.container.statusGate = null;
+      proxy.sql(`UPDATE runs SET created_at = ${Date.now() - 22_000_000}`);
+      await proxy.object.alarm();
+      expect(failureOf(proxy)?.code).toBe('deadline_exceeded');
+      gate.resolve();
+      await slow;
+      expect(run(proxy)).toMatchObject({ state: 'failed', phase: 'done' });
+      expect(failureOf(proxy)?.code).toBe('deadline_exceeded');
+      expect(types(proxy).filter(type => type === 'run_finished')).toHaveLength(1);
+      expect(types(proxy)).not.toContain('migration_applied');
+    });
+  });
+
+  it('counts a running container that answers no_run or another run as lost, and ends container_lost', async () => {
+    await withProxy({}, async proxy => {
+      await migrating(proxy);
+      proxy.container.status = () => doneStatus('another-run');
+      for (let alarm = 0; alarm < 7; alarm += 1) await proxy.object.alarm();
+      expect(run(proxy)).toMatchObject({ state: 'running', lost_ticks: 7 });
+      proxy.container.status = null;
+      await proxy.object.alarm();
+      expect(failureOf(proxy)).toEqual({
+        code: 'container_lost',
+        retryable: true,
+        sqlstate: null,
+        migrationTag: null,
+      });
+    });
+  });
+
+  it('counts an /apply the container refuses as a stalled start, ending container_start_failed after 5', async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      await post(proxy, head);
+      proxy.container.applyStatus = 500;
+      for (let alarm = 0; alarm < 10 && run(proxy)?.phase !== 'starting'; alarm += 1)
+        await proxy.object.alarm();
+      for (let alarm = 0; alarm < 4; alarm += 1) await proxy.object.alarm();
+      expect(run(proxy)).toMatchObject({ state: 'pending', phase: 'starting', stalled_alarms: 4 });
+      await proxy.object.alarm();
+      expect(failureOf(proxy)?.code).toBe('container_start_failed');
+    });
+  });
+
+  it('keeps a byte order mark, so the container sees the blob the owner approved', async () => {
+    await withProxy({}, async proxy => {
+      const base = await proxy.github.push(repoFiles(['0000_base']));
+      const head = await proxy.github.push(
+        repoFiles(['0000_base', '0001_widgets'], {
+          [`${MIGRATIONS}/0001_widgets.sql`]: '\uFEFFselect 1;',
+        })
+      );
+      proxy.github.pulls.set(head, [
+        { number: 7, mergedAt: '2026-11-26T10:00:00Z', baseRef: 'main', authorId: 99_001 },
+      ]);
+      proxy.github.reviews.set(7, [{ userId: 54751, state: 'APPROVED', commitId: head }]);
+      proxy.env.MIGRATION_REVIEW_BASELINE_SHA = base;
+      proxy.sts.allow('tok', attested({ sha: head }));
+      await post(proxy, head);
+      for (let alarm = 0; alarm < 8 && proxy.container.applyBodies.length === 0; alarm += 1)
+        await proxy.object.alarm();
+      const files = proxy.container.applyBodies[0]?.files as Record<string, string>;
+      expect(files['0001_widgets.sql']?.startsWith('\uFEFF')).toBe(true);
     });
   });
 });

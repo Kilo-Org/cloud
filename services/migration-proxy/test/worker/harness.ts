@@ -81,6 +81,10 @@ export class FakeContainer {
 
   /** Thrown by `start()`, as the runtime does for options it refuses. */
   startError: Error | null = null;
+  /** What `/apply` answers instead of 202, when set. */
+  applyStatus: number | null = null;
+  /** `/status` waits for this before answering, when set: a slow answer arriving late. */
+  statusGate: Promise<void> | null = null;
 
   start(options: unknown): void {
     if (this.startError !== null) throw this.startError;
@@ -113,6 +117,7 @@ export class FakeContainer {
         this.log.push(`${method} ${path}`);
         if (path === '/health') return Response.json({ ok: true });
         if (path === '/apply') {
+          if (this.applyStatus !== null) return Response.json({}, { status: this.applyStatus });
           const body = JSON.parse(init.body as string) as Record<string, unknown>;
           this.applyBodies.push(body);
           if (this.runId !== null && this.runId !== body.runId)
@@ -122,7 +127,10 @@ export class FakeContainer {
         }
         if (path === '/status') {
           if (this.status === null || this.runId === null) throw new Error('status failed');
-          return Response.json(this.status(this.runId));
+          // The answer is taken now and delivered after the gate: a late answer.
+          const answer = this.status(this.runId);
+          if (this.statusGate !== null) await this.statusGate;
+          return Response.json(answer);
         }
         if (path === '/sample') {
           this.sampleBodies.push(JSON.parse(init.body as string) as Record<string, unknown>);
@@ -256,6 +264,8 @@ export type Proxy = {
   log: string[];
   /** The alarm the object last asked for. */
   alarmAt: () => number | null;
+  /** Forgets the alarm, as if the runtime lost it. */
+  clearAlarm: () => void;
   /** Runs alarms until no run is active or `max` ran. */
   drive: (max?: number) => Promise<void>;
   /** The Worker's fetch against this object. */
@@ -376,6 +386,9 @@ export async function withProxy<T>(
             .map(row => JSON.parse(row.event) as ReturnType<Proxy['events']>[number]),
         sql: query => state.storage.sql.exec(query).toArray() as never,
         alarmAt: () => alarm,
+        clearAlarm: () => {
+          alarm = null;
+        },
         drive: async (max = 40) => {
           for (let tick = 0; tick < max; tick += 1) {
             await object.alarm();

@@ -276,6 +276,26 @@ describe('POST /v1/runs', () => {
     });
   });
 
+  it("503 github_unavailable for a GitHub answer that is not GitHub's shape", async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      proxy.github.malformedCompare = true;
+      const answer = await post(proxy, head);
+      expect(answer.status).toBe(503);
+      expect(answer.body).toMatchObject({ status: 'unavailable', reason: 'github_unavailable' });
+    });
+  });
+
+  it('re-arms a lost alarm when CI polls an active run', async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      const created = await post(proxy, head);
+      proxy.clearAlarm();
+      await proxy.request('GET', `/v1/runs/${created.body.run?.id}`, { token: 'tok' });
+      expect(proxy.alarmAt()).not.toBeNull();
+    });
+  });
+
   it('500 config_invalid for a refused config, and nothing starts', async () => {
     await withProxy({ vars: { MIGRATION_DB_LOGIN_MODE: 'direct' } }, async proxy => {
       const { head } = await readyRun(proxy);

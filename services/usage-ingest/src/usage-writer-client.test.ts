@@ -259,7 +259,7 @@ describe('usage writer client', () => {
         authorization: `Bearer ${serviceToken}`,
         'x-vercel-protection-bypass': config.protectionBypass,
       },
-      body: JSON.stringify(usage),
+      body: JSON.stringify(wireUsage),
       signal: expect.any(AbortSignal),
     });
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;

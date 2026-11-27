@@ -10,7 +10,7 @@ import { z } from 'zod';
 import type { UtsConfig } from '../env';
 import { classifyFailure } from '../oauth/errors';
 import { base64url, isRandomCredential, randomCredential, sha256 } from '../token/credentials';
-import type { SignInMailer } from './email/mailer';
+import type { EmailSignIn } from './email/delivery';
 import { anonymousWriteRetryAfter } from './limits';
 import { requestNetwork } from './network';
 import { type SignInChoices, continuePage, messagePage, unavailablePage } from './pages';
@@ -21,13 +21,13 @@ import { sessionCookie, sessionCookieValue } from './session';
 
 /**
  * The provider, SSO and email sign-in of one environment: its configuration, its statements and
- * its mail port (null where no sender is wired, so email sign-in is not offered).
+ * its email sign-in (`off` where no sender is wired, so email sign-in is not offered).
  */
 export type SignInMethods = {
   config: UtsConfig;
   settings: SignInConfig;
   store: ProviderSignInAccess;
-  mailer: SignInMailer | null;
+  email: EmailSignIn;
 };
 
 const PROVIDER_NAMES: Readonly<Record<UtsOAuthProvider, string>> = {
@@ -51,7 +51,13 @@ export function signInChoices(methods: SignInMethods, returnTo: string): SignInC
     providers: UTS_OAUTH_PROVIDERS.filter(
       provider => settings.providers[provider].status === 'on'
     ).map(provider => ({ provider, name: PROVIDER_NAMES[provider] })),
-    email: settings.emailHashKey.status === 'on' && methods.mailer !== null,
+    email:
+      methods.email.status !== 'on'
+        ? null
+        : {
+            turnstileSiteKey:
+              methods.email.delivery.kind === 'mailgun' ? methods.email.delivery.siteKey : null,
+          },
     sso: settings.sso.status === 'on',
   };
 }
@@ -183,7 +189,10 @@ export type SignInRefusal =
   | 'no_sso_connection'
   | 'invalid_link'
   | 'code_locked'
-  | 'codes_stopped';
+  | 'codes_stopped'
+  | 'network_limited'
+  | 'check_failed'
+  | 'recipient_not_allowed';
 
 const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   invalid_state: {
@@ -235,6 +244,19 @@ const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   codes_stopped: {
     status: 429,
     message: 'Too many wrong codes for this address. Use the link in the email.',
+  },
+  network_limited: {
+    status: 429,
+    message:
+      'Too many wrong codes from your network. Use the link in the email, or try again in an hour.',
+  },
+  check_failed: {
+    status: 400,
+    message: 'The check that you are a person did not pass. Go back and try again.',
+  },
+  recipient_not_allowed: {
+    status: 403,
+    message: 'This test environment sends sign-in email only to test addresses.',
   },
 };
 

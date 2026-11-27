@@ -42,6 +42,10 @@
     // WebAuthn related origin that the app host lists (design 5.14).
     "WEBAUTHN_RP_ID": "app.kilo.ai",
     "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
+    // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
+    // UTS_TURNSTILE_SITE_KEY are added here, after the secrets SIGNIN_EMAIL_HASH_KEY,
+    // UTS_MAILGUN_SENDING_KEY and UTS_TURNSTILE_SECRET_KEY are set. Staging also needs
+    // UTS_MAIL_ALLOWED_RECIPIENTS; production must not set it (README, "Configuration").
   },
   "durable_objects": {
     "bindings": [

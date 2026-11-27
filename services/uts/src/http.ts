@@ -21,7 +21,11 @@ import { type PatProbeDeps, handlePatProbe } from './pat/probe';
 import { jsonResponse } from './responses';
 import { feedPublisher } from './revocation/publish';
 import type { ScopeRegistry } from './scopes/policy';
+import { credentialNotices } from './notices/credential';
+import { noticesAccess } from './notices/store';
+import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
 import type { SignInMailer } from './signin/email/mailer';
+import { signInConfigFor } from './signin/providers/config';
 import { subjectDeps } from './subjects/deps';
 import { handleInternalRequest } from './subjects/routes';
 import type { ServiceTokenVerifier } from './subjects/service-tokens';
@@ -38,7 +42,8 @@ import { deployedStsCallers } from './sts-callers';
  * registry, a recording mail port for the email sign-in, a metadata fetch that serves the local
  * end-to-end run's client documents, a stand-in STS token verifier of the broker exchange and a
  * stand-in STS token check for the `/internal/` routes (src/dev.ts). The deployed options are the
- * sign-in pages, the grant's signer, the registry alone, no mail port, the platform `fetch`, and
+ * sign-in pages, the grant's signer, the registry alone, no recording mail port (mail goes through
+ * Mailgun where the mail settings are on, src/signin/email/delivery.ts), the platform `fetch`, and
  * the STS checks of `@kilocode/verify` with this environment's caller allow-lists
  * (src/sts-callers.ts).
  */
@@ -46,7 +51,7 @@ export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
   signer: SignerAccess | null;
   scopes: ScopeRegistry;
-  mailer: SignInMailer | null;
+  recordingMailer: SignInMailer | null;
   serviceTokens: ServiceTokenVerifier;
   metadataFetcher: MetadataFetcher;
   stsCallers: StsCallerVerifier | null;
@@ -57,23 +62,35 @@ const DEPLOYED: Omit<MintOptions, 'serviceTokens' | 'stsCallers'> = {
   authorizationHandoff: null,
   signer: null,
   scopes: utsScopeEntry,
-  mailer: null,
+  recordingMailer: null,
   metadataFetcher: (url, init) => fetch(url, init),
 };
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
 const probeWindows: AddressWindows = new Map();
 
-/** The account API is served once the identity store's primary config is bound. */
+/**
+ * The account API is served once the identity store's primary config is bound. A created
+ * credential's notice goes out at once by email where the mail settings are on (push has no
+ * deployed provider yet); elsewhere the minute cron settles it.
+ */
 function accountDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): AccountDeps | null {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return null;
+  const email = noticeEmailTransport(signInConfigFor(env, config).mail, platformFetch);
   return {
     config,
     account: work =>
       withIdentityStore(binding.connectionString, ctx, store => work(identityStoreAccount(store))),
     keys: shardAccessTokenKeys(env, config),
-    notices: null,
+    notices:
+      email === null
+        ? null
+        : credentialNotices({
+            notices: noticesAccess(binding.connectionString, ctx),
+            transports: { push: null, email },
+            now: () => new Date(),
+          }),
     publish: feedPublisher(env, config, ctx),
     context: ctx,
     nowSeconds: () => Math.floor(Date.now() / 1000),

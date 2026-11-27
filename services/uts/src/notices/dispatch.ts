@@ -147,6 +147,17 @@ function errorFields(error: unknown) {
     : { error: error instanceof Error ? error.name : 'unknown' };
 }
 
+/** One retention step (`uts.maintain_notice_rows`); a failure is logged and answered, not thrown. */
+export async function retainNotices(notices: NoticesAccess): Promise<SweepResult['retention']> {
+  try {
+    const steps = await notices(store => store.maintainNoticeRows(NOTICE_RETENTION_BATCH));
+    return { status: 'done', deleted: steps.reduce((total, step) => total + step.deleted, 0) };
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'uts.notice.retention_failed', ...errorFields(error) }));
+    return { status: 'failed' };
+  }
+}
+
 /**
  * The background pass: claims up to `NOTICE_SWEEP_LIMIT` due notices (new ones whose immediate
  * delivery never ran, retries, and claims left by a stopped Worker), delivers them in parallel, and
@@ -174,14 +185,6 @@ export async function sweepNotices(deps: NoticeDeps): Promise<SweepResult> {
     const { finish } = settled.value;
     if (finish.outcome === 'finished') result[finish.delivery] += 1;
   }
-  try {
-    const steps = await deps.notices(store => store.maintainNoticeRows(NOTICE_RETENTION_BATCH));
-    result.retention = {
-      status: 'done',
-      deleted: steps.reduce((total, step) => total + step.deleted, 0),
-    };
-  } catch (error) {
-    console.error(JSON.stringify({ event: 'uts.notice.retention_failed', ...errorFields(error) }));
-  }
+  result.retention = await retainNotices(deps.notices);
   return result;
 }

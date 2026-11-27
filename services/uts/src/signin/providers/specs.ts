@@ -238,6 +238,13 @@ export const DevEndpointsSchema = z.strictObject({
     .strictObject({ authorization: LocalUrlSchema, token: LocalUrlSchema, user: LocalUrlSchema })
     .optional(),
   workos: z.strictObject({ authorization: LocalUrlSchema, token: LocalUrlSchema }).optional(),
+  /** Mailgun's API origin (the messages path is appended) and Turnstile's siteverify URL. */
+  mail: z
+    .strictObject({
+      mailgun: LocalUrlSchema.refine(value => new URL(value).origin === value, 'an origin'),
+      turnstile: LocalUrlSchema,
+    })
+    .optional(),
 });
 export type DevEndpoints = z.infer<typeof DevEndpointsSchema>;
 

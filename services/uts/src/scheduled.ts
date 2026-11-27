@@ -4,16 +4,10 @@ import { withIdentityStore } from './db/client';
 import { getAuditRelayStub } from './dos/stubs';
 import { readConfig, type Env, type UtsConfig } from './env';
 import { identityStoreBinding } from './grants/binding';
-import { sweepNotices } from './notices/dispatch';
-import { noticesAccess } from './notices/store';
-import type { NoticeTransports } from './notices/transports';
-
-/**
- * No deployed environment has a push or email provider wired yet (README, "Security notices"), so
- * the sweep settles each out-of-band channel as `not_configured`; the in-app row shows every
- * notice, and the sweep's retention step still runs.
- */
-const DEPLOYED_NOTICE_TRANSPORTS: NoticeTransports = { push: null, email: null };
+import { retainNotices, sweepNotices } from './notices/dispatch';
+import { type NoticesAccess, noticesAccess } from './notices/store';
+import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
+import { type MailSettings, logMisconfigured, signInConfigFor } from './signin/providers/config';
 
 /** Arms each shard's relay object; logs `uts.audit_relay.not_started` for one that failed or refused. */
 export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
@@ -35,11 +29,37 @@ export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
 }
 
 /**
+ * The cron's notice step. Mail `off`: the sweep settles email as `not_configured`. Mail `on`: it
+ * sends through Mailgun. Mail `misconfigured` (a deploy error): the step claims nothing and only
+ * runs retention, because a round now would settle every due notice's email as `not_configured`
+ * for good; the notices stay pending and go out once the settings are fixed, within their 24
+ * hours. Push has no deployed provider yet, so it waits with them and then settles as
+ * `not_configured`.
+ */
+export async function noticeStep(
+  mail: MailSettings,
+  notices: NoticesAccess,
+  fetcher: typeof fetch
+): Promise<void> {
+  if (mail.status === 'misconfigured') {
+    logMisconfigured('notice_email', mail.missing);
+    await retainNotices(notices);
+    return;
+  }
+  await sweepNotices({
+    notices,
+    transports: { push: null, email: noticeEmailTransport(mail, fetcher) },
+    now: () => new Date(),
+  });
+}
+
+/**
  * The minute cron: keeps the 8 shard relays running; on one connection ends long transactions,
  * maintains audit partitions, OAuth rows and sign-in rows, and raises the relay-lag alert
- * (`src/audit/maintenance.ts`); then runs one notice sweep, whose claim and finish statements
- * open their own connections (`src/notices/dispatch.ts`). Nothing runs until the environment binds
- * its identity store. Every statement is its own transaction, and each step logs its own failure.
+ * (`src/audit/maintenance.ts`); then runs the notice step (`noticeStep`), whose claim and finish
+ * statements open their own connections (`src/notices/dispatch.ts`). Nothing runs until the
+ * environment binds its identity store. Every statement is its own transaction, and each step logs
+ * its own failure.
  */
 export async function scheduled(
   _controller: ScheduledController,
@@ -53,11 +73,11 @@ export async function scheduled(
   await step('connect', () =>
     withIdentityStore(binding.connectionString, context, store => runMaintenance(store))
   );
-  await step('notices', async () => {
-    await sweepNotices({
-      notices: noticesAccess(binding.connectionString, context),
-      transports: DEPLOYED_NOTICE_TRANSPORTS,
-      now: () => new Date(),
-    });
-  });
+  await step('notices', () =>
+    noticeStep(
+      signInConfigFor(env, config).mail,
+      noticesAccess(binding.connectionString, context),
+      platformFetch
+    )
+  );
 }

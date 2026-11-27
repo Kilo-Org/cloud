@@ -179,7 +179,13 @@ async function settle() {
 }
 
 const signIn = () =>
-  signInPage({ returnTo: '/signin/done', rpId: RP_ID, providers: [], email: true, sso: false });
+  signInPage({
+    returnTo: '/signin/done',
+    rpId: RP_ID,
+    providers: [],
+    email: { turnstileSiteKey: null },
+    sso: false,
+  });
 
 const device: PendingDevice = {
   clientId: 'kilo-cli',
@@ -271,7 +277,7 @@ describe('passkey sign-in on the issuer host', () => {
         returnTo: '/signin/done',
         rpId: 'localhost',
         providers: [],
-        email: true,
+        email: { turnstileSiteKey: null },
         sso: false,
       }),
       { host: 'localhost', capabilities: { relatedOrigins: false }, get: securityError }

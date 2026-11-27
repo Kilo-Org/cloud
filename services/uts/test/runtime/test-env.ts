@@ -46,5 +46,5 @@ export const noSignInMethods: SignInMethods = {
   store: async () => {
     throw new Error('unexpected sign-in method store call');
   },
-  mailer: null,
+  email: { status: 'off' },
 };

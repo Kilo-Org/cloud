@@ -1,0 +1,16 @@
+# The Cloud Agent e2e tests job (cloud-agent-e2e.yml on main, GitHub environment cloud-agent-e2e):
+# the Cloudflare Access service token of the e2e Worker's ingress (D35/D39, manager ruling M83).
+# Only the tests job reads the bundle. cloud-agent-e2e.yml has no workflow_call trigger, so no other
+# workflow can run its jobs under its job_workflow_ref.
+workload: ci-cloud-agent-e2e
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: cloud-agent-e2e
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/cloud-agent-e2e.yml@refs/heads/main]
+  events: [workflow_dispatch] # schedule is added when the nightly schedule returns
+secrets: [E2E_ACCESS_CLIENT_ID, E2E_ACCESS_CLIENT_SECRET]

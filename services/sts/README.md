@@ -522,6 +522,18 @@ Two kilocode-side rules hold these policies to what they name:
   `main` only (a deployment branch policy). STS trusts the `environment` claim; the branch rule is
   what makes it mean `main`.
 
+One `Kilo-Org/cloud` policy (repository id `1145038391`, owner id `201822503`, immutable subjects)
+serves a bundle the same way, production only, `refs/heads/main`:
+
+| Workload | GitHub environment | Workflow files | Events | Secrets |
+|---|---|---|---|---|
+| `ci-cloud-agent-e2e` | `cloud-agent-e2e` | `cloud-agent-e2e.yml` | `workflow_dispatch` | `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` |
+
+These are the Cloudflare Access service token of the e2e Worker's ingress (D35/D39); only the
+tests job reads the bundle. `cloud-agent-e2e.yml` may not gain an `on: workflow_call` trigger, and
+the `cloud-agent-e2e` environment admits deployments from `main` only, as for the kilocode
+policies. Restoring the nightly schedule adds `schedule` to the policy's events.
+
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
 review covers its STS binding; this repository refuses any config that deploys under the name.
@@ -827,8 +839,9 @@ copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,0
 a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
 cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
 has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
-push per GitHub policy per refresh: with the 7 kilocode policies, 7 `BundleDO` calls every 4
-minutes, or 2,520 a day in production.
+push per GitHub policy per refresh: with the 10 production GitHub policies (the 7 kilocode ones,
+`ci-deploy-bouncer`, `ci-db-migrate` and `ci-cloud-agent-e2e`), 10 `BundleDO` calls every 4
+minutes, or 3,600 a day in production; staging's one (`ci-db-migrate-staging`) adds 360 a day.
 
 ## Migration run attestation
 

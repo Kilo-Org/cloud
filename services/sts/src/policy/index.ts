@@ -4,6 +4,7 @@ import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import autoRoutingBenchmarkPolicy from '../../policy/auto-routing-benchmark.yaml';
 import autoRoutingPolicy from '../../policy/auto-routing.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import ciCloudAgentE2ePolicy from '../../policy/ci-cloud-agent-e2e.yaml';
 import ciDbMigrateStagingPolicy from '../../policy/ci-db-migrate-staging.yaml';
 import ciDbMigratePolicy from '../../policy/ci-db-migrate.yaml';
 import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
@@ -53,6 +54,7 @@ const sources: Record<PolicyFile, string> = {
   'auto-routing.yaml': autoRoutingPolicy,
   'auto-routing-benchmark.yaml': autoRoutingBenchmarkPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'ci-cloud-agent-e2e.yaml': ciCloudAgentE2ePolicy,
   'ci-db-migrate.yaml': ciDbMigratePolicy,
   'ci-db-migrate-staging.yaml': ciDbMigrateStagingPolicy,
   'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,

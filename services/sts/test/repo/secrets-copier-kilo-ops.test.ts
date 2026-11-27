@@ -27,25 +27,11 @@ import { parseWorkerConfig } from './worker-configs';
 const WORKLOAD = 'kilo-ops';
 const CONFIG_PATH = 'services/kilo-ops/wrangler.jsonc';
 
-/**
- * The names STS resolves from `/shared`, the fallback folder of every policy
- * (src/policy/schema.ts `bundleFolder`); every other name resolves from `/workloads/kilo-ops`.
- */
-const SHARED_NAMES: readonly string[] = ['O11Y_CF_AE_API_TOKEN'];
-
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
 /** The reader's own name union: a name outside it is a type error here, not a runtime failure. */
 const NAMES: readonly KiloOpsSecretName[] = ['O11Y_CF_AE_API_TOKEN', 'GF_SECRET_KEY'];
-
-/**
- * The store names the `dev` block reads. Two new entries have to exist in the account's Secrets
- * Store before `wrangler deploy --env dev` works, and neither may hold a production value: a config
- * that binds STS may not read a production-named store secret from a non-production block
- * (worker-configs.ts).
- */
-const DEV_STORE_NAMES: readonly string[] = ['O11Y_CF_AE_API_TOKEN_DEV', 'GF_SECRET_KEY_DEV'];
 
 /** One row of the copier table: the four columns the PR body publishes. */
 type CopierRow = {
@@ -60,6 +46,37 @@ type CopierRow = {
 };
 
 /**
+ * The copier table this PR publishes, row for row. The reader, the policy and the manifest are
+ * derived from the files; this literal is what they are compared against, so a row that changes in
+ * any of the three fails here. Without it the comparison would only restate the derivation.
+ */
+const EXPECTED_ROWS: readonly CopierRow[] = [
+  {
+    oldBinding: 'CF_ANALYTICS_API_KEY',
+    storeSecretName: 'O11Y_CF_AE_API_TOKEN',
+    stsLookup: '/shared/O11Y_CF_AE_API_TOKEN',
+    policyEntry: 'O11Y_CF_AE_API_TOKEN',
+  },
+  {
+    oldBinding: 'GF_SECRET_KEY',
+    storeSecretName: 'GF_SECRET_KEY',
+    stsLookup: '/workloads/kilo-ops/GF_SECRET_KEY',
+    policyEntry: 'GF_SECRET_KEY',
+  },
+];
+
+/**
+ * The two entries the `dev` block reads, by binding. Both have to exist in the account's Secrets
+ * Store before `wrangler deploy --env dev` works, and neither may hold a production value: a config
+ * that binds STS may not read a production-named store secret from a non-production block
+ * (worker-configs.ts).
+ */
+const EXPECTED_DEV_ENTRIES: readonly { binding: string; secret_name: string }[] = [
+  { binding: 'CF_ANALYTICS_API_KEY', secret_name: 'O11Y_CF_AE_API_TOKEN_DEV' },
+  { binding: 'GF_SECRET_KEY', secret_name: 'GF_SECRET_KEY_DEV' },
+];
+
+/**
  * Reads a config with Wrangler's own JSON, JSONC and TOML parser, the one a deploy uses. It lives
  * in this test file because wrangler's published types re-export from `@cloudflare/workers-utils`,
  * which wrangler does not ship, so type-aware lint sees the function as `error` typed everywhere
@@ -68,10 +85,12 @@ type CopierRow = {
 const readWorkerConfig = (path: string) =>
   parseWorkerConfig(path, experimental_readRawConfig({ config: join(repoRoot, path) }).rawConfig);
 
+function shippedPolicies(): Policy[] {
+  return shippedPolicyDocuments().map(({ document }) => PolicySchema.parse(document));
+}
+
 function shippedPolicy(workload: string): Policy {
-  const found = shippedPolicyDocuments()
-    .map(({ document }) => PolicySchema.parse(document))
-    .find(policy => policy.workload === workload);
+  const found = shippedPolicies().find(policy => policy.workload === workload);
   if (found === undefined) throw new Error(`no shipped policy for ${workload}`);
   return found;
 }
@@ -104,9 +123,16 @@ async function serving<N extends string>(
   return binding;
 }
 
-/** The bundle key STS reads, as src/policy/schema.ts `bundleFolder` places it. */
+/**
+ * The bundle key STS reads: another shipped policy granting the same name puts it in the fallback
+ * folder `/shared`, otherwise it is this workload's own entry in `/workloads/kilo-ops`
+ * (src/policy/schema.ts `bundleFolder`). EXPECTED_ROWS pins the result, so a wrong folder fails.
+ */
 function stsLookup(name: string): string {
-  return SHARED_NAMES.includes(name) ? `/shared/${name}` : `/workloads/${WORKLOAD}/${name}`;
+  const elsewhere = shippedPolicies().filter(
+    policy => policy.workload !== WORKLOAD && policy.secrets.includes(name)
+  );
+  return elsewhere.length > 0 ? `/shared/${name}` : `/workloads/${WORKLOAD}/${name}`;
 }
 
 describe('the secrets copier table for kilo-ops', () => {
@@ -146,8 +172,8 @@ describe('the secrets copier table for kilo-ops', () => {
       if (entry === undefined) {
         throw new Error(`${WORKLOAD}: ${name} -> ${binding} is not a Secrets Store binding`);
       }
-      // Manifest <-> store name: the entry names the canonical name or its `_PROD` alias.
-      expect([name, `${name}_PROD`], `${WORKLOAD}: ${binding}`).toContain(entry.secret_name);
+      // Manifest <-> store name: the entry names the canonical name, never a suffixed alias.
+      expect(entry.secret_name, `${WORKLOAD}: ${binding}`).toBe(name);
       rows.push({
         oldBinding: binding,
         storeSecretName: entry.secret_name,
@@ -167,18 +193,25 @@ describe('the secrets copier table for kilo-ops', () => {
     expect(rows, WORKLOAD).toHaveLength(NAMES.length);
     for (const row of rows) {
       expect(policy.secrets, `${WORKLOAD}: ${row.oldBinding}`).toContain(row.policyEntry);
-      expect(row.stsLookup, `${WORKLOAD}: ${row.oldBinding}`).toBe(stsLookup(row.policyEntry));
     }
+    // The published table itself: derived rows must equal it row for row, so a moved folder, a
+    // changed store name or a repointed binding fails here rather than at cutover.
+    expect(rows, WORKLOAD).toEqual(EXPECTED_ROWS);
 
-    // The `dev` block reads two new dev-only store entries, never a production copy.
+    // The `dev` block reads the two new dev-only store entries, by binding, never a production one.
     const devEntries = config.env?.['dev']?.secrets_store_secrets ?? [];
-    expect(devEntries.map(entry => entry.secret_name).sort(), WORKLOAD).toEqual(
-      [...DEV_STORE_NAMES].sort()
+    expect(
+      devEntries
+        .map(entry => ({ binding: entry.binding, secret_name: entry.secret_name }))
+        .sort((a, b) => a.binding.localeCompare(b.binding)),
+      WORKLOAD
+    ).toEqual(
+      [...EXPECTED_DEV_ENTRIES].sort((a, b) => a.binding.localeCompare(b.binding))
     );
     for (const entry of devEntries) {
       expect(entry.secret_name, `${WORKLOAD}: dev ${entry.binding}`).toMatch(ENVIRONMENT_SUFFIX);
       expect(
-        rows.map(row => row.storeSecretName),
+        EXPECTED_ROWS.map(row => row.storeSecretName),
         `${WORKLOAD}: dev ${entry.binding} reads a production secret`
       ).not.toContain(entry.secret_name);
     }

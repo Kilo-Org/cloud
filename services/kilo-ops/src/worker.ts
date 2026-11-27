@@ -62,11 +62,14 @@ GrafanaContainer.outboundByHost = {
       return new Response('method not allowed', { status: 405 });
     }
 
-    // Interception runs in the containers package's `ContainerProxy` Durable Object, whose
-    // handler receives no `ExecutionContext`, so this read cannot hand a bundle revalidation to
-    // `waitUntil`. The client still refreshes inline once the held bundle reaches its cache TTL, so
-    // the cost is a slower read at that point, not a stale bundle; the DO's own `GF_SECRET_KEY`
-    // read passes `this.ctx`.
+    // Interception runs in the containers package's `ContainerProxy` WorkerEntrypoint, whose
+    // outbound handler receives no `ExecutionContext`, so this read cannot hand a bundle
+    // revalidation to `waitUntil`. A refresh started between the 240 s revalidate point and the
+    // 300 s cache TTL lasts only as long as this outbound request; if the request ends first the
+    // client counts the attempt as failed and serves the bundle it already holds while it backs
+    // off, never beyond the 24 h stale cap. So the cost after that point is a slower read, not a
+    // fetch per request and not an unboundedly stale bundle. The DO's own `GF_SECRET_KEY` read
+    // passes `this.ctx`.
     const token = await resolveSecret(env, 'O11Y_CF_AE_API_TOKEN');
     if (!token) {
       return new Response('Analytics Engine token unavailable', { status: 503 });

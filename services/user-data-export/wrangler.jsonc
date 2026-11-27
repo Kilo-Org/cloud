@@ -47,6 +47,10 @@
     "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "R2_BUCKET_NAME": "user-data-export",
     "USER_DATA_EXPORT_WEB_URL": "https://api.kilo.ai",
+    // The credential of the `/api/internal/user-data-exports/ready` callback (decision D59):
+    // `sts` sends a `web:user-data-exports.ready` STS service token over the `STS` binding,
+    // `legacy` the `INTERNAL_API_SECRET` as `x-internal-api-key`. Rollback is `legacy`.
+    "WEB_INTERNAL_AUTH": "sts",
   },
   "triggers": {
     "crons": ["*/5 * * * *"],

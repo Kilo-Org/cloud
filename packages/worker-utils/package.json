@@ -84,7 +84,8 @@
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
-    "./environment-setup-authority": "./src/environment-setup-authority.ts"
+    "./environment-setup-authority": "./src/environment-setup-authority.ts",
+    "./web-internal-credential": "./src/web-internal-credential.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -97,6 +98,7 @@
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "aws4fetch": "catalog:",
@@ -107,6 +109,7 @@
     "@cfworker/json-schema": "catalog:"
   },
   "devDependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

@@ -4,6 +4,7 @@ import {
   consumeExportBatch,
   closeReplicaDatabase,
   deletePendingObjects,
+  dispatchReadyNotifications,
   exportHeader,
   exportTrailer,
   nextReadableAdapter,
@@ -862,5 +863,85 @@ describe('source advance', () => {
     const list = [withReader('a'), withReader('b')];
 
     expect(nextReadableAdapter(list, list[1]!)).toBeNull();
+  });
+});
+
+describe('dispatchReadyNotifications', () => {
+  const pending = { pendingNotifications: async () => [{ id: 'export-1' }, { id: 'export-2' }] };
+  const sts = (minted: unknown[]) => ({
+    async mintTokens(request: { tokens: { audience: string; scope: string }[] }) {
+      minted.push(request);
+      return {
+        status: 'ok' as const,
+        tokens: request.tokens.map(({ audience, scope }) => ({
+          status: 'issued' as const,
+          audience,
+          scope,
+          token: 'sts-ready-token',
+          jti: 'jti-ready',
+          expiresAt: Math.floor(Date.now() / 1000) + 300,
+        })),
+      };
+    },
+  });
+
+  it('sends each ready callback with a web:user-data-exports.ready STS token by default', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const minted: unknown[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: 'shared-secret',
+        STS: sts(minted),
+      },
+      pending
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(String(url)).toBe('https://api.kilo.ai/api/internal/user-data-exports/ready');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('authorization')).toBe('Bearer sts-ready-token');
+      expect(headers.has('x-internal-api-key')).toBe(false);
+      expect(init?.redirect).toBe('manual');
+    }
+    expect(minted).toEqual([
+      { tokens: [{ audience: 'web', scope: 'web:user-data-exports.ready' }] },
+    ]);
+  });
+
+  it('sends the internal secret under WEB_INTERNAL_AUTH=legacy', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const minted: unknown[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'legacy',
+        STS: sts(minted),
+      },
+      pending
+    );
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('x-internal-api-key')).toBe('shared-secret');
+    expect(headers.has('authorization')).toBe(false);
+    expect(minted).toEqual([]);
+  });
+
+  it('sends nothing, leaving every item leased, when no token can be had', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    await dispatchReadyNotifications(
+      { USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai', INTERNAL_API_SECRET: 'shared-secret' },
+      pending
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

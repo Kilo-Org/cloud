@@ -2,6 +2,8 @@ import type { z } from 'zod';
 
 import { DirectorySyncConflictBodySchema, isTerminalConflictCode } from '@kilocode/scim-contracts';
 
+import type { WebInternalCredential } from '@kilocode/worker-utils/web-internal-credential';
+
 import { REQUEST_TIMEOUT_MS } from '../util/constants';
 
 /**
@@ -46,8 +48,13 @@ const APPLIED: AttemptOutcome = { class: 'applied', status: null, code: null, re
 export type AppCallContext = {
   /** `BACKEND_API_URL`. */
   origin: string;
-  /** `INTERNAL_API_SECRET`, sent as `x-internal-api-key`. */
-  apiKey: string;
+  /**
+   * The credential header for one call (`webInternalCredential`): an STS
+   * `web:scim.sync` bearer, or under `WEB_INTERNAL_AUTH=legacy` the
+   * `INTERNAL_API_SECRET` as `x-internal-api-key`. Resolved per call, so a
+   * drain that outlives one token presents a fresh one.
+   */
+  credential: () => Promise<WebInternalCredential>;
   /**
    * Vercel's automation bypass for the origin, sent as
    * `x-vercel-protection-bypass` when set.
@@ -127,12 +134,26 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
 
   const url = `${ctx.origin}${init.path}`;
 
+  // No credential is an operator problem (STS down or refusing, a wrong
+  // switch value, a missing secret), never a property of the event: hold the
+  // cursor and retry, without spending a request. A rejected secret read
+  // propagates to the poll, as it did when the poll read the secret itself.
+  const credential = await ctx.credential();
+  if (credential.kind === 'unavailable') {
+    return {
+      class: 'unavailable',
+      status: null,
+      code: null,
+      reason: `${init.method} ${init.path} has no app credential: ${credential.reason}`,
+    };
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {
       method: init.method,
       headers: {
-        'x-internal-api-key': ctx.apiKey,
+        [credential.header]: credential.value,
         // Only when configured: an empty value is a *rejected* bypass rather
         // than no bypass, and the unprotected origin needs none.
         ...(ctx.protectionBypass === undefined || ctx.protectionBypass === ''
@@ -145,8 +166,8 @@ export async function callApp(ctx: AppCallContext, init: CallInit): Promise<Atte
       // Never follow a redirect. `x-internal-api-key` is a custom header, so
       // it is *not* stripped when a redirect crosses origins: a 3xx from
       // `BACKEND_API_URL` or an intermediary in front of it would hand the
-      // shared internal secret to whatever origin the `Location` names, and
-      // the body that origin returned would then be parsed as the route's
+      // credential to whatever origin the `Location` names, and the body that
+      // origin returned would then be parsed as the route's
       // response. `'manual'` rather than `'error'` so the status is a value
       // here and the classification below can name it.
       redirect: 'manual',

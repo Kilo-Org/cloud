@@ -697,7 +697,8 @@ describe('native organization compute accounting', () => {
       expect(url.href).toBe(
         'https://local-web.invalid/api/internal/organizations/compute-balance-alert'
       );
-      expect(new Headers(init?.headers).get('X-Internal-Secret')).toBe('fixture-secret');
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer fixture-sts-token');
+      expect(new Headers(init?.headers).has('X-Internal-Secret')).toBe(false);
       expect(JSON.parse(init?.body as string)).toEqual({ organizationId: f.orgId });
       expect((await f.payer()).microdollars_used).toBe(3_000_000);
       return Response.json({ ok: true });
@@ -711,6 +712,19 @@ describe('native organization compute accounting', () => {
         HYPERDRIVE: { connectionString },
         KILOCODE_BACKEND_BASE_URL: 'https://local-web.invalid',
         INTERNAL_API_SECRET_PROD: { get: async () => 'fixture-secret' },
+        STS: {
+          mintTokens: async (request: { tokens: { audience: string; scope: string }[] }) => ({
+            status: 'ok',
+            tokens: request.tokens.map(({ audience, scope }) => ({
+              status: 'issued',
+              audience,
+              scope,
+              token: 'fixture-sts-token',
+              jti: 'fixture-jti',
+              expiresAt: Math.floor(Date.now() / 1000) + 300,
+            })),
+          }),
+        },
         CONTAINER_BILLING_SERVICES: 'cloud-agent-next',
         CONTAINER_BILLING_CLOUD_AGENT_USER_IDS: '',
         CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS: f.orgId,

@@ -235,8 +235,11 @@ deletion and on the inactive update alike.
 
 The endpoints are reached under `BACKEND_API_URL`, which the staging and
 production environments point at `staging-app.kilo.ai` and `app.kilo.ai`
-respectively. Calling them also requires `INTERNAL_API_SECRET` in the
-`x-internal-api-key` header, bound from the Secrets Store.
+respectively. `WEB_INTERNAL_AUTH` picks the credential (decision D59): `sts`
+(production) sends a `web:scim.sync` STS service token, minted over the `STS`
+binding, in `Authorization: Bearer`; `legacy` (staging, and the rollback)
+sends `INTERNAL_API_SECRET` from the Secrets Store in `x-internal-api-key`.
+Without a credential an event is `unavailable` and holds the cursor.
 
 **Both sides share one contract module**, `@kilocode/scim-contracts`
 (`packages/scim-contracts`). The app validates requests with its schemas and

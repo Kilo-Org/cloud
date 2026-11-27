@@ -486,6 +486,7 @@ describe('policy audit stream', () => {
       'notifications',
       'o11y',
       'usage-ingest',
+      'uts',
       'web',
     ]);
     expect(event.data.attributes.removedWorkloads).toEqual([]);

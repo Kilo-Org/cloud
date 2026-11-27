@@ -3,6 +3,7 @@ import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
 import notificationsPolicy from '../../policy/notifications.yaml';
 import o11yPolicy from '../../policy/o11y.yaml';
 import usageIngestPolicy from '../../policy/usage-ingest.yaml';
+import utsPolicy from '../../policy/uts.yaml';
 import webPolicy from '../../policy/web.yaml';
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { loadPolicies, type PolicyIndex } from './load';
@@ -15,6 +16,7 @@ const sources: Record<PolicyFile, string> = {
   'notifications.yaml': notificationsPolicy,
   'o11y.yaml': o11yPolicy,
   'usage-ingest.yaml': usageIngestPolicy,
+  'uts.yaml': utsPolicy,
   'web.yaml': webPolicy,
 };
 

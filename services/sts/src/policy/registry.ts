@@ -9,6 +9,7 @@ export const POLICY_FILES = [
   'bouncer-watch.yaml',
   'notifications.yaml',
   'usage-ingest.yaml',
+  'uts.yaml',
   'web.yaml',
 ] as const;
 

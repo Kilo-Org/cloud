@@ -1,0 +1,13 @@
+# The UTS mint Worker (services/uts/wrangler.jsonc). Its identity-store login rotation reads two
+# names from /workloads/uts: the Cloudflare API token of a dedicated account member with Hyperdrive
+# edit rights only, and the first password of each identity-store login (services/uts/README.md,
+# "Login rotation").
+workload: uts
+environments:
+  - staging
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - UTS_HYPERDRIVE_SWITCH_TOKEN
+  - UTS_IDENTITY_STORE_LOGIN_SEEDS

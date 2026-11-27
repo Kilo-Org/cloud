@@ -73,6 +73,14 @@ export const STS_WEB_USAGE_RECORD_BENCHMARK_GRADER = {
   audience: 'web',
   scope: 'web:usage.benchmark-grader.record',
 } as const satisfies ServiceTokenRequest;
+/**
+ * Security Auto Analysis pushes remediation lifecycle events to the security notifications route.
+ * `web:security-notifications.dispatch` on the same route stays Security Sync's alone.
+ */
+export const STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE = {
+  audience: 'web',
+  scope: 'web:security-notifications.lifecycle',
+} as const satisfies ServiceTokenRequest;
 // --- End of scopes pending registration. -----------------------------------------------------
 
 export type WebInternalCredentialFailure =

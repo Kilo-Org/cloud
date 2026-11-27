@@ -24,6 +24,12 @@ import {
 } from '@kilocode/worker-utils/security-notification-policy';
 import { and, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH } from '@kilocode/sts-contracts';
+import {
+  webInternalCredential,
+  type WebInternalAuthEnv,
+  type WebInternalCredential,
+} from '@kilocode/worker-utils/web-internal-credential';
 import {
   isOrganizationNotificationOwner,
   resolveNotificationRecipientUserIds,
@@ -43,13 +49,16 @@ const MAX_ATTEMPTS = 4;
 
 type SecretBinding = { get(): Promise<string> };
 
-export type SecurityNotificationSweepEnv = {
+export type SecurityNotificationSweepEnv = WebInternalAuthEnv & {
   HYPERDRIVE?: { connectionString: string };
   BACKEND_API_URL?: string;
   INTERNAL_API_SECRET?: SecretBinding;
   SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED?: string;
   SECURITY_NOTIFICATION_DISPATCH_ENABLED?: string;
 };
+
+/** The app credential the sweep read once for the tick, before claiming any row. */
+type DispatchCredential = Extract<WebInternalCredential, { kind: 'ready' }>;
 
 type OwnerKey = `org:${string}` | `user:${string}`;
 
@@ -866,9 +875,9 @@ async function claimNotification(db: WorkerDb, notificationId: string): Promise<
   return rows.length > 0;
 }
 
-async function dispatchNotification(
+export async function dispatchNotification(
   backendUrl: string,
-  internalSecret: string,
+  credential: DispatchCredential,
   notificationId: string
 ): Promise<EndpointResponse> {
   try {
@@ -877,7 +886,7 @@ async function dispatchNotification(
       signal: AbortSignal.timeout(DISPATCH_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
-        'X-Internal-Secret': internalSecret,
+        [credential.header]: credential.value,
       },
       body: JSON.stringify({ notificationId }),
     });
@@ -1001,7 +1010,7 @@ async function dispatchPendingRows(
   states: Map<OwnerKey, OwnerConfigState>,
   recipients: Map<OwnerKey, Set<string>>,
   backendUrl: string,
-  internalSecret: string,
+  credential: DispatchCredential,
   now: Date
 ): Promise<
   Pick<
@@ -1044,7 +1053,7 @@ async function dispatchPendingRows(
       batch.map(async row => {
         const claimed = await claimNotification(db, row.notificationId);
         if (!claimed) return 'skipped' as const;
-        const outcome = await dispatchNotification(backendUrl, internalSecret, row.notificationId);
+        const outcome = await dispatchNotification(backendUrl, credential, row.notificationId);
         switch (outcome.outcome) {
           case 'sent':
             await markSent(db, row.notificationId);
@@ -1180,10 +1189,20 @@ export async function runSecurityNotificationSweep(
   let dispatchCapReached = false;
 
   if (dispatchEnabled) {
-    const [backendUrl, internalSecret] = [env.BACKEND_API_URL, await readInternalSecret(env)];
-    if (!backendUrl || !internalSecret) {
+    const backendUrl = env.BACKEND_API_URL;
+    // Read once per tick, before any row is claimed: an STS outage or refusal, or a missing
+    // secret, skips the dispatch phase and spends no attempt. A tick's requests are bounded
+    // (MAX_DISPATCH_PER_TICK in batches, each within DISPATCH_TIMEOUT_MS); a token that expires in
+    // a pathologically slow tick is refused by the app and retried like any unexpected answer.
+    const credential = backendUrl
+      ? await webInternalCredential(env, STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH, {
+          header: 'X-Internal-Secret',
+          secret: () => readInternalSecret(env),
+        })
+      : undefined;
+    if (!backendUrl || credential?.kind !== 'ready') {
       console.warn(
-        '[security-notifications] BACKEND_API_URL or internal secret missing; skipping dispatch'
+        '[security-notifications] BACKEND_API_URL or app credential missing; skipping dispatch'
       );
     } else {
       const dispatchResult = await dispatchPendingRows(
@@ -1191,7 +1210,7 @@ export async function runSecurityNotificationSweep(
         states,
         recipients,
         backendUrl,
-        internalSecret,
+        credential,
         now
       );
       processed = dispatchResult.processed;

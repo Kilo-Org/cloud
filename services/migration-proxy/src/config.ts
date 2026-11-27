@@ -1,3 +1,4 @@
+import { GITHUB_API } from './github';
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { z } from 'zod';
 
@@ -22,7 +23,7 @@ export type ProxyConfig = {
   /** Minutes between sampled checks while idle; 0 turns the check off. */
   sampleMinutes: number;
   runDeadlineSeconds: number;
-  github: { appId: string; installationId: string };
+  github: { appId: string; installationId: string; apiUrl: string };
   /** The review base of an environment's first run (§5 step 5). */
   reviewBaselineSha: string;
 };
@@ -47,6 +48,7 @@ const VarsSchema = z.object({
   MIGRATION_PROXY_GITHUB_APP_ID: z.string(),
   MIGRATION_PROXY_GITHUB_INSTALLATION_ID: z.string(),
   MIGRATION_REVIEW_BASELINE_SHA: z.string(),
+  MIGRATION_PROXY_GITHUB_API_URL: z.url({ protocol: /^https?$/ }).optional(),
 });
 
 /** Reads and checks the vars; the problems name vars and rules, never a value. */
@@ -103,6 +105,11 @@ export function readConfig(vars: Record<string, unknown>): ConfigResult {
   if (!SHA.test(v.MIGRATION_REVIEW_BASELINE_SHA)) {
     problems.push('MIGRATION_REVIEW_BASELINE_SHA: not set');
   }
+  // A fake GitHub is for the local stack only; a deployed proxy always reads api.github.com.
+  const apiUrl = v.MIGRATION_PROXY_GITHUB_API_URL ?? GITHUB_API;
+  if (apiUrl !== GITHUB_API && environment !== 'development') {
+    problems.push('MIGRATION_PROXY_GITHUB_API_URL: only the development stack may set it');
+  }
 
   if (problems.length > 0 || target === null) return { ok: false, problems };
   return {
@@ -118,6 +125,7 @@ export function readConfig(vars: Record<string, unknown>): ConfigResult {
       github: {
         appId: v.MIGRATION_PROXY_GITHUB_APP_ID,
         installationId: v.MIGRATION_PROXY_GITHUB_INSTALLATION_ID,
+        apiUrl,
       },
       reviewBaselineSha: v.MIGRATION_REVIEW_BASELINE_SHA,
     },

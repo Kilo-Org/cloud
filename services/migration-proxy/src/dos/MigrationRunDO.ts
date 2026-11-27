@@ -107,7 +107,7 @@ const SampleResultSchema = z.object({
 });
 
 type ProxyContainer = Omit<Container, 'start'> & {
-  start(options: { image: string; instance: 'basic'; enableInternet: true }): void;
+  start(options: { image: string; instance?: 'basic'; enableInternet: true }): void;
 };
 
 function failure(
@@ -207,9 +207,10 @@ export class MigrationRunDO extends DurableObject<Env> {
         if (run !== undefined) await this.tick(run, config.config, now);
         else await this.serialized(() => this.sampleIfDue(config.config, Date.now()));
       } catch (error) {
+        // The object holds no password and no SQL; its own errors name code paths and URLs only.
         console.error(
           'migration-proxy: alarm step failed',
-          error instanceof Error ? error.name : 'unknown'
+          error instanceof Error ? `${error.name}: ${error.message}` : 'unknown'
         );
       }
     }
@@ -621,7 +622,21 @@ export class MigrationRunDO extends DurableObject<Env> {
       return await this.finish(run, config, failure('container_start_failed'));
     let startedAt = run.containerStartedAt;
     if (startedAt === null) {
-      if (!container.running) await this.startContainer(container);
+      try {
+        if (!container.running) await this.startContainer(container, config);
+      } catch (error) {
+        // A refused start must not hold the run in `starting`: it counts like any stalled alarm.
+        console.error(
+          'migration-proxy: container start refused',
+          error instanceof Error ? error.message : 'unknown'
+        );
+        const stalled = run.stalledAlarms + 1;
+        if (stalled >= MAX_STALLED_ALARMS) {
+          return await this.finish(run, config, failure('container_start_failed'));
+        }
+        this.update(run.id, { stalledAlarms: stalled });
+        return;
+      }
       startedAt = now;
       this.update(run.id, { containerStartedAt: startedAt });
     }
@@ -795,7 +810,7 @@ export class MigrationRunDO extends DurableObject<Env> {
     let result: z.infer<typeof SampleResultSchema> | null = null;
     try {
       if (container !== undefined) {
-        if (!container.running) await this.startContainer(container);
+        if (!container.running) await this.startContainer(container, config);
         if (await this.waitReady(SAMPLE_READY_WAIT_MS)) {
           const password = await this.secret(DB_PASSWORD);
           const response = await this.containerFetch('/sample', {
@@ -855,13 +870,19 @@ export class MigrationRunDO extends DurableObject<Env> {
    * `start()` (an intercept added to a running container has no effect, spike A), then the
    * 6-hour inactivity timeout is set. Raw TCP stays open for Postgres.
    */
-  private async startContainer(container: ProxyContainer): Promise<void> {
+  private async startContainer(container: ProxyContainer, config: ProxyConfig): Promise<void> {
     const deny = this.ctx.exports.DenyOutbound({ props: {} });
     await container.interceptAllOutboundHttp(deny);
     await container.interceptOutboundHttps('*', deny);
     const image = container.images.proxy;
     if (image === undefined) throw new Error('container image proxy is not configured');
-    container.start({ image, instance: 'basic', enableInternet: true });
+    // `basic` (§1) everywhere it is deployed; local workerd refuses that name, and the local stack
+    // runs on whatever Docker gives it.
+    container.start({
+      image,
+      ...(config.environment === 'development' ? {} : { instance: 'basic' as const }),
+      enableInternet: true,
+    });
     await container.setInactivityTimeout(INACTIVITY_TIMEOUT_MS);
   }
 
@@ -1035,7 +1056,7 @@ export class MigrationRunDO extends DurableObject<Env> {
   }
 
   private github(config: ProxyConfig): GithubClient {
-    const key = `${config.github.appId}:${config.github.installationId}`;
+    const key = `${config.github.appId}:${config.github.installationId}:${config.github.apiUrl}`;
     if (this.githubClient?.key !== key) {
       this.githubClient = {
         key,
@@ -1043,6 +1064,7 @@ export class MigrationRunDO extends DurableObject<Env> {
           {
             appId: config.github.appId,
             installationId: config.github.installationId,
+            apiUrl: config.github.apiUrl,
             privateKey: () => this.secret(GITHUB_APP_KEY),
           },
           (url, init) => fetch(url, init)

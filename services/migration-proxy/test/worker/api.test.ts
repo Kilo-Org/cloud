@@ -372,6 +372,33 @@ describe('the downgrade guard (§5 step 3)', () => {
   });
 });
 
+describe('addressing the object (§1)', () => {
+  it('goes through the EU jurisdiction when deployed, and the plain namespace only on the local stack', async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      await post(proxy, head);
+      expect(proxy.routes).toEqual(['eu:runs']);
+    });
+    // workerd implements no jurisdictions, so `wrangler dev` (development) addresses `runs` directly.
+    await withProxy({ vars: { MIGRATION_PROXY_ENVIRONMENT: 'development' } }, async proxy => {
+      const { head } = await readyRun(proxy);
+      proxy.sts.allow(
+        'local',
+        attested(
+          {
+            sha: head,
+            environment: 'staging',
+            jobWorkflowRef: 'Kilo-Org/cloud/.github/workflows/deploy-staging.yml@refs/heads/main',
+          },
+          'ci-db-migrate-staging'
+        )
+      );
+      expect((await post(proxy, head, 'local')).status).toBe(202);
+      expect(proxy.routes).toEqual(['plain:runs']);
+    });
+  });
+});
+
 describe('GET /v1/runs/{id}', () => {
   it('200 with the run view for any run of the environment, 404 otherwise, 401 without identity', async () => {
     await withProxy({}, async proxy => {

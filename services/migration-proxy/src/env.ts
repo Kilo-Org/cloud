@@ -19,6 +19,8 @@ export type Env = {
   MIGRATION_PROXY_GITHUB_APP_ID?: string;
   MIGRATION_PROXY_GITHUB_INSTALLATION_ID?: string;
   MIGRATION_REVIEW_BASELINE_SHA?: string;
+  /** The local stack's fake GitHub; readConfig refuses it outside `development`. */
+  MIGRATION_PROXY_GITHUB_API_URL?: string;
 };
 
 declare global {

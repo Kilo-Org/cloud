@@ -117,6 +117,26 @@ describe('the real wrangler.jsonc', () => {
     expect(readConfig({ ...stagingVars(), ...rest, ...change })).toMatchObject({ ok: false });
   });
 
+  it('accepts a fake GitHub only in the development stack', () => {
+    const fake = { MIGRATION_PROXY_GITHUB_API_URL: 'http://127.0.0.1:8787' };
+    const production = readConfig({ ...topLevelVars(), ...SET_BY_E, ...fake });
+    expect(production).toEqual({
+      ok: false,
+      problems: ['MIGRATION_PROXY_GITHUB_API_URL: only the development stack may set it'],
+    });
+    const { MIGRATION_DB_TARGET: _target, ...rest } = SET_BY_E;
+    expect(readConfig({ ...stagingVars(), ...rest, ...fake }).ok).toBe(false);
+    const development = readConfig({
+      ...topLevelVars(),
+      ...SET_BY_E,
+      ...fake,
+      MIGRATION_PROXY_ENVIRONMENT: 'development',
+    });
+    expect(development.ok && development.config.github.apiUrl).toBe('http://127.0.0.1:8787');
+    const deployed = readConfig({ ...topLevelVars(), ...SET_BY_E });
+    expect(deployed.ok && deployed.config.github.apiUrl).toBe('https://api.github.com');
+  });
+
   it('refuses port 6543 and a target without a port', () => {
     for (const target of [
       'db.abcdefghijklmnopqrst.supabase.co:6543/postgres',

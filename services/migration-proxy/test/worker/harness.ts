@@ -79,7 +79,11 @@ export class FakeContainer {
     readonly insideBlock: () => boolean
   ) {}
 
+  /** Thrown by `start()`, as the runtime does for options it refuses. */
+  startError: Error | null = null;
+
   start(options: unknown): void {
+    if (this.startError !== null) throw this.startError;
     this.log.push('start');
     this.startOptions = options;
     this.running = true;
@@ -263,6 +267,8 @@ export type Proxy = {
   /** Builds a second object over the same storage, as a restarted object would be. */
   restart: () => Promise<MigrationRunDO>;
   queue: unknown[];
+  /** How the Worker addressed the object: `eu:<name>` through the jurisdiction, `plain:<name>`. */
+  routes: string[];
   /** The audit outbox, oldest first. */
   events: () => { type: string; data: { outcome: string; attributes: Record<string, unknown> } }[];
   /** One SQL query against the object's storage. */
@@ -337,8 +343,18 @@ export async function withProxy<T>(
       return object;
     };
     let object = await build();
+    const routes: string[] = [];
     proxyEnv.MIGRATION_RUN_DO = {
-      jurisdiction: () => ({ getByName: () => object }),
+      jurisdiction: (name: string) => ({
+        getByName: (objectName: string) => {
+          routes.push(`${name}:${objectName}`);
+          return object;
+        },
+      }),
+      getByName: (objectName: string) => {
+        routes.push(`plain:${objectName}`);
+        return object;
+      },
     } as unknown as Env['MIGRATION_RUN_DO'];
     vi.stubGlobal('fetch', github.fetch);
     try {
@@ -352,6 +368,7 @@ export async function withProxy<T>(
         env: proxyEnv,
         log,
         queue,
+        routes,
         events: () =>
           state.storage.sql
             .exec<{ event: string }>('SELECT event FROM audit_event ORDER BY seq')

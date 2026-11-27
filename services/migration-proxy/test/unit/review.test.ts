@@ -43,7 +43,12 @@ const prFiles = {
 beforeEach(async () => {
   github = new FakeGithub();
   client = createGithubClient(
-    { appId: '1', installationId: '2', privateKey: async () => pem },
+    {
+      appId: '1',
+      installationId: '2',
+      apiUrl: 'https://api.github.com',
+      privateKey: async () => pem,
+    },
     github.fetch
   );
   base = await github.push(baseFiles);

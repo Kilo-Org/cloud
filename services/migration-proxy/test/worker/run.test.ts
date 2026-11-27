@@ -300,6 +300,25 @@ describe('a run', () => {
 });
 
 describe('the container (§1)', () => {
+  it('fails container_start_failed after 5 refused starts instead of staying in starting', async () => {
+    await withProxy({}, async proxy => {
+      const { head } = await readyRun(proxy);
+      await post(proxy, head);
+      proxy.container.startError = new TypeError('Invalid container instance type.');
+      for (let alarm = 0; alarm < 10 && run(proxy)?.phase !== 'starting'; alarm += 1)
+        await proxy.object.alarm();
+      for (let alarm = 0; alarm < 4; alarm += 1) await proxy.object.alarm();
+      expect(run(proxy)).toMatchObject({ state: 'pending', phase: 'starting', stalled_alarms: 4 });
+      await proxy.object.alarm();
+      expect(failureOf(proxy)).toEqual({
+        code: 'container_start_failed',
+        retryable: true,
+        sqlstate: null,
+        migrationTag: null,
+      });
+    });
+  });
+
   it('registers both refusing intercepts before start(), then sets the 6-hour timeout', async () => {
     await withProxy({}, async proxy => {
       const { head } = await readyRun(proxy);

@@ -35,8 +35,13 @@ const RUN_PATH =
  * The one Durable Object instance per environment, which is the single-run lock (§1). No other
  * name is ever addressed, so at most one container exists.
  */
-function runObject(env: Env) {
-  return env.MIGRATION_RUN_DO.jurisdiction('eu').getByName('runs');
+function runObject(env: Env, config: ProxyConfig) {
+  // workerd implements no jurisdictions, so only the local stack addresses the plain namespace.
+  const namespace =
+    config.environment === 'development'
+      ? env.MIGRATION_RUN_DO
+      : env.MIGRATION_RUN_DO.jurisdiction('eu');
+  return namespace.getByName('runs');
 }
 
 function bearer(request: Request): string | null {
@@ -87,7 +92,7 @@ async function authenticate(
 ): Promise<{ attested: Attested } | { response: Response }> {
   const token = bearer(request);
   const record = (reason: string, attested: Attested | null) =>
-    runObject(env).recordDenial({
+    runObject(env, config).recordDenial({
       reason,
       actor: denialActor(config, attested),
       githubRunId: attested?.github.runId ?? null,
@@ -125,14 +130,14 @@ async function postRun(request: Request, env: Env, config: ProxyConfig): Promise
   const auth = await authenticate(request, env, config);
   if ('response' in auth) return auth.response;
   return createResponse(
-    await runObject(env).createRun({ attested: auth.attested, sha: runRequest.data.sha })
+    await runObject(env, config).createRun({ attested: auth.attested, sha: runRequest.data.sha })
   );
 }
 
 async function getRun(request: Request, env: Env, config: ProxyConfig, id: string) {
   const auth = await authenticate(request, env, config);
   if ('response' in auth) return auth.response;
-  const run = await runObject(env).getRun(id);
+  const run = await runObject(env, config).getRun(id);
   return run === null ? notFoundResponse() : Response.json(run);
 }
 
@@ -154,7 +159,8 @@ export default {
 
   /** Keeps the object's alarm set, so the sampled check runs while no run is active (§3). */
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    if (!readConfig(env).ok) return;
-    await runObject(env).wake();
+    const loaded = readConfig(env);
+    if (!loaded.ok) return;
+    await runObject(env, loaded.config).wake();
   },
 } satisfies ExportedHandler<Env>;

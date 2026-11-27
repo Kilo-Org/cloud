@@ -8,8 +8,8 @@ import { REPOSITORY } from './config';
  * 5xx, a network failure, a refused token) throws `GithubUnavailableError`; a later alarm retries.
  */
 
-const API = 'https://api.github.com';
-const REPO = `${API}/repos/${REPOSITORY.fullName}`;
+/** GitHub's REST API; only the local stack (`development`) points elsewhere, at a fake. */
+export const GITHUB_API = 'https://api.github.com';
 const TOKEN_REFRESH_MARGIN_MS = 10 * 60 * 1000;
 const PAGE_SIZE = 100;
 /** No PR has more reviews than this in practice; the walk stops there rather than loop. */
@@ -62,6 +62,7 @@ export type GithubClient = {
 export type GithubAppCredentials = {
   appId: string;
   installationId: string;
+  apiUrl: string;
   /** The App's PEM private key (PKCS#1, as GitHub issues it, or PKCS#8), read when needed. */
   privateKey: () => Promise<string>;
 };
@@ -183,6 +184,8 @@ export function createGithubClient(
   now: () => number = Date.now
 ): GithubClient {
   let cached: { token: string; expiresAt: number } | null = null;
+  const API = credentials.apiUrl;
+  const REPO = `${API}/repos/${REPOSITORY.fullName}`;
 
   const headers = (authorization: string) => ({
     Accept: 'application/vnd.github+json',

@@ -66,6 +66,9 @@ function recordingStore(
       settles.push(input);
       return input.result.kind === 'released' ? 'released' : settle;
     },
+    async exempt() {
+      throw new Error('unexpected exempt');
+    },
   };
   const access: AttestationAccess = work => work(store);
   return { access, claims, settles };
@@ -479,6 +482,107 @@ describe('token endpoint: kilo-mobile code exchange', () => {
     expect(response.status).toBe(400);
     expect(await errorOf(response)).toBe('invalid_request');
     expect(store.claims).toEqual([]);
+  });
+
+  it('asks for a new key when the attested key is stored already, and keeps the code', async () => {
+    const store = recordingStore(() => ({ outcome: 'claimed', storedKey: null }), 'key_known');
+    const { ca, attestation, gate } = await service(store.access);
+    gate.settings.appAttest.rootCertificate = ca.root;
+    const device = await standInAppAttestDevice(ca, APP_ID);
+    const code = randomCredential();
+    const grants = fakeGrants();
+    const response = await call(
+      await exchangeRequest(code, {
+        attestation_type: 'app_attest_key',
+        attestation_key_id: device.keyId,
+        attestation: await device.attest(await clientDataHashOf(code)),
+      }),
+      oauthDeps(grants.access, { attestation })
+    );
+    expect(await errorOf(response)).toBe('attestation_required');
+    expect(store.settles[0].result).toMatchObject({ kind: 'attested' });
+    expect(grants.calls).toEqual([]);
+  });
+
+  it('hands any printable base64url-and-dots token to Google, which decides', async () => {
+    const decoded: string[] = [];
+    const store = recordingStore(() => ({ outcome: 'claimed', storedKey: null }), 'refused');
+    const { attestation } = await service(store.access, async token => {
+      decoded.push(token);
+      return { status: 'invalid_token' };
+    });
+    const response = await call(
+      await exchangeRequest(randomCredential(), {
+        attestation_type: 'play_integrity',
+        attestation: 'abc.def',
+      }),
+      oauthDeps(fakeGrants().access, { attestation })
+    );
+    expect(await errorOf(response)).toBe('invalid_grant');
+    expect(decoded).toEqual(['abc.def']);
+    expect(store.settles[0].result).toEqual({ kind: 'refused', reason: 'token_invalid' });
+  });
+
+  it('answers the original error when verification throws, also when the release fails', async () => {
+    const claims: ClaimInput[] = [];
+    const failing: AttestationAccess = work =>
+      work({
+        async claim(input) {
+          claims.push(input);
+          return { outcome: 'claimed', storedKey: null };
+        },
+        async settle() {
+          throw new Error('the store is down');
+        },
+        async exempt() {
+          throw new Error('unexpected exempt');
+        },
+      });
+    const { attestation } = await service(failing, async () => {
+      throw new TypeError('decode crashed');
+    });
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (line: unknown) => errors.push(String(line));
+    try {
+      const response = await call(
+        await exchangeRequest(randomCredential(), {
+          attestation_type: 'play_integrity',
+          attestation: playIntegrityToken(),
+        }),
+        oauthDeps(fakeGrants().access, { attestation })
+      );
+      expect(response.status).toBe(500);
+    } finally {
+      console.error = original;
+    }
+    expect(claims).toHaveLength(1);
+    expect(errors.some(line => line.includes('uts.attestation.release_failed'))).toBe(true);
+    expect(errors.some(line => line.includes('"error":"TypeError"'))).toBe(true);
+  });
+
+  it('marks the code exempt before the exchange in development without config', async () => {
+    const exempted: Uint8Array[] = [];
+    const store: AttestationAccess = work =>
+      work({
+        claim: async () => {
+          throw new Error('unexpected claim');
+        },
+        settle: async () => {
+          throw new Error('unexpected settle');
+        },
+        exempt: async input => {
+          exempted.push(input.codeHash);
+        },
+      });
+    const code = randomCredential();
+    const grants = issuingGrants();
+    const response = await call(
+      await exchangeRequest(code),
+      oauthDeps(grants.access, { attestation: { kind: 'unattested_development', store } })
+    );
+    expect(response.status).toBe(200);
+    expect(exempted.map(hash => Buffer.from(hash))).toEqual([Buffer.from(await sha256(code))]);
   });
 
   it('refuses a second request for a code this isolate verifies now', async () => {

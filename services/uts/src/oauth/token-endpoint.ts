@@ -284,7 +284,12 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
       if (deps.attestation.kind === 'refused') {
         return oauthError('unauthorized_client', 400, 'device attestation is not configured here');
       }
-      if (deps.attestation.kind === 'verified') {
+      if (deps.attestation.kind === 'unattested_development') {
+        // Development without attestation config: the exchange statement's backstop still needs
+        // the code marked, and the statement refuses that outside development (migration 0017).
+        const environment = deps.config.environment;
+        await deps.attestation.store(store => store.exempt({ environment, codeHash }));
+      } else {
         const gate = await attestCodeExchange(
           params,
           {

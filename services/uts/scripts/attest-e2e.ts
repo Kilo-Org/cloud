@@ -463,6 +463,20 @@ async function main(): Promise<void> {
   );
   check(counted.rows[0]?.sign_count === '1', 'the assertion moved the stored counter to 1');
 
+  // A lost answer: the app sends the stored key's attestation again for a new code.
+  const lost = await authorized();
+  const reattested = await exchange(lost, await keyAttestation(device, lost.code));
+  log('iOS attestation of a stored key, new code', {
+    status: reattested.status,
+    error: reattested.error,
+  });
+  check(
+    reattested.status === 400 && reattested.error === 'attestation_required',
+    'an attestation of a stored key asks for an assertion or a new key'
+  );
+  const lostAssertion = await exchange(lost, await assertion(device, lost.code));
+  check(lostAssertion.status === 200, 'the same code then exchanges with an assertion of the key');
+
   // 2. Replays.
   const third = await authorized();
   const replayed = await exchange(third, firstAssertion);

@@ -272,7 +272,8 @@ describe('settle_code_attestation', () => {
     expect((await assertWith(3)).settled).toBe('refused');
     expect(await claim(replayed.fixture, null)).toEqual({ outcome: 'refused' });
 
-    // The key cannot be attested again for another code.
+    // A lost answer: the app attests the stored key again for another code. The code stays
+    // usable, and an assertion of the key then attests it.
     const again = await mobileCode();
     const againClaim = await claimAs(again, { type: 'app_attest_key', keyId });
     expect(
@@ -282,7 +283,26 @@ describe('settle_code_attestation', () => {
         claimId: againClaim.claimId,
         result: { kind: 'attested', publicKey: point, signCount: null },
       })
-    ).toBe('refused');
+    ).toBe('key_known');
+    const retried = await claimAs(again, { type: 'app_attest_assertion', keyId });
+    expect(retried.result).toEqual({
+      outcome: 'claimed',
+      storedKey: { publicKey: expect.anything(), signCount: 5 },
+    });
+    expect(
+      await attestations.settle({
+        environment,
+        codeHash: again.codeHash,
+        claimId: retried.claimId,
+        result: { kind: 'attested', publicKey: null, signCount: 6 },
+      })
+    ).toBe('attested');
+    const denied = await owner.query(
+      `SELECT 1 FROM uts.audit_events
+       WHERE account_id = $1 AND event_type = 'ai.kilo.uts.token.denied'`,
+      [again.accountId]
+    );
+    expect(denied.rowCount).toBe(0);
   });
 
   it('refuses a key whose id is not the SHA-256 of its point', async () => {
@@ -350,6 +370,45 @@ describe('settle_code_attestation', () => {
       })
     ).toBe('released');
     expect((await claim(fixture, { type: 'play_integrity', keyId: null })).outcome).toBe('claimed');
+  });
+});
+
+describe('the exchange backstop', () => {
+  it('refuses to consume an unattested kilo-mobile code', async () => {
+    const fixture = await mobileCode();
+    expect(await storeStateOf(() => exchange(fixture, randomUUID(), randomBytes(32)))).toBe(
+      '23514'
+    );
+    const claimed = await claimAs(fixture, { type: 'play_integrity', keyId: null });
+    expect(await storeStateOf(() => exchange(fixture, randomUUID(), randomBytes(32)))).toBe(
+      '23514'
+    );
+    await attestations.settle({
+      environment,
+      codeHash: fixture.codeHash,
+      claimId: claimed.claimId,
+      result: { kind: 'refused', reason: 'package_mismatch' },
+    });
+    expect(await storeStateOf(() => exchange(fixture, randomUUID(), randomBytes(32)))).toBe(
+      '23514'
+    );
+  });
+
+  it('lets a code marked exempt in development through, and refuses the mark elsewhere', async () => {
+    const fixture = await mobileCode();
+    expect(
+      await storeStateOf(() =>
+        attestations.exempt({ environment: 'staging', codeHash: fixture.codeHash })
+      )
+    ).toBe('22004');
+    expect(
+      await storeStateOf(() =>
+        attestations.exempt({ environment: 'production', codeHash: fixture.codeHash })
+      )
+    ).toBe('22004');
+    await attestations.exempt({ environment, codeHash: fixture.codeHash });
+    expect(await claim(fixture, null)).toEqual({ outcome: 'attested' });
+    expect((await exchange(fixture, randomUUID(), randomBytes(32))).outcome).toBe('issued');
   });
 });
 

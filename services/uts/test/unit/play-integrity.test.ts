@@ -233,6 +233,37 @@ describe('playIntegrityDecoder', () => {
     expect(refused.calls.filter(call => call.url === endpoints.tokenUri)).toHaveLength(2);
   });
 
+  it('waits out a 429 without calling Google again until the cooldown ends', async () => {
+    const { key } = await serviceAccount();
+    let now = NOW;
+    const decodes: string[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (url === endpoints.tokenUri) {
+        return Response.json({ access_token: 'stand-in', expires_in: 3599 });
+      }
+      decodes.push(typeof init?.body === 'string' ? init.body : '');
+      return decodes.length === 1
+        ? Response.json({}, { status: 429, headers: { 'Retry-After': '30' } })
+        : Response.json({ tokenPayloadExternal: rawVerdict() });
+    };
+    const decode = playIntegrityDecoder({
+      key,
+      packageName: PACKAGE,
+      endpoints,
+      fetcher,
+      now: () => now,
+    });
+    const quota = { status: 'unavailable', reason: 'quota' };
+    expect(await decode(playIntegrityToken())).toEqual(quota);
+    now += 29_000;
+    expect(await decode(playIntegrityToken())).toEqual(quota);
+    expect(decodes).toHaveLength(1);
+    now += 2_000;
+    expect(await decode(playIntegrityToken())).toMatchObject({ status: 'decoded' });
+    expect(decodes).toHaveLength(2);
+  });
+
   it('shares one token exchange between concurrent cold decodes', async () => {
     const { key } = await serviceAccount();
     const { calls, fetcher } = standIn(200, { tokenPayloadExternal: rawVerdict() });

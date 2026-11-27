@@ -11,8 +11,9 @@ import { oauthError, temporarilyUnavailable } from '../oauth/errors';
 import type { Params } from '../oauth/params';
 import { verifyAssertion, verifyKeyAttestation } from './app-attest';
 import {
+  ATTEST_VAR_NAMES,
   type AttestEnv,
-  type AttestationPolicy,
+  type AttestVarName,
   type AttestationSettings,
   attestationPolicy,
   readAttestationConfig,
@@ -46,29 +47,38 @@ export type AttestationGateDeps = {
   now: () => number;
 };
 
+/**
+ * `unattested_development` carries the store for the exempt statement, which the exchange
+ * statement's backstop needs before it consumes the code (migration 0017).
+ */
 export type AttestationService =
-  | Exclude<AttestationPolicy, { kind: 'verified' }>
+  | { kind: 'refused'; problems: readonly AttestVarName[] }
+  | { kind: 'unattested_development'; store: AttestationAccess }
   | { kind: 'verified'; gate: AttestationGateDeps };
 
 /** Codes in verification, per isolate. */
 const inFlight = new Set<string>();
 
-/** The attestation service of an environment whose identity store is bound. */
-export function attestationService(
-  env: AttestEnv,
-  config: UtsConfig,
-  store: AttestationAccess
-): AttestationService {
-  const policy = attestationPolicy(
-    readAttestationConfig(env, config.environment),
-    config.environment
-  );
-  if (policy.kind !== 'verified') return policy;
-  const { play } = policy.settings;
-  return {
-    kind: 'verified',
-    gate: {
-      environment: config.environment,
+type IsolatePolicy =
+  | { kind: 'refused'; problems: readonly AttestVarName[] }
+  | { kind: 'unattested_development' }
+  | { kind: 'verified'; settings: AttestationSettings; decode: PlayDecode };
+
+/**
+ * The policy and its decode port, per isolate, for the raw attestation values they came from: the
+ * config (a JSON key file and a digest list) is parsed once, not per request.
+ */
+let isolatePolicy: { key: string; policy: IsolatePolicy } | null = null;
+
+function policyOf(env: AttestEnv, environment: UtsEnvironment): IsolatePolicy {
+  const key = JSON.stringify([environment, ...ATTEST_VAR_NAMES.map(name => env[name] ?? null)]);
+  if (isolatePolicy?.key === key) return isolatePolicy.policy;
+  const policy = attestationPolicy(readAttestationConfig(env, environment), environment);
+  let resolved: IsolatePolicy;
+  if (policy.kind === 'verified') {
+    const { play } = policy.settings;
+    resolved = {
+      kind: 'verified',
       settings: policy.settings,
       decode: playIntegrityDecoder({
         key: play.key,
@@ -77,6 +87,29 @@ export function attestationService(
         fetcher: (url, init) => fetch(url, init),
         now: Date.now,
       }),
+    };
+  } else {
+    resolved = policy;
+  }
+  isolatePolicy = { key, policy: resolved };
+  return resolved;
+}
+
+/** The attestation service of an environment whose identity store is bound. */
+export function attestationService(
+  env: AttestEnv,
+  config: UtsConfig,
+  store: AttestationAccess
+): AttestationService {
+  const policy = policyOf(env, config.environment);
+  if (policy.kind === 'refused') return policy;
+  if (policy.kind === 'unattested_development') return { kind: 'unattested_development', store };
+  return {
+    kind: 'verified',
+    gate: {
+      environment: config.environment,
+      settings: policy.settings,
+      decode: policy.decode,
       store,
       inFlight,
       now: Date.now,
@@ -90,8 +123,11 @@ type Proof =
   | { type: 'play_integrity'; token: string };
 
 const BASE64 = /^[A-Za-z0-9+/_-]+={0,2}$/;
-/** A Play Integrity token is a compact JWE: base64url parts separated by dots. */
-const INTEGRITY_TOKEN = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]*){4}$/;
+/**
+ * A Play Integrity token is opaque to UTS: printable base64url characters and dots, within the
+ * size limit; `decodeIntegrityToken` decides whether it is one.
+ */
+const INTEGRITY_TOKEN = /^[A-Za-z0-9_.-]+$/;
 const KEY_ID_BYTES = 32;
 
 function malformed(): Response {
@@ -145,14 +181,22 @@ async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
 }
 
-/** `SHA-256(UTF-8(challenge))`: App Attest's client data hash and Play Integrity's request hash. */
-async function clientDataHashOf(code: string): Promise<Uint8Array> {
+/**
+ * The challenge (lowercase hex, Play Integrity's request hash as is) and `SHA-256(UTF-8(challenge))`
+ * (App Attest's client data hash).
+ */
+async function challengeOf(
+  code: string
+): Promise<{ challenge: string; clientDataHash: Uint8Array }> {
   const encoder = new TextEncoder();
   const challenge = Buffer.from(
     await sha256(encoder.encode(attestationChallengeInput(code)))
   ).toString('hex');
-  return await sha256(encoder.encode(challenge));
+  return { challenge, clientDataHash: await sha256(encoder.encode(challenge)) };
 }
+
+const ATTESTATION_REQUIRED =
+  'a device attestation over this code is required; attest a new App Attest key if the stored one is unknown';
 
 /** Verifies the proof; never throws for anything the client sent. */
 async function verify(
@@ -161,7 +205,7 @@ async function verify(
   code: string,
   deps: AttestationGateDeps
 ): Promise<SettleInput['result']> {
-  const clientDataHash = await clientDataHashOf(code);
+  const { challenge, clientDataHash } = await challengeOf(code);
   if (proof.type === 'app_attest_key') {
     const result = await verifyKeyAttestation(
       {
@@ -197,10 +241,7 @@ async function verify(
   }
   const checked = checkPlayVerdict(
     decoded.verdict,
-    {
-      ...deps.settings.play.expectation,
-      requestHash: Buffer.from(clientDataHash).toString('base64'),
-    },
+    { ...deps.settings.play.expectation, requestHash: challenge },
     deps.now()
   );
   return checked.status === 'verified'
@@ -234,11 +275,7 @@ async function runGate(
       return { status: 'exchange' };
     case 'proof_required':
     case 'unknown_key':
-      return oauthError(
-        'attestation_required',
-        400,
-        'a device attestation over this code is required; attest a new App Attest key if the stored one is unknown'
-      );
+      return oauthError('attestation_required', 400, ATTESTATION_REQUIRED);
     case 'busy':
       return temporarilyUnavailable();
     case 'refused':
@@ -259,8 +296,17 @@ async function runGate(
   try {
     result = await verify(proof, claim.storedKey, code.code, deps);
   } catch (error) {
-    // Let a retry verify again; the error itself answers 500.
-    await settle({ kind: 'released' });
+    // Let a retry verify again; the original error answers 500, whatever the release does.
+    try {
+      await settle({ kind: 'released' });
+    } catch (releaseError) {
+      console.error(
+        JSON.stringify({
+          event: 'uts.attestation.release_failed',
+          error: releaseError instanceof Error ? releaseError.name : 'unknown',
+        })
+      );
+    }
     throw error;
   }
   if (result.kind === 'refused') {
@@ -268,12 +314,19 @@ async function runGate(
       JSON.stringify({ event: 'uts.attestation.refused', type: proof.type, reason: result.reason })
     );
   }
-  const settled = await settle(result);
-  if (settled === 'attested') return { status: 'exchange' };
-  if (settled === 'refused') {
-    return oauthError('invalid_grant', 400, 'the device attestation was refused');
+  switch (await settle(result)) {
+    case 'attested':
+      return { status: 'exchange' };
+    case 'refused':
+      return oauthError('invalid_grant', 400, 'the device attestation was refused');
+    case 'key_known':
+      // An attestation of a key UTS holds already: the app uses that key with assertions, or
+      // attests a new one; this code stays usable.
+      return oauthError('attestation_required', 400, ATTESTATION_REQUIRED);
+    case 'released':
+    case 'stale':
+      return temporarilyUnavailable();
   }
-  return temporarilyUnavailable();
 }
 
 /** The attestation step of one code exchange: `exchange` once the code is attested. */

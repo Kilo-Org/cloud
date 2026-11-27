@@ -41,11 +41,16 @@ export type SettleInput = {
     | { kind: 'released' };
 };
 
-export type SettleOutcome = 'attested' | 'refused' | 'released' | 'stale';
+export type SettleOutcome = 'attested' | 'refused' | 'key_known' | 'released' | 'stale';
 
 export type AttestationStore = {
   claim(input: ClaimInput): Promise<ClaimResult>;
   settle(input: SettleInput): Promise<SettleOutcome>;
+  /**
+   * Development without attestation config only: marks the code exempt, so the exchange
+   * statement's backstop lets it through. The statement refuses every other environment.
+   */
+  exempt(input: { environment: UtsEnvironment; codeHash: Uint8Array }): Promise<void>;
 };
 
 /** Runs `work` with the attestation store of one identity-store connection. */
@@ -73,8 +78,10 @@ const ClaimRowSchema = z.discriminatedUnion('outcome', [
 ]);
 
 const SettleRowSchema = z.object({
-  outcome: z.enum(['attested', 'refused', 'released', 'stale']),
+  outcome: z.enum(['attested', 'refused', 'key_known', 'released', 'stale']),
 });
+
+const ExemptRowSchema = z.object({ outcome: z.literal('exempt') });
 
 export function identityStoreAttestations(store: IdentityStore): AttestationStore {
   return {
@@ -125,6 +132,17 @@ export function identityStoreAttestations(store: IdentityStore): AttestationStor
       );
       if (row === null) throw new Error('uts.settle_code_attestation returned no row');
       return row.outcome;
+    },
+
+    async exempt(input) {
+      const row = await store.maybeOne(
+        {
+          text: 'SELECT * FROM uts.exempt_code_attestation($1, $2)',
+          values: [input.environment, input.codeHash],
+        },
+        ExemptRowSchema
+      );
+      if (row === null) throw new Error('uts.exempt_code_attestation returned no row');
     },
   };
 }

@@ -50,9 +50,9 @@ export async function clientDataHashOf(code: string): Promise<Uint8Array> {
   return await sha256(await attestationChallenge(code));
 }
 
-/** The Play Integrity request hash the app sends for `code`. */
+/** The Play Integrity request hash the app sends for `code`: the challenge itself. */
 export async function playRequestHashOf(code: string): Promise<string> {
-  return Buffer.from(await clientDataHashOf(code)).toString('base64');
+  return await attestationChallenge(code);
 }
 
 function derLength(length: number): number[] {

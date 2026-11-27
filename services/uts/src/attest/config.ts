@@ -37,6 +37,12 @@ const DEV_ENDPOINTS_VAR = 'ATTEST_DEV_ENDPOINTS';
 export type AttestVarName = (typeof REQUIRED_VAR_NAMES)[number] | typeof DEV_ENDPOINTS_VAR;
 export type AttestEnv = Partial<Record<AttestVarName, string>>;
 
+/** Every attestation var, the development stand-in included. */
+export const ATTEST_VAR_NAMES: readonly AttestVarName[] = [
+  ...REQUIRED_VAR_NAMES,
+  DEV_ENDPOINTS_VAR,
+];
+
 export type AttestationSettings = {
   appAttest: AppAttestSettings;
   play: {

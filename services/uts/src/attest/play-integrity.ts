@@ -155,9 +155,19 @@ function dropAccessToken(key: ServiceAccountKey, endpoints: PlayIntegrityEndpoin
   if (cached?.state === 'ready' && cached.token === token) accessTokens.delete(cacheKey);
 }
 
-/** Exported for the tests: forget every cached access token. */
+/**
+ * Per isolate, by decode URL: until when Google's last 429 asked UTS to wait. While it lasts the
+ * port answers `quota` without a call, so a spent project quota is not hammered by every sign-in.
+ */
+const quotaUntil = new Map<string, number>();
+/** The wait after a 429 without a usable `Retry-After`, and the longest `Retry-After` honoured. */
+const QUOTA_COOLDOWN_MS = 60_000;
+const MAX_QUOTA_COOLDOWN_MS = 300_000;
+
+/** Exported for the tests: forget every cached access token and quota cooldown. */
 export function clearAccessTokens(): void {
   accessTokens.clear();
+  quotaUntil.clear();
 }
 
 /** The decode port for one service account and package. */
@@ -170,6 +180,10 @@ export function playIntegrityDecoder(deps: {
 }): PlayDecode {
   const url = `${deps.endpoints.apiBase}/${encodeURIComponent(deps.packageName)}:decodeIntegrityToken`;
   return async integrityToken => {
+    const waitUntil = quotaUntil.get(url);
+    if (waitUntil !== undefined && waitUntil > deps.now()) {
+      return { status: 'unavailable', reason: 'quota' };
+    }
     let token: string;
     try {
       token = await accessToken(deps.key, deps.endpoints, deps.fetcher, deps.now());
@@ -208,7 +222,16 @@ export function playIntegrityDecoder(deps: {
         dropAccessToken(deps.key, deps.endpoints, token);
         return { status: 'unavailable', reason: 'credential' };
       }
-      return { status: 'unavailable', reason: response.status === 429 ? 'quota' : 'upstream' };
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers.get('Retry-After') ?? '');
+        const cooldown =
+          Number.isInteger(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter * 1000, MAX_QUOTA_COOLDOWN_MS)
+            : QUOTA_COOLDOWN_MS;
+        quotaUntil.set(url, deps.now() + cooldown);
+        return { status: 'unavailable', reason: 'quota' };
+      }
+      return { status: 'unavailable', reason: 'upstream' };
     }
     const body = DecodeResponseSchema.safeParse(await response.json().catch(() => null));
     const verdict = TokenPayloadSchema.safeParse(body.data?.tokenPayloadExternal);

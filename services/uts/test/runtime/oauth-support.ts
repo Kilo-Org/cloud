@@ -1,3 +1,4 @@
+import type { AttestationAccess } from '../../src/attest/store';
 import { type UtsScopeEntry, utsScopeEntry } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { type JWK, SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
@@ -163,6 +164,18 @@ export const unexpectedStore = async (): Promise<never> => {
   throw new Error('unexpected store call');
 };
 
+/** An attestation store that only marks codes exempt, as development without config does. */
+export const exemptOnlyStore: AttestationAccess = work =>
+  work({
+    claim: async () => {
+      throw new Error('unexpected attestation claim');
+    },
+    settle: async () => {
+      throw new Error('unexpected attestation settle');
+    },
+    exempt: async () => undefined,
+  });
+
 /** Endpoint dependencies with the real signer objects of the test pool. */
 export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = {}): OAuthDeps {
   return {
@@ -182,8 +195,9 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     },
     thirdParty: unexpectedStore,
     exchange: null,
-    // The runtime pool runs in development without attestation config (src/attest/config.ts).
-    attestation: { kind: 'unattested_development' },
+    // The runtime pool runs in development without attestation config (src/attest/config.ts):
+    // a kilo-mobile exchange only marks its code exempt first.
+    attestation: { kind: 'unattested_development', store: exemptOnlyStore },
     web: {
       config,
       keys: async () => ({ status: 'unconfigured' }),

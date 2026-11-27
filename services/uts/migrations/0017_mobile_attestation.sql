@@ -13,6 +13,9 @@
 --   `token.denied` audit row; the code then never exchanges), or a release after a retryable
 --   failure. A settle of a claim that another request took over changes nothing.
 -- * An attested code stays attested, so a retry of the same exchange needs no second verification.
+-- * Backstop: a trigger refuses to consume a `kilo-mobile` code (`uts.require_code_attestation`)
+--   unless the code is attested, or exempt: `uts.exempt_code_attestation` marks a code exempt in
+--   development only, where the Worker runs without attestation config (decision Q67).
 -- * App Attest keys are kept until 400 days after their last use; a code's attestation goes with
 --   its code (`uts.maintain_oauth_rows()`).
 -- * Every write is a SECURITY DEFINER function; the app login reads neither new table.
@@ -20,7 +23,7 @@
 SET LOCAL ROLE uts_owner;
 
 CREATE TYPE uts.attestation_type AS ENUM ('app_attest_key', 'app_attest_assertion', 'play_integrity');
-CREATE TYPE uts.attestation_state AS ENUM ('verifying', 'attested', 'refused');
+CREATE TYPE uts.attestation_state AS ENUM ('verifying', 'attested', 'refused', 'exempt');
 
 -- App Attest keys: the key id is the SHA-256 of the key's uncompressed P-256 point (Apple's key
 -- identifier), and the counter is the last accepted assertion's.
@@ -34,16 +37,20 @@ CREATE TABLE uts.app_attest_keys (
 );
 CREATE INDEX app_attest_keys_last_used_idx ON uts.app_attest_keys (last_used_at);
 
--- One attestation per authorization code.
+-- One attestation per authorization code; an `exempt` row carries no attestation.
 CREATE TABLE uts.code_attestations (
   code_hash uts.sha256 PRIMARY KEY REFERENCES uts.authorization_codes (code_hash) ON DELETE CASCADE,
-  attestation_type uts.attestation_type NOT NULL,
+  attestation_type uts.attestation_type,
   key_id uts.sha256,
   state uts.attestation_state NOT NULL DEFAULT 'verifying',
   claim_id uuid NOT NULL,
   claimed_at timestamptz NOT NULL DEFAULT now(),
   settled_at timestamptz,
-  CONSTRAINT code_attestations_key_shape CHECK ((attestation_type = 'play_integrity') = (key_id IS NULL)),
+  CONSTRAINT code_attestations_type_shape CHECK ((state = 'exempt') = (attestation_type IS NULL)),
+  CONSTRAINT code_attestations_key_shape CHECK (
+    CASE WHEN attestation_type IS NULL THEN key_id IS NULL
+      ELSE (attestation_type = 'play_integrity') = (key_id IS NULL) END
+  ),
   CONSTRAINT code_attestations_settled_shape CHECK ((state = 'verifying') = (settled_at IS NULL))
 );
 
@@ -105,7 +112,7 @@ BEGIN
 
   SELECT * INTO claim FROM uts.code_attestations AS existing WHERE existing.code_hash = p_code_hash
   FOR UPDATE;
-  IF FOUND AND claim.state = 'attested' THEN
+  IF FOUND AND claim.state IN ('attested', 'exempt') THEN
     outcome := 'attested';
     RETURN NEXT;
     RETURN;
@@ -157,9 +164,9 @@ $$;
 -- Records the result of a claim. `p_result`: `attested` (with the key's point for a new App Attest
 -- key, or the assertion's counter), `refused` (with a fixed reason) or `released` (a retryable
 -- failure: the claim is dropped so a retry can verify again).
--- Outcomes: `attested`; `refused` (also an App Attest key that exists already, and an assertion
--- whose counter did not grow); `released`; `stale` (the claim is no longer current, nothing
--- changed).
+-- Outcomes: `attested`; `refused` (also an assertion whose counter did not grow); `key_known` (an
+-- attestation of a key stored already: the claim is dropped and the code stays usable);
+-- `released`; `stale` (the claim is no longer current, nothing changed).
 CREATE FUNCTION uts.settle_code_attestation(
   p_environment text,
   p_code_hash bytea,
@@ -211,7 +218,12 @@ BEGIN
       VALUES (claim.key_id, p_public_key, 0)
       ON CONFLICT ON CONSTRAINT app_attest_keys_pkey DO NOTHING;
       IF NOT FOUND THEN
-        refusal := 'key_attested_before';
+        -- The key is stored already (an attestation whose answer the app lost): the app keeps
+        -- using it with assertions, or attests a new key; this code stays usable either way.
+        DELETE FROM uts.code_attestations AS existing WHERE existing.code_hash = p_code_hash;
+        outcome := 'key_known';
+        RETURN NEXT;
+        RETURN;
       END IF;
     ELSIF claim.attestation_type = 'app_attest_assertion' THEN
       UPDATE uts.app_attest_keys AS existing
@@ -271,8 +283,52 @@ BEGIN
 END
 $$;
 
+-- Development only: marks a code exempt from attestation, for the Worker that runs without
+-- attestation config (decision Q67). Refused in every other environment.
+CREATE FUNCTION uts.exempt_code_attestation(p_environment text, p_code_hash bytea)
+RETURNS TABLE (outcome text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  PERFORM uts.require_inputs('uts.exempt_code_attestation',
+    p_environment = 'development' AND p_code_hash IS NOT NULL);
+  INSERT INTO uts.code_attestations (code_hash, state, claim_id, settled_at)
+  SELECT stored.code_hash, 'exempt', gen_random_uuid(), now()
+  FROM uts.authorization_codes AS stored WHERE stored.code_hash = p_code_hash
+  ON CONFLICT ON CONSTRAINT code_attestations_pkey DO NOTHING;
+  outcome := 'exempt';
+  RETURN NEXT;
+END
+$$;
+
+-- The backstop: an attestation-required client's code is consumed only when attested or exempt.
+-- The client list is the `attestation: 'required'` clients of src/oauth/clients.ts.
+CREATE FUNCTION uts.require_code_attestation() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NEW.client_id IN ('kilo-mobile') AND NOT EXISTS (
+    SELECT 1 FROM uts.code_attestations AS attested
+    WHERE attested.code_hash = NEW.code_hash AND attested.state IN ('attested', 'exempt')
+  ) THEN
+    RAISE EXCEPTION 'an attestation-required code is consumed only once attested'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER authorization_codes_require_attestation
+BEFORE UPDATE OF status ON uts.authorization_codes
+FOR EACH ROW WHEN (OLD.status = 'issued' AND NEW.status = 'consumed')
+EXECUTE FUNCTION uts.require_code_attestation();
+
 GRANT EXECUTE ON FUNCTION
   uts.claim_code_attestation(bytea, text, text, text, bytea, uuid, uts.attestation_type, bytea),
   uts.settle_code_attestation(text, bytea, uuid, text, bytea, bigint, text),
+  uts.exempt_code_attestation(text, bytea),
   uts.maintain_attestation_rows()
 TO uts_app;

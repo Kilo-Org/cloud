@@ -148,7 +148,7 @@ export const SUBJECT_OPERATIONS = [
 ] as const;
 
 /** Where a code's attestation stands (migration 0017). */
-export const ATTESTATION_STATES = ['verifying', 'attested', 'refused'] as const;
+export const ATTESTATION_STATES = ['verifying', 'attested', 'refused', 'exempt'] as const;
 
 /** Each enum by its type name in the `uts` schema. */
 export const IDENTITY_STORE_ENUMS = {

@@ -364,16 +364,20 @@ redirect delivered it. The token request adds:
 
 | `attestation_type` | `attestation_key_id` | `attestation` |
 |---|---|---|
-| `app_attest_key` (first sign-in of an install, or after `attestation_required`) | the new key's id, standard base64 | `attestKey(keyId, challenge)`, standard base64 |
-| `app_attest_assertion` | the stored key's id | `generateAssertion(keyId, challenge)`, standard base64 |
-| `play_integrity` | absent | a standard-request integrity token whose `requestHash` is the standard base64 of `SHA-256(UTF-8(challenge))` |
+| `app_attest_key` (the install holds no key for UTS: first sign-in, or after `attestation_required`) | the new key's id, standard base64 | `attestKey(keyId, challenge)`, standard base64 |
+| `app_attest_assertion` (every other sign-in) | the stored key's id | `generateAssertion(keyId, challenge)`, standard base64 |
+| `play_integrity` | absent | the token of a standard request whose `requestHash` is the challenge itself (`requestIntegrityCheckAsync(challenge)`), as returned |
 
-App Attest signs `SHA-256(UTF-8(challenge))` as its client data hash. An exchange without an
-attestation, or an assertion of a key UTS does not hold, answers `attestation_required` (400): the
-app attests a new key and sends the exchange again while the 60-second code lasts. A refused
-attestation answers `invalid_grant` and the code never exchanges. A dependency failure answers
-503 with `Retry-After`; the app retries the same exchange. A retry of an attested exchange (same
-code, verifier and DPoP key, a fresh proof) needs no attestation and gets the same grant.
+App Attest signs `SHA-256(UTF-8(challenge))` as its client data hash. Once `attestKey` ran for a
+key, the app stores its id and sends only assertions for it, also when the attestation's answer
+was lost; it attests a new key only after `attestation_required`. An exchange without an
+attestation, an assertion of a key UTS does not hold, or an attestation of a key UTS holds
+already answers `attestation_required` (400) and leaves the code usable while its 60 seconds
+last. A refused attestation answers `invalid_grant` and the code never exchanges. A dependency
+failure answers 503 with `Retry-After`; the app retries the same exchange. A retry of an attested
+exchange (same code, verifier and DPoP key, a fresh proof) needs no attestation and gets the same
+grant. UTS treats the Play Integrity token as opaque (base64url characters and dots, at most 16
+KiB); `decodeIntegrityToken` decides.
 
 **Checks.** App Attest: the chain to the pinned root with each certificate valid now, the nonce
 `SHA-256(authData || clientDataHash)` in the credential certificate, the key id as the SHA-256 of
@@ -388,15 +392,24 @@ the request (client, redirect URI, PKCE challenge, DPoP key, lifetime) before an
 a request without a valid code reaches no verifier and no Google call; it claims the code for one
 verification at a time (taken over after 15 seconds), and returns the stored key for an assertion.
 `uts.settle_code_attestation` stores a new key, moves an assertion's counter only upward, refuses
-(one `token.denied` audit row with the reason, and the code is dead), or releases the claim after
-a retryable failure; a settle of a claim another request took over changes nothing. Within an
-isolate a second request for a code in verification answers 503 before its first await. The
-exchange statement then runs as for any first-party client. Per mobile sign-in: 3 statements
-(claim, settle, exchange) instead of 1, a retry of an attested exchange 2; for Android one
+(one `token.denied` audit row with the reason, and the code is dead), drops the claim for a key
+stored already, or releases the claim after a retryable failure; a settle of a claim another
+request took over changes nothing. Within an isolate a second request for a code in verification
+answers 503 before its first await. The exchange statement then runs as for any first-party
+client, behind a backstop: the trigger `authorization_codes_require_attestation` refuses to
+consume a `kilo-mobile` code (SQLSTATE 23514) unless it is attested or, in development without
+attestation config only, marked exempt (`uts.exempt_code_attestation`, refused in every other
+environment). Per mobile sign-in: 3 statements (claim, settle, exchange) instead of 1, a retry of
+an attested exchange 2, development without config 2 (exempt, exchange); for Android one
 `decodeIntegrityToken` call plus one token exchange per isolate per hour; no Durable Object hop
-beyond the signer call; no queue message; one audit row per refusal. Refresh is unchanged. App
-Attest keys stay until 400 days after their last use (`uts.maintain_attestation_rows()`, minute
-cron); a code's attestation goes with its code.
+beyond the signer call; no queue message; one audit row per refusal. After a Google 429 each
+isolate answers 503 without calling Google for the `Retry-After` (60 seconds without one, at most
+5 minutes). The config is parsed once per isolate. Refresh is unchanged. App Attest keys stay
+until 400 days after their last use (`uts.maintain_attestation_rows()`, minute cron); a code's
+attestation goes with its code.
+
+Deliberate deferrals (decision Q86): the Play licensing verdict is not checked, and the App
+Attest receipt is not stored or sent to Apple's fraud-metric service.
 
 `scripts/attest-e2e.ts` (`UTS_E2E_ADMIN_URL`, `UTS_E2E_PORT`, default 9490) runs the mint Worker
 with a complete config and stand-ins for Apple and Google in their real formats, and a second

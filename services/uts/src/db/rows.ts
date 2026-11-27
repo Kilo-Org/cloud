@@ -605,7 +605,7 @@ export const AppAttestKeyRowSchema = z.strictObject({
 
 export const CodeAttestationRowSchema = z.strictObject({
   code_hash: sha256,
-  attestation_type: z.enum(enums.IDENTITY_STORE_ENUMS.attestation_type),
+  attestation_type: z.enum(enums.IDENTITY_STORE_ENUMS.attestation_type).nullable(),
   key_id: sha256.nullable(),
   state: z.enum(enums.ATTESTATION_STATES),
   claim_id: uuid,

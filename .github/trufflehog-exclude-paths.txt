@@ -78,6 +78,13 @@ apps/mobile/src/components/chat/mcp-settings-state-remote-servers\.test\.ts
 # the placeholder credential URI does not fail the scan.
 services/sts/test/repo/worker-configs\.test\.ts
 
+# STS replica-sweep fixtures. replica-sweep.test.ts gives each fake replica a
+# synthetic Hyperdrive connection string on an .invalid host, so the test can
+# tell which replica the sweep called. The commit that added them stays in branch
+# history. Exclude the fixture path so the placeholder credential URIs do not
+# fail the scan.
+services/sts/test/worker/replica-sweep\.test\.ts
+
 # UTS connection-policy fixtures. operator-connection.test.ts asserts which
 # operator and test-admin URLs the identity-store scripts refuse, so it lists
 # synthetic credential URLs for a remote example host. Earlier commits on the

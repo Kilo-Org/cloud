@@ -1,15 +1,25 @@
-import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { and, eq } from 'drizzle-orm';
+import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   modelsByProvider,
   organization_audit_logs,
   organization_group_policy_settings,
+  organization_new_models_baselines,
   organizations,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  getOrganizationById,
+  mutateOrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
+import {
+  evaluateEffectiveModelAccessPolicy,
+  getEffectiveModelDecision,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import { createModelsByProviderIndexLoader } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import { applySnapshotChangesAndAudit } from '@/lib/providers/openrouter/sync-providers';
 import type {
@@ -312,12 +322,107 @@ describe('logAutoModelChangesForAllOrgs with disable_new_models', () => {
   const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
   const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
 
+  beforeEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_audit_logs);
+    await clearSnapshots();
+  });
+
+  afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_audit_logs);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+    await clearSnapshots();
+  });
+
+  test('does not select an unrestricted org just because it has the policy', async () => {
+    const owner = await insertTestUser();
+    const org = await createTestOrganization('Policy Only Org', owner.id, 0, {
+      disable_new_models: true,
+    });
+
+    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+
+    expect(result.orgCount).toBe(0);
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
+    const updated = await getOrganizationById(org.id);
+    expect(updated?.settings.model_deny_list).toBeUndefined();
+  });
+
+  test('skips the organizations that were already handled at publication', async () => {
+    const owner = await insertTestUser();
+    const handledOrg = await createTestOrganization('Handled Org', owner.id, 0, {
+      provider_policy_mode: 'allow',
+      provider_allow_list: ['z-ai'],
+    });
+    const otherOrg = await createTestOrganization('Other Org', owner.id, 0, {
+      provider_policy_mode: 'allow',
+      provider_allow_list: ['z-ai'],
+    });
+
+    const result = await logAutoModelChangesForAllOrgs(
+      oldSnapshot,
+      newSnapshot,
+      new Set([handledOrg.id])
+    );
+
+    expect(result.orgCount).toBe(1);
+    expect(result.logCount).toBe(1);
+    expect(await fetchAutoChangeLogs(handledOrg.id)).toHaveLength(0);
+    expect(await fetchAutoChangeLogs(otherOrg.id)).toHaveLength(1);
+  });
+});
+
+describe('applySnapshotChangesAndAudit with disable_new_models', () => {
+  const glm5 = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+  const glm51 = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+  const glm52 = buildSnapshot([
+    { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1', 'z-ai/glm-5.2'] },
+  ]);
+
+  async function seedSnapshot(snapshot: NormalizedOpenRouterResponse) {
+    const [row] = await db
+      .insert(modelsByProvider)
+      .values({ data: snapshot })
+      .returning({ id: modelsByProvider.id });
+    return row.id;
+  }
+
+  async function seedBaseline(organizationId: string, snapshotId: number) {
+    await db
+      .insert(organization_new_models_baselines)
+      .values({ organization_id: organizationId, snapshot_id: snapshotId });
+  }
+
+  async function baselineOf(organizationId: string) {
+    const [row] = await db
+      .select({ snapshotId: organization_new_models_baselines.snapshot_id })
+      .from(organization_new_models_baselines)
+      .where(eq(organization_new_models_baselines.organization_id, organizationId));
+    return row?.snapshotId ?? null;
+  }
+
+  async function snapshotIds() {
+    const rows = await db.select({ id: modelsByProvider.id }).from(modelsByProvider);
+    return rows.map(row => row.id).sort((a, b) => a - b);
+  }
+
   async function policyRevision(organizationId: string) {
     const [row] = await db
       .select({ revision: organization_group_policy_settings.policy_revision })
       .from(organization_group_policy_settings)
       .where(eq(organization_group_policy_settings.organization_id, organizationId));
     return row?.revision ?? null;
+  }
+
+  async function denyList(organizationId: string) {
+    return (await getOrganizationById(organizationId))?.settings.model_deny_list;
+  }
+
+  async function createPolicyOrg(name: string, settings: object = {}) {
+    const owner = await insertTestUser();
+    return createTestOrganization(name, owner.id, 0, { disable_new_models: true, ...settings });
   }
 
   beforeEach(async () => {
@@ -334,20 +439,17 @@ describe('logAutoModelChangesForAllOrgs with disable_new_models', () => {
     await clearSnapshots();
   });
 
-  test('adds new models to the deny list of an unrestricted org and logs them as disabled', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Disable New Models Org', owner.id, 0, {
-      disable_new_models: true,
-    });
+  test('commits the deny list, the audit row and the baseline with the snapshot', async () => {
+    const org = await createPolicyOrg('Disable New Models Org');
+    const previousId = await seedSnapshot(glm5);
+    await seedBaseline(org.id, previousId);
 
-    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+    const result = await applySnapshotChangesAndAudit({ providers: glm51 });
 
-    expect(result.orgCount).toBe(1);
-    expect(result.logCount).toBe(1);
-
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
-    expect(updated?.settings.disable_new_models).toBe(true);
+    expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+    expect((await getOrganizationById(org.id))?.settings.disable_new_models).toBe(true);
+    expect(await policyRevision(org.id)).toBe(1);
+    expect(await baselineOf(org.id)).toBe(result.id);
 
     const logs = await fetchAutoChangeLogs(org.id);
     expect(logs).toHaveLength(1);
@@ -355,220 +457,226 @@ describe('logAutoModelChangesForAllOrgs with disable_new_models', () => {
     expect(logs[0].actor_email).toBeNull();
     expect(logs[0].actor_name).toBeNull();
     expect(logs[0].message).toBe('Disabled new models from provider z-ai: z-ai/glm-5.1');
-    expect(logs[0].details).toEqual({ id: 'autoRouting.models', added: [], removed: [] });
-    expect(await policyRevision(org.id)).toBe(1);
+    expect(logs[0].details).toEqual({
+      id: 'autoRouting.models',
+      added: [],
+      removed: [],
+      disabled: [{ provider: 'z-ai', models: ['z-ai/glm-5.1'] }],
+    });
   });
 
-  test('disables new models from every provider and bumps the policy revision each sync', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Multi Provider Org', owner.id, 0, {
-      disable_new_models: true,
-    });
+  test('reconciles an org without a baseline from the snapshot being replaced', async () => {
+    const org = await createPolicyOrg('No Baseline Org');
+    await seedSnapshot(glm5);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
+    try {
+      const result = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+      expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+      expect(await baselineOf(org.id)).toBe(result.id);
+      expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(`org ${org.id} has no baseline`));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('falls back to the replaced snapshot when the baseline snapshot no longer exists', async () => {
+    const org = await createPolicyOrg('Dangling Baseline Org');
+    const missingId = (await seedSnapshot(glm5)) + 1000;
+    await seedBaseline(org.id, missingId);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    try {
+      const result = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+      expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+      expect(await baselineOf(org.id)).toBe(result.id);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('disables new models from every provider in one audit row', async () => {
+    const org = await createPolicyOrg('Multi Provider Org');
     const before = buildSnapshot([
       { slug: 'anthropic', models: ['anthropic/claude-4.5'] },
       { slug: 'z-ai', models: ['z-ai/glm-5'] },
     ]);
-    const mid = buildSnapshot([
-      { slug: 'anthropic', models: ['anthropic/claude-4.5', 'anthropic/claude-4.6'] },
-      { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] },
-    ]);
-    const after = buildSnapshot([
-      { slug: 'anthropic', models: ['anthropic/claude-4.5', 'anthropic/claude-4.6'] },
-      { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1', 'z-ai/glm-5.2'] },
-    ]);
+    await seedBaseline(org.id, await seedSnapshot(before));
 
-    await logAutoModelChangesForAllOrgs(before, mid);
-    await logAutoModelChangesForAllOrgs(mid, after);
+    await applySnapshotChangesAndAudit({
+      providers: buildSnapshot([
+        { slug: 'anthropic', models: ['anthropic/claude-4.5', 'anthropic/claude-4.6'] },
+        { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] },
+      ]),
+    });
 
-    const updated = await getOrganizationById(org.id);
-    expect([...(updated?.settings.model_deny_list ?? [])].sort()).toEqual([
+    expect([...((await denyList(org.id)) ?? [])].sort()).toEqual([
       'anthropic/claude-4.6',
       'z-ai/glm-5.1',
-      'z-ai/glm-5.2',
     ]);
-    expect(await policyRevision(org.id)).toBe(2);
-
-    const logs = await fetchAutoChangeLogs(org.id);
-    expect(logs.map(log => log.message).sort()).toEqual([
-      'Disabled new models from provider anthropic: anthropic/claude-4.6; Disabled new models from provider z-ai: z-ai/glm-5.1',
-      'Disabled new models from provider z-ai: z-ai/glm-5.2',
-    ]);
-  });
-
-  test('keeps existing deny list entries and only adds models that are not denied yet', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Existing Deny List Org', owner.id, 0, {
-      disable_new_models: true,
-      model_deny_list: ['openai/gpt-4o', 'z-ai/glm-5.1'],
-    });
-
-    const after = buildSnapshot([
-      { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1', 'z-ai/glm-5.2'] },
-    ]);
-    await logAutoModelChangesForAllOrgs(oldSnapshot, after);
-
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual([
-      'openai/gpt-4o',
-      'z-ai/glm-5.1',
-      'z-ai/glm-5.2',
-    ]);
-
     const logs = await fetchAutoChangeLogs(org.id);
     expect(logs).toHaveLength(1);
-    expect(logs[0].message).toBe('Disabled new models from provider z-ai: z-ai/glm-5.2');
+    expect(logs[0].message).toBe(
+      'Disabled new models from provider anthropic: anthropic/claude-4.6; Disabled new models from provider z-ai: z-ai/glm-5.1'
+    );
   });
 
-  test('leaves the deny list alone when the new model is already denied', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Already Denied Org', owner.id, 0, {
-      disable_new_models: true,
-      model_deny_list: ['z-ai/glm-5.1'],
-    });
-
-    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
-
-    expect(result.logCount).toBe(0);
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
-    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
-  });
-
-  test('preserves other settings', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Other Settings Org', owner.id, 0, {
-      disable_new_models: true,
+  test('keeps existing deny list entries and the other settings', async () => {
+    const org = await createPolicyOrg('Existing Deny List Org', {
+      model_deny_list: ['openai/gpt-4o', 'z-ai/glm-5.1'],
       disable_openrouter: true,
       provider_allow_list: ['z-ai'],
     });
+    await seedBaseline(org.id, await seedSnapshot(glm51));
 
-    await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+    await applySnapshotChangesAndAudit({ providers: glm52 });
 
     const updated = await getOrganizationById(org.id);
     expect(updated?.settings).toMatchObject({
       disable_new_models: true,
       disable_openrouter: true,
       provider_allow_list: ['z-ai'],
-      model_deny_list: ['z-ai/glm-5.1'],
+      model_deny_list: ['openai/gpt-4o', 'z-ai/glm-5.1', 'z-ai/glm-5.2'],
     });
-  });
-
-  test('clears the default model when it becomes disabled', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Default Model Org', owner.id, 0, {
-      disable_new_models: true,
-      default_model: 'z-ai/glm-5.1',
-    });
-
-    await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
-
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
-    expect(updated?.settings.default_model).toBeUndefined();
-  });
-
-  test('clears a default model written with a variant suffix when its base model is disabled', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Default Variant Org', owner.id, 0, {
-      disable_new_models: true,
-      default_model: 'z-ai/glm-5.1:free',
-    });
-
-    await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
-
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.default_model).toBeUndefined();
-  });
-
-  test('keeps the default model when it is not one of the disabled models', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Other Default Model Org', owner.id, 0, {
-      disable_new_models: true,
-      default_model: 'z-ai/glm-5',
-    });
-
-    await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
-
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
-    expect(updated?.settings.default_model).toBe('z-ai/glm-5');
-  });
-
-  test('includes an org with the policy even when its entitlement has expired', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Expired Policy Org', owner.id, 0, {
-      disable_new_models: true,
-    });
-    await db
-      .update(organizations)
-      .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z', require_seats: true })
-      .where(eq(organizations.id, org.id));
-
-    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
-
-    expect(result.orgCount).toBe(1);
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
-    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
-  });
-
-  test('does not touch soft-deleted orgs with the policy', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Deleted Policy Org', owner.id, 0, {
-      disable_new_models: true,
-    });
-    await db
-      .update(organizations)
-      .set({ deleted_at: new Date().toISOString() })
-      .where(eq(organizations.id, org.id));
-
-    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
-
-    expect(result.orgCount).toBe(0);
-    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
-    const [row] = await db.select().from(organizations).where(eq(organizations.id, org.id));
-    expect(row.settings.model_deny_list).toBeUndefined();
-  });
-
-  test('logs removals normally and leaves the deny list unchanged when nothing was added', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Removal Only Policy Org', owner.id, 0, {
-      disable_new_models: true,
-      model_deny_list: ['openai/gpt-4o'],
-    });
-
-    const before = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-4.0', 'z-ai/glm-5'] }]);
-    const after = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
-    await logAutoModelChangesForAllOrgs(before, after);
-
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['openai/gpt-4o']);
-    expect(await policyRevision(org.id)).toBeNull();
-
     const logs = await fetchAutoChangeLogs(org.id);
     expect(logs).toHaveLength(1);
-    expect(logs[0].message).toBe('Removed models (no longer available): z-ai/glm-4.0');
+    expect(logs[0].message).toBe('Disabled new models from provider z-ai: z-ai/glm-5.2');
+  });
+
+  test('writes nothing for a model that is already denied, but still advances the baseline', async () => {
+    const org = await createPolicyOrg('Already Denied Org', { model_deny_list: ['z-ai/glm-5.1'] });
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    const result = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+    expect(await policyRevision(org.id)).toBeNull();
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
+    expect(await baselineOf(org.id)).toBe(result.id);
+  });
+
+  test('bumps the group policy revision only when the deny list changed', async () => {
+    const org = await createPolicyOrg('Revision Org');
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+    expect(await policyRevision(org.id)).toBe(1);
+
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+    expect(await policyRevision(org.id)).toBe(1);
+
+    await applySnapshotChangesAndAudit({ providers: glm5 });
+    expect(await policyRevision(org.id)).toBe(1);
+
+    await applySnapshotChangesAndAudit({ providers: glm52 });
+    expect(await policyRevision(org.id)).toBe(2);
+    expect([...((await denyList(org.id)) ?? [])].sort()).toEqual(['z-ai/glm-5.1', 'z-ai/glm-5.2']);
+  });
+
+  test('publishing an unchanged snapshot writes nothing', async () => {
+    const org = await createPolicyOrg('Unchanged Org');
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    const second = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
+    expect(await baselineOf(org.id)).toBe(second.id);
+  });
+
+  test('does nothing for an org whose baseline already is the published snapshot', async () => {
+    const owner = await insertTestUser();
+    // Restricted, so the post-commit logger would write an "Added models" row if it did not skip the org.
+    const org = await createTestOrganization('Current Baseline Org', owner.id, 0, {
+      disable_new_models: true,
+      provider_policy_mode: 'allow',
+      provider_allow_list: ['z-ai'],
+    });
+    const previousId = await seedSnapshot(glm5);
+    await seedBaseline(org.id, previousId + 1);
+
+    const result = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(result.id).toBe(previousId + 1);
+    expect(await denyList(org.id)).toBeUndefined();
+    expect(await policyRevision(org.id)).toBeNull();
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
+    expect(await baselineOf(org.id)).toBe(result.id);
+  });
+
+  test('catches up from an older retained baseline', async () => {
+    const org = await createPolicyOrg('Catch Up Org');
+    const baselineId = await seedSnapshot(glm5);
+    const previousId = await seedSnapshot(glm51);
+    await seedBaseline(org.id, baselineId);
+    expect(await snapshotIds()).toEqual([baselineId, previousId]);
+
+    const result = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+    expect([...((await denyList(org.id)) ?? [])].sort()).toEqual(['z-ai/glm-5.1', 'z-ai/glm-5.2']);
+    expect(await baselineOf(org.id)).toBe(result.id);
+    expect(await snapshotIds()).toEqual([previousId, result.id]);
+    const logs = await fetchAutoChangeLogs(org.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].message).toBe(
+      'Disabled new models from provider z-ai: z-ai/glm-5.1, z-ai/glm-5.2'
+    );
+  });
+
+  test('keeps the default model and Organization Auto models enabled', async () => {
+    const org = await createPolicyOrg('Configured Models Org', {
+      default_model: 'z-ai/glm-5.1',
+      org_auto_model: {
+        routes: { balanced: 'z-ai/glm-5.2' },
+        fallback_model: 'z-ai/glm-5.3',
+      },
+    });
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    await applySnapshotChangesAndAudit({
+      providers: buildSnapshot([
+        {
+          slug: 'z-ai',
+          models: ['z-ai/glm-5', 'z-ai/glm-5.1', 'z-ai/glm-5.2', 'z-ai/glm-5.3', 'z-ai/glm-5.4'],
+        },
+      ]),
+    });
+
+    const updated = await getOrganizationById(org.id);
+    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.4']);
+    expect(updated?.settings.default_model).toBe('z-ai/glm-5.1');
+    expect(updated?.settings.org_auto_model).toEqual({
+      routes: { balanced: 'z-ai/glm-5.2' },
+      fallback_model: 'z-ai/glm-5.3',
+    });
+    const logs = await fetchAutoChangeLogs(org.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].message).toBe(
+      'Added models from provider z-ai: z-ai/glm-5.1, z-ai/glm-5.2, z-ai/glm-5.3; Disabled new models from provider z-ai: z-ai/glm-5.4'
+    );
     expect(logs[0].details).toEqual({
       id: 'autoRouting.models',
-      added: [],
-      removed: ['z-ai/glm-4.0'],
+      added: [{ provider: 'z-ai', models: ['z-ai/glm-5.1', 'z-ai/glm-5.2', 'z-ai/glm-5.3'] }],
+      removed: [],
+      disabled: [{ provider: 'z-ai', models: ['z-ai/glm-5.4'] }],
     });
   });
 
-  test('disables additions while still logging removals in the same audit row', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Mixed Policy Org', owner.id, 0, {
-      disable_new_models: true,
-    });
+  test('logs removals and disables additions in the same audit row', async () => {
+    const org = await createPolicyOrg('Mixed Policy Org');
+    await seedBaseline(
+      org.id,
+      await seedSnapshot(buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-4.0', 'z-ai/glm-5'] }]))
+    );
 
-    const before = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-4.0', 'z-ai/glm-5'] }]);
-    const after = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
-    await logAutoModelChangesForAllOrgs(before, after);
+    await applySnapshotChangesAndAudit({ providers: glm51 });
 
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['z-ai/glm-5.1']);
-
+    expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
     const logs = await fetchAutoChangeLogs(org.id);
     expect(logs).toHaveLength(1);
     expect(logs[0].message).toBe(
@@ -578,43 +686,98 @@ describe('logAutoModelChangesForAllOrgs with disable_new_models', () => {
       id: 'autoRouting.models',
       added: [],
       removed: ['z-ai/glm-4.0'],
+      disabled: [{ provider: 'z-ai', models: ['z-ai/glm-5.1'] }],
     });
   });
 
-  test('ignores the flag on non-enterprise orgs', async () => {
+  test('logs removals without touching the deny list or the revision', async () => {
+    const org = await createPolicyOrg('Removal Only Org', { model_deny_list: ['openai/gpt-4o'] });
+    await seedBaseline(
+      org.id,
+      await seedSnapshot(buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-4.0', 'z-ai/glm-5'] }]))
+    );
+
+    await applySnapshotChangesAndAudit({ providers: glm5 });
+
+    expect(await denyList(org.id)).toEqual(['openai/gpt-4o']);
+    expect(await policyRevision(org.id)).toBeNull();
+    const logs = await fetchAutoChangeLogs(org.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].details).toEqual({
+      id: 'autoRouting.models',
+      added: [],
+      removed: ['z-ai/glm-4.0'],
+    });
+  });
+
+  test('still handles an org with an expired entitlement', async () => {
+    const org = await createPolicyOrg('Expired Policy Org');
+    await db
+      .update(organizations)
+      .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z', require_seats: true })
+      .where(eq(organizations.id, org.id));
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await denyList(org.id)).toEqual(['z-ai/glm-5.1']);
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
+  });
+
+  test('does not touch soft-deleted orgs with the policy and drops their baseline', async () => {
+    const org = await createPolicyOrg('Deleted Policy Org');
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, org.id));
+
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await denyList(org.id)).toBeUndefined();
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
+    expect(await baselineOf(org.id)).toBeNull();
+  });
+
+  test('only advances the baseline of a non-enterprise org with the policy', async () => {
     const owner = await insertTestUser();
-    const teamsOrg = await createTestOrganization(
+    const org = await createTestOrganization(
       'Teams Policy Org',
       owner.id,
       0,
       { disable_new_models: true },
       true
     );
+    await seedBaseline(org.id, await seedSnapshot(glm5));
 
-    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+    const result = await applySnapshotChangesAndAudit({ providers: glm51 });
 
-    expect(result.orgCount).toBe(0);
-    expect(await fetchAutoChangeLogs(teamsOrg.id)).toHaveLength(0);
-    const updated = await getOrganizationById(teamsOrg.id);
-    expect(updated?.settings.model_deny_list).toBeUndefined();
+    expect(await denyList(org.id)).toBeUndefined();
+    expect(await policyRevision(org.id)).toBeNull();
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
+    expect(await baselineOf(org.id)).toBe(result.id);
   });
 
-  test('keeps the existing behaviour when the flag is false', async () => {
+  test('without the policy, logs added models normally, does not deny them and drops the baseline', async () => {
     const owner = await insertTestUser();
-    const org = await createTestOrganization('Flag Off Org', owner.id, 0, {
+    const restricted = await createTestOrganization('Flag Off Org', owner.id, 0, {
       disable_new_models: false,
       provider_policy_mode: 'allow',
       provider_allow_list: ['z-ai'],
       model_deny_list: ['openai/gpt-4o'],
     });
+    const unrestricted = await createTestOrganization('Flag Off Unrestricted Org', owner.id, 0);
+    const previousId = await seedSnapshot(glm5);
+    await seedBaseline(restricted.id, previousId);
+    await seedBaseline(unrestricted.id, previousId);
 
-    await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+    await applySnapshotChangesAndAudit({ providers: glm51 });
 
-    const updated = await getOrganizationById(org.id);
-    expect(updated?.settings.model_deny_list).toEqual(['openai/gpt-4o']);
-    expect(await policyRevision(org.id)).toBeNull();
-
-    const logs = await fetchAutoChangeLogs(org.id);
+    expect(await denyList(restricted.id)).toEqual(['openai/gpt-4o']);
+    expect(await policyRevision(restricted.id)).toBeNull();
+    expect(await baselineOf(restricted.id)).toBeNull();
+    expect(await baselineOf(unrestricted.id)).toBeNull();
+    const logs = await fetchAutoChangeLogs(restricted.id);
     expect(logs).toHaveLength(1);
     expect(logs[0].message).toBe('Added models from provider z-ai: z-ai/glm-5.1');
     expect(logs[0].details).toEqual({
@@ -622,18 +785,402 @@ describe('logAutoModelChangesForAllOrgs with disable_new_models', () => {
       added: [{ provider: 'z-ai', models: ['z-ai/glm-5.1'] }],
       removed: [],
     });
+    expect(await fetchAutoChangeLogs(unrestricted.id)).toHaveLength(0);
   });
 
-  test('does not include unrestricted orgs when the flag is false', async () => {
-    const owner = await insertTestUser();
-    const org = await createTestOrganization('Flag Off Unrestricted Org', owner.id, 0, {
-      disable_new_models: false,
+  test('writes one audit row for a restricted org with the policy, not a second one after the commit', async () => {
+    const org = await createPolicyOrg('Restricted Policy Org', {
+      provider_policy_mode: 'allow',
+      provider_allow_list: ['z-ai'],
     });
+    await seedBaseline(org.id, await seedSnapshot(glm5));
 
-    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+    await applySnapshotChangesAndAudit({ providers: glm51 });
 
-    expect(result.orgCount).toBe(0);
-    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(0);
+    const logs = await fetchAutoChangeLogs(org.id);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].message).toBe('Disabled new models from provider z-ai: z-ai/glm-5.1');
+  });
+
+  test('one org failing does not block the others or the publication, and its baseline stays', async () => {
+    // Its settings pass `getEffectiveModelRestrictions` but fail `OrganizationSettingsSchema.parse`
+    // when the deny list is written.
+    const failing = await createPolicyOrg('Failing Org', {
+      minimum_balance_alert_email: ['not-an-email'],
+    });
+    const healthy = await createPolicyOrg('Healthy Org');
+    const baselineId = await seedSnapshot(glm5);
+    const previousId = await seedSnapshot(glm51);
+    await seedBaseline(failing.id, baselineId);
+    await seedBaseline(healthy.id, previousId);
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const result = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(await denyList(healthy.id)).toEqual(['z-ai/glm-5.2']);
+      expect(await baselineOf(healthy.id)).toBe(result.id);
+      expect(await fetchAutoChangeLogs(healthy.id)).toHaveLength(1);
+
+      expect(await denyList(failing.id)).toBeUndefined();
+      expect(await policyRevision(failing.id)).toBeNull();
+      expect(await baselineOf(failing.id)).toBe(baselineId);
+      expect(await fetchAutoChangeLogs(failing.id)).toHaveLength(0);
+
+      expect(await snapshotIds()).toEqual([baselineId, previousId, result.id]);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('retries a failed org on the next sync from its retained baseline', async () => {
+    const org = await createPolicyOrg('Retry Org', {
+      minimum_balance_alert_email: ['not-an-email'],
+    });
+    const baselineId = await seedSnapshot(glm5);
+    await seedBaseline(org.id, baselineId);
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      await applySnapshotChangesAndAudit({ providers: glm51 });
+      expect(await baselineOf(org.id)).toBe(baselineId);
+
+      const settings = (await getOrganizationById(org.id))?.settings ?? {};
+      await db
+        .update(organizations)
+        .set({ settings: { ...settings, minimum_balance_alert_email: [] } })
+        .where(eq(organizations.id, org.id));
+
+      const result = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+      expect([...((await denyList(org.id)) ?? [])].sort()).toEqual([
+        'z-ai/glm-5.1',
+        'z-ai/glm-5.2',
+      ]);
+      expect(await baselineOf(org.id)).toBe(result.id);
+      expect(await snapshotIds()).toHaveLength(2);
+      expect(await snapshotIds()).toContain(result.id);
+      expect(await snapshotIds()).not.toContain(baselineId);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('keeps the previous snapshot for one more cycle and deletes older ones', async () => {
+    const firstId = await seedSnapshot(glm5);
+
+    const second = await applySnapshotChangesAndAudit({ providers: glm51 });
+    expect(await snapshotIds()).toEqual([firstId, second.id]);
+
+    const third = await applySnapshotChangesAndAudit({ providers: glm52 });
+    expect(await snapshotIds()).toEqual([second.id, third.id]);
+  });
+
+  test('keeps a snapshot an org baseline points at, even when it is older than the previous one', async () => {
+    const org = await createPolicyOrg('Retained Baseline Org', {
+      minimum_balance_alert_email: ['not-an-email'],
+    });
+    const baselineId = await seedSnapshot(glm5);
+    await seedSnapshot(glm51);
+    await seedBaseline(org.id, baselineId);
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const result = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+      expect(await snapshotIds()).toContain(baselineId);
+      expect(await snapshotIds()).toContain(result.id);
+      expect(await baselineOf(org.id)).toBe(baselineId);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('reconciles orgs whose baselines are the previous snapshot and an older one in one publication', async () => {
+    const current = await createPolicyOrg('Previous Baseline Org');
+    const behind = await createPolicyOrg('Behind Baseline Org');
+    const olderId = await seedSnapshot(glm5);
+    const previousId = await seedSnapshot(glm51);
+    await seedBaseline(current.id, previousId);
+    await seedBaseline(behind.id, olderId);
+
+    const result = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+    expect(await denyList(current.id)).toEqual(['z-ai/glm-5.2']);
+    expect([...((await denyList(behind.id)) ?? [])].sort()).toEqual([
+      'z-ai/glm-5.1',
+      'z-ai/glm-5.2',
+    ]);
+    expect(await baselineOf(current.id)).toBe(result.id);
+    expect(await baselineOf(behind.id)).toBe(result.id);
+  });
+
+  test('drops the baseline of an org that no longer has the policy', async () => {
+    const org = await createPolicyOrg('Policy Turned Off Org');
+    const previousId = await seedSnapshot(glm5);
+    await seedBaseline(org.id, previousId);
+    await db.update(organizations).set({ settings: {} }).where(eq(organizations.id, org.id));
+
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await baselineOf(org.id)).toBeNull();
+    expect(await denyList(org.id)).toBeUndefined();
+  });
+
+  test('applies a deny list change made while the publication waited for the org lock', async () => {
+    const org = await createPolicyOrg('Concurrent Deny List Org');
+    await seedBaseline(org.id, await seedSnapshot(glm5));
+
+    let publication: ReturnType<typeof applySnapshotChangesAndAudit> | undefined;
+    let publicationWaited = false;
+    await db.transaction(async tx => {
+      await mutateOrganizationSettings(
+        org.id,
+        organization => ({ ...organization.settings, model_deny_list: ['openai/gpt-4o'] }),
+        tx
+      );
+      publication = applySnapshotChangesAndAudit({ providers: glm51 });
+      // The publication read the org without a lock and now waits for the row this
+      // transaction holds.
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const result = await db.execute<{ waiting: number }>(
+          sql`SELECT count(*)::int AS waiting FROM pg_stat_activity
+              WHERE datname = current_database() AND wait_event_type = 'Lock'`
+        );
+        if (result.rows[0].waiting > 0) {
+          publicationWaited = true;
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    });
+    const result = await publication;
+
+    expect(publicationWaited).toBe(true);
+    expect(await denyList(org.id)).toEqual(['openai/gpt-4o', 'z-ai/glm-5.1']);
+    expect(await baselineOf(org.id)).toBe(result?.id);
+    expect(await policyRevision(org.id)).toBe(1);
+    expect(await fetchAutoChangeLogs(org.id)).toHaveLength(1);
+  });
+});
+
+describe('the baseline check after a publication', () => {
+  const glm5 = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+  const glm51 = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+  const glm52 = buildSnapshot([
+    { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1', 'z-ai/glm-5.2'] },
+  ]);
+
+  async function createPolicyOrg(name: string, settings: object = {}) {
+    const owner = await insertTestUser();
+    return createTestOrganization(name, owner.id, 0, { disable_new_models: true, ...settings });
+  }
+
+  /** The gateway's decision, with the snapshot reads served by the test database. */
+  async function decide(organizationId: string, modelId: string) {
+    const loader = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => {
+        const [row] = await db
+          .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+          .from(modelsByProvider)
+          .orderBy(sql`${modelsByProvider.id} desc`)
+          .limit(1);
+        return row;
+      },
+      fetchSnapshotById: async id => {
+        const [row] = await db
+          .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+          .from(modelsByProvider)
+          .where(eq(modelsByProvider.id, id));
+        return row;
+      },
+      fetchOpenRouterModels: async () => ({}),
+      fetchVercelModels: async () => ({}),
+      ttlMs: 60_000,
+      nowMs: () => Date.now(),
+    });
+    const policyContext = await getOrganizationGroupPolicyContext({
+      organizationId,
+      subject: { type: 'defaultAccess' },
+    });
+    const policy = evaluateEffectiveModelAccessPolicy(policyContext);
+    return {
+      baselineSnapshotId: policy.newModelsBaselineSnapshotId,
+      decision: await getEffectiveModelDecision(
+        policy,
+        modelId,
+        loader.getProviderSlugsForModel,
+        loader.isModelListedAtOrBefore
+      ),
+    };
+  }
+
+  const denied = { allowed: false, denialSource: 'organization_model' };
+
+  beforeEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_audit_logs);
+    await clearSnapshots();
+  });
+
+  afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_audit_logs);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+    await clearSnapshots();
+  });
+
+  test('a reconciled org reads its new baseline and is denied the disabled model', async () => {
+    const org = await createPolicyOrg('Reconciled Org');
+    const [{ id: baselineId }] = await db
+      .insert(modelsByProvider)
+      .values({ data: glm5 })
+      .returning({ id: modelsByProvider.id });
+    await db
+      .insert(organization_new_models_baselines)
+      .values({ organization_id: org.id, snapshot_id: baselineId });
+
+    const published = await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await decide(org.id, 'z-ai/glm-5.1')).toEqual({
+      baselineSnapshotId: published.id,
+      decision: denied,
+    });
+    expect((await decide(org.id, 'z-ai/glm-5')).decision).toEqual({ allowed: true });
+  });
+
+  test('an org whose reconciliation failed is denied every model listed after its baseline', async () => {
+    const failing = await createPolicyOrg('Failing Org', {
+      minimum_balance_alert_email: ['not-an-email'],
+    });
+    const [{ id: baselineId }] = await db
+      .insert(modelsByProvider)
+      .values({ data: glm5 })
+      .returning({ id: modelsByProvider.id });
+    await db
+      .insert(organization_new_models_baselines)
+      .values({ organization_id: failing.id, snapshot_id: baselineId });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      await applySnapshotChangesAndAudit({ providers: glm51 });
+      await applySnapshotChangesAndAudit({ providers: glm52 });
+
+      // The failed org never got a deny list entry, yet it still cannot use the new models.
+      expect((await getOrganizationById(failing.id))?.settings.model_deny_list).toBeUndefined();
+      expect(await decide(failing.id, 'z-ai/glm-5.1')).toEqual({
+        baselineSnapshotId: baselineId,
+        decision: denied,
+      });
+      expect((await decide(failing.id, 'z-ai/glm-5.2')).decision).toEqual(denied);
+      expect((await decide(failing.id, 'z-ai/glm-5')).decision).toEqual({ allowed: true });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('a failed org is admitted to the models once the next sync reconciles it', async () => {
+    const org = await createPolicyOrg('Recovering Org', {
+      minimum_balance_alert_email: ['not-an-email'],
+    });
+    const [{ id: baselineId }] = await db
+      .insert(modelsByProvider)
+      .values({ data: glm5 })
+      .returning({ id: modelsByProvider.id });
+    await db
+      .insert(organization_new_models_baselines)
+      .values({ organization_id: org.id, snapshot_id: baselineId });
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      await applySnapshotChangesAndAudit({ providers: glm51 });
+      await mutateOrganizationSettings(org.id, organization => ({
+        ...organization.settings,
+        minimum_balance_alert_email: [],
+      }));
+      const published = await applySnapshotChangesAndAudit({ providers: glm52 });
+
+      expect(await decide(org.id, 'z-ai/glm-5.1')).toEqual({
+        baselineSnapshotId: published.id,
+        decision: denied,
+      });
+      expect((await getOrganizationById(org.id))?.settings.model_deny_list).toEqual([
+        'z-ai/glm-5.1',
+        'z-ai/glm-5.2',
+      ]);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test('an org without the policy has no baseline check', async () => {
+    const owner = await insertTestUser();
+    const org = await createTestOrganization('No Policy Org', owner.id, 0);
+    await db.insert(modelsByProvider).values({ data: glm5 });
+    await applySnapshotChangesAndAudit({ providers: glm51 });
+
+    expect(await decide(org.id, 'z-ai/glm-5.1')).toEqual({
+      baselineSnapshotId: undefined,
+      decision: { allowed: true },
+    });
+  });
+});
+
+describe('getOrganizationGroupPolicyContext new models baseline', () => {
+  beforeEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_audit_logs);
+    await clearSnapshots();
+  });
+
+  afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+    await clearSnapshots();
+  });
+
+  async function baselineFor(options: { settings: object; teams?: boolean; baseline?: boolean }) {
+    const owner = await insertTestUser();
+    const org = await createTestOrganization(
+      'Baseline Context Org',
+      owner.id,
+      0,
+      options.settings,
+      options.teams ? true : undefined
+    );
+    if (options.baseline !== false) {
+      await db
+        .insert(organization_new_models_baselines)
+        .values({ organization_id: org.id, snapshot_id: 4242 });
+    }
+    const context = await getOrganizationGroupPolicyContext({
+      organizationId: org.id,
+      subject: { type: 'defaultAccess' },
+    });
+    return context.newModelsBaselineSnapshotId;
+  }
+
+  test('returns the baseline for an enterprise org with the policy', async () => {
+    expect(await baselineFor({ settings: { disable_new_models: true } })).toBe(4242);
+  });
+
+  test('is undefined for an enterprise org with the policy but no baseline', async () => {
+    expect(
+      await baselineFor({ settings: { disable_new_models: true }, baseline: false })
+    ).toBeUndefined();
+  });
+
+  test('ignores a leftover baseline of an org without the policy', async () => {
+    expect(await baselineFor({ settings: {} })).toBeUndefined();
+    expect(await baselineFor({ settings: { disable_new_models: false } })).toBeUndefined();
+  });
+
+  test('ignores a baseline outside Enterprise', async () => {
+    expect(
+      await baselineFor({ settings: { disable_new_models: true }, teams: true })
+    ).toBeUndefined();
   });
 });
 
@@ -652,7 +1199,7 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     await clearSnapshots();
   });
 
-  test('reads the stored previous snapshot, replaces it with the new one, and emits audit logs based on the diff', async () => {
+  test('reads the stored previous snapshot, keeps it next to the new one, and emits audit logs based on the diff', async () => {
     const owner = await insertTestUser();
     const enterpriseOrg = await createTestOrganization('Wiring Org', owner.id, 0, {
       provider_policy_mode: 'allow',
@@ -660,7 +1207,10 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     });
 
     const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
-    await db.insert(modelsByProvider).values({ data: oldSnapshot });
+    const [{ id: previousId }] = await db
+      .insert(modelsByProvider)
+      .values({ data: oldSnapshot })
+      .returning({ id: modelsByProvider.id });
 
     const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
     const result = await applySnapshotChangesAndAudit({ providers: newSnapshot });
@@ -673,8 +1223,12 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
 
     const remainingRows = await db
       .select({ id: modelsByProvider.id, data: modelsByProvider.data })
-      .from(modelsByProvider);
-    expect(remainingRows).toEqual([{ id: result.id, data: newSnapshot }]);
+      .from(modelsByProvider)
+      .orderBy(modelsByProvider.id);
+    expect(remainingRows).toEqual([
+      { id: previousId, data: oldSnapshot },
+      { id: result.id, data: newSnapshot },
+    ]);
 
     const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
     expect(logs).toHaveLength(1);

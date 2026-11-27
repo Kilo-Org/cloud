@@ -296,6 +296,10 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
     id: z.literal('autoRouting.models'),
     added: z.array(z.strictObject({ provider: z.string(), models: z.array(z.string()) })),
     removed: z.array(z.string()),
+    // Models the `disable_new_models` policy put on the deny list as they became available.
+    disabled: z
+      .array(z.strictObject({ provider: z.string(), models: z.array(z.string()) }))
+      .optional(),
   }),
 
   NamedPolicySchema.extend({ id: z.literal('namedPolicy.created') }),

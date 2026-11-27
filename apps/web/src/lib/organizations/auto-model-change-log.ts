@@ -1,10 +1,20 @@
 import { captureException } from '@sentry/nextjs';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import type { Organization } from '@kilocode/db/schema';
-import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  modelsByProvider,
+  organization_new_models_baselines,
+  organization_seats_purchases,
+  organizations,
+} from '@kilocode/db/schema';
+import type { OrganizationSettings } from '@kilocode/db/schema-types';
+import type { AuditDetail } from '@kilocode/app-shared/organizations';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
-import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import {
+  bumpOrganizationGroupPolicyRevision,
+  lockOrganizationGroupPolicy,
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   normalizeInferenceProviderId,
@@ -165,28 +175,29 @@ export function relevantChangesIsEmpty(changes: RelevantChanges): boolean {
  *
  * Segments (each conditionally present, joined by `'; '`):
  *   Added models from provider {slug}: {id1}, {id2}
+ *   Disabled new models from provider {slug}: {id1}, {id2}
  *   Removed models (no longer available): {id1}, {id2}
  *   Removed models (no longer offered by any allowed provider): {id1}, {id2}
  *
- * When `addedModelsDisabled` is set, the additions were also put on the deny list and read
- * `Disabled new models from provider {slug}: {id1}, {id2}` instead.
+ * `disabledByReasonProvider` lists the additions the `disable_new_models` policy put on the
+ * deny list; `changes.addedByReasonProvider` then holds only the additions that stay enabled.
  */
 export function buildAutoChangeMessage(
   changes: RelevantChanges,
-  { addedModelsDisabled }: { addedModelsDisabled: boolean }
+  disabledByReasonProvider: ReadonlyMap<string, string[]> = new Map()
 ): string {
   const segments: string[] = [];
 
-  const sortedProviders = [...changes.addedByReasonProvider.keys()].sort((a, b) =>
-    a.localeCompare(b)
-  );
-  const addedPrefix = addedModelsDisabled ? 'Disabled new models' : 'Added models';
-  for (const providerSlug of sortedProviders) {
-    const models = changes.addedByReasonProvider.get(providerSlug);
-    if (models && models.length > 0) {
-      segments.push(`${addedPrefix} from provider ${providerSlug}: ${models.join(', ')}`);
+  const pushByProvider = (prefix: string, byProvider: ReadonlyMap<string, string[]>) => {
+    for (const providerSlug of [...byProvider.keys()].sort((a, b) => a.localeCompare(b))) {
+      const models = byProvider.get(providerSlug);
+      if (models && models.length > 0) {
+        segments.push(`${prefix} from provider ${providerSlug}: ${models.join(', ')}`);
+      }
     }
-  }
+  };
+  pushByProvider('Added models', changes.addedByReasonProvider);
+  pushByProvider('Disabled new models', disabledByReasonProvider);
 
   if (changes.removedFromCatalog.length > 0) {
     segments.push(`Removed models (no longer available): ${changes.removedFromCatalog.join(', ')}`);
@@ -199,6 +210,56 @@ export function buildAutoChangeMessage(
   }
 
   return segments.join('; ');
+}
+
+export type NewModelsPolicyOutcome = {
+  /** `changes` with only the additions that stay enabled. */
+  changes: RelevantChanges;
+  /** providerSlug -> sorted list of normalized model ids put on the deny list. */
+  disabledByReasonProvider: Map<string, string[]>;
+  /** The new deny list, or null when it is unchanged. */
+  modelDenyList: string[] | null;
+};
+
+/**
+ * Models the organization already chose explicitly. The policy leaves them enabled, so a model
+ * that disappears from the catalog and comes back cannot break the default model or
+ * Organization Auto.
+ */
+function explicitlyConfiguredModelIds(settings: OrganizationSettings): Set<string> {
+  const ids = [
+    settings.default_model,
+    settings.org_auto_model?.fallback_model,
+    ...Object.values(settings.org_auto_model?.routes ?? {}),
+  ];
+  return new Set(ids.filter(id => id !== undefined).map(id => normalizeModelId(id)));
+}
+
+/** Apply the `disable_new_models` policy to one organization's relevant changes. */
+export function applyNewModelsPolicy(
+  settings: OrganizationSettings,
+  changes: RelevantChanges
+): NewModelsPolicyOutcome {
+  const configured = explicitlyConfiguredModelIds(settings);
+  const addedByReasonProvider = new Map<string, string[]>();
+  const disabledByReasonProvider = new Map<string, string[]>();
+  for (const [provider, models] of changes.addedByReasonProvider) {
+    const enabled = models.filter(model => configured.has(model));
+    const disabled = models.filter(model => !configured.has(model));
+    if (enabled.length > 0) addedByReasonProvider.set(provider, enabled);
+    if (disabled.length > 0) disabledByReasonProvider.set(provider, disabled);
+  }
+
+  const currentDenyList = settings.model_deny_list ?? [];
+  const deniedModels = new Set(currentDenyList.map(model => normalizeModelId(model)));
+  const newlyDenied = [...disabledByReasonProvider.values()]
+    .flat()
+    .filter(model => !deniedModels.has(model));
+  return {
+    changes: { ...changes, addedByReasonProvider },
+    disabledByReasonProvider,
+    modelDenyList: newlyDenied.length > 0 ? [...currentDenyList, ...new Set(newlyDenied)] : null,
+  };
 }
 
 export type LogResult = {
@@ -230,61 +291,210 @@ const orgHasCurrentEntitlement = sql<boolean>`(
 
 const orgDisablesNewModels = sql<boolean>`(${organizations.settings}->>'disable_new_models' = 'true')`;
 
-function auditDetails(changes: RelevantChanges, addedModelsDisabled: boolean) {
+function auditDetails(
+  changes: RelevantChanges,
+  disabledByReasonProvider: ReadonlyMap<string, string[]> = new Map()
+): AuditDetail {
+  const byProvider = (map: ReadonlyMap<string, string[]>) =>
+    [...map].map(([provider, models]) => ({ provider, models }));
   return {
-    id: 'autoRouting.models' as const,
-    // The mobile detail line reads these as enabled additions, so disabled ones are
-    // left to the message.
-    added: addedModelsDisabled
-      ? []
-      : [...changes.addedByReasonProvider].map(([provider, models]) => ({ provider, models })),
+    id: 'autoRouting.models',
+    added: byProvider(changes.addedByReasonProvider),
     removed: [...changes.removedFromCatalog, ...changes.removedFromAllowedProviders],
+    // Omitted when empty, so mobile builds that predate the field still parse the row.
+    ...(disabledByReasonProvider.size > 0
+      ? { disabled: byProvider(disabledByReasonProvider) }
+      : {}),
   };
 }
 
-/**
- * Add the models `changes` newly admits to the organization's deny list and record the
- * change, in one transaction. The policy is read again under the row lock, so an
- * organization that turned it off since the sync read it only gets the audit row.
- */
-async function disableAddedModelsAndLog(organizationId: string, changes: RelevantChanges) {
-  const addedModels = [...changes.addedByReasonProvider.values()].flat();
-  await db.transaction(async tx => {
-    // Same lock order as `updateAllowLists`: the group policy revision, then the organization row.
-    await bumpOrganizationGroupPolicyRevision(tx, organizationId, null);
-    let addedModelsDisabled = false;
-    await mutateOrganizationSettings(
-      organizationId,
-      organization => {
-        if (organization.plan !== 'enterprise' || !organization.settings.disable_new_models) {
-          return organization.settings;
-        }
-        addedModelsDisabled = true;
-        const modelDenyList = [
-          ...new Set([...(organization.settings.model_deny_list ?? []), ...addedModels]),
-        ];
-        const defaultModel = organization.settings.default_model;
-        const defaultModelDisabled =
-          defaultModel !== undefined && addedModels.includes(normalizeModelId(defaultModel));
-        return {
-          ...organization.settings,
-          model_deny_list: modelDenyList,
-          ...(defaultModelDisabled ? { default_model: undefined } : {}),
-        };
-      },
-      tx
-    );
-    await createAuditLog({
-      action: 'organization.settings.auto_change',
-      actor_id: null,
-      actor_email: null,
-      actor_name: null,
-      details: auditDetails(changes, addedModelsDisabled),
-      message: buildAutoChangeMessage(changes, { addedModelsDisabled }),
-      organization_id: organizationId,
-      tx,
+async function upsertBaseline(tx: DrizzleTransaction, organizationId: string, snapshotId: number) {
+  await tx
+    .insert(organization_new_models_baselines)
+    .values({ organization_id: organizationId, snapshot_id: snapshotId })
+    .onConflictDoUpdate({
+      target: organization_new_models_baselines.organization_id,
+      set: { snapshot_id: snapshotId, updated_at: sql`now()` },
     });
+}
+
+async function writePolicyAuditLog(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  outcome: NewModelsPolicyOutcome
+) {
+  if (relevantChangesIsEmpty(outcome.changes) && outcome.disabledByReasonProvider.size === 0) {
+    return;
+  }
+  await createAuditLog({
+    action: 'organization.settings.auto_change',
+    actor_id: null,
+    actor_email: null,
+    actor_name: null,
+    details: auditDetails(outcome.changes, outcome.disabledByReasonProvider),
+    message: buildAutoChangeMessage(outcome.changes, outcome.disabledByReasonProvider),
+    organization_id: organizationId,
+    tx,
   });
+}
+
+/**
+ * Reconcile one organization from its baseline to `snapshotId`.
+ *
+ * The policy itself cannot change meanwhile: `updateNewModelsPolicy` waits for the snapshot lock
+ * the caller holds. The deny list can, so the organization's locks are taken only when the deny
+ * list changes, and the outcome is then decided again on the locked row.
+ */
+async function reconcileOrganization(
+  tx: DrizzleTransaction,
+  organization: Organization,
+  diff: SnapshotDiff,
+  snapshotId: number
+): Promise<void> {
+  // Only enterprise organizations have model restrictions. The baseline still advances, so a
+  // later upgrade does not disable everything released in between.
+  if (organization.plan === 'enterprise') {
+    const result = {
+      outcome: applyNewModelsPolicy(
+        organization.settings,
+        computeRelevantChangesForOrg(organization, diff)
+      ),
+    };
+    if (result.outcome.modelDenyList) {
+      // Same lock order as `updateAllowLists`: the group policy, then the organization row.
+      await lockOrganizationGroupPolicy(tx, organization.id);
+      await mutateOrganizationSettings(
+        organization.id,
+        locked => {
+          result.outcome = applyNewModelsPolicy(
+            locked.settings,
+            computeRelevantChangesForOrg(locked, diff)
+          );
+          return result.outcome.modelDenyList
+            ? { ...locked.settings, model_deny_list: result.outcome.modelDenyList }
+            : locked.settings;
+        },
+        tx
+      );
+      if (result.outcome.modelDenyList) {
+        await bumpOrganizationGroupPolicyRevision(tx, organization.id, null);
+      }
+    }
+    await writePolicyAuditLog(tx, organization.id, result.outcome);
+  }
+  await upsertBaseline(tx, organization.id, snapshotId);
+}
+
+/**
+ * Apply the `disable_new_models` policy for a snapshot that is being published. Call it inside
+ * the publishing transaction, under the snapshot lock, after inserting the new snapshot.
+ *
+ * Each organization is reconciled from its own baseline snapshot, in a savepoint, and its
+ * baseline then advances to the new snapshot in the same transaction as its deny list. The
+ * gateway only admits models listed by an organization's baseline snapshot or an older one
+ * (`newModelsBaselineSnapshotId`), so a newly listed model is never usable before it is
+ * disabled. When one organization fails, it is reported and its baseline stays where it was:
+ * it cannot use the new models until the next sync reconciles it, and the other organizations
+ * and the publication go ahead. The caller must keep every snapshot a baseline points at.
+ *
+ * Returns the organizations it handled, which `logAutoModelChangesForAllOrgs` skips.
+ */
+export async function applyNewModelsPolicyForPublication(
+  tx: DrizzleTransaction,
+  {
+    previousSnapshot,
+    previousSnapshotId,
+    newSnapshot,
+    newSnapshotId,
+  }: {
+    previousSnapshot: NormalizedOpenRouterResponse | null;
+    previousSnapshotId: number | null;
+    newSnapshot: NormalizedOpenRouterResponse;
+    newSnapshotId: number;
+  }
+): Promise<{ handledOrganizationIds: Set<string> }> {
+  const policyOrganizations = await tx
+    .select({
+      organization: organizations,
+      baselineSnapshotId: organization_new_models_baselines.snapshot_id,
+    })
+    .from(organizations)
+    .leftJoin(
+      organization_new_models_baselines,
+      eq(organization_new_models_baselines.organization_id, organizations.id)
+    )
+    .where(and(isNull(organizations.deleted_at), orgDisablesNewModels));
+
+  await tx.delete(organization_new_models_baselines).where(
+    notInArray(
+      organization_new_models_baselines.organization_id,
+      policyOrganizations.map(({ organization }) => organization.id)
+    )
+  );
+
+  const olderBaselineIds = [
+    ...new Set(
+      policyOrganizations.flatMap(({ baselineSnapshotId }) =>
+        baselineSnapshotId !== null && baselineSnapshotId !== previousSnapshotId
+          ? [baselineSnapshotId]
+          : []
+      )
+    ),
+  ];
+  const olderBaselines = new Map(
+    olderBaselineIds.length === 0
+      ? []
+      : (
+          await tx
+            .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+            .from(modelsByProvider)
+            .where(inArray(modelsByProvider.id, olderBaselineIds))
+        ).map(row => [row.id, row.data])
+  );
+  const baselineSnapshotFor = (organizationId: string, baselineSnapshotId: number | null) => {
+    if (baselineSnapshotId !== null && baselineSnapshotId === previousSnapshotId) {
+      return previousSnapshot;
+    }
+    const baseline =
+      baselineSnapshotId === null ? undefined : olderBaselines.get(baselineSnapshotId);
+    if (baseline) return baseline;
+    // Without its baseline, models listed between it and the previous snapshot stay enabled.
+    console.warn(
+      `[auto-model-change-log] org ${organizationId} has no baseline snapshot; reconciling from the previous snapshot`
+    );
+    return previousSnapshot;
+  };
+  const diffs = new Map<NormalizedOpenRouterResponse | null, SnapshotDiff>();
+  const diffFrom = (baseline: NormalizedOpenRouterResponse | null) => {
+    let diff = diffs.get(baseline);
+    if (!diff) {
+      diff = computeSnapshotDiff(baseline, newSnapshot);
+      diffs.set(baseline, diff);
+    }
+    return diff;
+  };
+
+  const handledOrganizationIds = new Set<string>();
+  for (const { organization, baselineSnapshotId } of policyOrganizations) {
+    // A failed organization is skipped by the post-commit log too: its additions are not
+    // "added", since the next sync disables them.
+    handledOrganizationIds.add(organization.id);
+    try {
+      const diff = diffFrom(baselineSnapshotFor(organization.id, baselineSnapshotId));
+      await tx.transaction(sp => reconcileOrganization(sp, organization, diff, newSnapshotId));
+    } catch (err) {
+      console.error(
+        `[auto-model-change-log] failed to apply the new models policy for org ${organization.id}`,
+        err
+      );
+      captureException(err, {
+        tags: { component: 'auto-model-change-log' },
+        extra: { organization_id: organization.id },
+      });
+    }
+  }
+
+  return { handledOrganizationIds };
 }
 
 /**
@@ -293,16 +503,16 @@ async function disableAddedModelsAndLog(organizationId: string, changes: Relevan
  * model/provider restrictions whose effective model availability changed.
  * Attributed to `System` via null actor fields.
  *
- * An enterprise organization with the `disable_new_models` advanced policy is
- * always included, whatever its restrictions or entitlement, and the models that
- * become available to it are also added to its deny list.
+ * Organizations in `skipOrganizationIds` were already handled by
+ * `applyNewModelsPolicyForPublication`.
  *
  * Safe to call from inside a background job; individual per-org failures are
  * reported to Sentry and do not break the rest of the loop.
  */
 export async function logAutoModelChangesForAllOrgs(
   oldSnapshot: NormalizedOpenRouterResponse | null,
-  newSnapshot: NormalizedOpenRouterResponse
+  newSnapshot: NormalizedOpenRouterResponse,
+  skipOrganizationIds: ReadonlySet<string> = new Set()
 ): Promise<LogResult> {
   const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
 
@@ -310,37 +520,36 @@ export async function logAutoModelChangesForAllOrgs(
     return { orgCount: 0, logCount: 0 };
   }
 
-  const enterpriseOrgs = await db
-    .select()
-    .from(organizations)
-    .where(
-      and(
-        eq(organizations.plan, 'enterprise'),
-        isNull(organizations.deleted_at),
-        or(and(orgHasModelRestrictions, orgHasCurrentEntitlement), orgDisablesNewModels)
+  const enterpriseOrgs = (
+    await db
+      .select()
+      .from(organizations)
+      .where(
+        and(
+          eq(organizations.plan, 'enterprise'),
+          isNull(organizations.deleted_at),
+          orgHasModelRestrictions,
+          orgHasCurrentEntitlement
+        )
       )
-    );
+  ).filter(organization => !skipOrganizationIds.has(organization.id));
 
   let logCount = 0;
   for (const organization of enterpriseOrgs) {
     const changes = computeRelevantChangesForOrg(organization, diff);
     if (relevantChangesIsEmpty(changes)) continue;
 
-    const message = buildAutoChangeMessage(changes, { addedModelsDisabled: false });
+    const message = buildAutoChangeMessage(changes);
     try {
-      if (organization.settings.disable_new_models && changes.addedByReasonProvider.size > 0) {
-        await disableAddedModelsAndLog(organization.id, changes);
-      } else {
-        await createAuditLog({
-          action: 'organization.settings.auto_change',
-          actor_id: null,
-          actor_email: null,
-          actor_name: null,
-          details: auditDetails(changes, false),
-          message,
-          organization_id: organization.id,
-        });
-      }
+      await createAuditLog({
+        action: 'organization.settings.auto_change',
+        actor_id: null,
+        actor_email: null,
+        actor_name: null,
+        details: auditDetails(changes),
+        message,
+        organization_id: organization.id,
+      });
       logCount++;
     } catch (err) {
       console.error(

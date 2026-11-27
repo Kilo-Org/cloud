@@ -888,6 +888,26 @@ GitHub-style, WorkOS-style): sign-in
 -> code -> token for each, Apple's `form_post`, the email lock, the linking refusals, and a check
 that no audit row names a token, a code or an address.
 
+`scripts/provider-signin-proof.ts` checks a deployed issuer without credentials: its
+`/signin/passkeys` page offers exactly the expected providers, and each
+`/signin/oauth/<provider>/start` answers 303 to the provider's authorization endpoint of
+`src/signin/providers/specs.ts` with the expected `client_id`, the issuer's callback as
+`redirect_uri`, the provider's scope, a `state`, PKCE S256 where the provider offers it, a `nonce`
+for OpenID Connect, and the flow's binder cookie. It prints public values only and exits 1 on any
+failure (a network error, 429 or 5xx is marked retryable):
+
+```sh
+UTS_PROOF_ISSUER=https://uts-staging.kiloapps.io \
+UTS_PROOF_PROVIDERS=github=<client id>,google=<client id> \
+pnpm exec tsx scripts/provider-signin-proof.ts
+```
+
+`UTS_PROOF_PROVIDERS` lists every provider the issuer must offer, with the client id from that
+environment's block in `wrangler.jsonc`; leave it empty for an issuer that offers none. Each start
+stores one flow row, which expires unused after 10 minutes, and takes one anonymous sign-in write
+slot. The proof never completes a sign-in, so it proves the client id and the redirect, not the
+client secret.
+
 ## Security notices
 
 Design 5.13 and 8.4; migration `0010_notices.sql`, code in `src/notices/`.
@@ -1142,7 +1162,8 @@ feed object answers, terminal deletion, the user-created event and the audit row
 - `pnpm test:repo`: the repository config check and the scope registry check (`test/repo`), with
   no database.
 - `pnpm test:script`: the sign-in pages' browser script (`test/script`), run against the rendered
-  pages in a fresh `node:vm` context with stand-ins for the DOM, `fetch` and WebAuthn.
+  pages in a fresh `node:vm` context with stand-ins for the DOM, `fetch` and WebAuthn, and the
+  checks of the provider sign-in proof on synthetic answers.
 - `pnpm test` runs all three; none needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests"), the OAuth grant functions, the DPoP `jti`
   check and the account functions (gates, PATs, bot keys, member removal) included.
@@ -1266,10 +1287,12 @@ GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSE
   legacy value other services use, means the same here (it logs `source` `worker`), so the
   standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
 
-Both environments read `worker` until their flips (below). Staging and production refuse to start
-without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
-or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set under
-either source, so a rollback is the var alone. The `worker` source is removed in the same change
+Staging reads `worker` until its flip (below); production reads `sts`, which its sign-in client ids
+need (Production sign-in providers). Staging and production refuse to start without the var
+(`src/env.ts`), and `test/repo` fails a deployed block that does not name a source or does not
+bind its own environment's STS as caller `uts`. The Worker secrets set before the flip stay set
+under either source, so a rollback is the var alone, except in production while it sets sign-in
+client ids, whose client secrets have no Worker secret. The `worker` source is removed in the same change
 that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret;
 the rotation job always reads it from the bundle ("Login rotation").
 
@@ -1325,7 +1348,8 @@ environment's `uts` policy live in STS:
 4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker` (or the standard `secrets-store`, read as
    `worker`), after re-running the parity check of step 1 the other way: a value changed in the
    bundle while on `sts` (a rotated provider secret) must reach the Worker secret first, or the
-   rollback serves the old one.
+   rollback serves the old one. In production, the sign-in client ids are removed first
+   (Production sign-in providers).
 
 ### Provisioning per environment
 
@@ -1337,10 +1361,48 @@ environment's `uts` policy live in STS:
 | `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
-| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID` | var | The OAuth client ids of the GitHub and Google sign-in registrations; staging sets both, production sets neither, so production offers neither provider (Sign-in providers, "Configuration") |
-| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
-| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips |
+| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google and GitLab sign-in registrations of the environment. Staging sets GitHub and Google; production sets all three, and only under `SECRETS_SOURCE` `sts`, which `test/repo` holds (Production sign-in providers) |
+| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set, in the environment's `/workloads/uts` folder in the secrets manager, before the deploy that adds the client id. Staging also copies each to the Worker secret with `wrangler secret put <name> --env staging` reading standard input; production keeps them only in the folder, so it reads them only under `sts` |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); staging `worker` until its flip, production `sts` |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
+
+### Production sign-in providers (runbook)
+
+Production offers GitHub, Google and GitLab sign-in through the three client id vars in the top
+level of `wrangler.jsonc`. Their client secrets exist only in production's `/workloads/uts` folder,
+never as Worker secrets, so the providers work only under `SECRETS_SOURCE` `sts`. `test/repo`
+fails a production block that sets any `SIGNIN_<PROVIDER>_CLIENT_ID` under another source, which
+holds the order below in both directions: the flip comes before the client ids, and a rollback
+removes the client ids before the source goes back. Enable, in this order:
+
+1. **Prerequisites merged and deployed:** the `uts` STS policy (`services/sts/policy/uts.yaml`,
+   which grants `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET` and
+   `SIGNIN_GITLAB_CLIENT_SECRET` in production) and the `SECRETS_SOURCE` reader (`src/secrets.ts`).
+2. **Flip production to `sts`** with the parity check, deploy and one-hour watch of "Runtime
+   secrets" above. In the watch, production's `uts.secrets.read` lines with `source` `sts` must
+   name none of the three client secrets under `absent` or `empty`: the bundle then holds a value
+   for each before any client id needs it.
+3. **Merge the client id change.** Merge the base branch into it first: its diff must then add the
+   three client ids and change no `SECRETS_SOURCE` line. A diff that still changes
+   `SECRETS_SOURCE` means the flip of step 2 has not landed: stop. The deploy workflow then
+   deploys it.
+4. **Prove it** against production with the client ids from `wrangler.jsonc`:
+
+   ```sh
+   UTS_PROOF_ISSUER=https://uts.kiloapps.io \
+   UTS_PROOF_PROVIDERS=github=<client id>,google=<client id>,gitlab=<client id> \
+   pnpm exec tsx scripts/provider-signin-proof.ts
+   ```
+
+   Every check must pass. The proof does not use a client secret, so then complete one sign-in
+   per provider with a team member's own account, and check the hour after the deploy for no new
+   `uts.signin.misconfigured` or `uts.secrets.unavailable` line and no provider failure in the
+   callback logs.
+
+**Rollback**, in this order: revert the client id change and let it deploy, so production offers
+none of the three providers (the proof with `UTS_PROOF_PROVIDERS` empty passes); then, only if the
+source itself must go back, deploy `SECRETS_SOURCE` `worker` as in step 4 of "Runtime secrets".
+`test/repo` refuses the reverse order, because under `worker` production holds no client secret.
 
 ## Identity store
 

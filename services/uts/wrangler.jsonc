@@ -49,8 +49,15 @@
     // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
     // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
     // Each environment stays on `worker` until its flip; the flip and its rollback are this one var
-    // (README, "Runtime secrets"). The Worker secrets stay set either way.
-    "SECRETS_SOURCE": "worker",
+    // (README, "Runtime secrets"). The Worker secrets set before the flip stay set either way.
+    "SECRETS_SOURCE": "sts",
+    // GitHub, Google and GitLab sign-in. Production holds their SIGNIN_<PROVIDER>_CLIENT_SECRET
+    // values only in its /workloads/uts bundle, never as Worker secrets, so these client ids need
+    // SECRETS_SOURCE `sts` (test/repo): they deploy after the flip, and a rollback removes them
+    // before the source goes back (README, "Production sign-in providers").
+    "SIGNIN_GITHUB_CLIENT_ID": "Ov23lie6u5czgxYlcfcO",
+    "SIGNIN_GOOGLE_CLIENT_ID": "1000529458754-3qjv67tvqek9r5q1u8ico35mng699t96.apps.googleusercontent.com",
+    "SIGNIN_GITLAB_CLIENT_ID": "1d7b8acf64d4298f8438f0d7019e91c17c205832c19151f73460fc224e1d3f56",
     // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
     // UTS_TURNSTILE_SITE_KEY are added here, after the secrets SIGNIN_EMAIL_HASH_KEY,
     // UTS_MAILGUN_SENDING_KEY and UTS_TURNSTILE_SECRET_KEY are set in the source SECRETS_SOURCE
@@ -132,7 +139,7 @@
         "SECRETS_SOURCE": "worker",
         // GitHub and Google sign-in. Each client id is the switch: its SIGNIN_<PROVIDER>_CLIENT_SECRET
         // is set first, in the staging /workloads/uts bundle and the Worker secret (README,
-        // "Configuration"). Production offers neither yet.
+        // "Configuration").
         "SIGNIN_GITHUB_CLIENT_ID": "Ov23liHukmJusfuEp36F",
         "SIGNIN_GOOGLE_CLIENT_ID": "798264175281-uqim60mc4mnbbecouob37hacetigcaoe.apps.googleusercontent.com",
       },

@@ -585,6 +585,27 @@ function secretsSourceProblems(
   return problems;
 }
 
+/** A sign-in method's client id var (src/signin/providers/config.ts); each needs a runtime secret. */
+const SIGN_IN_CLIENT_ID_VAR = /^SIGNIN_[A-Z]+_CLIENT_ID$/;
+
+/**
+ * Production holds the sign-in client secrets only in its `/workloads/uts` bundle, never as Worker
+ * secrets, so a production block that sets a sign-in client id reads `SECRETS_SOURCE` `sts`: under
+ * `worker` that provider would be misconfigured (its routes answer 500). The flip therefore
+ * deploys before the client ids, and a rollback removes the client ids before the source goes back
+ * (README, "Production sign-in providers").
+ */
+function productionSignInProblems(where: string, bindings: Bindings): string[] {
+  const vars = bindings.vars ?? {};
+  const clientIds = Object.keys(vars)
+    .filter(name => SIGN_IN_CLIENT_ID_VAR.test(name))
+    .sort();
+  if (clientIds.length === 0 || vars.SECRETS_SOURCE === 'sts') return [];
+  return [
+    `${where}: sets ${clientIds.join(', ')} with SECRETS_SOURCE ${String(vars.SECRETS_SOURCE)}; production holds the client secrets only in its STS bundle, so it sets a sign-in client id only under sts`,
+  ];
+}
+
 /** Problems with the development config; `utsConfigProblems` lists its rules. */
 function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
@@ -706,7 +727,8 @@ export const FEED_MAX_LOG_SAMPLING_RATE = 0.05;
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
  * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store,
  * keeps query strings (a provider callback's authorization code) out of its logs, names its
- * secrets source and binds its own environment's STS as caller `uts`;
+ * secrets source and binds its own environment's STS as caller `uts`, and in production sets a
+ * sign-in client id only under `SECRETS_SOURCE` `sts`;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
  * without placement, binds no Durable Object, binds each mint entrypoint once, keeps at most a
@@ -748,6 +770,9 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
         if (environment === 'production' || environment === 'staging') {
           problems.push(...hyperdriveProblems(block.where, block.bindings, environment));
           problems.push(...secretsSourceProblems(block.where, block.bindings, environment));
+        }
+        if (environment === 'production') {
+          problems.push(...productionSignInProblems(block.where, block.bindings));
         }
       }
       const main = block.block?.main ?? mint.config.main;

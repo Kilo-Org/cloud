@@ -100,10 +100,7 @@ async function resolveSecret(
   try {
     return await readKiloOpsSecret(env, name, ctx);
   } catch (err) {
-    console.error(
-      '[resolveSecret] secret read failed:',
-      err instanceof Error ? err.message : err
-    );
+    console.error('[resolveSecret] secret read failed:', err instanceof Error ? err.message : err);
     return null;
   }
 }

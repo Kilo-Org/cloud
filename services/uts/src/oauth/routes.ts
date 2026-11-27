@@ -29,7 +29,7 @@ import { signInChoices } from '../signin/flows';
 import { requestSession, signInHandoff } from '../signin/handoff';
 import { messagePage, passkeysPage, signInPage, unavailablePage } from '../signin/pages';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../signin/passkey/ceremonies';
-import { signInConfigFor } from '../signin/providers/config';
+import { logMisconfigured, signInConfigFor } from '../signin/providers/config';
 import { handleProviderRequest } from '../signin/providers/routes';
 import { providerSignInAccess } from '../signin/providers/store';
 import { signInScript } from '../signin/script';
@@ -45,10 +45,15 @@ import { handleRevoke } from './revoke';
 import { type DeviceCodeGrant, handleToken } from './token-endpoint';
 
 /**
- * The RFC 8628 device grant: its token-endpoint hook and its pages. Served only where the
- * user-code secret is set.
+ * The RFC 8628 device grant: its token-endpoint hook and its pages where the user-code secret is
+ * set (`served`). Where the secret is unset (`off`) or malformed (`misconfigured`) the grant is not
+ * served and every other route works as before.
  */
-export type DeviceService = { grant: DeviceCodeGrant; pages: DeviceDeps };
+export type DeviceService =
+  | { status: 'served'; grant: DeviceCodeGrant; pages: DeviceDeps }
+  | { status: 'off' | 'misconfigured' };
+
+type ServedDevice = Extract<DeviceService, { status: 'served' }>;
 
 /**
  * What an OAuth or sign-in request needs; the runtime tests pass their own stores, `scopes` and
@@ -63,7 +68,7 @@ export type OAuthDeps = {
   /** Writes a committed statement's feed entries to the feed objects (src/revocation/publish.ts). */
   publish: FeedPublish;
   handoff: AuthorizationHandoff;
-  device: DeviceService | null;
+  device: DeviceService;
   signIn: SignInDeps;
   tickets: TicketDeps;
 };
@@ -118,12 +123,13 @@ export function oauthService(
       publish: feedPublisher(env, config, ctx),
       handoff: handoff === null ? signInPages : handoff(signInPages),
       device:
-        secret === null
-          ? null
-          : {
+        secret.status === 'on'
+          ? {
+              status: 'served',
               grant: deviceCodeGrant({ config, sign: signer, scopes }, signIn.signIn),
-              pages: { ...signIn, userCodeSecret: secret },
-            },
+              pages: { ...signIn, userCodeSecret: secret.secret },
+            }
+          : { status: secret.status },
       signIn,
       tickets: { config, tickets: ticketAccess(binding.connectionString, ctx) },
     },
@@ -152,6 +158,15 @@ async function handleSignedInPage(request: Request, deps: SignInDeps): Promise<R
   }
 }
 
+/**
+ * The device grant for a device page, or null (the page is not served). A malformed secret is
+ * logged once per request that reaches a device page, by name only.
+ */
+function servedDevice(device: DeviceService): ServedDevice | null {
+  if (device.status === 'misconfigured') logMisconfigured('device', ['DEVICE_USER_CODE_KEY']);
+  return device.status === 'served' ? device : null;
+}
+
 /** The response for an endpoint, or null when `pathname` names none that is served. */
 export async function handleOAuthRequest(
   request: Request,
@@ -170,7 +185,10 @@ export async function handleOAuthRequest(
     case UTS_AUTHORIZE_PATH:
       return await handleAuthorize(request, deps);
     case UTS_TOKEN_PATH:
-      return await handleToken(request, { ...deps, deviceCodeGrant: deps.device?.grant ?? null });
+      return await handleToken(request, {
+        ...deps,
+        deviceCodeGrant: deps.device.status === 'served' ? deps.device.grant : null,
+      });
     case UTS_REVOKE_PATH:
       return await handleRevoke(request, deps);
     case UTS_INTROSPECT_PATH:
@@ -185,14 +203,18 @@ export async function handleOAuthRequest(
       return signInScript();
     case UTS_TICKETS_PATH:
       return await handleTicketIssue(request, deps.tickets);
-    case UTS_DEVICE_AUTHORIZATION_PATH:
-      return deps.device === null
-        ? null
-        : await handleDeviceAuthorization(request, deps.device.pages);
-    case UTS_DEVICE_VERIFICATION_PATH:
-      return deps.device === null ? null : await handleDevicePage(request, deps.device.pages);
-    case UTS_DEVICE_DECISION_PATH:
-      return deps.device === null ? null : await handleDeviceDecision(request, deps.device.pages);
+    case UTS_DEVICE_AUTHORIZATION_PATH: {
+      const device = servedDevice(deps.device);
+      return device === null ? null : await handleDeviceAuthorization(request, device.pages);
+    }
+    case UTS_DEVICE_VERIFICATION_PATH: {
+      const device = servedDevice(deps.device);
+      return device === null ? null : await handleDevicePage(request, device.pages);
+    }
+    case UTS_DEVICE_DECISION_PATH: {
+      const device = servedDevice(deps.device);
+      return device === null ? null : await handleDeviceDecision(request, device.pages);
+    }
     default:
       return null;
   }

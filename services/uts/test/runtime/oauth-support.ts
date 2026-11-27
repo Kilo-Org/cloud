@@ -175,7 +175,7 @@ export function oauthDeps(grants: GrantsAccess, overrides: Partial<OAuthDeps> = 
     handoff: async () => {
       throw new Error('unexpected hand-off');
     },
-    device: null,
+    device: { status: 'off' },
     signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
     tickets: { config, tickets: unexpectedStore },
     ...overrides,

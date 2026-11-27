@@ -45,11 +45,19 @@ export function formatUserCode(normalized: string): string {
 export type UserCodeKey = CryptoKey;
 
 /**
- * The environment's user-code secret, or null where it is unset: the device grant is then not
- * served. A malformed secret is refused, not used.
+ * The environment's user-code secret: `off` where it is unset, `misconfigured` where it is not 32
+ * bytes in base64url. It never throws: in both cases the device grant is not served, and a bad
+ * value cannot fail the token, metadata or any other route.
  */
-export function userCodeSecret(env: Pick<Env, 'DEVICE_USER_CODE_KEY'>): string | null {
-  return env.DEVICE_USER_CODE_KEY === undefined ? null : KeySchema.parse(env.DEVICE_USER_CODE_KEY);
+export type UserCodeSecret =
+  | { status: 'on'; secret: string }
+  | { status: 'off' }
+  | { status: 'misconfigured' };
+
+export function userCodeSecret(env: Pick<Env, 'DEVICE_USER_CODE_KEY'>): UserCodeSecret {
+  if (env.DEVICE_USER_CODE_KEY === undefined) return { status: 'off' };
+  const parsed = KeySchema.safeParse(env.DEVICE_USER_CODE_KEY);
+  return parsed.success ? { status: 'on', secret: parsed.data } : { status: 'misconfigured' };
 }
 
 export async function importUserCodeKey(secret: string): Promise<UserCodeKey> {

@@ -30,7 +30,7 @@ export function authorizationServerMetadata(
     return { ...base, response_types_supported: [], grant_types_supported: [] };
   }
   const { issuer } = config.endpoints;
-  const device = oauth.deps.device !== null;
+  const device = oauth.deps.device.status === 'served';
   return {
     ...base,
     authorization_endpoint: `${issuer}${UTS_AUTHORIZE_PATH}`,

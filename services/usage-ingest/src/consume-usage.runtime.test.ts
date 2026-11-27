@@ -2,15 +2,19 @@ import { createServer } from 'node:http';
 import { setTimeout } from 'node:timers/promises';
 import { createTestHarness } from 'wrangler';
 import { expect, it, vi } from 'vitest';
-import { STS_STAND_IN_TOKEN, stsStandIn } from './sts-stand-in.test-fixture';
+import { STS_STAND_IN_TOKEN, stsStandIn, stsStandInToken } from './sts-stand-in.test-fixture';
 import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import { usage } from './usage.test-fixture';
 
 // The committed `USAGE_WRITER_AUTH`: production (no entry) is unset, so legacy sends the secret;
-// staging is `sts`, so it sends only the token its STS binding issued.
+// staging is `sts`, so it sends only the token its STS binding issued, which the stand-in issued
+// for exactly audience `web` and scope `web:usage.record`.
 it.each([
   [undefined, { secret: 'local-writer', authorization: undefined }],
-  ['staging', { secret: undefined, authorization: `Bearer ${STS_STAND_IN_TOKEN}` }],
+  [
+    'staging',
+    { secret: undefined, authorization: `Bearer ${stsStandInToken('web', 'web:usage.record')}` },
+  ],
 ])(
   'processes the configured %s entry through Queues and the real HTTP writer client',
   async (env, credential) => {

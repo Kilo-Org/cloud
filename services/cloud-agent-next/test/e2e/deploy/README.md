@@ -16,8 +16,8 @@ modified, so the production/default deploy is unaffected.
 
 The rendered e2e Worker binds no production resource and has no public address
 (see [What the render changes](#what-the-render-changes-and-why)). Until the
-Access configuration below exists, the jobs of the `Cloud Agent E2E` workflow
-stop at their first step, which checks it. A passing run additionally needs:
+Access configuration below exists, the `deploy` and `preflight` jobs stop at
+their first step, which checks it. A passing run additionally needs:
 
 - the closed ingress in [Closed CI path](#closed-ci-path): the Access
   application, its service token and the `cloud-agent-e2e` GitHub environment;
@@ -88,10 +88,12 @@ one day. `tests` downloads it instead of installing. The Access check
 Worker before the tests: four times when the stack is deployed, twice when it
 isn't. Each check passes in one request and fails after at most about 2.5
 minutes (six tries, each at most 15 s, 10 s apart). After the deploy, the
-readback makes 10 names-only Cloudflare API GETs, five per Worker. Before the
-run, the `preflight` job makes one secrets-names GET, and the `tests` job reads
-STS once (typically about 1 s; at most 3 attempts, about 6.5 minutes worst case)
-and sends five requests through Access.
+readback makes 10 names-only Cloudflare API GETs, five per Worker, each at most
+3 attempts of 30 s with a short wait between them (at most 30 requests, about
+15 minutes worst case). Before the run, the short extra `preflight` job makes
+one secrets-names GET, and the `tests` job reads STS once (typically about 1 s;
+at most 3 attempts, about 6.5 minutes worst case) and sends five requests
+through Access.
 
 The jobs of `cloud-agent-e2e.yml`:
 
@@ -193,6 +195,9 @@ Prerequisites, in order:
    `kiloapps.ai`); a separate application is the documented case and leaves
    the live one untouched. The policy is app-scoped (inline and reusable
    policies cannot be mixed on one application).
+   Keep exactly this one Service Auth policy on `fake-llm-e2e-test`: the fake
+   LLM's gate binds only the application audience, so any further policy on the
+   application would admit its identities too.
 10. Deploy from `main`: dispatch `Cloud Agent E2E`. The `deploy` job refuses a
     Worker holding any secret outside `INTERNAL_API_SECRET`,
     `E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET` (deleting another is

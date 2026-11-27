@@ -181,7 +181,14 @@ if (isMain) {
         );
       }
       if ((response.status === 429 || response.status >= 500) && attempt <= READ_RETRIES) {
+        // Retry-After in seconds when Cloudflare sends it, else 1-2 s.
+        const retryAfter = Number(response.headers.get('Retry-After'));
         await response.body?.cancel();
+        const waitMs =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter, 30) * 1000
+            : 1000 + Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitMs));
         continue;
       }
       const body = await response.json().catch(() => ({}));

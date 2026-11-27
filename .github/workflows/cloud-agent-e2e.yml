@@ -273,6 +273,20 @@ jobs:
         with:
           persist-credentials: false
 
+      # The same package-free backend check as preflight, before anything uses it.
+      - name: Check the backend
+        run: |
+          node -e '
+          const denied = new Set(["kilo.ai", "api.kilo.ai", "app.kilo.ai", "kilocode.ai"]);
+          let url;
+          try { url = new URL(process.env.E2E_BACKEND_URL); } catch { process.exit(1); }
+          const host = url.hostname.toLowerCase().replace(/\.$/, "");
+          if (url.protocol !== "https:" || denied.has(host) || host.endsWith(".kilocode.ai")) process.exit(1);
+          ' || {
+            echo "::error::Set vars.CLOUD_AGENT_E2E_BACKEND_URL to an https non-production backend that signs with NEXTAUTH_SECRET_DEV"
+            exit 1
+          }
+
       - name: Read the Access service token from STS
         id: sts
         uses: ./.github/actions/sts-bundle

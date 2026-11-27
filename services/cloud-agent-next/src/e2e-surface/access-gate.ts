@@ -1,6 +1,8 @@
 /**
- * Cloudflare Access gate for the deployed e2e Worker. e2e-only: referenced from
- * `src/e2e-entry.ts`, never from production.
+ * Cloudflare Access gate for the deployed e2e Workers. e2e-only: referenced from
+ * `src/e2e-entry.ts` (the e2e Worker, `client-id` binding) and
+ * `test/e2e/fake-llm-worker.ts` (the fake LLM, `audience` binding), never from
+ * production.
  *
  * The Worker's only hostname sits behind an Access application. Access adds a
  * signed `Cf-Access-Jwt-Assertion` to every request it admits; the Worker

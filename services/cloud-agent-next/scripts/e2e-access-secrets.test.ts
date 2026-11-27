@@ -100,6 +100,11 @@ describe('upload-access-secrets.sh', () => {
         `E2E_ACCESS_CLIENT_ID=${CLIENT_ID}\n`,
         'E2E_ACCESS_CLIENT_SECRET is missing',
       ],
+      [
+        ['cloud-agent-e2e-test', '-'],
+        VALUES.replaceAll('\n', '\r\n'),
+        'refusing a line with a carriage return',
+      ],
       [['cloud-agent-e2e-test'], VALUES, 'usage:'],
     ] as const) {
       const result = run([...args], stdin);

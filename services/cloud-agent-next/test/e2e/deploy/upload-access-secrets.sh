@@ -14,6 +14,10 @@
 # package's own wrangler runs through `pnpm exec`.
 set -euo pipefail
 set +x
+if ((BASH_VERSINFO[0] < 4)); then
+  printf 'upload-access-secrets: needs bash 4 or later (found %s)\n' "$BASH_VERSION" >&2
+  exit 1
+fi
 
 ALLOWED_SCRIPT="cloud-agent-e2e-test"
 ALLOWED_NAMES=(E2E_ACCESS_CLIENT_ID E2E_ACCESS_CLIENT_SECRET)
@@ -41,6 +45,7 @@ fi
 declare -A values=()
 while IFS= read -r line || [[ -n "$line" ]]; do
   [[ -z "$line" ]] && continue
+  [[ "$line" != *$'\r'* ]] || fail 'refusing a line with a carriage return (CRLF input)'
   name="${line%%=*}"
   [[ "$line" == *=* ]] || fail 'every line must be NAME=value'
   allowed=false

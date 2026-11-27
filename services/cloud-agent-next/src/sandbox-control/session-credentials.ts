@@ -24,6 +24,7 @@ import {
 } from '../shared/sandbox-provider.js';
 import { addVercelScmForwarding } from '../scm-broker/vercel-policy.js';
 import { isValidSandboxId } from '../sandbox-id.js';
+import { codeReviewIdFromCallbackTarget } from '../router/schemas.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
   issueCloudAgentBitbucketSessionCapability,
@@ -76,6 +77,7 @@ import {
   CAPABILITY_FAMILY_PATTERN_SOURCE,
   CURRENT_CAPABILITY_PREFIX,
   hasCurrentCapabilityPrefix,
+  reviewCapabilityPrefix,
   LEGACY_CAPABILITY_PREFIX,
 } from '@kilocode/worker-utils/scm-capability-contract';
 
@@ -221,6 +223,10 @@ export type AdditionalScmRepository = z.infer<typeof additionalScmRepositorySche
 const sessionCredentialGrantShape = z
   .object({
     version: z.literal(1),
+    review: z
+      .object({ sessionId: sessionIdSchema, reviewId: z.string().optional() })
+      .strict()
+      .optional(),
     containmentEnabled: z.boolean().optional(),
     scopeId: scopeIdSchema,
     sandboxId: z
@@ -344,6 +350,17 @@ function refinePersistedSessionCredentialGrant(
     }
   }
   const contained = grant.containmentEnabled !== false;
+  if (
+    grant.review &&
+    (!contained ||
+      grant.members.length !== 1 ||
+      grant.members[0]?.sessionId !== grant.review.sessionId ||
+      grant.networkSecrets?.length ||
+      [grant.scm, ...(grant.additionalRepositories ?? []).map(entry => entry.scm)].some(
+        scm => scm && !scm.capability?.credential.startsWith(reviewCapabilityPrefix(scm.purpose))
+      ))
+  )
+    reject();
   if (
     grant.networkSecrets?.length &&
     (!contained ||
@@ -909,6 +926,8 @@ async function refreshScmCapability(
     }
   }
   if (
+    (!grant.review ||
+      existingScm?.capability?.credential.startsWith(reviewCapabilityPrefix(repository.type))) &&
     !refresh &&
     isCapabilityCurrent(existingScm?.capability, outboundContainerId, now) &&
     (repository.type !== 'github' || existingScm?.githubAppType !== undefined)
@@ -927,7 +946,7 @@ async function refreshScmCapability(
       ...common,
       githubRepo: repository.repo,
       accessPurpose: repository.accessPurpose ?? 'workflow',
-      allowUserAuthorization: repository.allowUserAuthorization,
+      allowUserAuthorization: grant.review ? false : repository.allowUserAuthorization,
       ...(repository.expectedIntegrationId
         ? { expectedIntegrationId: repository.expectedIntegrationId }
         : {}),
@@ -1031,6 +1050,23 @@ async function refreshScmCapability(
       ),
     };
   }
+  if (grant.review) {
+    const binding = env.GIT_TOKEN_SERVICE;
+    if (!binding?.scopeCodeReviewCapability || !scm.capability) invalidCredentials();
+    const credential = await binding.scopeCodeReviewCapability({
+      ...grant.review,
+      provider: repository.type,
+      capability: scm.capability.credential,
+      additional: repository !== grant.repository,
+    });
+    scm.capability = cachedCapability(
+      credential,
+      reviewCapabilityPrefix(repository.type),
+      outboundContainerId,
+      now,
+      diagnostic
+    );
+  }
   return scm;
 }
 
@@ -1056,6 +1092,21 @@ export const ISSUED_CREDENTIAL_ENV_KEYS = [
   'KILO_BITBUCKET_REPOSITORY_UUID',
   ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
 ] as const;
+
+// Stored route specs can contain profile variables from before review containment.
+function reviewEnvironment(env: Record<string, string> | undefined): Record<string, string> {
+  const defaults = {
+    CI: 'true',
+    GIT_TERMINAL_PROMPT: '0',
+    GH_PROMPT_DISABLED: '1',
+    PAGER: 'cat',
+    GIT_PAGER: 'cat',
+    TERM: 'dumb',
+  };
+  return Object.fromEntries(
+    Object.entries(defaults).filter(([key, value]) => env?.[key] === value)
+  );
+}
 
 function preparedPayload(input: {
   payload: SessionAttachPayload;
@@ -1112,7 +1163,9 @@ function preparedPayload(input: {
     replacements.reduce((result, [token, alias]) => result.replaceAll(token, alias), value);
   const profile = { envVars: input.profileEnv };
   const env = Object.fromEntries(
-    Object.entries({ ...profile.envVars, ...payload.env }).map(([key, value]) => [
+    Object.entries(
+      grant.review ? reviewEnvironment(payload.env) : { ...profile.envVars, ...payload.env }
+    ).map(([key, value]) => [
       key,
       key === 'GH_TOKEN' || key === 'GITHUB_TOKEN'
         ? (replacements.find(([token]) => token === value)?.[1] ?? value)
@@ -1413,6 +1466,20 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
+  const review =
+    source.createdOnPlatform === 'code-review' || source.billingOrigin === 'code-review'
+      ? { sessionId: input.sessionId, ...(source.reviewId ? { reviewId: source.reviewId } : {}) }
+      : undefined;
+  if (existing?.review && existing.review.sessionId !== review?.sessionId) invalidCredentials();
+  if (
+    review &&
+    (existing?.members.some(member => member.sessionId !== input.sessionId) ||
+      input.networkSecrets?.length ||
+      Object.keys(source.encryptedSecrets ?? {}).length ||
+      Object.keys(source.mcpServers ?? {}).length ||
+      Object.keys(source.networkSecrets ?? {}).length)
+  )
+    invalidCredentials();
   const members = existing?.members ?? [];
   if (
     members.some(
@@ -1440,6 +1507,7 @@ export async function prepareCredentialGrant(
   const kiloToken = token.data;
   let grant: SessionCredentialGrant = {
     version: 1,
+    ...(review ? { review } : {}),
     scopeId: scopeId.data,
     directory,
     sandboxId,
@@ -1498,7 +1566,7 @@ export async function prepareCredentialGrant(
           member,
           outboundContainerId,
           now,
-          input.refreshBacking,
+          input.refreshBacking || existing?.review?.reviewId !== review?.reviewId,
           existingScm,
           diagnostic
         );
@@ -1612,6 +1680,7 @@ export function credentialSourceFromMetadata(
   ) {
     invalidCredentials();
   }
+  const reviewId = codeReviewIdFromCallbackTarget(metadata.callback?.target);
   const hosted = metadata.hostedGitHubRepositories;
   const repository =
     hosted === undefined
@@ -1632,6 +1701,7 @@ export function credentialSourceFromMetadata(
       ? {}
       : { billingOrigin: metadata.identity.billingOrigin }),
     ...(repository === undefined ? {} : { repository }),
+    ...(reviewId ? { reviewId } : {}),
     ...(hosted === undefined ? {} : { additionalHostedGitHubRepositories: hosted.additional }),
   };
 }

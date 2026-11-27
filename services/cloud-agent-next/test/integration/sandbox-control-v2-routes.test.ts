@@ -2674,7 +2674,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
   it('keeps the provider lease unchanged when a web session joins an unattended sandbox', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
-    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    await stub.prepare(prepareInput(SESSION, 'slack'));
     const { wrapper } = await connectAndHello(provider);
     await wrapper.next();
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
@@ -2706,7 +2706,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
   it('keeps the unattended window when a session without an origin joins', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
-    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    await stub.prepare(prepareInput(SESSION, 'slack'));
     const { wrapper } = await connectAndHello(provider);
     await wrapper.next();
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
@@ -2775,7 +2775,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
   it('preserves the web idle window in a mixed sandbox until the web route is released', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
-    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    await stub.prepare(prepareInput(SESSION, 'slack'));
     const { wrapper } = await connectAndHello(provider);
     await wrapper.next();
     wrapper.send({ type: 'session.ready', sessionId: SESSION });

@@ -1942,6 +1942,8 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     expect(prepareFrame?.type).toBe('session.prepare');
     const serialized = JSON.stringify(prepareFrame);
+    expect(serialized).not.toContain('profile-github-token');
+    expect(serialized).not.toContain('profile-token');
     expect(serialized).not.toContain(NATIVE_KILO_TOKEN);
     expect(serialized).not.toContain(NATIVE_GIT_TOKEN);
     expect(serialized).not.toContain('user_123');
@@ -2392,6 +2394,32 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await resolve(alias, 'other-container')).toBeNull();
     await setGrantExpiry(stub, SESSION, Date.now() - 1000);
     expect(await resolve(alias)).toBeNull();
+  });
+
+  it('withholds legacy review grants until the active session reissues them', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const input = prepareInput(SESSION, {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'code-review',
+      reviewId: 'review-1',
+    });
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+    if (prepareFrame?.type !== 'session.prepare' || !prepareFrame.credentials.git)
+      throw new Error('missing git');
+    const outbound = {
+      credential: prepareFrame.credentials.git.token,
+      outboundContainerId: OUTBOUND_CONTAINER_ID,
+      url: prepareFrame.spec.git?.url + '/info/refs?service=git-upload-pack',
+      method: 'GET',
+    };
+    expect((await stub.resolveCredential(outbound))?.credential).toMatch(/^kgh2\.review\./);
+    await patchGrant(stub, SESSION, grant => ({ ...grant, review: undefined }));
+    expect(await stub.resolveCredential(outbound)).toBeNull();
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await stub.resolveCredential(outbound))?.credential).toMatch(/^kgh2\.review\./);
   });
 
   it('never redeems Kilo aliases through the credential broker', async () => {

@@ -38,3 +38,18 @@ export const GITHUB_CAPABILITY_HOSTS = [
 
 export const BITBUCKET_GIT_ORIGIN = 'https://bitbucket.org';
 export const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
+
+/** An encrypted review envelope contains a container-bound provider capability. */
+export function reviewCapabilityPrefix(provider: CapabilityPurpose): string {
+  return CURRENT_CAPABILITY_PREFIX[provider] + 'review.';
+}
+
+export type ScopeReviewCapabilityParams = {
+  provider: CapabilityPurpose;
+  capability: string;
+  sessionId: string;
+  reviewId?: string;
+  additional: boolean;
+};
+
+export const REVIEW_PUBLICATION_MAX_BYTES = 256 * 1024;

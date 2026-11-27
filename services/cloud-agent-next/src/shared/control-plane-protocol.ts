@@ -670,6 +670,7 @@ export const controlPlaneCredentialSourceSchema = z
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
       .optional(),
+    reviewId: z.string().min(1).max(128).optional(),
     createdOnPlatform: z.string().max(100).optional(),
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),

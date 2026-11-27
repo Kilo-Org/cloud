@@ -257,8 +257,11 @@ export function buildControlPlaneSessionRegistration(
   // Its runtime skills stay: they
   // carry the trusted review skill that the Code Reviewer attaches.
   const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
-  const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;
-  const networkSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.networkSecrets;
+  const review =
+    metadata.identity.createdOnPlatform === 'code-review' ||
+    metadata.identity.billingOrigin === 'code-review';
+  const encryptedSecrets = review ? undefined : metadata.profile?.encryptedSecrets;
+  const networkSecrets = review ? undefined : metadata.profile?.networkSecrets;
   if (Object.keys(networkSecrets ?? {}).length > 0 && sandboxProvider !== 'cloudflare-containers') {
     throw new Error('Network secrets require a Cloudflare sandbox');
   }

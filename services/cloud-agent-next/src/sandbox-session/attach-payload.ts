@@ -75,10 +75,12 @@ export function buildSessionAttachPayload(
       ? 'working'
       : undefined;
   const profile = readProfileBundle(metadata);
-  const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
+  const review =
+    metadata.identity.createdOnPlatform === 'code-review' ||
+    metadata.identity.billingOrigin === 'code-review';
   validateControlSessionOptions(metadata);
   const env = {
-    ...(!readOnlyBitbucketReview ? (profile.envVars ?? {}) : {}),
+    ...(!review ? (profile.envVars ?? {}) : {}),
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),
   };
   rejectReservedControlRuntimeEnvironment(env);
@@ -93,7 +95,7 @@ export function buildSessionAttachPayload(
     ...(metadata.auth.kiloSessionId ? { snapshotIdentity: metadata.auth.kiloSessionId } : {}),
     ...(git ? { git } : {}),
     ...(Object.keys(env).length > 0 ? { env } : {}),
-    ...(!readOnlyBitbucketReview && profile.mcpServers && Object.keys(profile.mcpServers).length > 0
+    ...(!review && profile.mcpServers && Object.keys(profile.mcpServers).length > 0
       ? { mcp: materializeMcpServers(profile.mcpServers, mcpPrivateKey) }
       : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),

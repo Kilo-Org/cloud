@@ -180,11 +180,89 @@ describe('the secrets copier table for the Workers that read STS', () => {
       })),
     ];
 
-    // The table itself: no two rows name the same Worker binding, and every row the PR body
-    // publishes is present.
-    expect(rows.map(row => `${row.workload}|${row.oldBinding}`)).toEqual([
-      ...new Set(rows.map(row => `${row.workload}|${row.oldBinding}`)),
-    ]);
-    expect(rows).toHaveLength(2 + 5 + 3 + 3 + 3);
+    // The published table, row for row: workload, the binding read today, the store item behind
+    // it (`—` for a plain Worker secret) and the folder the copier writes to. Pinning all four
+    // columns is what makes the table the PR body prints a claim this test can fail on.
+    const published: ReadonlyArray<readonly [string, string, string, string]> = [
+      ['kilo-ai-attribution', 'NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared/NEXTAUTH_SECRET'],
+      [
+        'kilo-ai-attribution',
+        'ADMIN_SECRET',
+        'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
+        '/workloads/kilo-ai-attribution/ADMIN_SECRET',
+      ],
+      [
+        'auto-routing',
+        'INTERNAL_API_SECRET_PROD',
+        'INTERNAL_API_SECRET_PROD',
+        '/shared/INTERNAL_API_SECRET',
+      ],
+      ['auto-routing', 'OPENROUTER_API_KEY', 'OPENROUTER_API_KEY', '/shared/OPENROUTER_API_KEY'],
+      [
+        'auto-routing',
+        'O11Y_CF_AE_API_TOKEN',
+        'O11Y_CF_AE_API_TOKEN',
+        '/shared/O11Y_CF_AE_API_TOKEN',
+      ],
+      ['auto-routing', 'NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared/NEXTAUTH_SECRET'],
+      [
+        'auto-routing',
+        'AUTO_ROUTING_DECISION_SECRET',
+        'AUTO_ROUTING_DECISION_SECRET_PROD',
+        '/workloads/auto-routing/AUTO_ROUTING_DECISION_SECRET',
+      ],
+      [
+        'auto-routing-benchmark',
+        'INTERNAL_API_SECRET_PROD',
+        'INTERNAL_API_SECRET_PROD',
+        '/shared/INTERNAL_API_SECRET',
+      ],
+      [
+        'auto-routing-benchmark',
+        'BOT_TOKEN_MINT_SECRET',
+        'BOT_TOKEN_MINT_SECRET',
+        '/shared/BOT_TOKEN_MINT_SECRET',
+      ],
+      [
+        'auto-routing-benchmark',
+        'OPENROUTER_API_KEY',
+        'OPENROUTER_API_KEY',
+        '/shared/OPENROUTER_API_KEY',
+      ],
+      [
+        'cloudflare-scim-sync',
+        'WORKOS_API_KEY',
+        'WORKOS_API_KEY',
+        '/workloads/cloudflare-scim-sync/WORKOS_API_KEY',
+      ],
+      [
+        'cloudflare-scim-sync',
+        'WORKOS_CLIENT_ID',
+        'WORKOS_CLIENT_ID',
+        '/workloads/cloudflare-scim-sync/WORKOS_CLIENT_ID',
+      ],
+      [
+        'cloudflare-scim-sync',
+        'INTERNAL_API_SECRET',
+        'INTERNAL_API_SECRET_PROD',
+        '/shared/INTERNAL_API_SECRET',
+      ],
+      ['kiloclaw-billing', 'INTERNAL_API_SECRET', '—', '/shared/INTERNAL_API_SECRET'],
+      [
+        'kiloclaw-billing',
+        'SNOWFLAKE_PRIVATE_KEY_PEM',
+        '—',
+        '/workloads/kiloclaw-billing/SNOWFLAKE_PRIVATE_KEY_PEM',
+      ],
+      [
+        'kiloclaw-billing',
+        'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+        '—',
+        '/workloads/kiloclaw-billing/SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+      ],
+    ];
+    expect(
+      rows.map(row => [row.workload, row.oldBinding, row.storeSecretName, row.stsLookup])
+    ).toEqual(published);
   });
 });

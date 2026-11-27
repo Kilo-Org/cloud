@@ -1400,22 +1400,28 @@ export async function startRun(
     // aggregate so config-only changes (model removed, threshold tweaked)
     // take effect without re-running any model. The state mirrors the rows
     // insertRun just wrote, so no re-read is needed.
-    await finalizeRunIfComplete(env, runId, kind, {
-      router,
-      status: 'running',
-      minAccuracy: policy.minAccuracy,
-      switchCostFactor: policy.switchCostFactor,
-      bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
-      benchmarkUserId: benchmarkIdentity.benchmarkUserId,
-      benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
-      models: runModelRows,
-      repetitions,
-      classifierMaxP95LatencyMs: kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
-      startedAt,
-      purpose,
-      engineIdentity,
-      measurementRevision: ACTIVE_MEASUREMENT_REVISION,
-    });
+    await finalizeRunIfComplete(
+      env,
+      runId,
+      kind,
+      {
+        router,
+        status: 'running',
+        minAccuracy: policy.minAccuracy,
+        switchCostFactor: policy.switchCostFactor,
+        bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+        benchmarkUserId: benchmarkIdentity.benchmarkUserId,
+        benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
+        models: runModelRows,
+        repetitions,
+        classifierMaxP95LatencyMs: kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
+        startedAt,
+        purpose,
+        engineIdentity,
+        measurementRevision: ACTIVE_MEASUREMENT_REVISION,
+      },
+      options.ctx
+    );
     return { runId, enqueuedModels: 0, skippedModels };
   }
 

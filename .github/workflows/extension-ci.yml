@@ -34,7 +34,7 @@ jobs:
       # start the shards for an input the bundle cannot observe.
       extension_e2e: ${{ steps.filter.outputs.extension_e2e == 'true' }}
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # untagged, 6 commits after v1.1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -176,7 +176,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # untagged, 6 commits after v1.1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
 
@@ -255,7 +255,7 @@ jobs:
     env:
       CI: 'true'
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # untagged, 6 commits after v1.1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
 

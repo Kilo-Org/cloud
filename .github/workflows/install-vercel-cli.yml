@@ -1,9 +1,10 @@
 name: Install Vercel CLI
 
-# Installs the pinned Vercel CLI once per run, in a job without id-token, and
-# hands it over as an artifact. stage-vercel-deployment.yml and
-# promote-vercel-deployment.yml read their STS bundle first, then download this
-# artifact and run the CLI by its path; neither installs anything
+# Installs the pinned Vercel CLI once per run attempt, in a job without
+# id-token, and hands it over as an artifact with its SHA-256.
+# stage-vercel-deployment.yml and promote-vercel-deployment.yml read their STS
+# bundle first, then download this artifact, check the digest before they unpack
+# it, and run the CLI by its path; neither installs anything
 # (.github/actions/sts-bundle/README.md, rules for a calling job).
 on:
   workflow_call:
@@ -11,6 +12,9 @@ on:
       artifact:
         description: 'Name of the artifact that holds the packed Vercel CLI'
         value: ${{ jobs.install.outputs.artifact }}
+      sha256:
+        description: 'SHA-256 of vercel-cli.tgz in that artifact'
+        value: ${{ jobs.install.outputs.sha256 }}
 
 permissions: {}
 
@@ -24,7 +28,8 @@ jobs:
     env:
       VERCEL_VERSION: '59.5.0'
     outputs:
-      artifact: vercel-cli
+      artifact: vercel-cli-${{ github.run_attempt }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
     steps:
       # The installed tree is ~265 MB (~77 MB compressed), so the cache only pays
       # off when the prefix holds a runnable copy of the pinned version. A miss, or
@@ -66,16 +71,20 @@ jobs:
           fi
           "$VERCEL_CLI_PREFIX/bin/vercel" --version
 
-      # Symlinks and file modes survive only inside an archive.
+      # Symlinks and file modes survive only inside an archive. Its digest goes
+      # to the readers as a job output, so an artifact another job of the run
+      # uploads under this name is refused.
       - name: Pack Vercel CLI
-        run: tar -czf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli" .
+        id: pack
+        run: |
+          tar -czf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli" .
+          echo "sha256=$(sha256sum "$RUNNER_TEMP/vercel-cli.tgz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      # One artifact per run; a re-run of all jobs replaces it.
+      # One artifact per run attempt; the name never repeats, so nothing overwrites it.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: vercel-cli
+          name: vercel-cli-${{ github.run_attempt }}
           path: ${{ runner.temp }}/vercel-cli.tgz
           retention-days: 1
           if-no-files-found: error
-          overwrite: true
           compression-level: 0

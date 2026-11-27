@@ -21,6 +21,10 @@ on:
         description: 'Artifact of this run that holds the packed Vercel CLI (install-vercel-cli.yml)'
         required: true
         type: string
+      vercel_cli_sha256:
+        description: 'SHA-256 of vercel-cli.tgz in that artifact, from the same install job'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -79,7 +83,11 @@ jobs:
 
       # The CLI stays off PATH, so no later step resolves another command from it.
       - name: Unpack Vercel CLI
+        env:
+          VERCEL_CLI_SHA256: ${{ inputs.vercel_cli_sha256 }}
         run: |
+          echo "$VERCEL_CLI_SHA256  $RUNNER_TEMP/vercel-cli.tgz" | sha256sum --check --strict --quiet ||
+            { echo "::error::The Vercel CLI artifact does not match the digest of its install job"; exit 1; }
           mkdir "$RUNNER_TEMP/vercel-cli"
           tar -xzf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli"
           "$RUNNER_TEMP/vercel-cli/bin/vercel" --version

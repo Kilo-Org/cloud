@@ -117,6 +117,7 @@ jobs:
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
       vercel_token_key: VERCEL_TOKEN_APP
       vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
+      vercel_cli_sha256: ${{ needs.vercel-cli.outputs.sha256 }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
 
   deploy-ai-gateway:
@@ -133,6 +134,7 @@ jobs:
       vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
       vercel_token_key: VERCEL_TOKEN_AI_GATEWAY
       vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
+      vercel_cli_sha256: ${{ needs.vercel-cli.outputs.sha256 }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
 
   # Worker change detection reads only the SHAs check-changes publishes, so this

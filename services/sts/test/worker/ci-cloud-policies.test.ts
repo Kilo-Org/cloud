@@ -474,7 +474,7 @@ ${overrides.extra ?? ''}`;
     // trigger-only policy, which holds no secret, so the loader refuses it either way.
     it('refuses a carve-out policy with a dynamic grant', () => {
       expect(load(carveOutPolicy({ extra: 'dynamic:\n  - grant: migration-run' }))).toThrow(
-        /migration-run|workflow_run|secret/
+        'a policy with dynamic migration-run holds nothing else'
       );
     });
 

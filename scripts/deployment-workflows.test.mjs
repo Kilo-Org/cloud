@@ -39,7 +39,8 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
     assert.equal(stage.env, undefined);
     assert.equal(handover['continue-on-error'], true);
     assert.equal(handover.if, "steps.sentry-stage.outcome == 'success'");
-    assert.equal(handover.with.name, 'cloud-agent-sentry');
+    assert.equal(handover.with.name, 'cloud-agent-sentry-${{ github.run_attempt }}');
+    assert.equal(handover.with.overwrite, undefined, 'a per-attempt name is never overwritten');
     assert.equal(steps.indexOf(handover), steps.indexOf(stage) + 1);
     assert.doesNotMatch(JSON.stringify(workers.jobs[job]), /SENTRY_AUTH_TOKEN/);
     assert.equal(retry.if, `steps.${deploy.id}.outcome == 'failure'`);
@@ -63,7 +64,10 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
     'deploy-cloud-agent-after-session-ingest',
   ]);
   assert.equal(upload.uses, './.github/workflows/cloud-agent-sentry-sourcemaps.yml');
-  assert.deepEqual(upload.with, { target_environment: '${{ inputs.target_environment }}' });
+  assert.deepEqual(upload.with, {
+    target_environment: '${{ inputs.target_environment }}',
+    source_sha: '${{ inputs.source_sha || github.sha }}',
+  });
   assert.match(upload.if, /!cancelled\(\)/);
   const sentry = workflow('cloud-agent-sentry-sourcemaps');
   assert.equal(
@@ -666,6 +670,7 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.deepEqual(stageAiGateway.needs, ['check-changes', 'vercel-cli']);
   assert.equal(stageAiGateway.with.vercel_cli_artifact, '${{ needs.vercel-cli.outputs.artifact }}');
+  assert.equal(stageAiGateway.with.vercel_cli_sha256, '${{ needs.vercel-cli.outputs.sha256 }}');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
   assert.equal(stageAiGateway.with.target_environment, 'production');
   assert.equal(stageAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
@@ -680,6 +685,7 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
     axiom_annotation_dataset: 'vercel',
     axiom_expected_project: 'kilocode-ai-gateway',
     vercel_cli_artifact: '${{ needs.vercel-cli.outputs.artifact }}',
+    vercel_cli_sha256: '${{ needs.vercel-cli.outputs.sha256 }}',
   });
   assert.equal(promoteAiGateway.secrets, undefined);
 

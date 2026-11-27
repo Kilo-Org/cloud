@@ -249,10 +249,9 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: cloud-agent-sentry
+          name: cloud-agent-sentry-${{ github.run_attempt }}
           path: ${{ runner.temp }}/cloud-agent-sentry.tgz
           retention-days: 1
-          overwrite: true
           compression-level: 0
 
   # The detection-only call: a deploy call passes `worker_matrix`, so this job
@@ -589,10 +588,9 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: cloud-agent-sentry
+          name: cloud-agent-sentry-${{ github.run_attempt }}
           path: ${{ runner.temp }}/cloud-agent-sentry.tgz
           retention-days: 1
-          overwrite: true
           compression-level: 0
 
   deploy-session-ingest:
@@ -770,10 +768,9 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: cloud-agent-sentry
+          name: cloud-agent-sentry-${{ github.run_attempt }}
           path: ${{ runner.temp }}/cloud-agent-sentry.tgz
           retention-days: 1
-          overwrite: true
           compression-level: 0
 
   # Uploads the source maps a Cloud Agent deploy above handed over, with the
@@ -799,6 +796,7 @@ jobs:
     uses: ./.github/workflows/cloud-agent-sentry-sourcemaps.yml
     with:
       target_environment: ${{ inputs.target_environment }}
+      source_sha: ${{ inputs.source_sha || github.sha }}
 
   deploy-uts:
     # Guard: this reusable workflow can be invoked from a fork, and the job

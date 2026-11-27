@@ -428,6 +428,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -453,17 +455,20 @@ jobs:
 
       # Symlinks into node_modules/.pnpm survive only inside an archive. Only
       # the node_modules folders travel; each release job checks out the tree.
+      # The digest goes to the release jobs as a job output, so an artifact
+      # another job of the run uploads under this name is refused.
       - name: Pack the installed closure
+        id: pack
         run: |
           find . -path ./.git -prune -o -type d -name node_modules -prune -print0 |
             tar --null -T - -I 'zstd -T0 -3' -cf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst"
+          echo "sha256=$(sha256sum "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: kilo-app-node-modules
+          name: kilo-app-node-modules-${{ github.run_attempt }}
           path: ${{ runner.temp }}/kilo-app-node-modules.tar.zst
           retention-days: 1
-          overwrite: true
           compression-level: 0
           if-no-files-found: error
 
@@ -501,11 +506,16 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: kilo-app-node-modules
+          name: kilo-app-node-modules-${{ github.run_attempt }}
           path: ${{ runner.temp }}
 
       - name: Unpack the installed closure
-        run: tar -I zstd -xf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" -C "$GITHUB_WORKSPACE"
+        env:
+          CLOSURE_SHA256: ${{ needs.app-workspace.outputs.sha256 }}
+        run: |
+          echo "$CLOSURE_SHA256  $RUNNER_TEMP/kilo-app-node-modules.tar.zst" | sha256sum --check --strict --quiet ||
+            { echo "::error::The installed closure does not match the digest of the app-workspace job"; exit 1; }
+          tar -I zstd -xf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" -C "$GITHUB_WORKSPACE"
 
       - name: Verify EAS production environment
         working-directory: apps/mobile
@@ -584,11 +594,16 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: kilo-app-node-modules
+          name: kilo-app-node-modules-${{ github.run_attempt }}
           path: ${{ runner.temp }}
 
       - name: Unpack the installed closure
-        run: tar -I zstd -xf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" -C "$GITHUB_WORKSPACE"
+        env:
+          CLOSURE_SHA256: ${{ needs.app-workspace.outputs.sha256 }}
+        run: |
+          echo "$CLOSURE_SHA256  $RUNNER_TEMP/kilo-app-node-modules.tar.zst" | sha256sum --check --strict --quiet ||
+            { echo "::error::The installed closure does not match the digest of the app-workspace job"; exit 1; }
+          tar -I zstd -xf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" -C "$GITHUB_WORKSPACE"
 
       - name: Build iOS and Android
         working-directory: apps/mobile

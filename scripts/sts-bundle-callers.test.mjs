@@ -5,7 +5,19 @@
 // command line; the migrated GitHub secrets have no reader left; and the reusable
 // workflows that read a bundle keep exactly their reviewed callers.
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
@@ -242,6 +254,8 @@ test('each reusable workflow that reads a bundle keeps exactly its reviewed call
           if (file !== 'cloud-agent-sentry-sourcemaps.yml') {
             // The Vercel CLI comes from this run's install-vercel-cli.yml job, which holds no id-token.
             assert.equal(job.with.vercel_cli_artifact, '${{ needs.vercel-cli.outputs.artifact }}');
+            // Its digest comes from the same job, and the reader checks it before unpacking.
+            assert.equal(job.with.vercel_cli_sha256, '${{ needs.vercel-cli.outputs.sha256 }}');
             const install = document.jobs['vercel-cli'];
             assert.equal(install.uses, './.github/workflows/install-vercel-cli.yml', caller);
             assert.deepEqual(install.permissions, {}, `${caller}: the CLI install holds no token`);
@@ -336,4 +350,66 @@ test('the failure notices and the STS watch keep their Slack webhook outside STS
     'sts-deployment-watch-health.yml',
     'sts-deployment-watch.yml',
   ]);
+});
+
+test('the Vercel CLI and app closure hand-offs are per attempt and digest-checked before unpacking', () => {
+  const install = workflows['install-vercel-cli.yml'].jobs.install;
+  assert.equal(install.outputs.artifact, 'vercel-cli-${{ github.run_attempt }}');
+  assert.equal(install.outputs.sha256, '${{ steps.pack.outputs.sha256 }}');
+  const upload = install.steps.find(step => /upload-artifact/.test(step.uses ?? ''));
+  assert.equal(upload.with.name, 'vercel-cli-${{ github.run_attempt }}');
+  assert.equal(upload.with.overwrite, undefined);
+  for (const [file, job, expected] of [
+    ['stage-vercel-deployment.yml', 'stage', '${{ inputs.vercel_cli_sha256 }}'],
+    ['promote-vercel-deployment.yml', 'promote', '${{ inputs.vercel_cli_sha256 }}'],
+    ['kilo-app-release.yml', 'preflight', '${{ needs.app-workspace.outputs.sha256 }}'],
+    ['kilo-app-release.yml', 'build-and-submit', '${{ needs.app-workspace.outputs.sha256 }}'],
+  ]) {
+    const steps = workflows[file].jobs[job].steps;
+    const unpack = steps.find(step => /tar (-I zstd )?-x/.test(step.run ?? ''));
+    assert.ok(Object.values(unpack.env ?? {}).includes(expected), `${file}#${job} gets the digest`);
+    const run = unpack.run;
+    assert.ok(run.indexOf('sha256sum --check') < run.search(/tar (-I zstd )?-x/), `${file}#${job}`);
+    const download = steps.find(step => /download-artifact/.test(step.uses ?? ''));
+    assert.match(download.with.name, /run_attempt|inputs\.vercel_cli_artifact/, `${file}#${job}`);
+  }
+  const app = workflows['kilo-app-release.yml'].jobs['app-workspace'];
+  assert.equal(app.outputs.sha256, '${{ steps.pack.outputs.sha256 }}');
+  const appUpload = app.steps.find(step => /upload-artifact/.test(step.uses ?? ''));
+  assert.equal(appUpload.with.name, 'kilo-app-node-modules-${{ github.run_attempt }}');
+  assert.equal(appUpload.with.overwrite, undefined);
+});
+
+test('the Sentry hand-off check refuses anything but the staged files', () => {
+  const work = mkdtempSync(join(tmpdir(), 'sentry-handoff-'));
+  const check = archive =>
+    spawnSync('bash', ['scripts/ci/check-sentry-handoff.sh', archive], { encoding: 'utf8' });
+  try {
+    const pack = (name, setup) => {
+      const root = join(work, name);
+      mkdirSync(join(root, '0'), { recursive: true });
+      writeFileSync(join(root, 'uploads.json'), '[]');
+      writeFileSync(join(root, 'sentry-cli'), 'binary');
+      writeFileSync(join(root, '0', 'index.js'), 'code');
+      writeFileSync(join(root, '0', 'index.js.map'), '{}');
+      setup?.(root);
+      const archive = join(work, `${name}.tgz`);
+      execFileSync('tar', ['-czf', archive, '-C', root, '.']);
+      return archive;
+    };
+    assert.equal(check(pack('clean')).status, 0, 'the staged layout passes');
+    for (const [name, setup] of [
+      ['dotfile', root => writeFileSync(join(root, '.sentryclirc'), '[defaults]\nurl=https://x')],
+      ['nested-dotfile', root => writeFileSync(join(root, '0', '.env'), 'SENTRY_URL=https://x')],
+      ['properties', root => writeFileSync(join(root, 'sentry.properties'), 'defaults.url=x')],
+      ['symlink', root => symlinkSync('/etc/passwd', join(root, '0', 'link.js'))],
+      ['other-file', root => writeFileSync(join(root, '0', 'notes.txt'), 'x')],
+    ]) {
+      const result = check(pack(name, setup));
+      assert.notEqual(result.status, 0, `${name} is refused`);
+      assert.match(result.stderr, /::error title=sentry-handoff::/, name);
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });

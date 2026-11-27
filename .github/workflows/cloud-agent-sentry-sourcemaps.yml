@@ -1,12 +1,13 @@
 name: Upload Cloud Agent Sentry source maps
 
-# Called by deploy-workers.yml after a Cloud Agent deploy. The deploy job
-# validates the built maps and hands them over with the native Sentry CLI binary
-# of the lockfile (services/cloud-agent-next/scripts/sentry-source-maps.ts,
-# stageSentryUploads); this job reads the Sentry token from STS and runs only
-# that binary. Policies: ci-cloud-agent-sentry (production) and
-# ci-cloud-agent-sentry-staging (staging), D53/M112. Keep deploy-workers.yml its
-# only caller: any workflow on main that calls this file in one of those
+# Called by deploy-workers.yml after a successful Cloud Agent deploy job. The
+# deploy job validates the built maps and hands them over with the argument
+# lists to upload them (services/cloud-agent-next/scripts/sentry-source-maps.ts,
+# stageSentryUploads). This job reads the Sentry token from STS, checks the
+# hand-off archive, and runs only a sentry-cli binary it verified against the
+# lockfile of the deployed commit. Policies: ci-cloud-agent-sentry (production)
+# and ci-cloud-agent-sentry-staging (staging), D53/M112. Keep deploy-workers.yml
+# its only caller: any workflow on main that calls this file in one of those
 # environments receives the token.
 on:
   workflow_call:
@@ -14,6 +15,11 @@ on:
       target_environment:
         description: 'GitHub environment of the deploy: production or staging'
         required: true
+        type: string
+      source_sha:
+        description: 'Commit the deploy built; its lockfile pins the Sentry CLI (defaults to the caller SHA)'
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -37,15 +43,31 @@ jobs:
       contents: read
       id-token: write
     steps:
-      # Only for the local sts-bundle action; nothing else is read from the tree.
-      - name: Checkout the STS action
+      # The run's own commit: the sts-bundle action and the hand-off check.
+      - name: Checkout the STS action and the hand-off check
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          sparse-checkout: .github/actions/sts-bundle
+          filter: blob:none
+          sparse-checkout: |
+            .github/actions/sts-bundle
+            scripts/ci
 
-      # First, while every earlier step is trusted: nothing from the deploy job
-      # has reached the runner yet.
+      # The deployed commit: only the two files that pin the Sentry CLI.
+      - name: Checkout the lockfile of the deployed commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          path: deployed
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /pnpm-workspace.yaml
+            /pnpm-lock.yaml
+
+      # Before anything from the deploy job reaches the runner: every step ahead
+      # of the read is trusted.
       - name: Read the Sentry token from STS
         id: sts
         uses: ./.github/actions/sts-bundle
@@ -59,33 +81,39 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: cloud-agent-sentry
+          name: cloud-agent-sentry-${{ github.run_attempt }}
           path: ${{ runner.temp }}
 
+      # The archive may hold only uploads.json, sentry-cli and the maps. The
+      # binary the deploy job handed over must equal the one in the lockfile's
+      # platform package, which this job fetches and checks against the lockfile
+      # integrity of the deployed commit; only that verified binary runs. It runs
+      # in an empty directory with the maps by absolute path, with no dotenv
+      # loading and the Sentry host fixed, and each argument list must be a source
+      # map upload that does not redirect the token (--url, --auth-token, --header).
       - name: Upload source maps
         if: steps.download.outcome == 'success'
         env:
           SENTRY_AUTH_TOKEN: ${{ steps.sts.outputs.SENTRY_AUTH_TOKEN }}
-        # The binary the deploy job handed over must equal the one in the
-        # lockfile's platform package, which this job fetches and checks against
-        # the lockfile integrity of this run's own commit; only that verified
-        # binary runs. Each argument list must be a source map upload and may
-        # not redirect the token (--url, --auth-token, --header).
+          SENTRY_LOAD_DOTENV: '0'
+          SENTRY_URL: https://sentry.io/
         run: |
           set -euo pipefail
           fail() { echo "::error::$1"; exit 1; }
+          bash scripts/ci/check-sentry-handoff.sh "$RUNNER_TEMP/cloud-agent-sentry.tgz"
           stage="$RUNNER_TEMP/cloud-agent-sentry"
-          mkdir "$stage" "$RUNNER_TEMP/sentry-cli-package"
-          tar -xzf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$stage"
+          work="$RUNNER_TEMP/sentry-upload"
+          mkdir "$stage" "$work" "$RUNNER_TEMP/sentry-cli-package"
+          tar -xzf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$stage" --no-same-owner
 
-          version=$(sed -nE "s/^  '@sentry\/cli': ([0-9]+\.[0-9]+\.[0-9]+)$/\1/p" pnpm-workspace.yaml | head -n 1)
+          version=$(sed -nE "s/^  '@sentry\/cli': ([0-9]+\.[0-9]+\.[0-9]+)$/\1/p" deployed/pnpm-workspace.yaml | head -n 1)
           case "$RUNNER_ARCH" in
             X64) platform=linux-x64 ;;
             ARM64) platform=linux-arm64 ;;
             *) fail "no Sentry CLI platform package for $RUNNER_ARCH" ;;
           esac
           [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "no @sentry/cli catalog version in pnpm-workspace.yaml"
-          integrity=$(awk -v key="  '@sentry/cli-$platform@$version':" '$0 == key { getline; print; exit }' pnpm-lock.yaml |
+          integrity=$(awk -v key="  '@sentry/cli-$platform@$version':" '$0 == key { getline; print; exit }' deployed/pnpm-lock.yaml |
             sed -nE 's/.*integrity: (sha512-[A-Za-z0-9+\/=]+).*/\1/p')
           [[ -n $integrity ]] || fail "pnpm-lock.yaml has no integrity for @sentry/cli-$platform@$version"
           curl -fsSL --proto '=https' --max-time 120 -o "$RUNNER_TEMP/sentry-cli.tgz" \
@@ -97,8 +125,8 @@ jobs:
           cmp -s "$cli" "$stage/sentry-cli" || fail "the handed-over sentry-cli is not the lockfile's binary"
           chmod 0755 "$cli"
 
-          cd "$stage"
-          count=$(jq 'length' uploads.json)
+          cd "$work"
+          count=$(jq 'length' "$stage/uploads.json")
           for ((i = 0; i < count; i++)); do
             args=()
             while IFS= read -r -d '' arg; do
@@ -106,8 +134,12 @@ jobs:
                 --url | --url=* | --auth-token | --auth-token=* | --header | --header=*)
                   fail "upload $i names $arg" ;;
               esac
+              # A map path is relative to the hand-off; it runs by absolute path.
+              if [[ $arg =~ ^[0-9]+/[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+                arg="$stage/$arg"
+              fi
               args+=("$arg")
-            done < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' uploads.json)
+            done < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' "$stage/uploads.json")
             [[ ${args[0]-} == sourcemaps && ${args[1]-} == upload ]] || fail "upload $i is not a source map upload"
             "$cli" "${args[@]}"
           done

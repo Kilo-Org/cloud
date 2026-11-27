@@ -21,8 +21,11 @@ import ciKilocodeReleaseJetbrainsPolicy from '../../policy/ci-kilocode-release-j
 import ciKilocodeReleasePolicy from '../../policy/ci-kilocode-release.yaml';
 import ciKilocodeScanNotifyPolicy from '../../policy/ci-kilocode-scan-notify.yaml';
 import ciVercelPromotePolicy from '../../policy/ci-vercel-promote.yaml';
-import ciVercelStageStagingPolicy from '../../policy/ci-vercel-stage-staging.yaml';
-import ciVercelStagePolicy from '../../policy/ci-vercel-stage.yaml';
+import ciVercelStageProductionAiGatewaySecureProxyPolicy from '../../policy/ci-vercel-stage-production-ai-gateway-secure-proxy.yaml';
+import ciVercelStageProductionAiGatewayPolicy from '../../policy/ci-vercel-stage-production-ai-gateway.yaml';
+import ciVercelStageProductionAppPolicy from '../../policy/ci-vercel-stage-production-app.yaml';
+import ciVercelStageStagingAiGatewayPolicy from '../../policy/ci-vercel-stage-staging-ai-gateway.yaml';
+import ciVercelStageStagingAppPolicy from '../../policy/ci-vercel-stage-staging-app.yaml';
 import cloudAgentNextPolicy from '../../policy/cloud-agent-next.yaml';
 import cloudflareGmailPushPolicy from '../../policy/cloudflare-gmail-push.yaml';
 import cloudflareScimSyncPolicy from '../../policy/cloudflare-scim-sync.yaml';
@@ -62,8 +65,12 @@ const sources: Record<PolicyFile, string> = {
   'auto-routing.yaml': autoRoutingPolicy,
   'auto-routing-benchmark.yaml': autoRoutingBenchmarkPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
-  'ci-vercel-stage.yaml': ciVercelStagePolicy,
-  'ci-vercel-stage-staging.yaml': ciVercelStageStagingPolicy,
+  'ci-vercel-stage-production-app.yaml': ciVercelStageProductionAppPolicy,
+  'ci-vercel-stage-production-ai-gateway.yaml': ciVercelStageProductionAiGatewayPolicy,
+  'ci-vercel-stage-production-ai-gateway-secure-proxy.yaml':
+    ciVercelStageProductionAiGatewaySecureProxyPolicy,
+  'ci-vercel-stage-staging-app.yaml': ciVercelStageStagingAppPolicy,
+  'ci-vercel-stage-staging-ai-gateway.yaml': ciVercelStageStagingAiGatewayPolicy,
   'ci-vercel-promote.yaml': ciVercelPromotePolicy,
   'ci-cloud-agent-sentry.yaml': ciCloudAgentSentryPolicy,
   'ci-cloud-agent-sentry-staging.yaml': ciCloudAgentSentryStagingPolicy,

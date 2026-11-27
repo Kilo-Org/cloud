@@ -25,13 +25,13 @@ outputs:
     description: 'Cloudflare Access service token client secret of the Cloud Agent e2e Worker (ci-cloud-agent-e2e)'
     value: ${{ steps.bundle.outputs.E2E_ACCESS_CLIENT_SECRET }}
   VERCEL_TOKEN_APP:
-    description: 'Vercel token of the kilocode-app project (ci-vercel-stage, ci-vercel-stage-staging)'
+    description: 'Vercel token of the kilocode-app project (ci-vercel-stage-production-app, ci-vercel-stage-staging-app)'
     value: ${{ steps.bundle.outputs.VERCEL_TOKEN_APP }}
   VERCEL_TOKEN_AI_GATEWAY:
-    description: 'Vercel token of the AI gateway project (ci-vercel-stage, ci-vercel-stage-staging)'
+    description: 'Vercel token of the AI gateway project (ci-vercel-stage-production-ai-gateway, ci-vercel-stage-staging-ai-gateway)'
     value: ${{ steps.bundle.outputs.VERCEL_TOKEN_AI_GATEWAY }}
   VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY:
-    description: 'Vercel token of the AI gateway secure proxy project (ci-vercel-stage)'
+    description: 'Vercel token of the AI gateway secure proxy project (ci-vercel-stage-production-ai-gateway-secure-proxy)'
     value: ${{ steps.bundle.outputs.VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY }}
   VERCEL_TOKEN:
     description: 'Vercel token that promotes and inspects deployments (ci-vercel-promote)'

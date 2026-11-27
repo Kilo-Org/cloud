@@ -49,8 +49,7 @@ jobs:
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY_SECURE_PROXY
-      vercel_token_key: VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY
+      vercel_project: ai-gateway-secure-proxy
       vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
       vercel_cli_sha256: ${{ needs.vercel-cli.outputs.sha256 }}
 

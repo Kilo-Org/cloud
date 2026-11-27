@@ -88,7 +88,9 @@ jobs:
       # its working directory are new empty directories with no .sentryclirc or
       # sentry.properties up to /, no SENTRY_* variable but the token, the fixed
       # host and SENTRY_LOAD_DOTENV=0, and each argument list is a source map
-      # upload of fixed flags and map paths under the hand-off only.
+      # upload to the kilo-code organization's kilo-cloud-agent project with
+      # fixed flags and map paths under the hand-off only
+      # (check-sentry-handoff.sh --upload-args).
       - name: Upload source maps
         env:
           GH_TOKEN: ${{ github.token }}
@@ -140,32 +142,13 @@ jobs:
           home=$(mktemp -d)
           bash scripts/ci/check-sentry-handoff.sh --workdir "$work"
           bash scripts/ci/check-sentry-handoff.sh --workdir "$home"
-          count=$(jq 'length' "$stage/uploads.json")
+          count=$(jq -e 'if type == "array" and length > 0 then length else error("no uploads") end' \
+            "$stage/uploads.json") || fail "uploads.json is not a list of uploads"
+          argv=$(mktemp)
           for ((i = 0; i < count; i++)); do
-            raw=()
-            while IFS= read -r -d '' arg; do raw+=("$arg"); done \
-              < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' "$stage/uploads.json")
-            [[ ${raw[0]-} == sourcemaps && ${raw[1]-} == upload ]] || fail "upload $i is not a source map upload"
-            args=(sourcemaps upload)
-            for ((k = 2; k < ${#raw[@]}; k++)); do
-              arg=${raw[k]}
-              case "$arg" in
-                --org | --project | --release | --wait-for)
-                  ((k + 1 < ${#raw[@]})) || fail "upload $i: $arg has no value"
-                  value=${raw[k + 1]}
-                  [[ $value =~ ^[A-Za-z0-9@._][A-Za-z0-9@._-]*$ ]] || fail "upload $i: $arg has an unexpected value"
-                  args+=("$arg" "$value")
-                  k=$((k + 1))
-                  ;;
-                --strict | --validate | --no-rewrite) args+=("$arg") ;;
-                *)
-                  # Any other argument must be a map path relative to the hand-off.
-                  [[ $arg =~ ^[0-9]+/[A-Za-z0-9_][A-Za-z0-9_.-]*$ && $arg != *..* ]] ||
-                    fail "upload $i names an argument that is neither an allowed flag nor a map path"
-                  args+=("$stage/$arg")
-                  ;;
-              esac
-            done
+            bash scripts/ci/check-sentry-handoff.sh --upload-args "$stage" "$i" >"$argv"
+            args=()
+            while IFS= read -r -d '' arg; do args+=("$arg"); done <"$argv"
             (cd "$work" && env -i PATH=/usr/bin:/bin HOME="$home" TMPDIR="$RUNNER_TEMP" \
               SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" SENTRY_URL=https://sentry.io/ SENTRY_LOAD_DOTENV=0 \
               "$cli" "${args[@]}")

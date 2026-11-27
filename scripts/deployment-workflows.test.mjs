@@ -681,9 +681,8 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   assert.equal(stageAiGateway.with.vercel_cli_sha256, '${{ needs.vercel-cli.outputs.sha256 }}');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
   assert.equal(stageAiGateway.with.target_environment, 'production');
-  assert.equal(stageAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(stageAiGateway.with.vercel_project, 'ai-gateway');
   assert.equal(stageAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
-  assert.equal(stageAiGateway.with.vercel_token_key, 'VERCEL_TOKEN_AI_GATEWAY');
   assert.equal(stageAiGateway.secrets, undefined);
 
   const promoteAiGateway = production.jobs['promote-ai-gateway'];
@@ -700,9 +699,8 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
   assert.deepEqual(deployAiGateway.needs, ['check-changes', 'vercel-cli']);
   assert.equal(deployAiGateway.with.target_environment, 'staging');
-  assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(deployAiGateway.with.vercel_project, 'ai-gateway');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
-  assert.equal(deployAiGateway.with.vercel_token_key, 'VERCEL_TOKEN_AI_GATEWAY');
   assert.equal(deployAiGateway.secrets, undefined);
 
   // Neither pipeline's Workers read anything the Vercel deploys produce, so both
@@ -1765,7 +1763,7 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
       writeFileSync(join(bin, 'vercel'), VERCEL_STUB, { mode: 0o755 });
       const substitutions = {
         'runner.temp': runnerTemp,
-        'steps.vercel-cli-cache.outputs.cache-hit': 'false',
+        'vars[steps.project.outputs.project_id_var]': 'probe-project',
         ...values,
       };
       const env = {
@@ -1837,7 +1835,9 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
     assert.ok(promoted.argv.includes('--scope=kilocode'), 'the scope stays on the command');
 
     const stage = workflow('stage-vercel-deployment');
-    const stageValues = { 'steps.sts.outputs[inputs.vercel_token_key]': 'probe-token' };
+    const stageValues = {
+      'steps.sts.outputs[steps.project.outputs.token_key]': 'probe-token',
+    };
 
     const staged = runStep({
       document: stage,

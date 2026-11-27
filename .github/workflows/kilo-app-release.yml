@@ -467,11 +467,13 @@ jobs:
             tar --null -T - -I 'zstd -T0 -3' -cf "$RUNNER_TEMP/kilo-app-node-modules.tar.zst"
           echo "sha256=$(sha256sum "$RUNNER_TEMP/kilo-app-node-modules.tar.zst" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
+      # A re-run of a failed release job reuses this job's artifact, so it lives
+      # as long as such a re-run is likely.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kilo-app-node-modules-${{ github.run_attempt }}
           path: ${{ runner.temp }}/kilo-app-node-modules.tar.zst
-          retention-days: 1
+          retention-days: 7
           compression-level: 0
           if-no-files-found: error
 

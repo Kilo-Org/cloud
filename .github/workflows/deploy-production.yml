@@ -106,8 +106,7 @@ jobs:
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_APP
-      vercel_token_key: VERCEL_TOKEN_APP
+      vercel_project: app
       vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
       vercel_cli_sha256: ${{ needs.vercel-cli.outputs.sha256 }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
@@ -123,8 +122,7 @@ jobs:
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
-      vercel_token_key: VERCEL_TOKEN_AI_GATEWAY
+      vercel_project: ai-gateway
       vercel_cli_artifact: ${{ needs.vercel-cli.outputs.artifact }}
       vercel_cli_sha256: ${{ needs.vercel-cli.outputs.sha256 }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}

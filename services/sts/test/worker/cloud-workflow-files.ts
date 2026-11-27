@@ -1,7 +1,8 @@
 /**
  * Every workflow file in Kilo-Org/cloud's `.github/workflows`. `ci-cloud-policies.test.ts` presents
- * a token of each one to every cloud CI policy, and `test/repo/cloud-workflow-files.test.ts` holds
- * this list to the directory, so a new workflow file is checked as soon as it lands.
+ * a token of each one to every cloud CI policy. `scripts/sts-bundle-callers.test.mjs`, which runs on
+ * every change to `.github/workflows` and to this file, holds this list to the directory, so a PR
+ * that adds or removes a workflow file must update it.
  */
 export const CLOUD_WORKFLOW_FILES = [
   'auto-docs.yml',

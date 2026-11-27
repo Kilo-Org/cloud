@@ -41,6 +41,8 @@ const policy = workload => load(readFileSync(policyUrl(workload), 'utf8'));
 // Each reader job, the workloads it can read (one per GitHub environment it can
 // run in), and the GitHub environment of each. `policyElsewhere`: the policy
 // lands with its own change; its checks run once the file is in this tree.
+// `environment` and `workload`: the expressions of a job that picks both from
+// its inputs (default: the environment is `inputs.target_environment`).
 const READERS = [
   {
     file: 'cloud-agent-e2e.yml',
@@ -51,7 +53,21 @@ const READERS = [
   {
     file: 'stage-vercel-deployment.yml',
     job: 'stage',
-    workloads: { production: 'ci-vercel-stage', staging: 'ci-vercel-stage-staging' },
+    // One GitHub environment and one policy per Vercel environment and project:
+    // every caller presents the same job_workflow_ref, so the environment claim
+    // is what keeps one project's job from opening another project's token.
+    workloads: {
+      'production-vercel-app': 'ci-vercel-stage-production-app',
+      'production-vercel-ai-gateway': 'ci-vercel-stage-production-ai-gateway',
+      'production-vercel-ai-gateway-secure-proxy':
+        'ci-vercel-stage-production-ai-gateway-secure-proxy',
+      'staging-vercel-app': 'ci-vercel-stage-staging-app',
+      'staging-vercel-ai-gateway': 'ci-vercel-stage-staging-ai-gateway',
+    },
+    environment:
+      "${{ format('{0}-vercel-{1}', inputs.target_environment, inputs.vercel_project) }}",
+    workload:
+      "${{ format('ci-vercel-stage-{0}-{1}', inputs.target_environment, inputs.vercel_project) }}",
   },
   {
     file: 'promote-vercel-deployment.yml',
@@ -150,7 +166,7 @@ for (const reader of READERS) {
     if (environments.length === 1) {
       assert.equal(environment, environments[0], 'the job runs in its policy environment');
     } else {
-      assert.equal(environment, '${{ inputs.target_environment }}');
+      assert.equal(environment, reader.environment ?? '${{ inputs.target_environment }}');
     }
     const events = Object.keys(workflows[reader.file].on ?? {});
     for (const [githubEnvironment, workload] of Object.entries(reader.workloads)) {
@@ -181,7 +197,9 @@ for (const reader of READERS) {
         (_, name) => workflowEnv[name]
       );
       const workloads = Object.values(reader.workloads);
-      if (named.startsWith('${{')) {
+      if (reader.workload) {
+        assert.equal(named, reader.workload, `${label} reads ${named}`);
+      } else if (named.startsWith('${{')) {
         for (const workload of workloads) {
           assert.ok(named.includes(workload.replace(/-staging$/, '')), `${label} reads ${named}`);
         }
@@ -289,22 +307,114 @@ test('the stage job reads its bundle with the action of the run commit, before t
   const side = steps.findIndex(step => step.with?.path === 'sts-action');
   assert.equal(steps[side].with.ref, '${{ github.sha }}');
   assert.equal(steps[side].with['sparse-checkout'], '.github/actions/sts-bundle');
+  const resolve = steps.findIndex(step => step.id === 'project');
   const read = steps.findIndex(isRead);
   const source = steps.findIndex(
     step => step.with?.ref === '${{ inputs.source_sha || github.sha }}'
   );
-  assert.ok(side < read && read < source, 'side checkout, read, then the deployed commit');
+  assert.ok(side < resolve && resolve < read && read < source, 'side checkout, read, deploy');
+  assert.equal(steps[read].with.secrets, '${{ steps.project.outputs.token_key }}');
 });
 
-test('each stage caller requests a project token its environment policy holds', () => {
+// Runs the stage job's resolve step as the runner does and returns its outputs.
+function resolveStageProject(targetEnvironment, project) {
+  const step = workflows['stage-vercel-deployment.yml'].jobs.stage.steps.find(
+    candidate => candidate.id === 'project'
+  );
+  assert.deepEqual(step.env, { VERCEL_PROJECT: '${{ inputs.vercel_project }}' });
+  const directory = mkdtempSync(join(tmpdir(), 'vercel-project-'));
+  try {
+    const output = join(directory, 'github-output');
+    writeFileSync(output, '');
+    const result = spawnSync('bash', ['-e', '-c', step.run], {
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH,
+        GITHUB_OUTPUT: output,
+        TARGET_ENVIRONMENT: targetEnvironment,
+        VERCEL_PROJECT: project,
+      },
+    });
+    const outputs = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+    return { status: result.status, outputs };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+test('each stage caller opens exactly its own project token, through its own environment', () => {
+  const stage = READERS.find(reader => reader.file === 'stage-vercel-deployment.yml');
+  assert.equal(
+    workflows['stage-vercel-deployment.yml'].jobs.stage.env.TARGET_ENVIRONMENT,
+    '${{ inputs.target_environment }}'
+  );
+  const used = new Set();
   for (const caller of REUSABLE_CALLERS['stage-vercel-deployment.yml']) {
     const [file, name] = caller.split('#');
-    const job = workflows[file].jobs[name];
-    const environment = job.with.target_environment;
-    const workload =
-      environment === 'production' ? 'ci-vercel-stage' : `ci-vercel-stage-${environment}`;
-    assert.ok(policy(workload).secrets.includes(job.with.vercel_token_key), caller);
+    const { target_environment: target, vercel_project: project } = workflows[file].jobs[name].with;
+    const environment = `${target}-vercel-${project}`;
+    const workload = stage.workloads[environment];
+    assert.ok(workload, `${caller}: no policy for GitHub environment ${environment}`);
+    assert.equal(workload, `ci-vercel-stage-${target}-${project}`, caller);
+    used.add(environment);
+    const { status, outputs } = resolveStageProject(target, project);
+    assert.equal(status, 0, caller);
+    // The bundle holds this project's token alone, and the job requests that key.
+    assert.deepEqual(policy(workload).secrets, [outputs.token_key], caller);
+    assert.equal(
+      outputs.project_id_var,
+      outputs.token_key.replace(/^VERCEL_TOKEN_/, 'VERCEL_PROJECT_ID_'),
+      caller
+    );
   }
+  // No stage policy is left without a caller.
+  assert.deepEqual([...used].sort(), Object.keys(stage.workloads).sort());
+  // The five stage policies hold three distinct project tokens, one each.
+  const tokens = Object.values(stage.workloads).map(workload => policy(workload).secrets);
+  for (const secrets of tokens) assert.equal(secrets.length, 1);
+  assert.deepEqual([...new Set(tokens.flat())].sort(), [
+    'VERCEL_TOKEN_AI_GATEWAY',
+    'VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY',
+    'VERCEL_TOKEN_APP',
+  ]);
+  // The promote policy holds the team token, never a project token.
+  assert.deepEqual(
+    policy('ci-vercel-promote').secrets.filter(secret => /^VERCEL_TOKEN_/.test(secret)),
+    []
+  );
+});
+
+test('the stage resolve step refuses a project without a policy in that environment', () => {
+  for (const [target, project] of [
+    ['staging', 'ai-gateway-secure-proxy'],
+    ['production', 'web'],
+    ['production', ''],
+    ['preview', 'app'],
+    ['production', 'app/../ai-gateway'],
+  ]) {
+    const { status, outputs } = resolveStageProject(target, project);
+    assert.notEqual(status, 0, `${target}/${project}`);
+    assert.deepEqual(outputs, {}, `${target}/${project}`);
+  }
+});
+
+test('the cloud CI policy tests present every workflow file of this directory', () => {
+  // services/sts/test/worker/ci-cloud-policies.test.ts presents a token of each listed file to
+  // every cloud CI policy. This suite runs on every workflow change, so a new file fails here, in
+  // the PR that adds it, and not later in an unrelated STS change.
+  const source = readFileSync(
+    new URL('../services/sts/test/worker/cloud-workflow-files.ts', import.meta.url),
+    'utf8'
+  );
+  const list = source.match(/CLOUD_WORKFLOW_FILES = \[([^\]]*)\] as const;/);
+  assert.ok(list, 'CLOUD_WORKFLOW_FILES is a literal list');
+  const listed = [...list[1].matchAll(/'([^']+)'/g)].map(match => match[1]).sort();
+  assert.deepEqual(listed, Object.keys(workflows).sort());
 });
 
 test('every bundle key a reader requests is an output of the action and a secret of its policy', () => {
@@ -323,8 +433,15 @@ test('every bundle key a reader requests is an output of the action and a secret
         .split('\n')
         .map(line => line.trim())
         .filter(Boolean);
+      for (const secret of held) {
+        assert.ok(
+          outputs.includes(secret),
+          `${secret} of ${reader.file} is an output of the action`
+        );
+      }
       for (const key of keys) {
-        if (key.startsWith('${{')) continue; // the stage job's key comes from its caller
+        // The stage job's resolve step picks its key; the caller test above checks it.
+        if (key.startsWith('${{')) continue;
         assert.ok(outputs.includes(key), `${key} is an output of the action`);
         if (policies.length > 0) {
           assert.ok(held.has(key), `${key} is a secret of ${reader.file}#${reader.job}'s policy`);
@@ -359,6 +476,11 @@ test('the Vercel CLI and app closure hand-offs are per attempt and digest-checke
   const upload = install.steps.find(step => /upload-artifact/.test(step.uses ?? ''));
   assert.equal(upload.with.name, 'vercel-cli-${{ github.run_attempt }}');
   assert.equal(upload.with.overwrite, undefined);
+  // A re-run of a failed reader job finds the hand-off for a week.
+  assert.equal(upload.with['retention-days'], 7);
+  // The CLI comes from the registry on every run, never from the Actions cache.
+  assert.ok(!install.steps.some(step => /^actions\/cache(\/restore)?@/.test(step.uses ?? '')));
+  assert.doesNotMatch(JSON.stringify(install.steps), /cache-hit|CACHE_HIT/);
   for (const [file, job, expected] of [
     ['stage-vercel-deployment.yml', 'stage', '${{ inputs.vercel_cli_sha256 }}'],
     ['promote-vercel-deployment.yml', 'promote', '${{ inputs.vercel_cli_sha256 }}'],
@@ -384,6 +506,7 @@ test('the Vercel CLI and app closure hand-offs are per attempt and digest-checke
   const appUpload = app.steps.find(step => /upload-artifact/.test(step.uses ?? ''));
   assert.equal(appUpload.with.name, 'kilo-app-node-modules-${{ github.run_attempt }}');
   assert.equal(appUpload.with.overwrite, undefined);
+  assert.equal(appUpload.with['retention-days'], 7);
 });
 
 // GNU tar and find: the archive checks run on the Linux runners, so these two tests skip elsewhere.
@@ -509,22 +632,104 @@ test('the Sentry upload job is pinned to its lookup, environment and argument al
     'TMPDIR',
   ]);
   assert.match(envLine, /SENTRY_URL=https:\/\/sentry\.io\/ SENTRY_LOAD_DOTENV=0/);
-  // The argument allowlist: flags with a value, bare flags, and nothing else but map paths.
-  assert.match(run, /--org \| --project \| --release \| --wait-for\)/);
-  assert.match(run, /--strict \| --validate \| --no-rewrite\) args\+=/);
-  const valuePattern = run.match(/\[\[ \$value =~ (\S+) \]\]/)[1];
-  const value = new RegExp(valuePattern);
-  assert.equal(valuePattern, '^[A-Za-z0-9@._][A-Za-z0-9@._-]*$');
-  for (const refused of ['--url', '-u', '--auth-token', 'https://x', '']) {
-    assert.doesNotMatch(refused, value, `--org ${refused} is refused`);
-  }
-  for (const allowed of [
+  // Each argument list comes from the hand-off check's allowlist, never from uploads.json directly.
+  assert.match(
+    run,
+    /bash scripts\/ci\/check-sentry-handoff\.sh --upload-args "\$stage" "\$i" >"\$argv"\n/
+  );
+  assert.match(
+    run,
+    /args=\(\)\n\s+while IFS= read -r -d '' arg; do args\+=\("\$arg"\); done <"\$argv"\n/
+  );
+  assert.equal(run.match(/\bargs\+=/g).length, 1, 'args is filled from the checked list only');
+});
+
+test('the Sentry upload arguments are exactly what stageSentryUploads writes', () => {
+  // The values the producer writes (services/cloud-agent-next/scripts/sentry-source-maps.ts).
+  const producer = readFileSync(
+    new URL('../services/cloud-agent-next/scripts/sentry-source-maps.ts', import.meta.url),
+    'utf8'
+  );
+  assert.match(producer, /'--org',\s+'kilo-code',\s+'--project',\s+'kilo-cloud-agent',/);
+  assert.match(producer, /\.regex\(\/\^cloud-agent-wrapper@\[a-f0-9\]\{64\}\$\/\)/);
+  assert.match(producer, /'--wait-for',\s+'120',/);
+
+  const stage = mkdtempSync(join(tmpdir(), 'sentry-args-'));
+  const release = `cloud-agent-wrapper@${'0123456789abcdef'.repeat(4)}`;
+  const upload = [
+    'sourcemaps',
+    'upload',
+    '--org',
     'kilo-code',
+    '--project',
     'kilo-cloud-agent',
+    '--release',
+    release,
+    '--strict',
+    '--validate',
+    '--no-rewrite',
+    '--wait-for',
     '120',
-    `cloud-agent-wrapper@${'a'.repeat(64)}`,
-  ]) {
-    assert.match(allowed, value);
+    '0/index.js',
+    '0/index.js.map',
+  ];
+  const check = uploads => {
+    writeFileSync(join(stage, 'uploads.json'), JSON.stringify(uploads));
+    return spawnSync('bash', ['scripts/ci/check-sentry-handoff.sh', '--upload-args', stage, '0'], {
+      encoding: 'utf8',
+    });
+  };
+  const replace = (flag, value) => {
+    const copy = [...upload];
+    copy[copy.indexOf(flag) + 1] = value;
+    return copy;
+  };
+  try {
+    const passed = check([upload]);
+    assert.equal(passed.status, 0, passed.stderr);
+    const expected = upload.map(arg => (/^0\//.test(arg) ? join(stage, arg) : arg));
+    assert.deepEqual(passed.stdout.split('\0').slice(0, -1), expected);
+    // The worker upload has no release.
+    const worker = upload.filter(arg => arg !== '--release' && arg !== release);
+    assert.equal(check([worker]).status, 0, 'an upload without --release passes');
+
+    for (const [name, refused] of [
+      ['another org', replace('--org', 'kilo-cod')],
+      ['another org with a suffix', replace('--org', 'kilo-code-x')],
+      ['another project', replace('--project', 'kilo-cloud-agent-staging')],
+      ['a release of another name', replace('--release', `cloud-agent@${'a'.repeat(64)}`)],
+      ['a short release', replace('--release', `cloud-agent-wrapper@${'a'.repeat(63)}`)],
+      ['an upper-case release', replace('--release', `cloud-agent-wrapper@${'A'.repeat(64)}`)],
+      ['a release with a suffix', replace('--release', `${release}x`)],
+      ['a non-numeric wait', replace('--wait-for', '120s')],
+      ['a negative wait', replace('--wait-for', '-1')],
+      ['an empty wait', replace('--wait-for', '')],
+      ['no org', upload.filter((arg, i) => i !== 2 && i !== 3)],
+      ['no project', upload.filter((arg, i) => i !== 4 && i !== 5)],
+      ['a second org', [...upload.slice(0, 14), '--org', 'kilo-code', ...upload.slice(14)]],
+      ['a second release', [...upload.slice(0, 14), '--release', release, ...upload.slice(14)]],
+      ['an url flag', [...upload.slice(0, 14), '--url', 'https://x', ...upload.slice(14)]],
+      ['an auth flag', [...upload.slice(0, 14), '--auth-token', 'x', ...upload.slice(14)]],
+      ['a flag with no value', [...upload.slice(0, 13), '--org']],
+      ['no map path', upload.slice(0, 13)],
+      ['a parent map path', [...upload.slice(0, 13), '0/../x.js']],
+      ['another command', ['releases', 'new', ...upload.slice(2)]],
+      ['a value split by NUL', replace('--org', 'kilo-code\u0000--url')],
+    ]) {
+      const result = check([refused]);
+      assert.notEqual(result.status, 0, `${name} is refused`);
+      assert.equal(result.stdout, '', `${name} prints no argument`);
+      assert.match(result.stderr, /::error title=sentry-handoff::/, name);
+    }
+    for (const [name, uploads] of [
+      ['an object', { 0: upload }],
+      ['a list with a number', [[...upload.slice(0, 13), 120]]],
+      ['an empty list', [[]]],
+      ['no upload at the index', []],
+    ]) {
+      assert.notEqual(check(uploads).status, 0, `${name} is refused`);
+    }
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
   }
-  assert.match(run, /neither an allowed flag nor a map path/);
 });

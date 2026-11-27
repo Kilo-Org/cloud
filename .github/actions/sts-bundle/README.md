@@ -8,7 +8,7 @@ a port of Kilo-Org/kilocode's `.github/actions/kilo-credentials` with this repos
 | Workflow | Job | Workload | Keys |
 |---|---|---|---|
 | `.github/workflows/cloud-agent-e2e.yml` | `tests` | `ci-cloud-agent-e2e` | `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` |
-| `.github/workflows/stage-vercel-deployment.yml` | `stage` | `ci-vercel-stage`, `ci-vercel-stage-staging` | the caller's `vercel_token_key`: `VERCEL_TOKEN_APP`, `VERCEL_TOKEN_AI_GATEWAY` or `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
+| `.github/workflows/stage-vercel-deployment.yml` | `stage` | `ci-vercel-stage-<environment>-<project>`, one per caller's `target_environment` and `vercel_project`, in GitHub environment `<environment>-vercel-<project>` | that project's token only: `VERCEL_TOKEN_APP`, `VERCEL_TOKEN_AI_GATEWAY` or `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
 | `.github/workflows/promote-vercel-deployment.yml` | `promote` | `ci-vercel-promote` | `VERCEL_TOKEN`, `AXIOM_ANNOTATION_TOKEN` (best-effort) |
 | `.github/workflows/cloud-agent-sentry-sourcemaps.yml` | `upload` | `ci-cloud-agent-sentry`, `ci-cloud-agent-sentry-staging` | `SENTRY_AUTH_TOKEN` |
 | `.github/workflows/kilo-app-release.yml` | `preflight`, `build-and-submit` | `ci-kilo-app-release` | `EXPO_TOKEN` |

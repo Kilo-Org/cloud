@@ -30,29 +30,36 @@ type Expected = {
   carveOut: boolean;
 };
 
+/** The stage job's GitHub environment for each Vercel environment and project, and its token. */
+const VERCEL_STAGE = (
+  [
+    ['production', 'app', 'VERCEL_TOKEN_APP'],
+    ['production', 'ai-gateway', 'VERCEL_TOKEN_AI_GATEWAY'],
+    ['production', 'ai-gateway-secure-proxy', 'VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY'],
+    ['staging', 'app', 'VERCEL_TOKEN_APP'],
+    ['staging', 'ai-gateway', 'VERCEL_TOKEN_AI_GATEWAY'],
+  ] as const
+).map(([target, project, token]) => ({
+  environment: `${target}-vercel-${project}`,
+  workload: `ci-vercel-stage-${target}-${project}`,
+  token,
+}));
+const VERCEL_PROJECT_TOKENS = [
+  'VERCEL_TOKEN_APP',
+  'VERCEL_TOKEN_AI_GATEWAY',
+  'VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY',
+];
+
 const EXPECTED: Expected[] = [
-  {
-    workload: 'ci-vercel-stage',
-    stsEnvironment: 'production',
-    environment: 'production',
+  ...VERCEL_STAGE.map(stage => ({
+    workload: stage.workload,
+    stsEnvironment: 'production' as const,
+    environment: stage.environment,
     workflow: 'stage-vercel-deployment.yml',
     events: CARVE_OUT_EVENTS,
-    secrets: [
-      'VERCEL_TOKEN_APP',
-      'VERCEL_TOKEN_AI_GATEWAY',
-      'VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY',
-    ],
+    secrets: [stage.token],
     carveOut: true,
-  },
-  {
-    workload: 'ci-vercel-stage-staging',
-    stsEnvironment: 'production',
-    environment: 'staging',
-    workflow: 'stage-vercel-deployment.yml',
-    events: CARVE_OUT_EVENTS,
-    secrets: ['VERCEL_TOKEN_APP', 'VERCEL_TOKEN_AI_GATEWAY'],
-    carveOut: true,
-  },
+  })),
   {
     workload: 'ci-vercel-promote',
     stsEnvironment: 'production',
@@ -112,6 +119,7 @@ const EXPECTED: Expected[] = [
 const GITHUB_ENVIRONMENTS = [
   'production',
   'staging',
+  ...VERCEL_STAGE.map(stage => stage.environment),
   'release',
   'kilo-mcp-release',
   'cloud-agent-e2e',
@@ -319,6 +327,60 @@ describe('shipped Kilo-Org/cloud CI bundle policies', () => {
       expect(outcome, JSON.stringify(ids)).toMatchObject({ status: 'denied' });
       expect(outcome).not.toMatchObject({ workload: 'ci-vercel-promote' });
     }
+  });
+
+  // Every caller of stage-vercel-deployment.yml presents the same job_workflow_ref, so the GitHub
+  // environment is what tells one Vercel project's job from another's: a token of one project's
+  // stage job, or of the promote job, opens no other project's token, in any environment or event.
+  describe('Vercel project tokens', () => {
+    it.each(VERCEL_STAGE)('a stage job in $environment opens $token only', async stage => {
+      const { verify } = await fixture('production');
+      for (const event of CARVE_OUT_EVENTS) {
+        const outcome = await verify(
+          claims(stage.environment, 'stage-vercel-deployment.yml', event)
+        );
+        expect(outcome, event).toMatchObject({ status: 'verified', workload: stage.workload });
+        if (outcome.status !== 'verified') throw new Error(event);
+        expect(policyIndex.get('production', outcome.workload)?.secrets).toEqual([stage.token]);
+      }
+    });
+
+    it('opens at most the project token of the GitHub environment a stage or promote job runs in', async () => {
+      for (const stsEnvironment of ['production', 'staging', 'development'] as const) {
+        const { verify } = await fixture(stsEnvironment);
+        for (const file of ['stage-vercel-deployment.yml', 'promote-vercel-deployment.yml']) {
+          for (const environment of GITHUB_ENVIRONMENTS) {
+            const own = VERCEL_STAGE.find(stage => stage.environment === environment);
+            for (const event of CARVE_OUT_EVENTS) {
+              const outcome = await verify(claims(environment, file, event));
+              const label = `${stsEnvironment} ${file} ${environment ?? 'no environment'} ${event}`;
+              const secrets =
+                outcome.status === 'verified'
+                  ? (policyIndex.get(stsEnvironment, outcome.workload)?.secrets ?? [])
+                  : [];
+              const opened = secrets.filter(secret => VERCEL_PROJECT_TOKENS.includes(secret));
+              if (
+                file === 'stage-vercel-deployment.yml' &&
+                own &&
+                stsEnvironment === 'production'
+              ) {
+                expect(opened, label).toEqual([own.token]);
+              } else {
+                expect(opened, label).toEqual([]);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    it('keeps the promote job on the team token, with no project token', () => {
+      // The team token: project tokens cannot promote.
+      expect(policyIndex.get('production', 'ci-vercel-promote')?.secrets).toEqual([
+        'VERCEL_TOKEN',
+        'AXIOM_ANNOTATION_TOKEN',
+      ]);
+    });
   });
 
   // D53/M112 security requirement: each carve-out policy admits one workflow file, and a token from

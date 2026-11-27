@@ -536,8 +536,11 @@ no token, lease or deploy token; their bundles are `/ci/<workload>`, read with
 
 | Workload | STS environment | GitHub environment | Workflow file | Events | Secrets |
 |---|---|---|---|---|---|
-| `ci-vercel-stage` | production | `production` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP`, `VERCEL_TOKEN_AI_GATEWAY`, `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
-| `ci-vercel-stage-staging` | production | `staging` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP`, `VERCEL_TOKEN_AI_GATEWAY` |
+| `ci-vercel-stage-production-app` | production | `production-vercel-app` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP` |
+| `ci-vercel-stage-production-ai-gateway` | production | `production-vercel-ai-gateway` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY` |
+| `ci-vercel-stage-production-ai-gateway-secure-proxy` | production | `production-vercel-ai-gateway-secure-proxy` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
+| `ci-vercel-stage-staging-app` | production | `staging-vercel-app` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP` |
+| `ci-vercel-stage-staging-ai-gateway` | production | `staging-vercel-ai-gateway` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY` |
 | `ci-vercel-promote` | production | `production` | `promote-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN`, `AXIOM_ANNOTATION_TOKEN` |
 | `ci-cloud-agent-sentry` | production | `production` | `cloud-agent-sentry-sourcemaps.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `SENTRY_AUTH_TOKEN` |
 | `ci-cloud-agent-sentry-staging` | production | `staging` | `cloud-agent-sentry-sourcemaps.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `SENTRY_AUTH_TOKEN` |
@@ -545,19 +548,26 @@ no token, lease or deploy token; their bundles are `/ci/<workload>`, read with
 | `ci-auto-docs` | production | `production` | `auto-docs.yml` | `push`, `workflow_dispatch` | `DOC_WEBHOOK_URL`, `DOC_WEBHOOK_SECRET` |
 | `ci-kiloclaw-dev-push` | staging | none | `push-dev-kiloclaw.yml` | `workflow_dispatch` | `FLY_DEV_API_TOKEN` |
 
-The Vercel project tokens can deploy production, so the staging stage policy reads them from the
-production manager too. The first five are reusable workflows: a deploy workflow's own file belongs
-to its trigger-only policy (see "Trigger-only policies" below), so the reader jobs live in files of
-their own, and `scripts/sts-bundle-callers.test.mjs` pins every caller. Their callers run on
-`workflow_run`, `schedule` and `workflow_dispatch`, which those policies accept under the D53/M112
-carve-out (manager ruling M112, extending D53): `D53_M112_CI_BUNDLE_CARVE_OUT` in
-`src/policy/schema.ts` lists exactly `stage-vercel-deployment.yml`, `promote-vercel-deployment.yml`
-and `cloud-agent-sentry-sourcemaps.yml`, and admits a policy only when it is a `Kilo-Org/cloud`
-policy on `refs/heads/main`, binds a GitHub environment, names exactly one of those files, accepts
-no event beyond those three, holds at least one secret, and grants no token, dynamic grant or
+The stage job runs in one GitHub environment per Vercel environment and project, and each of those
+environments has its own policy holding that project's token alone: every caller of the file
+presents the same `job_workflow_ref`, so the `environment` claim is what keeps one project's stage
+job from opening another project's token. The promote policy holds the one team token
+(`VERCEL_TOKEN`), which a project token cannot replace: promotion with the project tokens failed
+and was reverted (#5513). The Vercel project tokens can deploy production, so the staging stage
+policies read them from the production manager too. The first eight are reusable workflows: a
+deploy workflow's own file belongs to its trigger-only policy (see "Trigger-only policies" below),
+so the reader jobs live in files of their own, and `scripts/sts-bundle-callers.test.mjs` pins every
+caller. Their callers run on `workflow_run`, `schedule` and `workflow_dispatch`, which those
+policies accept under the D53/M112 carve-out (manager ruling M112, extending D53):
+`D53_M112_CI_BUNDLE_CARVE_OUT` in `src/policy/schema.ts` lists exactly
+`stage-vercel-deployment.yml`, `promote-vercel-deployment.yml` and
+`cloud-agent-sentry-sourcemaps.yml`, and admits a policy only when it is a `Kilo-Org/cloud` policy
+on `refs/heads/main`, binds a GitHub environment, names exactly one of those files, accepts no
+event beyond those three, holds at least one secret, and grants no token, dynamic grant or
 environment grant. These jobs already received the same values as GitHub secrets on the same
 triggers; the environments `production`, `staging` and `release` admit deployments from `main`
-only (read back 2026-11-27).
+only (read back 2026-11-27), and the five `*-vercel-*` environments must be created with the same
+`main`-only branch policy before the first run.
 
 Exceptions that stay outside STS on purpose (criterion 2): `sts-deployment-watch.yml` and
 `sts-deployment-watch-health.yml` (the watcher of STS's own deployments, with its own Cloudflare

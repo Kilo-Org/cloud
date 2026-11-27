@@ -184,20 +184,35 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
   // A snapshot row never changes, so its index stays valid; only the few snapshots that
   // `disable_new_models` baselines still point at are ever looked up here.
   const indexesBySnapshotId = new Map<number, ModelIdToProviderSlugsIndex>();
+  // Auto routing decides its candidates concurrently, so concurrent lookups share one read.
+  const pendingIndexesBySnapshotId = new Map<
+    number,
+    Promise<ModelIdToProviderSlugsIndex | undefined>
+  >();
   async function loadIndexForSnapshot(
     snapshotId: number
   ): Promise<ModelIdToProviderSlugsIndex | undefined> {
     const cached = indexesBySnapshotId.get(snapshotId);
     if (cached) return cached;
-    const snapshot = await options.fetchSnapshotById(snapshotId);
-    if (!snapshot) return undefined;
-    const index = buildModelIdToProviderSlugsIndex(snapshot.data);
-    if (indexesBySnapshotId.size >= MAX_CACHED_BASELINE_INDEXES) {
-      const oldest = indexesBySnapshotId.keys().next().value;
-      if (oldest !== undefined) indexesBySnapshotId.delete(oldest);
-    }
-    indexesBySnapshotId.set(snapshotId, index);
-    return index;
+    const pending = pendingIndexesBySnapshotId.get(snapshotId);
+    if (pending) return await pending;
+    const load = (async () => {
+      try {
+        const snapshot = await options.fetchSnapshotById(snapshotId);
+        if (!snapshot) return undefined;
+        const index = buildModelIdToProviderSlugsIndex(snapshot.data);
+        if (indexesBySnapshotId.size >= MAX_CACHED_BASELINE_INDEXES) {
+          const oldest = indexesBySnapshotId.keys().next().value;
+          if (oldest !== undefined) indexesBySnapshotId.delete(oldest);
+        }
+        indexesBySnapshotId.set(snapshotId, index);
+        return index;
+      } finally {
+        pendingIndexesBySnapshotId.delete(snapshotId);
+      }
+    })();
+    pendingIndexesBySnapshotId.set(snapshotId, load);
+    return await load;
   }
 
   /**

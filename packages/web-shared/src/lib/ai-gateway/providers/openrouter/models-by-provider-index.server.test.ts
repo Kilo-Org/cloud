@@ -535,6 +535,61 @@ describe('isModelListedAtOrBefore', () => {
     expect(byIdCalls).toEqual([5, 5, 5]);
   });
 
+  it('shares one read between concurrent lookups of an uncached snapshot', async () => {
+    const byIdCalls: number[] = [];
+    let releaseRead: () => void = () => undefined;
+    const readReleased = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    const { isModelListedAtOrBefore } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => ({ id: 9, data: snapshotWithModels([MODEL, NEWER_MODEL]) }),
+      fetchSnapshotById: async id => {
+        byIdCalls.push(id);
+        await readReleased;
+        return { id, data: snapshotWithModels([MODEL]) };
+      },
+      fetchOpenRouterModels: async () => ({}),
+      fetchVercelModels: async () => ({}),
+      ttlMs: 1_000,
+      nowMs: () => 0,
+    });
+
+    const lookups = Array.from({ length: 64 }, (_, index) =>
+      isModelListedAtOrBefore(5, index % 2 === 0 ? MODEL : NEWER_MODEL)
+    );
+    // The latest index loads first, so let the by-id read start before releasing it.
+    for (let attempt = 0; attempt < 20 && byIdCalls.length === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    releaseRead();
+    const results = await Promise.all(lookups);
+
+    expect(byIdCalls).toEqual([5]);
+    expect(results).toEqual(Array.from({ length: 64 }, (_, index) => index % 2 === 0));
+    await isModelListedAtOrBefore(5, MODEL);
+    expect(byIdCalls).toEqual([5]);
+  });
+
+  it('retries a snapshot read that failed instead of keeping the failure', async () => {
+    let calls = 0;
+    const { isModelListedAtOrBefore } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => ({ id: 9, data: snapshotWithModels([MODEL]) }),
+      fetchSnapshotById: async id => {
+        calls += 1;
+        if (calls === 1) throw new Error('replica unavailable');
+        return { id, data: snapshotWithModels([MODEL]) };
+      },
+      fetchOpenRouterModels: async () => ({}),
+      fetchVercelModels: async () => ({}),
+      ttlMs: 1_000,
+      nowMs: () => 0,
+    });
+
+    await expect(isModelListedAtOrBefore(5, MODEL)).rejects.toThrow('replica unavailable');
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(true);
+    expect(calls).toBe(2);
+  });
+
   it('loads by id when the latest read failed, since the cached index has no snapshot id', async () => {
     const { isModelListedAtOrBefore, byIdCalls } = loaderWith({ byId: { 5: [MODEL] } });
 

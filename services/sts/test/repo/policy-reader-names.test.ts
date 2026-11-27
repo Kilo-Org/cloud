@@ -23,9 +23,10 @@ import { parseWorkerConfig, workerConfigPaths, type WorkerConfig } from './worke
  * A name present in one place and absent from another fails only at cutover: the legacy read keeps
  * working while `sts` answers `not_granted`.
  *
- * `migration-proxy` has no `src/secrets.ts`; `notifications`, `o11y` and `audit-relay` have one in
- * their earlier shape (listed below); `bouncer-watch` lives in another repository. Their own suites
- * cover their names. A Worker that has the file must have the map.
+ * `migration-proxy` has no `src/secrets.ts`; `notifications`, `o11y`, `audit-relay` and
+ * `cloudflare-webhook-agent-ingest` have one in an earlier shape, keyed `SECRETS_STORE_BINDINGS` or
+ * otherwise (listed below); `bouncer-watch` lives in another repository. Their own suites cover
+ * their names. A Worker that has the file with the `BINDINGS` map must agree with its policy.
  */
 
 const BINDINGS_START = /^(?:export )?const BINDINGS = \{/m;
@@ -35,10 +36,11 @@ const LEGACY_READERS: Record<string, true> = {
   notifications: true,
   o11y: true,
   'audit-relay': true,
+  'cloudflare-webhook-agent-ingest': true,
 };
 
 /** The `BINDINGS` entries of a source file, or null when it has no such map. */
-export function bindingEntries(source: string): Array<[stsName: string, binding: string]> | null {
+function bindingEntries(source: string): Array<[stsName: string, binding: string]> | null {
   const start = BINDINGS_START.exec(source);
   if (start === null) return null;
   const end = source.indexOf('} as const;', start.index);

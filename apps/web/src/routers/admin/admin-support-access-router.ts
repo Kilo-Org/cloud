@@ -10,7 +10,10 @@ import {
   SUPPORT_WRITE_MAX_DURATION_SECONDS,
   isSupportAccessEnabled,
 } from '@kilocode/web-shared/lib/admin/support-access';
-import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import {
+  supportStepUpCredential,
+  supportStepUpPort,
+} from '@kilocode/web-shared/lib/admin/support-step-up';
 import { loadEffectiveMembershipRows } from '@kilocode/web-shared/lib/organizations/effective-membership';
 import { userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import {
@@ -90,7 +93,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
           input.actionClass === 'support_write' ? 'support_write_request' : 'support_read_request',
         actionClass: input.actionClass,
         organizationId: input.organizationId,
-        credential: ctx.credential,
+        credential: supportStepUpCredential(ctx.credential),
         webSessionId: ctx.webSessionId ?? null,
         route: ctx.trpcPath ?? null,
         method: ctx.trpcType ?? null,
@@ -175,7 +178,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
           action: 'support_approval',
           actionClass: 'support_write',
           organizationId: grant.organization_id,
-          credential: ctx.credential,
+          credential: supportStepUpCredential(ctx.credential),
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,
           method: ctx.trpcType ?? null,
@@ -279,7 +282,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
         action: 'support_emergency_issue',
         actionClass: 'support_write',
         organizationId: input.organizationId,
-        credential: ctx.credential,
+        credential: supportStepUpCredential(ctx.credential),
         webSessionId: ctx.webSessionId ?? null,
         route: ctx.trpcPath ?? null,
         method: ctx.trpcType ?? null,

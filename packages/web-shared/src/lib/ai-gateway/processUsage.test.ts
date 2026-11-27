@@ -1,4 +1,5 @@
 import { test, describe, expect, beforeEach, afterEach } from '@jest/globals';
+import { version } from 'uuid';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
 import {
@@ -3367,6 +3368,13 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.http_x_vercel_ip_city).toBe('Amsterdam');
     expect(metadata.http_x_vercel_ip_country).toBe('NL');
     expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
+  });
+
+  test('generates a UUIDv7 usage id unless the context supplies one', () => {
+    expect(version(extractUsageContextInfo(makeUsageContext()).id)).toBe(7);
+
+    const usageId = crypto.randomUUID();
+    expect(extractUsageContextInfo(makeUsageContext({ usageId })).id).toBe(usageId);
   });
 
   test('is a no-op on records without NUL bytes', async () => {

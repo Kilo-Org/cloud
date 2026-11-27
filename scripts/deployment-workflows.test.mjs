@@ -18,6 +18,7 @@ const staging = workflow('deploy-staging');
 const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
+const extensionCi = workflow('extension-ci');
 
 test('Cloud Agent source-map uploads are best-effort without masking build or deploy failures', () => {
   for (const [job, selector] of [
@@ -523,6 +524,41 @@ test('both deploys start from a successful main CI run and keep an hourly catch-
     );
   }
   assert.notEqual(production.concurrency.group, staging.concurrency.group);
+});
+
+test('change-detection gates keep full history on a checkout without a mirror refresh', () => {
+  // These jobs diff the candidate against a base the run does not own, so they
+  // need every commit: a shallow clone makes `git merge-base --is-ancestor`
+  // unresolvable there, which for the deploy gate leaves target_sha empty and
+  // silently stops every deployment. They also run on a short budget, and
+  // useblacksmith/checkout's post-step mirror refresh (~400 s: 3 x 120 s fetch
+  // attempts plus waits) cancelled them in a slowdown, taking the deployment
+  // behind the gate with it. actions/checkout has no mirror to refresh; blobs
+  // stay lazy because the diffs compare trees only.
+  for (const [workflow, job] of [
+    [gate, 'check'],
+    [workers, 'detect-changes'],
+    [ci, 'changes'],
+    [extensionCi, 'changes'],
+  ]) {
+    const name = `${workflow.name} ${job}`;
+    const steps = workflow.jobs[job].steps;
+    const checkouts = steps.filter(step => step.uses?.includes('checkout@'));
+    assert.equal(checkouts.length, 1, `${name} must check out once`);
+    const [checkout] = checkouts;
+    assert.equal(
+      checkout.uses,
+      'actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
+      `${name} must not use a checkout that refreshes a runner mirror`
+    );
+    assert.equal(checkout.with['fetch-depth'], 0, `${name} must keep full history`);
+    assert.equal(checkout.with.filter, 'blob:none', `${name} must not download blobs up front`);
+    assert.equal(checkout.with['persist-credentials'], false, `${name} never pushes`);
+    assert.ok(
+      workflow.jobs[job]['timeout-minutes'] >= 10,
+      `${name} must leave room for the checkout's work`
+    );
+  }
 });
 
 test('successful main CI selects the tested deployment SHA', () => {

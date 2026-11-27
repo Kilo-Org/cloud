@@ -16,7 +16,8 @@ import type { OAuthService } from '../oauth/routes';
  * feed Worker always; the authorization, token, revocation and introspection endpoints once the
  * identity store is bound; the device grant (RFC 8628 section 4) once its user-code secret is
  * set; `private_key_jwt` (EdDSA) once `kilo-web`'s key set is valid (`webClientReady`); and the
- * RFC 8693 token exchange where the broker exchange is wired or `kilo-web`'s legacy bridge is on.
+ * RFC 8693 token exchange where the broker exchange is wired, the CI exchange has trust policies,
+ * or `kilo-web`'s legacy bridge is on.
  * Without `grant_types_supported`, a reader would assume `authorization_code` and `implicit`.
  */
 export function authorizationServerMetadata(
@@ -49,7 +50,9 @@ export function authorizationServerMetadata(
       UTS_GRANT_TYPES.authorizationCode,
       UTS_GRANT_TYPES.refreshToken,
       ...(device ? [UTS_GRANT_TYPES.deviceCode] : []),
-      ...(oauth.deps.exchange === null && !bridge ? [] : [UTS_GRANT_TYPES.tokenExchange]),
+      ...(oauth.deps.exchange === null && oauth.deps.ci.status !== 'on' && !bridge
+        ? []
+        : [UTS_GRANT_TYPES.tokenExchange]),
     ],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: webClientReady ? ['none', 'private_key_jwt'] : ['none'],

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { version } from 'uuid';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -427,10 +428,8 @@ describe('POST /api/exa/[...path]', () => {
       mockedFetch.mockResolvedValue(
         makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
       );
-      const usageId = '4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f';
       const occurredAt = new Date('2026-11-06T12:00:00.000Z');
       jest.useFakeTimers({ now: occurredAt, doNotFake: ['nextTick'] });
-      const randomUUIDSpy = jest.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(usageId);
 
       try {
         const { POST } = await import('./route');
@@ -439,13 +438,13 @@ describe('POST /api/exa/[...path]', () => {
 
         expect(mockedRecordExaUsage).toHaveBeenCalledWith(
           expect.objectContaining({
-            id: usageId,
+            id: expect.any(String),
             occurredAt: occurredAt.toISOString(),
           }),
           expect.anything()
         );
+        expect(version(mockedRecordExaUsage.mock.calls[0][0].id)).toBe(7);
       } finally {
-        randomUUIDSpy.mockRestore();
         jest.useRealTimers();
       }
     });
@@ -846,7 +845,6 @@ describe('POST /api/exa/[...path]', () => {
   });
 
   describe('usage queue fallback', () => {
-    const usageId = '6d1f3c2a-8b4e-4f7a-9c3d-2e5b7a9f1c04';
     let consoleError: jest.SpyInstance;
     let consoleWarn: jest.SpyInstance;
     let ingestStatus: number;
@@ -875,7 +873,6 @@ describe('POST /api/exa/[...path]', () => {
       ingestStatus = 202;
       consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
       consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      jest.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(usageId);
       setUserAuth();
       mockedFetch.mockImplementation(async input => {
         if (String(input).startsWith('https://ingest.synthetic.invalid/')) {
@@ -920,7 +917,7 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
       const directRecord = mockedRecordExaUsage.mock.calls[0][0];
-      expect(directRecord.id).toBe(usageId);
+      expect(version(directRecord.id)).toBe(7);
       const publishes = fetchCallsTo(INGEST_EXA_USAGE_URL);
       expect(publishes).toHaveLength(1);
       const [, init] = publishes[0];
@@ -1048,7 +1045,7 @@ describe('POST /api/exa/[...path]', () => {
       expect(consoleWarn).toHaveBeenCalledWith(
         'usage enqueue unavailable',
         expect.objectContaining({
-          usageId,
+          usageId: expect.any(String),
           usage_kind: 'exa_usage',
           reason: 'publisher_not_configured',
         })
@@ -1108,7 +1105,7 @@ describe('POST /api/exa/[...path]', () => {
       await proxySearch();
 
       const logged = JSON.stringify(consoleError.mock.calls);
-      expect(logged).not.toContain(usageId);
+      expect(logged).not.toContain(mockedRecordExaUsage.mock.calls[0][0].id);
       expect(logged).not.toContain('user-123');
       expect(logged).not.toContain(PUBLISH_SECRET);
       expect(logged).not.toContain('secret-query-text');

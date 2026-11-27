@@ -22,8 +22,27 @@ export default defineConfig({
           EVENT_SERVICE: 'event-service-stub',
           NOTIFICATIONS: 'notifications-stub',
           KILO_CHAT_SELF: kCurrentWorker,
+          // Worker unit tests resolve the STS binding to the stub below instead of the deployed
+          // broker. The binding names the `SecretsBroker` entrypoint, so the stub exports it.
+          // Nothing reaches it while SECRETS_SOURCE is `secrets-store`.
+          STS: 'sts-stub',
         },
         workers: [
+          {
+            name: 'sts-stub',
+            modules: true,
+            script: `
+              import { WorkerEntrypoint } from 'cloudflare:workers';
+              export class SecretsBroker extends WorkerEntrypoint {
+                async getBundle() {
+                  return { status: 'unavailable', reason: 'internal', retryAfterSeconds: 5 };
+                }
+              }
+              export default class StsStub extends WorkerEntrypoint {
+                async fetch() { return new Response('ok'); }
+              }
+            `,
+          },
           {
             name: 'kiloclaw-stub',
             modules: true,

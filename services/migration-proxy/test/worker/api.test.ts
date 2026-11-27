@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { attested, withProxy, type Proxy } from './harness';
 import { doneStatus, post, readyRun, repoFiles } from './scenario';
 
@@ -284,6 +284,65 @@ describe('POST /v1/runs', () => {
       expect(answer.status).toBe(503);
       expect(answer.body).toMatchObject({ status: 'unavailable', reason: 'github_unavailable' });
     });
+  });
+
+  it('logs what GitHub said when it refuses a call, and never a credential', async () => {
+    const ipAllowList =
+      'Although you appear to have the correct authorization credentials, the `Kilo-Org` organization has an IP allow list enabled';
+    const lines: unknown[][] = [];
+    for (const level of ['debug', 'info', 'log', 'warn', 'error'] as const) {
+      vi.spyOn(console, level).mockImplementation((...args: unknown[]) => {
+        lines.push(args);
+      });
+    }
+    try {
+      await withProxy({}, async proxy => {
+        const { head } = await readyRun(proxy);
+        proxy.github.outage = { status: 403, body: { message: ipAllowList }, tokenMints: true };
+        const refused = await post(proxy, head);
+        expect(refused.status).toBe(503);
+        expect(refused.body).toMatchObject({ status: 'unavailable', reason: 'github_unavailable' });
+
+        const failures = lines
+          .flat()
+          .filter(
+            value =>
+              typeof value === 'object' &&
+              value !== null &&
+              'event' in value &&
+              value.event === 'github_call_failed'
+          );
+        expect(failures).toEqual([
+          {
+            event: 'github_call_failed',
+            op: 'compare',
+            reason: 'GET 403',
+            status: 403,
+            githubMessage: ipAllowList,
+            documentationUrl: null,
+            retryAfter: null,
+            rateLimitRemaining: null,
+            timedOut: false,
+          },
+        ]);
+
+        const credentials = proxy.github.authorizations.map(header => header.split(' ')[1] ?? '');
+        expect(credentials).toContain('ghs_fake');
+        const jwt = credentials.find(credential => credential.startsWith('eyJ'));
+        expect(jwt).toBeDefined();
+        const keyLine = proxy.sts.secrets.MIGRATION_PROXY_GITHUB_APP_KEY?.split('\n')[1] ?? '';
+        expect(keyLine.length).toBeGreaterThan(40);
+        const logged = lines
+          .flat()
+          .map(value =>
+            value instanceof Error ? `${value.message}\n${value.stack}` : JSON.stringify(value)
+          )
+          .join('\n');
+        for (const secret of [...credentials, keyLine]) expect(logged).not.toContain(secret);
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it('re-arms a lost alarm when CI polls an active run', async () => {

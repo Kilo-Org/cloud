@@ -192,6 +192,11 @@ export type Env = {
   KILO_WEB_BRIDGE_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
+  /**
+   * The CI token exchange's trust policies (src/ci/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the exchange off; a value that breaks a rule keeps it off and is logged.
+   */
+  CI_TOKEN_POLICIES?: string;
 } & SignInEnv &
   AttestEnv;
 

@@ -636,6 +636,31 @@ describe('email sign-in', () => {
     });
   }
 
+  it('refuses a code entry without a code hash, and leaves the code pending (migration 0022)', async () => {
+    const email = address();
+    await sendEmail(email);
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          'SELECT * FROM uts.verify_email_code($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9)',
+          [
+            environment,
+            keyed('kilo-uts-email', email),
+            sha256(token()),
+            network.userAgent,
+            network.clientIp,
+            network.asn,
+            network.country,
+            network.city,
+            newAccountId(),
+          ]
+        )
+      )
+    ).toBe('22004');
+    const { result } = await enter(email, '123456');
+    expect(result.outcome).toBe('signed_in');
+  });
+
   it('refuses guesses across older codes: a new email exhausts every earlier code', async () => {
     const email = address();
     const first = await sendEmail(email, '111111');

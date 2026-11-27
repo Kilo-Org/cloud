@@ -847,7 +847,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       this.env.API_URL,
       this.state.reviewId,
       this.state.attemptId,
-      await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET')
+      await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
     );
 
     // Payload without reviewId (it's in the URL path)
@@ -1372,7 +1372,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         Authorization: `Bearer ${this.state.authToken}`,
         'x-internal-api-key': await readCodeReviewInfraSecret(
           this.env,
-          'INTERNAL_API_SECRET'
+          'INTERNAL_API_SECRET',
+          this.ctx
         ),
       };
       if (this.state.skipBalanceCheck) {
@@ -1384,7 +1385,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.API_URL,
         this.state.reviewId,
         this.state.attemptId,
-        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET')
+        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
       );
 
       const sessionInput = this.state.sessionInput;
@@ -1467,7 +1468,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         userHeaders['x-skip-balance-check'] = 'true';
         userHeaders['x-internal-api-key'] = await readCodeReviewInfraSecret(
           this.env,
-          'INTERNAL_API_SECRET'
+          'INTERNAL_API_SECRET',
+          this.ctx
         );
       }
 
@@ -1591,7 +1593,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         userHeaders['x-skip-balance-check'] = 'true';
         userHeaders['x-internal-api-key'] = await readCodeReviewInfraSecret(
           this.env,
-          'INTERNAL_API_SECRET'
+          'INTERNAL_API_SECRET',
+          this.ctx
         );
       }
 
@@ -1632,7 +1635,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         Authorization: `Bearer ${this.state.authToken}`,
         'x-internal-api-key': await readCodeReviewInfraSecret(
           this.env,
-          'INTERNAL_API_SECRET'
+          'INTERNAL_API_SECRET',
+          this.ctx
         ),
       };
       if (this.state.skipBalanceCheck) {
@@ -1646,7 +1650,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.API_URL,
         this.state.reviewId,
         this.state.attemptId,
-        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET')
+        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
       );
 
       await client.updateSession(internalHeaders, {

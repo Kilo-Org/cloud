@@ -836,14 +836,14 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
   it.each(STS_ENVIRONMENTS)(
     'refuses a registration-only workload its own scopes and the web dispatch in %s',
     async environment => {
-      // model-eval-ingest.yaml is a registration no Worker migration activates: STS answers for it
-      // as for a name with no file.
+      // kiloclaw.yaml stays a registration until KiloClaw is retired (design 9.3): STS answers
+      // for it as for a name with no file.
       for (const entry of [
         STS_SECURITY_SYNC_MANUAL_SYNC,
         STS_SECURITY_SYNC_DISMISS_FINDING,
         STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
       ]) {
-        expect(await mintAsShipped(environment, 'model-eval-ingest', entry)).toEqual({
+        expect(await mintAsShipped(environment, 'kiloclaw', entry)).toEqual({
           status: 'ok',
           tokens: [{ status: 'denied', ...entry, reason: 'unknown_workload' }],
         });

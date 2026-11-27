@@ -1,4 +1,5 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   agent_configs,
   security_findings,
@@ -1088,9 +1089,12 @@ async function dispatchPendingRows(
   };
 }
 
-async function readInternalSecret(env: SecurityNotificationSweepEnv): Promise<string | null> {
+async function readInternalSecret(
+  env: SecurityNotificationSweepEnv,
+  ctx?: SecretsExecutionContext
+): Promise<string | null> {
   try {
-    const secret = await readSecuritySyncSecret(env, 'INTERNAL_API_SECRET');
+    const secret = await readSecuritySyncSecret(env, 'INTERNAL_API_SECRET', ctx);
     return secret || null;
   } catch {
     return null;
@@ -1098,7 +1102,8 @@ async function readInternalSecret(env: SecurityNotificationSweepEnv): Promise<st
 }
 
 export async function runSecurityNotificationSweep(
-  env: SecurityNotificationSweepEnv
+  env: SecurityNotificationSweepEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<SweepResult> {
   const startedAt = Date.now();
   const empty = {
@@ -1177,7 +1182,7 @@ export async function runSecurityNotificationSweep(
   let dispatchCapReached = false;
 
   if (dispatchEnabled) {
-    const [backendUrl, internalSecret] = [env.BACKEND_API_URL, await readInternalSecret(env)];
+    const [backendUrl, internalSecret] = [env.BACKEND_API_URL, await readInternalSecret(env, ctx)];
     if (!backendUrl || !internalSecret) {
       console.warn(
         '[security-notifications] BACKEND_API_URL or internal secret missing; skipping dispatch'

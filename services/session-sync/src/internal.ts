@@ -6,6 +6,7 @@ import { userIDSchema } from './protocol';
 
 import { getTenantStub } from './dos/SessionSyncTenantDO';
 import type { Env } from './env';
+import { requestContext } from './request-context';
 import { readSessionSyncSecret } from './secrets';
 
 export const internal = new Hono<{ Bindings: Env }>();
@@ -14,7 +15,7 @@ internal.post('/users/:userID/erase', async c => {
   const provided = c.req.header('X-Internal-Secret');
   if (!provided) return c.json({ error: 'Unauthorized' }, 401);
   try {
-    const expected = await readSessionSyncSecret(c.env, 'INTERNAL_API_SECRET');
+    const expected = await readSessionSyncSecret(c.env, 'INTERNAL_API_SECRET', requestContext(c));
     if (
       !expected ||
       Buffer.byteLength(provided) !== Buffer.byteLength(expected) ||

@@ -12,6 +12,7 @@ import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
 import { readWebhookAgentIngestSecret } from '../secrets';
+import { requestContext } from './request-context';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -53,7 +54,11 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
   }
 
   const apiKeyHeader = c.req.header(INTERNAL_API_KEY_HEADER);
-  const secret = await readWebhookAgentIngestSecret(c.env, 'INTERNAL_API_SECRET');
+  const secret = await readWebhookAgentIngestSecret(
+    c.env,
+    'INTERNAL_API_SECRET',
+    requestContext(c)
+  );
 
   if (!secret) {
     logger.error('INTERNAL_API_SECRET not configured');

@@ -17,7 +17,7 @@ function okBundle(secrets: Record<string, string>, missing: string[] = []) {
   return {
     status: 'ok' as const,
     workload: 'cloudflare-webhook-agent-ingest',
-    environment: 'production',
+    environment: 'production' as const,
     etag: ETAG,
     stale: false,
     fetchedAt: '2026-11-27T00:00:00.000Z',
@@ -65,27 +65,30 @@ describe('secretsSource', () => {
 });
 
 describe('readWebhookAgentIngestSecret', () => {
-  it.each(NAMES)('reads %s from its binding by default and from the bundle under sts', async name => {
-    const store = storeSecret('legacy-value');
-    const sts = stsBinding();
-    const env = { ...legacyEnv(store.secret), STS: sts.binding };
+  it.each(NAMES)(
+    'reads %s from its binding by default and from the bundle under sts',
+    async name => {
+      const store = storeSecret('legacy-value');
+      const sts = stsBinding();
+      const env = { ...legacyEnv(store.secret), STS: sts.binding };
 
-    expect(await readWebhookAgentIngestSecret(env, name)).toBe('legacy-value');
-    expect(sts.getBundle).not.toHaveBeenCalled();
+      expect(await readWebhookAgentIngestSecret(env, name)).toBe('legacy-value');
+      expect(sts.getBundle).not.toHaveBeenCalled();
 
-    expect(await readWebhookAgentIngestSecret({ ...env, SECRETS_SOURCE: 'sts' }, name)).toBe(
-      'bundle-value'
-    );
-    expect(store.get).toHaveBeenCalledOnce();
-    expect(sts.getBundle).toHaveBeenCalledOnce();
+      expect(await readWebhookAgentIngestSecret({ ...env, SECRETS_SOURCE: 'sts' }, name)).toBe(
+        'bundle-value'
+      );
+      expect(store.get).toHaveBeenCalledOnce();
+      expect(sts.getBundle).toHaveBeenCalledOnce();
 
-    // Flipping the variable back reads the legacy binding again.
-    expect(await readWebhookAgentIngestSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
-      'legacy-value'
-    );
-    expect(store.get).toHaveBeenCalledTimes(2);
-    expect(sts.getBundle).toHaveBeenCalledOnce();
-  });
+      // Flipping the variable back reads the legacy binding again.
+      expect(await readWebhookAgentIngestSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
+        'legacy-value'
+      );
+      expect(store.get).toHaveBeenCalledTimes(2);
+      expect(sts.getBundle).toHaveBeenCalledOnce();
+    }
+  );
 
   it('reads a plain Worker secret, which arrives as a string', async () => {
     expect(

@@ -12,6 +12,7 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { logExportEvent, safeError } from './observability';
 import { readUserDataExportSecret } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 const DOWNLOAD_EXPIRES_SECONDS = 300;
 const DOWNLOAD_CONTENT_DISPOSITION = 'attachment; filename="kilo-data-export.jsonl.gz"';
@@ -30,15 +31,19 @@ function authorized(request: Request, expected: string): boolean {
   return timingSafeEqual(received, expected);
 }
 
-async function authenticatedUserId(request: Request, env: ExportEnv): Promise<string | null> {
+async function authenticatedUserId(
+  request: Request,
+  env: ExportEnv,
+  ctx?: SecretsExecutionContext
+): Promise<string | null> {
   try {
-    const internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET');
+    const internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
     if (!authorized(request, internalApiSecret)) return null;
     const token = extractBearerToken(request.headers.get('authorization'));
     if (!token) return null;
     const payload = await verifyKiloToken(
       token,
-      await readUserDataExportSecret(env, 'NEXTAUTH_SECRET'),
+      await readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx),
       { audience: USER_DATA_EXPORT_AUDIENCE }
     );
     const now = Math.floor(Date.now() / 1000);
@@ -100,12 +105,12 @@ async function readJson(request: Request): Promise<unknown> {
 }
 
 export default {
-  async fetch(request: Request, env: ExportEnv): Promise<Response> {
+  async fetch(request: Request, env: ExportEnv, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
       return Response.json({ ok: true, service: 'user-data-export' });
     }
-    const kiloUserId = await authenticatedUserId(request, env);
+    const kiloUserId = await authenticatedUserId(request, env, ctx);
     if (!kiloUserId) {
       logExportEvent('warn', 'export_http_unauthorized', {
         method: request.method,
@@ -164,8 +169,8 @@ export default {
           return Response.json({ error: 'Export not found' }, { status: 404 });
         }
         const [accessKeyId, secretAccessKey] = await Promise.all([
-          readUserDataExportSecret(env, 'R2_ACCESS_KEY_ID'),
-          readUserDataExportSecret(env, 'R2_SECRET_ACCESS_KEY'),
+          readUserDataExportSecret(env, 'R2_ACCESS_KEY_ID', ctx),
+          readUserDataExportSecret(env, 'R2_SECRET_ACCESS_KEY', ctx),
         ]);
         const signer = createR2Client({
           accessKeyId,
@@ -202,12 +207,16 @@ export default {
     if (batch.queue.endsWith('-dlq')) await consumeDeadLetterBatch(batch, env);
     else await consumeExportBatch(batch, env);
   },
-  async scheduled(_controller: ScheduledController, env: ExportEnv): Promise<void> {
+  async scheduled(
+    _controller: ScheduledController,
+    env: ExportEnv,
+    ctx?: ExecutionContext
+  ): Promise<void> {
     const { reconcile } = await import('./worker');
     const startedAt = Date.now();
     logExportEvent('info', 'export_reconcile_started');
     try {
-      await reconcile(env);
+      await reconcile(env, ctx);
       logExportEvent('info', 'export_reconcile_completed', {
         durationMs: Date.now() - startedAt,
       });

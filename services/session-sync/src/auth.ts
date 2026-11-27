@@ -1,5 +1,6 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { device_sessions, kilocode_users } from '@kilocode/db/schema';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
@@ -121,11 +122,12 @@ function requireSecret(value: string, minBytes: number): string {
 
 /** Shared signing key; ticket audiences remain distinct from sync grants. */
 export async function syncSigningKey(
-  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET'>
+  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET'>,
+  ctx?: SecretsExecutionContext
 ): Promise<Uint8Array> {
   return new TextEncoder().encode(
     requireSecret(
-      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET'),
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx),
       MIN_GRANT_SECRET_BYTES
     )
   );
@@ -292,7 +294,11 @@ async function checkAccount(
 }
 
 /** Handles `POST /v1/auth/exchange`. */
-export async function exchange(request: Request, env: AuthEnv): Promise<Response> {
+export async function exchange(
+  request: Request,
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
+): Promise<Response> {
   if (request.method !== 'POST') {
     return failure(405, 'method_not_allowed', 'Use POST for credential exchange');
   }
@@ -315,11 +321,11 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
 
   try {
     const nextAuthSecret = requireSecret(
-      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET'),
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx),
       MIN_GRANT_SECRET_BYTES
     );
     const grantSecret = requireSecret(
-      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET'),
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx),
       MIN_GRANT_SECRET_BYTES
     );
     const credential = await verifyCredential(token, nextAuthSecret, environment);
@@ -373,9 +379,10 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
 /** Validates a grant and exposes its deadline without accepting raw Kilo credentials. */
 export async function verifyGrant(
   token: string,
-  env: AuthEnv
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<{ principal: Principal; expiresAt: number } | undefined> {
-  const key = await syncSigningKey(env);
+  const key = await syncSigningKey(env, ctx);
   let payload: unknown;
   try {
     ({ payload } = await jwtVerify(token, key, {
@@ -400,11 +407,15 @@ export async function verifyGrant(
 }
 
 /** Verifies a sync grant. Raw Kilo credentials are never accepted here. */
-export async function authorize(request: Request, env: AuthEnv): Promise<Principal | Response> {
+export async function authorize(
+  request: Request,
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
+): Promise<Principal | Response> {
   const token = extractBearerToken(request.headers.get('Authorization'));
   if (!token) return failure(401, 'unauthenticated', 'A sync grant is required');
   try {
-    const verified = await verifyGrant(token, env);
+    const verified = await verifyGrant(token, env, ctx);
     return (
       verified?.principal ?? failure(401, 'invalid_grant', 'The sync grant is invalid or expired')
     );
@@ -422,7 +433,11 @@ const transcriptClaims = z.object({
   exp: numericDate,
 });
 
-export async function authorizeTranscript(request: Request, env: AuthEnv) {
+export async function authorizeTranscript(
+  request: Request,
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
+) {
   const prefix = `${SESSION_TRANSCRIPT_TOKEN_SCHEME} `;
   const authorization = request.headers.get('Authorization');
   if (!authorization?.startsWith(prefix)) return undefined;
@@ -436,7 +451,7 @@ export async function authorizeTranscript(request: Request, env: AuthEnv) {
   let secret: string;
   try {
     secret = requireSecret(
-      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET'),
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx),
       MIN_GRANT_SECRET_BYTES
     );
   } catch (error) {

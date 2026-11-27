@@ -23,6 +23,7 @@ import {
   createErrorHandler,
   createNotFoundHandler,
 } from '@kilocode/worker-utils';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { doNameForAttempt } from './do-name';
 import { readCodeReviewInfraSecret } from './secrets';
 
@@ -39,10 +40,27 @@ export const CodeReviewOrchestrator = CodeReviewOrchestratorBase;
 type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
 
+/**
+ * Hono's `executionCtx` getter throws outside a request context, which is how unit tests call the
+ * routes. A missing context only costs the `waitUntil` keep-alive for a bundle revalidation; it
+ * never changes which secret a read returns.
+ */
+function requestContext(c: {
+  executionCtx: SecretsExecutionContext;
+}): SecretsExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
+
 // Authentication middleware
 app.use(
   '*',
-  backendAuthMiddleware<HonoEnv>(c => readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN'))
+  backendAuthMiddleware<HonoEnv>(c =>
+    readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN', requestContext(c))
+  )
 );
 
 // Route: POST /review

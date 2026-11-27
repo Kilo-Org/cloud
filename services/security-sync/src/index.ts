@@ -793,7 +793,7 @@ async function processSecuritySyncMessage(
 }
 
 export default {
-  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
+  async fetch(request: Request, env: CloudflareEnv, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === 'GET' && url.pathname === '/health') {
@@ -812,7 +812,7 @@ export default {
         );
       }
       const [internalSecret, authHeader] = await Promise.all([
-        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET'),
+        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET', ctx),
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
@@ -848,7 +848,7 @@ export default {
         );
       }
       const [internalSecret, authHeader] = await Promise.all([
-        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET'),
+        readSecuritySyncSecret(env, 'INTERNAL_API_SECRET', ctx),
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
@@ -883,7 +883,7 @@ export default {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   },
 
-  async scheduled(controller: ScheduledController, env: CloudflareEnv) {
+  async scheduled(controller: ScheduledController, env: CloudflareEnv, ctx?: ExecutionContext) {
     const environment = getEnvironment(env);
     if (controller.cron === '15 * * * *') {
       const run = createScheduledJobRun({
@@ -891,7 +891,7 @@ export default {
         environment,
       });
       try {
-        const result = await runSecurityNotificationSweep(env);
+        const result = await runSecurityNotificationSweep(env, ctx);
         emitScheduledJobEvent(
           buildScheduledJobSuccessEvent(run, {
             scheduled_time: controller.scheduledTime,

@@ -6,6 +6,7 @@ import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-util
 import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
 import { readWebhookAgentIngestSecret } from '../secrets';
+import { requestContext } from '../util/request-context';
 
 const callbacks = new Hono<HonoContext>();
 
@@ -36,7 +37,8 @@ callbacks.post('/execution', async c => {
 
   const callbackTokenSecret = await readWebhookAgentIngestSecret(
     c.env,
-    'CALLBACK_TOKEN_SECRET'
+    'CALLBACK_TOKEN_SECRET',
+    requestContext(c)
   );
   if (!callbackTokenSecret) {
     logger.error('Callback authentication secret not configured');

@@ -40,7 +40,9 @@ export class SessionNotificationsDO extends DurableObject<Env> {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
     const token = socketTicket(request);
-    const ticket = token ? await verifyTicket(token, this.env, 'session-notifications') : undefined;
+    const ticket = token
+      ? await verifyTicket(token, this.env, 'session-notifications', this.ctx)
+      : undefined;
     if (!ticket || ticket.role !== 'viewer' || !this.matches(ticket.userID)) {
       return new Response('Invalid notification ticket', { status: 401 });
     }
@@ -124,7 +126,12 @@ export class SessionNotificationsDO extends DurableObject<Env> {
     }
     if (frame.data.type === 'ping') this.control(ws, 'pong', {});
     else {
-      const ticket = await verifyTicket(frame.data.ticket, this.env, 'session-notifications');
+      const ticket = await verifyTicket(
+        frame.data.ticket,
+        this.env,
+        'session-notifications',
+        this.ctx
+      );
       const current = this.attachment(ws);
       if (
         !ticket ||

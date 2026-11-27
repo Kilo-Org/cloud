@@ -54,7 +54,7 @@ import {
   type AliasPromotionResult,
 } from '@/lib/providers/openrouter/sync-alias-pins';
 import { lockAliasPromotionWrite } from '@/lib/auto-routing-custom-routers';
-import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { recordSyncCompleted } from '@/lib/providers/sync-state';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
   applyFreeEndpointDataPolicy,

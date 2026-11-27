@@ -37,6 +37,7 @@ import {
 import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import type { Context, Hono } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
@@ -952,7 +953,7 @@ export async function createCaseInferenceDeps(
     });
     if (veto) return refused('permanently_failed');
     const assignmentId = crypto.randomUUID();
-    const usageId = crypto.randomUUID();
+    const usageId = createUsageId();
     const selected = await env.BENCH_DB.batch(
       selectPaidModelRequestPayerStatements(env.BENCH_DB, {
         key,

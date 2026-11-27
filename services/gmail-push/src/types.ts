@@ -1,3 +1,4 @@
+import type { BundleBinding } from '@kilocode/secrets-client';
 import type { GmailPushIdempotency } from './idempotency';
 
 export interface GmailPushQueueMessage {
@@ -12,6 +13,10 @@ export interface GmailPushQueueMessage {
 export type AppEnv = Env & {
   GMAIL_PUSH_QUEUE: Queue<GmailPushQueueMessage>;
   IDEMPOTENCY: DurableObjectNamespace<GmailPushIdempotency>;
+  // `wrangler types` has not run for the SecretsBroker binding yet; this is its RPC shape
+  // (packages/secrets-client `BundleBinding`). Absent until the binding deploys.
+  STS?: BundleBinding;
+  SECRETS_SOURCE?: string;
 };
 
 export type HonoContext = {

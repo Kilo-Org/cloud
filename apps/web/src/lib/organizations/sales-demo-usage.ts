@@ -346,19 +346,19 @@ export async function populateSalesDemoUsage(
     await txn.insert(microdollar_usage).values(plan.rawRows.slice(i, i + INSERT_CHUNK_SIZE));
   }
 
-  const metadataInserts = plan.metadataRows.map(row => ({
-    id: row.id,
-    message_id: row.message_id,
-    system_prompt_length: row.system_prompt_length,
-    max_tokens: row.max_tokens,
-    has_middle_out_transform: row.has_middle_out_transform,
-    feature_id: featureIds.get(row.feature) ?? null,
-    mode_id: modeIds.get(row.mode) ?? null,
-  }));
-  for (let i = 0; i < metadataInserts.length; i += INSERT_CHUNK_SIZE) {
-    await txn
-      .insert(microdollar_usage_metadata)
-      .values(metadataInserts.slice(i, i + INSERT_CHUNK_SIZE));
+  // A Drizzle insert names every column the schema declares, including the ones the next
+  // migration drops, so this names its columns explicitly until that migration has run.
+  const metadataValues = plan.metadataRows.map(
+    row =>
+      sql`(${row.id}::uuid, ${row.message_id}, ${row.system_prompt_length}::integer, ${row.max_tokens}::bigint, ${row.has_middle_out_transform}::boolean, ${featureIds.get(row.feature) ?? null}::integer, ${modeIds.get(row.mode) ?? null}::integer)`
+  );
+  for (let i = 0; i < metadataValues.length; i += INSERT_CHUNK_SIZE) {
+    await txn.execute(sql`
+      INSERT INTO ${microdollar_usage_metadata} (
+        id, message_id, system_prompt_length, max_tokens, has_middle_out_transform, feature_id, mode_id
+      )
+      VALUES ${sql.join(metadataValues.slice(i, i + INSERT_CHUNK_SIZE), sql`, `)}
+    `);
   }
 
   for (const { kiloUserId, usageDate, total } of plan.perUserDayTotals) {

@@ -46,7 +46,7 @@ const payload = UsageRecordRequestSchema.parse({
     message_id: 'synthetic-message',
     created_at: createdAt,
     is_user_byok: false,
-    user_prompt_prefix: 'sensitive-prompt',
+    http_x_forwarded_for: 'sensitive-address',
   },
   prior_microdollar_usage: 42,
   posthog_distinct_id: 'sensitive-posthog-id',

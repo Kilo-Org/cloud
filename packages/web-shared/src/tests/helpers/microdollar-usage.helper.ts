@@ -50,8 +50,6 @@ function defineDefaultContextInfo(): UsageContextInfo {
     http_x_vercel_ip_longitude: -79,
     http_x_vercel_ja4_digest: 'normal_fingerprint',
     provider: 'openrouter',
-    user_prompt_prefix: null,
-    system_prompt_prefix: null,
     system_prompt_length: 30000,
     system_prompt_kind: null,
     http_user_agent: 'OpenAI/JS 1.0.0',
@@ -73,8 +71,6 @@ function defineDefaultContextInfo(): UsageContextInfo {
     reasoning_setting: null,
     inference_region: null,
     ttfb_ms: null,
-    abuse_delay: null,
-    abuse_downgraded_from: null,
   };
 }
 

@@ -14,12 +14,14 @@ import {
   useCombinedProfiles,
   useProfileMutations,
   useCombinedProfileMutations,
+  type ProfileOwnerType,
   type ProfileSummaryWithOwner,
 } from '@/hooks/useCloudAgentProfiles';
 import { ProfileDetailPane } from './ProfileDetailPane';
 import { TRPCClientError } from '@trpc/client';
 
 type ProfilesManagerProps = {
+  owner: ProfileOwnerType;
   organizationId?: string;
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
@@ -28,24 +30,27 @@ type ProfilesManagerProps = {
 };
 
 export function ProfilesManager({
+  owner,
   organizationId,
   onProfileSelect,
   openToNewProfile,
   initialSelectedProfileId,
 }: ProfilesManagerProps) {
+  const profileOrgId = owner === 'organization' ? organizationId : undefined;
   const permissionsQuery = useCloudAgentSettings({
-    organizationId,
-    enabled: !!organizationId,
+    organizationId: profileOrgId,
+    enabled: !!profileOrgId,
   });
-  const canCreateOrganizationProfile =
-    !!organizationId && permissionsQuery.data?.canManage === true && !permissionsQuery.error;
-  const organizationPermissionMessage = permissionsQuery.error
-    ? 'Could not check organization permissions.'
-    : permissionsQuery.data?.canManage === false
-      ? 'Only organization owners and admins can create organization profiles.'
-      : !canCreateOrganizationProfile
-        ? 'Checking organization permissions...'
-        : undefined;
+  const isCreationBlocked =
+    owner === 'organization' &&
+    (!profileOrgId || permissionsQuery.data?.canManage !== true || !!permissionsQuery.error);
+  const organizationPermissionMessage = !isCreationBlocked
+    ? undefined
+    : permissionsQuery.error
+      ? 'Could not check organization permissions.'
+      : permissionsQuery.data?.canManage === false
+        ? 'Only organization owners and admins can create organization profiles.'
+        : 'Checking organization permissions...';
   const combinedQuery = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -58,12 +63,12 @@ export function ProfilesManager({
   const isLoading = organizationId ? combinedQuery.isLoading : regularQuery.isLoading;
   const error = organizationId ? combinedQuery.error : regularQuery.error;
 
-  const orgProfiles = organizationId ? (combinedQuery.data?.orgProfiles ?? []) : [];
-  const personalProfiles = organizationId
-    ? (combinedQuery.data?.personalProfiles ?? [])
+  const profiles = organizationId
+    ? ((owner === 'organization'
+        ? combinedQuery.data?.orgProfiles
+        : combinedQuery.data?.personalProfiles) ?? [])
     : (regularQuery.data ?? []).map(p => ({ ...p, ownerType: 'user' as const }));
   const effectiveDefaultId = organizationId ? combinedQuery.data?.effectiveDefaultId : null;
-  const allProfiles: ProfileSummaryWithOwner[] = [...orgProfiles, ...personalProfiles];
 
   const combinedMutations = useCombinedProfileMutations({ organizationId: organizationId ?? '' });
   const regularMutations = useProfileMutations({ organizationId: undefined });
@@ -75,34 +80,23 @@ export function ProfilesManager({
   const [isCreating, setIsCreating] = useState(openToNewProfile ?? false);
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileDescription, setNewProfileDescription] = useState('');
-  const [newProfileOwnerType, setNewProfileOwnerType] = useState<'personal' | 'organization'>(
-    'personal'
-  );
   const [savingNew, setSavingNew] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Select first profile when list loads and nothing is selected
+  const firstProfileId = profiles[0]?.id ?? null;
   useEffect(() => {
-    if (!isCreating && !selectedId && allProfiles.length > 0) {
-      setSelectedId(allProfiles[0]?.id ?? null);
+    if (!isCreating && !selectedId && firstProfileId) {
+      setSelectedId(firstProfileId);
     }
-  }, [allProfiles, selectedId, isCreating]);
+  }, [firstProfileId, selectedId, isCreating]);
 
   const handleDelete = async (profile: ProfileSummaryWithOwner) => {
     setDeletingId(profile.id);
     try {
-      const profileOrgId = profile.ownerType === 'organization' ? organizationId : undefined;
-      if (organizationId) {
-        await combinedMutations.deleteProfile.mutateAsync({
-          profileId: profile.id,
-          organizationId: profileOrgId,
-        });
-      } else {
-        await regularMutations.deleteProfile.mutateAsync({
-          profileId: profile.id,
-          organizationId: undefined,
-        });
-      }
+      await mutations.deleteProfile.mutateAsync({
+        profileId: profile.id,
+        organizationId: profileOrgId,
+      });
       toast.success(`Profile "${profile.name}" deleted`);
       if (selectedId === profile.id) setSelectedId(null);
     } catch {
@@ -113,7 +107,7 @@ export function ProfilesManager({
   };
 
   const handleCreateProfile = async () => {
-    if (newProfileOwnerType === 'organization' && !canCreateOrganizationProfile) {
+    if (isCreationBlocked) {
       toast.error(organizationPermissionMessage);
       return;
     }
@@ -123,12 +117,10 @@ export function ProfilesManager({
     }
     setSavingNew(true);
     try {
-      const createOrgId =
-        organizationId && newProfileOwnerType === 'organization' ? organizationId : undefined;
       const created = await mutations.createProfile.mutateAsync({
         name: newProfileName.trim(),
         description: newProfileDescription.trim() || undefined,
-        organizationId: createOrgId,
+        organizationId: profileOrgId,
       });
       toast.success(`Profile "${newProfileName}" created`);
       setIsCreating(false);
@@ -167,47 +159,19 @@ export function ProfilesManager({
             </div>
           ) : (
             <div className="py-1">
-              {organizationId && orgProfiles.length > 0 && (
-                <>
-                  <p className="text-muted-foreground px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider">
-                    Organization
-                  </p>
-                  {orgProfiles.map(p => (
-                    <ProfileListItem
-                      key={p.id}
-                      profile={p}
-                      isSelected={selectedId === p.id}
-                      isEffectiveDefault={isEffectiveDefault(p)}
-                      onSelect={() => {
-                        setSelectedId(p.id);
-                        setIsCreating(false);
-                      }}
-                    />
-                  ))}
-                </>
-              )}
-              {personalProfiles.length > 0 && (
-                <>
-                  {organizationId && (
-                    <p className="text-muted-foreground mt-1 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider">
-                      Personal
-                    </p>
-                  )}
-                  {personalProfiles.map(p => (
-                    <ProfileListItem
-                      key={p.id}
-                      profile={p}
-                      isSelected={selectedId === p.id}
-                      isEffectiveDefault={isEffectiveDefault(p)}
-                      onSelect={() => {
-                        setSelectedId(p.id);
-                        setIsCreating(false);
-                      }}
-                    />
-                  ))}
-                </>
-              )}
-              {allProfiles.length === 0 && !isCreating && (
+              {profiles.map(p => (
+                <ProfileListItem
+                  key={p.id}
+                  profile={p}
+                  isSelected={selectedId === p.id}
+                  isEffectiveDefault={isEffectiveDefault(p)}
+                  onSelect={() => {
+                    setSelectedId(p.id);
+                    setIsCreating(false);
+                  }}
+                />
+              ))}
+              {profiles.length === 0 && !isCreating && (
                 <p className="text-muted-foreground px-3 py-6 text-center text-xs">
                   No profiles yet.
                 </p>
@@ -241,19 +205,16 @@ export function ProfilesManager({
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         {isCreating ? (
           <NewProfilePane
-            organizationId={organizationId}
-            canCreateOrganizationProfile={canCreateOrganizationProfile}
+            isCreationBlocked={isCreationBlocked}
             organizationPermissionMessage={organizationPermissionMessage}
             name={newProfileName}
             description={newProfileDescription}
-            ownerType={newProfileOwnerType}
             onNameChange={setNewProfileName}
             onDescriptionChange={setNewProfileDescription}
-            onOwnerTypeChange={setNewProfileOwnerType}
             onSave={handleCreateProfile}
             onCancel={() => {
               setIsCreating(false);
-              if (allProfiles.length > 0) setSelectedId(allProfiles[0]?.id ?? null);
+              setSelectedId(firstProfileId);
             }}
             isSaving={savingNew}
           />
@@ -261,15 +222,9 @@ export function ProfilesManager({
           <ProfileDetailPane
             key={selectedId}
             profileId={selectedId}
-            ownerType={allProfiles.find(p => p.id === selectedId)?.ownerType ?? 'user'}
-            organizationId={
-              allProfiles.find(p => p.id === selectedId)?.ownerType === 'organization'
-                ? organizationId
-                : undefined
-            }
-            isEffectiveDefault={
-              !!allProfiles.find(p => p.id === selectedId && isEffectiveDefault(p))
-            }
+            ownerType={owner}
+            organizationId={profileOrgId}
+            isEffectiveDefault={profiles.some(p => p.id === selectedId && isEffectiveDefault(p))}
             onProfileSelect={
               onProfileSelect
                 ? () => {
@@ -278,7 +233,7 @@ export function ProfilesManager({
                 : undefined
             }
             onDelete={() => {
-              const profile = allProfiles.find(p => p.id === selectedId);
+              const profile = profiles.find(p => p.id === selectedId);
               if (profile) void handleDelete(profile);
             }}
             isDeleting={deletingId === selectedId}
@@ -348,78 +303,36 @@ function ProfileListItem({
 // -------------------------------------------------------------------
 
 type NewProfilePaneProps = {
-  organizationId?: string;
-  canCreateOrganizationProfile: boolean;
+  isCreationBlocked: boolean;
   organizationPermissionMessage?: string;
   name: string;
   description: string;
-  ownerType: 'personal' | 'organization';
   onNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
-  onOwnerTypeChange: (v: 'personal' | 'organization') => void;
   onSave: () => void;
   onCancel: () => void;
   isSaving: boolean;
 };
 
 function NewProfilePane({
-  organizationId,
-  canCreateOrganizationProfile,
+  isCreationBlocked,
   organizationPermissionMessage,
   name,
   description,
-  ownerType,
   onNameChange,
   onDescriptionChange,
-  onOwnerTypeChange,
   onSave,
   onCancel,
   isSaving,
 }: NewProfilePaneProps) {
-  const isCreationBlocked = ownerType === 'organization' && !canCreateOrganizationProfile;
   return (
     <div className="space-y-4 p-4">
       <h3 className="text-sm font-semibold">New Profile</h3>
 
-      {organizationId && (
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Owner</Label>
-          <div className="flex gap-1.5">
-            {(
-              [
-                { value: 'personal', label: 'Personal', Icon: User },
-                { value: 'organization', label: 'Organization', Icon: Building },
-              ] as const
-            ).map(({ value, label, Icon }) => (
-              <button
-                key={value}
-                type="button"
-                className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                  ownerType === value
-                    ? 'border-primary bg-accent text-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent/50'
-                )}
-                onClick={() => onOwnerTypeChange(value)}
-                disabled={isSaving || (value === 'organization' && !canCreateOrganizationProfile)}
-                aria-pressed={ownerType === value}
-                aria-describedby={
-                  value === 'organization' && !canCreateOrganizationProfile
-                    ? 'organization-profile-permission'
-                    : undefined
-                }
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </button>
-            ))}
-          </div>
-          {organizationPermissionMessage && (
-            <p id="organization-profile-permission" className="text-muted-foreground text-xs">
-              {organizationPermissionMessage}
-            </p>
-          )}
-        </div>
+      {organizationPermissionMessage && (
+        <p id="organization-profile-permission" className="text-muted-foreground text-xs">
+          {organizationPermissionMessage}
+        </p>
       )}
 
       <div className="grid gap-2">
@@ -447,7 +360,12 @@ function NewProfilePane({
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
           Cancel
         </Button>
-        <Button size="sm" onClick={onSave} disabled={isSaving || isCreationBlocked || !name.trim()}>
+        <Button
+          size="sm"
+          onClick={onSave}
+          disabled={isSaving || isCreationBlocked || !name.trim()}
+          aria-describedby={isCreationBlocked ? 'organization-profile-permission' : undefined}
+        >
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
         </Button>
       </div>

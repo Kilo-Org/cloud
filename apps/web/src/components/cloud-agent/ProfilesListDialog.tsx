@@ -10,12 +10,17 @@ type ProfilesListDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialSection?: 'profiles' | 'personal-profiles';
   onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
+  orgProfilesOnly?: boolean;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;
 };
 
-export function ProfilesListDialog(props: ProfilesListDialogProps) {
-  return <CloudAgentSettingsDialog {...props} initialSection="profiles" />;
+export function ProfilesListDialog({
+  initialSection = 'profiles',
+  ...props
+}: ProfilesListDialogProps) {
+  return <CloudAgentSettingsDialog {...props} initialSection={initialSection} />;
 }

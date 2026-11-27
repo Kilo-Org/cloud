@@ -21,10 +21,19 @@ import {
   interactiveContextSegmentClassName,
   SegmentText,
 } from '@/components/cloud-agent-next/session-context-segments';
-import { type ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
+import type { ProfileOwnerType, ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
 import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
 import { useCloudAgentSettingsDeepLink } from '@/components/cloud-agent-next/settings/useCloudAgentSettingsDeepLink';
 import { ProfilesListDialog } from './ProfilesListDialog';
+
+type ProfilesSection = 'profiles' | 'personal-profiles';
+
+function profileSection(
+  organizationId: string | undefined,
+  owner: ProfileOwnerType
+): ProfilesSection {
+  return organizationId && owner === 'user' ? 'personal-profiles' : 'profiles';
+}
 
 type ProfilePickerPopoverProps = {
   organizationId?: string;
@@ -47,6 +56,7 @@ export function ProfilePickerPopover({
   const [open, setOpen] = useState(false);
   const [pickingOverride, setPickingOverride] = useState(false);
   const [showManageProfiles, setShowManageProfiles] = useState(false);
+  const [targetSection, setTargetSection] = useState<ProfilesSection>('profiles');
   const [openToNewProfile, setOpenToNewProfile] = useState(false);
   const [editProfileId, setEditProfileId] = useState<string | null>(null);
   const { setSection, clearSection } = useCloudAgentSettingsDeepLink();
@@ -56,9 +66,10 @@ export function ProfilePickerPopover({
     if (!open) setPickingOverride(false);
   }, [open]);
 
-  const openManageProfiles = () => {
+  const openManageProfiles = (section: ProfilesSection) => {
+    setTargetSection(section);
     setShowManageProfiles(true);
-    setSection('profiles');
+    setSection(section);
   };
 
   const closeManageProfiles = () => {
@@ -68,11 +79,11 @@ export function ProfilePickerPopover({
     clearSection();
   };
 
-  const openEditDialog = (profileId: string) => {
+  const openEditDialog = (profile: ProfileSummaryWithOwner) => {
     setOpen(false);
     setOpenToNewProfile(false);
-    setEditProfileId(profileId);
-    openManageProfiles();
+    setEditProfileId(profile.id);
+    openManageProfiles(profileSection(organizationId, profile.ownerType));
   };
 
   const {
@@ -179,7 +190,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(true);
-                openManageProfiles();
+                openManageProfiles(profileSection(organizationId, 'user'));
               }}
             >
               <Plus className="h-3 w-3 shrink-0" />
@@ -190,7 +201,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(false);
-                openManageProfiles();
+                openManageProfiles('profiles');
               }}
             >
               <FolderCog className="h-3 w-3 shrink-0" />
@@ -202,11 +213,11 @@ export function ProfilePickerPopover({
 
       <ProfilesListDialog
         organizationId={organizationId}
+        initialSection={targetSection}
         open={showManageProfiles}
         onOpenChange={nextOpen => {
           if (nextOpen) {
-            setShowManageProfiles(true);
-            setSection('profiles');
+            openManageProfiles(targetSection);
             return;
           }
           closeManageProfiles();
@@ -264,7 +275,7 @@ type ActiveProfileViewProps = {
   onRetry: () => void;
   overrideCandidatesCount: number;
   formatCounts: (p: ProfileSummaryWithOwner) => string;
-  onEditProfile: (id: string) => void;
+  onEditProfile: (profile: ProfileSummaryWithOwner) => void;
   onStartPickOverride: () => void;
   onRemoveOverride: () => void;
   onSelectProfile: (id: string | null) => void;
@@ -372,7 +383,7 @@ function ActiveProfileView({
           <Layers className="text-primary h-3.5 w-3.5 shrink-0" />
           <button
             type="button"
-            onClick={() => onEditProfile(active.id)}
+            onClick={() => onEditProfile(active)}
             className="min-w-0 flex-1 cursor-pointer text-left"
             title="Edit profile"
           >
@@ -404,7 +415,7 @@ function ActiveProfileView({
         {topProfile && baseProfile && (
           <button
             type="button"
-            onClick={() => onEditProfile(baseProfile.id)}
+            onClick={() => onEditProfile(baseProfile)}
             className="hover:bg-accent/30 block w-full cursor-pointer border-t border-dashed px-3 py-2 text-left transition-colors"
             title="Edit base profile"
           >

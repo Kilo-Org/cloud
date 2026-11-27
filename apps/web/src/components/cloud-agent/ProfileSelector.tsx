@@ -225,6 +225,7 @@ export function ProfileSelector({
 
       <ProfilesListDialog
         organizationId={organizationId}
+        orgProfilesOnly={orgProfilesOnly}
         open={showManageDialog}
         onOpenChange={setShowManageDialog}
         onProfileSelect={profileId => {

@@ -378,10 +378,12 @@ Identity kinds:
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
 `STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`: the canary scopes `web:sts.canary` and
-`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`, and
+`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`,
 under `uts` the scopes `uts:subjects.revoke`, `uts:browser-sessions.end`,
-`uts:api-credentials.revoke` and `uts:token-exchange`) and belong to a listed audience, every
-audience needs at least one scope, and no audience may be the workload itself. A reserved scope
+`uts:api-credentials.revoke` and `uts:token-exchange`, under `bouncer` the scopes `bouncer:decide`,
+`bouncer:usage.write`, `bouncer:signup.decide` and `bouncer:signup.history`, and the phase 4
+service scopes) and belong to a listed audience, every audience needs at least one scope, and no
+audience may be the workload itself. A reserved scope
 (`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its audience fail the load whatever the
 registry says: no policy may grant them (see [Alerts on token denials](#alerts-on-token-denials)).
 `dynamic` lists the database lease grants the workload may request
@@ -451,11 +453,16 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide`, `bouncer:signup.history` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
+| `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 
-Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
+Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
+are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only and accepts only
+production STS tokens; the shared Bouncer client of both apps mints them behind
+`BOUNCER_STS_TOKENS` (`ENVIRONMENT.md`). The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
 config check below refuses a `worker-binding` policy that no config here binds. Its local block
@@ -475,11 +482,13 @@ workload check, so a grant alone opens no route to another caller.
 The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
 lists the project's `production`, its custom environment `staging` and its previews, mapped to
 production, staging and development STS as for `web`. Its UTS feed read stays development only, in
-`environmentGrants`; staging and production get it with phase 4's activation go.
+`environmentGrants`; staging and production get it with phase 4's activation go. Phase 4 activated
+it for Bouncer: `bouncer:decide` and `bouncer:usage.write` are a production grant in
+`environmentGrants`, and it holds neither signup scope, since the gateway sends no signup call.
 
-Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every `ai-gateway` scope on
-development STS, the same as `web`'s development grants. If fork or outside pull-request previews
-are ever enabled on that project, these grants need a review first.
+Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every scope `ai-gateway`
+holds on development STS, the same as `web`'s development grants. If fork or outside pull-request
+previews are ever enabled on that project, these grants need a review first.
 
 Workloads with a policy, all over `worker-binding`:
 

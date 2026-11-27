@@ -182,6 +182,41 @@ describe('the installed Bouncer auth with the real transport', () => {
     }
   });
 
+  it.each([
+    ['sts', 'sends its token without the legacy key', true],
+    ['dual', 'sends the legacy key alone and leaves the mint in its jitter', false],
+  ] as const)(
+    'on a cold instance without a startup read, a %s decide %s',
+    async (mode, _outcome, minted) => {
+      setRuntime({
+        VERCEL_ENV: 'production',
+        VERCEL_TARGET_ENV: 'production',
+        BOUNCER_CLIENT_AUTH: mode,
+      });
+      installBouncerAuth('kilocode-ai-gateway');
+      mockExchangeHeld = false;
+      // A 1 s first-mint jitter, four times the 250 ms token wait.
+      const random = jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      try {
+        await decide(
+          { requestId: 'r-10', tier: 'anonymous', ip: '203.0.113.7' },
+          { timeoutMs: 1_000 }
+        );
+        const [headers] = bouncerCalls();
+        if (minted) {
+          expect(headers.get('authorization')).toBe('Bearer sts-decide-token');
+          expect(headers.get('x-internal-api-key')).toBeNull();
+        } else {
+          expect(headers.get('authorization')).toBeNull();
+          expect(headers.get('x-internal-api-key')).toBe('env-only-secret');
+          expect(stsCalls()).toEqual([]);
+        }
+      } finally {
+        random.mockRestore();
+      }
+    }
+  );
+
   it('mints every granted scope at install in sts, before any call, and sends no legacy key', async () => {
     setRuntime({
       VERCEL_ENV: 'production',
@@ -270,6 +305,7 @@ describe('createBouncerTransportFor', () => {
   const connect = jest.fn(() => ({
     tokens: { get: jest.fn(async () => 'token') },
     exchangeReady: async () => true,
+    skipJitter: () => {},
   }));
 
   it('connects to production STS for a production deployment', () => {
@@ -401,6 +437,28 @@ describe('connectBouncerSts', () => {
     await expect(token).rejects.toThrow();
     expect(mint).toHaveBeenCalledWith(false);
     expect(mint).not.toHaveBeenCalledWith(true);
+  });
+
+  it('ends a running first-mint jitter on skipJitter', async () => {
+    jest.useFakeTimers();
+    const { connected, stsFetch } = connection({ held: { value: false } });
+    const token = connected.tokens.get(DECIDE, ctx);
+    await jest.advanceTimersByTimeAsync(20);
+    expect(stsFetch).not.toHaveBeenCalled();
+    connected.skipJitter();
+    await jest.advanceTimersByTimeAsync(20);
+    await expect(token).resolves.toBe('sts-token');
+    expect(stsFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a first-mint jitter that starts within the skip window', async () => {
+    jest.useFakeTimers();
+    const { connected, stsFetch } = connection({ held: { value: false } });
+    connected.skipJitter();
+    const token = connected.tokens.get(DECIDE, ctx);
+    await jest.advanceTimersByTimeAsync(20);
+    await expect(token).resolves.toBe('sts-token');
+    expect(stsFetch).toHaveBeenCalledTimes(1);
   });
 
   it('delays a first-exchange mint by the jitter and reports not ready meanwhile', async () => {

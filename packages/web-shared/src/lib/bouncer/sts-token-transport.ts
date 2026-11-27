@@ -29,8 +29,18 @@ import { getVercelOidcToken } from '@vercel/functions/oidc';
 export const BOUNCER_FIRST_MINT_JITTER_MS = 2_000;
 /** A readiness check that found no exchanged token is not repeated for this long. */
 export const BOUNCER_NOT_HELD_MEMORY_MS = 250;
+/**
+ * After `skipJitter`, a first-mint jitter that starts within this long is skipped. It covers an
+ * admission call's whole token wait (250 ms, `BOUNCER_TOKEN_WAIT_MS` in `sts-auth.ts`), so the mint
+ * its read starts goes to STS at once.
+ */
+export const BOUNCER_JITTER_SKIP_MS = 250;
 
-type Connection = { tokens: { get: BouncerTokenRead }; exchangeReady: () => Promise<boolean> };
+type Connection = {
+  tokens: { get: BouncerTokenRead };
+  exchangeReady: () => Promise<boolean>;
+  skipJitter: () => void;
+};
 
 /**
  * Builds the transport, or throws `BouncerStsConfigError` unless this is a Vercel production
@@ -57,8 +67,8 @@ export function createBouncerTransportFor(options: {
   if (options.stsUrl !== STS_ISSUERS.production) {
     throw new BouncerStsConfigError('STS_URL is not the production STS issuer');
   }
-  const { tokens, exchangeReady } = options.connect(STS_ISSUERS.production);
-  return { read: async (target, ctx) => await tokens.get(target, ctx), exchangeReady };
+  const { tokens, exchangeReady, skipJitter } = options.connect(STS_ISSUERS.production);
+  return { read: async (target, ctx) => await tokens.get(target, ctx), exchangeReady, skipJitter };
 }
 
 /**
@@ -76,7 +86,9 @@ export function createBouncerTransportFor(options: {
  *   through an exchange or a jitter.
  * - Jitter: when the step finds no held exchanged token, this instance exchanges or polls for the
  *   deployment's first one; the mint then waits a random 0 to `BOUNCER_FIRST_MINT_JITTER_MS`
- *   before it goes to STS, so a deployment's instances spread out.
+ *   before it goes to STS, so a deployment's instances spread out. `skipJitter` ends a running
+ *   jitter and skips one that starts within `BOUNCER_JITTER_SKIP_MS`; only an `sts` admission call
+ *   asks for it, so `dual`, background renewals and the `sts` startup reads keep the jitter.
  * - Counter: every STS answer reaches `hooks.mint`: `true` only for an answer that issued a token,
  *   `false` for a denial, any other answer, or a request that failed.
  */
@@ -96,6 +108,8 @@ export function connectBouncerSts(options: {
   let notHeldUntil = 0;
   let firstMintPending = false;
   let step: Promise<string> | null = null;
+  let skipJitterUntil = Number.NEGATIVE_INFINITY;
+  let endJitter: (() => void) | null = null;
 
   function held(): Promise<boolean> {
     checking ??= options
@@ -115,6 +129,11 @@ export function connectBouncerSts(options: {
     return found && !firstMintPending;
   }
 
+  function skipJitter(): void {
+    skipJitterUntil = now() + BOUNCER_JITTER_SKIP_MS;
+    endJitter?.();
+  }
+
   async function identityStep(): Promise<string> {
     firstMintPending = true;
     try {
@@ -126,9 +145,14 @@ export function connectBouncerSts(options: {
         return await identity;
       }
       const token = await identity;
-      const jitter = Promise.withResolvers<void>();
-      setTimeout(jitter.resolve, Math.floor(random() * BOUNCER_FIRST_MINT_JITTER_MS));
-      await jitter.promise;
+      if (now() >= skipJitterUntil) {
+        const jitter = Promise.withResolvers<void>();
+        endJitter = jitter.resolve;
+        const timer = setTimeout(jitter.resolve, Math.floor(random() * BOUNCER_FIRST_MINT_JITTER_MS));
+        await jitter.promise;
+        clearTimeout(timer);
+        endJitter = null;
+      }
       return token;
     } finally {
       firstMintPending = false;
@@ -163,6 +187,7 @@ export function connectBouncerSts(options: {
       fetch: countingFetch,
     }),
     exchangeReady,
+    skipJitter,
   };
 }
 

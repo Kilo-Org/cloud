@@ -411,7 +411,9 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
       // In `dual` a call waits only when the mint is one STS call away; without a wait it still
       // carries the legacy key. `sts` has no such fallback (a call without the token is refused),
       // so there an admission call waits for the mint even on a cold instance, within the same
-      // budget and deadline.
+      // budget and deadline, and its mint skips the 0 to 2 s first-mint jitter, which would
+      // outlast the wait.
+      if (mode === 'sts') void transport.then(t => t.skipJitter(), () => undefined);
       if (mode === 'dual') {
         const ready = await race(
           transport.then(t => t.exchangeReady()),

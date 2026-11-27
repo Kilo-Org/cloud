@@ -38,6 +38,7 @@ type Harness = {
   auth: BouncerAuth;
   read: jest.MockedFunction<BouncerTokenRead>;
   exchangeReady: jest.MockedFunction<() => Promise<boolean>>;
+  skipJitter: jest.MockedFunction<() => void>;
   loadTransport: jest.MockedFunction<BouncerAuthOptions['loadTransport']>;
   waitUntil: jest.MockedFunction<BouncerAuthOptions['waitUntil']>;
   /** The hooks the auth passed to the transport; set once it loaded. */
@@ -55,10 +56,11 @@ function harness(
 ): Harness {
   const read = jest.fn<BouncerTokenRead>();
   const exchangeReady = jest.fn(async () => true);
+  const skipJitter = jest.fn<() => void>();
   let hooks: BouncerTransportHooks | null = null;
   const loadTransport = jest.fn<BouncerAuthOptions['loadTransport']>(async given => {
     hooks = given;
-    return { read, exchangeReady };
+    return { read, exchangeReady, skipJitter };
   });
   const waitUntil = jest.fn<BouncerAuthOptions['waitUntil']>();
   const logged: Line[] = [];
@@ -78,6 +80,7 @@ function harness(
     auth,
     read,
     exchangeReady,
+    skipJitter,
     loadTransport,
     waitUntil,
     hooks: () => {
@@ -445,7 +448,7 @@ describe('createBouncerAuth', () => {
     });
     const h = harness('kilocode-app', WEB_SCOPES, {
       prewarm: true,
-      loadTransport: async () => ({ read, exchangeReady: async () => true }),
+      loadTransport: async () => ({ read, exchangeReady: async () => true, skipJitter: () => {} }),
     });
     await new Promise(resolve => setImmediate(resolve));
     expect(read.mock.calls.map(([target]) => target.scope).sort()).toEqual([...WEB_SCOPES].sort());
@@ -576,6 +579,8 @@ describe('createBouncerAuth', () => {
         missed: { 'bouncer:decide': { exchange_pending: BOUNCER_BREAKER_THRESHOLD } },
       });
       expect(breakerOpened(h)).toBe(0);
+      // `dual` keeps the first-mint jitter.
+      expect(h.skipJitter).not.toHaveBeenCalled();
     });
 
     it('in sts waits for a cold mint that lands inside the budget and sends its token', async () => {
@@ -592,6 +597,21 @@ describe('createBouncerAuth', () => {
         authorization: `Bearer ${TOKEN}`,
       });
       expect(h.exchangeReady).not.toHaveBeenCalled();
+      // The mint this call waits for skips the first-mint jitter.
+      expect(h.skipJitter).toHaveBeenCalledTimes(1);
+    });
+
+    it('in sts asks no jitter skip for a held token or a route that never waits', async () => {
+      const h = harness('kilocode-app', WEB_SCOPES);
+      h.flag.value = 'sts';
+      h.read.mockResolvedValue(TOKEN);
+      const held = h.auth.headers(decideCall);
+      expect(await settledAt(held, 1)).toBe(true);
+      await expect(held).resolves.toMatchObject({ authorization: `Bearer ${TOKEN}` });
+      h.read.mockReturnValue(Promise.withResolvers<string>().promise);
+      const noWait = h.auth.headers(call('bouncer:usage.write', false));
+      expect(await settledAt(noWait, 1)).toBe(true);
+      expect(h.skipJitter).not.toHaveBeenCalled();
     });
 
     it('in sts still ends a cold wait at the budget', async () => {
@@ -745,6 +765,7 @@ describe('createBouncerAuth', () => {
       h.loadTransport.mockResolvedValue({
         read: async (target, ctx) => await tokens.get(target, ctx),
         exchangeReady: async () => true,
+        skipJitter: () => {},
       });
       const minted = () => transport.mock.calls.flatMap(([request]) => request.tokens);
       return { h, transport, minted };

@@ -1065,6 +1065,7 @@ describe('a decide whose STS mint hangs', () => {
       loadTransport: async () => ({
         read: async () => await Promise.withResolvers<string>().promise,
         exchangeReady: async () => true,
+        skipJitter: () => {},
       }),
       waitUntil: () => undefined,
       log: () => undefined,

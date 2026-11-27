@@ -1,6 +1,7 @@
 import { createExecutionContext, runInDurableObject } from 'cloudflare:test';
 import { signerOfTokenKid, UTS_ENDPOINTS, UTS_SIGNER_COUNT } from '@kilocode/uts-contracts';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { getSignerStub, KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
 import { handleRequest } from '../../src/http';
 import { SIGNER_KEYS_COPY_MS, signerKeysRead } from '../../src/signer-keys';
@@ -39,6 +40,25 @@ async function answerAt(at: number) {
 }
 
 describe('SignerKeys entrypoint reads', () => {
+  it('answers a feed Worker that sends no request, as the previous release does, with signer keys only', async () => {
+    // The previous feed Worker parses the answer as a strict object of `signers` alone, so an
+    // answer that names `feeds` would fail there during a deploy or after its rollback.
+    const PreviousReleaseRead = z.strictObject({
+      status: z.literal('answered'),
+      answer: z.strictObject({ signers: z.array(z.unknown()) }),
+    });
+    const result: unknown = await env.FEED_MINT.signerKeys();
+    const previous = PreviousReleaseRead.safeParse(result);
+    if (typeof result === 'object' && result !== null && Symbol.dispose in result) {
+      const dispose = result[Symbol.dispose];
+      if (typeof dispose === 'function') dispose.call(result);
+    }
+    expect(previous.success).toBe(true);
+    const asked = await readSignerKeys(env.FEED_MINT, { feeds: true });
+    if (asked.status !== 'answered') throw new Error(`answered ${asked.status}`);
+    expect(asked.answer.feeds).toHaveLength(2);
+  });
+
   it('answers the feed caller with every signer exactly once, each read now', async () => {
     const before = Date.now();
     const answer = await feedAnswer();
@@ -68,7 +88,9 @@ describe('SignerKeys entrypoint reads', () => {
     const reads = await Promise.all(
       Array.from({ length: 200 }, async (_, isolate) => ({
         shard: isolate % KEY_SET_SHARD_COUNT,
-        read: await signerKeysRead(env, config, FEED_PROPS, isolate % KEY_SET_SHARD_COUNT),
+        read: await signerKeysRead(env, config, FEED_PROPS, isolate % KEY_SET_SHARD_COUNT, {
+          feeds: true,
+        }),
       }))
     );
     const elapsed = Date.now() - started;
@@ -116,7 +138,9 @@ describe('SignerKeys entrypoint reads', () => {
       environment: 'staging' as const,
       endpoints: UTS_ENDPOINTS.staging,
     };
-    expect(await signerKeysRead(env, staging, { caller: 'uts-feed-staging' }, 0)).toEqual({
+    expect(
+      await signerKeysRead(env, staging, { caller: 'uts-feed-staging' }, 0, { feeds: true })
+    ).toEqual({
       status: 'misconfigured',
     });
   });

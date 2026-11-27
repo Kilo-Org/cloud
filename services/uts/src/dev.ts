@@ -55,12 +55,17 @@ export const DEV_FEED_STOP_PATH = '/__dev/feed/stop';
 export const DEV_MAIL_PATH = '/__dev/mail';
 
 /**
- * `POST /__dev/tickets/redeem` with `{ ticket, audience }` redeems as the development redeemer
- * `uts-ticket-test`, as its `TicketRedeemer` binding would, for the local end-to-end run, which
- * cannot hold a service binding.
+ * `POST /__dev/tickets/redeem` with `{ ticket, audience, purpose, resource }` redeems as the
+ * development redeemer `uts-ticket-test`, as its `TicketRedeemer` binding would, for the local
+ * end-to-end run, which cannot hold a service binding.
  */
 export const DEV_TICKET_REDEEM_PATH = '/__dev/tickets/redeem';
-const DevRedeemSchema = z.strictObject({ ticket: z.unknown(), audience: z.unknown() });
+const DevRedeemSchema = z.strictObject({
+  ticket: z.unknown(),
+  audience: z.unknown(),
+  purpose: z.unknown(),
+  resource: z.unknown(),
+});
 
 async function handleDevTicketRedeem(
   request: Request,
@@ -77,7 +82,9 @@ async function handleDevTicketRedeem(
     { config, tickets: ticketAccess(binding.connectionString, ctx) },
     'uts-ticket-test',
     body.data.ticket,
-    body.data.audience
+    body.data.audience,
+    body.data.purpose,
+    body.data.resource
   );
   return jsonResponse(result, result.status === 'redeemed' ? 200 : 400);
 }

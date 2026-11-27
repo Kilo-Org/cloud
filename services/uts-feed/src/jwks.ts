@@ -116,7 +116,7 @@ function disposeResult(result: unknown): void {
 async function readFromMint(mint: SignerKeysBinding): Promise<MintRead> {
   // Created in an async callback, so a binding that throws as it is called becomes a rejection
   // that the catch below answers.
-  const call = Promise.try(async () => await mint.signerKeys());
+  const call = Promise.try(async () => await mint.signerKeys({ feeds: true }));
   const guard = Promise.withResolvers<typeof GUARD_EXPIRED>();
   const timer = setTimeout(() => guard.resolve(GUARD_EXPIRED), KEY_SET_READ_GUARD_MS);
   // The call's result is unknown until validated, so it also covers the guard's symbol.

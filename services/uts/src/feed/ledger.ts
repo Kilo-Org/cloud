@@ -67,6 +67,15 @@ type Backfill = { status: 'idle' } | { status: 'reading'; startedAt: number };
 type OldList = { list: SerializedList; replacedAt: number; bytes: number };
 
 /**
+ * The list the object vouches for under one head date (`iat`, whole seconds). Once a head of that
+ * date has gone out, no other list is signed under it: a verifier that holds a head refuses one of
+ * the same date over another list (`packages/verify`, `adopt`), so a second list would only be
+ * refused until a later date. A list that changes under a claimed date waits for the next good
+ * backfill that starts in a later second.
+ */
+type Claim = { issuedAt: number; list: SerializedList };
+
+/**
  * One feed object's entries, lists and head, as plain data (design 5.6). The object holds no entry
  * in storage: the identity store is the record, and a new ledger signs no head before its first
  * good backfill.
@@ -76,14 +85,16 @@ type OldList = { list: SerializedList; replacedAt: number; bytes: number };
  * that backfill read every entry committed before it started. So `iat` advances only with a good
  * backfill, a verifier's head-age limit measures how current the list is, and a verifier that
  * moves to the other object's head (whose `iat` is not older) loses no entry committed before it.
- * Entries a publish adds after that point are in the list too; the head is signed again for each
- * new list or backfill.
+ * Entries a publish adds after that point are in the list too. Under one date the object signs
+ * one list only (`Claim`); a list that changes after a head of that date went out gets its head
+ * from the next good backfill that starts in a later second.
  */
 export class FeedLedger {
   readonly #entries: FeedEntries = new Map();
   #list: SerializedList = serializeList([]);
   #oldLists: OldList[] = [];
   #head: SignedHead | null = null;
+  #claim: Claim | null = null;
   #backfill: Backfill = { status: 'idle' };
   /** When the last good backfill started; null until one succeeds. */
   #lastGoodBackfillAt: number | null = null;
@@ -157,11 +168,27 @@ export class FeedLedger {
     }
   }
 
-  /** The list with this hash: the current one or one replaced in the last 30 seconds. */
+  /**
+   * When a backfill should start so that the current list gets a head: the start of the second
+   * after the claimed head date, when the list changed since a head of that date went out; null
+   * when the current list has its head or none is claimed. The object moves its alarm to this time,
+   * so a published entry reaches a head in about a second instead of at the next 5-second run.
+   */
+  backfillWantedAt(now: number): number | null {
+    const claim = this.#claim;
+    if (claim === null || claim.list.hash === this.#list.hash) return null;
+    return Math.max(now, (claim.issuedAt + 1) * 1000);
+  }
+
+  /**
+   * The list with this hash: the current one, the one the held head date vouches for, or one
+   * replaced in the last 30 seconds.
+   */
   list(listHash: unknown, now: number): SerializedList | null {
     const hash = FeedListHashSchema.safeParse(listHash);
     if (!hash.success) return null;
     if (this.#list.hash === hash.data) return this.#list;
+    if (this.#claim?.list.hash === hash.data) return this.#claim.list;
     const old = this.#oldLists.find(
       held => held.list.hash === hash.data && now - held.replacedAt < FEED_LIST_KEEP_MS
     );
@@ -169,27 +196,30 @@ export class FeedLedger {
   }
 
   /**
-   * The head for the current list as of the last good backfill: the held one while it names both,
-   * otherwise a new one. A head signed for a list or backfill that changed while it was signed is
-   * returned to its caller (it was true when signed) but not kept.
+   * The head as of the last good backfill: for the list claimed under that backfill's date, which
+   * the first head of the date claims before it is signed (one admission check before the await,
+   * so two concurrent calls never sign two lists under one date). The held head is reused while it
+   * names that list and date. A list that changed after the claim keeps the claimed head until a
+   * backfill dates a new one (`backfillWantedAt`).
    */
   async head(signer: HeadSigner, now: number): Promise<HeadAnswer> {
     if (!this.vouches(now) || this.#lastGoodBackfillAt === null) return { status: 'refused' };
     const issuedAt = Math.floor(this.#lastGoodBackfillAt / 1000);
-    const listHash = this.#list.hash;
+    if (this.#claim === null || this.#claim.issuedAt < issuedAt) {
+      this.#claim = { issuedAt, list: this.#list };
+    }
+    const { list } = this.#claim;
     const held = this.#head;
-    if (held !== null && held.listHash === listHash && held.issuedAt === issuedAt) {
+    if (held !== null && held.listHash === list.hash && held.issuedAt === issuedAt) {
       return { status: 'signed', head: held };
     }
     const compact = await signFeedHead(signer.signingKey, signer.kid, {
       iat: issuedAt,
-      list_hash: listHash,
+      list_hash: list.hash,
     });
-    const signed: SignedHead = { compact, listHash, issuedAt };
+    const signed: SignedHead = { compact, listHash: list.hash, issuedAt };
     const latest = this.#head;
-    if (listHash === this.#list.hash && (latest === null || latest.issuedAt <= issuedAt)) {
-      this.#head = signed;
-    }
+    if (latest === null || latest.issuedAt <= issuedAt) this.#head = signed;
     return { status: 'signed', head: signed };
   }
 

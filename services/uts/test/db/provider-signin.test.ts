@@ -754,6 +754,31 @@ describe('email sign-in', () => {
     expect(await follow(linkOnly.link)).toMatchObject({ outcome: 'signed_in' });
   });
 
+  it('sends at most 5 link-only emails an hour while codes are stopped, and never caps the code emails (migration 0020)', async () => {
+    const email = address();
+    const sent = [];
+    for (let request = 0; request < 11; request += 1) sent.push((await sendEmail(email)).result);
+    expect(
+      sent.map(result => {
+        if (result.outcome !== 'stored') return result.outcome;
+        return result.withCode ? 'code' : 'link';
+      })
+    ).toEqual([...Array(5).fill('code'), ...Array(5).fill('link'), 'send_limited']);
+    const rows = await owner.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM uts.email_codes WHERE email_hash = $1',
+      [keyed('kilo-uts-email', email)]
+    );
+    expect(rows.rows).toEqual([{ count: 10 }]);
+    // Once the hour and the stop are over, emails carry codes again.
+    await owner.query(
+      `UPDATE uts.email_code_limits SET hour_started_at = now() - interval '61 minutes',
+         day_started_at = now() - interval '61 minutes', stopped_until = now() - interval '1 minute'
+       WHERE email_hash = $1`,
+      [keyed('kilo-uts-email', email)]
+    );
+    expect((await sendEmail(email)).result).toMatchObject({ outcome: 'stored', withCode: true });
+  });
+
   it('stops codes after 20 wrong entries in a day', async () => {
     const email = address();
     for (let round = 0; round < 4; round += 1) {
@@ -885,5 +910,113 @@ describe('privileges and maintenance', () => {
       sha256(flow.state),
     ]);
     expect(left.rowCount).toBe(0);
+  });
+});
+
+describe('required inputs (migration 0020)', () => {
+  it('refuse a callback without the binder instead of skipping the binder check', async () => {
+    const { flow } = await startFlow('github');
+    const email = address();
+    const values = [
+      environment,
+      sha256(flow.state),
+      null,
+      'github',
+      randomUUID(),
+      email,
+      true,
+      null,
+      sha256(token()),
+      network.userAgent,
+      network.clientIp,
+      network.asn,
+      network.country,
+      network.city,
+      newAccountId(),
+    ];
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+             $12, $13, $14, $15)`,
+          values
+        )
+      )
+    ).toBe('22004');
+    const stored = await owner.query('SELECT status FROM uts.sign_in_flows WHERE state_hash = $1', [
+      sha256(flow.state),
+    ]);
+    expect(stored.rows).toEqual([{ status: 'issued' }]);
+    expect(
+      await owner.query('SELECT 1 FROM uts.accounts WHERE primary_email = $1', [email])
+    ).toMatchObject({ rowCount: 0 });
+  });
+
+  it('refuse a link opened in another browser without the confirmation answer instead of signing in', async () => {
+    const email = address();
+    const link = token();
+    const started = await store.startEmail({
+      email,
+      emailHash: keyed('kilo-uts-email', email),
+      linkHash: sha256(link),
+      codeHash: keyed('kilo-uts-email-code', `${email}:123456`),
+      binderHash: sha256(token()),
+      returnTo: '/signin/done',
+    });
+    expect(started.outcome).toBe('stored');
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          'SELECT * FROM uts.complete_email_link($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+          [
+            environment,
+            sha256(link),
+            null,
+            null,
+            sha256(token()),
+            network.userAgent,
+            network.clientIp,
+            network.asn,
+            network.country,
+            network.city,
+            newAccountId(),
+          ]
+        )
+      )
+    ).toBe('22004');
+    expect(await store.readEmailLink(sha256(link))).not.toBeNull();
+  });
+});
+
+describe('linking with a tier A pass the session opened (migration 0020)', () => {
+  it('adds the method with a pass from uts.open_browser_tier_a_gate_pass and consumes it', async () => {
+    const accountId = await insertAccount(owner);
+    const session = await browserSession(accountId);
+    const [email, code] = [randomBytes(32), randomBytes(32)];
+    await owner.query(
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, address)
+       VALUES ('tier_a', $1, $2, $3, now() + interval '10 minutes', 'current')`,
+      [email, accountId, code]
+    );
+    const opened = await app.query<{ outcome: string; gate_pass_id: string }>(
+      'SELECT outcome, gate_pass_id FROM uts.open_browser_tier_a_gate_pass($1, $2, $3, $4, $5, NULL, NULL)',
+      [environment, sha256(session.token), 'method_add', email, code]
+    );
+    expect(opened.rows[0].outcome).toBe('opened');
+    const gatePassId = opened.rows[0].gate_pass_id;
+    const { flow, result } = await startFlow('gitlab', {
+      intent: { kind: 'link', sessionTokenHash: sha256(session.token), gatePassId },
+      returnTo: '/signin/done',
+    });
+    expect(result.outcome).toBe('started');
+    const linked = await complete(flow, { email: address(), emailProven: false });
+    expect(linked.result).toEqual({ outcome: 'linked', returnTo: '/signin/done' });
+    const methods = await owner.query(
+      `SELECT method.provider, pass.status FROM uts.sign_in_methods AS method
+       JOIN uts.gate_passes AS pass ON pass.id = method.gate_pass_id
+       WHERE method.account_id = $1`,
+      [accountId]
+    );
+    expect(methods.rows).toEqual([{ provider: 'gitlab', status: 'consumed' }]);
   });
 });

@@ -7,6 +7,8 @@ import {
   type NoticeDeps,
   deliverClaimed,
   dispatchNotice,
+  NOTICE_SWEEP_LIMIT,
+  NOTICE_SWEEP_ROUNDS,
   sweepNotices,
 } from '../../src/notices/dispatch';
 import {
@@ -365,6 +367,58 @@ describe('notice delivery', () => {
     });
   });
 
+  it('claims again while each claim comes back full, at most NOTICE_SWEEP_ROUNDS times a pass', async () => {
+    const full = Array.from({ length: NOTICE_SWEEP_LIMIT }, (_, index) =>
+      claimed('sessions_revoked', { noticeId: `n${index}` })
+    );
+    const limits: number[] = [];
+    const store: NoticeStore = {
+      ...memoryStore(full).store,
+      claimDueNotices: async limit => {
+        limits.push(limit);
+        return full;
+      },
+    };
+    const result = await sweepNotices(deps(store, ALWAYS_SENT, []));
+    expect(limits).toEqual(Array.from({ length: NOTICE_SWEEP_ROUNDS }, () => NOTICE_SWEEP_LIMIT));
+    expect(result.claimed).toBe(NOTICE_SWEEP_LIMIT * NOTICE_SWEEP_ROUNDS);
+  });
+
+  it('stops claiming after a short claim, and starts no round past the pass deadline', async () => {
+    const short = [claimed('sessions_revoked')];
+    let claims = 0;
+    const shortStore: NoticeStore = {
+      ...memoryStore(short).store,
+      claimDueNotices: async () => {
+        claims += 1;
+        return short;
+      },
+    };
+    await sweepNotices(deps(shortStore, ALWAYS_SENT, []));
+    expect(claims).toBe(1);
+
+    const full = Array.from({ length: NOTICE_SWEEP_LIMIT }, (_, index) =>
+      claimed('sessions_revoked', { noticeId: `n${index}` })
+    );
+    claims = 0;
+    const slowStore: NoticeStore = {
+      ...memoryStore(full).store,
+      claimDueNotices: async () => {
+        claims += 1;
+        return full;
+      },
+    };
+    let clock = CREATED_AT.getTime();
+    await sweepNotices({
+      notices: work => work(slowStore),
+      transports: fakeTransports(ALWAYS_SENT, []),
+      // Each reading of the clock moves it a second: one round of 20 notices reads it at least 40
+      // times (one attempt time per channel), so the first round ends past the deadline.
+      now: () => new Date((clock += 1_000)),
+    });
+    expect(claims).toBe(1);
+  });
+
   it('logs a failed retention step without failing the pass', async () => {
     const store: NoticeStore = {
       ...memoryStore([]).store,
@@ -488,41 +542,58 @@ describe('push through the notifications Worker', () => {
     ]);
   });
 
-  it('takes a thrown refusal, such as a wrong caller, as a permanent failure', async () => {
+  it('takes a thrown call as a retryable failure: the binding cannot tell a refusal from a network fault', async () => {
     const push = notificationsServicePush({
       dispatchSecurityNotice: async () => {
-        throw new Error('caller not allowed');
+        throw new Error('network connection lost');
       },
     });
-    expect(await push(message)).toBe('permanent_failure');
+    expect(await push(message)).toBe('retryable_failure');
   });
 
-  it('still emails, and does not retry push, when the receiver refuses', async () => {
-    for (const refuse of [
-      async () => {
-        throw new Error('caller not allowed');
-      },
-      async () => ({ kind: 'refused', error: 'invalid_payload' }),
-    ]) {
-      const outbox: RecordedMessage[] = [];
-      const { store, finished } = memoryStore([]);
-      const result = await deliverClaimed(
-        {
-          notices: work => work(store),
-          transports: {
-            push: notificationsServicePush({ dispatchSecurityNotice: refuse }),
-            email: fakeTransports(ALWAYS_SENT, outbox).email,
-          },
-          now: () => CREATED_AT,
+  it('retries a push-only notice whose push call threw', async () => {
+    const { store, finished } = memoryStore([], { outcome: 'finished', delivery: 'pending' });
+    await deliverClaimed(
+      {
+        notices: work => work(store),
+        transports: {
+          push: notificationsServicePush({
+            dispatchSecurityNotice: async () => {
+              throw new Error('network connection lost');
+            },
+          }),
+          email: fakeTransports(ALWAYS_SENT, []).email,
         },
-        claimed('new_device_network')
-      );
-      expect(finished[0].attempts.map(attempt => [attempt.channel, attempt.outcome])).toEqual([
-        ['push', 'permanent_failure'],
-        ['email', 'sent'],
-      ]);
-      expect(outbox.map(entry => entry.channel)).toEqual(['email']);
-      expect(result.finish).toEqual({ outcome: 'finished', delivery: 'delivered' });
-    }
+        now: () => CREATED_AT,
+      },
+      claimed('sign_in_code_stopped')
+    );
+    expect(finished[0].attempts.map(attempt => [attempt.channel, attempt.outcome])).toEqual([
+      ['push', 'retryable_failure'],
+    ]);
+  });
+
+  it('still emails, and does not retry push, when the receiver answers a refusal', async () => {
+    const outbox: RecordedMessage[] = [];
+    const { store, finished } = memoryStore([]);
+    const result = await deliverClaimed(
+      {
+        notices: work => work(store),
+        transports: {
+          push: notificationsServicePush({
+            dispatchSecurityNotice: async () => ({ kind: 'refused', error: 'invalid_payload' }),
+          }),
+          email: fakeTransports(ALWAYS_SENT, outbox).email,
+        },
+        now: () => CREATED_AT,
+      },
+      claimed('new_device_network')
+    );
+    expect(finished[0].attempts.map(attempt => [attempt.channel, attempt.outcome])).toEqual([
+      ['push', 'permanent_failure'],
+      ['email', 'sent'],
+    ]);
+    expect(outbox.map(entry => entry.channel)).toEqual(['email']);
+    expect(result.finish).toEqual({ outcome: 'finished', delivery: 'delivered' });
   });
 });

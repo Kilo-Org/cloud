@@ -74,6 +74,36 @@ describe('audit relay objects', () => {
     expect(await other.ensureStarted()).toBe(false);
   });
 
+  it('keep relaying when an alarm wakes them by an id that carries no name', async () => {
+    const named = getAuditRelayStub(env, config, 3);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await runInDurableObject(named, async (_instance, state) => {
+        await state.storage.deleteAlarm();
+        await state.storage.deleteAll();
+      });
+      await runInDurableObject(named, (_instance, state) => state.abort('test restart')).catch(
+        () => undefined
+      );
+      // An alarm after an eviction or a deploy starts the object from its id alone, as a raw id
+      // does: the id names no object name.
+      const raw = env.UTS_AUDIT_RELAY_DO.get(
+        env.UTS_AUDIT_RELAY_DO.idFromString(named.id.toString())
+      );
+      const alarm = await runInDurableObject(raw, async (instance: UtsAuditRelayDO, state) => {
+        expect(state.id.name).toBeUndefined();
+        await instance.alarm();
+        return await state.storage.getAlarm();
+      });
+      expect(alarm).toBeGreaterThan(Date.now());
+      const lines = errors.mock.calls.map(([line]) => String(line));
+      expect(lines.filter(line => line.includes('uts.audit_relay.refused'))).toEqual([]);
+      expect(lines.some(line => line.startsWith('{"event":"uts.audit_relay.failed"'))).toBe(true);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
   it('back off after each failed run, doubling to the cap, across a restart before every run', async () => {
     // The test pool has no identity store (its Hyperdrive binding names a closed port), so every
     // run fails before it reads; an unknown failure counts as retryable.

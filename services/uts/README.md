@@ -22,7 +22,9 @@ The issuer, key set URL and local ports of each environment live in
   (`src/signin/`), the device grant (`src/signin/device/`) and ticket minting (`src/tickets/`) run
   in this fetch handler. Staging and production bind no identity store yet, so they serve none of
   them. Tickets are redeemed only through the `TicketRedeemer` entrypoint, by a caller listed in
-  `TICKET_REDEEMERS` (empty in staging and production).
+  `TICKET_REDEEMERS` (empty in staging and production). The caller names the audience, the
+  purpose and the resource (or none) it opens, and only a ticket minted for all three redeems; a
+  mismatch leaves the ticket usable (migration 0020).
 - The mobile app (`kilo-mobile`) needs device attestation (design 5.5), which UTS does not verify
   yet, so the authorization endpoint serves it in development only.
 - Placement runs the fetch handler next to the identity store's primary in Frankfurt:
@@ -151,8 +153,11 @@ statement (`uts.feed_entries_of_statement()`, migration 0006; one index probe, s
 issued path). After the commit the Worker writes them to both feed objects in parallel
 (`src/revocation/publish.ts`) and goes on once one confirms; each write ends within 2 seconds.
 `/revoke`, the account API's revokes and the `/internal/` routes answer 503 when neither confirms
-(the revocation stands, the backfill adds it, and the retry finds it revoked); the reuse paths
-answer as before. A failed publish logs kinds and counts, never ids.
+(the revocation stands, and the backfill adds it); the reuse paths answer as before. A retried
+`/revoke` or account API revoke finds the credential revoked and gets its feed entry back while
+the entry lives (`uts.live_feed_entries`, `uts.live_feed_entries_of_refresh_token`, migration
+0019), so it answers success only once a feed object confirmed the entry. A failed publish logs
+kinds and counts, never ids.
 
 The two feed objects (`src/feed/UtsFeedDO.ts`) are named `<environment>:feed:<0|1>`, in the `eu`
 jurisdiction, feed 0 with the `weur` hint and feed 1 with `eeur`; only this Worker binds them, so
@@ -161,12 +166,17 @@ only it writes entries. Each one:
 - keeps its entries in memory only (`src/feed/ledger.ts`); the identity store is the record;
 - every 5 seconds (alarm) reads, as the app login, the entries revoked in the last 20 minutes,
   or every live entry after a restart or a gap over 15 minutes (`src/revocation/store.ts`), drops
-  expired entries, and rotates its feed key;
+  expired entries, and rotates its feed key. While the environment binds no identity store the
+  alarm runs hourly and only rotates the key; loading moves such an alarm back to now once the
+  store is bound;
 - signs a head (`typ: kilo-feed-head+jwt`, `{iat, list_hash}`) with its own Ed25519 key, kept in
   its KV storage with the signer's 30-day rotation and published next key (`uts-feed-<n>-<thumbprint>`).
   `iat` is the start of its last good backfill, so every revocation committed before it is in the
-  list; a new head is signed for each new list or backfill, and none once that backfill is 30
-  seconds old or the object holds more than 50,000 entries. A backfill is given up after 10
+  list. It signs one list per `iat`: a verifier that holds a head refuses another list under the
+  same `iat`, so a publish that changes the list after a head of that `iat` went out keeps that
+  head and moves the next backfill to the start of the next second, whose head names the new list.
+  None is signed once that backfill is 30 seconds old or the object holds more than 50,000
+  entries. A backfill is given up after 10
   seconds (5 for the connect); expired entries leave the list at most once a minute;
 - serves its current list, and each list it replaced in the last 30 seconds (at most 16 MB of old
   list text, the oldest dropped first), by hash;
@@ -421,7 +431,9 @@ statements. The run serves the metadata document and the fake STS key set itself
 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a
 `sid` (`src/account/bearer.ts`): `EdDSA` under a `uts-token-` key that the isolate's key-set shard
-holds (one Durable Object call per request), `typ` `at+jwt`, the issuer, 60 seconds of skew and
+holds, read through an isolate copy of the key list (one Durable Object call per isolate per 10
+seconds, or per 2 seconds while tokens name a kid the copy lacks, so a flood of forged tokens costs
+no call each), `typ` `at+jwt`, the issuer, 60 seconds of skew and
 the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
 only). A PAT names no session, so it is refused there. Each action is one statement that reads the
 grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
@@ -458,14 +470,14 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
 
 | Route | Scope | Behaviour | SQL |
 |---|---|---|---|
-| `POST /account/pats` | `uts:pats.manage` | Tier B gate (a sign-in within 10 minutes, or a passkey step-up of the same session); the scope must be registered and PAT-eligible; 90 days unless `expires_in_days` (1 to 365) says otherwise; at most 100 live PATs per account; the PAT appears once in the answer. A gate refusal answers 401 with the RFC 9470 challenge (`insufficient_user_authentication`, `max_age="600"`) | `uts.create_pat` |
+| `POST /account/pats` | `uts:pats.manage` | Tier B gate (a sign-in within 10 minutes, or a passkey step-up of the same session); the scope must be registered and PAT-eligible; 90 days unless `expires_in_days` (1 to 365) says otherwise; at most 100 live PATs per account, and at most 20 created per account in any hour (429 with `Retry-After`); the PAT appears once in the answer. A gate refusal answers 401 with the RFC 9470 challenge (`insufficient_user_authentication`, `max_age="600"`) | `uts.create_pat` |
 | `GET /account/pats` | `uts:pats.manage` | The live PATs, newest first, with the last four characters | `uts.list_pats` |
-| `DELETE /account/pats/<id>` | `uts:pats.manage` | Revokes; writes a 15-minute feed entry; 204 also when already revoked | `uts.revoke_pat` |
-| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization (a key flagged within 7 days counts) | `uts.create_bot_key` |
+| `DELETE /account/pats/<id>` | `uts:pats.manage` | Revokes; writes a 15-minute feed entry; 204 also when already revoked, once a feed object took the entry | `uts.revoke_pat` |
+| `POST /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | An owner or admin of the organization; tier B gate; at most 100 live keys per organization (a key flagged within 7 days counts), and at most 20 created per organization in any hour (429) | `uts.create_bot_key` |
 | `GET /account/orgs/<org>/bot-keys` | `uts:bot-keys.manage` | The live keys; a flagged key shows when it stops | `uts.list_bot_keys` |
 | `DELETE /account/orgs/<org>/bot-keys/<id>` | `uts:bot-keys.manage` | Revokes; 15-minute feed entry | `uts.revoke_bot_key` |
 | `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff; tier B gate, since keeping restores long-lived access | `uts.keep_bot_key` |
-| `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per address per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
+| `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per client (an IPv4 address or an IPv6 /64) per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
 
 - A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
   notice and the audit row in one statement. The push and email notice goes through the
@@ -493,12 +505,20 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   the primary address (`current`) or the new one (`new`), and each code counts only in its own
   role. The service that sends a `current` code, and the caller of the gate, hash the account's
   primary address itself, never an address from the request.
+- `uts.open_browser_tier_a_gate_pass` (migration 0020) opens the same tier A pass for the browser
+  session a cookie names, with the same checks on that session's sign-in; passkey registration and
+  an in-session method link consume a pass of their own browser session, which
+  `uts.open_tier_a_gate_pass` (a grant's device session) cannot open. No route opens a pass or
+  sends a tier A code yet: both wait for the account pages and the mail sender.
 - `PatLookup` (`src/pat/entrypoint.ts`) is the lookup port of `@kilocode/verify` for Worker
   verifiers: the lowercase-hex SHA-256 in, `found`, `not_found`, `rate_limited` or `unavailable`
   out (`UtsPatLookupResultSchema`). It answers only callers its environment lists
   (`PAT_LOOKUP_CALLERS`), runs at most min(100, 3 × `PAT_LOOKUP_CONNECTIONS`) lookups at once per
-  isolate (see "Deploys"), and sends one statement through the PAT config. The probe route uses the
-  same cap.
+  isolate (see "Deploys"), and sends one statement through the PAT config. A lookup that has not
+  answered in 5 seconds, connecting included, answers `unavailable` (`pg`'s connect timeout cannot
+  end a hung connect on a Workers socket), and a lookup's slot lapses after 10 seconds even if its
+  promise never settles, as when Workers cancels a request whose client went away. The probe route
+  uses the same cap.
 - The scope registry is `UTS_SCOPE_REGISTRY` in `@kilocode/uts-contracts`; `test/repo` checks every
   entry against the rules of design 5.3 (no PAT carries a privileged, step-up, staff,
   credential-changing or session-bound scope; a privileged scope needs a step-up and lives at most
@@ -634,7 +654,10 @@ earlier pending code (their links keep working). The fifth wrong code entry exha
 keeps working, so wrong entries by someone else cannot lock the owner out. At most 5 codes per
 address per hour; past that cap codes stop for 1 hour. The 20th wrong entry in a day stops codes
 until that day window ends, exhausts every pending code, and gives the account a notice; while
-codes are stopped every code entry is refused (`codes_stopped`). The link page names the address
+codes are stopped every code entry is refused (`codes_stopped`). While codes are stopped an email
+carries only its link, and at most 5 such link-only emails go to an address in its hour
+(`send_limited`, 429, nothing stored or sent; migration 0020), so an address gets at most 10
+sign-in emails an hour; the code emails are never capped by it. The link page names the address
 (`p…@example.com`). The email start sets a binder cookie, like a flow's; a link opened in a browser
 without it says so and signs in only after a second confirmation, so a link someone else asked
 for cannot sign the reader into that person's account in one click. The address and the code are
@@ -740,10 +763,11 @@ identity-store connection is not held while a provider answers:
    reads only the account's pending notices of the last hour.
 2. Send push, then email, skipping the channels an earlier round settled. Each answers `sent`,
    `no_target`, `not_configured`, `retryable_failure` or `permanent_failure`; a provider that does
-   not answer within 10 seconds is a retryable failure. The push receiver refuses a wrong caller or
-   an invalid payload by throwing or by an answer outside its outcome union: that is a permanent
-   failure of push for the notice, logged as `uts.notice.push_refused` and never retried, and email
-   still goes out.
+   not answer within 10 seconds is a retryable failure. A push receiver answer outside its outcome
+   union is a permanent failure of push for the notice, logged as `uts.notice.push_refused` and
+   never retried, and email still goes out. A push call that throws is retried like a timeout
+   (also logged as `uts.notice.push_refused`): a binding throws for a network or deploy fault as
+   well as for a refusal, so a push-only notice is not given up after one fault.
 3. Finish (`uts.finish_notice`) with the round's attempts, one `uts.notice_attempts` row each. The
    notice is `pending` again (1 minute after round 1, 5 after round 2) while a planned channel only
    failed retryably, else `delivered` when a channel sent it, else `failed`. A finish under a claim
@@ -753,8 +777,10 @@ A notice is tried in at most 3 rounds and for 24 hours; the in-app row stays wha
 Each background pass first settles up to 500 notices past those limits (delivered when an earlier
 attempt sent them, else failed), without sending them. The account API's `CredentialNotices` port
 (`src/notices/credential.ts`) claims the `credential_created` notice that the create statement
-wrote and delivers it at once; `sweepNotices` (at most 20 notices per pass) delivers every other
-due notice and the retries, then runs one retention step (`uts.maintain_notice_rows`, at most 500
+wrote and delivers it at once; `sweepNotices` delivers every other due notice and the retries:
+it claims 20 at a time, oldest first, and claims again while a claim comes back full, at most 5
+times and never 30 seconds after the pass began (up to 100 a minute), so a burst drains instead of
+waiting past the 24-hour limit. Then it runs one retention step (`uts.maintain_notice_rows`, at most 500
 rows of each kind): known devices and networks unseen for 90 days, and finished notices with
 their attempts 400 days after they were written.
 
@@ -994,9 +1020,12 @@ Both Workers deploy through `.github/workflows/deploy-workers.yml`, which discov
 change, as on the first deploy of an environment, detection takes them out of the parallel matrix:
 the `deploy-uts` job deploys `services/uts`, and `deploy-uts-feed-after-uts` deploys
 `services/uts-feed` only after it succeeds (`scripts/deployment-workflows.test.mjs` checks the
-order). A change to only one of them deploys in the matrix. The signer-keys answer carries the feed
-objects' keys in an optional `feeds` field for one release, so either Worker can deploy or roll back
-alone. Every grant statement calls `uts.feed_entries_of_statement()`, so apply migration 0006 to an
+order). A change to only one of them deploys in the matrix. The feed Worker asks for the feed
+objects' keys (`signerKeys({ feeds: true })`), and the mint Worker adds the `feeds` field only
+then: the feed Worker of the release before feed objects asks with no request and parses the answer
+strictly, so it keeps serving signer keys during the deploy window and after a rollback of either
+Worker. The answer schema drops top-level fields it does not name, so a later field needs no such
+step. Every grant statement calls `uts.feed_entries_of_statement()`, so apply migration 0006 to an
 environment's identity store before that environment binds `IDENTITY_STORE`; the code exchange,
 third-party refresh and `/revoke` fail until it is applied.
 
@@ -1015,7 +1044,7 @@ start without a valid var; development may leave it out (cap 100).
 | `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
 | `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
-| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset, the device grant is not served. Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
+| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
 
 ## Identity store
 
@@ -1046,7 +1075,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations. Holds the privileges of every UTS login (no SET), so `uts.end_long_transactions()` can end their sessions |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, and passkeys, browser sessions, step-ups, device codes, tickets, WebAuthn challenges, sign-in methods, email codes and wrong user-code counts only through the sign-in functions (migration 0008), keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()`, `uts.maintain_provider_sign_in_rows()` and `uts.end_long_transactions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, and passkeys, browser sessions, step-ups, device codes, tickets, WebAuthn challenges, sign-in methods, email codes and wrong user-code counts only through the sign-in functions (migration 0008), keeping SELECT on them; notices SELECT only, written by the statement of a change and moved only by the notice functions (migration 0020); INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()`, `uts.maintain_provider_sign_in_rows()` and `uts.end_long_transactions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -1086,6 +1115,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
 - Short secrets get a keyed hash (HMAC-SHA-256) under a key that only UTS holds: email codes, email
   addresses in code and limit rows, and RFC 8628 device user codes, which are short enough that a
   plain SHA-256 could be reversed offline.
+- A security guard never compares a caller input with `<>` or `NOT` alone: a NULL makes the guard
+  NULL and skips the refusal. Each SECURITY DEFINER statement refuses a missing required input
+  first (`uts.require_inputs`, SQLSTATE 22004) and compares with `IS DISTINCT FROM`.
 - Each lifecycle has one status enum, and a CHECK constraint ties every status to the columns it
   needs. Lifetimes from design section 5.3 are CHECK constraints too.
 - A gate pass serves one action of its own account once: each table that records a gated action
@@ -1113,7 +1145,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   `uts.org_memberships`; `uts.remove_org_member` (migration 0005) does the former. A removal
   written as one statement, with data-modifying CTEs, keeps the snapshot it took before the wait
   and misses the new credential. An account holds at most 100 live PATs and an organization at
-  most 100 live bot keys, counted behind a lock.
+  most 100 live bot keys, counted behind a lock; behind the same lock an account creates at most 20
+  PATs and an organization gets at most 20 bot keys in any hour (migration 0019), which bounds the
+  feed entries a create-and-revoke loop can add.
 - The app login can still revoke, flag, keep, deny and record use of CI trust policies,
   third-party consents and device codes, through column grants that leave out the holder, the
   hash, the scope, the lifetime and the pass, so an update cannot turn a row into a different
@@ -1131,7 +1165,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
   and tokens, revocations and DPoP proof `jti`s only through the security-definer OAuth functions
   (migration 0004), and PATs, org bot keys and gate passes only through the security-definer
   account functions (migration 0005), which write the credential rows and their audit row
-  together; it keeps SELECT on those tables. It still writes the ungated credential tables directly.
+  together; it keeps SELECT on those tables. Accounts, memberships and the SSO tables it writes not
+  at all since migration 0019: only security-definer functions change them. It still writes the
+  ungated credential tables directly.
   The account-deletion function will be one more such function: in the same statement, before the
   delete, it collects the active bot keys the account created (the keys the delete trigger is about
   to flag) and writes a bot-key-flagged audit row and the org-admin notices for each (design
@@ -1150,7 +1186,10 @@ shard (`id % 8`). Each shard publishes as its own audit stream, `uts:<environmen
 `last_seq` numbers that stream's batches.
 
 The relay (`src/audit/relay.ts`) is one Durable Object per shard (`UtsAuditRelayDO`, named
-`<environment>:audit-relay:<shard>`). Its alarm runs every 5 seconds: it reads up to 500 rows past
+`<environment>:audit-relay:<shard>`). It finds its shard by comparing its id with the id of each
+shard's name, not by `ctx.id.name`, which an alarm after an eviction or a deploy does not carry;
+an object whose id is no shard's in this environment and jurisdiction refuses to run. Its alarm
+runs every 5 seconds: it reads up to 500 rows past
 the watermark, sends them as one gzipped `AuditBatch` to `AUDIT_QUEUE`, the environment's UTS
 audit queue `kilo-audit-uts[-staging|-local]` (halving any batch the encoder refuses, so each
 message stays under 60 KB), and moves the watermark after each message the queue accepted, only

@@ -13,7 +13,14 @@ import { PatLookup } from '../../src/pat/entrypoint';
 import * as deployed from '../../src/index';
 import * as development from '../../src/dev-index';
 import { createSecret, hexOfHash, secretHash } from '../../src/pat/format';
-import { type PatRow, lookupPatHash } from '../../src/pat/lookup';
+import {
+  PAT_LOOKUP_DEADLINE_MS,
+  PAT_LOOKUP_LEASE_MS,
+  type PatRow,
+  identityStorePatLookup,
+  lookupLimiter,
+  lookupPatHash,
+} from '../../src/pat/lookup';
 import { type PatProbeDeps, handlePatProbe } from '../../src/pat/probe';
 import { storeFailure } from './oauth-support';
 import { config, env } from './test-env';
@@ -106,7 +113,7 @@ describe('the PAT lookup', () => {
         PAT_LOOKUP_CONNECTIONS: connections,
       };
       expect(patLookupsInFlight(target)).toBe(cap);
-      const limiter = { inFlight: 0 };
+      const limiter = lookupLimiter();
       const { promise: gate, resolve } = Promise.withResolvers<void>();
       const hash = await hashOf(createSecret('pat'));
       const held = Array.from({ length: cap }, () =>
@@ -120,15 +127,48 @@ describe('the PAT lookup', () => {
           limiter
         )
       );
-      expect(limiter.inFlight).toBe(cap);
+      expect(limiter.leases.size).toBe(cap);
       expect(
         await lookupPatHash(hash, async () => row(), patLookupsInFlight(target), limiter)
       ).toEqual({ status: 'rate_limited', retryAfterSeconds: 1 });
       resolve();
       expect((await Promise.all(held)).every(result => result.status === 'found')).toBe(true);
-      expect(limiter.inFlight).toBe(0);
+      expect(limiter.leases.size).toBe(0);
     }
   );
+
+  it('frees the slot of a lookup that never settles, as when its request is cancelled, after its lease', async () => {
+    // A cancelled request's promises never settle, so its `finally` never runs; a plain counter
+    // would keep the slot for the life of the isolate.
+    const limiter = lookupLimiter();
+    const hash = await hashOf(createSecret('pat'));
+    const now = 1_800_000_000_000;
+    void lookupPatHash(hash, () => new Promise<never>(() => undefined), 1, limiter, now);
+    expect(await lookupPatHash(hash, async () => row(), 1, limiter, now + 1)).toEqual({
+      status: 'rate_limited',
+      retryAfterSeconds: 1,
+    });
+    expect(
+      (await lookupPatHash(hash, async () => row(), 1, limiter, now + PAT_LOOKUP_LEASE_MS)).status
+    ).toBe('found');
+    // The lapsed lease left the books, and the settled lookup gave its own back.
+    expect(limiter.leases.size).toBe(0);
+  });
+
+  it('answers unavailable when a connect hangs, so a lookup ends by its deadline', async () => {
+    // TEST-NET-1 (RFC 5737) routes nowhere, so the connect never completes.
+    const lookup = identityStorePatLookup(
+      'postgres://uts_pat:unused@192.0.2.1:5432/uts',
+      createExecutionContext()
+    );
+    const limiter = lookupLimiter();
+    const started = Date.now();
+    expect(
+      await lookupPatHash(await hashOf(createSecret('pat')), lookup, 1, limiter, started)
+    ).toEqual({ status: 'unavailable', retryAfterSeconds: 2 });
+    expect(Date.now() - started).toBeLessThan(PAT_LOOKUP_DEADLINE_MS + 2000);
+    expect(limiter.leases.size).toBe(0);
+  });
 
   it('refuses to start staging or production without a valid PAT_LOOKUP_CONNECTIONS', () => {
     for (const environment of ['production', 'staging'] as const) {
@@ -289,6 +329,27 @@ describe('the PAT probe route', () => {
       deps
     );
     expect(other.status).toBe(401);
+  });
+
+  it('counts the lookups of one IPv6 /64 together, since one subscriber holds the whole /64', async () => {
+    const pat = createSecret('pat');
+    const deps = probeDeps(async () => ({ status: 'not_found' }));
+    const from = (address: string) =>
+      handlePatProbe(
+        probeRequest({ Authorization: `Bearer ${pat}`, 'CF-Connecting-IP': address }),
+        deps
+      );
+    for (let index = 0; index < LOOKUPS_PER_SECOND_PER_ADDRESS; index += 1) {
+      expect((await from(`2001:db8:1:2::${(index + 1).toString(16)}`)).status).toBe(401);
+    }
+    expect((await from('2001:0db8:0001:0002:ffff:0:0:1')).status).toBe(429);
+    expect((await from('2001:db8:1:3::1')).status).toBe(401);
+    // An IPv4-mapped address counts as its IPv4 address.
+    for (let index = 0; index < LOOKUPS_PER_SECOND_PER_ADDRESS; index += 1) {
+      expect((await from('198.51.100.7')).status).toBe(401);
+    }
+    expect((await from('::ffff:198.51.100.7')).status).toBe(429);
+    expect((await from('not an address')).status).toBe(400);
   });
 
   it('answers 503 with the retry time when the lookup cannot answer', async () => {

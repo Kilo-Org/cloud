@@ -9,7 +9,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { createLocalJWKSet, decodeJwt, jwtVerify } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/env';
 import type {
   ExchangeCodeInput,
@@ -584,6 +584,7 @@ describe('token endpoint: request shape', () => {
       formRequest('/token', { grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
       oauthDeps(fakeGrants().access, {
         device: {
+          status: 'served',
           grant: async () => new Response('hook', { status: 418 }),
           pages: {
             config,
@@ -1307,5 +1308,31 @@ describe('mint Worker wiring', () => {
         'urn:ietf:params:oauth:grant-type:device_code',
       ],
     });
+  });
+
+  it('serves every other route, without the device grant, while the user-code secret is malformed', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const malformed: Env = { ...env, DEVICE_USER_CODE_KEY: 'not a key' };
+      const response = await fetchMint(metadataRequest(), malformed);
+      expect(response.status).toBe(200);
+      const document = await metadata(response);
+      expect(document.device_authorization_endpoint).toBeUndefined();
+      expect(document.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
+      expect(errors.mock.calls).toEqual([]);
+      expect(
+        (
+          await fetchMint(
+            formRequest('/device_authorization', { client_id: 'kilo-cli' }),
+            malformed
+          )
+        ).status
+      ).toBe(404);
+      expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+        { event: 'uts.signin.misconfigured', method: 'device', missing: ['DEVICE_USER_CODE_KEY'] },
+      ]);
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

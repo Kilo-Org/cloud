@@ -124,25 +124,41 @@ export const TICKET_REDEEMERS: Readonly<
 };
 
 /**
- * `refused`: the caller is not a listed redeemer, or the audience is not one of its own; no
- * statement runs. `invalid_ticket`: unknown, used, expired, minted for another audience, or its
- * grant ended; every such ticket answers alike. `unavailable` and `failed`: a store failure that
- * a retry can, or cannot, fix.
+ * `refused`: the caller is not a listed redeemer, the audience is not one of its own, or the
+ * expected purpose or resource is malformed; no statement runs. `invalid_ticket`: unknown, used,
+ * expired, minted for another audience, purpose or resource, or its grant ended; every such ticket
+ * answers alike. `unavailable` and `failed`: a store failure that a retry can, or cannot, fix.
  */
 export type TicketRedeemResult =
   | { status: 'redeemed'; redemption: TicketRedemption }
   | { status: 'refused' | 'invalid_ticket' | 'unavailable' | 'failed' };
 
-/** Redeems `ticket` for `audience` on behalf of the binding caller `caller` (null: no props). */
+/**
+ * Redeems `ticket` for `audience` on behalf of the binding caller `caller` (null: no props). The
+ * caller names the purpose and the resource (null: none) it opens, so a ticket minted for another
+ * stream, terminal or download of the same service redeems nothing and stays usable for its own.
+ */
 export async function redeemTicket(
   deps: TicketDeps,
   caller: string | null,
   ticket: unknown,
-  audience: unknown
+  audience: unknown,
+  purpose: unknown,
+  resource: unknown
 ): Promise<TicketRedeemResult> {
-  const allowed = caller === null ? undefined : TICKET_REDEEMERS[deps.config.environment][caller];
+  const redeemers = TICKET_REDEEMERS[deps.config.environment];
+  // An own property only: a name such as `constructor` is on every object's prototype.
+  const allowed = caller !== null && Object.hasOwn(redeemers, caller) ? redeemers[caller] : null;
   const parsedAudience = UtsAudienceSchema.safeParse(audience);
-  if (allowed === undefined || !parsedAudience.success || !allowed.includes(parsedAudience.data)) {
+  const parsedPurpose = UtsTicketPurposeSchema.safeParse(purpose);
+  const parsedResource = UtsTicketResourceSchema.nullable().safeParse(resource);
+  if (
+    allowed === null ||
+    !parsedAudience.success ||
+    !allowed.includes(parsedAudience.data) ||
+    !parsedPurpose.success ||
+    !parsedResource.success
+  ) {
     console.error(JSON.stringify({ event: 'uts.tickets.redeem_refused', caller }));
     return { status: 'refused' };
   }
@@ -151,7 +167,13 @@ export async function redeemTicket(
   try {
     const ticketHash = await sha256(ticket);
     const result = await deps.tickets(store =>
-      store.redeem(deps.config.environment, ticketHash, parsedAudience.data)
+      store.redeem(
+        deps.config.environment,
+        ticketHash,
+        parsedAudience.data,
+        parsedPurpose.data,
+        parsedResource.data
+      )
     );
     if (result.outcome !== 'redeemed') return { status: 'invalid_ticket' };
     return {

@@ -14,6 +14,7 @@ import {
 } from '../account/responses';
 import type { UtsConfig } from '../env';
 import { jsonResponse } from '../responses';
+import { clientLimitKey } from '../network-address';
 import { type AddressWindows, admitLookup } from './address-limit';
 import { hexOfHash, isWellFormedSecret, secretHash } from './format';
 
@@ -21,7 +22,8 @@ import { hexOfHash, isWellFormedSecret, secretHash } from './format';
  * GET /probe/pat: a route that UTS itself verifies with a PAT, so a PAT can be proven end to end
  * (create, use, revoke) before any service accepts PATs. It follows the verifier rules for a PAT
  * (design 7): the offline format and checksum check first, so a malformed value gets 401 without a
- * lookup; a client address is required; at most 20 lookups per second per address per isolate;
+ * lookup; a client address is required; at most 20 lookups per second per client (an IPv4 address
+ * or an IPv6 /64) per isolate;
  * then the UTS lookup, with no cache, so a revoked PAT fails on its next use. It accepts only a
  * PAT for the `uts` audience with the scope `uts:probe.read`, and answers whose PAT it is.
  */
@@ -43,12 +45,13 @@ export async function handlePatProbe(request: Request, deps: PatProbeDeps): Prom
   if (pat === undefined || !isWellFormedSecret('pat', pat)) {
     return credentialInvalid(deps.config, 'the credential is not a well-formed PAT');
   }
-  // The address the Cloudflare edge saw; a client cannot set it.
-  const address = request.headers.get('CF-Connecting-IP');
-  if (address === null || address === '') {
+  // The address the Cloudflare edge saw; a client cannot set it. Lookups count per IPv4 address
+  // or IPv6 /64.
+  const client = clientLimitKey(request.headers.get('CF-Connecting-IP'));
+  if (client === null) {
     return accountError('invalid_request', 400, 'the request carries no client address');
   }
-  if (!admitLookup(deps.windows, address, deps.now())) {
+  if (!admitLookup(deps.windows, client, deps.now())) {
     return accountError('too_many_requests', 429, 'too many PAT lookups from this address', {
       'Retry-After': '1',
     });

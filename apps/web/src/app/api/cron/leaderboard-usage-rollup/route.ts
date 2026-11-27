@@ -4,7 +4,11 @@ import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { isCronAuthorizationValid } from '@/lib/cron-auth';
 import { buildLeaderboardUsageDays } from '@/lib/leaderboard-usage-rollup';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import {
+  logExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
@@ -14,6 +18,9 @@ export const maxDuration = 800;
 
 // Leaves room for the day in progress to finish inside `maxDuration`.
 const BUILD_BUDGET_MS = 500_000;
+
+// Yesterday settles at 01:00 UTC; still missing two hours later means runs are failing.
+const YESTERDAY_MISSING_AFTER_UTC_HOUR = 3;
 
 /**
  * Hourly build of `leaderboard_usage_daily` for the public leaderboard routes.
@@ -34,14 +41,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const now = new Date();
   const summary = await buildLeaderboardUsageDays({
     readDb,
     db,
-    now: new Date(),
+    now,
     deadline: Date.now() + BUILD_BUDGET_MS,
   });
 
-  sentryLogger('cron', 'info')('Leaderboard usage rollup completed', summary);
+  // Console only: these logs are for investigating, not alerting.
+  const yesterdayMissing =
+    !summary.yesterdayBuilt && now.getUTCHours() >= YESTERDAY_MISSING_AFTER_UTC_HOUR;
+  const log = summary.emptyDays.length > 0 || yesterdayMissing ? warnExceptInTest : logExceptInTest;
+  log(JSON.stringify({ type: 'leaderboard_usage_rollup', ...summary, yesterdayMissing }));
 
   return NextResponse.json({
     success: true,

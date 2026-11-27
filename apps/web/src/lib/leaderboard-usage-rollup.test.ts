@@ -8,13 +8,20 @@ import {
   microdollar_usage_metadata,
   mode,
 } from '@kilocode/db/schema';
-import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { cleanupDbForTest, db, type DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   buildLeaderboardUsageDays,
   leaderboardUsageWindow,
   rebuildLeaderboardUsageDay,
   settledLeaderboardUsageDays,
 } from '@/lib/leaderboard-usage-rollup';
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/utils.server'),
+  errorExceptInTest: jest.fn(),
+  logExceptInTest: jest.fn(),
+}));
 
 type UsageInput = {
   created_at: string;
@@ -118,7 +125,12 @@ describe('leaderboard usage rollup', () => {
 
     const written = await rebuildLeaderboardUsageDay('2026-11-10', { readDb: db, db });
 
-    expect(written).toBe(4);
+    expect(written).toEqual({
+      rows: 4,
+      slices: 96,
+      durationMs: expect.any(Number),
+      slowestSliceMs: expect.any(Number),
+    });
     const shared = {
       usage_date: '2026-11-10',
       provider: 'openrouter',
@@ -272,6 +284,44 @@ describe('leaderboard usage rollup', () => {
     expect(await rollupRows()).toEqual([]);
   });
 
+  test('reports why days were left unbuilt and which built days were empty', async () => {
+    const now = new Date('2026-11-10T00:20:00.000Z');
+    await insertUsage({ created_at: '2026-11-08T12:00:00.000Z' });
+    await insertUsage({ created_at: '2026-11-07T12:00:00.000Z' });
+    await insertUsage({ created_at: '2026-11-06T12:00:00.000Z' });
+
+    const summary = await buildLeaderboardUsageDays({
+      readDb: db,
+      db,
+      now,
+      deadline: Date.now() + 60_000,
+    });
+
+    expect(summary).toEqual({
+      built: [
+        expect.objectContaining({ usageDate: '2026-11-08', rows: 1, slices: 96 }),
+        expect.objectContaining({ usageDate: '2026-11-07', rows: 1, slices: 96 }),
+      ],
+      remaining: ['2026-11-06', '2026-11-05', '2026-11-04', '2026-11-03'],
+      unsettled: ['2026-11-09'],
+      emptyDays: [],
+      stoppedBy: 'cap',
+      yesterdayBuilt: false,
+      replicaLagMs: null,
+      durationMs: expect.any(Number),
+    });
+
+    const next = await buildLeaderboardUsageDays({
+      readDb: db,
+      db,
+      now,
+      deadline: Date.now() + 60_000,
+    });
+
+    expect(next.built.map(day => day.usageDate)).toEqual(['2026-11-06', '2026-11-05']);
+    expect(next.emptyDays).toEqual(['2026-11-05']);
+  });
+
   test('stops starting new days once the deadline has passed', async () => {
     const result = await buildLeaderboardUsageDays({
       readDb: db,
@@ -282,6 +332,7 @@ describe('leaderboard usage rollup', () => {
 
     expect(result.built).toEqual([]);
     expect(result.remaining).toHaveLength(7);
+    expect(result.stoppedBy).toBe('deadline');
   });
 
   test('a day whose deadline passes before its last slice writes nothing', async () => {
@@ -289,13 +340,42 @@ describe('leaderboard usage rollup', () => {
     await rebuildLeaderboardUsageDay('2026-11-10', { readDb: db, db });
     await insertUsage({ created_at: '2026-11-10T13:00:00.000Z' });
 
-    const rows = await rebuildLeaderboardUsageDay('2026-11-10', {
+    const build = await rebuildLeaderboardUsageDay('2026-11-10', {
       readDb: db,
       db,
       deadline: Date.now(),
     });
 
-    expect(rows).toBeNull();
+    expect(build).toBeNull();
     expect((await rollupRows()).map(row => row.request_count)).toEqual([1]);
+  });
+
+  test('logs a failed day with its stage, slice and Postgres code, then rethrows', async () => {
+    const timeout = Object.assign(new Error('Failed query'), {
+      cause: Object.assign(new Error('canceling statement due to statement timeout'), {
+        code: '57014',
+      }),
+    });
+    const failingReadDb = {
+      transaction: async () => {
+        throw timeout;
+      },
+    } as unknown as DrizzleDatabase;
+
+    await expect(
+      rebuildLeaderboardUsageDay('2026-11-10', { readDb: failingReadDb, db })
+    ).rejects.toBe(timeout);
+
+    const [line] = jest.mocked(errorExceptInTest).mock.calls.at(-1) as [string];
+    expect(JSON.parse(line)).toEqual({
+      type: 'leaderboard_usage_rollup_day_failed',
+      usageDate: '2026-11-10',
+      stage: 'read',
+      sliceStart: '2026-11-10T00:00:00.000Z',
+      slicesCompleted: 0,
+      durationMs: expect.any(Number),
+      errorName: 'Error',
+      postgresCode: '57014',
+    });
   });
 });

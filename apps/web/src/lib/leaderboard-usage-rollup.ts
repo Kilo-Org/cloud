@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 
 import { leaderboard_usage_daily } from '@kilocode/db/schema';
 import type { DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /** Complete UTC days before today that the leaderboard routes read. */
 export const LEADERBOARD_USAGE_LOOKBACK_DAYS = 7;
@@ -120,75 +121,138 @@ function keyOf(row: LeaderboardUsageKey): string {
   ]);
 }
 
+export type LeaderboardUsageDayBuild = {
+  rows: number;
+  durationMs: number;
+  slices: number;
+  slowestSliceMs: number;
+};
+
+function postgresErrorCode(error: unknown): string | null {
+  let current = error;
+  for (let depth = 0; depth < 3 && typeof current === 'object' && current !== null; depth++) {
+    if ('code' in current && typeof current.code === 'string') return current.code;
+    current = 'cause' in current ? current.cause : undefined;
+  }
+  return null;
+}
+
 /**
  * Aggregates one UTC day of usage from `readDb` 15 minutes at a time, then replaces
- * that day's rollup rows on `db` in one transaction. Returns the rows written, or
- * `null` without writing anything when `deadline` passes before the last slice.
+ * that day's rollup rows on `db` in one transaction. Returns what was written,
+ * or `null` without writing anything when `deadline` passes before the last
+ * slice. A failure is logged with the day, the stage and the slice, then rethrown.
  */
 export async function rebuildLeaderboardUsageDay(
   usageDate: string,
   { readDb, db, deadline }: { readDb: DrizzleDatabase; db: DrizzleDatabase; deadline?: number }
-): Promise<number | null> {
+): Promise<LeaderboardUsageDayBuild | null> {
+  const startedAt = Date.now();
   const dayStartMs = Date.parse(`${usageDate}T00:00:00.000Z`);
   const rows = new Map<string, LeaderboardUsageRow>();
+  let slices = 0;
+  let slowestSliceMs = 0;
+  let stage: { name: 'read'; sliceStart: string } | { name: 'write' } | null = null;
 
-  for (
-    let sliceStartMs = dayStartMs;
-    sliceStartMs < dayStartMs + DAY_MS;
-    sliceStartMs += SLICE_MS
-  ) {
-    if (deadline !== undefined && Date.now() >= deadline) return null;
-    const start = new Date(sliceStartMs).toISOString();
-    const end = new Date(sliceStartMs + SLICE_MS).toISOString();
-    for (const aggregate of await aggregateSlice(readDb, start, end)) {
-      const key = keyOf(aggregate);
-      const existing = rows.get(key);
-      const sums = {
-        input_tokens: Number(aggregate.input_tokens),
-        output_tokens: Number(aggregate.output_tokens),
-        cache_hit_tokens: Number(aggregate.cache_hit_tokens),
-        cost_microdollars: Number(aggregate.cost_microdollars),
-        request_count: Number(aggregate.request_count),
-        error_count: Number(aggregate.error_count),
-      };
-      if (existing) {
-        existing.input_tokens += sums.input_tokens;
-        existing.output_tokens += sums.output_tokens;
-        existing.cache_hit_tokens += sums.cache_hit_tokens;
-        existing.cost_microdollars += sums.cost_microdollars;
-        existing.request_count += sums.request_count;
-        existing.error_count += sums.error_count;
-      } else {
-        rows.set(key, {
-          provider: aggregate.provider,
-          requested_model: aggregate.requested_model,
-          model: aggregate.model,
-          inference_provider: aggregate.inference_provider,
-          mode: aggregate.mode,
-          is_user_byok: aggregate.is_user_byok,
-          ...sums,
-        });
+  try {
+    for (
+      let sliceStartMs = dayStartMs;
+      sliceStartMs < dayStartMs + DAY_MS;
+      sliceStartMs += SLICE_MS
+    ) {
+      if (deadline !== undefined && Date.now() >= deadline) {
+        logExceptInTest(
+          JSON.stringify({
+            type: 'leaderboard_usage_rollup_day_deadline',
+            usageDate,
+            slices,
+            durationMs: Date.now() - startedAt,
+          })
+        );
+        return null;
+      }
+      const start = new Date(sliceStartMs).toISOString();
+      const end = new Date(sliceStartMs + SLICE_MS).toISOString();
+      stage = { name: 'read', sliceStart: start };
+      const sliceStartedAt = Date.now();
+      const aggregates = await aggregateSlice(readDb, start, end);
+      slowestSliceMs = Math.max(slowestSliceMs, Date.now() - sliceStartedAt);
+      slices++;
+      for (const aggregate of aggregates) {
+        const key = keyOf(aggregate);
+        const existing = rows.get(key);
+        const sums = {
+          input_tokens: Number(aggregate.input_tokens),
+          output_tokens: Number(aggregate.output_tokens),
+          cache_hit_tokens: Number(aggregate.cache_hit_tokens),
+          cost_microdollars: Number(aggregate.cost_microdollars),
+          request_count: Number(aggregate.request_count),
+          error_count: Number(aggregate.error_count),
+        };
+        if (existing) {
+          existing.input_tokens += sums.input_tokens;
+          existing.output_tokens += sums.output_tokens;
+          existing.cache_hit_tokens += sums.cache_hit_tokens;
+          existing.cost_microdollars += sums.cost_microdollars;
+          existing.request_count += sums.request_count;
+          existing.error_count += sums.error_count;
+        } else {
+          rows.set(key, {
+            provider: aggregate.provider,
+            requested_model: aggregate.requested_model,
+            model: aggregate.model,
+            inference_provider: aggregate.inference_provider,
+            mode: aggregate.mode,
+            is_user_byok: aggregate.is_user_byok,
+            ...sums,
+          });
+        }
       }
     }
-  }
 
-  const values = [...rows.values()].map(row => ({ usage_date: usageDate, ...row }));
+    const values = [...rows.values()].map(row => ({ usage_date: usageDate, ...row }));
 
-  await db.transaction(async tx => {
-    // Serializes concurrent rebuilds of the same day, so an overlapping run
-    // deletes the first run's committed rows instead of duplicating them.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext('leaderboard_usage_daily'), hashtext(${usageDate}))`
+    stage = { name: 'write' };
+    await db.transaction(async tx => {
+      // Serializes concurrent rebuilds of the same day, so an overlapping run
+      // deletes the first run's committed rows instead of duplicating them.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('leaderboard_usage_daily'), hashtext(${usageDate}))`
+      );
+      await tx.execute(sql`DELETE FROM leaderboard_usage_daily WHERE usage_date = ${usageDate}`);
+      for (let index = 0; index < values.length; index += INSERT_BATCH_SIZE) {
+        await tx
+          .insert(leaderboard_usage_daily)
+          .values(values.slice(index, index + INSERT_BATCH_SIZE));
+      }
+    });
+
+    const build = {
+      rows: values.length,
+      durationMs: Date.now() - startedAt,
+      slices,
+      slowestSliceMs,
+    };
+    logExceptInTest(JSON.stringify({ type: 'leaderboard_usage_rollup_day', usageDate, ...build }));
+    return build;
+  } catch (error) {
+    // The Postgres code tells a statement timeout (57014) from a replay
+    // conflict on the replica (40001). The message is left out: it repeats the
+    // query text.
+    errorExceptInTest(
+      JSON.stringify({
+        type: 'leaderboard_usage_rollup_day_failed',
+        usageDate,
+        stage: stage?.name ?? null,
+        sliceStart: stage?.name === 'read' ? stage.sliceStart : null,
+        slicesCompleted: slices,
+        durationMs: Date.now() - startedAt,
+        errorName: error instanceof Error ? error.name : typeof error,
+        postgresCode: postgresErrorCode(error),
+      })
     );
-    await tx.execute(sql`DELETE FROM leaderboard_usage_daily WHERE usage_date = ${usageDate}`);
-    for (let index = 0; index < values.length; index += INSERT_BATCH_SIZE) {
-      await tx
-        .insert(leaderboard_usage_daily)
-        .values(values.slice(index, index + INSERT_BATCH_SIZE));
-    }
-  });
-
-  return values.length;
+    throw error;
+  }
 }
 
 /**
@@ -205,6 +269,21 @@ export function settledLeaderboardUsageDays(
     return now.getTime() >= settledAtMs && (replayedAtMs === null || replayedAtMs >= settledAtMs);
   });
 }
+
+export type LeaderboardUsageBuildSummary = {
+  built: ({ usageDate: string } & LeaderboardUsageDayBuild)[];
+  /** Settled days still unbuilt, left for the next run. */
+  remaining: string[];
+  /** Unbuilt days that have not settled yet, or that the replica has not replayed past. */
+  unsettled: string[];
+  /** Days built with no rows, which look missing and are rebuilt every run. */
+  emptyDays: string[];
+  stoppedBy: 'deadline' | 'cap' | null;
+  yesterdayBuilt: boolean;
+  /** How far `readDb` trails `now`; null on a primary. */
+  replicaLagMs: number | null;
+  durationMs: number;
+};
 
 /**
  * Builds the days in the leaderboard window that have no rollup rows yet,
@@ -228,7 +307,8 @@ export async function buildLeaderboardUsageDays({
   db: DrizzleDatabase;
   now: Date;
   deadline: number;
-}): Promise<{ built: { usageDate: string; rows: number }[]; remaining: string[] }> {
+}): Promise<LeaderboardUsageBuildSummary> {
+  const startedAt = Date.now();
   const window = leaderboardUsageWindow(now);
   const existing = await db.execute<{ usage_date: string }>(sql`
     SELECT DISTINCT to_char(usage_date, 'YYYY-MM-DD') AS usage_date
@@ -240,22 +320,39 @@ export async function buildLeaderboardUsageDays({
   const replay = await readDb.execute<{ replayed_at_ms: number | null }>(sql`
     SELECT (extract(epoch FROM pg_last_xact_replay_timestamp()) * 1000)::float8 AS replayed_at_ms
   `);
-  const toBuild = settledLeaderboardUsageDays(
-    window,
-    now,
-    replay.rows[0]?.replayed_at_ms ?? null
-  ).filter(usageDate => !builtDates.has(usageDate));
+  const replayedAtMs = replay.rows[0]?.replayed_at_ms ?? null;
+  const settled = settledLeaderboardUsageDays(window, now, replayedAtMs);
+  const toBuild = settled.filter(usageDate => !builtDates.has(usageDate));
 
-  const built: { usageDate: string; rows: number }[] = [];
-  for (const usageDate of toBuild.slice(0, MAX_DAYS_PER_RUN)) {
-    if (Date.now() >= deadline) break;
-    const rows = await rebuildLeaderboardUsageDay(usageDate, { readDb, db, deadline });
-    if (rows === null) break;
-    built.push({ usageDate, rows });
+  const built: LeaderboardUsageBuildSummary['built'] = [];
+  let stoppedBy: LeaderboardUsageBuildSummary['stoppedBy'] = null;
+  for (const usageDate of toBuild) {
+    if (built.length >= MAX_DAYS_PER_RUN) {
+      stoppedBy = 'cap';
+      break;
+    }
+    if (Date.now() >= deadline) {
+      stoppedBy = 'deadline';
+      break;
+    }
+    const build = await rebuildLeaderboardUsageDay(usageDate, { readDb, db, deadline });
+    if (build === null) {
+      stoppedBy = 'deadline';
+      break;
+    }
+    built.push({ usageDate, ...build });
   }
 
   return {
     built,
     remaining: toBuild.filter(usageDate => !built.some(day => day.usageDate === usageDate)),
+    unsettled: window.filter(
+      usageDate => !builtDates.has(usageDate) && !settled.includes(usageDate)
+    ),
+    emptyDays: built.filter(day => day.rows === 0).map(day => day.usageDate),
+    stoppedBy,
+    yesterdayBuilt: builtDates.has(window[0]) || built.some(day => day.usageDate === window[0]),
+    replicaLagMs: replayedAtMs === null ? null : Math.max(0, now.getTime() - replayedAtMs),
+    durationMs: Date.now() - startedAt,
   };
 }

@@ -450,6 +450,12 @@ const EXCEPTIONS = {
     signals: { 'verify-library': 1 },
     pins: ['audience: UTS_ACCOUNT_AUDIENCE', 'export const STS_CALLER_WORKLOADS'],
   },
+  'services/uts/src/ci/exchange.ts': {
+    reason:
+      'Third party: the UTS CI token exchange (design section 5.3) checks a GitHub Actions OIDC ID token under the GitHub key set (src/ci/github-keys.ts) and issuer, for the UTS issuer as its one audience; not a Kilo credential',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['issuer: GITHUB_ACTIONS_ISSUER', 'if (payload.aud !== audience)'],
+  },
   'services/uts/src/attest/app-attest.ts': {
     reason:
       'Third party: UTS mobile attestation (design section 5.5) checks an Apple App Attest certificate chain to the Apple root and the device key assertion of the kilo-mobile code exchange; not a Kilo credential',

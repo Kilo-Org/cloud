@@ -26,7 +26,7 @@ KILOCODE_CONFIG_PATH="${KILOCODE_CONFIG_PATH:-$HOME/.kilocode/cli/config.json}"
 # schema or tool payload") while the same image succeeded on a paid route, so a
 # free-route run conflates provider-side free-tier behaviour with the image under
 # test. Overridable, but a free route is rejected below unless explicitly allowed.
-KILOCODE_SMOKE_MODEL="${KILOCODE_SMOKE_MODEL:-kilocode/kilo-auto/balanced}"
+KILOCODE_SMOKE_MODEL="${KILOCODE_SMOKE_MODEL:-kilocode/kilo-auto/efficient}"
 EXPECTED_VERSION_BEFORE="${EXPECTED_VERSION_BEFORE:-}"
 EXPECTED_VERSION_AFTER="${EXPECTED_VERSION_AFTER:-}"
 MODE="fresh"
@@ -39,7 +39,7 @@ usage() {
 Usage: bash scripts/tests/single-image/live-provider.sh [--upgrade]
 
 Runs a packaged KiloClaw image against the real Kilo Gateway using a PAID auto
-route by default (kilocode/kilo-auto/balanced, what production instances use).
+route by default (kilocode/kilo-auto/efficient, what production instances use).
 Provide KILOCODE_API_KEY explicitly or authenticate with the Kilo CLI locally so
 ~/.kilocode/cli/config.json contains an active token. The account must have
 credits: a free route is rejected, because free-route failures reflect provider
@@ -152,7 +152,7 @@ case "$KILOCODE_SMOKE_MODEL" in
     echo "  The live smoke must run on a PAID route with credits available, because" >&2
     echo "  free-route failures reflect provider-side free-tier behaviour rather than" >&2
     echo "  the image under test and are indistinguishable from a real regression." >&2
-    echo "  Default is kilocode/kilo-auto/balanced (what production instances use)." >&2
+    echo "  Default is kilocode/kilo-auto/efficient (what production instances use)." >&2
     echo "  Override deliberately with ALLOW_FREE_SMOKE_MODEL=true if you know why." >&2
     if [ "${ALLOW_FREE_SMOKE_MODEL:-false}" != "true" ]; then
       exit 1
@@ -676,7 +676,7 @@ def has_image(m):
     return "image" in inp if isinstance(inp, (str, list, tuple)) else False
 
 configured = sys.argv[1]
-# `openclaw models list` keys are provider-qualified ("kilocode/kilo-auto/balanced")
+# `openclaw models list` keys are provider-qualified ("kilocode/kilo-auto/efficient")
 # while the configured value may omit the provider prefix; match on either.
 #
 # Match the FULL route, never a trailing segment. Suffix matching on the last

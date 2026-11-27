@@ -20,7 +20,6 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   gatewayModelEndpointsSource,
-  gatewayModelEndpointsUrl,
   openRouterGatewayModelsSource,
   vercelGatewayModelsSource,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
@@ -28,26 +27,27 @@ import { openRouterProvidersSource } from '@/lib/providers/openrouter/sync-provi
 import { openRouterProviderModelsSource } from '@/lib/providers/openrouter/fetch-provider-models';
 import { modelsDevCatalogSource } from '@/lib/providers/direct-byok/models-dev';
 import { directByokMetadataSources } from '@/lib/providers/direct-byok/sync-direct-byok';
-import { parseIsoTimestamp } from '@/lib/providers/openrouter/sync-providers-stale-alert';
-import {
-  METADATA_CACHE_STALE_AFTER_MS,
-  alertIfMetadataCacheStale,
-  type StaleMetadataEntry,
-} from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
+import { parseIsoTimestamp } from '@/lib/providers/sync-state';
 
 const SOURCE_CONCURRENCY = 4;
 const PROVIDER_MODELS_CONCURRENCY = 3;
 const MODEL_ENDPOINTS_CONCURRENCY_PER_GATEWAY = 8;
 const REFRESH_BUDGET_MS = 180_000;
 const ESCAPED_NUL_PATTERN = /(?:^|[^\\])(?:\\\\)*\\u0000/;
+const METADATA_CACHE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+const MAX_LOGGED_STALE_ENTRIES = 10;
 
 const GATEWAY_MODEL_LISTS = [
   { gateway: OPENROUTER, modelsSource: openRouterGatewayModelsSource },
   { gateway: VERCEL_AI_GATEWAY, modelsSource: vercelGatewayModelsSource },
 ];
 
+type StaleMetadataEntry = {
+  url: string;
+  updatedAt: Date | null;
+};
+
 type ModelEndpointsGroup = {
-  urlPattern: string;
   sources: MetadataSource<unknown>[];
 };
 
@@ -144,7 +144,6 @@ async function readModelEndpointsGroups(): Promise<ModelEndpointsGroup[]> {
     GATEWAY_MODEL_LISTS.map(async ({ gateway, modelsSource }) => {
       const models = await readStoredMetadata(modelsSource, db);
       return {
-        urlPattern: gatewayModelEndpointsUrl(gateway, '{id}'),
         sources: (models?.data ?? []).map(model => gatewayModelEndpointsSource(gateway, model.id)),
       };
     })
@@ -163,16 +162,25 @@ async function findStaleEntries(failedUrls: string[], now: Date): Promise<StaleM
 }
 
 // sync-providers fetches a model's endpoints live until they are first stored, and new models
-// appear often, so a failed first fetch is not stale: it would otherwise alert on a single error.
+// appear often, so a failed first fetch is not stale: it would otherwise warn on a single error.
 async function findStaleModelEndpointsEntries(
-  urlPattern: string,
   failedUrls: string[],
   now: Date
 ): Promise<StaleMetadataEntry[]> {
   const entries = await findStaleEntries(failedUrls, now);
-  return entries
-    .filter(entry => entry.updatedAt !== null)
-    .map(entry => ({ ...entry, group: urlPattern }));
+  return entries.filter(entry => entry.updatedAt !== null);
+}
+
+function warnAboutStaleEntries(staleEntries: StaleMetadataEntry[]) {
+  if (staleEntries.length === 0) return;
+  const listed = staleEntries
+    .slice(0, MAX_LOGGED_STALE_ENTRIES)
+    .map(entry => `${entry.url} (last updated ${entry.updatedAt?.toISOString() ?? 'never'})`);
+  const remaining = staleEntries.length - listed.length;
+  const sources = staleEntries.length === 1 ? '1 source' : `${staleEntries.length} sources`;
+  console.warn(
+    `[refresh-metadata-cache] ${sources} failed to refresh and more than a day out of date: ${listed.join(', ')}${remaining > 0 ? `, and ${remaining} more` : ''}`
+  );
 }
 
 export async function refreshMetadataCache() {
@@ -201,15 +209,13 @@ export async function refreshMetadataCache() {
 
   const now = new Date();
   const staleModelEndpointsEntries = await Promise.all(
-    modelEndpointsResults.map(result =>
-      findStaleModelEndpointsEntries(result.group.urlPattern, result.failedUrls, now)
-    )
+    modelEndpointsResults.map(result => findStaleModelEndpointsEntries(result.failedUrls, now))
   );
   const staleEntries = [
     ...(await findStaleEntries(failedUrls, now)),
     ...staleModelEndpointsEntries.flat(),
   ];
-  await alertIfMetadataCacheStale(staleEntries);
+  warnAboutStaleEntries(staleEntries);
 
   const sum = (counts: number[]) => counts.reduce((total, count) => total + count, 0);
   return {

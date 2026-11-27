@@ -31371,6 +31371,37 @@
     ],
     "searchBlob": "organizations.settings.updateMinimumBalanceAlert Configure or turn off low-balance email alerts for an organization. Use to set a balance threshold and alert recipients. organizations settings updateminimumbalancealert organizationid enabled minimum_balance minimum_balance_alert_email organizationId enabled minimum_balance minimum_balance_alert_email"
   },
+  "organizations.settings.updateNewModelsPolicy": {
+    "path": "organizations.settings.updateNewModelsPolicy",
+    "kind": "mutation",
+    "summary": "Toggles whether newly released AI models are disabled by default for an organization, setting the org-wide new-models policy. Use to turn access to new models off or on for everyone in the organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "disable_new_models": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "organizationId",
+        "disable_new_models"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "settings",
+      "updatenewmodelspolicy",
+      "organizationid",
+      "disable_new_models"
+    ],
+    "searchBlob": "organizations.settings.updateNewModelsPolicy Toggles whether newly released AI models are disabled by default for an organization, setting the org-wide new-models policy. Use to turn access to new models off or on for everyone in the organization. organizations settings updatenewmodelspolicy organizationid disable_new_models organizationId disable_new_models"
+  },
   "organizations.settings.updateProjectsUIEnabled": {
     "path": "organizations.settings.updateProjectsUIEnabled",
     "kind": "mutation",

@@ -97,7 +97,8 @@ async function runDispatcherStage<T>(options: {
 
 export async function dispatchDueOwners(
   env: CloudflareEnv,
-  dispatchId: string = randomUUID()
+  dispatchId: string = randomUUID(),
+  ctx?: ExecutionContext
 ): Promise<{
   dispatchId: string;
   discoveredOwners: number;
@@ -149,6 +150,7 @@ export async function dispatchDueOwners(
       recoverStaleRemediationLaunchAttempts(db, {
         env,
         claimedBefore: new Date(now - REMEDIATION_LAUNCH_RECLAIM_TIMEOUT_MS),
+        ctx,
       }),
     successTags: result => ({
       requeued_stale_remediation_launch_count: result.requeuedCount,

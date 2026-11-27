@@ -230,6 +230,7 @@ describe('providers and models tabs', () => {
       onSetModelsAllowed: jest.fn(),
       onOpenModelDetails: jest.fn(),
       showDetails: false,
+      newModelsDisabledByDefault: false,
       ...overrides,
     };
   }

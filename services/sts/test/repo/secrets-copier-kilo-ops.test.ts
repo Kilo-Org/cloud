@@ -205,9 +205,7 @@ describe('the secrets copier table for kilo-ops', () => {
         .map(entry => ({ binding: entry.binding, secret_name: entry.secret_name }))
         .sort((a, b) => a.binding.localeCompare(b.binding)),
       WORKLOAD
-    ).toEqual(
-      [...EXPECTED_DEV_ENTRIES].sort((a, b) => a.binding.localeCompare(b.binding))
-    );
+    ).toEqual([...EXPECTED_DEV_ENTRIES].sort((a, b) => a.binding.localeCompare(b.binding)));
     for (const entry of devEntries) {
       expect(entry.secret_name, `${WORKLOAD}: dev ${entry.binding}`).toMatch(ENVIRONMENT_SUFFIX);
       expect(

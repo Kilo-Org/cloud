@@ -20,7 +20,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": ">=24 <25",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

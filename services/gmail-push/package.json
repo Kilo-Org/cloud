@@ -17,7 +17,6 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "@kilocode/sts-contracts": "workspace:*",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

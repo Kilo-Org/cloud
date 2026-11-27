@@ -69,12 +69,17 @@ async function retryWithBackoff(
 
 export async function handleQueue(
   batch: MessageBatch<GmailPushQueueMessage>,
-  env: AppEnv
+  env: AppEnv,
+  ctx?: ExecutionContext
 ): Promise<void> {
-  await Promise.allSettled(batch.messages.map(message => processMessage(message, env)));
+  await Promise.allSettled(batch.messages.map(message => processMessage(message, env, ctx)));
 }
 
-async function processMessage(message: Message<GmailPushQueueMessage>, env: AppEnv): Promise<void> {
+async function processMessage(
+  message: Message<GmailPushQueueMessage>,
+  env: AppEnv,
+  ctx?: ExecutionContext
+): Promise<void> {
   const msg = message.body;
   const { userId, pubSubBody } = msg;
   const attempt = msg.attempt ?? 0;
@@ -96,7 +101,7 @@ async function processMessage(message: Message<GmailPushQueueMessage>, env: AppE
   }
 
   try {
-    const internalSecret = await readGmailPushSecret(env, 'INTERNAL_API_SECRET');
+    const internalSecret = await readGmailPushSecret(env, 'INTERNAL_API_SECRET', ctx);
 
     // Look up machine status via service binding
     const statusRes = await env.KILOCLAW.fetch(

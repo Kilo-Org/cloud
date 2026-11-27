@@ -21,7 +21,11 @@ function scheduledEnvironment(env: CloudflareEnv): string | undefined {
   return 'ENVIRONMENT' in env && typeof env.ENVIRONMENT === 'string' ? env.ENVIRONMENT : undefined;
 }
 
-async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
+async function handleFetch(
+  request: Request,
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
+): Promise<Response> {
   const url = new URL(request.url);
 
   if (request.method === 'GET' && url.pathname === '/health') {
@@ -36,9 +40,14 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     return Response.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const internalSecret = await readModelEvalIngestSecret(env, 'INTERNAL_API_SECRET');
+  // Read the secret only for a request that presents a key: the Worker is reachable on its
+  // workers.dev host, so a keyless request costs no bundle load under `sts`.
   const authHeader = request.headers.get('x-internal-api-key');
-  if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
+  if (!authHeader) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const internalSecret = await readModelEvalIngestSecret(env, 'INTERNAL_API_SECRET', ctx);
+  if (!internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -63,8 +72,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
 }
 
 export default {
-  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
-    return handleFetch(request, env);
+  async fetch(request: Request, env: CloudflareEnv, ctx?: ExecutionContext): Promise<Response> {
+    return handleFetch(request, env, ctx);
   },
 
   async scheduled(controller: ScheduledController, env: CloudflareEnv): Promise<void> {

@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
-import type { BundleResult } from '@kilocode/sts-contracts';
 import { readEventServiceSecret, secretsSource, type EventServiceSecretName } from './secrets';
 
 const NAMES: EventServiceSecretName[] = ['NEXTAUTH_SECRET'];
 const ETAG = '"0123456789abcdef"';
 
-function okBundle(secrets: Record<string, string>, missing: string[] = []): BundleResult {
+function okBundle(secrets: Record<string, string>, missing: string[] = []) {
   return {
-    status: 'ok',
+    status: 'ok' as const,
     workload: 'event-service',
-    environment: 'production',
+    environment: 'production' as const,
     etag: ETAG,
     stale: false,
     fetchedAt: '2026-11-27T00:00:00.000Z',
@@ -22,8 +21,8 @@ function okBundle(secrets: Record<string, string>, missing: string[] = []): Bund
 }
 
 /** A fresh binding per call: the client keeps one bundle per binding for the isolate. */
-function stsBinding(result: BundleResult = okBundle({ NEXTAUTH_SECRET: 'bundle-nextauth' })) {
-  const getBundle = vi.fn<BundleBinding['getBundle']>(async () => result);
+function stsBinding(bundle = okBundle({ NEXTAUTH_SECRET: 'bundle-nextauth' })) {
+  const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
   return { binding: { getBundle } satisfies BundleBinding, getBundle };
 }
 

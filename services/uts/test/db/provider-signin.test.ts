@@ -934,9 +934,11 @@ describe('required inputs (migration 0020)', () => {
       network.city,
       newAccountId(),
     ];
+    // Migration 0013 takes this signature away from the app login and calls it from the browser
+    // session wrapper, so the owner calls it here.
     expect(
       await sqlStateOf(() =>
-        app.query(
+        owner.query(
           `SELECT * FROM uts.complete_provider_sign_in($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
              $12, $13, $14, $15)`,
           values

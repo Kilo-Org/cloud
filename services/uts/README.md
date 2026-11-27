@@ -22,7 +22,9 @@ The issuer, key set URL and local ports of each environment live in
   (`src/signin/`), the device grant (`src/signin/device/`) and ticket minting (`src/tickets/`) run
   in this fetch handler. Staging and production bind no identity store yet, so they serve none of
   them. Tickets are redeemed only through the `TicketRedeemer` entrypoint, by a caller listed in
-  `TICKET_REDEEMERS` (empty in staging and production).
+  `TICKET_REDEEMERS` (empty in staging and production). The caller names the audience, the
+  purpose and the resource (or none) it opens, and only a ticket minted for all three redeems; a
+  mismatch leaves the ticket usable (migration 0020).
 - The mobile app (`kilo-mobile`) needs device attestation (design 5.5), which UTS does not verify
   yet, so the authorization endpoint serves it in development only.
 - Placement runs the fetch handler next to the identity store's primary in Frankfurt:
@@ -380,6 +382,11 @@ Another environment's origin, a path, a trailing slash or a query answers `inval
   the primary address (`current`) or the new one (`new`), and each code counts only in its own
   role. The service that sends a `current` code, and the caller of the gate, hash the account's
   primary address itself, never an address from the request.
+- `uts.open_browser_tier_a_gate_pass` (migration 0020) opens the same tier A pass for the browser
+  session a cookie names, with the same checks on that session's sign-in; passkey registration and
+  an in-session method link consume a pass of their own browser session, which
+  `uts.open_tier_a_gate_pass` (a grant's device session) cannot open. No route opens a pass or
+  sends a tier A code yet: both wait for the account pages and the mail sender.
 - `PatLookup` (`src/pat/entrypoint.ts`) is the lookup port of `@kilocode/verify` for Worker
   verifiers: the lowercase-hex SHA-256 in, `found`, `not_found`, `rate_limited` or `unavailable`
   out (`UtsPatLookupResultSchema`). It answers only callers its environment lists
@@ -508,7 +515,10 @@ earlier pending code (their links keep working). The fifth wrong code entry exha
 keeps working, so wrong entries by someone else cannot lock the owner out. At most 5 codes per
 address per hour; past that cap codes stop for 1 hour. The 20th wrong entry in a day stops codes
 until that day window ends, exhausts every pending code, and gives the account a notice; while
-codes are stopped every code entry is refused (`codes_stopped`). The link page names the address
+codes are stopped every code entry is refused (`codes_stopped`). While codes are stopped an email
+carries only its link, and at most 5 such link-only emails go to an address in its hour
+(`send_limited`, 429, nothing stored or sent; migration 0020), so an address gets at most 10
+sign-in emails an hour; the code emails are never capped by it. The link page names the address
 (`p…@example.com`). The email start sets a binder cookie, like a flow's; a link opened in a browser
 without it says so and signs in only after a second confirmation, so a link someone else asked
 for cannot sign the reader into that person's account in one click. The address and the code are
@@ -614,10 +624,11 @@ identity-store connection is not held while a provider answers:
    reads only the account's pending notices of the last hour.
 2. Send push, then email, skipping the channels an earlier round settled. Each answers `sent`,
    `no_target`, `not_configured`, `retryable_failure` or `permanent_failure`; a provider that does
-   not answer within 10 seconds is a retryable failure. The push receiver refuses a wrong caller or
-   an invalid payload by throwing or by an answer outside its outcome union: that is a permanent
-   failure of push for the notice, logged as `uts.notice.push_refused` and never retried, and email
-   still goes out.
+   not answer within 10 seconds is a retryable failure. A push receiver answer outside its outcome
+   union is a permanent failure of push for the notice, logged as `uts.notice.push_refused` and
+   never retried, and email still goes out. A push call that throws is retried like a timeout
+   (also logged as `uts.notice.push_refused`): a binding throws for a network or deploy fault as
+   well as for a refusal, so a push-only notice is not given up after one fault.
 3. Finish (`uts.finish_notice`) with the round's attempts, one `uts.notice_attempts` row each. The
    notice is `pending` again (1 minute after round 1, 5 after round 2) while a planned channel only
    failed retryably, else `delivered` when a channel sent it, else `failed`. A finish under a claim
@@ -627,8 +638,10 @@ A notice is tried in at most 3 rounds and for 24 hours; the in-app row stays wha
 Each background pass first settles up to 500 notices past those limits (delivered when an earlier
 attempt sent them, else failed), without sending them. The account API's `CredentialNotices` port
 (`src/notices/credential.ts`) claims the `credential_created` notice that the create statement
-wrote and delivers it at once; `sweepNotices` (at most 20 notices per pass) delivers every other
-due notice and the retries, then runs one retention step (`uts.maintain_notice_rows`, at most 500
+wrote and delivers it at once; `sweepNotices` delivers every other due notice and the retries:
+it claims 20 at a time, oldest first, and claims again while a claim comes back full, at most 5
+times and never 30 seconds after the pass began (up to 100 a minute), so a burst drains instead of
+waiting past the 24-hour limit. Then it runs one retention step (`uts.maintain_notice_rows`, at most 500
 rows of each kind): known devices and networks unseen for 90 days, and finished notices with
 their attempts 400 days after they were written.
 
@@ -779,7 +792,7 @@ start without a valid var; development may leave it out (cap 100).
 | `IDENTITY_STORE` | Hyperdrive binding | The identity store's primary config (design 5.2); unset, no OAuth or sign-in endpoint is served |
 | `WEBAUTHN_RP_ID` | var | The app host whose passkeys users hold: `app.kilo.ai`, `staging-app.kilo.ai` |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
-| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset, the device grant is not served. Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
+| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
 
 ## Identity store
 
@@ -810,7 +823,7 @@ its Hyperdrive configs, and those configs run with caching disabled.
 | Role | Logins | Hyperdrive config | Privileges |
 |---|---|---|---|
 | `uts_owner` | none | none | Owns the objects; the admin login acts as it during migrations. Holds the privileges of every UTS login (no SET), so `uts.end_long_transactions()` can end their sessions |
-| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, and passkeys, browser sessions, step-ups, device codes, tickets, WebAuthn challenges, sign-in methods, email codes and wrong user-code counts only through the sign-in functions (migration 0008), keeping SELECT on them; INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()`, `uts.maintain_provider_sign_in_rows()` and `uts.end_long_transactions()` |
+| `uts_app` | `uts_app_a`, `uts_app_b` | Primary: mint, sign-in, refresh, revoke, account API, audit relay | DML on the ungated credential tables; on gated rows (CI trust policies, third-party consents) SELECT, DELETE and UPDATE of lifecycle columns only; PATs, org bot keys and gate passes SELECT only, written only through the account functions (migration 0005); codes, grants, device sessions, third-party families and tokens, revocations and DPoP proof `jti`s only through the OAuth functions, and passkeys, browser sessions, step-ups, device codes, tickets, WebAuthn challenges, sign-in methods, email codes and wrong user-code counts only through the sign-in functions (migration 0008), keeping SELECT on them; notices SELECT only, written by the statement of a change and moved only by the notice functions (migration 0020); INSERT on chosen audit columns and SELECT on audit rows; SELECT on relay watermarks, which it moves only through `uts.advance_audit_watermark()`; `uts.maintain_audit_partitions()`, `uts.maintain_oauth_rows()`, `uts.maintain_sign_in_rows()`, `uts.maintain_provider_sign_in_rows()` and `uts.end_long_transactions()` |
 | `uts_pat` | `uts_pat_a`, `uts_pat_b` | PAT lookups | `uts.lookup_pat(bytea)` and `uts.lookup_bot_key(bytea)` only |
 | `uts_reader` | `uts_reader_a`, `uts_reader_b` | Replica: account views | SELECT on the `uts_read` views; read-only transactions by default |
 
@@ -850,6 +863,9 @@ INHERIT FALSE` passes on no privilege until the session switches, and reports su
 - Short secrets get a keyed hash (HMAC-SHA-256) under a key that only UTS holds: email codes, email
   addresses in code and limit rows, and RFC 8628 device user codes, which are short enough that a
   plain SHA-256 could be reversed offline.
+- A security guard never compares a caller input with `<>` or `NOT` alone: a NULL makes the guard
+  NULL and skips the refusal. Each SECURITY DEFINER statement refuses a missing required input
+  first (`uts.require_inputs`, SQLSTATE 22004) and compares with `IS DISTINCT FROM`.
 - Each lifecycle has one status enum, and a CHECK constraint ties every status to the columns it
   needs. Lifetimes from design section 5.3 are CHECK constraints too.
 - A gate pass serves one action of its own account once: each table that records a gated action
@@ -914,7 +930,10 @@ shard (`id % 8`). Each shard publishes as its own audit stream, `uts:<environmen
 `last_seq` numbers that stream's batches.
 
 The relay (`src/audit/relay.ts`) is one Durable Object per shard (`UtsAuditRelayDO`, named
-`<environment>:audit-relay:<shard>`). Its alarm runs every 5 seconds: it reads up to 500 rows past
+`<environment>:audit-relay:<shard>`). It finds its shard by comparing its id with the id of each
+shard's name, not by `ctx.id.name`, which an alarm after an eviction or a deploy does not carry;
+an object whose id is no shard's in this environment and jurisdiction refuses to run. Its alarm
+runs every 5 seconds: it reads up to 500 rows past
 the watermark, sends them as one gzipped `AuditBatch` to `AUDIT_QUEUE`, the environment's UTS
 audit queue `kilo-audit-uts[-staging|-local]` (halving any batch the encoder refuses, so each
 message stays under 60 KB), and moves the watermark after each message the queue accepted, only

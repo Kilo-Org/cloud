@@ -1,9 +1,6 @@
 import { z } from 'zod';
 
-import {
-  createPublicSnowflakeReport,
-  publicSnowflakeReportOptions,
-} from '@/lib/public-snowflake-report';
+import { createPublicSnowflakeReport, publicReportOptions } from '@/lib/public-report';
 import { LEADERBOARD_PROVIDER_RACE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 // Weekly token volume per model lab, from a fixed start date through the most
@@ -88,4 +85,4 @@ export const GET = createPublicSnowflakeReport({
   source: 'public-leaderboard-provider-race-api',
 });
 
-export const OPTIONS = publicSnowflakeReportOptions;
+export const OPTIONS = publicReportOptions;

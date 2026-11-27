@@ -80,9 +80,9 @@ describe('readUserDataExportSecret', () => {
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
       // Flipping the variable back reads the legacy binding again.
-      expect(await readUserDataExportSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
-        'legacy-value'
-      );
+      expect(
+        await readUserDataExportSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)
+      ).toBe('legacy-value');
       expect(store.get).toHaveBeenCalledTimes(2);
       expect(sts.getBundle).toHaveBeenCalledOnce();
     }
@@ -132,5 +132,16 @@ describe('readUserDataExportSecret', () => {
       expect(await readUserDataExportSecret(env, name)).toBe('bundle-value');
     }
     expect(sts.getBundle).toHaveBeenCalledOnce();
+  });
+
+  it('returns an empty value as stored from either source', async () => {
+    const store = storeSecret('');
+    const sts = stsBinding(okBundle({ ...fullBundle, NEXTAUTH_SECRET: '' }));
+
+    // The caller applies its own empty-value policy; the reader must not substitute anything.
+    expect(await readUserDataExportSecret(legacyEnv(store.secret), 'NEXTAUTH_SECRET')).toBe('');
+    expect(
+      await readUserDataExportSecret({ STS: sts.binding, SECRETS_SOURCE: 'sts' }, 'NEXTAUTH_SECRET')
+    ).toBe('');
   });
 });

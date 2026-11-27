@@ -82,9 +82,9 @@ describe('readCodeReviewInfraSecret', () => {
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
       // Flipping the variable back reads the legacy binding again.
-      expect(await readCodeReviewInfraSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
-        'legacy-value'
-      );
+      expect(
+        await readCodeReviewInfraSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)
+      ).toBe('legacy-value');
       expect(store.get).toHaveBeenCalledTimes(2);
       expect(sts.getBundle).toHaveBeenCalledOnce();
     }
@@ -134,5 +134,20 @@ describe('readCodeReviewInfraSecret', () => {
       expect(await readCodeReviewInfraSecret(env, name)).toBe('bundle-value');
     }
     expect(sts.getBundle).toHaveBeenCalledOnce();
+  });
+
+  it('returns an empty value as stored from either source', async () => {
+    const store = storeSecret('');
+    const sts = stsBinding(okBundle({ ...fullBundle, BACKEND_AUTH_TOKEN: '' }));
+
+    // The middleware applies its own empty-value policy (it refuses an empty token); the reader
+    // must not substitute anything.
+    expect(await readCodeReviewInfraSecret(legacyEnv(store.secret), 'BACKEND_AUTH_TOKEN')).toBe('');
+    expect(
+      await readCodeReviewInfraSecret(
+        { STS: sts.binding, SECRETS_SOURCE: 'sts' },
+        'BACKEND_AUTH_TOKEN'
+      )
+    ).toBe('');
   });
 });

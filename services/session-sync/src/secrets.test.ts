@@ -138,4 +138,23 @@ describe('readSessionSyncSecret', () => {
     expect(await readSessionSyncSecret(env, 'INTERNAL_API_SECRET')).toBe('bundle-value');
     expect(sts.getBundle).toHaveBeenCalledOnce();
   });
+
+  it('returns an empty value as stored, and does not hold it for the isolate', async () => {
+    const store = storeSecret('');
+    const env = legacyEnv(store.secret);
+
+    // The caller applies its own empty-value policy; the reader must not substitute anything.
+    expect(await readSessionSyncSecret(env, 'NEXTAUTH_SECRET')).toBe('');
+    // Holding the empty value would pin a not-yet-populated item for the isolate's lifetime.
+    expect(await readSessionSyncSecret(env, 'NEXTAUTH_SECRET')).toBe('');
+    expect(store.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a bundle value that is empty as stored', async () => {
+    const sts = stsBinding(okBundle({ ...fullBundle, NEXTAUTH_SECRET: '' }));
+
+    expect(
+      await readSessionSyncSecret({ STS: sts.binding, SECRETS_SOURCE: 'sts' }, 'NEXTAUTH_SECRET')
+    ).toBe('');
+  });
 });

@@ -56,6 +56,30 @@ function holdersBySecretName(): Map<string, string[]> {
 const HOLDERS = holdersBySecretName();
 
 /**
+ * Names whose value is shared beyond the policies that grant it today. `apps/web` verifies the
+ * Worker's callbacks with the same `CALLBACK_TOKEN_SECRET` (`apps/web/src/lib/web-config.server.ts`),
+ * so the value lives in `/shared` rather than the Workload's own folder. STS resolves a Workload
+ * folder before `/shared`, so a `/workloads/<workload>` copy would shadow the shared value for that
+ * Worker alone, silently.
+ */
+const SHARED_ELSEWHERE: Record<string, true> = { CALLBACK_TOKEN_SECRET: true };
+
+/** The published table's path column: where the copier copies each value. */
+const PUBLISHED_PATHS: Record<string, string> = {
+  'session-sync|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'session-sync|SESSION_SYNC_SECRET': '/workloads/session-sync/SESSION_SYNC_SECRET',
+  'session-sync|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'user-data-export|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'user-data-export|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'user-data-export|R2_ACCESS_KEY_ID': '/workloads/user-data-export/R2_ACCESS_KEY_ID',
+  'user-data-export|R2_SECRET_ACCESS_KEY': '/workloads/user-data-export/R2_SECRET_ACCESS_KEY',
+  'kilo-code-review-worker|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'kilo-code-review-worker|CALLBACK_TOKEN_SECRET': '/shared/CALLBACK_TOKEN_SECRET',
+  'kilo-code-review-worker|BACKEND_AUTH_TOKEN':
+    '/workloads/kilo-code-review-worker/BACKEND_AUTH_TOKEN',
+};
+
+/**
  * Proves one Worker's rows against the three sources the copier table claims to agree: the shipped
  * policy (its `secrets`), the reader (which binding serves each name) and the wrangler manifest
  * (which of those bindings is a Secrets Store secret, and under which `secret_name`).
@@ -113,8 +137,8 @@ async function proveWorker<N extends string>(worker: {
       expect(binding, `${worker.workload}: ${name}`).toBe(name);
     }
     // Folder: a name several policies grant cannot live in one Workload's folder, and a name only
-    // this Workload grants stays in its own.
-    const shared = (HOLDERS.get(name)?.length ?? 0) > 1;
+    // this Workload grants stays in its own unless its value is shared outside STS.
+    const shared = (HOLDERS.get(name)?.length ?? 0) > 1 || SHARED_ELSEWHERE[name] === true;
     rows.push({
       workload: worker.workload,
       oldBinding: binding,
@@ -177,6 +201,12 @@ describe('the secrets copier table for the Workers that read STS', () => {
       // how many policies grant the name, so a value copied anywhere else is a copier mistake.
       expect(row.stsLookup.split('/').at(-1), row.workload).toBe(row.policyEntry);
     }
+    // The published path column, made executable: the copier copies each value into exactly this
+    // folder, so a row whose folder differs from the table is a documentation bug that would
+    // misplace the value.
+    expect(
+      Object.fromEntries(rows.map(row => [`${row.workload}|${row.policyEntry}`, row.stsLookup]))
+    ).toEqual(PUBLISHED_PATHS);
     // The plain-Worker-secret rows and the store rows both appear: the table's second column must
     // not claim a store item for a name the manifest does not bind one to.
     expect(rows.filter(row => row.storeSecretName === '—').map(row => row.policyEntry)).toEqual([

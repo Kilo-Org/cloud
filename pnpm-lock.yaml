@@ -3442,6 +3442,9 @@ importers:
       '@kilocode/sts-contracts':
         specifier: workspace:*
         version: link:../../packages/sts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

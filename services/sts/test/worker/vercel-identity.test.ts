@@ -416,17 +416,37 @@ describe('Vercel identity of the shipped ai-gateway policy', () => {
     });
   });
 
-  it('refuses every kilocode-ai-gateway environment on staging and production STS', async () => {
+  it('verifies the project production on production STS and its custom environment staging on staging STS', async () => {
+    const staging = await shipped('staging');
+    expect(
+      await staging(
+        gatewayClaims('staging', { custom_environment_id: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV' })
+      )
+    ).toMatchObject({ status: 'verified', workload: 'ai-gateway', provider: 'vercel' });
+    const production = await shipped('production');
+    expect(await production(gatewayClaims('production'))).toMatchObject({
+      status: 'verified',
+      workload: 'ai-gateway',
+      provider: 'vercel',
+    });
+  });
+
+  it('refuses a preview on staging and production STS and production or staging on another STS', async () => {
     const staging = await shipped('staging');
     expect(await staging(gatewayClaims('preview'))).toMatchObject({
       status: 'denied',
       reason: 'environment_mismatch',
       subject: { actor: 'ai-gateway' },
     });
-    // The project's custom environment staging, which the policy does not list yet.
+    expect(await staging(gatewayClaims('production'))).toMatchObject({
+      status: 'denied',
+      reason: 'environment_mismatch',
+      subject: { actor: 'ai-gateway' },
+    });
+    // Another custom environment of the project is not the listed staging one.
     expect(
       await staging(
-        gatewayClaims('staging', { custom_environment_id: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV' })
+        gatewayClaims('staging', { custom_environment_id: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PW' })
       )
     ).toMatchObject({
       status: 'denied',
@@ -440,9 +460,19 @@ describe('Vercel identity of the shipped ai-gateway policy', () => {
       reason: 'environment_mismatch',
       subject: { actor: 'ai-gateway' },
     });
-    expect(await production(gatewayClaims('production'))).toMatchObject({
+    expect(
+      await production(
+        gatewayClaims('staging', { custom_environment_id: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV' })
+      )
+    ).toMatchObject({
       status: 'denied',
-      reason: 'identity_rejected',
+      reason: 'environment_mismatch',
+      subject: { actor: 'ai-gateway' },
+    });
+    const development = await shipped('development');
+    expect(await development(gatewayClaims('production'))).toMatchObject({
+      status: 'denied',
+      reason: 'environment_mismatch',
       subject: { actor: 'ai-gateway' },
     });
   });

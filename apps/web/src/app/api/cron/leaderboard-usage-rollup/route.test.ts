@@ -27,7 +27,15 @@ function request(secret: string): NextRequest {
 function summary(overrides: Partial<LeaderboardUsageBuildSummary> = {}) {
   return {
     built: [
-      { usageDate: '2026-11-09', rows: 42, durationMs: 9_000, slices: 96, slowestSliceMs: 300 },
+      {
+        usageDate: '2026-11-09',
+        rows: 42,
+        durationMs: 9_000,
+        slices: 288,
+        slowestSliceMs: 300,
+        replayWaitMs: 50,
+        conflictRetries: 0,
+      },
     ],
     remaining: [],
     unsettled: [],

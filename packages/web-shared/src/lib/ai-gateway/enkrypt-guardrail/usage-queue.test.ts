@@ -27,6 +27,13 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
   APP_URL: 'https://app.example.com',
 }));
+// The real publisher, wrapped so a test can stand in one STS outcome without a token client.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/usage-publisher', () => {
+  const actual = jest.requireActual<typeof UsagePublisher>(
+    '@kilocode/web-shared/lib/ai-gateway/usage-publisher'
+  );
+  return { ...actual, enqueueEnkryptUsage: jest.fn(actual.enqueueEnkryptUsage) };
+});
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { after } from 'next/server';
@@ -38,6 +45,8 @@ import {
 } from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { recordEnkryptUsage } from './usage';
 import { readJsonBody, requestUrlOf } from '@kilocode/web-shared/tests/helpers/request-body.helper';
+import { enqueueEnkryptUsage } from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
+import type * as UsagePublisher from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
 
 const INGEST_URL = 'https://ingest.example.test/enkrypt-usage';
 const HANDOFF_URL = 'https://app.example.com/api/internal/enkrypt-usage/record';
@@ -241,4 +250,57 @@ describe('recordEnkryptUsage through the usage queue', () => {
     expect(callsTo(HANDOFF_URL)).toHaveLength(1);
     expect(callsTo(INGEST_URL)).toEqual([]);
   });
+});
+
+describe('recordEnkryptUsage under USAGE_PUBLISHER_AUTH=sts', () => {
+  it.each(['sts_token_denied', 'sts_token_unavailable'] as const)(
+    'writes locally in Frankfurt when no request was launched (%s)',
+    async reason => {
+      enableQueue();
+      jest.mocked(enqueueEnkryptUsage).mockResolvedValueOnce({ kind: 'not_sent', reason });
+      const usageRecord = await enkryptUsageRecordForNewOrganization();
+
+      await recordEnkryptUsage(usageRecord);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(await enkryptLedgerRows(usageRecord.organizationId)).toHaveLength(1);
+      expect(droppedLogs()).toEqual([]);
+    }
+  );
+
+  it('hands off from SFO when no request was launched', async () => {
+    enableQueue();
+    mockedIsUSRegion.mockReturnValue(true);
+    mockFetch.mockResolvedValue(Response.json({ status: 'recorded' }));
+    jest
+      .mocked(enqueueEnkryptUsage)
+      .mockResolvedValueOnce({ kind: 'not_sent', reason: 'sts_token_unavailable' });
+
+    await recordEnkryptUsage(await enkryptUsageRecordForNewOrganization());
+
+    expect(callsTo(HANDOFF_URL)).toHaveLength(1);
+    expect(callsTo(INGEST_URL)).toEqual([]);
+    expect(droppedLogs()).toEqual([]);
+  });
+
+  it.each(regions)(
+    'drops the write from %s after a launched send whose later token failed',
+    async (_region, us) => {
+      enableQueue();
+      mockedIsUSRegion.mockReturnValue(us);
+      // What the publisher answers once a request was launched (usage-publisher-sts.test.ts).
+      jest
+        .mocked(enqueueEnkryptUsage)
+        .mockResolvedValueOnce({ kind: 'unavailable', reason: 'sts_token_unavailable' });
+      const usageRecord = await enkryptUsageRecordForNewOrganization();
+
+      await recordEnkryptUsage(usageRecord);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(await enkryptLedgerRows(usageRecord.organizationId)).toEqual([]);
+      expect(droppedLogs()).toEqual([
+        [DROPPED, { usage_id: expect.any(String), reason: 'sts_token_unavailable' }],
+      ]);
+    }
+  );
 });

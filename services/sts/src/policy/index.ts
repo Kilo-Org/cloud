@@ -41,6 +41,7 @@ import sessionIngestPolicy from '../../policy/session-ingest.yaml';
 import sessionSyncPolicy from '../../policy/session-sync.yaml';
 import usageIngestPolicy from '../../policy/usage-ingest.yaml';
 import userDataExportPolicy from '../../policy/user-data-export.yaml';
+import utsPolicy from '../../policy/uts.yaml';
 import webPolicy from '../../policy/web.yaml';
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { loadPolicies, type PolicyIndex } from './load';
@@ -91,6 +92,7 @@ const sources: Record<PolicyFile, string> = {
   'session-sync.yaml': sessionSyncPolicy,
   'usage-ingest.yaml': usageIngestPolicy,
   'user-data-export.yaml': userDataExportPolicy,
+  'uts.yaml': utsPolicy,
   'web.yaml': webPolicy,
 };
 

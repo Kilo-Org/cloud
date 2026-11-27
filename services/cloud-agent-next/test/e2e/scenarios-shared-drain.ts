@@ -36,7 +36,11 @@ import {
   trackStartedSession,
   type ScenarioDeadline,
 } from './scenarios-shared-runtime.js';
-import type { CallbackSink, ScenarioEnvironment } from './scenario-capabilities.js';
+import {
+  sinkCallbackTarget,
+  type CallbackSink,
+  type ScenarioEnvironment,
+} from './scenario-capabilities.js';
 
 const CLEANUP_TIMEOUT_MS = 15_000;
 const CHILD_HOLD_MS = 8_000;
@@ -129,7 +133,7 @@ async function openDrainSession(
     )
   );
   await deadline.within('callback target', signal =>
-    registerSessionCallback(config, session.cloudAgentSessionId, { url: sink.callbackUrl }, signal)
+    registerSessionCallback(config, session.cloudAgentSessionId, sinkCallbackTarget(sink), signal)
   );
   const stream = openStream(config, session.cloudAgentSessionId, { replay: true });
   try {

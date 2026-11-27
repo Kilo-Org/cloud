@@ -21,13 +21,25 @@ export const MAX_DAYS_PER_RUN = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSERT_BATCH_SIZE = 1_000;
 
-// A busy hour is ~800k usage rows. A 15-minute slice keeps each read a few
-// seconds when warm, and well under the replica's 90s
-// `max_standby_streaming_delay` when cold, past which WAL replay may cancel it.
-const SLICE_MS = 15 * 60 * 1000;
+// A busy hour is ~800k usage rows, so a 5-minute slice reads ~70k and takes
+// about half a second warm. WAL replay can wait on a running slice, so the
+// slice length bounds the replica lag a slice causes, and keeps it well under
+// the replica's 90s `max_standby_streaming_delay` even when cold.
+const SLICE_MS = 5 * 60 * 1000;
 const SLICE_STATEMENT_TIMEOUT_MS = 60_000;
 // The default 32MB spills the usage-side hash join to disk at a busy hour.
 const SLICE_WORK_MEM = '128MB';
+
+// Back-to-back slices on `microdollar_usage` keep WAL replay waiting on the
+// replica, since frequent vacuums there conflict with each slice's snapshot.
+// The replay lag then grows until `max_standby_streaming_delay` (90s) cancels
+// a slice with 40001, leaving production reads on that replica stale meanwhile.
+// So before each slice, replay catches up to everything received so far.
+const REPLAY_CATCH_UP_TIMEOUT_MS = 30_000;
+const REPLAY_POLL_MS = 100;
+// A slice cancelled by a replay conflict is retried after replay catches up.
+const REPLAY_CONFLICT_ATTEMPTS = 3;
+const REPLAY_CONFLICT_CODE = '40001';
 
 type LeaderboardUsageKey = {
   provider: string | null;
@@ -69,6 +81,32 @@ export function leaderboardUsageWindow(now: Date): string[] {
   return Array.from({ length: LEADERBOARD_USAGE_LOOKBACK_DAYS }, (_, index) =>
     utcDateString(todayMs - (index + 1) * DAY_MS)
   );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Waits until `readDb` has replayed all the WAL it had received when called,
+ * up to `REPLAY_CATCH_UP_TIMEOUT_MS`. Returns how long it waited. A primary
+ * has no replay, so it returns at once.
+ */
+export async function waitForReplayCatchUp(readDb: DrizzleDatabase): Promise<number> {
+  const startedAt = Date.now();
+  const received = await readDb.execute<{ receive_lsn: string | null }>(
+    sql`SELECT pg_last_wal_receive_lsn()::text AS receive_lsn`
+  );
+  const receiveLsn = received.rows[0]?.receive_lsn;
+  if (!receiveLsn) return 0;
+  while (Date.now() - startedAt < REPLAY_CATCH_UP_TIMEOUT_MS) {
+    const replayed = await readDb.execute<{ caught_up: boolean | null }>(
+      sql`SELECT pg_last_wal_replay_lsn() >= ${receiveLsn}::pg_lsn AS caught_up`
+    );
+    if (replayed.rows[0]?.caught_up !== false) break;
+    await sleep(REPLAY_POLL_MS);
+  }
+  return Date.now() - startedAt;
 }
 
 async function aggregateSlice(
@@ -126,6 +164,10 @@ export type LeaderboardUsageDayBuild = {
   durationMs: number;
   slices: number;
   slowestSliceMs: number;
+  /** Time spent waiting for the replica to replay before slices. */
+  replayWaitMs: number;
+  /** Slices retried after a replay conflict cancelled them. */
+  conflictRetries: number;
 };
 
 function postgresErrorCode(error: unknown): string | null {
@@ -138,7 +180,7 @@ function postgresErrorCode(error: unknown): string | null {
 }
 
 /**
- * Aggregates one UTC day of usage from `readDb` 15 minutes at a time, then replaces
+ * Aggregates one UTC day of usage from `readDb` 5 minutes at a time, then replaces
  * that day's rollup rows on `db` in one transaction. Returns what was written,
  * or `null` without writing anything when `deadline` passes before the last
  * slice. A failure is logged with the day, the stage and the slice, then rethrown.
@@ -152,6 +194,8 @@ export async function rebuildLeaderboardUsageDay(
   const rows = new Map<string, LeaderboardUsageRow>();
   let slices = 0;
   let slowestSliceMs = 0;
+  let replayWaitMs = 0;
+  let conflictRetries = 0;
   let stage: { name: 'read'; sliceStart: string } | { name: 'write' } | null = null;
 
   try {
@@ -174,9 +218,33 @@ export async function rebuildLeaderboardUsageDay(
       const start = new Date(sliceStartMs).toISOString();
       const end = new Date(sliceStartMs + SLICE_MS).toISOString();
       stage = { name: 'read', sliceStart: start };
-      const sliceStartedAt = Date.now();
-      const aggregates = await aggregateSlice(readDb, start, end);
-      slowestSliceMs = Math.max(slowestSliceMs, Date.now() - sliceStartedAt);
+      let aggregates: SliceAggregateRow[] | null = null;
+      for (let attempt = 1; aggregates === null; attempt++) {
+        replayWaitMs += await waitForReplayCatchUp(readDb);
+        const sliceStartedAt = Date.now();
+        try {
+          aggregates = await aggregateSlice(readDb, start, end);
+        } catch (error) {
+          if (
+            postgresErrorCode(error) !== REPLAY_CONFLICT_CODE ||
+            attempt >= REPLAY_CONFLICT_ATTEMPTS
+          ) {
+            throw error;
+          }
+          conflictRetries++;
+          logExceptInTest(
+            JSON.stringify({
+              type: 'leaderboard_usage_rollup_slice_retry',
+              usageDate,
+              sliceStart: start,
+              attempt,
+              sliceMs: Date.now() - sliceStartedAt,
+            })
+          );
+          continue;
+        }
+        slowestSliceMs = Math.max(slowestSliceMs, Date.now() - sliceStartedAt);
+      }
       slices++;
       for (const aggregate of aggregates) {
         const key = keyOf(aggregate);
@@ -232,6 +300,8 @@ export async function rebuildLeaderboardUsageDay(
       durationMs: Date.now() - startedAt,
       slices,
       slowestSliceMs,
+      replayWaitMs,
+      conflictRetries,
     };
     logExceptInTest(JSON.stringify({ type: 'leaderboard_usage_rollup_day', usageDate, ...build }));
     return build;
@@ -246,6 +316,8 @@ export async function rebuildLeaderboardUsageDay(
         stage: stage?.name ?? null,
         sliceStart: stage?.name === 'read' ? stage.sliceStart : null,
         slicesCompleted: slices,
+        replayWaitMs,
+        conflictRetries,
         durationMs: Date.now() - startedAt,
         errorName: error instanceof Error ? error.name : typeof error,
         postgresCode: postgresErrorCode(error),

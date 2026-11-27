@@ -626,9 +626,20 @@ repository secrets. The wire contract is `ci.ts` in `@kilocode/uts-contracts`.
   organization claim, so a CI token never holds more than a PAT of the same account could.
 - **Subject.** Each policy names one UTS account, a dedicated CI account for that job, not an org
   bot key. The token then has the claim profile of any user token, so a verifier needs no new
-  subject kind; blocking the account, or its subject revocation on the feed, stops its CI tokens.
-  The token carries `sub`, `client_id` (the policy name), `scope`, `aud`, `env`, `jti` and the
-  policy's lifetime (at most 1 hour), and no `sid`, `org`, `act` or refresh token.
+  subject kind. The token carries `sub`, `client_id` (the policy name), `scope`, `aud`, `env`,
+  `jti` and the policy's lifetime (at most 1 hour), and no `sid`, `org`, `act` or refresh token.
+- **Stopping CI tokens.** Removing a policy stops new CI tokens only: tokens already issued live
+  until their expiry, up to 1 hour. The emergency stop is an access block of the CI account
+  (subject operation `revoke`, reason `access_block`): its statement refuses every later exchange
+  and puts a `subject` entry (with `revoked_before`) and a `blocked_account` entry on the
+  revocation feed for 70 minutes, past the longest CI token issued before it. A verifier refuses
+  such a token once its feed copy holds the entries, not at once (design 3, 5.6, 7): the first
+  request 10 seconds after its last fetch refreshes the copy in the background, a request waits
+  for a refresh once the signed head is over 30 seconds old (about 41 seconds in the worst case),
+  and, for a policy lifetime over 10 minutes, the verifier answers 503 rather than accept it once
+  the head is over 60 seconds old (10 minutes for a shorter lifetime).
+  `test/runtime/ci-token.test.ts` proves both with `@kilocode/verify`; `test/db/ci-token.test.ts`
+  proves the block's feed entries.
 - **Checks.** The OIDC token is `RS256` under GitHub's key set, issuer
   `https://token.actions.githubusercontent.com`, exactly the environment's UTS issuer URL as its
   one audience, `exp` with 60 seconds of skew and no future `iat`. The repository and owner ids,

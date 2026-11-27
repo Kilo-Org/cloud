@@ -73,7 +73,13 @@ async function fetchKeySet(fetcher: typeof fetch): Promise<Fetched> {
     await response.body?.cancel();
     return { status: 'failed' };
   }
-  const text = await readBoundedText(response.body, MAX_BODY_BYTES);
+  // A body that times out or resets part way fails the read like a failed fetch.
+  let text: string | null;
+  try {
+    text = await readBoundedText(response.body, MAX_BODY_BYTES);
+  } catch {
+    return { status: 'failed' };
+  }
   if (text === null) return { status: 'failed' };
   let json: unknown;
   try {

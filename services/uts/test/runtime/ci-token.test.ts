@@ -6,9 +6,23 @@ import {
   UTS_GRANT_TYPES,
   UTS_ID_TOKEN_TYPE_URN,
   UtsAccessTokenClaimsSchema,
+  utsScopeEntry,
 } from '@kilocode/uts-contracts';
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify } from 'jose';
-import { describe, expect, it } from 'vitest';
+import {
+  FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS,
+  FEED_REFRESH_AFTER_MS,
+  type RevocationFeedSource,
+  createVerifier,
+} from '@kilocode/verify';
+import {
+  SignJWT,
+  calculateJwkThumbprint,
+  createLocalJWKSet,
+  exportJWK,
+  generateKeyPair,
+  jwtVerify,
+} from 'jose';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CiExchangeService } from '../../src/ci/exchange';
 import {
   GITHUB_ACTIONS_JWKS_URL,
@@ -18,8 +32,10 @@ import {
 } from '../../src/ci/github-keys';
 import { CI_LEGACY_SUBJECT_REPOSITORY, type CiPolicy, CiPolicySchema } from '../../src/ci/policy';
 import type { CiExchangeInput, CiExchangeResult, CiTokenAccess } from '../../src/ci/store';
+import { signFeedHead } from '../../src/feed/head';
 import { authorizationServerMetadata } from '../../src/metadata/authorization-server';
 import { handleOAuthRequest } from '../../src/oauth/routes';
+import { type FeedEntry, serializeList } from '../../src/revocation/entries';
 import type { SignerAccess } from '../../src/token/mint';
 import { errorOf, formRequest, oauthDeps, storeFailure, unexpectedStore } from './oauth-support';
 import { keySet } from './support';
@@ -68,7 +84,11 @@ const keyB = await githubSigningKey('github-key-b');
 
 /** GitHub's key set as a fake fetch serves it; `answer` swaps what it serves, `calls` counts. */
 function githubKeySet(initial: GithubSigningKey[]) {
-  const served = { keys: initial, answer: 'ok' as 'ok' | 'fail' | 'redirect', calls: 0 };
+  const served = {
+    keys: initial,
+    answer: 'ok' as 'ok' | 'fail' | 'redirect' | 'broken_body',
+    calls: 0,
+  };
   const fetcher: typeof fetch = async (input, init) => {
     served.calls += 1;
     expect(input).toBe(GITHUB_ACTIONS_JWKS_URL);
@@ -76,6 +96,16 @@ function githubKeySet(initial: GithubSigningKey[]) {
     if (served.answer === 'fail') return new Response('down', { status: 503 });
     if (served.answer === 'redirect') {
       return new Response(null, { status: 302, headers: { Location: 'https://example.com/' } });
+    }
+    if (served.answer === 'broken_body') {
+      // A 200 whose body resets after the headers, as a dropped connection does.
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"keys": ['));
+          controller.error(new Error('connection reset'));
+        },
+      });
+      return new Response(body, { status: 200 });
     }
     return Response.json({ keys: served.keys.map(key => key.jwk) });
   };
@@ -460,6 +490,26 @@ describe('the CI token exchange', () => {
     expect(keys.served.calls).toBe(3);
   });
 
+  it('answers 503 when the key set body fails part way, and pauses fetches 10 seconds', async () => {
+    let now = Date.now();
+    const keys = githubKeySet([keyA]);
+    keys.served.answer = 'broken_body';
+    const ci = ciService({ fetcher: keys.fetcher, now: () => now });
+    const exchange = async () =>
+      await call(ciRequest(await githubToken(keyA, {}, Math.floor(now / 1000))), ci, standInSigner);
+    const failed = await exchange();
+    expect(failed.status).toBe(503);
+    expect(failed.headers.get('Retry-After')).toBe('2');
+    expect(await errorOf(failed)).toBe('temporarily_unavailable');
+    now += 9_000;
+    expect((await exchange()).status).toBe(503);
+    expect(keys.served.calls).toBe(1);
+    now += 1_000;
+    keys.served.answer = 'ok';
+    expect((await exchange()).status).toBe(200);
+    expect(keys.served.calls).toBe(2);
+  });
+
   it('refuses an inactive account with invalid_grant, and maps store and signer failures', async () => {
     const subject = await githubToken();
     const inactive = recordingStore(async () => ({ outcome: 'account_inactive' }));
@@ -490,5 +540,127 @@ describe('the CI token exchange', () => {
       ).grant_types_supported;
     expect(grantTypes(ciService())).toContain(UTS_GRANT_TYPES.tokenExchange);
     expect(grantTypes({ status: 'off' })).not.toContain(UTS_GRANT_TYPES.tokenExchange);
+  });
+});
+
+/**
+ * The UTS revocation feed as a verifier reads it: heads signed now under a feed key the test
+ * holds, over UTS's own list serialization of `entries`.
+ */
+async function utsFeed() {
+  const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
+  const jwk = await exportJWK(publicKey);
+  const kid = `uts-feed-0-${await calculateJwkThumbprint(jwk, 'sha256')}`;
+  const lists = new Map<string, Uint8Array<ArrayBuffer>>();
+  const feed = {
+    entries: [] as FeedEntry[],
+    reachable: true,
+    key: { ...jwk, kid, alg: 'EdDSA', use: 'sig' },
+    source: {
+      async head() {
+        if (!feed.reachable) throw new Error('feed unreachable');
+        const list = serializeList(feed.entries);
+        lists.set(list.hash, new Uint8Array(new TextEncoder().encode(list.text)));
+        return await signFeedHead(privateKey, kid, {
+          iat: Math.floor(Date.now() / 1000),
+          list_hash: list.hash,
+        });
+      },
+      async list(hash) {
+        const bytes = lists.get(hash);
+        if (bytes === undefined) throw new Error('unknown list hash');
+        return bytes;
+      },
+    } satisfies RevocationFeedSource,
+  };
+  return feed;
+}
+
+describe('the emergency stop for issued CI tokens', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * A CI token from the real exchange and signer, and a `@kilocode/verify` verifier for the
+   * gateway over the real UTS token keys and `feed`. The clock is faked only after issuance, since
+   * the signer objects check `iat` against the real clock.
+   */
+  async function issuedTokenAndVerifier() {
+    const response = await call(ciRequest(await githubToken()));
+    expect(response.status).toBe(200);
+    const token = CiTokenResponseSchema.parse(await response.json()).access_token;
+    const feed = await utsFeed();
+    const tokenKeys = (await keySet()).keys;
+    const verifier = createVerifier({
+      audience: 'kilo-gateway',
+      environment: 'development',
+      resourceMetadataUrl: `${config.endpoints.issuer}/.well-known/oauth-protected-resource`,
+      uts: {
+        issuer: config.endpoints.issuer,
+        jwks: async () => ({
+          body: { keys: [...tokenKeys, feed.key] },
+          age: 0,
+          oldestAge: 0,
+        }),
+        scopeRegistry: (audience, scope) => {
+          const entry = utsScopeEntry(scope);
+          return entry === null || entry.audience !== audience ? null : entry;
+        },
+        revocation: feed.source,
+      },
+    });
+    const background: Promise<unknown>[] = [];
+    const verify = async () =>
+      await verifier.verify(
+        `Bearer ${token}`,
+        { issuer: 'uts', scope: KILO_GATEWAY_INFERENCE_SCOPE },
+        { waitUntil: promise => background.push(promise), clientAddress: '203.0.113.7' }
+      );
+    const drain = async () => {
+      await Promise.all(background.splice(0));
+    };
+    return { feed, verify, drain };
+  }
+
+  it('refuses an already-issued CI token once the account block reaches the verifier feed copy', async () => {
+    const { feed, verify, drain } = await issuedTokenAndVerifier();
+    expect(await verify()).toMatchObject({ ok: true });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 1_000);
+    // The entries `uts.apply_subject_operation` writes for an access block (test/db/ci-token.test.ts).
+    const now = Date.now();
+    feed.entries = [
+      {
+        kind: 'subject',
+        id: ACCOUNT,
+        revokedBefore: now,
+        revokedAt: now,
+        expiresAt: now + 70 * 60_000,
+      },
+      {
+        kind: 'blocked_account',
+        id: ACCOUNT,
+        revokedBefore: null,
+        revokedAt: now,
+        expiresAt: now + 70 * 60_000,
+      },
+    ];
+    // Not at once: inside 10 seconds of its last fetch the verifier answers from its copy.
+    expect(await verify()).toMatchObject({ ok: true });
+    // The first request 10 seconds after the last fetch refreshes the copy in the background.
+    vi.setSystemTime(Date.now() + FEED_REFRESH_AFTER_MS);
+    await verify();
+    await drain();
+    expect(await verify()).toMatchObject({ ok: false, status: 401 });
+  });
+
+  it('refuses an issued CI token rather than accept it once the feed head is over 60 seconds old', async () => {
+    const { feed, verify } = await issuedTokenAndVerifier();
+    expect(await verify()).toMatchObject({ ok: true });
+    feed.reachable = false;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + FEED_LONG_CREDENTIAL_MAX_HEAD_AGE_MS + 1_000);
+    expect(await verify()).toMatchObject({ ok: false, status: 503 });
   });
 });

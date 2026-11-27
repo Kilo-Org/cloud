@@ -1878,13 +1878,19 @@ export async function dispatchScheduler(env: Env, ctx?: SecretsExecutionContext)
         caseId,
       });
     }
-    await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
+    await finalizeRunIfComplete(
+      env,
+      claim.run_id,
+      'decider',
+      await getRunState(env, claim.run_id),
+      ctx
+    );
   }
   for (const runId of await listSettledSchedulerRuns(
     env.BENCH_DB,
     REGISTRY_QUEUES * MAX_RUNNING_RUNS_PER_QUEUE
   )) {
-    await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId));
+    await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId), ctx);
   }
   let claimed = await dispatchClaims(env, config);
   if (await initializeScheduledRuns(env)) claimed += await dispatchClaims(env, config);

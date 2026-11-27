@@ -42,6 +42,13 @@ const SHARED_NAMES: readonly string[] = ['INTERNAL_API_SECRET', 'NEXTAUTH_SECRET
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
+/**
+ * The suffix a non-production block's store secret must carry, spelled as
+ * `test/repo/worker-configs.ts` `NON_PRODUCTION_SECRET` spells it. The broad suffix above would
+ * also accept `_PROD`, which is exactly what this row must reject.
+ */
+const NON_PRODUCTION_SECRET = /_(DEV|DEVELOPMENT|LOCAL|STAGING|TEST)$/;
+
 /** The reader's own name unions: a name outside them is a type error here, not a runtime failure. */
 const NAMES: readonly CloudAgentNextSecretName[] = [
   'INTERNAL_API_SECRET',
@@ -198,7 +205,7 @@ describe('the secrets copier table for cloud-agent-next', () => {
     // The `dev` block reads only non-production store secrets: a config that binds STS may not
     // read a production-named secret from a non-production block (worker-configs.ts).
     for (const entry of config.env?.['dev']?.secrets_store_secrets ?? []) {
-      expect(entry.secret_name, `${WORKLOAD}: dev ${entry.binding}`).toMatch(ENVIRONMENT_SUFFIX);
+      expect(entry.secret_name, `${WORKLOAD}: dev ${entry.binding}`).toMatch(NON_PRODUCTION_SECRET);
     }
   });
 });

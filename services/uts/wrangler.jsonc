@@ -34,6 +34,10 @@
     // The PAT lookup Hyperdrive config's connection limit: 20 percent of max_connections 160. The
     // per-isolate PAT lookup cap is min(100, 3 x this) = 96 (src/env.ts, design 3).
     "PAT_LOOKUP_CONNECTIONS": "32",
+    // Passkeys belong to the app host; the sign-in pages on the issuer origin use them as a
+    // WebAuthn related origin that the app host lists (design 5.14).
+    "WEBAUTHN_RP_ID": "app.kilo.ai",
+    "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
   },
   "durable_objects": {
     "bindings": [
@@ -41,13 +45,23 @@
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
       // The two revocation-feed objects; only this Worker binds them (src/feed/UtsFeedDO.ts).
       { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+      { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
     { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
   ],
+  // The audit outbox relay sends each shard's batches to the environment's UTS audit queue, which
+  // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
+  // streams from it (design 8.1).
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
+  // Every minute: keep the 8 audit shard relays running, maintain audit partitions, OAuth rows and
+  // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts). It
+  // does nothing while IDENTITY_STORE is unbound.
+  "triggers": { "crons": ["* * * * *"] },
   // No identity-store Hyperdrive binding yet: the OAuth endpoints, the account API, the PAT probe
   // route and the PAT lookup stay off until the environment's identity store is provisioned
   // (src/grants/binding.ts, src/pat/lookup.ts).
@@ -68,14 +82,19 @@
         "DO_JURISDICTION": "eu",
         // The staging PAT lookup config's connection limit; per-isolate cap min(100, 36) = 36.
         "PAT_LOOKUP_CONNECTIONS": "12",
+        "WEBAUTHN_RP_ID": "staging-app.kilo.ai",
+        "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
       },
       "durable_objects": {
         "bindings": [
           { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
           { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
           { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+          { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
         ],
       },
+      "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
+      "triggers": { "crons": ["* * * * *"] },
     },
   },
 }

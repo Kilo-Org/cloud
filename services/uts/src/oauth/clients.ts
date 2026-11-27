@@ -1,3 +1,5 @@
+import type { UtsEnvironment } from '@kilocode/uts-contracts';
+import { matchesPrivateUseRedirect } from '../signin/native/redirect';
 import { oauthError } from './errors';
 import type { Params } from './params';
 
@@ -8,28 +10,68 @@ import type { Params } from './params';
  * caches the document (`uts.third_party_clients`) with its redirect URIs.
  */
 
+/**
+ * Where a first-party client receives its code. A desktop app uses a loopback address (RFC 8252
+ * section 7.3): any port, the host `127.0.0.1` or `[::1]` (never `localhost`, RFC 8252 section
+ * 8.3), and a fixed path. A mobile app uses one private-use-scheme URI (RFC 8252 section 7.1).
+ */
+export type RedirectRule =
+  | { kind: 'loopback'; path: string }
+  | { kind: 'private_use_scheme'; uri: string };
+
 export type FirstPartyClient = {
   clientId: string;
   name: string;
   clientClass: 'desktop' | 'mobile';
+  redirect: RedirectRule;
+  /** Whether the client may sign in with the RFC 8628 device grant (design 5.5). */
+  deviceGrant: boolean;
   /**
-   * RFC 8252 section 7.3: a native app receives the code on a loopback address. Any port is
-   * allowed, the host is `127.0.0.1` or `[::1]` (never `localhost`, RFC 8252 section 8.3), and the
-   * path is fixed.
+   * `required`: design 5.5 asks the client for device attestation (App Attest, Play Integrity),
+   * which UTS does not verify yet, so the authorization endpoint serves the client in development
+   * only and refuses it in staging and production (`clientServedIn`). `none`: no attestation.
    */
-  loopbackPath: string;
+  attestation: 'required' | 'none';
 };
 
 /**
- * The first-party clients that use the authorization endpoint today: the CLI, which the VS Code
- * and JetBrains extensions drive (design 5.5). A client joins this list when it moves to UTS.
+ * The first-party clients (design 5.5): the CLI, which the VS Code and JetBrains extensions drive,
+ * with the device grant as its fallback, and the mobile app, which signs in through the system
+ * browser. A client joins this list when it moves to UTS.
  */
 const FIRST_PARTY_CLIENTS: ReadonlyMap<string, FirstPartyClient> = new Map([
   [
     'kilo-cli',
-    { clientId: 'kilo-cli', name: 'Kilo CLI', clientClass: 'desktop', loopbackPath: '/callback' },
+    {
+      clientId: 'kilo-cli',
+      name: 'Kilo CLI',
+      clientClass: 'desktop',
+      redirect: { kind: 'loopback', path: '/callback' },
+      deviceGrant: true,
+      attestation: 'none',
+    },
+  ],
+  [
+    'kilo-mobile',
+    {
+      clientId: 'kilo-mobile',
+      name: 'Kilo mobile app',
+      clientClass: 'mobile',
+      redirect: { kind: 'private_use_scheme', uri: 'com.kilocode.kiloapp:/oauth/callback' },
+      deviceGrant: false,
+      attestation: 'required',
+    },
   ],
 ]);
+
+/**
+ * Whether the authorization endpoint serves `client` in `environment`. A client that needs device
+ * attestation is served only in development until UTS verifies attestation, so no staging or
+ * production grant exists for it; every later step (refresh, tickets) needs such a grant.
+ */
+export function clientServedIn(client: FirstPartyClient, environment: UtsEnvironment): boolean {
+  return client.attestation === 'none' || environment === 'development';
+}
 
 /** The shape `uts.third_party_clients` enforces: an HTTPS URL with a path and no query. */
 const THIRD_PARTY_CLIENT_ID = /^https:\/\/[^/?#]+\/[^?#]+$/;
@@ -65,10 +107,20 @@ export function requestClient(
   return identity;
 }
 
+/** The first-party client a request names, or the error response; third-party clients refused. */
+export function requestFirstPartyClient(params: Params): FirstPartyClient | Response {
+  const identity = requestClient(params);
+  if (identity instanceof Response) return identity;
+  if (identity.kind !== 'first_party') {
+    return oauthError('unauthorized_client', 400, 'this endpoint serves first-party clients only');
+  }
+  return identity.client;
+}
+
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '[::1]']);
 
-/** True when `redirectUri` is a loopback redirect of `client` on any port. */
-export function isLoopbackRedirect(client: FirstPartyClient, redirectUri: string): boolean {
+/** True when `redirectUri` is a loopback redirect on any port with the rule's path. */
+function isLoopbackRedirect(path: string, redirectUri: string): boolean {
   let url: URL;
   try {
     url = new URL(redirectUri);
@@ -81,10 +133,17 @@ export function isLoopbackRedirect(client: FirstPartyClient, redirectUri: string
     url.port !== '' &&
     url.username === '' &&
     url.password === '' &&
-    url.pathname === client.loopbackPath &&
+    url.pathname === path &&
     url.search === '' &&
     url.hash === '' &&
     // The parsed form must be the sent form, so no normalization hides another target.
     url.href === redirectUri
   );
+}
+
+/** True when `redirectUri` is the redirect `client` registered. */
+export function isRegisteredRedirect(client: FirstPartyClient, redirectUri: string): boolean {
+  return client.redirect.kind === 'loopback'
+    ? isLoopbackRedirect(client.redirect.path, redirectUri)
+    : matchesPrivateUseRedirect(client.redirect.uri, redirectUri);
 }

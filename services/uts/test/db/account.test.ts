@@ -8,7 +8,7 @@ import { type AccountStore, identityStoreAccount } from '../../src/account/store
 import { IdentityStore } from '../../src/db/client';
 import { lookupBotKey, lookupPat } from '../../src/db/lookups';
 import { createSecret, hexOfHash, lastFour } from '../../src/pat/format';
-import { TestDatabase, insertAccount, sqlStateOf } from './harness';
+import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
 /**
  * The account functions (migration 0005) through the Worker's own statements
@@ -259,10 +259,16 @@ describe('PAT create', () => {
     const holder = await session({ minutesAgo: 60 });
     const passkey = await owner.query<{ id: string }>(
       `INSERT INTO uts.passkey_credentials (account_id, credential_id, public_key, backup_eligible,
-         backed_up, rp_id, name, added_at)
-       VALUES ($1, $2, $3, false, false, 'app.kilo.ai', 'laptop', now() - interval '30 days')
+         backed_up, rp_id, name, added_at, user_handle, gate_pass_id)
+       VALUES ($1, $2, $3, false, false, 'app.kilo.ai', 'laptop', now() - interval '30 days', $4, $5)
        RETURNING id`,
-      [holder.accountId, randomBytes(32), randomBytes(32)]
+      [
+        holder.accountId,
+        randomBytes(32),
+        randomBytes(32),
+        randomBytes(32),
+        await insertGatePass(owner, holder.accountId, 'passkey_add'),
+      ]
     );
     await owner.query(
       `INSERT INTO uts.step_ups (account_id, device_session_id, purpose, passkey_credential_id, expires_at)
@@ -993,9 +999,15 @@ describe('tier A gate passes', () => {
     const holder = await session({ amr: ['oauth'] });
     await owner.query(
       `INSERT INTO uts.passkey_credentials (account_id, credential_id, public_key, backup_eligible,
-         backed_up, rp_id, name, added_at)
-       VALUES ($1, $2, $3, false, false, 'app.kilo.ai', 'laptop', now() - interval '30 days')`,
-      [holder.accountId, randomBytes(32), randomBytes(32)]
+         backed_up, rp_id, name, added_at, user_handle, gate_pass_id)
+       VALUES ($1, $2, $3, false, false, 'app.kilo.ai', 'laptop', now() - interval '30 days', $4, $5)`,
+      [
+        holder.accountId,
+        randomBytes(32),
+        randomBytes(32),
+        randomBytes(32),
+        await insertGatePass(owner, holder.accountId, 'passkey_add'),
+      ]
     );
     const [email, code] = [randomBytes(32), randomBytes(32)];
     await tierACode(holder.accountId, email, code);

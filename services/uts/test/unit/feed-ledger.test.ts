@@ -269,6 +269,22 @@ describe('lists', () => {
     expect(heldBytes).toBeLessThanOrEqual(FEED_MAX_OLD_LIST_BYTES);
   });
 
+  it('keeps more than 64 small lists while they fit the byte bound', async () => {
+    const ledger = backfilled();
+    const held: FeedEntry[] = [];
+    const hashes: string[] = [];
+    // 100 changes in 10 seconds; each list is far under the byte bound.
+    for (let step = 0; step < 100; step += 1) {
+      const at = T0 + step * 100;
+      const entry = grant(`many-${step}`);
+      held.push(entry);
+      ledger.take([entry], at);
+      hashes.push(serializeList(held).hash);
+    }
+    const now = T0 + 10_000;
+    expect(hashes.filter(hash => ledger.list(hash, now) !== null)).toHaveLength(100);
+  });
+
   it('keeps every list for 30 seconds after it was replaced, at more than 4 changes per second', async () => {
     const ledger = backfilled();
     const held: FeedEntry[] = [];

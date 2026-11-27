@@ -107,6 +107,9 @@ describe('the PAT lookup', () => {
         ...env,
         UTS_ENVIRONMENT: environment,
         DO_JURISDICTION: environment === 'development' ? 'none' : 'eu',
+        ...(environment === 'development'
+          ? {}
+          : { WEBAUTHN_RP_ID: 'app.kilo.ai', WEBAUTHN_ORIGINS: 'https://uts.kiloapps.io' }),
         PAT_LOOKUP_CONNECTIONS: connections,
       };
       expect(patLookupsInFlight(target)).toBe(cap);

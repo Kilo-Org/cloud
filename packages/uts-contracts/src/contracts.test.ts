@@ -293,8 +293,11 @@ describe('revocation feed shapes', () => {
   it('read the feed over a FeedReader binding, validating and disposing each result', async () => {
     const bytes = new TextEncoder().encode(JSON.stringify(list));
     const disposed: string[] = [];
+    // Node has `Symbol.dispose`; the ES2024 lib this package compiles against does not name it.
+    const dispose: unknown = Reflect.get(Symbol, 'dispose');
+    if (typeof dispose !== 'symbol') throw new Error('this runtime has no Symbol.dispose');
     const withDisposer = <T extends object>(value: T, name: string): T =>
-      Object.defineProperty(value, Symbol.dispose, { value: () => disposed.push(name) });
+      Object.defineProperty(value, dispose, { value: () => disposed.push(name) });
     const binding: FeedReaderBinding = {
       head: async () => withDisposer({ status: 'ok', head: 'a.b.c' }, 'head'),
       list: async hash =>
@@ -380,6 +383,31 @@ describe('revocation feed shapes', () => {
     await expect(
       feedReaderSources(hanging).feed.head(AbortSignal.abort(new Error('already')))
     ).rejects.toThrow('already');
+  });
+
+  it('rejects a binding call that throws synchronously, as one whose promise rejects', async () => {
+    const throwing: FeedReaderBinding = {
+      head: () => {
+        throw new Error('stub head threw');
+      },
+      list: () => {
+        throw new Error('stub list threw');
+      },
+      bootstrap: () => {
+        throw new Error('stub bootstrap threw');
+      },
+      jwks: () => {
+        throw new Error('stub jwks threw');
+      },
+    };
+    const sources = feedReaderSources(throwing);
+    const signal = new AbortController().signal;
+    const head = sources.feed.head(signal);
+    expect(head).toBeInstanceOf(Promise);
+    await expect(head).rejects.toThrow('stub head threw');
+    await expect(sources.feed.list('known', signal)).rejects.toThrow('stub list threw');
+    await expect(sources.bootstrap(signal)).rejects.toThrow('stub bootstrap threw');
+    await expect(sources.jwks(signal)).rejects.toThrow('stub jwks threw');
   });
 
   it('read the feed over HTTPS and refuse a non-200 answer', async () => {

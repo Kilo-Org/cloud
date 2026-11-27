@@ -103,6 +103,116 @@ describe('queue handler', () => {
     expect(pages[0]).toContain(`\nunknown stream (undecodable) after 1 attempts at ${key}`);
   });
 
+  it.each([
+    {
+      label: 'a UTS stream on the STS queue',
+      queue: 'kilo-audit',
+      stream: 'uts:production:3',
+      source: 'kilo:uts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'an STS stream with UTS sources on the UTS queue',
+      queue: 'kilo-audit-uts',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:uts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'an STS stream on the UTS dead-letter queue',
+      queue: 'kilo-audit-uts-dlq',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:sts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a UTS stream of another environment',
+      queue: 'kilo-audit-uts',
+      stream: 'uts:staging:3',
+      source: 'kilo:uts:staging',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a UTS stream that is not one of the 8 shards',
+      queue: 'kilo-audit-uts',
+      stream: 'uts:production:8',
+      source: 'kilo:uts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'an event source of another producer',
+      queue: 'kilo-audit',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:uts:production',
+      reason: 'refused_source_mismatch',
+    },
+    {
+      label: 'an unknown audit queue',
+      queue: 'kilo-audit-other',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:sts:production',
+      reason: 'refused_queue_not_allowed',
+    },
+  ])(
+    'keeps $label under dead-letter/unknown and never archives it',
+    async ({ queue, stream, source, reason }) => {
+      const http = recordingFetch(axiomOk);
+      vi.stubGlobal('fetch', http.impl);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const forged = auditBatch(1, 2, stream);
+      const body = await encodeAuditBatch({
+        ...forged,
+        events: forged.events.map(event => ({ ...event, source })),
+      });
+
+      const { batch, result } = await runQueue(queue, [body.buffer]);
+
+      expect(result.retryMessages).toEqual([]);
+      expect(result.explicitAcks).toHaveLength(1);
+      expect(await listObjectKeys(`streams/${stream}/`)).toEqual([]);
+      const [message] = batch.messages;
+      const key = deadLetterKey(null, message.timestamp, message.id);
+      expect(await storedBytes(key)).toEqual(body);
+      // Refused batches share the unknown bucket's hourly page with every other test here, so the
+      // log line, which every refusal writes, is what this checks; a page carries the same text.
+      const given = errors.mock.calls
+        .map(([line]) => String(line))
+        .filter(line => line.startsWith('{"event":"audit_relay.dead_letter_given_up"'))
+        .map(line => JSON.parse(line));
+      expect(given).toEqual([expect.objectContaining({ queue, stream, key, reason, toSeq: 2 })]);
+      for (const page of pageTexts(http.requests)) {
+        expect(page).toContain(`\n${stream} seq 1..2 (${reason}) after 1 attempts at ${key}`);
+      }
+      errors.mockRestore();
+    }
+  );
+
+  it.each([
+    { queue: 'kilo-audit-uts', environment: 'production' },
+    { queue: 'kilo-audit-uts-local', environment: 'development' },
+  ])(
+    'archives a UTS shard stream with its own source from $queue',
+    async ({ queue, environment }) => {
+      const http = recordingFetch(axiomOk);
+      vi.stubGlobal('fetch', http.impl);
+      const stream = `uts:${environment}:5`;
+      const batch = auditBatch(1, 2, stream);
+      const body = await encodeAuditBatch({
+        ...batch,
+        events: batch.events.map(event => ({
+          ...event,
+          source: `kilo:uts:${environment}`,
+          type: 'ai.kilo.uts.token.issued',
+        })),
+      });
+
+      const { result } = await runQueue(queue, [body.buffer]);
+
+      expect(result.retryMessages).toEqual([]);
+      expect(await listObjectKeys(`streams/${stream}/`)).toEqual([archiveObjectKey(stream, 2)]);
+    }
+  );
+
   it('archives dead-lettered batches of several streams once their cause is gone', async () => {
     const http = recordingFetch(axiomOk);
     vi.stubGlobal('fetch', http.impl);

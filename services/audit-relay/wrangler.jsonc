@@ -70,6 +70,24 @@
         "max_retries": 100,
         "retry_delay": 900,
       },
+      // UTS produces to its own queue (design 8.1), so the consumer knows a batch came from UTS.
+      {
+        "queue": "kilo-audit-uts",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 24,
+        "retry_delay": 60,
+        "max_concurrency": 6,
+        "dead_letter_queue": "kilo-audit-uts-dlq",
+      },
+      {
+        "queue": "kilo-audit-uts-dlq",
+        "max_batch_size": 100,
+        "max_batch_timeout": 30,
+        "max_concurrency": 1,
+        "max_retries": 100,
+        "retry_delay": 900,
+      },
     ],
   },
   "durable_objects": {
@@ -149,6 +167,24 @@
             "max_retries": 100,
             "retry_delay": 900,
           },
+          // UTS produces to its own queue (design 8.1), so the consumer knows a batch came from UTS.
+          {
+            "queue": "kilo-audit-uts-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 24,
+            "retry_delay": 60,
+            "max_concurrency": 6,
+            "dead_letter_queue": "kilo-audit-uts-staging-dlq",
+          },
+          {
+            "queue": "kilo-audit-uts-staging-dlq",
+            "max_batch_size": 100,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 900,
+          },
         ],
       },
       "durable_objects": {
@@ -204,6 +240,23 @@
           },
           {
             "queue": "kilo-audit-local-dlq",
+            "max_batch_size": 100,
+            "max_batch_timeout": 30,
+            "max_concurrency": 1,
+            "max_retries": 100,
+            "retry_delay": 900,
+          },
+          // UTS produces to its own queue (design 8.1), so the consumer knows a batch came from UTS.
+          {
+            "queue": "kilo-audit-uts-local",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 10,
+            "dead_letter_queue": "kilo-audit-uts-local-dlq",
+          },
+          {
+            "queue": "kilo-audit-uts-local-dlq",
             "max_batch_size": 100,
             "max_batch_timeout": 30,
             "max_concurrency": 1,

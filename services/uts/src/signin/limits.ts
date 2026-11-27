@@ -1,0 +1,71 @@
+import { jsonResponse } from '../responses';
+import { anonymousWriter } from './network';
+
+/**
+ * The limit on anonymous sign-in writes (design 3, "Anonymous sign-in writes"): a passkey sign-in
+ * challenge, a device authorization, and a provider, SSO or email sign-in start each store a row
+ * (the email start also sends mail) before anyone is signed in. Each isolate allows one anonymous
+ * writer (`anonymousWriter`: an IPv4 address or an IPv6 /48) a number of such writes per minute,
+ * counted before the statement runs: 10 shared by every write but the SSO start, and 60 SSO starts
+ * in their own window, because the staff of an org that requires SSO often share one egress
+ * address. The count is plain data in the isolate, like the PAT miss limit: a caller spread over
+ * many isolates gets more, which the rows' short lives and the store's per-writer cap on pending
+ * device codes bound.
+ */
+const ALLOWANCES = { shared: 10, sso: 60 } as const;
+const WINDOW_MS = 60_000;
+/** The map holds at most this many windows; past it, the oldest window is dropped first. */
+const MAX_WRITERS = 10_000;
+
+type Window = { startedAt: number; count: number };
+const windows = new Map<string, Window>();
+
+export type AnonymousWrite =
+  | 'passkey_sign_in_challenge'
+  | 'device_authorization'
+  | 'provider_sign_in_start'
+  | 'sso_sign_in_start'
+  | 'email_sign_in_start';
+
+/**
+ * Null when the writer of `address` may write now (and counts the write); otherwise the seconds
+ * until its window ends, logged as an auth action that stored nothing. Requests without a
+ * connecting address share one window.
+ */
+export function anonymousWriteRetryAfter(
+  address: string | null,
+  action: AnonymousWrite,
+  now = Date.now()
+): number | null {
+  const allowance = action === 'sso_sign_in_start' ? 'sso' : 'shared';
+  const key = `${allowance}:${anonymousWriter(address) ?? 'unknown'}`;
+  const current = windows.get(key);
+  if (current === undefined || now - current.startedAt >= WINDOW_MS) {
+    windows.delete(key);
+    if (windows.size >= MAX_WRITERS) {
+      const oldest = windows.keys().next();
+      if (!oldest.done) windows.delete(oldest.value);
+    }
+    windows.set(key, { startedAt: now, count: 1 });
+    return null;
+  }
+  if (current.count < ALLOWANCES[allowance]) {
+    current.count += 1;
+    return null;
+  }
+  console.log(
+    JSON.stringify({ event: 'auth_action', action, outcome: 'rate_limited', stored: false })
+  );
+  return Math.max(1, Math.ceil((current.startedAt + WINDOW_MS - now) / 1000));
+}
+
+/** `anonymousWriteRetryAfter` for the JSON calls: null, or the 429 to answer. */
+export function anonymousWriteRefusal(
+  address: string | null,
+  action: AnonymousWrite,
+  now = Date.now()
+): Response | null {
+  const retryAfter = anonymousWriteRetryAfter(address, action, now);
+  if (retryAfter === null) return null;
+  return jsonResponse({ error: 'rate_limited' }, 429, { 'Retry-After': String(retryAfter) });
+}

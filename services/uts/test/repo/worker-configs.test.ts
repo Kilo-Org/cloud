@@ -2,12 +2,16 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { UTS_MINT_DEPLOYMENTS } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
+  FEED_TEST_CONFIG,
   MINT_CONFIG,
   MINT_DEV_CONFIG,
+  MINT_TEST_CONFIG,
   parseWorkerConfig,
   repoRoot,
   utsConfigProblems,
@@ -56,6 +60,23 @@ describe('repository Worker configs', () => {
 
   it('keep the two UTS Workers as configured: names, eu jurisdiction, placement, no traces', () => {
     expect(utsConfigProblems(repoConfigs())).toEqual([]);
+  });
+
+  it('deploy the mint Worker under exactly the names @kilocode/uts-contracts exports', () => {
+    expect(UTS_MINT_DEPLOYMENTS).toEqual({
+      production: 'uts',
+      staging: 'uts-staging',
+      development: 'uts-local',
+    });
+    const mint = z
+      .object({ name: z.string(), env: z.object({ staging: z.object({ name: z.string() }) }) })
+      .parse(configAt(MINT_CONFIG).config);
+    const dev = z.object({ name: z.string() }).parse(configAt(MINT_DEV_CONFIG).config);
+    expect([mint.name, mint.env.staging.name, dev.name]).toEqual([
+      UTS_MINT_DEPLOYMENTS.production,
+      UTS_MINT_DEPLOYMENTS.staging,
+      UTS_MINT_DEPLOYMENTS.development,
+    ]);
   });
 });
 
@@ -385,6 +406,20 @@ describe('the UTS configs themselves', () => {
     }
   }, 120_000);
 
+  it('fail a mint block that produces to any queue but its own UTS audit queue', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        queues: { producers: [{ binding: 'AUDIT_QUEUE', queue: 'kilo-audit' }] },
+      }))
+    );
+    expect(problems).toEqual([
+      expect.stringContaining(
+        '(top level): produces to AUDIT_QUEUE=kilo-audit; expected AUDIT_QUEUE=kilo-audit-uts'
+      ),
+    ]);
+  });
+
   it('fail placement on the feed Worker', () => {
     const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);
     const feed = configAt(FEED_CONFIG);
@@ -393,5 +428,18 @@ describe('the UTS configs themselves', () => {
       placement: { region: 'aws:eu-central-1' },
     });
     expect(utsConfigProblems([...configs, placed])).toHaveLength(3);
+  });
+
+  it('fail a UTS test config that deploys under any name but its own', () => {
+    for (const [path, edit] of [
+      [MINT_TEST_CONFIG, { name: 'uts' }],
+      [FEED_TEST_CONFIG, { env: { staging: { name: 'uts-staging' } } }],
+    ] as const) {
+      const configs = repoConfigs().filter(worker => worker.path !== path);
+      const renamed = parseWorkerConfig(path, { ...configAt(path).config, ...edit });
+      expect(utsConfigProblems([...configs, renamed])).toEqual([
+        expect.stringContaining(`${path} deploys`),
+      ]);
+    }
   });
 });

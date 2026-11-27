@@ -9,8 +9,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { createLocalJWKSet, decodeJwt, jwtVerify } from 'jose';
-import { describe, expect, it } from 'vitest';
-import { handleDevRequest } from '../../src/dev';
+import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/env';
 import type {
   ExchangeCodeInput,
@@ -41,9 +40,10 @@ import {
   oauthDeps,
   grantEntry,
   recordingPublisher,
+  unexpectedStore,
   storeFailure,
 } from './oauth-support';
-import { config, env } from './test-env';
+import { config, env, noSignInMethods } from './test-env';
 
 const THIRD_PARTY = 'https://client.example.com/oauth/metadata.json';
 const VERIFIER = randomCredential();
@@ -582,7 +582,16 @@ describe('token endpoint: request shape', () => {
     const response = await call(
       formRequest('/token', { grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
       oauthDeps(fakeGrants().access, {
-        deviceCodeGrant: async () => new Response('hook', { status: 418 }),
+        device: {
+          status: 'served',
+          grant: async () => new Response('hook', { status: 418 }),
+          pages: {
+            config,
+            signIn: unexpectedStore,
+            methods: noSignInMethods,
+            userCodeSecret: 'A'.repeat(43),
+          },
+        },
       })
     );
     expect(response.status).toBe(418);
@@ -1155,28 +1164,60 @@ describe('mint Worker wiring', () => {
     });
   });
 
-  it('lists the token, revocation and introspection endpoints once the store is bound, and the authorization endpoint only with a hand-off', async () => {
+  it('lists the authorization, token, revocation and introspection endpoints once the store is bound, and the device grant only with its user-code secret', async () => {
     const deployed = await metadata(await fetchMint(metadataRequest()));
     expect(deployed).toMatchObject({
+      authorization_endpoint: `${config.endpoints.issuer}/authorize`,
       token_endpoint: `${config.endpoints.issuer}/token`,
       revocation_endpoint: `${config.endpoints.issuer}/revoke`,
       introspection_endpoint: `${config.endpoints.issuer}/introspect`,
-      grant_types_supported: ['refresh_token'],
-      response_types_supported: [],
+      grant_types_supported: ['authorization_code', 'refresh_token'],
+      response_types_supported: ['code'],
       code_challenge_methods_supported: ['S256'],
       dpop_signing_alg_values_supported: ['EdDSA', 'ES256'],
       authorization_response_iss_parameter_supported: true,
     });
-    expect(deployed.authorization_endpoint).toBeUndefined();
-    expect((await fetchMint(new Request(`${config.endpoints.issuer}/authorize`))).status).toBe(404);
+    expect(deployed.device_authorization_endpoint).toBeUndefined();
+    expect(
+      (await fetchMint(formRequest('/device_authorization', { client_id: 'kilo-cli' }))).status
+    ).toBe(404);
 
-    const development = await metadata(
-      await handleDevRequest(metadataRequest(), env, createExecutionContext())
+    const withDevice = await metadata(
+      await fetchMint(metadataRequest(), { ...env, DEVICE_USER_CODE_KEY: 'A'.repeat(43) })
     );
-    expect(development).toMatchObject({
-      authorization_endpoint: `${config.endpoints.issuer}/authorize`,
-      response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code', 'refresh_token'],
+    expect(withDevice).toMatchObject({
+      device_authorization_endpoint: `${config.endpoints.issuer}/device_authorization`,
+      grant_types_supported: [
+        'authorization_code',
+        'refresh_token',
+        'urn:ietf:params:oauth:grant-type:device_code',
+      ],
     });
+  });
+
+  it('serves every other route, without the device grant, while the user-code secret is malformed', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const malformed: Env = { ...env, DEVICE_USER_CODE_KEY: 'not a key' };
+      const response = await fetchMint(metadataRequest(), malformed);
+      expect(response.status).toBe(200);
+      const document = await metadata(response);
+      expect(document.device_authorization_endpoint).toBeUndefined();
+      expect(document.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
+      expect(errors.mock.calls).toEqual([]);
+      expect(
+        (
+          await fetchMint(
+            formRequest('/device_authorization', { client_id: 'kilo-cli' }),
+            malformed
+          )
+        ).status
+      ).toBe(404);
+      expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+        { event: 'uts.signin.misconfigured', method: 'device', missing: ['DEVICE_USER_CODE_KEY'] },
+      ]);
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

@@ -40,8 +40,10 @@ describe('domains', () => {
   it('reject a hash that is not 32 bytes', async () => {
     expect(
       await rejects(
-        `INSERT INTO uts.tickets (ticket_hash, purpose, audience, account_id, expires_at)
-         VALUES ($1, 'stream', 'session-ingest', $2, now() + interval '30 seconds')`,
+        `INSERT INTO uts.tickets
+           (ticket_hash, purpose, audience, account_id, expires_at, grant_id, client_id)
+         VALUES ($1, 'stream', 'session-ingest', $2, now() + interval '30 seconds',
+                 gen_random_uuid(), 'kilo-cli')`,
         [randomHash().subarray(0, 31), accountId]
       )
     ).toBe(CHECK_VIOLATION);
@@ -337,6 +339,8 @@ describe('device codes', () => {
       account_id: accountId,
       gate_pass_id: await insertGatePass(writer, accountId, 'device_approve'),
       approved_at: now,
+      auth_time: now,
+      amr: '{passkey,device_grant}',
     });
     await insertDeviceCode('denied', { account_id: accountId, denied_at: now });
     await insertDeviceCode('consumed', {
@@ -344,7 +348,32 @@ describe('device codes', () => {
       gate_pass_id: await insertGatePass(writer, accountId, 'device_approve'),
       approved_at: now,
       consumed_at: now,
+      auth_time: now,
+      amr: '{passkey,device_grant}',
+      grant_id: crypto.randomUUID(),
+      dpop_jkt: `\\x${randomHash().toString('hex')}`,
     });
+  });
+
+  it('reject an approval without its sign-in, and a consumed code without its grant', async () => {
+    const now = new Date().toISOString();
+    const approval = async () => ({
+      account_id: accountId,
+      gate_pass_id: await insertGatePass(writer, accountId, 'device_approve'),
+      approved_at: now,
+      auth_time: now,
+      amr: '{passkey,device_grant}',
+    });
+    expect(
+      await sqlStateOf(async () =>
+        insertDeviceCode('approved', { ...(await approval()), amr: null })
+      )
+    ).toBe(CHECK_VIOLATION);
+    expect(
+      await sqlStateOf(async () =>
+        insertDeviceCode('consumed', { ...(await approval()), consumed_at: now })
+      )
+    ).toBe(CHECK_VIOLATION);
   });
 
   it.each([
@@ -383,10 +412,13 @@ describe('email codes and limits', () => {
     purpose = 'sign_in',
     account: string | null = null
   ) {
+    // A sign-in email carries its address, its link, its return path and the binder hash of the
+    // browser that asked for it; a tier A code none of them.
+    const signIn = purpose === 'sign_in';
     return writer.query(
-      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, address)
+      `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, attempts, expires_at, status, consumed_at, address, email, link_hash, return_to, binder_hash)
        VALUES ($1, $2, $3, $4, $5, now() + interval '10 minutes', $6, CASE WHEN $7 THEN now() END,
-               CASE WHEN $8::boolean THEN 'current'::uts.email_code_address END)`,
+               CASE WHEN $8::boolean THEN 'current'::uts.email_code_address END, $9, $10, $11, $12)`,
       [
         purpose,
         randomHash(),
@@ -396,6 +428,10 @@ describe('email codes and limits', () => {
         status,
         consumed,
         purpose === 'tier_a',
+        signIn ? 'someone@example.com' : null,
+        signIn ? randomHash() : null,
+        signIn ? '/signin/done' : null,
+        signIn ? randomHash() : null,
       ]
     );
   }
@@ -404,6 +440,33 @@ describe('email codes and limits', () => {
     await insertEmailCode('pending', 4, false);
     await insertEmailCode('consumed', 1, true);
     await insertEmailCode('exhausted', 5, false);
+  });
+
+  it('tie the address, link, return path and binder to sign-in emails, and a code to tier A', async () => {
+    const insertShape = (purpose: string, email: string | null, code: Buffer | null) =>
+      writer.query(
+        `INSERT INTO uts.email_codes (purpose, email_hash, account_id, code_hash, expires_at, email, link_hash, return_to, binder_hash)
+         VALUES ($1, $2, $3, $4, now() + interval '10 minutes', $5, $6, $7, $8)`,
+        [
+          purpose,
+          randomHash(),
+          accountId,
+          code,
+          email,
+          email === null ? null : randomHash(),
+          email === null ? null : '/signin/done',
+          email === null ? null : randomHash(),
+        ]
+      );
+    // A sign-in email without a code: sent while codes are stopped.
+    await insertShape('sign_in', 'someone@example.com', null);
+    expect(await sqlStateOf(() => insertShape('sign_in', null, randomHash()))).toBe(
+      CHECK_VIOLATION
+    );
+    expect(await sqlStateOf(() => insertShape('tier_a', null, null))).toBe(CHECK_VIOLATION);
+    expect(await sqlStateOf(() => insertShape('tier_a', 'someone@example.com', randomHash()))).toBe(
+      CHECK_VIOLATION
+    );
   });
 
   it.each([
@@ -461,8 +524,10 @@ describe('tickets', () => {
   it('reject a ticket that lives over 60 seconds', async () => {
     expect(
       await rejects(
-        `INSERT INTO uts.tickets (ticket_hash, purpose, audience, account_id, expires_at)
-         VALUES ($1, 'stream', 'session-ingest', $2, now() + interval '61 seconds')`,
+        `INSERT INTO uts.tickets
+           (ticket_hash, purpose, audience, account_id, expires_at, grant_id, client_id)
+         VALUES ($1, 'stream', 'session-ingest', $2, now() + interval '61 seconds',
+                 gen_random_uuid(), 'kilo-cli')`,
         [randomHash(), accountId]
       )
     ).toBe(CHECK_VIOLATION);
@@ -558,9 +623,15 @@ describe('gate passes and step-ups', () => {
     const sessionId = await insertBrowserSession(writer, accountId);
     const passkey = await writer.query<{ id: string }>(
       `INSERT INTO uts.passkey_credentials
-         (account_id, credential_id, public_key, backup_eligible, backed_up, rp_id, name)
-       VALUES ($1, $2, '\\x01', true, true, 'app.example.com', 'laptop') RETURNING id`,
-      [accountId, randomHash()]
+         (account_id, credential_id, public_key, backup_eligible, backed_up, rp_id, name,
+          user_handle, gate_pass_id)
+       VALUES ($1, $2, '\\x01', true, true, 'app.example.com', 'laptop', $3, $4) RETURNING id`,
+      [
+        accountId,
+        randomHash(),
+        randomHash(),
+        await insertGatePass(writer, accountId, 'passkey_add'),
+      ]
     );
     const insertStepUp = (ssoAge: string, ip: string | null) =>
       writer.query(
@@ -791,21 +862,25 @@ describe('gate pass binding', () => {
     const code = await writer.query<{ id: string }>(
       `INSERT INTO uts.device_codes
          (device_code_hash, user_code_hash, client_id, scopes, expires_at, status, account_id,
-          gate_pass_id, approved_at, consumed_at)
+          gate_pass_id, approved_at, consumed_at, auth_time, amr, grant_id, dpop_jkt)
        VALUES ($1, $2, 'kilo-cli', '{gateway:models.read}', now() + interval '10 minutes',
-               'consumed', $3, $4, now(), now())
+               'consumed', $3, $4, now(), now(), now(), '{passkey}', $5, $6)
        RETURNING id`,
       [
         randomHash(),
         randomHash(),
         accountId,
         await insertGatePass(writer, accountId, 'device_approve'),
+        crypto.randomUUID(),
+        randomHash(),
       ]
     );
     // A second exchange of one approval would need the code back in `approved`.
     expect(
       await rejects(
-        `UPDATE uts.device_codes SET status = 'approved', consumed_at = NULL WHERE id = $1`,
+        `UPDATE uts.device_codes
+         SET status = 'approved', consumed_at = NULL, grant_id = NULL, dpop_jkt = NULL
+         WHERE id = $1`,
         [code.rows[0].id]
       )
     ).toBe(CHECK_VIOLATION);
@@ -857,9 +932,9 @@ describe('gate pass binding', () => {
       writer.query(
         `INSERT INTO uts.device_codes
            (device_code_hash, user_code_hash, client_id, scopes, expires_at, status, account_id,
-            gate_pass_id, approved_at)
+            gate_pass_id, approved_at, auth_time, amr)
          VALUES ($1, $2, 'kilo-cli', '{gateway:models.read}', now() + interval '10 minutes',
-                 'approved', $3, $4, now())`,
+                 'approved', $3, $4, now(), now(), '{passkey,device_grant}')`,
         [randomHash(), randomHash(), approver, gatePassId]
       );
     const otherAccountId = await insertAccount(writer);

@@ -420,6 +420,12 @@ const EXCEPTIONS = {
     signals: { primitive: 1, 'auth-library-import': 1 },
     pins: ['audience: UTS_ACCOUNT_AUDIENCE', 'issuer: config.endpoints.issuer'],
   },
+  'services/uts/src/signin/providers/exchange.ts': {
+    reason:
+      'Third party: UTS provider sign-in checks the ID token of an upstream OIDC provider under that provider key set and issuers (src/signin/providers/specs.ts)',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['keySet(spec.endpoints.jwks)', 'issuer: [...spec.endpoints.issuers]'],
+  },
   'packages/trpc/src/agent-profiles-mobile.ts': {
     reason: 'Mobile tRPC router composition: createTRPCRouter only; requests run in apps/web',
     signals: { 'web-shared-import': 1 },

@@ -4,6 +4,7 @@ import type { UtsConfig } from '../env';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
 import { jsonResponse } from '../responses';
 import type { FeedPublish } from '../revocation/publish';
+import { requestNetwork } from '../signin/network';
 import {
   type MintClient,
   type ScopeRegistry,
@@ -66,12 +67,6 @@ const DeviceParamsSchema = z.strictObject({
   label: z.optional(z.string().regex(/^[\x20-\x7e]{1,128}$/)),
   platform: z.optional(z.string().regex(/^[\x21-\x7e]{1,64}$/)),
 });
-const CfSchema = z.looseObject({
-  asn: z.number().int().positive().optional(),
-  country: z.string().optional(),
-  city: z.string().optional(),
-});
-const IpSchema = z.union([z.ipv4(), z.ipv6()]);
 
 const GRANT_ERRORS = {
   invalid_grant: 'the grant is invalid, expired or revoked',
@@ -85,7 +80,7 @@ const GRANT_ERRORS = {
  * token answer like any invalid grant, so the response tells an attacker nothing more. A proof
  * whose `jti` the grant recorded before answers `invalid_dpop_proof`, as a refused proof does.
  */
-function grantError(
+export function grantError(
   outcome: keyof typeof GRANT_ERRORS | 'dpop_mismatch' | 'reuse_detected' | 'dpop_replay'
 ): Response {
   if (outcome === 'dpop_replay') return replayedDpopProof();
@@ -101,9 +96,9 @@ type TokenSelection = { scopes: string[] | null; resources: string[] | null };
  * scope the client may not hold (`clientScopeRefusal`) answers `invalid_scope` before the grant
  * statement runs.
  */
-function tokenSelection(
+export function tokenSelection(
   params: Params,
-  deps: TokenDeps,
+  deps: Pick<TokenDeps, 'config' | 'scopes'>,
   client: MintClient
 ): TokenSelection | Response {
   const scopeParam = params.one('scope');
@@ -139,7 +134,7 @@ function mintClient(identity: Exclude<ClientIdentity, { kind: 'unknown' }>): Min
     : { kind: 'third_party', clientId: identity.clientId };
 }
 
-function required(params: Params, name: string): string | Response {
+export function required(params: Params, name: string): string | Response {
   const param = params.one(name);
   return param.status === 'present'
     ? param.value
@@ -147,7 +142,7 @@ function required(params: Params, name: string): string | Response {
 }
 
 /** Where the device that signs in is, for its device-session row. */
-function deviceContext(
+export function deviceContext(
   request: Request,
   params: Params,
   client: FirstPartyClient
@@ -161,16 +156,14 @@ function deviceContext(
   if (label.status === 'repeated' || platform.status === 'repeated' || !parsed.success) {
     return oauthError('invalid_request', 400, 'device_label or device_platform is malformed');
   }
-  const cf = CfSchema.safeParse(request.cf).data;
-  const country = cf?.country;
-  const city = cf?.city;
+  const network = requestNetwork(request);
   return {
     label: parsed.data.label ?? client.name,
     platform: parsed.data.platform ?? 'unknown',
-    clientIp: IpSchema.safeParse(request.headers.get('CF-Connecting-IP')).data ?? null,
-    asn: cf?.asn ?? null,
-    country: country !== undefined && /^[A-Z]{2}$/.test(country) ? country : null,
-    city: city !== undefined && city.length > 0 && city.length <= 128 ? city : null,
+    clientIp: network.clientIp,
+    asn: network.asn,
+    country: network.country,
+    city: network.city,
   };
 }
 
@@ -181,8 +174,8 @@ function deviceContext(
  * scope the registry does not allow the client, or an organization scope without `org` or with
  * another role, even if the registry changed after the grant was created.
  */
-async function completeMint(
-  deps: TokenDeps,
+export async function completeMint(
+  deps: Pick<TokenDeps, 'config' | 'sign' | 'scopes'>,
   client: MintClient,
   grantId: string,
   minted: Minted,

@@ -19,6 +19,8 @@ export const AuthorizationServerMetadataSchema = z.looseObject({
   revocation_endpoint: z.url().optional(),
   introspection_endpoint: z.url().optional(),
   code_challenge_methods_supported: z.array(z.string().min(1)).optional(),
+  /** RFC 8628, section 4. */
+  device_authorization_endpoint: z.url().optional(),
   token_endpoint_auth_methods_supported: z.array(z.string().min(1)).optional(),
   revocation_endpoint_auth_methods_supported: z.array(z.string().min(1)).optional(),
   introspection_endpoint_auth_methods_supported: z.array(z.string().min(1)).optional(),

@@ -8,7 +8,7 @@ import {
 } from './feed/UtsFeedDO';
 
 /**
- * The feed object of `wrangler dev --env local` only (`src/dev-index.ts` exports it as
+ * The feed object of `wrangler dev -c wrangler.dev.jsonc` only (`src/dev-index.ts` exports it as
  * `UtsFeedDO`): the deployed object plus `devStop`, which makes every call fail and stops its alarm
  * work for a while, as a stopped object would, for the local end-to-end run of the feed's
  * fail-over (design 5.7 proof run: one feed object stopped for 90 seconds). No deployed bundle

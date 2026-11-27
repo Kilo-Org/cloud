@@ -13,19 +13,24 @@
     "UTS_ENVIRONMENT": "development",
     "DO_JURISDICTION": "none",
     "PAT_LOOKUP_CONNECTIONS": "34",
+    "WEBAUTHN_RP_ID": "localhost",
+    "WEBAUTHN_ORIGINS": "http://localhost:8800",
   },
   "durable_objects": {
     "bindings": [
       { "name": "UTS_SIGNER_DO", "class_name": "UtsSignerDO" },
       { "name": "UTS_KEY_SET_DO", "class_name": "UtsKeySetDO" },
       { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
+      { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UtsSignerDO"] },
     { "tag": "v2", "new_sqlite_classes": ["UtsKeySetDO"] },
     { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
   ],
+  "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-local" }] },
   // The OAuth routes and the account API are served once IDENTITY_STORE exists, the PAT probe
   // route and the PAT lookup once IDENTITY_STORE_PAT does. Nothing listens on either: the runtime
   // tests pass their own stores (a lookup through the real binding fails as an unreachable
@@ -96,6 +101,20 @@
       "binding": "OTHER_READS",
       "service": "uts-test",
       "entrypoint": "FeedReads",
+      "props": { "caller": "o11y" },
+    },
+    // The TicketRedeemer entrypoint as the development redeemer binds it, and as a caller it
+    // refuses.
+    {
+      "binding": "TICKET_REDEEMER",
+      "service": "uts-test",
+      "entrypoint": "TicketRedeemer",
+      "props": { "caller": "uts-ticket-test" },
+    },
+    {
+      "binding": "OTHER_REDEEMER",
+      "service": "uts-test",
+      "entrypoint": "TicketRedeemer",
       "props": { "caller": "o11y" },
     },
   ],

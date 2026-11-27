@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "An kunna bincike kafin amfani",
         "scanBeforeUseOff": "An kashe bincike kafin amfani",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "An kashe {{provider}}: {{models}}",
         "autoRoutingRemoved": "An cire: {{models}}",
         "browserPolicyOff": "An hana amfani da burauza",
         "browserPolicyAllow": "Asalin yanar gizo da aka yarda kawai",

@@ -3518,6 +3518,7 @@
         "scanBeforeUseOn": "Nyocha tupu ojiji agbanyere",
         "scanBeforeUseOff": "Nyocha tupu ojiji agbanyụrụ",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Agbanyụrụ {{provider}}: {{models}}",
         "autoRoutingRemoved": "Ewepụrụ: {{models}}",
         "browserPolicyOff": "Egbochiri ojiji ihe nchọgharị",
         "browserPolicyAllow": "Naanị mmalite ekwenyere",

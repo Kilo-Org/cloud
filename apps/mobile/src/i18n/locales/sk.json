@@ -3713,6 +3713,7 @@
         "scanBeforeUseOn": "Skenovanie pred použitím zapnuté",
         "scanBeforeUseOff": "Skenovanie pred použitím vypnuté",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Vypnuté {{provider}}: {{models}}",
         "autoRoutingRemoved": "Odstránené: {{models}}",
         "browserPolicyOff": "Používanie prehliadača zablokované",
         "browserPolicyAllow": "Iba povolené pôvody",

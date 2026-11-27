@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "භාවිතයට පෙර ස්කෑන් කිරීම සක්‍රීයයි",
         "scanBeforeUseOff": "භාවිතයට පෙර ස්කෑන් කිරීම අක්‍රීයයි",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "අක්‍රීය කළ {{provider}}: {{models}}",
         "autoRoutingRemoved": "ඉවත් කළ: {{models}}",
         "browserPolicyOff": "බ්‍රව්සර් භාවිතය අවහිර වී ඇත",
         "browserPolicyAllow": "අවසර ලත් මූලයන් පමණි",

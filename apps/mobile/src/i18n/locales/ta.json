@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "பயன்படுத்தும் முன் ஸ்கேன் இயக்கப்பட்டது",
         "scanBeforeUseOff": "பயன்படுத்தும் முன் ஸ்கேன் முடக்கப்பட்டது",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "முடக்கப்பட்டது {{provider}}: {{models}}",
         "autoRoutingRemoved": "நீக்கப்பட்டது: {{models}}",
         "browserPolicyOff": "உலாவி பயன்பாடு தடுக்கப்பட்டது",
         "browserPolicyAllow": "அனுமதிக்கப்பட்ட மூலங்கள் மட்டும்",

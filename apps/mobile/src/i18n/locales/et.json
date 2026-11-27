@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Enne kasutamist skaneerimine sees",
         "scanBeforeUseOff": "Enne kasutamist skaneerimine väljas",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Välja lülitatud {{provider}}: {{models}}",
         "autoRoutingRemoved": "Eemaldatud: {{models}}",
         "browserPolicyOff": "Brauseri kasutamine blokeeritud",
         "browserPolicyAllow": "Ainult lubatud päritolud",

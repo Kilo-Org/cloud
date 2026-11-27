@@ -3569,6 +3569,7 @@
         "scanBeforeUseOn": "उपयोग से पहले स्कैन चालू",
         "scanBeforeUseOff": "उपयोग से पहले स्कैन बंद",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "बंद किए गए {{provider}}: {{models}}",
         "autoRoutingRemoved": "हटाए गए: {{models}}",
         "browserPolicyOff": "ब्राउज़र उपयोग अवरुद्ध",
         "browserPolicyAllow": "केवल अनुमत ओरिजिन",

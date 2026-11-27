@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Σάρωση πριν τη χρήση ενεργή",
         "scanBeforeUseOff": "Σάρωση πριν τη χρήση ανενεργή",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Απενεργοποιήθηκαν {{provider}}: {{models}}",
         "autoRoutingRemoved": "Αφαιρέθηκαν: {{models}}",
         "browserPolicyOff": "Αποκλείστηκε η χρήση περιηγητή",
         "browserPolicyAllow": "Μόνο επιτρεπόμενες προελεύσεις",

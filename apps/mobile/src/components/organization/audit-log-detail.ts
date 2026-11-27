@@ -537,6 +537,14 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
           })
         );
       }
+      for (const group of d.disabled ?? []) {
+        parts.push(
+          t('organization.auditLog.detail.autoRoutingDisabled', {
+            provider: isolated(group.provider),
+            models: list(group.models.map(value => isolated(value))),
+          })
+        );
+      }
       if (d.removed.length > 0) {
         parts.push(
           t('organization.auditLog.detail.autoRoutingRemoved', {

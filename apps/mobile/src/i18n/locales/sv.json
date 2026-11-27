@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skanna före användning på",
         "scanBeforeUseOff": "Skanna före användning av",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Inaktiverade {{provider}}: {{models}}",
         "autoRoutingRemoved": "Borttagna: {{models}}",
         "browserPolicyOff": "Webbläsaranvändning blockerad",
         "browserPolicyAllow": "Endast tillåtna ursprung",

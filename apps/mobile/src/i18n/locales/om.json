@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Fayyadama dura sakatta'uu hojii irra jira",
         "scanBeforeUseOff": "Fayyadama dura sakatta'uu hojii irraa dhaabame",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Hojii irraa dhaabame {{provider}}: {{models}}",
         "autoRoutingRemoved": "Haqame: {{models}}",
         "browserPolicyOff": "Fayyadama biraawzarii uggurame",
         "browserPolicyAllow": "Madda hayyamame qofa",

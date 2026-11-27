@@ -3705,6 +3705,7 @@
         "scanBeforeUseOn": "Verificação antes do uso ativada",
         "scanBeforeUseOff": "Verificação antes do uso desativada",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Desativados {{provider}}: {{models}}",
         "autoRoutingRemoved": "Removidos: {{models}}",
         "browserPolicyOff": "Uso do navegador bloqueado",
         "browserPolicyAllow": "Somente origens permitidas",

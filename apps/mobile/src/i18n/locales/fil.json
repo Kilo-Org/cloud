@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Scan bago gamitin: Naka-on",
         "scanBeforeUseOff": "Scan bago gamitin: Naka-off",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Naka-disable {{provider}}: {{models}}",
         "autoRoutingRemoved": "Inalis: {{models}}",
         "browserPolicyOff": "Naka-block ang paggamit ng browser",
         "browserPolicyAllow": "Mga pinapayagang origin lang",

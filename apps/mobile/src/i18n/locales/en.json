@@ -3691,6 +3691,7 @@
         "scanBeforeUseOn": "Scan before use on",
         "scanBeforeUseOff": "Scan before use off",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Disabled {{provider}}: {{models}}",
         "autoRoutingRemoved": "Removed: {{models}}",
         "browserPolicyOff": "Browser use blocked",
         "browserPolicyAllow": "Allowed origins only",

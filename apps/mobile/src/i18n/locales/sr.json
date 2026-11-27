@@ -3645,6 +3645,7 @@
         "scanBeforeUseOn": "Skeniranje pre upotrebe uključeno",
         "scanBeforeUseOff": "Skeniranje pre upotrebe isključeno",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Isključeno {{provider}}: {{models}}",
         "autoRoutingRemoved": "Uklonjeno: {{models}}",
         "browserPolicyOff": "Korišćenje pregledača blokirano",
         "browserPolicyAllow": "Samo dozvoljeni izvori",

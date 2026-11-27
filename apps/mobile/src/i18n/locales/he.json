@@ -3637,6 +3637,7 @@
         "scanBeforeUseOn": "סריקה לפני שימוש מופעלת",
         "scanBeforeUseOff": "סריקה לפני שימוש מושבתת",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "הושבתו {{provider}}: {{models}}",
         "autoRoutingRemoved": "הוסרו: {{models}}",
         "browserPolicyOff": "שימוש בדפדפן חסום",
         "browserPolicyAllow": "רק מקורות מורשים",

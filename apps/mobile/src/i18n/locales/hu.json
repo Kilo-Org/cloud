@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Használat előtti vizsgálat be",
         "scanBeforeUseOff": "Használat előtti vizsgálat ki",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Letiltva {{provider}}: {{models}}",
         "autoRoutingRemoved": "Eltávolítva: {{models}}",
         "browserPolicyOff": "Böngészőhasználat tiltva",
         "browserPolicyAllow": "Csak engedélyezett eredetek",

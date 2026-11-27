@@ -3781,6 +3781,7 @@
         "scanBeforeUseOn": "Scanáil roimh úsáid cumasaithe",
         "scanBeforeUseOff": "Scanáil roimh úsáid díchumasaithe",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Díchumasaithe {{provider}}: {{models}}",
         "autoRoutingRemoved": "Bainte: {{models}}",
         "browserPolicyOff": "Úsáid an bhrabhsálaí coiscthe",
         "browserPolicyAllow": "Bunúis cheadaithe amháin",

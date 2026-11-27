@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "ব্যবহারের আগে স্ক্যান চালু",
         "scanBeforeUseOff": "ব্যবহারের আগে স্ক্যান বন্ধ",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "বন্ধ করা হয়েছে {{provider}}: {{models}}",
         "autoRoutingRemoved": "অপসারণ করা হয়েছে: {{models}}",
         "browserPolicyOff": "ব্রাউজার ব্যবহার নিষিদ্ধ",
         "browserPolicyAllow": "শুধুমাত্র অনুমোদিত উৎস",

@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Foydalanishdan oldin skanerlash yoqilgan",
         "scanBeforeUseOff": "Foydalanishdan oldin skanerlash o'chirilgan",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "O‘chirildi {{provider}}: {{models}}",
         "autoRoutingRemoved": "Olib tashlandi: {{models}}",
         "browserPolicyOff": "Brauzerdan foydalanish to'silgan",
         "browserPolicyAllow": "Faqat ruxsat etilgan manbalar",

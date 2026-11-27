@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Erabili aurretik eskaneatzea gaituta",
         "scanBeforeUseOff": "Erabili aurretik eskaneatzea desgaituta",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Desgaituta {{provider}}: {{models}}",
         "autoRoutingRemoved": "Kenduta: {{models}}",
         "browserPolicyOff": "Nabigatzailearen erabilera blokeatuta",
         "browserPolicyAllow": "Jatorri baimenduak soilik",

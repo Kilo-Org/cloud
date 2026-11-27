@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "वापरण्यापूर्वी स्कॅन सुरू",
         "scanBeforeUseOff": "वापरण्यापूर्वी स्कॅन बंद",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "बंद केले {{provider}}: {{models}}",
         "autoRoutingRemoved": "काढले: {{models}}",
         "browserPolicyOff": "ब्राउझर वापरास अडथळा आला",
         "browserPolicyAllow": "केवळ अनुमत ओरिजिन",

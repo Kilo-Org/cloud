@@ -3841,6 +3841,7 @@
         "scanBeforeUseOn": "الفحص قبل الاستخدام مفعّل",
         "scanBeforeUseOff": "الفحص قبل الاستخدام معطّل",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "عُطّلت {{provider}}: {{models}}",
         "autoRoutingRemoved": "أُزيلت: {{models}}",
         "browserPolicyOff": "استخدام المتصفح محظور",
         "browserPolicyAllow": "النطاقات المسموحة فقط",

@@ -3713,6 +3713,7 @@
         "scanBeforeUseOn": "Nuskaitymas prieš naudojimą įjungtas",
         "scanBeforeUseOff": "Nuskaitymas prieš naudojimą išjungtas",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Išjungta {{provider}}: {{models}}",
         "autoRoutingRemoved": "Pašalinta: {{models}}",
         "browserPolicyOff": "Naršyklės naudojimas užblokuotas",
         "browserPolicyAllow": "Tik leidžiamos kilmės",

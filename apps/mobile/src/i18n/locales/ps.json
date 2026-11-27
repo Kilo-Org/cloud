@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "له کارولو دمخه سکن فعال",
         "scanBeforeUseOff": "له کارولو دمخه سکن غیرفعال",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "غیرفعال شول {{provider}}: {{models}}",
         "autoRoutingRemoved": "لرې شول: {{models}}",
         "browserPolicyOff": "د براوزر کارول مخه نیول شوې",
         "browserPolicyAllow": "یوازې اجازه شوې اصليې",

@@ -195,6 +195,39 @@ describe('auditEntryDetail', () => {
     expect(regionOnly).not.toContain(i18n.t('organization.auditLog.detail.enabled'));
   });
 
+  it('renders the models the disable-new-models policy denied, between added and removed', async () => {
+    const rendered = await renderIn('en', {
+      id: 'autoRouting.models',
+      added: [{ provider: 'anthropic', models: ['a'] }],
+      disabled: [{ provider: 'openai', models: ['b', 'c'] }],
+      removed: ['d'],
+    });
+    const added = i18n.t('organization.auditLog.detail.autoRoutingAdded', {
+      provider: isolateBidiText('anthropic'),
+      models: formatList([isolateBidiText('a')], 'en'),
+    });
+    const disabled = i18n.t('organization.auditLog.detail.autoRoutingDisabled', {
+      provider: isolateBidiText('openai'),
+      models: formatList([isolateBidiText('b'), isolateBidiText('c')], 'en'),
+    });
+    const removed = i18n.t('organization.auditLog.detail.autoRoutingRemoved', {
+      models: formatList([isolateBidiText('d')], 'en'),
+    });
+    expect(rendered).toContain(disabled);
+    expect(rendered?.indexOf(added)).toBeGreaterThanOrEqual(0);
+    expect(rendered?.indexOf(disabled)).toBeGreaterThan(rendered?.indexOf(added) ?? Infinity);
+    expect(rendered?.indexOf(removed)).toBeGreaterThan(rendered?.indexOf(disabled) ?? Infinity);
+
+    const onlyDisabled = await renderIn('en', {
+      id: 'autoRouting.models',
+      added: [],
+      disabled: [{ provider: 'openai', models: ['b'] }],
+      removed: [],
+    });
+    expect(onlyDisabled).toContain('openai');
+    expect(onlyDisabled).not.toContain('Removed');
+  });
+
   it('states the allowed origins a browser-control save carried', async () => {
     const policy = i18n.t('organization.auditLog.detail.browserPolicyAllow');
     const withOrigins = await renderIn('en', {

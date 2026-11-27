@@ -351,11 +351,23 @@ Design 5.9. A third-party client id is the HTTPS URL of its Client ID Metadata D
 
   The document must name the same client id. It must not carry a client secret, and every
   redirect URI must be HTTPS, HTTP loopback on `127.0.0.1` or `localhost` (never `[::1]`: the
-  confirm page's `form-action` cannot name an IPv6 literal), or a private-use scheme. A blocked
-  client is never served and keeps its status through a refresh. Each isolate runs one fetch per
-  client id at a time, and after a failure it waits 60 seconds before it fetches that id again. A
-  Worker cannot see the address a name resolves to, so a public name that resolves to a private
-  address relies on Workers not reaching private networks.
+  confirm page's `form-action` cannot name an IPv6 literal), or a reverse-domain private-use
+  scheme (RFC 8252 section 7.1: `com.example.app:`, never a scheme without a period); `/authorize`
+  checks a cached URI against the same rule again. A blocked client is never served and keeps its
+  status through a refresh. Each isolate runs one fetch per client id at a time, and after a
+  failure it waits 60 seconds before it fetches that id again. Every fetch also counts against the
+  requesting network's anonymous-write allowance (10 a minute per network per isolate, its own
+  window, `src/signin/limits.ts`); past it `/authorize` answers `429 temporarily_unavailable` with
+  `Retry-After`, and a cached client costs nothing. The minute cron deletes an active client that
+  no consent names one day after its cache time ended (`uts.maintain_third_party_client_rows`,
+  migration 0021). Only `uts.save_third_party_client` and `uts.extend_third_party_client` write a
+  client; the app login has no DML on the table. A Worker cannot see the address a name resolves
+  to, so a public name that resolves to a private address relies on Workers not reaching private
+  networks.
+- **Errors before consent**: a third-party client listed its own redirect URIs, so every
+  `/authorize` error before the user acts in the hand-off is shown (400 JSON), never redirected;
+  a denial or a later error, once the user signed in and consented or denied, goes back to the
+  redirect URI.
 - **Consent** (`consent.ts`): the sign-in hand-off sends a third-party request with a browser
   session to the consent screen. An active consent of the account, client and organization that
   covers the scopes approves at once. Otherwise the page shows the client name, the metadata URL,
@@ -804,7 +816,11 @@ entries of the first run to the feed again.
 - `revoke` with `access_block`, `account_recovery` or `account_reset`: `revoked_before = now` (70
   minutes in the feed), every browser session, device grant, third-party family, PAT, CI trust
   policy and sandbox grant revoked, each grant and session with its `revoked_sids` entry and each
-  PAT with its `revoked_pat_ids` entry. `access_block` also blocks the account and lists it in
+  PAT with its `revoked_pat_ids` entry; an approved device code becomes denied, an authorization
+  code not yet exchanged is deleted and every third-party consent is revoked (migration 0021), so
+  neither code becomes a grant and the consent screen comes back; the active org bot keys the
+  subject created are flagged (audit rows and org admin notices), not revoked, because a key
+  belongs to its organization. `access_block` also blocks the account and lists it in
   `blocked_accounts` for 70 minutes.
 - `revoke` with `account_deleted`: the same, with `revoked_before` and `blocked_accounts` kept 24
   hours; the active bot keys the account created are flagged (audit rows and org admin notices);
@@ -847,8 +863,12 @@ with `deleted`, `stale`, `identity_taken`, `email_taken`, `passkey_taken` or
 another organization, or on an inactive connection).
 
 **Authority sync.** `email` moves the primary email forward by version (the audit row names no
-address); `membership` adds, changes or (with `role: null`) removes a membership through
-`uts.remove_org_member`, ordered by the subject's version; `sso-organization` writes the SSO policy,
+address) and deletes the subject's `email` sign-in methods of other addresses; an address another
+account still holds as its primary email or `email` method answers `409 retry_later email_taken`
+(`Retry-After: 30`, nothing written), so two subjects' syncs may arrive in either order;
+`membership` adds, changes or (with `role: null`) removes a membership through
+`uts.remove_org_member`, ordered by the subject's version, and a newer sync that changes nothing
+still raises the row's version; `sso-organization` writes the SSO policy,
 the WorkOS organization whose `externalId` is the app organization, and its connections, ordered
 by the organization's own version; a connection active in another organization never moves
 (`409 retry_later connection_conflict`, `Retry-After: 30`, nothing written, also when another

@@ -4,7 +4,7 @@ import {
   type PostMessageAsUserParams,
   type PostMessageAsUserResult,
 } from '@kilocode/kilo-chat';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 // 5s is well above kilo-chat's expected p99 for postMessageAsUser
 // (~ a single DO RPC + a sendMessage) and well below Vercel's outer
@@ -88,7 +88,8 @@ function getKiloChatBaseUrl(): string {
 export async function postMessageAsUser(
   params: PostMessageAsUserParams
 ): Promise<PostMessageAsUserResult> {
-  if (!INTERNAL_API_SECRET) {
+  const internalApiSecret = await readInternalApiSecret();
+  if (!internalApiSecret) {
     throw new Error(
       'INTERNAL_API_SECRET is not configured — cannot authenticate to kilo-chat internal routes'
     );
@@ -101,7 +102,7 @@ export async function postMessageAsUser(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': internalApiSecret,
       },
       body: JSON.stringify(params),
       // Internal-only call between services; no caching.

@@ -253,9 +253,11 @@ jobs:
       group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.ios_hash }}
       cancel-in-progress: false
     steps:
+      # No lfs: the build reads apps/mobile, the root install and the two
+      # downloaded dist trees, and every LFS file is a web video under
+      # apps/web/public. The LFS batch API refuses GitHub-hosted runners, so
+      # an LFS fetch here fails the checkout.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -369,9 +371,8 @@ jobs:
       group: ${{ github.workflow }}-${{ github.event_name }}-android-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.android_hash }}
       cancel-in-progress: false
     steps:
+      # No lfs, for the same reason as the ios checkout above.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0

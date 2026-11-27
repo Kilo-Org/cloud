@@ -17,9 +17,10 @@ const mockSettleCodeReviewUsage = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.settleCodeReviewUsage
 >;
 const mockCaptureException = jest.fn();
+const mockAuthorize = jest.fn<() => Promise<Response | null>>();
 
 jest.mock('@/lib/internal-api-auth', () => ({
-  authorizeInternalApiRequest: () => null,
+  authorizeInternalApiRequest: () => mockAuthorize(),
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
@@ -49,6 +50,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockGetCodeReviewById.mockResolvedValue({ id: REVIEW_ID } as CloudAgentCodeReview);
   mockSettleCodeReviewUsage.mockResolvedValue(true);
+  mockAuthorize.mockResolvedValue(null);
   ({ POST } = await import('./route'));
 });
 
@@ -122,5 +124,22 @@ describe('POST /api/internal/code-review-usage/[reviewId]', () => {
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'Review not found' });
     expect(mockSettleCodeReviewUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns the auth refusal unchanged and reads nothing', async () => {
+    const refusal = Response.json({ error: 'Unauthorized' }, { status: 401 });
+    mockAuthorize.mockResolvedValue(refusal);
+
+    await expect(post({ totalTokensIn: 1 })).resolves.toBe(refusal);
+    expect(mockGetCodeReviewById).not.toHaveBeenCalled();
+  });
+
+  it('lets a failed secret read reject instead of echoing it in a 500 body', async () => {
+    const failure = new Error('STS denied the bundle request for this workload');
+    mockAuthorize.mockRejectedValue(failure);
+
+    await expect(post({ totalTokensIn: 1 })).rejects.toBe(failure);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockGetCodeReviewById).not.toHaveBeenCalled();
   });
 });

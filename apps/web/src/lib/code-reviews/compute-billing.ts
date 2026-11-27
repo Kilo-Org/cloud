@@ -8,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 
 type BillingOwner = { type: 'user' | 'org'; id: string };
@@ -18,7 +18,7 @@ export async function isCodeReviewComputeBillingEnabled(owner: BillingOwner): Pr
   if (!baseUrl) throw new Error('Cloud Agent billing status is unavailable');
   const response = await fetchWithinBudget(
     `${baseUrl}/internal/code-review/billing/${owner.type}/${encodeURIComponent(owner.id)}`,
-    { headers: { 'x-internal-api-key': INTERNAL_API_SECRET }, cache: 'no-store' }
+    { headers: { 'x-internal-api-key': await readInternalApiSecret() }, cache: 'no-store' }
   );
   if (!response.ok) throw new Error('Cloud Agent billing status is unavailable');
   return z.object({ enabled: z.boolean() }).parse(await response.json()).enabled;

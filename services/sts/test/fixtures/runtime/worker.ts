@@ -154,7 +154,7 @@ export class RefresherDO extends StsRefresherDO {
         secrets: { AUDIT_RELAY_AXIOM_TOKEN: { value: 'axiom-token', version: 3, id: 'id-axiom' } },
         missing: ['AUDIT_RELAY_SLACK_WEBHOOK_PAGE'],
         fetchedAt: new Date().toISOString(),
-        policyHash: await workloadPolicyHash(workload),
+        policyHash: await workloadPolicyHash('development', workload),
         stale: false,
       },
     };
@@ -168,7 +168,7 @@ async function readBundle(env: ProbeEnv): Promise<Response> {
     secrets: { O11Y_CF_AE_API_TOKEN: { value: 'ae-token', version: 7, id: 'id-ae' } },
     missing: [],
     fetchedAt: new Date().toISOString(),
-    policyHash: await workloadPolicyHash('o11y'),
+    policyHash: await workloadPolicyHash('development', 'o11y'),
     stale: false,
   });
   // A caller that never disposes what it received, then keeps working past the broker's timer.

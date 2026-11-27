@@ -6,16 +6,13 @@ import {
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
 } from './security-worker-request';
 
-jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-internal-secret',
-}));
-
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const params = {
   url: 'https://security-auto-analysis.test/internal/manual-analysis-start',
   service: 'analysis' as const,
+  internalApiSecret: 'test-internal-secret',
   body: { schemaVersion: 1 },
 };
 

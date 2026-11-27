@@ -286,8 +286,17 @@ test('both jobs take the identity id from the environment secret and refuse an e
     );
     const id = '0000000a-0000-4000-8000-000000000000';
     const valid = runPrefix(prefix, id);
+    // A missing or failed hash stops the job instead of printing an empty value.
     assert.ok(
-      valid.stdout.includes('identity_id_sha256='),
+      step.run.includes(
+        '[[ $h =~ ^[0-9a-f]{16}$ ]] || fail "identity id hash unavailable"\n' +
+          'echo "identity_id_sha256=$h"\n'
+      ),
+      `${name}: the hash is checked before it is printed`
+    );
+    assert.match(
+      valid.stdout,
+      /^identity_id_sha256=[0-9a-f]{16}$/m,
       `${name}: ${valid.stdout}${valid.stderr}`
     );
     assert.ok(!valid.stdout.includes('COPY_IDENTITY_ID'), `${name}: a valid id passes the checks`);

@@ -3,7 +3,7 @@
 STS serves each workload one bundle of runtime secrets read from Infisical Cloud EU, it mints
 short-lived service tokens (Ed25519 JWTs, one audience and one scope each) for the audiences a
 workload's policy grants, it brokers database leases from Infisical's dynamic PostgreSQL engine
-for the lease grants a policy lists, and it mints 1-hour Cloudflare deploy tokens for the GitHub
+for the lease grants a policy lists, and it mints Cloudflare deploy tokens of up to 1 hour for the GitHub
 deploy jobs a policy names. It records every delivery, mint, lease, deploy token and key change in
 audit logs that a queue relays to the audit pipeline. The audit queue consumer is not part of this
 Worker.
@@ -1291,9 +1291,9 @@ dynamic:
     zones: ['9f7103cbcadbe93a052c120f231e8507'] # kiloapps.io
     intendedScripts: [bouncer, bouncer-watch]
     intendedRoutes: [] # zone route patterns the job may add or change; bouncer uses a Custom Domain
-    ttlSeconds: 3600 # the default; 300 to 3600
+    ttlSeconds: 900 # 300 to 3600; the default is 3600
     maxActive: 2 # unexpired tokens at once
-    maxPerHour: 4 # mint requests per hour, whatever their outcome
+    maxPerHour: 12 # mint requests per hour, whatever their outcome; at most 12
 ```
 
 STS sends only the ids: the `account` groups apply to the account in `CF_DEPLOY_ACCOUNT_ID`, the

@@ -1,4 +1,17 @@
-# Registration only: services/auto-routing-benchmark/wrangler.jsonc. No environment, identity or grant.
+# The auto-routing-benchmark Worker (services/auto-routing-benchmark/wrangler.jsonc). Production
+# only. Over its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts) it writes pool pins, reads
+# usage receipts and the production routing profile, and records its grader's own LLM usage at the
+# web app, one scope each.
 workload: auto-routing-benchmark
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:auto-routing.pool-pins.write
+  - web:usage.receipts.read
+  - web:auto-routing.production-profile.read
+  - web:usage.benchmark-grader.record

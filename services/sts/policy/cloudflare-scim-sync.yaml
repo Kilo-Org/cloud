@@ -1,4 +1,14 @@
-# Registration only: services/scim-sync/wrangler.jsonc. No environment, identity or grant.
+# The cloudflare-scim-sync Worker (services/scim-sync/wrangler.jsonc). Production only:
+# `env.staging` (cloudflare-scim-sync-staging) binds no STS. It applies directory changes over the
+# web app's /api/internal/scim/* routes with a web:scim.sync token over its `STS` SecretsBroker
+# binding (WEB_INTERNAL_AUTH=sts).
 workload: cloudflare-scim-sync
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:scim.sync

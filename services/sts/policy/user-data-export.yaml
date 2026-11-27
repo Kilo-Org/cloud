@@ -1,4 +1,13 @@
-# Registration only: services/user-data-export/wrangler.jsonc. No environment, identity or grant.
+# The user-data-export Worker (services/user-data-export/wrangler.jsonc). Production only. It tells
+# the web app that an export is ready with a web:user-data-exports.ready token over its `STS`
+# SecretsBroker binding (WEB_INTERNAL_AUTH=sts).
 workload: user-data-export
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:user-data-exports.ready

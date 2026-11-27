@@ -27,6 +27,42 @@ const GATEWAY_BASE_SCOPES = [
   'ai-gateway-secure-proxy:request.forward',
 ];
 
+/** The shipped web policy's audiences and scopes in production: Bouncer, then its phase 2 C1 calls. */
+const WEB_PRODUCTION_AUDIENCES = [
+  'usage-ingest',
+  'o11y',
+  'bouncer',
+  'code-review',
+  'session-ingest',
+];
+const WEB_PRODUCTION_SCOPES = [
+  ...WEB_BASE_SCOPES,
+  'bouncer:decide',
+  'bouncer:usage.write',
+  'bouncer:signup.decide',
+  'code-review:review.dispatch',
+  'code-review:review.status-read',
+  'code-review:review.cancel',
+  'code-review:review.retry-fresh',
+  'session-ingest:session-access.invalidate',
+];
+
+/** The shipped ai-gateway policy's audiences and scopes in production: Bouncer, then its web calls. */
+const GATEWAY_PRODUCTION_AUDIENCES = [
+  'usage-ingest',
+  'o11y',
+  'ai-gateway-secure-proxy',
+  'bouncer',
+  'web',
+];
+const GATEWAY_PRODUCTION_SCOPES = [
+  ...GATEWAY_BASE_SCOPES,
+  'bouncer:decide',
+  'bouncer:usage.write',
+  'web:usage.region-handoff.record',
+  'web:claude-billing.payer-state.read',
+];
+
 function withGrants(grants: string): string {
   return `${valid}${grants}`;
 }
@@ -102,13 +138,8 @@ describe('policy token grants', () => {
     ).toThrow('audience canary is reserved and no policy may grant it');
     // The shipped web policy, which sends the probe, grants neither.
     expect(policyIndex.get('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'o11y', 'bouncer'],
-      scopes: [
-        ...WEB_BASE_SCOPES,
-        'bouncer:decide',
-        'bouncer:usage.write',
-        'bouncer:signup.decide',
-      ],
+      audiences: WEB_PRODUCTION_AUDIENCES,
+      scopes: WEB_PRODUCTION_SCOPES,
     });
   });
 
@@ -865,7 +896,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only and two Bouncer scopes in production only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only and its Bouncer and web scopes in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -889,8 +920,8 @@ secrets: [APP_TWO_SECRET]
     });
     expect(policyFor('production', 'ai-gateway')).toMatchObject({
       environments: ['development', 'staging', 'production'],
-      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'bouncer'],
-      scopes: [...GATEWAY_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write'],
+      audiences: GATEWAY_PRODUCTION_AUDIENCES,
+      scopes: GATEWAY_PRODUCTION_SCOPES,
       secrets: [],
       dynamic: [],
       environmentGrants: {},
@@ -931,37 +962,114 @@ describe('dual-accept grants of the shipped policies', () => {
   );
 
   it.each(['staging', 'production'] as const)(
-    'grants the callers only these scopes and audiences in %s, beside the production Bouncer grants',
+    'grants the callers only these scopes and audiences in %s, beside the production Bouncer and phase 2 C1 grants',
     environment => {
-      const bouncer = environment === 'production';
+      const production = environment === 'production';
       expect(policyFor(environment, 'usage-ingest')).toMatchObject({
         audiences: ['web'],
         scopes: ['web:sts.canary', 'web:usage.record'],
         secrets: [],
       });
       expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y', ...(bouncer ? ['bouncer'] : [])],
-        scopes: [
-          ...WEB_BASE_SCOPES,
-          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] : []),
-        ],
+        audiences: production ? WEB_PRODUCTION_AUDIENCES : ['usage-ingest', 'o11y'],
+        scopes: production ? WEB_PRODUCTION_SCOPES : WEB_BASE_SCOPES,
         secrets: [],
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
-        audiences: [
-          'usage-ingest',
-          'o11y',
-          'ai-gateway-secure-proxy',
-          ...(bouncer ? ['bouncer'] : []),
-        ],
-        scopes: [
-          ...GATEWAY_BASE_SCOPES,
-          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
-        ],
+        audiences: production
+          ? GATEWAY_PRODUCTION_AUDIENCES
+          : ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
+        scopes: production ? GATEWAY_PRODUCTION_SCOPES : GATEWAY_BASE_SCOPES,
         secrets: [],
       });
     }
   );
+});
+
+describe('phase 2 C1 grants of the shipped policies', () => {
+  /** Each phase 2 C1 scope and its one sender (its docblock in scopes.ts), production only. */
+  const SENDERS: Readonly<Record<string, string>> = {
+    'web:compute-balance-alert.send': 'container-usage-meter',
+    'web:scim.sync': 'cloudflare-scim-sync',
+    'web:user-data-exports.ready': 'user-data-export',
+    'web:security-notifications.dispatch': 'cloudflare-security-sync',
+    'web:security-notifications.lifecycle': 'security-auto-analysis',
+    'web:auto-routing.pool-pins.write': 'auto-routing-benchmark',
+    'web:usage.receipts.read': 'auto-routing-benchmark',
+    'web:auto-routing.production-profile.read': 'auto-routing-benchmark',
+    'web:usage.benchmark-grader.record': 'auto-routing-benchmark',
+    'web:usage.classifier.record': 'auto-routing',
+    'web:usage.region-handoff.record': 'ai-gateway',
+    'web:claude-billing.payer-state.read': 'ai-gateway',
+    'web:glanceable-snapshot.read': 'notifications',
+    'web:byoc-credentials.read': 'cloud-agent-next',
+    'web:byoc-credentials.write': 'cloud-agent-next',
+    'web:hosted-workspace-pull-requests.refresh': 'cloud-agent-next',
+    'web:bot-session.callback': 'cloud-agent-next',
+    'web:security-analysis.callback': 'cloud-agent-next',
+    'web:code-review.agent-callback': 'cloud-agent-next',
+    'webhook-agent-ingest:execution.callback': 'cloud-agent-next',
+    'security-auto-analysis:analysis.callback': 'cloud-agent-next',
+    'web:code-review.status-callback': 'kilo-code-review-worker',
+    'code-review:review.dispatch': 'web',
+    'code-review:review.status-read': 'web',
+    'code-review:review.cancel': 'web',
+    'code-review:review.retry-fresh': 'web',
+    'session-ingest:session-access.invalidate': 'web',
+  };
+  /** The Workers whose registration became a production worker-binding policy for these grants. */
+  const ACTIVATED = [
+    'container-usage-meter',
+    'cloudflare-scim-sync',
+    'user-data-export',
+    'cloudflare-security-sync',
+    'security-auto-analysis',
+    'auto-routing-benchmark',
+    'auto-routing',
+    'cloud-agent-next',
+    'kilo-code-review-worker',
+  ];
+
+  it.each(Object.entries(SENDERS))(
+    'grants %s to %s in production and to no other policy',
+    (scope, sender) => {
+      expect(policyFor('production', sender)).toMatchObject({
+        audiences: expect.arrayContaining([scope.slice(0, scope.indexOf(':'))]),
+        scopes: expect.arrayContaining([scope]),
+      });
+      expect(
+        policyIndex
+          .forEnvironment('production')
+          .filter(policy => policy.scopes.includes(scope))
+          .map(policy => policy.workload)
+      ).toEqual([sender]);
+    }
+  );
+
+  it.each(['development', 'staging'] as const)('grants no phase 2 C1 scope in %s', environment => {
+    for (const policy of policyIndex.forEnvironment(environment)) {
+      expect(policy.scopes.filter(scope => Object.hasOwn(SENDERS, scope))).toEqual([]);
+    }
+  });
+
+  it.each(ACTIVATED)('serves %s as a production-only worker binding', workload => {
+    expect(policyIndex.registered()).not.toContain(workload);
+    expect(policyFor('production', workload)).toMatchObject({
+      environments: ['production'],
+      identity: { kind: 'worker-binding' },
+    });
+    expect(policyFor('staging', workload)).toBeNull();
+    expect(policyFor('development', workload)).toBeNull();
+  });
+
+  it('grants each activated Worker only its own C1 scopes', () => {
+    for (const workload of ACTIVATED) {
+      const own = Object.entries(SENDERS)
+        .filter(([, sender]) => sender === workload)
+        .map(([scope]) => scope);
+      expect(policyFor('production', workload)?.scopes).toEqual(own);
+    }
+  });
 });
 
 describe('policy registrations', () => {
@@ -1314,7 +1422,7 @@ scopes: ['gateway:models.read']
     ).toBe(true);
   });
 
-  it('grants web its UTS audiences, scopes and client keys in development only, and the Bouncer scopes in production only', () => {
+  it('grants web its UTS audiences, scopes and client keys in development only, and its Bouncer and phase 2 C1 scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'uts-feed', 'uts'],
@@ -1333,13 +1441,8 @@ scopes: ['gateway:models.read']
       secrets: [],
     });
     expect(policyFor('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'o11y', 'bouncer'],
-      scopes: [
-        ...WEB_BASE_SCOPES,
-        'bouncer:decide',
-        'bouncer:usage.write',
-        'bouncer:signup.decide',
-      ],
+      audiences: WEB_PRODUCTION_AUDIENCES,
+      scopes: WEB_PRODUCTION_SCOPES,
       secrets: [],
     });
   });

@@ -1,4 +1,13 @@
-# Registration only: services/container-usage-meter/wrangler.jsonc. No environment, identity or grant.
+# The container-usage-meter Worker (services/container-usage-meter/wrangler.jsonc). Production only.
+# It asks the web app to send an organization's compute balance alert with a
+# web:compute-balance-alert.send token over its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts).
 workload: container-usage-meter
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:compute-balance-alert.send

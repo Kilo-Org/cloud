@@ -4,19 +4,45 @@ import {
   STS_BOUNCER_SIGNUP_DECIDE,
   STS_BOUNCER_SIGNUP_HISTORY,
   STS_BOUNCER_USAGE_WRITE,
+  STS_CODE_REVIEW_CANCEL,
+  STS_CODE_REVIEW_DISPATCH,
+  STS_CODE_REVIEW_RETRY_FRESH,
+  STS_CODE_REVIEW_STATUS_READ,
   STS_DENIED_PROBE,
   STS_DENIED_PROBE_REASON,
   STS_DENIED_PROBE_WORKLOAD,
   STS_ENVIRONMENTS,
   STS_SECURE_PROXY_FORWARD,
+  STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK,
   STS_SECURITY_SYNC_DISMISS_FINDING,
   STS_SECURITY_SYNC_MANUAL_SYNC,
+  STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
+  STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK,
+  STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE,
+  STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+  STS_WEB_BOT_SESSION_CALLBACK,
+  STS_WEB_BYOC_CREDENTIALS_READ,
+  STS_WEB_BYOC_CREDENTIALS_WRITE,
+  STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ,
+  STS_WEB_CODE_REVIEW_AGENT_CALLBACK,
+  STS_WEB_CODE_REVIEW_STATUS_CALLBACK,
+  STS_WEB_COMPUTE_BALANCE_ALERT,
+  STS_WEB_GLANCEABLE_SNAPSHOT_READ,
+  STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH,
+  STS_WEB_SCIM_SYNC,
+  STS_WEB_SECURITY_ANALYSIS_CALLBACK,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+  STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
+  STS_WEB_USAGE_RECEIPTS_READ,
+  STS_WEB_USAGE_RECORD_BENCHMARK_GRADER,
+  STS_WEB_USAGE_RECORD_CLASSIFIER,
+  STS_WEB_USAGE_RECORD_REGION_HANDOFF,
+  STS_WEB_USER_DATA_EXPORT_READY,
   isStsDeniedProbe,
   type MintRequest,
   type MintResult,
@@ -820,6 +846,37 @@ describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
   );
 });
 
+/** Mints `entry` for `workload` under the shipped policies and registry, with no identity check. */
+async function mintAsShipped(
+  environment: (typeof STS_ENVIRONMENTS)[number],
+  workload: string,
+  entry: { audience: string; scope: string }
+) {
+  const result = await serveMint(
+    env,
+    { ...config, environment },
+    {
+      caller: { channel: 'http', workload, identity: 'test', attestationExp: null, claims: {} },
+      request: { tokens: [entry] },
+      waitUntil,
+      authority: defaultMintAuthority,
+    }
+  );
+  await Promise.all(pending);
+  return result;
+}
+
+/** The reason the shipped policies refuse `workload` a scope its policy does not grant. */
+function refusalReason(
+  environment: (typeof STS_ENVIRONMENTS)[number],
+  workload: string,
+  audience: string
+): 'unknown_workload' | 'audience_not_allowed' | 'scope_not_allowed' {
+  const policy = defaultMintAuthority.policies.get(environment, workload);
+  if (policy === null) return 'unknown_workload';
+  return policy.audiences.includes(audience) ? 'scope_not_allowed' : 'audience_not_allowed';
+}
+
 describe('phase 4 service scopes under the shipped policies', () => {
   // The O11y scopes, the Security Sync scopes and the web scopes each share one audience, and a
   // mint holds one token per audience, so each scope is asked for in a request of its own.
@@ -850,30 +907,15 @@ describe('phase 4 service scopes under the shipped policies', () => {
       STS_O11Y_ALERTING_WRITE,
     ],
   };
+  /** The phase 2 C1 grant of a phase 4 scope, production only: Security Sync's dispatch. */
+  const PRODUCTION_GRANTED: Readonly<
+    Record<string, readonly { audience: string; scope: string }[]>
+  > = { 'cloudflare-security-sync': [STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH] };
   const shipped = STS_ENVIRONMENTS.flatMap(environment =>
     defaultMintAuthority.policies
       .forEnvironment(environment)
       .map(policy => ({ environment, workload: policy.workload, policy }))
   );
-
-  async function mintAsShipped(
-    environment: (typeof STS_ENVIRONMENTS)[number],
-    workload: string,
-    entry: { audience: string; scope: string }
-  ) {
-    const result = await serveMint(
-      env,
-      { ...config, environment },
-      {
-        caller: { channel: 'http', workload, identity: 'test', attestationExp: null, claims: {} },
-        request: { tokens: [entry] },
-        waitUntil,
-        authority: defaultMintAuthority,
-      }
-    );
-    await Promise.all(pending);
-    return result;
-  }
 
   it('covers the web, usage-ingest, ai-gateway and o11y policies in every environment', () => {
     for (const environment of STS_ENVIRONMENTS) {
@@ -945,7 +987,10 @@ describe('phase 4 service scopes under the shipped policies', () => {
   it.each(shipped)(
     'refuses $workload in $environment every phase 4 service scope it is not granted, never as unknown_scope',
     async ({ environment, workload, policy }) => {
-      const granted = GRANTED[workload] ?? [];
+      const granted = [
+        ...(GRANTED[workload] ?? []),
+        ...(environment === 'production' ? (PRODUCTION_GRANTED[workload] ?? []) : []),
+      ];
       for (const entry of SERVICE_SCOPES.filter(scope => !granted.includes(scope))) {
         // A policy holding the audience for another scope is refused the scope; otherwise the audience.
         const reason = policy.audiences.includes(entry.audience)
@@ -973,7 +1018,12 @@ describe('phase 4 service scopes under the shipped policies', () => {
         { workload: 'web', entry: STS_SECURE_PROXY_FORWARD, reason: 'audience_not_allowed' },
         { workload: 'ai-gateway', entry: STS_O11Y_ALERTING_READ, reason: 'scope_not_allowed' },
         { workload: 'ai-gateway', entry: STS_O11Y_ALERTING_WRITE, reason: 'scope_not_allowed' },
-        { workload: 'ai-gateway', entry: STS_USAGE_RECORD, reason: 'audience_not_allowed' },
+        {
+          workload: 'ai-gateway',
+          entry: STS_USAGE_RECORD,
+          // In production the gateway holds audience web for its region handoff and payer reads.
+          reason: environment === 'production' ? 'scope_not_allowed' : 'audience_not_allowed',
+        },
         { workload: 'o11y', entry: STS_O11Y_API_METRICS_WRITE, reason: 'audience_not_allowed' },
         {
           workload: 'usage-ingest',
@@ -991,17 +1041,101 @@ describe('phase 4 service scopes under the shipped policies', () => {
   );
 
   it.each(STS_ENVIRONMENTS)(
-    'refuses the registered-only Security Sync workload its own scopes and the web dispatch in %s',
+    'refuses the Security Sync workload its own scopes in %s, and serves it in production only',
     async environment => {
-      // cloudflare-security-sync.yaml is a registration: STS answers for it as for a name with no file.
-      for (const entry of [
-        STS_SECURITY_SYNC_MANUAL_SYNC,
-        STS_SECURITY_SYNC_DISMISS_FINDING,
-        STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
-      ]) {
+      // cloudflare-security-sync.yaml is a production policy whose one audience is web.
+      for (const entry of [STS_SECURITY_SYNC_MANUAL_SYNC, STS_SECURITY_SYNC_DISMISS_FINDING]) {
         expect(await mintAsShipped(environment, 'cloudflare-security-sync', entry)).toEqual({
           status: 'ok',
-          tokens: [{ status: 'denied', ...entry, reason: 'unknown_workload' }],
+          tokens: [
+            {
+              status: 'denied',
+              ...entry,
+              reason: environment === 'production' ? 'audience_not_allowed' : 'unknown_workload',
+            },
+          ],
+        });
+      }
+    }
+  );
+});
+
+describe('phase 2 C1 grants under the shipped policies', () => {
+  /** Each phase 2 C1 scope and its one sender, the workload its docblock in scopes.ts names. */
+  const SENDERS = [
+    [STS_WEB_COMPUTE_BALANCE_ALERT, 'container-usage-meter'],
+    [STS_WEB_SCIM_SYNC, 'cloudflare-scim-sync'],
+    [STS_WEB_USER_DATA_EXPORT_READY, 'user-data-export'],
+    [STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH, 'cloudflare-security-sync'],
+    [STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE, 'security-auto-analysis'],
+    [STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE, 'auto-routing-benchmark'],
+    [STS_WEB_USAGE_RECEIPTS_READ, 'auto-routing-benchmark'],
+    [STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ, 'auto-routing-benchmark'],
+    [STS_WEB_USAGE_RECORD_BENCHMARK_GRADER, 'auto-routing-benchmark'],
+    [STS_WEB_USAGE_RECORD_CLASSIFIER, 'auto-routing'],
+    [STS_WEB_USAGE_RECORD_REGION_HANDOFF, 'ai-gateway'],
+    [STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, 'ai-gateway'],
+    [STS_WEB_GLANCEABLE_SNAPSHOT_READ, 'notifications'],
+    [STS_WEB_BYOC_CREDENTIALS_READ, 'cloud-agent-next'],
+    [STS_WEB_BYOC_CREDENTIALS_WRITE, 'cloud-agent-next'],
+    [STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH, 'cloud-agent-next'],
+    [STS_WEB_BOT_SESSION_CALLBACK, 'cloud-agent-next'],
+    [STS_WEB_SECURITY_ANALYSIS_CALLBACK, 'cloud-agent-next'],
+    [STS_WEB_CODE_REVIEW_AGENT_CALLBACK, 'cloud-agent-next'],
+    [STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK, 'cloud-agent-next'],
+    [STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK, 'cloud-agent-next'],
+    [STS_WEB_CODE_REVIEW_STATUS_CALLBACK, 'kilo-code-review-worker'],
+    [STS_CODE_REVIEW_DISPATCH, 'web'],
+    [STS_CODE_REVIEW_STATUS_READ, 'web'],
+    [STS_CODE_REVIEW_CANCEL, 'web'],
+    [STS_CODE_REVIEW_RETRY_FRESH, 'web'],
+    [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE, 'web'],
+  ] as const;
+  const production = defaultMintAuthority.policies
+    .forEnvironment('production')
+    .map(policy => ({ workload: policy.workload }));
+
+  it.each(SENDERS)('lets the sender of %o, %s, mint it in production', async (entry, workload) => {
+    // The policy admits the token, so the mint reaches the token signer. The test Worker's signers
+    // belong to development and refuse a production request, so the answer is `unavailable`, never
+    // a denial.
+    expect(await mintAsShipped('production', workload, entry)).toEqual({
+      status: 'unavailable',
+      retryAfterSeconds: TOKEN_SIGNER_RETRY_AFTER_SECONDS,
+    });
+    expect(await issuedRows()).toEqual([]);
+    expect(await flushedDenials()).toEqual([]);
+  });
+
+  it.each(SENDERS)('refuses %o to its sender %s outside production', async (entry, workload) => {
+    for (const environment of ['development', 'staging'] as const) {
+      expect(await mintAsShipped(environment, workload, entry)).toEqual({
+        status: 'ok',
+        tokens: [
+          {
+            status: 'denied',
+            ...entry,
+            reason: refusalReason(environment, workload, entry.audience),
+          },
+        ],
+      });
+    }
+    expect(await issuedRows()).toEqual([]);
+  });
+
+  it.each(production)(
+    'refuses $workload in production every phase 2 C1 scope it is not granted, never as unknown_scope',
+    async ({ workload }) => {
+      for (const [entry] of SENDERS.filter(([, sender]) => sender !== workload)) {
+        expect(await mintAsShipped('production', workload, entry)).toEqual({
+          status: 'ok',
+          tokens: [
+            {
+              status: 'denied',
+              ...entry,
+              reason: refusalReason('production', workload, entry.audience),
+            },
+          ],
         });
       }
     }

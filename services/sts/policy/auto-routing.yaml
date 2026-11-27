@@ -1,4 +1,13 @@
-# Registration only: services/auto-routing/wrangler.jsonc. No environment, identity or grant.
+# The auto-routing Worker (services/auto-routing/wrangler.jsonc). Production only. Its classifier
+# records its own LLM usage at the web app's /api/internal/usage/record with a
+# web:usage.classifier.record token over its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts).
 workload: auto-routing
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:usage.classifier.record

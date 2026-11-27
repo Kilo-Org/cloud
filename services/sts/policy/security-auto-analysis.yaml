@@ -1,4 +1,14 @@
-# Registration only: services/security-auto-analysis/wrangler.jsonc. No environment, identity or grant.
+# The security-auto-analysis Worker (services/security-auto-analysis/wrangler.jsonc). Production
+# only: the `dev` block binds no STS. It pushes a finding's lifecycle event to the web app's
+# /api/internal/security-agent/notifications with a web:security-notifications.lifecycle token over
+# its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts).
 workload: security-auto-analysis
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:security-notifications.lifecycle

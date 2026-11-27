@@ -34,7 +34,10 @@ scopes:
 # (repo Kilo-Org/bouncer) runs in production only and accepts only production STS tokens: the
 # shared Bouncer client sends a bouncer:decide token with decide and release and a
 # bouncer:usage.write token with usage events, beside the legacy key while Bouncer runs
-# STS_AUTH=dual. The gateway sends no signup call, so it holds neither signup scope.
+# STS_AUTH=dual. The gateway sends no signup call, so it holds neither signup scope. In the US
+# region (sfo1; the web app runs in Frankfurt only) the gateway hands usage writes to the web app
+# and reads Claude payer states from it, a production grant: STS refuses the web workload its own
+# audience, so only the gateway holds these two web scopes.
 environmentGrants:
   development:
     audiences:
@@ -44,6 +47,9 @@ environmentGrants:
   production:
     audiences:
       - bouncer
+      - web
     scopes:
       - bouncer:decide
       - bouncer:usage.write
+      - web:usage.region-handoff.record
+      - web:claude-billing.payer-state.read

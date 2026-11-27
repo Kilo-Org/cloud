@@ -1,4 +1,24 @@
-# Registration only: services/cloud-agent-next/wrangler.jsonc. No environment, identity or grant.
+# The cloud-agent-next Worker (services/cloud-agent-next/wrangler.jsonc). Production only. Over its
+# `STS` SecretsBroker binding it reads and writes BYOC credentials and refreshes hosted workspace
+# pull requests at the web app, and sends its callbacks: bot session, security analysis and code
+# review agent status to the web app, execution to Webhook Agent Ingest, and analysis to Security
+# Auto Analysis, one scope each.
 workload: cloud-agent-next
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+  - webhook-agent-ingest
+  - security-auto-analysis
+scopes:
+  - web:byoc-credentials.read
+  - web:byoc-credentials.write
+  - web:hosted-workspace-pull-requests.refresh
+  - web:bot-session.callback
+  - web:security-analysis.callback
+  - web:code-review.agent-callback
+  - webhook-agent-ingest:execution.callback
+  - security-auto-analysis:analysis.callback

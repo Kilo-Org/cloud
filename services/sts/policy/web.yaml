@@ -39,6 +39,9 @@ scopes:
 # (bouncer:decide for decide, charge-decide and release; bouncer:usage.write for usage and credit
 # events; bouncer:signup.decide for signup), beside the legacy key while Bouncer runs
 # STS_AUTH=dual. The web app makes no signup-history call, so it holds no bouncer:signup.history.
+# The web app's calls to the Code Review Worker (code-review: dispatch, status read, cancel, fresh
+# retry) and its session access invalidation at Session Ingest (session-ingest) are a production
+# grant, like every phase 2 C1 grant; another environment gets them by adding its key.
 environmentGrants:
   development:
     audiences:
@@ -55,7 +58,14 @@ environmentGrants:
   production:
     audiences:
       - bouncer
+      - code-review
+      - session-ingest
     scopes:
       - bouncer:decide
       - bouncer:usage.write
       - bouncer:signup.decide
+      - code-review:review.dispatch
+      - code-review:review.status-read
+      - code-review:review.cancel
+      - code-review:review.retry-fresh
+      - session-ingest:session-access.invalidate

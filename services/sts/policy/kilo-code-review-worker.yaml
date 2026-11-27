@@ -1,4 +1,13 @@
-# Registration only: services/code-review-infra/wrangler.jsonc. No environment, identity or grant.
+# The kilo-code-review-worker Worker (services/code-review-infra/wrangler.jsonc). Production only.
+# It writes a review's status to the web app's /api/internal/code-review-status/{reviewId} with a
+# web:code-review.status-callback token over its `STS` SecretsBroker binding.
 workload: kilo-code-review-worker
-registered: true
+environments:
+  - production
+identity:
+  kind: worker-binding
 secrets: []
+audiences:
+  - web
+scopes:
+  - web:code-review.status-callback

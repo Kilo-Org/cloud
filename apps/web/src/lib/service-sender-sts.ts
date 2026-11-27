@@ -5,7 +5,8 @@ import {
   stsTokenFailure,
   type StsTokenFailure,
 } from '@kilocode/web-shared/lib/sts-service-tokens';
-import type { ServiceSenderStsEnvironment } from './service-sender-auth';
+
+export type ServiceSenderStsEnvironment = 'production' | 'development';
 
 /**
  * The STS side of a `service-sender-auth.ts` switch set to `sts`. Senders import this module only

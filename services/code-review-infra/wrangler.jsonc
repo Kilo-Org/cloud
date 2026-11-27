@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-01-20",
   "compatibility_flags": ["nodejs_compat"],
-  // Production features. Traces stay off: a config that binds STS may not record traces
-  // (services/sts README, "Policy"), since a trace records outbound URLs.
+  // Production features. Traces stay off, as a config that binds STS requires (services/sts README,
+  // "Policy"), since a trace records outbound URLs.
   "upload_source_maps": true,
   "observability": {
     "enabled": true,
@@ -16,15 +16,9 @@
   "version_metadata": {
     "binding": "CF_VERSION_METADATA",
   },
-  // Mints this Worker's own status-write token (src/status-callback-auth.ts).
-  "services": [
-    {
-      "binding": "STS",
-      "service": "sts",
-      "entrypoint": "SecretsBroker",
-      "props": { "caller": "kilo-code-review-worker" },
-    },
-  ],
+  // No STS binding here yet: batch B (#13047) adds this Worker's STS binding and its worker-binding
+  // policy, and the registry PR adds the status-write grant. Until then
+  // CODE_REVIEW_STATUS_CALLBACK_AUTH=sts fails closed (sts_binding_missing, src/status-callback-auth.ts).
   // Public environment variables
   "vars": {
     "ENVIRONMENT": "production",

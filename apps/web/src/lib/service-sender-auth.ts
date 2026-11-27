@@ -1,6 +1,6 @@
 import type { ServiceTokenRequest } from '@kilocode/service-token-client';
 import { z } from 'zod';
-import type { ServiceSenderToken } from './service-sender-sts';
+import type { ServiceSenderStsEnvironment, ServiceSenderToken } from './service-sender-sts';
 
 /**
  * The credential switch of a web sender to a Kilo service whose receiver has no staging STS
@@ -25,8 +25,6 @@ export type VercelRuntime = Readonly<Record<string, string | undefined>> & {
   VERCEL_ENV?: string;
   VERCEL_TARGET_ENV?: string;
 };
-
-export type ServiceSenderStsEnvironment = 'production' | 'development';
 
 /**
  * The STS environment a sender mints from: Vercel production is production, and a process outside

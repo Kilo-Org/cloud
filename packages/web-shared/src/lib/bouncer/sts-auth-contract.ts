@@ -1,11 +1,46 @@
+import type {
+  STS_BOUNCER_DECIDE,
+  STS_BOUNCER_SIGNUP_DECIDE,
+  STS_BOUNCER_USAGE_WRITE,
+} from '@kilocode/sts-contracts';
+
 /**
- * The types and the error shared by the Bouncer STS auth (`sts-auth.ts`) and its lazily loaded
- * transport (`sts-token-transport.ts`). A leaf: it imports nothing, so neither module imports the
- * other statically and the import graph has no cycle.
+ * The types, the error and the per-app scope table shared by the Bouncer STS auth (`sts-auth.ts`)
+ * and its lazily loaded transport (`sts-token-transport.ts`). A leaf: its one import is type-only,
+ * so neither module imports the other statically and the import graph has no cycle.
  */
 
-/** The Bouncer scopes the shared client sends; the signup-history import job's scope is not one. */
-export type BouncerScope = 'bouncer:decide' | 'bouncer:usage.write' | 'bouncer:signup.decide';
+/**
+ * The Bouncer scopes the shared client sends, from the registered pairs of `@kilocode/sts-contracts`;
+ * the signup-history import job's scope is not one.
+ */
+export type BouncerScope = (
+  | typeof STS_BOUNCER_DECIDE
+  | typeof STS_BOUNCER_USAGE_WRITE
+  | typeof STS_BOUNCER_SIGNUP_DECIDE
+)['scope'];
+
+/**
+ * The `x-kilo-caller` values: the labels Bouncer's legacy-call counters accept (`KNOWN_CALLERS` in
+ * Kilo-Org/bouncer `src/api-auth.ts`). They are counting labels, not STS workload names: Bouncer
+ * attributes a call that carries a token by the token's `sub` (`service:web`, `service:ai-gateway`).
+ */
+export type BouncerCaller = 'kilocode-app' | 'kilocode-ai-gateway';
+
+/**
+ * The Bouncer scopes each app's STS policy grants in production (`services/sts/policy/web.yaml`
+ * and `ai-gateway.yaml`, `environmentGrants.production`); `sts-auth-scopes.test.ts` checks the two
+ * stay equal. The auth reads no other scope.
+ */
+export const BOUNCER_APP_SCOPES: Readonly<Record<BouncerCaller, readonly BouncerScope[]>> = {
+  'kilocode-app': ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'],
+  'kilocode-ai-gateway': ['bouncer:decide', 'bouncer:usage.write'],
+};
+
+/** What the transport reports back to the auth: each STS mint answer, HTTP 2xx or not. */
+export type BouncerTransportHooks = {
+  mint(ok: boolean): void;
+};
 
 /** Reads one token, from memory when the client holds a fresh one (`ServiceTokens.get`). */
 export type BouncerTokenRead = (

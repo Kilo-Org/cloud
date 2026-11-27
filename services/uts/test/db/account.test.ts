@@ -61,6 +61,8 @@ async function waitUntilBlocked(pid: number): Promise<void> {
 }
 
 type Session = { accountId: string; grantId: string; deviceSessionId: string };
+/** What an account statement takes from the token: its subject and the session its `sid` names. */
+type Caller = Pick<Session, 'accountId' | 'grantId'>;
 
 /** A first-party grant whose device session signed in `minutesAgo` minutes ago with `amr`. */
 async function session(
@@ -99,7 +101,7 @@ async function membership(orgId: string, accountId: string, role: string, enforc
 }
 
 function patInput(
-  holder: Session,
+  holder: Caller,
   overrides: Partial<Parameters<AccountStore['createPat']>[0]> = {}
 ) {
   const token = createSecret('pat');
@@ -120,7 +122,7 @@ function patInput(
   };
 }
 
-async function createdPat(holder: Session, overrides: Parameters<typeof patInput>[1] = {}) {
+async function createdPat(holder: Caller, overrides: Parameters<typeof patInput>[1] = {}) {
   const { token, input } = patInput(holder, overrides);
   const result = await account.createPat(input);
   if (result.outcome !== 'created') throw new Error(`expected created, got ${result.outcome}`);
@@ -498,7 +500,7 @@ async function organization() {
   return { orgId, admin, member };
 }
 
-function botKeyInput(holder: Session, orgId: string) {
+function botKeyInput(holder: Caller, orgId: string) {
   const token = createSecret('bot_key');
   return {
     token,
@@ -516,7 +518,7 @@ function botKeyInput(holder: Session, orgId: string) {
   };
 }
 
-async function createdBotKey(holder: Session, orgId: string) {
+async function createdBotKey(holder: Caller, orgId: string) {
   const { token, input } = botKeyInput(holder, orgId);
   const result = await account.createBotKey(input);
   if (result.outcome !== 'created') throw new Error(`expected created, got ${result.outcome}`);
@@ -1144,5 +1146,188 @@ describe('tier A gate passes', () => {
       )
     ).toBe('22023');
     expect(await sqlStateOf(() => openTierA(holder, 'email_change', codes))).toBe('22023');
+  });
+});
+
+/**
+ * A browser session of the web BFF that signed in `minutesAgo` minutes ago with `amr` and holds a
+ * BFF handle, as the code exchange leaves it. A `kilo-web` token names it in `sid`, so the caller
+ * passes it as `grantId`.
+ */
+async function webSession(
+  options: { minutesAgo?: number; amr?: string[]; accountId?: string; handle?: boolean } = {}
+) {
+  const accountId = options.accountId ?? (await insertAccount(owner));
+  const handle = options.handle ?? true;
+  const result = await owner.query<{ id: string }>(
+    `INSERT INTO uts.browser_sessions (account_id, token_hash, auth_time, amr, idle_expires_at,
+       expires_at, handle_hash, handle_issued_at, handle_auth_time, handle_amr)
+     VALUES ($1, $2, now() - make_interval(mins => $3::integer), $4::uts.auth_method[],
+       now() + interval '14 days', now() + interval '30 days', $5, CASE WHEN $6::boolean THEN now() END,
+       CASE WHEN $6::boolean THEN now() - make_interval(mins => $3::integer) END,
+       CASE WHEN $6::boolean THEN $4::uts.auth_method[] END)
+     RETURNING id`,
+    [
+      accountId,
+      randomBytes(32),
+      options.minutesAgo ?? 1,
+      options.amr ?? ['oauth'],
+      handle ? randomBytes(32) : null,
+      handle,
+    ]
+  );
+  const sessionId = result.rows[0].id;
+  return { accountId, grantId: sessionId, browserSessionId: sessionId };
+}
+
+describe('the web BFF’s browser session on the account statements', () => {
+  it('creates, lists and revokes a PAT, with the pass on the browser session', async () => {
+    const web = await webSession();
+    const { id, token } = await createdPat(web);
+    const pass = await owner.query(
+      `SELECT pass.browser_session_id, pass.device_session_id, pass.satisfied_by::text[] AS satisfied_by
+       FROM uts.gate_passes AS pass JOIN uts.personal_access_tokens AS pat ON pat.gate_pass_id = pass.id
+       WHERE pat.id = $1`,
+      [id]
+    );
+    expect(pass.rows).toEqual([
+      {
+        browser_session_id: web.browserSessionId,
+        device_session_id: null,
+        satisfied_by: ['recent_sign_in'],
+      },
+    ]);
+    expect(await lookupPat(new IdentityStore(patLogin), sha256(token))).toMatchObject({
+      pat_id: id,
+      account_id: web.accountId,
+    });
+    const listed = await account.listPats(web);
+    expect(listed.outcome === 'listed' ? listed.pats.map(pat => pat.id) : listed).toEqual([id]);
+    expect((await account.revokePat({ environment, ...web, patId: id })).outcome).toBe('revoked');
+    const [created] = await auditRows(web.accountId);
+    expect(created.event.data.attributes).toMatchObject({ patId: id, grantId: web.grantId });
+  });
+
+  it('refuses to act for another account: its session, its PATs and its list stay out of reach', async () => {
+    const web = await webSession();
+    const victim = await webSession();
+    const victimPat = await createdPat(victim);
+    // The signed-in user's subject with another account's browser session in `sid`.
+    const crossed = { accountId: web.accountId, grantId: victim.grantId };
+    expect((await account.createPat(patInput(crossed).input)).outcome).toBe('invalid_session');
+    expect(await account.listPats(crossed)).toEqual({ outcome: 'invalid_session' });
+    expect(await account.revokePat({ environment, ...crossed, patId: victimPat.id })).toEqual({
+      outcome: 'invalid_session',
+      feedEntries: [],
+    });
+    // The signed-in user's own session cannot reach the other account's PAT either.
+    expect(await account.revokePat({ environment, ...web, patId: victimPat.id })).toEqual({
+      outcome: 'not_found',
+      feedEntries: [],
+    });
+    expect(await account.listPats(web)).toEqual({ outcome: 'listed', pats: [] });
+    const victimList = await account.listPats(victim);
+    expect(
+      victimList.outcome === 'listed' ? victimList.pats.map(pat => pat.id) : victimList
+    ).toEqual([victimPat.id]);
+    const ownedByWeb = await owner.query(
+      'SELECT 1 FROM uts.personal_access_tokens WHERE account_id = $1',
+      [web.accountId]
+    );
+    expect(ownedByWeb.rowCount).toBe(0);
+  });
+
+  it('refuses a session without a BFF handle, an ended session, and one a subject revocation covers', async () => {
+    const noHandle = await webSession({ handle: false });
+    const ended = await webSession();
+    await owner.query(
+      `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(), revoke_reason = 'sign_out'
+       WHERE id = $1`,
+      [ended.browserSessionId]
+    );
+    const covered = await webSession();
+    await owner.query(
+      `INSERT INTO uts.revocations (kind, subject_id, revoked_before, feed_expires_at)
+       VALUES ('subject', $1, now(), now() + interval '20 minutes')`,
+      [covered.accountId]
+    );
+    for (const caller of [noHandle, ended, covered]) {
+      expect((await account.createPat(patInput(caller).input)).outcome).toBe('invalid_session');
+      expect(await account.listPats(caller)).toEqual({ outcome: 'invalid_session' });
+    }
+  });
+
+  it('gates a create on that session: an old sign-in is refused with one denied row per session, a passkey step-up of it passes', async () => {
+    const web = await webSession({ minutesAgo: 30 });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      expect((await account.createPat(patInput(web).input)).outcome).toBe('gate_required');
+    }
+    const rows = await auditRows(web.accountId);
+    expect(rows.map(row => row.type)).toEqual(['ai.kilo.uts.gate.refused']);
+    expect(rows[0].event.data.attributes).toMatchObject({
+      action: 'pat_create',
+      tier: 'b',
+      sessionId: web.browserSessionId,
+    });
+    const passkey = await owner.query<{ id: string }>(
+      `INSERT INTO uts.passkey_credentials (account_id, credential_id, public_key, backup_eligible,
+         backed_up, rp_id, name, added_at, user_handle, gate_pass_id)
+       VALUES ($1, $2, $3, false, false, 'app.kilo.ai', 'laptop', now() - interval '30 days', $4, $5)
+       RETURNING id`,
+      [
+        web.accountId,
+        randomBytes(32),
+        randomBytes(32),
+        randomBytes(32),
+        await insertGatePass(owner, web.accountId, 'passkey_add'),
+      ]
+    );
+    await owner.query(
+      `INSERT INTO uts.step_ups (account_id, browser_session_id, purpose, passkey_credential_id, expires_at)
+       VALUES ($1, $2, 'gate', $3, now() + interval '10 minutes')`,
+      [web.accountId, web.browserSessionId, passkey.rows[0].id]
+    );
+    expect((await account.createPat(patInput(web).input)).outcome).toBe('created');
+  });
+
+  it('binds a PAT to an organization only for a member that meets its SSO rule', async () => {
+    const web = await webSession();
+    const ssoOrg = randomUUID();
+    await membership(ssoOrg, web.accountId, 'member', 'required');
+    expect((await account.createPat(patInput(web, { orgId: ssoOrg }).input)).outcome).toBe(
+      'org_denied'
+    );
+    const ssoWeb = await webSession({ accountId: web.accountId, amr: ['sso'] });
+    expect((await account.createPat(patInput(ssoWeb, { orgId: ssoOrg }).input)).outcome).toBe(
+      'created'
+    );
+    expect((await account.createPat(patInput(ssoWeb, { orgId: randomUUID() }).input)).outcome).toBe(
+      'org_denied'
+    );
+  });
+
+  it('lets only an owner or admin manage bot keys, and keeps a flagged key behind the gate', async () => {
+    const orgId = randomUUID();
+    const admin = await webSession();
+    const member = await webSession();
+    await membership(orgId, admin.accountId, 'admin');
+    await membership(orgId, member.accountId, 'member');
+    expect((await account.createBotKey(botKeyInput(member, orgId).input)).outcome).toBe(
+      'not_org_admin'
+    );
+    expect(await account.listBotKeys({ ...member, orgId })).toEqual({ outcome: 'not_org_admin' });
+    const key = await createdBotKey(admin, orgId);
+    await owner.query(
+      `UPDATE uts.org_bot_keys SET status = 'flagged', flagged_at = now() WHERE id = $1`,
+      [key.id]
+    );
+    const stale = await webSession({ accountId: admin.accountId, minutesAgo: 30 });
+    expect(await account.keepBotKey({ environment, ...stale, orgId, keyId: key.id })).toBe(
+      'gate_required'
+    );
+    expect(await account.keepBotKey({ environment, ...admin, orgId, keyId: key.id })).toBe('kept');
+    expect(
+      (await account.revokeBotKey({ environment, ...admin, orgId, keyId: key.id })).outcome
+    ).toBe('revoked');
   });
 });

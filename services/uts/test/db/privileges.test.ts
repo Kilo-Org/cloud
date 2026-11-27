@@ -388,11 +388,11 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     ['widen a consent', `UPDATE uts.third_party_consents SET scopes = scopes`],
     [
       'call the gated PAT write step',
-      `SELECT * FROM uts.write_gated_pat('a', NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', NULL, 1)`,
+      `SELECT * FROM uts.write_gated_pat('a', NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', NULL, 1)`,
     ],
     [
       'call the gated bot key write step',
-      `SELECT * FROM uts.write_gated_bot_key('a', NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', 1)`,
+      `SELECT * FROM uts.write_gated_bot_key('a', NULL, NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', 1)`,
     ],
     ['compute tier B checks', `SELECT uts.tier_b_checks('a', NULL, NULL)`],
   ])('cannot %s', async (_name, statement) => {

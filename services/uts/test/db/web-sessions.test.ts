@@ -291,7 +291,7 @@ describe('kilo-web code exchange', () => {
     );
     for (const call of [
       sessions.read({ handleHash: sha256(handle), assertion: assertion() }),
-      sessions.mint({ ...handleInput(handle), scope: SCOPE, stepUp: false }),
+      sessions.mint({ ...handleInput(handle), scope: SCOPE, stepUp: false, orgId: null }),
       sessions.revokeDevice({ ...handleInput(handle), sid: randomUUID() }),
     ]) {
       expect((await call).outcome).toBe('invalid_session');
@@ -372,7 +372,12 @@ describe('read and token', () => {
          idle_expires_at = now() + interval '13 days' WHERE id = $1`,
       [sessionId]
     );
-    const minted = await sessions.mint({ ...handleInput(handle), scope: SCOPE, stepUp: false });
+    const minted = await sessions.mint({
+      ...handleInput(handle),
+      scope: SCOPE,
+      stepUp: false,
+      orgId: null,
+    });
     expect(minted).toMatchObject({
       outcome: 'issued',
       sessionId,
@@ -391,7 +396,8 @@ describe('read and token', () => {
     const { accountId, handle } = await webSession();
     const before = (await auditRows(accountId)).length;
     expect(
-      (await sessions.mint({ ...handleInput(handle), scope: SCOPE, stepUp: true })).outcome
+      (await sessions.mint({ ...handleInput(handle), scope: SCOPE, stepUp: true, orgId: null }))
+        .outcome
     ).toBe('step_up_required');
     expect((await auditRows(accountId)).length).toBe(before);
   });
@@ -413,6 +419,97 @@ describe('read and token', () => {
         (await sessions.read({ handleHash: sha256(handle), assertion: assertion() })).outcome
       ).toBe('invalid_session');
     }
+  });
+});
+
+describe('an organization-bound token from the browser session', () => {
+  const ORG_SCOPE = 'git-token-service:bitbucket.repositories.read';
+  /** `ai-attribution:identity.read` allows owners and members only (`uts.scope_org_roles`). */
+  const ROLE_SCOPE = 'ai-attribution:identity.read';
+
+  async function joinOrg(accountId: string, role: string, enforcement?: 'required') {
+    const orgId = randomUUID();
+    await owner.query(
+      `INSERT INTO uts.org_memberships (org_id, account_id, role, event_version) VALUES ($1, $2, $3, 1)`,
+      [orgId, accountId, role]
+    );
+    if (enforcement !== undefined) {
+      await owner.query(
+        `INSERT INTO uts.org_sso_policies (org_id, enforcement, event_version) VALUES ($1, $2, 1)`,
+        [orgId, enforcement]
+      );
+    }
+    return orgId;
+  }
+
+  const mint = (handle: string, scope: string, orgId: string | null) =>
+    sessions.mint({ ...handleInput(handle), scope, stepUp: false, orgId });
+
+  it('mints for an active member, with the organization and role, and audits the organization', async () => {
+    const { accountId, sessionId, handle } = await webSession();
+    const orgId = await joinOrg(accountId, 'member');
+    expect(await mint(handle, ORG_SCOPE, orgId)).toMatchObject({
+      outcome: 'issued',
+      sessionId,
+      subjectId: accountId,
+      orgId,
+      orgRole: 'member',
+      scopes: [ORG_SCOPE],
+    });
+    expect((await auditRows(accountId)).at(-1)?.event.data.attributes).toMatchObject({
+      grantType: 'browser_session',
+      org: orgId,
+    });
+  });
+
+  it('refuses a non-member, and a member of another account, and writes no audit row', async () => {
+    const { accountId, handle } = await webSession();
+    const other = await webSession();
+    const othersOrg = await joinOrg(other.accountId, 'owner');
+    const before = (await auditRows(accountId)).length;
+    for (const orgId of [randomUUID(), othersOrg]) {
+      expect((await mint(handle, ORG_SCOPE, orgId)).outcome).toBe('org_denied');
+    }
+    expect((await auditRows(accountId)).length).toBe(before);
+  });
+
+  it('refuses a member on the next mint once uts.remove_org_member removed them', async () => {
+    const { accountId, handle } = await webSession();
+    const orgId = await joinOrg(accountId, 'member');
+    expect((await mint(handle, ORG_SCOPE, orgId)).outcome).toBe('issued');
+    const removed = await owner.query('SELECT outcome FROM uts.remove_org_member($1, $2, $3, 2)', [
+      environment,
+      orgId,
+      accountId,
+    ]);
+    expect(removed.rows).toEqual([{ outcome: 'removed' }]);
+    expect((await mint(handle, ORG_SCOPE, orgId)).outcome).toBe('org_denied');
+    // The same session still mints without the organization: removal ends no browser session.
+    expect((await mint(handle, SCOPE, null)).outcome).toBe('issued');
+  });
+
+  it('keeps an organization’s SSO rule: only a handle whose sign-in includes SSO passes', async () => {
+    const { accountId, sessionId, handle } = await webSession();
+    const orgId = await joinOrg(accountId, 'member', 'required');
+    expect((await mint(handle, ORG_SCOPE, orgId)).outcome).toBe('org_denied');
+    await owner.query(
+      `UPDATE uts.browser_sessions SET amr = '{sso}', handle_amr = '{sso}' WHERE id = $1`,
+      [sessionId]
+    );
+    expect((await mint(handle, ORG_SCOPE, orgId)).outcome).toBe('issued');
+  });
+
+  it('holds a role-limited scope to its roles, with or without an organization', async () => {
+    const { accountId, handle } = await webSession();
+    const adminOrg = await joinOrg(accountId, 'admin');
+    const memberOrg = await joinOrg(accountId, 'member');
+    expect((await mint(handle, ROLE_SCOPE, adminOrg)).outcome).toBe('org_denied');
+    expect((await mint(handle, ROLE_SCOPE, null)).outcome).toBe('org_denied');
+    expect(await mint(handle, ROLE_SCOPE, memberOrg)).toMatchObject({
+      outcome: 'issued',
+      orgId: memberOrg,
+      orgRole: 'member',
+    });
   });
 });
 

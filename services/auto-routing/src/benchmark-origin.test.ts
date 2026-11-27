@@ -28,8 +28,12 @@ vi.mock('./secrets', async importOriginal => {
 
 function benchmarkEnv() {
   const fetch = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+  const secret = { get: async () => 'legacy-internal' };
   return {
-    env: { BENCHMARK_SERVICE: { fetch }, INTERNAL_API_SECRET_PROD: 'legacy-internal' },
+    env: {
+      BENCHMARK_SERVICE: { fetch } as unknown as Fetcher,
+      INTERNAL_API_SECRET_PROD: secret,
+    },
     fetch,
   };
 }

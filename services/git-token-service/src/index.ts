@@ -54,6 +54,7 @@ import {
 } from './gitlab-runtime-token-resolver.js';
 import { DEFAULT_GITLAB_INSTANCE_URL } from '@kilocode/worker-utils/gitlab-url';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
+import { readGitTokenServiceSecret } from './secrets';
 import { isGitHubDisconnectAssertion } from './github-disconnect-assertion.js';
 import {
   GitLabSessionCapabilityCodec,
@@ -390,13 +391,8 @@ const bitbucketCodeReviewAudiences = new Map([
 ]);
 
 type ServiceHttpEnv = CloudflareEnv & {
-  NEXTAUTH_SECRET: SecretsStoreSecret | string;
   GITHUB_USER_TOKEN_SOURCE_METADATA_ENABLED?: string;
 };
-
-async function resolveSecret(secret: SecretsStoreSecret | string): Promise<string> {
-  return typeof secret === 'string' ? secret : secret.get();
-}
 
 async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
@@ -524,18 +520,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private gitlabLookupService: GitLabLookupService;
   private gitlabCredentialResolver: GitLabCredentialBroker;
   private githubUserAuthorizationService: GitHubUserAuthorizationService;
+  /** The invocation context every secret read from this entrypoint runs under. */
+  private readonly secretsCtx: ExecutionContext;
 
   constructor(ctx: ExecutionContext, env: CloudflareEnv) {
     super(ctx, env);
-    this.githubService = new GitHubTokenService(env);
+    this.secretsCtx = ctx;
+    this.githubService = new GitHubTokenService(env, ctx);
     this.installationLookupService = new InstallationLookupService(env);
     this.hostedWorkspaceGitHubRepositories = new HostedWorkspaceGitHubRepositories(
       params => this.findHostedWorkspaceInstallationWithLoginRepair(params),
       this.githubService
     );
     this.gitlabLookupService = new GitLabLookupService(env);
-    this.gitlabCredentialResolver = createGitLabCredentialBroker(env);
-    this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
+    this.gitlabCredentialResolver = createGitLabCredentialBroker(env, ctx);
+    this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env, ctx);
   }
 
   private async refreshGitHubInstallationLogins(
@@ -846,11 +845,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     let taskGrant: GitHubTaskGrant | undefined;
     if (params.taskScope) {
       try {
-        taskGrant = await new GitHubTaskResources(auth.githubToken, this.env).issue(
-          repository.owner,
-          repository.repo,
-          params.taskScope
-        );
+        taskGrant = await new GitHubTaskResources(
+          auth.githubToken,
+          this.env,
+          this.secretsCtx
+        ).issue(repository.owner, repository.repo, params.taskScope);
       } catch (error) {
         return {
           success: false,
@@ -860,7 +859,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     }
     let capability: string;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
+      );
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         accessPurpose: params.accessPurpose ?? 'workflow',
@@ -898,7 +901,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   ): Promise<RedeemGitHubSessionCapabilityResult> {
     let claims;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
+      );
       claims = new GitHubSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
       if (error instanceof GitHubSessionCapabilityError) {
@@ -979,7 +986,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         auth,
         claims.taskGrant,
         taskDecision,
-        params.requestUrl
+        params.requestUrl,
+        this.secretsCtx
       );
       if (authorization !== null) {
         authorization = this.formatUpstreamAuthorization(params.requestUrl, authorization);
@@ -1131,27 +1139,36 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
   async getBitbucketToken(params: GetBitbucketTokenParams): Promise<GetBitbucketTokenResult> {
     if (!params.orgId) return { success: false, reason: 'invalid_request' };
-    const result = await resolveBitbucketToken(this.env, params);
+    const result = await resolveBitbucketToken(this.env, params, undefined, this.secretsCtx);
     return result.success ? { success: true, token: result.token } : result;
   }
 
   async issueBitbucketSessionCapability(
     params: IssueBitbucketSessionCapabilityParams
   ): Promise<IssueBitbucketSessionCapabilityResult> {
-    const resolved = await resolveBitbucketCapabilitySubject(this.env, {
-      userId: params.userId,
-      orgId: params.orgId,
-      ...(params.expectedIntegrationId !== undefined
-        ? { expectedIntegrationId: params.expectedIntegrationId }
-        : {}),
-      workspaceUuid: params.workspaceUuid,
-      repositoryUuid: params.repositoryUuid,
-      repositoryUrl: params.repositoryUrl,
-    });
+    const resolved = await resolveBitbucketCapabilitySubject(
+      this.env,
+      {
+        userId: params.userId,
+        orgId: params.orgId,
+        ...(params.expectedIntegrationId !== undefined
+          ? { expectedIntegrationId: params.expectedIntegrationId }
+          : {}),
+        workspaceUuid: params.workspaceUuid,
+        repositoryUuid: params.repositoryUuid,
+        repositoryUrl: params.repositoryUrl,
+      },
+      undefined,
+      this.secretsCtx
+    );
     if (!resolved.success) return resolved;
     const { subject } = resolved;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
+      );
       const capability = new BitbucketSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         orgId: params.orgId,
@@ -1179,7 +1196,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   ): Promise<RedeemBitbucketSessionCapabilityResult> {
     let claims;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
+      );
       claims = new BitbucketSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
       if (error instanceof BitbucketSessionCapabilityError) {
@@ -1197,14 +1218,19 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     );
     if (upstream.failure) return { success: false, reason: upstream.failure };
 
-    const resolved = await resolveBitbucketCapabilitySubject(this.env, {
-      userId: claims.userId,
-      orgId: claims.orgId,
-      expectedIntegrationId: claims.integrationId,
-      workspaceUuid: claims.workspaceUuid,
-      repositoryUuid: claims.repositoryUuid,
-      repositoryUrl: `https://bitbucket.org/${claims.repositoryFullName}.git`,
-    });
+    const resolved = await resolveBitbucketCapabilitySubject(
+      this.env,
+      {
+        userId: claims.userId,
+        orgId: claims.orgId,
+        expectedIntegrationId: claims.integrationId,
+        workspaceUuid: claims.workspaceUuid,
+        repositoryUuid: claims.repositoryUuid,
+        repositoryUrl: `https://bitbucket.org/${claims.repositoryFullName}.git`,
+      },
+      undefined,
+      this.secretsCtx
+    );
     if (!resolved.success) return { success: false, reason: 'source_unavailable' };
     const { subject } = resolved;
     if (
@@ -1270,7 +1296,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     let capability: string;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
+      );
       capability = new GitLabSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
         outboundContainerId: params.outboundContainerId,
@@ -1304,7 +1334,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   ): Promise<RedeemGitLabSessionCapabilityResult> {
     let claims;
     try {
-      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const encryptionKey = await readGitTokenServiceSecret(
+        this.env,
+        'SCM_SESSION_CAPABILITY_ENCRYPTION_KEY',
+        this.secretsCtx
+      );
       claims = new GitLabSessionCapabilityCodec(encryptionKey).decode(params.capability);
     } catch (error) {
       if (error instanceof GitLabSessionCapabilityError) {
@@ -1400,7 +1434,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 }
 
 export default {
-  async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
+  async fetch(request: Request, env: ServiceHttpEnv, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
     // Credential-bearing endpoints must never be cached, including on their
@@ -1438,7 +1472,7 @@ export default {
 
     let secret: string;
     try {
-      secret = await resolveSecret(env.NEXTAUTH_SECRET);
+      secret = await readGitTokenServiceSecret(env, 'NEXTAUTH_SECRET', ctx);
     } catch {
       return Response.json(
         { error: 'authentication_unavailable' },
@@ -1492,10 +1526,15 @@ export default {
         return Response.json({ error: 'organization_required' }, { status: 403 });
       }
       try {
-        const result: BitbucketRepositoryListResult = await listBitbucketRepositories(env, {
-          userId: authorization.kiloUserId,
-          orgId: authorization.organizationId,
-        });
+        const result: BitbucketRepositoryListResult = await listBitbucketRepositories(
+          env,
+          {
+            userId: authorization.kiloUserId,
+            orgId: authorization.organizationId,
+          },
+          undefined,
+          ctx
+        );
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
@@ -1532,7 +1571,11 @@ export default {
       // matches the integration the token belongs to.
       const requested = parsed.data;
       try {
-        const authorizationService = new BitbucketWorkspaceAccessTokenAuthorizationService(env);
+        const authorizationService = new BitbucketWorkspaceAccessTokenAuthorizationService(
+          env,
+          {},
+          ctx
+        );
         const workspaceAuthorization: BitbucketWorkspaceAccessTokenAuthorizationResult =
           await authorizationService.getAuthorization({
             userId: authorization.kiloUserId,
@@ -1597,7 +1640,8 @@ export default {
             userId: authorization.kiloUserId,
             ...(authorization.organizationId ? { orgId: authorization.organizationId } : {}),
           },
-          parsed.data
+          parsed.data,
+          ctx
         );
         return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
       } catch {
@@ -1622,7 +1666,7 @@ export default {
         userId: authorization.kiloUserId,
         orgId: authorization.organizationId,
       };
-      const service = new BitbucketCodeReviewService(env);
+      const service = new BitbucketCodeReviewService(env, {}, ctx);
 
       try {
         switch (url.pathname) {
@@ -1673,7 +1717,7 @@ export default {
         );
       }
       try {
-        const service = new GitHubUserAuthorizationService(env);
+        const service = new GitHubUserAuthorizationService(env, ctx);
         const result = await service.getUserAccessToken(authorization.kiloUserId, parsed.data);
         if (
           result.connected &&
@@ -1707,7 +1751,7 @@ export default {
     const expected = GitHubIdentityPreconditionSchema.safeParse(disconnectBody);
     if (!expected.success) return Response.json({ error: 'invalid_request' }, { status: 400 });
     try {
-      const service = new GitHubUserAuthorizationService(env);
+      const service = new GitHubUserAuthorizationService(env, ctx);
       await service.disconnectUserAuthorization(authorization.kiloUserId, expected.data);
       return Response.json({ disconnected: true });
     } catch (error) {

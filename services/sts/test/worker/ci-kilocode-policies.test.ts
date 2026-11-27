@@ -247,10 +247,11 @@ describe('shipped Kilo-Org/kilocode policies', () => {
   it('refuses another repository, another owner, and the subject forms kilocode issues today', async () => {
     const { verify } = await fixture('production');
     const base = claims('release', 'publish.yml', 'workflow_dispatch');
-    // Kilo-Org/bouncer's repository id, with every other claim unchanged.
+    // Kilo-Org/bouncer's repository id, with every other claim unchanged. Bouncer has its own
+    // workload (ci-deploy-bouncer), so the claims match it and its identity check refuses them.
     expect(await verify({ ...base, repository_id: '1395255492' })).toMatchObject({
       status: 'denied',
-      reason: 'unknown_workload',
+      reason: 'identity_rejected',
     });
     expect(await verify({ ...base, repository_owner_id: '1' })).toMatchObject({
       status: 'denied',

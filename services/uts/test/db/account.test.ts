@@ -127,8 +127,11 @@ async function createdPat(holder: Session, overrides: Parameters<typeof patInput
   return { token, id: result.id, result };
 }
 
-/** `count` PATs of `holder`, live for a day, or created 2 days ago and expired a day ago. */
-async function insertPats(holder: Session, count: number, state: 'live' | 'expired') {
+/**
+ * `count` PATs of `holder`: live for a day and created 2 hours ago (outside the hourly create
+ * count), created 2 days ago and expired a day ago, or live and created just now (`recent`).
+ */
+async function insertPats(holder: Session, count: number, state: 'live' | 'expired' | 'recent') {
   await owner.query(
     `WITH passes AS (
        INSERT INTO uts.gate_passes (account_id, device_session_id, tier, action, satisfied_by,
@@ -141,10 +144,11 @@ async function insertPats(holder: Session, count: number, state: 'live' | 'expir
      INSERT INTO uts.personal_access_tokens (account_id, name, token_hash, last_four, audience,
        scope, gate_pass_id, created_at, expires_at)
      SELECT $1, 'bulk', sha256(convert_to(id::text, 'UTF8')), 'abcd', 'uts', 'uts:probe.read', id,
-       now() - CASE WHEN $4::boolean THEN interval '0' ELSE interval '2 days' END,
-       now() + CASE WHEN $4::boolean THEN interval '1 day' ELSE interval '-1 day' END
+       now() - CASE $4::text WHEN 'live' THEN interval '2 hours' WHEN 'recent' THEN interval '0'
+         ELSE interval '2 days' END,
+       now() + CASE WHEN $4::text = 'expired' THEN interval '-1 day' ELSE interval '1 day' END
      FROM passes`,
-    [holder.accountId, holder.deviceSessionId, count, state === 'live']
+    [holder.accountId, holder.deviceSessionId, count, state]
   );
 }
 
@@ -343,7 +347,8 @@ describe('PAT create', () => {
     await owner.query(
       `UPDATE uts.personal_access_tokens SET status = 'revoked', revoked_at = now(),
          revoke_reason = 'user_revoke'
-       WHERE id = (SELECT id FROM uts.personal_access_tokens WHERE account_id = $1 LIMIT 1)`,
+       WHERE id = (SELECT id FROM uts.personal_access_tokens
+                   WHERE account_id = $1 AND expires_at > now() LIMIT 1)`,
       [holder.accountId]
     );
     expect((await account.createPat(patInput(holder).input)).outcome).toBe('created');
@@ -367,6 +372,25 @@ describe('PAT create', () => {
     } finally {
       await first.query('ROLLBACK');
     }
+  });
+
+  it('lets an account create 20 PATs an hour; revoked and expired ones count', async () => {
+    const holder = await session();
+    await insertPats(holder, 19, 'recent');
+    await owner.query(
+      `UPDATE uts.personal_access_tokens SET status = 'revoked', revoked_at = now(),
+         revoke_reason = 'user_revoke'
+       WHERE id = (SELECT id FROM uts.personal_access_tokens WHERE account_id = $1 LIMIT 1)`,
+      [holder.accountId]
+    );
+    expect((await account.createPat(patInput(holder).input)).outcome).toBe('created');
+    expect((await account.createPat(patInput(holder).input)).outcome).toBe('rate_limited');
+    await owner.query(
+      `UPDATE uts.personal_access_tokens SET created_at = now() - interval '61 minutes'
+       WHERE id = (SELECT id FROM uts.personal_access_tokens WHERE account_id = $1 LIMIT 1)`,
+      [holder.accountId]
+    );
+    expect((await account.createPat(patInput(holder).input)).outcome).toBe('created');
   });
 
   it('allows 1 to 365 days and refuses any other lifetime', async () => {
@@ -420,9 +444,10 @@ describe('PAT list and revoke', () => {
     });
     const [entry] = revoked.feedEntries;
     expect(entry.expiresAt - entry.revokedAt).toBe(15 * 60_000);
+    // A retry, as after a 503 that no feed object confirmed, gets the same live entry to publish.
     expect(await account.revokePat({ environment, ...holder, patId: id })).toEqual({
       outcome: 'already_revoked',
-      feedEntries: [],
+      feedEntries: [entry],
     });
     expect(await lookupPat(new IdentityStore(patLogin), sha256(token))).toBeNull();
     const feed = await owner.query(
@@ -497,7 +522,8 @@ async function insertBotKeys(
   holder: Session,
   orgId: string,
   count: number,
-  flaggedDaysAgo: number | null = null
+  flaggedDaysAgo: number | null = null,
+  createdDaysAgo = 10
 ) {
   await owner.query(
     `WITH passes AS (
@@ -511,11 +537,11 @@ async function insertBotKeys(
      INSERT INTO uts.org_bot_keys (org_id, created_by, name, token_hash, last_four, audience, scope,
        gate_pass_id, created_at, expires_at, status, flagged_at)
      SELECT $3, $1, 'bulk', sha256(convert_to(id::text, 'UTF8')), 'wxyz', 'uts', 'uts:probe.read',
-       id, now() - interval '10 days', now() + interval '30 days',
+       id, now() - make_interval(days => $6::integer), now() + interval '30 days',
        CASE WHEN $5::integer IS NULL THEN 'active' ELSE 'flagged' END::uts.bot_key_status,
        now() - make_interval(days => $5::integer)
      FROM passes`,
-    [holder.accountId, holder.deviceSessionId, orgId, count, flaggedDaysAgo]
+    [holder.accountId, holder.deviceSessionId, orgId, count, flaggedDaysAgo, createdDaysAgo]
   );
 }
 
@@ -574,6 +600,20 @@ describe('org bot keys', () => {
     );
   });
 
+  it('lets an organization get 20 bot keys an hour; revoked ones count', async () => {
+    const { orgId, admin } = await organization();
+    await insertBotKeys(admin, orgId, 19, null, 0);
+    await owner.query(
+      `UPDATE uts.org_bot_keys SET status = 'revoked', revoked_at = now(), revoked_by = $2
+       WHERE id = (SELECT id FROM uts.org_bot_keys WHERE org_id = $1 LIMIT 1)`,
+      [orgId, admin.accountId]
+    );
+    expect((await account.createBotKey(botKeyInput(admin, orgId).input)).outcome).toBe('created');
+    expect((await account.createBotKey(botKeyInput(admin, orgId).input)).outcome).toBe(
+      'rate_limited'
+    );
+  });
+
   it('puts two concurrent creates in one organization in order', async () => {
     const { orgId, admin } = await organization();
     await insertBotKeys(admin, orgId, 99);
@@ -612,11 +652,15 @@ describe('org bot keys', () => {
     const revoke = (session: Session, keyId: string) =>
       account.revokeBotKey({ environment, ...session, orgId, keyId });
     expect(await revoke(member, id)).toEqual({ outcome: 'not_org_admin', feedEntries: [] });
-    expect(await revoke(admin, id)).toEqual({
+    const revoked = await revoke(admin, id);
+    expect(revoked).toEqual({
       outcome: 'revoked',
       feedEntries: [expect.objectContaining({ kind: 'bot_key', id, revokedBefore: null })],
     });
-    expect(await revoke(admin, id)).toEqual({ outcome: 'already_revoked', feedEntries: [] });
+    expect(await revoke(admin, id)).toEqual({
+      outcome: 'already_revoked',
+      feedEntries: revoked.feedEntries,
+    });
     expect(await revoke(admin, randomUUID())).toEqual({ outcome: 'not_found', feedEntries: [] });
     expect(await lookupBotKey(new IdentityStore(patLogin), sha256(token))).toBeNull();
     const feed = await owner.query('SELECT kind FROM uts.revocations WHERE subject_id = $1', [id]);
@@ -713,6 +757,26 @@ describe('member removal', () => {
       ]);
       expect(again.rows).toEqual([{ outcome: 'unchanged' }]);
     }
+  });
+
+  it('records a newer removal of a member already removed, so an older added event cannot win', async () => {
+    const holder = await session();
+    const orgId = randomUUID();
+    const remove = (version: number) =>
+      app.query('SELECT outcome FROM uts.remove_org_member($1, $2, $3, $4)', [
+        environment,
+        orgId,
+        holder.accountId,
+        version,
+      ]);
+    expect((await remove(4)).rows).toEqual([{ outcome: 'recorded' }]);
+    expect((await remove(6)).rows).toEqual([{ outcome: 'unchanged' }]);
+    expect((await remove(5)).rows).toEqual([{ outcome: 'unchanged' }]);
+    const row = await owner.query(
+      'SELECT status, event_version FROM uts.org_memberships WHERE org_id = $1',
+      [orgId]
+    );
+    expect(row.rows).toEqual([{ status: 'removed', event_version: 6n }]);
   });
 
   it('records a removal it holds no membership for, so a late added event cannot win', async () => {
@@ -970,6 +1034,18 @@ describe('tier A gate passes', () => {
     }
     expect(await codeState(email)).toEqual([{ status: 'exhausted', attempts: 5 }]);
     expect((await openTierA(holder, 'method_add', { email, code })).outcome).toBe('code_invalid');
+  });
+
+  it('count a missing code as a wrong one and open no pass', async () => {
+    const holder = await session({ amr: ['oauth'] });
+    const [email, code] = [randomBytes(32), randomBytes(32)];
+    await tierACode(holder.accountId, email, code);
+    const result = await app.query<{ outcome: string; gate_pass_id: string | null }>(
+      'SELECT outcome, gate_pass_id FROM uts.open_tier_a_gate_pass($1, $2, $3, $4, $5, NULL, NULL, NULL)',
+      [environment, holder.accountId, holder.grantId, 'method_add', email]
+    );
+    expect(result.rows).toEqual([{ outcome: 'code_invalid', gate_pass_id: null }]);
+    expect(await codeState(email)).toEqual([{ status: 'pending', attempts: 1 }]);
   });
 
   it('need both codes for an email change and consume neither when one is wrong', async () => {

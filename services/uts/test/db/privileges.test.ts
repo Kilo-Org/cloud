@@ -33,6 +33,11 @@ const FUNCTION_WRITTEN_TABLES = [
   'personal_access_tokens',
   'org_bot_keys',
   'gate_passes',
+  'accounts',
+  'sso_connections',
+  'sso_domains',
+  'org_sso_policies',
+  'org_memberships',
 ];
 
 /** A column each table has, for the refused UPDATE; `status` unless named here. */
@@ -41,6 +46,7 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   third_party_rotated_tokens: 'family_id',
   revocations: 'kind',
   dpop_proofs: 'jti',
+  org_sso_policies: 'enforcement',
 };
 
 let db: TestDatabase;
@@ -201,7 +207,7 @@ describe('role attributes', () => {
 describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
   it('reads and writes the ungated credential tables', async () => {
     const app = await db.connect(login);
-    const accountId = await insertAccount(app);
+    const accountId = await insertAccount(await db.connectAsOwner());
     const sessionId = await insertBrowserSession(app, accountId);
     const result = await app.query(
       `UPDATE uts.browser_sessions SET status = 'revoked', revoked_at = now(),
@@ -359,14 +365,19 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     'cannot insert, update or delete uts.%s directly, only read it',
     async table => {
       const app = await db.connect(login);
-      await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
-      const column = UPDATE_COLUMN[table] ?? 'status';
-      for (const statement of [
-        `INSERT INTO uts.${table} DEFAULT VALUES`,
-        `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
-        `DELETE FROM uts.${table} WHERE false`,
-      ]) {
-        expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+      // Closed here: this file opens a connection per test, and these cases alone are 32 of them.
+      try {
+        await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
+        const column = UPDATE_COLUMN[table] ?? 'status';
+        for (const statement of [
+          `INSERT INTO uts.${table} DEFAULT VALUES`,
+          `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
+          `DELETE FROM uts.${table} WHERE false`,
+        ]) {
+          expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+        }
+      } finally {
+        await app.end();
       }
     }
   );
@@ -450,8 +461,7 @@ describe.each(['uts_pat_a', 'uts_pat_b'] as const)('PAT login %s', login => {
 
 describe.each(['uts_reader_a', 'uts_reader_b'] as const)('reader login %s', login => {
   it('reads the account views', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
+    const accountId = await insertAccount(await db.connectAsOwner());
     const reader = await db.connect(login);
     const result = await reader.query('SELECT id, status FROM uts_read.accounts WHERE id = $1', [
       accountId,
@@ -646,6 +656,8 @@ describe('functions', () => {
       { routine: 'keep_bot_key', grantee: 'uts_app' },
       { routine: 'list_bot_keys', grantee: 'uts_app' },
       { routine: 'list_pats', grantee: 'uts_app' },
+      { routine: 'live_feed_entries', grantee: 'uts_app' },
+      { routine: 'live_feed_entries_of_refresh_token', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_audit_partitions', grantee: 'uts_app' },

@@ -4,6 +4,7 @@ import {
   UTS_ACCOUNT_AUDIENCE,
   UtsAccessTokenClaimsSchema,
   UtsTokenKidSchema,
+  type SignerKeysRead,
   type UtsPublicJwk,
   utsScopeEntry,
 } from '@kilocode/uts-contracts';
@@ -54,26 +55,73 @@ export type BearerCheck =
   | { status: 'unavailable' };
 
 /**
- * The key with `kid` from the key-set shard this isolate reads (the shard the `SignerKeys`
- * entrypoint uses), so an account request makes one Durable Object call and the shards keep their
- * bound on signer reads. A failed shard call or a refused shard is `unavailable`.
+ * A signer key list the isolate read is reused for this long for a `kid` it holds. A signer
+ * publishes its next key long before it signs with it (design 5.7); a `kid` the copy lacks reads
+ * again once the copy is 2 seconds old (`ACCESS_TOKEN_KEYS_RECHECK_MS`).
  */
-export function shardAccessTokenKeys(env: Env, config: UtsConfig): AccessTokenKeys {
+export const ACCESS_TOKEN_KEYS_FRESH_MS = 10 * 1000;
+
+/**
+ * A `kid` missing from the copy reads the key set again only once the copy is this old, as old as
+ * the key-set shard's own copy, so tokens under made-up kids cost at most one Durable Object call
+ * per isolate per 2 seconds.
+ */
+export const ACCESS_TOKEN_KEYS_RECHECK_MS = 2 * 1000;
+
+/**
+ * The isolate's copy of the signer keys of one environment, as plain data: no promise is shared
+ * between requests (design 7), so requests that miss at once each read, and a read that lands
+ * late never replaces a newer copy.
+ */
+export type AccessTokenKeyCopy = {
+  copy: { environment: UtsConfig['environment']; keys: UtsPublicJwk[]; readAt: number } | null;
+};
+
+const ISOLATE_KEY_COPY: AccessTokenKeyCopy = { copy: null };
+
+/** One read of the signer keys a key-set shard holds. */
+export type KeySetRead = () => Promise<SignerKeysRead>;
+
+/**
+ * The key with `kid` from the key-set shard this isolate reads (the shard the `SignerKeys`
+ * entrypoint uses), through the isolate's copy: an account request makes a Durable Object call
+ * only when the copy is over 10 seconds old, or over 2 seconds old and lacks `kid`. The check runs
+ * before the token's signature is verified, so without the copy every request with any token
+ * under a well-formed kid would cost a call. A failed shard call or a refused shard is
+ * `unavailable` and leaves the copy as it was.
+ */
+export function shardAccessTokenKeys(
+  env: Env,
+  config: UtsConfig,
+  held: AccessTokenKeyCopy = ISOLATE_KEY_COPY,
+  read: KeySetRead = () => readThroughIsolateShard(shard => readKeySetShard(env, config, shard))
+): AccessTokenKeys {
+  const find = (keys: readonly UtsPublicJwk[], kid: string): KeyLookup => {
+    const key = keys.find(candidate => candidate.kid === kid);
+    return key === undefined ? { status: 'unknown' } : { status: 'found', key };
+  };
   return async kid => {
-    let read;
+    const startedAt = Date.now();
+    const copy = held.copy?.environment === config.environment ? held.copy : null;
+    if (copy !== null) {
+      const age = startedAt - copy.readAt;
+      const found = find(copy.keys, kid);
+      if (age < ACCESS_TOKEN_KEYS_FRESH_MS && found.status === 'found') return found;
+      if (age < ACCESS_TOKEN_KEYS_RECHECK_MS) return found;
+    }
+    let result;
     try {
-      read = await readThroughIsolateShard(shard => readKeySetShard(env, config, shard));
+      result = await read();
     } catch (error) {
       console.error(JSON.stringify({ event: 'uts.account.keys_failed', error: String(error) }));
       return { status: 'unavailable' };
     }
-    if (read.status !== 'answered') return { status: 'unavailable' };
-    for (const entry of read.answer.signers) {
-      if (entry.status !== 'ok') continue;
-      const key = entry.keys.find(candidate => candidate.kid === kid);
-      if (key !== undefined) return { status: 'found', key };
+    if (result.status !== 'answered') return { status: 'unavailable' };
+    const keys = result.answer.signers.flatMap(entry => (entry.status === 'ok' ? entry.keys : []));
+    if (held.copy === null || held.copy.readAt <= startedAt) {
+      held.copy = { environment: config.environment, keys, readAt: startedAt };
     }
-    return { status: 'unknown' };
+    return find(keys, kid);
   };
 }
 

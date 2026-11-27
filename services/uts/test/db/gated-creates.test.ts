@@ -202,9 +202,10 @@ describe('uts.write_gated_pat', () => {
          RETURNING id
        )
        INSERT INTO uts.personal_access_tokens
-         (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, expires_at)
+         (account_id, name, token_hash, last_four, audience, scope, gate_pass_id, created_at,
+          expires_at)
        SELECT $1, 'seed', sha256(convert_to(id::text, 'UTF8')), 'abcd', 'gateway',
-              'gateway:models.read', id, now() + interval '90 days'
+              'gateway:models.read', id, now() - interval '2 hours', now() + interval '90 days'
        FROM passes`,
       [accountId, sessionId]
     );

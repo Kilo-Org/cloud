@@ -455,6 +455,33 @@ function compact<T extends Record<string, unknown>>(body: T): Record<string, unk
   return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
 }
 
+let targetMismatchLogged = false;
+
+/**
+ * Whether this process calls Bouncer at all. Bouncer runs in production only. `VERCEL_ENV`, which
+ * Vercel always sets, decides: `production` calls it; `preview` (previews and the `staging` custom
+ * environment) never does, whatever `BOUNCER_URL` says, and takes the same path as an unset
+ * `BOUNCER_URL` (signup admission is skipped as in development). Anything else (outside Vercel,
+ * or `development`) keeps today's behaviour: `BOUNCER_URL` alone decides. A production deployment
+ * whose `VERCEL_TARGET_ENV` names another environment keeps calling Bouncer, so production never
+ * loses it silently, and logs one config error per instance.
+ */
+export function bouncerEnabledForDeployment(
+  runtime: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  const { VERCEL_ENV: environment, VERCEL_TARGET_ENV: target } = runtime;
+  if (environment === 'production') {
+    if (target !== undefined && target !== 'production' && !targetMismatchLogged) {
+      targetMismatchLogged = true;
+      console.error('[bouncer] config error: VERCEL_ENV is production but VERCEL_TARGET_ENV is not', {
+        target,
+      });
+    }
+    return true;
+  }
+  return environment !== 'preview';
+}
+
 type PostResult =
   | { ok: true; status: number; response: Response }
   /** The endpoint or the key is absent, or the endpoint is not one this client sends to. */
@@ -485,7 +512,9 @@ async function postWithResult(
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<PostResult> {
-  const endpoint = parseInternalServiceEndpoint(BOUNCER_URL, path);
+  const endpoint = bouncerEnabledForDeployment()
+    ? parseInternalServiceEndpoint(BOUNCER_URL, path)
+    : null;
   if (!endpoint) return { ok: false, kind: 'unconfigured' };
   let internalApiSecret: string;
   try {

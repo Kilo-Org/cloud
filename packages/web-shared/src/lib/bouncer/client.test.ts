@@ -1017,3 +1017,92 @@ describe('a decide whose STS mint hangs', () => {
     legacyOnly();
   });
 });
+
+describe('bouncerEnabledForDeployment', () => {
+  // A fresh module per test, so the once-per-instance config error starts unlogged.
+  function freshCheck(): typeof BouncerClient.bouncerEnabledForDeployment {
+    let check: typeof BouncerClient.bouncerEnabledForDeployment | undefined;
+    jest.isolateModules(() => {
+      check = jest.requireActual<typeof BouncerClient>(
+        '@kilocode/web-shared/lib/bouncer/client'
+      ).bouncerEnabledForDeployment;
+    });
+    if (!check) throw new Error('client module did not load');
+    return check;
+  }
+
+  it('enables a Vercel production deployment without VERCEL_TARGET_ENV, with no error', () => {
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const check = freshCheck();
+    expect(check({ VERCEL_ENV: 'production' })).toBe(true);
+    expect(check({ VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' })).toBe(true);
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it('keeps Bouncer on a production deployment whose target says staging, with one error', () => {
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const check = freshCheck();
+    const runtime = { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'staging' };
+    expect(check(runtime)).toBe(true);
+    expect(check(runtime)).toBe(true);
+    expect(errors).toHaveBeenCalledTimes(1);
+    expect(errors.mock.calls[0]?.[0]).toContain('[bouncer] config error');
+  });
+
+  it.each(['staging', 'preview'])('disables a VERCEL_ENV=preview deployment targeting %s', target => {
+    expect(freshCheck()({ VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: target })).toBe(false);
+  });
+
+  it.each([{}, { VERCEL_ENV: 'development' }])(
+    'leaves %j to BOUNCER_URL, as before',
+    runtime => {
+      expect(freshCheck()(runtime)).toBe(true);
+    }
+  );
+});
+
+describe('a preview or staging deployment with BOUNCER_URL set', () => {
+  const runtimeNames = ['VERCEL_ENV', 'VERCEL_TARGET_ENV'] as const;
+  const saved = Object.fromEntries(runtimeNames.map(name => [name, process.env[name]]));
+
+  afterEach(() => {
+    for (const name of runtimeNames) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+  });
+
+  it.each(['staging', 'preview'])(
+    'sends no Bouncer request when targeting %s, as with BOUNCER_URL unset',
+    async target => {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.VERCEL_TARGET_ENV = target;
+      mockFetch.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      await expect(
+        decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 50 })
+      ).resolves.toBeNull();
+      await expect(
+        signupDecide({ operationId: 'signup:operation-preview', ip: '203.0.113.7' })
+      ).resolves.toBeNull();
+      await expect(
+        deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-preview', userId: 'user-1' })
+      ).resolves.toEqual({
+        delivered: false,
+        permanent: true,
+        status: null,
+        error: 'bouncer_not_configured',
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('still calls Bouncer on Vercel production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.VERCEL_TARGET_ENV = 'production';
+    mockFetch.mockResolvedValue(Response.json({}));
+    await expect(
+      deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-production', userId: 'user-1' })
+    ).resolves.toEqual({ delivered: true, status: 200 });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});

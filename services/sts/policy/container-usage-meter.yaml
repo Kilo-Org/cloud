@@ -1,12 +1,19 @@
-# The container-usage-meter Worker (services/container-usage-meter/wrangler.jsonc). Production only.
+# The container-usage-meter Worker (services/container-usage-meter/wrangler.jsonc). It reads its
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets
+# Store binding) until secrets-cutover flips it. INTERNAL_API_SECRET resolves from /shared.
+#
+# CONTAINER_BILLING_CLOUD_AGENT_USER_IDS stays a plain Worker secret read from `secrets-store`: it is a payer
+# allowlist (configuration), not a credential, and its readers are synchronous.
+#
 # It asks the web app to send an organization's compute balance alert with a
-# web:compute-balance-alert.send token over its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts).
+# web:compute-balance-alert.send token over the same binding (WEB_INTERNAL_AUTH=sts). Production only.
 workload: container-usage-meter
 environments:
   - production
 identity:
   kind: worker-binding
-secrets: []
+secrets:
+  - INTERNAL_API_SECRET
 audiences:
   - web
 scopes:

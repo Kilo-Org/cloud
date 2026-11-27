@@ -463,7 +463,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 | `ai-gateway` | `web`: `web:usage.region-handoff.record`, `web:claude-billing.payer-state.read` | none | production only (`environmentGrants`) |
 | `notifications` | `web`: `web:glanceable-snapshot.read` | in its file | production |
-| `container-usage-meter` | `web`: `web:compute-balance-alert.send` | none | production |
+| `container-usage-meter` | `web`: `web:compute-balance-alert.send` | in its file | production |
 | `cloudflare-scim-sync` | `web`: `web:scim.sync` | none | production |
 | `user-data-export` | `web`: `web:user-data-exports.ready` | none | production |
 | `cloudflare-security-sync` | `web`: `web:security-notifications.dispatch` | none | production |
@@ -518,7 +518,11 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
-| `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc` |
+| `cloudflare-gmail-push` | production | `services/gmail-push/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `kiloclaw-inbound-email` | production | `services/kiloclaw-inbound-email/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `cloudflare-scim-sync` | production | `services/scim-sync/wrangler.jsonc` |
 | `user-data-export` | production | `services/user-data-export/wrangler.jsonc` |
 | `cloudflare-security-sync` | production | `services/security-sync/wrangler.jsonc` |
@@ -528,9 +532,9 @@ Workloads with a policy, all over `worker-binding`:
 | `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc` |
 | `kilo-code-review-worker` | production | `services/code-review-infra/wrangler.jsonc` |
 
-The nine Workers after `notifications` became policies for their phase 2 C1 grants. Each config's
-production STS binding arrives with that Worker's own change; until then the repository check in
-`test/repo/worker-configs.test.ts` fails for it.
+The eight Workers after `container-usage-meter` became policies for their phase 2 C1 grants. Each
+config's production STS binding arrives with that Worker's own change; until then the repository
+check in `test/repo/worker-configs.test.ts` fails for it.
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.

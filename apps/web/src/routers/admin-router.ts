@@ -40,8 +40,7 @@ import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionTranscript } from '@/lib/session-transcript';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
-import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
-import { postTestMetadataCacheStaleAlert } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
+import { isSyncStale, parseIsoTimestamp } from '@/lib/providers/sync-state';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
 import { refreshMetadataCache } from '@/lib/providers/metadata-cache/refresh-metadata-cache';
@@ -2727,17 +2726,6 @@ export const adminRouter = createTRPCRouter({
         }
         return refreshMetadataCache();
       }),
-    postTestStaleAlert: adminProcedure
-      .meta({ adminAudit: { kind: 'declarative', action: 'providers.stale_alert.test_post' } })
-      .input(z.object({ job: z.enum(['metadata_cache', 'providers', 'direct_byok']) }))
-      .mutation(async ({ input }) => {
-        addAdminAuditMetadata({ job: input.job });
-        const delivery =
-          input.job === 'metadata_cache'
-            ? await postTestMetadataCacheStaleAlert()
-            : await postTestStaleSyncAlert(input.job);
-        return { delivery };
-      }),
     getLastSync: adminProcedure.query(async () => {
       const [[latest], [syncState], [metadataCache]] = await Promise.all([
         db
@@ -2761,13 +2749,23 @@ export const adminRouter = createTRPCRouter({
           })
           .from(ai_gateway_metadata_cache),
       ]);
-      const toIso = (value: string | null | undefined) =>
-        value ? new Date(value).toISOString() : null;
+      const now = new Date();
+      const completedAt = parseIsoTimestamp(syncState?.lastCompletedAt ?? null);
+      const directByokCompletedAt = parseIsoTimestamp(syncState?.directByokLastCompletedAt ?? null);
+      const metadataCacheNewestUpdatedAt = parseIsoTimestamp(
+        metadataCache?.newestUpdatedAt ?? null
+      );
+      const metadataCacheOldestUpdatedAt = parseIsoTimestamp(
+        metadataCache?.oldestUpdatedAt ?? null
+      );
       return {
-        completed_at: toIso(syncState?.lastCompletedAt),
-        direct_byok_completed_at: toIso(syncState?.directByokLastCompletedAt),
-        metadata_cache_newest_updated_at: toIso(metadataCache?.newestUpdatedAt),
-        metadata_cache_oldest_updated_at: toIso(metadataCache?.oldestUpdatedAt),
+        completed_at: completedAt?.toISOString() ?? null,
+        completed_stale: isSyncStale(completedAt, now),
+        direct_byok_completed_at: directByokCompletedAt?.toISOString() ?? null,
+        direct_byok_completed_stale: isSyncStale(directByokCompletedAt, now),
+        metadata_cache_newest_updated_at: metadataCacheNewestUpdatedAt?.toISOString() ?? null,
+        metadata_cache_newest_updated_stale: isSyncStale(metadataCacheNewestUpdatedAt, now),
+        metadata_cache_oldest_updated_at: metadataCacheOldestUpdatedAt?.toISOString() ?? null,
         total_providers: latest?.data.total_providers ?? null,
         total_models: latest?.data.total_models ?? null,
       };

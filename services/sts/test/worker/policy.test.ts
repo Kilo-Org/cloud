@@ -1017,7 +1017,7 @@ describe('phase 2 C1 grants of the shipped policies', () => {
     'code-review:review.retry-fresh': 'web',
     'session-ingest:session-access.invalidate': 'web',
   };
-  /** The Workers whose registration became a production worker-binding policy for these grants. */
+  /** The Workers that send C1 tokens over a production-only worker binding and hold no other grant. */
   const ACTIVATED = [
     'container-usage-meter',
     'cloudflare-scim-sync',

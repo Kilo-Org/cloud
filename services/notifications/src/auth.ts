@@ -29,12 +29,14 @@ export const authMiddleware = createMiddleware<{
   try {
     // The Secrets Store source hands the verifier its binding, which keeps the verifier's
     // per-isolate cache and its refusal of an empty value. The STS source hands it the bundle
-    // value, refused here when empty. A failed read on either source answers 401.
+    // value, refused here when empty. A failed read on either source answers 401, and so does a
+    // deployment that binds no signer (the closed staging environment), before the verifier or
+    // any database read.
     const nextAuthSecret =
       secretsSource(c.env) === 'sts'
         ? await readNotificationsSecret(c.env, 'NEXTAUTH_SECRET', c.executionCtx)
         : c.env.NEXTAUTH_SECRET;
-    if (nextAuthSecret === '') {
+    if (nextAuthSecret === undefined || nextAuthSecret === '') {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     const auth = await verifyKiloBearerAgainstCurrentPepper({

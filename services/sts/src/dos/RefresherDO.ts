@@ -504,13 +504,13 @@ export class RefresherDO extends DurableObject<Env> {
       secrets,
       missing,
       fetchedAt: new Date(own.fetchedAt).toISOString(),
-      policyHash: await this.#policies.workloadHash(policy.workload),
+      policyHash: await this.#policies.workloadHash(this.#config.environment, policy.workload),
       stale: stale || own.stale,
     };
   }
 
   async #applyPolicyChange(): Promise<boolean> {
-    const hash = await this.#policies.hash();
+    const hash = await this.#policies.hash(this.#config.environment);
     const state = this.#db
       .select()
       .from(schema.policyState)
@@ -519,7 +519,7 @@ export class RefresherDO extends DurableObject<Env> {
     if (state?.hash === hash) return false;
 
     const previous: PolicySnapshotEntry[] = state ? PolicySnapshotSchema.parse(state.snapshot) : [];
-    const current = this.#policies.snapshot();
+    const current = this.#policies.snapshot(this.#config.environment);
     await this.#audit.append(
       this.#stream,
       policyChangedEvent({

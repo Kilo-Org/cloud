@@ -1,0 +1,4 @@
+# Registration only: services/event-service/wrangler.jsonc. No environment, identity or grant.
+workload: event-service
+registered: true
+secrets: []

@@ -1,9 +1,7 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import {
-  INTERNAL_API_SECRET,
-  SECURITY_AUTO_ANALYSIS_WORKER_URL,
-} from '@kilocode/web-shared/lib/config.server';
+import { SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import {
   isDefinitiveSecurityWorkerRejection,
   postSecurityWorkerJson,
@@ -89,7 +87,8 @@ function definitiveRejectionError(status: number): TRPCError {
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
 ): Promise<{ queued: true; commandId: string }> {
-  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
+  const internalApiSecret = SECURITY_AUTO_ANALYSIS_WORKER_URL ? await readInternalApiSecret() : '';
+  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !internalApiSecret) {
     // Mirrored by the mobile security mutation classifier: a stable
     // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
     // classifier treats as retryable transport. The sentence is the shared
@@ -108,6 +107,7 @@ export async function submitManualAnalysisStart(
   const { response, body } = await postSecurityWorkerJson({
     url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/manual-analysis-start`,
     service: 'analysis',
+    internalApiSecret,
     body: {
       schemaVersion: 1,
       findingId: params.findingId,

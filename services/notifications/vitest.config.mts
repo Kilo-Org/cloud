@@ -1,5 +1,5 @@
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 const kCurrentWorker = Symbol.for('miniflare.kCurrentWorker');
 
@@ -59,5 +59,7 @@ export default defineConfig({
   test: {
     passWithNoTests: true,
     setupFiles: ['./src/__tests__/setup.ts'],
+    // Node-only suites (Wrangler's config reader) run in vitest.node.config.ts.
+    exclude: [...configDefaults.exclude, 'src/**/*.node.test.ts'],
   },
 });

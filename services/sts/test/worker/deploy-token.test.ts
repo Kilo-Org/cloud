@@ -2082,7 +2082,9 @@ dynamic:${value.grant}
     const index = load(policyFile());
     const grant = index.get('production', 'ci-deploy-x')?.dynamic[0];
     expect(grant).toMatchObject({ grant: 'cloudflare-deploy', ttlSeconds: 3600, zones: [] });
-    expect(index.snapshot()[0].dynamic).toEqual(['cloudflare-deploy:x-deploy:3600:1:2:aaaaaaaa:']);
+    expect(index.snapshot('production')[0].dynamic).toEqual([
+      'cloudflare-deploy:x-deploy:3600:1:2:aaaaaaaa:',
+    ]);
   });
 
   it.each([
@@ -2196,7 +2198,7 @@ secrets: [${CLOUDFLARE_MINTING_TOKEN_SECRET}]
         { cloudflareDeployPins: { ...TEST_PINS, forbiddenGroupIds: [SCRIPTS_GROUP] } }
       )
     ).toThrow('is a forbidden group');
-    // Empty until setup step 3; every pinned value is a permission-group or zone id.
+    // Filled at setup step 3; every pinned value is a permission-group or zone id.
     const pinned = [
       ...CLOUDFLARE_DEPLOY_PINS.forbiddenGroupIds,
       ...CLOUDFLARE_DEPLOY_PINS.allowedGroups.map(group => group.id),

@@ -16,7 +16,9 @@
     "traces": { "enabled": false },
   },
   "logpush": true,
-  "compatibility_flags": ["nodejs_compat"],
+  // `@kilocode/verify` verifies JOSE tokens; before 2026-03-03 this flag is not on by default
+  // (design section 7). It changes when Workerd reports unhandled rejections, not verification.
+  "compatibility_flags": ["nodejs_compat", "unhandled_rejection_after_microtask_checkpoint"],
   "dev": { "port": 8801 },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   /**
@@ -100,6 +102,13 @@
      * the Secrets Store: the old ticket webhook (not #kilo-o11y-alerts) and the old token.
      */
     "SECRETS_SOURCE": "sts",
+    /**
+     * ADMIN_CREDENTIAL_ACCEPT is unset here, which means `legacy-only`: the admin routes accept
+     * only X-O11Y-ADMIN-TOKEN, exactly as before (src/admin-middleware.ts). Accepting STS service
+     * tokens needs the `o11y` scopes registered and granted, then a separate change that sets it
+     * and STS_ENVIRONMENT. Rollback is a redeploy with it unset or `legacy-only`; it does not
+     * touch SECRETS_SOURCE.
+     */
   },
   /**
    * Alert deployment requirements:

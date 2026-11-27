@@ -95,9 +95,34 @@ export const GithubIdentitySchema = z.strictObject({
   refs: z.array(RefSchema).min(1).max(32).default([GITHUB_PRODUCTION_REF]),
   jobWorkflowRefs: z.array(JobWorkflowRefSchema).min(1).max(32),
   events: z.array(z.enum(GITHUB_EVENTS)).min(1).max(GITHUB_EVENTS.length),
+  /** Accept GitHub's default (name-only) subject too; see `GITHUB_LEGACY_SUBJECT_REPOSITORY`. */
+  legacySubject: z.literal(true).optional(),
 });
 
 export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
+
+/**
+ * The one repository whose policies may set `legacySubject` (decision 2026-11-27): Kilo-Org/kilocode.
+ * Its tokens still carry the default subject `repo:Kilo-Org/kilocode:environment:<env>`, so STS
+ * accepts that form for it; the token's `repository_id` and `repository_owner_id` claims must still
+ * equal these ids, and every other binding still applies, so a renamed or recreated repository with
+ * the same name is refused.
+ *
+ * WHY: npm/cli#9969 (open): npm trusted publishing fails with "package not found" for repositories
+ * using use_immutable_subject, so kilocode cannot turn it on without breaking npm releases; Azure
+ * signing (its federated credential matches `sub`) also needs a new trust entry before the switch.
+ *
+ * HOW TO UPGRADE: when npm fixes #9969 -> add the Azure federated credential for
+ * `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main` -> turn on use_immutable_subject
+ * for kilocode -> prove oidc_check on main and v2 -> delete this exception (this constant, the
+ * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the seven
+ * `ci-kilocode-*` policies).
+ */
+export const GITHUB_LEGACY_SUBJECT_REPOSITORY = {
+  repository: 'Kilo-Org/kilocode',
+  repositoryId: '946087422',
+  repositoryOwnerId: '201822503',
+} as const;
 
 /**
  * The `sub` a token for this identity must carry: GitHub's immutable format, which names the owner
@@ -107,6 +132,14 @@ export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
 export function githubSubject(identity: GithubIdentity, ref: string): string {
   const [owner, name] = identity.repository.split('/');
   const repository = `repo:${owner}@${identity.repositoryOwnerId}/${name}@${identity.repositoryId}`;
+  return identity.environment === undefined
+    ? `${repository}:ref:${ref}`
+    : `${repository}:environment:${identity.environment}`;
+}
+
+/** GitHub's default subject for a `legacySubject` policy: the immutable form without the ids. */
+export function githubLegacySubject(identity: GithubIdentity, ref: string): string {
+  const repository = `repo:${identity.repository}`;
   return identity.environment === undefined
     ? `${repository}:ref:${ref}`
     : `${repository}:environment:${identity.environment}`;
@@ -289,6 +322,16 @@ export function cloudflareDeployGrant(policy: Policy): CloudflareDeployGrant | u
   );
 }
 
+/**
+ * Grants a policy adds where STS runs in one environment only, on top of its base grants, under
+ * the same rules (design 6.3). Activating a grant in another environment is a data change.
+ */
+const EnvironmentGrantsSchema = z.strictObject({
+  audiences: z.array(AudienceSchema.max(63)).max(64).default([]),
+  scopes: z.array(ScopeSchema.max(127)).max(256).default([]),
+  secrets: z.array(SecretNameSchema).max(256).default([]),
+});
+
 export const PolicySchema = z.strictObject({
   workload: WorkloadNameSchema,
   environments: z.array(StsEnvironmentSchema).min(1).max(3),
@@ -306,10 +349,51 @@ export const PolicySchema = z.strictObject({
     .array(DynamicGrantSchema)
     .max(LeaseGrantSchema.options.length + 1)
     .default([]),
+  /** Grants for one STS environment only, each key one of `environments`; absent adds none. */
+  environmentGrants: z
+    .strictObject({
+      development: EnvironmentGrantsSchema.optional(),
+      staging: EnvironmentGrantsSchema.optional(),
+      production: EnvironmentGrantsSchema.optional(),
+    })
+    .default({}),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;
 export type PolicyIdentity = z.infer<typeof PolicyIdentitySchema>;
+
+/**
+ * A workload name reserved for a later policy: no environment, identity or grant, so STS serves,
+ * admits, bundles, audits and hashes nothing for it, exactly as for a name with no file. The
+ * workload's own change replaces `registered` and the empty `secrets` with a policy, which then
+ * passes every policy and binding check.
+ */
+export const RegistrationSchema = z.strictObject({
+  workload: WorkloadNameSchema,
+  registered: z.literal(true),
+  secrets: z.tuple([]),
+});
+
+/** A file that sets `registered` at all is read as a registration, never as a policy. */
+export function isRegistrationDocument(document: unknown): boolean {
+  return typeof document === 'object' && document !== null && Object.hasOwn(document, 'registered');
+}
+
+/**
+ * The policy as STS applies it in `environment`: its base grants plus that environment's own, with
+ * no `environmentGrants` left, so a reader of the result sees only what this environment grants.
+ */
+export function effectivePolicy(policy: Policy, environment: StsEnvironment): Policy {
+  if (Object.keys(policy.environmentGrants).length === 0) return policy;
+  const extra = policy.environmentGrants[environment];
+  return {
+    ...policy,
+    audiences: [...policy.audiences, ...(extra?.audiences ?? [])],
+    scopes: [...policy.scopes, ...(extra?.scopes ?? [])],
+    secrets: [...policy.secrets, ...(extra?.secrets ?? [])],
+    environmentGrants: {},
+  };
+}
 
 export const PolicySnapshotEntrySchema = z.strictObject({
   workload: z.string(),
@@ -515,6 +599,16 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
       `a github-oidc workload is named ${GITHUB_WORKLOAD_PREFIX}<job>; its bundle folder is /ci/<workload>`
     );
   }
+  if (
+    identity.legacySubject === true &&
+    (identity.repository !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repository ||
+      identity.repositoryId !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryId ||
+      identity.repositoryOwnerId !== GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryOwnerId)
+  ) {
+    problems.push(
+      `identity.legacySubject is allowed only for ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repository} (repository id ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryId}, owner id ${GITHUB_LEGACY_SUBJECT_REPOSITORY.repositoryOwnerId})`
+    );
+  }
   if (hasDuplicates(identity.refs)) problems.push('identity.refs contains a duplicate');
   if (hasDuplicates(identity.jobWorkflowRefs)) {
     problems.push('identity.jobWorkflowRefs contains a duplicate');
@@ -568,6 +662,39 @@ export function policyFileProblems(
   policy: Policy,
   registry: StsScopeRegistry = STS_SCOPE_REGISTRY,
   pins: CloudflareDeployPins = CLOUDFLARE_DEPLOY_PINS
+): string[] {
+  const problems = appliedPolicyProblems(policy, registry, pins);
+  for (const [environment, grants] of Object.entries(policy.environmentGrants)) {
+    if (grants === undefined) continue;
+    if (!policy.environments.some(listed => listed === environment)) {
+      problems.push(
+        `environmentGrants.${environment} names an environment the policy does not list`
+      );
+    }
+    if (grants.audiences.length + grants.scopes.length + grants.secrets.length === 0) {
+      problems.push(`environmentGrants.${environment} grants nothing`);
+    }
+  }
+  // Each environment's policy, with its own grants added, passes every rule the base policy does,
+  // so a grant for one environment meets the same registry, reserved-scope and secret-name rules.
+  for (const environment of policy.environments) {
+    if (policy.environmentGrants[environment] === undefined) continue;
+    for (const problem of appliedPolicyProblems(
+      effectivePolicy(policy, environment),
+      registry,
+      pins
+    )) {
+      if (!problems.includes(problem)) problems.push(`${environment}: ${problem}`);
+    }
+  }
+  return problems;
+}
+
+/** The checks of one policy as STS applies it: the base policy, or one environment's. */
+function appliedPolicyProblems(
+  policy: Policy,
+  registry: StsScopeRegistry,
+  pins: CloudflareDeployPins
 ): string[] {
   const problems: string[] = [...grantProblems(policy, registry), ...dynamicProblems(policy, pins)];
   if (hasDuplicates(policy.environments)) problems.push('environments contains a duplicate');

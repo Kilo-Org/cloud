@@ -22,3 +22,20 @@ audiences:
   - usage-ingest
 scopes:
   - usage-ingest:sts.canary
+# UTS grants, development only until phase 4's activation go; staging and production are each a
+# key added below. The web app reads the UTS revocation feed (uts-feed), ends or revokes a
+# subject's sessions and credentials (uts), and signs its kilo-web client assertion with
+# UTS_KILO_WEB_CLIENT_KEY (UTS_KILO_WEB_CLIENT_KEY_NEXT during a rotation).
+environmentGrants:
+  development:
+    audiences:
+      - uts-feed
+      - uts
+    scopes:
+      - uts-feed:revocation.read
+      - uts:subjects.revoke
+      - uts:browser-sessions.end
+      - uts:api-credentials.revoke
+    secrets:
+      - UTS_KILO_WEB_CLIENT_KEY
+      - UTS_KILO_WEB_CLIENT_KEY_NEXT

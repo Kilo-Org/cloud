@@ -10,7 +10,7 @@ import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 const bodySchema = z.object({ organizationId: z.uuid() }).strict();
 
 export async function POST(request: NextRequest) {
-  const unauthorized = authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request);
   if (unauthorized) return unauthorized;
   const body = bodySchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });

@@ -22,6 +22,6 @@ dynamic:
     zones: ['9f7103cbcadbe93a052c120f231e8507'] # kiloapps.io
     intendedScripts: [bouncer, bouncer-watch]
     intendedRoutes: [] # bouncer uses a Custom Domain
-    ttlSeconds: 3600
+    ttlSeconds: 900
     maxActive: 2
-    maxPerHour: 4
+    maxPerHour: 12

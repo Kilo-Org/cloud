@@ -999,7 +999,11 @@ export function redirectTargetHost(response: Response, requestUrl: URL): string 
 }
 
 export async function dispatchReadyNotifications(
-  env: Pick<ExportEnv, 'USER_DATA_EXPORT_WEB_URL' | 'INTERNAL_API_SECRET'> & WebInternalAuthEnv,
+  env: Pick<
+    ExportEnv,
+    'USER_DATA_EXPORT_WEB_URL' | 'INTERNAL_API_SECRET' | 'SECRETS_SOURCE' | 'STS'
+  > &
+    WebInternalAuthEnv,
   state: Pick<StateDb, 'pendingNotifications'>,
   ctx?: SecretsExecutionContext
 ): Promise<void> {

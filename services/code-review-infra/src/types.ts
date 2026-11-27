@@ -178,12 +178,11 @@ export interface Env {
   CALLBACK_TOKEN_SECRET?: string;
   BACKEND_AUTH_TOKEN?: string;
   SECRETS_SOURCE?: string;
-  // The `STS` SecretsBroker service binding: `packages/secrets-client`'s `BundleBinding`, which is
-  // its RPC shape rather than a generated type. Absent until the binding deploys.
-  STS?: BundleBinding;
-
-  /** STS `SecretsBroker`, `props.caller` `kilo-code-review-worker`; mints the status-write token. */
-  STS?: MintBinding;
+  /**
+   * STS `SecretsBroker`, `props.caller` `kilo-code-review-worker`: one binding serves both entry
+   * points, the bundle read (`BundleBinding`) and the status-write token mint (`MintBinding`).
+   */
+  STS?: BundleBinding & MintBinding;
   /** `legacy` (default) or `sts`: the credential of this Worker's own status writes. */
   CODE_REVIEW_STATUS_CALLBACK_AUTH?: string;
 

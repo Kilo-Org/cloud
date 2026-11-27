@@ -883,6 +883,11 @@ describe('dispatchReadyNotifications', () => {
         })),
       };
     },
+    // One real binding serves both entry points. These tests take the sender path, whose secret
+    // thunk is never called, so a bundle read here is a bug in the test rather than a missing stub.
+    async getBundle(): Promise<never> {
+      throw new Error('dispatchReadyNotifications tests never read a bundle');
+    },
   });
 
   it('sends each ready callback with a web:user-data-exports.ready STS token under sts', async () => {

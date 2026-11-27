@@ -57,6 +57,16 @@ export const STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ = {
   audience: 'web',
   scope: 'web:auto-routing.production-profile.read',
 } as const satisfies ServiceTokenRequest;
+/** auto-routing's classifier records its own LLM usage at `/api/internal/usage/record`. */
+export const STS_WEB_USAGE_RECORD_CLASSIFIER = {
+  audience: 'web',
+  scope: 'web:usage.classifier.record',
+} as const satisfies ServiceTokenRequest;
+/** auto-routing-benchmark's grader records its own LLM usage at `/api/internal/usage/record`. */
+export const STS_WEB_USAGE_RECORD_BENCHMARK_GRADER = {
+  audience: 'web',
+  scope: 'web:usage.benchmark-grader.record',
+} as const satisfies ServiceTokenRequest;
 
 export type WebInternalCredentialFailure =
   /** `WEB_INTERNAL_AUTH` holds a value other than `sts` or `legacy`. */
@@ -70,6 +80,13 @@ export type WebInternalCredentialFailure =
   /** `legacy` mode with an empty secret. */
   | 'secret_missing';
 
+/** The resolved credential: an STS token, the legacy secret, or why there is neither. */
+export type WebInternalServiceCredential =
+  | { kind: 'sts'; token: string }
+  | { kind: 'legacy'; secret: string }
+  | { kind: 'unavailable'; reason: WebInternalCredentialFailure };
+
+/** The same credential as the header a request carries. */
 export type WebInternalCredential =
   | { kind: 'ready'; header: string; value: string }
   | { kind: 'unavailable'; reason: WebInternalCredentialFailure };
@@ -95,7 +112,7 @@ function unavailable(
   target: ServiceTokenRequest,
   reason: WebInternalCredentialFailure,
   detail: Record<string, string | number> = {}
-): WebInternalCredential {
+): { kind: 'unavailable'; reason: WebInternalCredentialFailure } {
   // One line per failed credential, so a mint-failure monitor can count them by scope. The token,
   // the secret and the error message never appear.
   console.warn(
@@ -111,27 +128,26 @@ function unavailable(
 }
 
 /**
- * The header for one request to a web `/api/internal/*` route. In `sts` mode a warm token is a
+ * The credential for one request to a web `/api/internal/*` route. In `sts` mode a warm token is a
  * memory read; a cold one waits for one mint over the binding (at most the client's attempt
  * timeout). The callers are queue consumers, alarms and crons, not user requests, so the read
- * waits for a renewal it starts rather than handing it to `waitUntil`.
+ * waits for a renewal it starts rather than handing it to `waitUntil`. `secret` is read only in
+ * `legacy` mode; a rejection propagates, as the secret read did before.
  */
-export async function webInternalCredential(
+export async function resolveWebInternalCredential(
   env: WebInternalAuthEnv,
   target: ServiceTokenRequest,
-  legacy: LegacyWebInternalCredential
-): Promise<WebInternalCredential> {
+  secret: () => Promise<string | null | undefined>
+): Promise<WebInternalServiceCredential> {
   const mode = webInternalAuthMode(env.WEB_INTERNAL_AUTH);
   if (mode === null) return unavailable(target, 'auth_misconfigured');
   if (mode === 'legacy') {
-    const secret = await legacy.secret();
-    if (!secret) return unavailable(target, 'secret_missing');
-    return { kind: 'ready', header: legacy.header, value: legacy.format?.(secret) ?? secret };
+    const value = await secret();
+    return value ? { kind: 'legacy', secret: value } : unavailable(target, 'secret_missing');
   }
   if (env.STS === undefined) return unavailable(target, 'sts_binding_missing');
   try {
-    const token = await tokensFor(env.STS).get(target);
-    return { kind: 'ready', header: 'authorization', value: `Bearer ${token}` };
+    return { kind: 'sts', token: await tokensFor(env.STS).get(target) };
   } catch (error) {
     if (!(error instanceof ServiceTokenError)) {
       return unavailable(target, 'token_unavailable', {
@@ -143,5 +159,26 @@ export async function webInternalCredential(
       : unavailable(target, 'token_unavailable', {
           retry_after_seconds: error.retryAfterSeconds ?? 0,
         });
+  }
+}
+
+/** `resolveWebInternalCredential` as the header of the route: a bearer, or the legacy header. */
+export async function webInternalCredential(
+  env: WebInternalAuthEnv,
+  target: ServiceTokenRequest,
+  legacy: LegacyWebInternalCredential
+): Promise<WebInternalCredential> {
+  const credential = await resolveWebInternalCredential(env, target, legacy.secret);
+  switch (credential.kind) {
+    case 'sts':
+      return { kind: 'ready', header: 'authorization', value: `Bearer ${credential.token}` };
+    case 'legacy':
+      return {
+        kind: 'ready',
+        header: legacy.header,
+        value: legacy.format?.(credential.secret) ?? credential.secret,
+      };
+    case 'unavailable':
+      return credential;
   }
 }

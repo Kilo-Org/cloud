@@ -8,6 +8,10 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import {
+  STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ,
+  webInternalSenderCredential,
+} from '@kilocode/web-shared/lib/web-internal-sts';
+import {
   claudeBillingEffectiveConnection,
   getGrantedClaudeBillingConnection,
   type ClaudeBillingOwner,
@@ -85,8 +89,14 @@ export async function getAuthoritativeClaudeBillingState(
     const granted = await getGrantedClaudeBillingConnection(owner, db);
     return claudeBillingPayerState(granted ? claudeBillingEffectiveConnection(granted) : null);
   }
-  const internalApiSecret = await readInternalApiSecret();
-  if (!internalApiSecret) throw new Error('Claude payer-state authentication is not configured');
+  // `WEB_INTERNAL_SENDER_AUTH`: a `web:claude-billing.payer-state.read` STS token by default, the
+  // internal secret under `legacy`.
+  const credential = await webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
+    legacySecret: readInternalApiSecret,
+  });
+  if (credential.kind === 'unavailable') {
+    throw new Error('Claude payer-state authentication is not configured');
+  }
   const payerStateUrl = parseInternalServiceEndpoint(
     APP_URL,
     '/api/internal/claude-billing/payer-state'
@@ -96,7 +106,7 @@ export async function getAuthoritativeClaudeBillingState(
     payerStateUrl.toString(),
     async () => ({
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': internalApiSecret },
+      headers: { 'content-type': 'application/json', [credential.header]: credential.value },
       body: JSON.stringify(owner),
       cache: 'no-store',
     }),

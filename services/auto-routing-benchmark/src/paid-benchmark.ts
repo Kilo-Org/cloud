@@ -30,6 +30,11 @@ import {
   type PaidBenchmarkStartResult,
 } from '@kilocode/auto-routing-contracts';
 import type { Hono } from 'hono';
+import {
+  STS_WEB_USAGE_RECEIPTS_READ,
+  webInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { fetchBenchmarkModelCatalog, catalogModelVariants } from './platform-models';
 import type { HonoEnv } from './hono-env';
 import {
@@ -136,6 +141,13 @@ const STAGE_ACTIVATION_GRACE_MS = 2 * STAGE_ABANDON_MS;
 const RECEIPT_POLL_DELAYS_MS = [250, 500, 1_000];
 
 type PaidBenchmarkEnv = HonoEnv['Bindings'];
+
+/** The bindings a receipt read needs; a caller can pass its own narrower Worker env. */
+type UsageReceiptsEnv = Pick<
+  PaidBenchmarkEnv,
+  'BENCH_DB' | 'KILO_WEB_API_BASE_URL' | 'INTERNAL_API_SECRET_PROD'
+> &
+  WebInternalAuthEnv;
 
 type RequestCounts = {
   total: number;
@@ -902,8 +914,8 @@ async function pausePaidBenchmark(
  * does not match the signed assignment is refused rather than booked.
  */
 export async function reconcilePaidUsageReceipts(
-  // Reads only these three bindings, so a caller can pass its own narrower Worker env.
-  env: Pick<PaidBenchmarkEnv, 'BENCH_DB' | 'KILO_WEB_API_BASE_URL' | 'INTERNAL_API_SECRET_PROD'>,
+  // Reads only these bindings, so a caller can pass its own narrower Worker env.
+  env: UsageReceiptsEnv,
   options: {
     limit?: number;
     fetchImpl?: typeof fetch;
@@ -1106,7 +1118,7 @@ export async function reconcilePaidUsageReceipts(
 export async function reconcilePaidPayerReceipts(
   // Only the bindings this path actually uses, so a caller can pass its own Worker env
   // without casting to this worker's full `Env`.
-  env: Pick<PaidBenchmarkEnv, 'BENCH_DB' | 'KILO_WEB_API_BASE_URL' | 'INTERNAL_API_SECRET_PROD'>,
+  env: UsageReceiptsEnv,
   input: {
     ownerType: 'user' | 'organization';
     ownerId: string;
@@ -1153,7 +1165,7 @@ type UsageReceipt = {
 
 /** The authoritative receipt read (primary), or null when it cannot be reached. */
 async function readUsageReceipts(
-  env: Pick<PaidBenchmarkEnv, 'BENCH_DB' | 'KILO_WEB_API_BASE_URL' | 'INTERNAL_API_SECRET_PROD'>,
+  env: UsageReceiptsEnv,
   usageIds: readonly string[],
   fetchImpl: typeof fetch,
   limits: { signal?: AbortSignal; deadline?: number } = {}
@@ -1164,12 +1176,18 @@ async function readUsageReceipts(
   const remaining = (limits.deadline ?? Date.now() + 10_000) - Date.now();
   const timeout = AbortSignal.timeout(Math.max(1, Math.min(10_000, remaining)));
   const signal = limits.signal ? AbortSignal.any([limits.signal, timeout]) : timeout;
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  // A `web:usage.receipts.read` STS token by default, the internal secret under
+  // `WEB_INTERNAL_AUTH=legacy`; without one the receipts are unreachable for now.
+  const credential = await webInternalCredential(env, STS_WEB_USAGE_RECEIPTS_READ, {
+    header: 'x-internal-api-key',
+    secret: () => env.INTERNAL_API_SECRET_PROD.get(),
+  });
+  if (credential.kind === 'unavailable') return null;
   let response: Response;
   try {
     response = await fetchImpl(new URL(BENCHMARK_USAGE_RECEIPTS_PATH, env.KILO_WEB_API_BASE_URL), {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': secret },
+      headers: { 'content-type': 'application/json', [credential.header]: credential.value },
       body: JSON.stringify({ usageIds }),
       signal,
     });

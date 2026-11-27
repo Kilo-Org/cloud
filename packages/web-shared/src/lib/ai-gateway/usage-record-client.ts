@@ -4,6 +4,11 @@ import { captureException } from '@sentry/nextjs';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import {
+  STS_WEB_USAGE_RECORD_REGION_HANDOFF,
+  webInternalSenderCredential,
+  type WebInternalSenderCredential,
+} from '@kilocode/web-shared/lib/web-internal-sts';
 import type { UsageRecordInsertResult } from './processUsage.types';
 import {
   UsageRecordResponseSchema,
@@ -77,14 +82,24 @@ function isRetryableError(error: unknown): boolean {
 export async function recordUsageInPrimaryRegion(
   payload: UsageRecordRequest
 ): Promise<RemoteUsageRecordOutcome> {
-  let internalApiSecret: string;
+  // `WEB_INTERNAL_SENDER_AUTH`: a `web:usage.region-handoff.record` STS token by default, the
+  // internal secret under `legacy`. Without one the caller writes locally.
+  let credential: WebInternalSenderCredential;
   try {
-    internalApiSecret = await readInternalApiSecret();
+    credential = await webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+      legacySecret: readInternalApiSecret,
+    });
   } catch {
     return { kind: 'unavailable', reason: 'internal_api_secret_unavailable' };
   }
-  if (!internalApiSecret) {
-    return { kind: 'unavailable', reason: 'missing_internal_api_secret' };
+  if (credential.kind === 'unavailable') {
+    return {
+      kind: 'unavailable',
+      reason:
+        credential.reason === 'secret_missing'
+          ? 'missing_internal_api_secret'
+          : `credential_${credential.reason}`,
+    };
   }
   if (!APP_URL) {
     return { kind: 'unavailable', reason: 'missing_app_url' };
@@ -103,7 +118,7 @@ export async function recordUsageInPrimaryRegion(
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': internalApiSecret,
+          [credential.header]: credential.value,
           'x-usage-write-source': 'region_handoff',
         },
         body,

@@ -263,6 +263,7 @@ describe('classifier usage delivery', () => {
     const outcome = await writeClassifierUsage(
       {
         KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+        WEB_INTERNAL_AUTH: 'legacy',
         INTERNAL_API_SECRET_PROD: { get: async () => 'test-internal-secret' } as SecretsStoreSecret,
       },
       usage
@@ -287,11 +288,72 @@ describe('classifier usage delivery', () => {
       writeClassifierUsage(
         {
           KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+          WEB_INTERNAL_AUTH: 'legacy',
           INTERNAL_API_SECRET_PROD: {
             get: async () => {
               throw new Error('secrets unavailable');
             },
           } as SecretsStoreSecret,
+        },
+        usage
+      )
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'missing_config' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('presents a web:usage.classifier.record STS token by default, never the secret', async () => {
+    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'recorded',
+        result: { usageId: usage.core.id, createdAt, newMicrodollarsUsed: 13 },
+      })
+    );
+    const secret = vi.fn(async () => 'test-internal-secret');
+    const minted: unknown[] = [];
+    const outcome = await writeClassifierUsage(
+      {
+        KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+        INTERNAL_API_SECRET_PROD: { get: secret } as unknown as SecretsStoreSecret,
+        STS: {
+          async mintTokens(request) {
+            minted.push(request);
+            return {
+              status: 'ok',
+              tokens: request.tokens.map(({ audience, scope }) => ({
+                status: 'issued',
+                audience,
+                scope,
+                token: 'sts-classifier-token',
+                jti: 'jti-classifier',
+                expiresAt: Math.floor(Date.now() / 1000) + 300,
+              })),
+            };
+          },
+        },
+      },
+      usage
+    );
+    expect(outcome.kind).toBe('recorded');
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers;
+    expect(headers).toEqual({
+      'content-type': 'application/json',
+      authorization: 'Bearer sts-classifier-token',
+    });
+    expect(secret).not.toHaveBeenCalled();
+    expect(minted).toEqual([
+      { tokens: [{ audience: 'web', scope: 'web:usage.classifier.record' }] },
+    ]);
+  });
+
+  it('returns unavailable without a request when no STS token can be had', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    await expect(
+      writeClassifierUsage(
+        {
+          KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+          INTERNAL_API_SECRET_PROD: { get: async () => 'unused' } as SecretsStoreSecret,
         },
         usage
       )

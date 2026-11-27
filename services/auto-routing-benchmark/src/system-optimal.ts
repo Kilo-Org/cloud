@@ -12,6 +12,11 @@ import {
   type ProductionAutoMetrics,
   type ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
+import {
+  STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+  webInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { getBenchmarkConfig } from './config';
 import {
   getRoutingCaseResultsForEntries,
@@ -268,13 +273,26 @@ export function optimizeThresholdPolicy(params: {
  * endpoint is unavailable, slow, or has no data, so the daily run keeps the
  * last computed values instead of inventing numbers or stalling the tick.
  */
-export async function fetchProductionAutoMetrics(env: Env): Promise<ProductionAutoMetrics | null> {
+export async function fetchProductionAutoMetrics(
+  env: Env & WebInternalAuthEnv
+): Promise<ProductionAutoMetrics | null> {
   try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
+    // The route reads a bearer either way: an STS `web:auto-routing.production-profile.read`
+    // token by default, the internal secret under `WEB_INTERNAL_AUTH=legacy`.
+    const credential = await webInternalCredential(
+      env,
+      STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+      {
+        header: 'authorization',
+        secret: () => env.INTERNAL_API_SECRET_PROD.get(),
+        format: secret => `Bearer ${secret}`,
+      }
+    );
+    if (credential.kind === 'unavailable') return null;
     const response = await fetch(
       `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/production-profile`,
       {
-        headers: { authorization: `Bearer ${secret}` },
+        headers: { [credential.header]: credential.value },
         signal: AbortSignal.timeout(10_000),
       }
     );

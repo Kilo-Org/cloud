@@ -52,8 +52,9 @@ const PATHNAME_HEADER = 'x-pathname';
 const REFERER_HEADER = 'referer';
 
 // An allowlist, because a deny list misses every new header name that carries a
-// credential, such as x-vercel-sc-headers.
-const ALLOWED_HEADERS = new Set([
+// credential, such as x-vercel-sc-headers. The SDK collection policy reads the
+// same list, so both layers keep the same headers.
+export const SENTRY_REQUEST_HEADER_ALLOWLIST: readonly string[] = [
   'accept',
   'accept-encoding',
   'accept-language',
@@ -70,7 +71,9 @@ const ALLOWED_HEADERS = new Set([
   'x-forwarded-host',
   'x-forwarded-proto',
   'traceparent',
-]);
+];
+
+const ALLOWED_HEADERS = new Set(SENTRY_REQUEST_HEADER_ALLOWLIST);
 
 function sanitizeStringQuery(queryString: string): string {
   return queryString

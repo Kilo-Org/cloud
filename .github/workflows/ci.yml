@@ -632,6 +632,23 @@ jobs:
           matrix=$(scripts/changed-workspaces.sh "${excludes[@]}" "${includes[@]}")
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
+  # The Sentry init guard reads every source file under apps/, services/ and
+  # packages/, so no path filter can name its inputs and it runs on every
+  # change. It needs Node and git only, no install, so the job stays cheap.
+  sentry-init-guard:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Check Sentry init options
+        run: node --test scripts/sentry-init-guard.test.mjs
+
   # The workflow wiring suites and the checks that read the workflows. No job
   # waits for this one, so it adds no time before the workspace checks start;
   # the required `test` job needs it, so a failure still blocks the merge.
@@ -1284,12 +1301,13 @@ jobs:
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the web
   # production build, the workspace tests, the dependency cycle check,
-  # drizzle-check, harness-sdk, the plugin contract checks and the ai-gateway
-  # builds, which have no required check of their own.
+  # drizzle-check, harness-sdk, the plugin contract checks, the Sentry init
+  # guard and the ai-gateway builds, which have no required check of their own.
   test:
     needs:
       - changes
       - ci-wiring
+      - sentry-init-guard
       - plugin-contract
       - web-test
       - test-scripts

@@ -34,6 +34,52 @@ describe('redactSensitiveHeaders', () => {
     });
   });
 
+  it('redacts named credential headers', () => {
+    const names = [
+      'x-device-auth-viewer-token',
+      'x-vercel-oidc-token',
+      'x-vercel-sc-headers',
+      'x-vercel-proxy-signature',
+      'x-vercel-is-internal-rewrite-signature',
+      'x-kilo-runtime-proxy-attestation',
+      'x-kilo-runtime-proxy-origin',
+    ];
+
+    const result = redactSensitiveHeaders(Object.fromEntries(names.map(name => [name, 'fake'])));
+
+    expect(result).toEqual(Object.fromEntries(names.map(name => [name, '[REDACTED]'])));
+  });
+
+  it('redacts headers whose name contains a credential term', () => {
+    const names = [
+      'X-Internal-Secret',
+      'x-callback-token',
+      'x-kilo-facade-auth-token',
+      'x-slack-signature',
+      'x-internal-api-key',
+      'x-admin-password',
+      'x-session-cookie',
+      'x-custom-auth',
+      'x-amz-security-token',
+    ];
+
+    const result = redactSensitiveHeaders(Object.fromEntries(names.map(name => [name, 'fake'])));
+
+    expect(result).toEqual(Object.fromEntries(names.map(name => [name, '[REDACTED]'])));
+  });
+
+  it('keeps headers whose name contains no credential term', () => {
+    const input = {
+      'user-agent': 'test-agent',
+      'x-event-key': 'repo:push',
+      'x-github-event': 'push',
+      'x-kilo-user-id': 'user-1',
+      'x-forwarded-for': '203.0.113.1',
+    };
+
+    expect(redactSensitiveHeaders(input)).toEqual(input);
+  });
+
   it('handles mixed-case header keys', () => {
     const input = {
       Authorization: 'Bearer token',

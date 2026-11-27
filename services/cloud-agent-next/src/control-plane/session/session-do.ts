@@ -334,6 +334,11 @@ const REGISTRATION_KEY = 'control_plane_session';
 const SESSION_METADATA_KEY = 'session_metadata';
 const ROUTE_KEY = 'control_plane_route';
 const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
+const CLOUD_STATUS_ENTITY_ID = 'cloud-status';
+const SANDBOX_UNREACHABLE = 'sandbox_unreachable';
+const sandboxUnreachableStatusSchema = z.object({
+  cloudStatus: z.object({ type: z.literal('error'), message: z.literal(SANDBOX_UNREACHABLE) }),
+});
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 const ROOT_STATUS_KEY = 'session_root_status';
@@ -4435,7 +4440,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * window. Accepted work keeps its own backstop: the runtime may still own it.
    */
   private async failUnansweredQueued(): Promise<void> {
-    const reason = 'sandbox_unreachable';
+    const reason = SANDBOX_UNREACHABLE;
     if (this.route.state === 'preparing') {
       this.finalizeAttempt(this.route.attemptId, { status: 'failed', safeError: reason });
     }
@@ -4926,7 +4931,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     step?: string;
     message?: string;
   }): void {
-    this.emitSynthetic('cloud.status', { cloudStatus: status }, 'cloud-status');
+    this.emitSynthetic('cloud.status', { cloudStatus: status }, CLOUD_STATUS_ENTITY_ID);
   }
 
   /** One row per entity keeps synthetic state replayable by cursor without unbounded growth. */
@@ -4970,6 +4975,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     step?: string;
     message?: string;
   } | null {
+    if (
+      (this.route.state === 'preparing' || this.route.state === 'failed') &&
+      !this.messages.some(message => message.state === 'queued')
+    ) {
+      const payload = this.eventQueries.findByEntityId(CLOUD_STATUS_ENTITY_ID)?.payload;
+      if (payload !== undefined) {
+        try {
+          const status = sandboxUnreachableStatusSchema.safeParse(JSON.parse(payload));
+          if (status.success) return status.data.cloudStatus;
+        } catch {
+          // Older or corrupt event data cannot override the route snapshot.
+        }
+      }
+    }
     switch (this.route.state) {
       case 'unknown':
         return null;

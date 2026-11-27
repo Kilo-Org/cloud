@@ -1382,6 +1382,29 @@ describe('SandboxSessionV2 queued status check', () => {
       message: 'sandbox_unreachable',
     });
 
+    const stream = await stub.fetch('https://example.com/stream?replay=false', {
+      headers: { Upgrade: 'websocket' },
+    });
+    const socket = stream.webSocket;
+    if (socket === null) throw new Error(`Stream upgrade failed: ${stream.status}`);
+    try {
+      const connected = new Promise<unknown>(resolve => {
+        socket.addEventListener('message', event => {
+          const message = JSON.parse(String(event.data)) as {
+            streamEventType: string;
+            data: unknown;
+          };
+          if (message.streamEventType === 'connected') resolve(message.data);
+        });
+      });
+      socket.accept();
+      await expect(bounded(connected)).resolves.toMatchObject({
+        cloudStatus: { type: 'error', message: 'sandbox_unreachable' },
+      });
+    } finally {
+      socket.close();
+    }
+
     const attemptId = peer.attemptId;
     const preparationAttempt = () =>
       runInDurableObject(stub, instance =>

@@ -901,7 +901,9 @@ describe('dispatchReadyNotifications', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     for (const [url, init] of fetchMock.mock.calls) {
-      expect(String(url)).toBe('https://api.kilo.ai/api/internal/user-data-exports/ready');
+      expect(url instanceof URL ? url.href : url).toBe(
+        'https://api.kilo.ai/api/internal/user-data-exports/ready'
+      );
       const headers = new Headers(init?.headers);
       expect(headers.get('authorization')).toBe('Bearer sts-ready-token');
       expect(headers.has('x-internal-api-key')).toBe(false);

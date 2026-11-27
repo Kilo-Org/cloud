@@ -19,8 +19,7 @@ const BUILD_BUDGET_MS = 500_000;
  * Hourly build of `leaderboard_usage_daily` for the public leaderboard routes.
  * Each run fills the days in the leaderboard window that have no rollup yet, so
  * a new day lands within an hour of UTC midnight and a failed run is retried by
- * the next one. Runs in the early UTC hours also rebuild yesterday to pick up
- * usage rows that reached the database late.
+ * the next one.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');

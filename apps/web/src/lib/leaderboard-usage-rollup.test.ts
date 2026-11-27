@@ -272,35 +272,6 @@ describe('leaderboard usage rollup', () => {
     expect(await rollupRows()).toEqual([]);
   });
 
-  test.each([
-    { now: '2026-11-10T05:20:00.000Z', requests: 2, rebuilt: ['2026-11-09'] },
-    { now: '2026-11-10T06:20:00.000Z', requests: 1, rebuilt: [] },
-  ])(
-    'rebuilds yesterday for late usage rows only before 06:00 UTC ($now)',
-    async ({ now, requests, rebuilt }) => {
-      const window = leaderboardUsageWindow(new Date(now));
-      for (const day of window) {
-        await insertUsage({ created_at: `${day}T12:00:00.000Z` });
-        await rebuildLeaderboardUsageDay(day, { readDb: db, db });
-      }
-      await insertUsage({ created_at: '2026-11-09T23:59:59.000Z' });
-
-      const result = await buildLeaderboardUsageDays({
-        readDb: db,
-        db,
-        now: new Date(now),
-        deadline: Date.now() + 60_000,
-      });
-
-      expect(result.built.map(day => day.usageDate)).toEqual(rebuilt);
-      expect(
-        (await rollupRows())
-          .filter(row => row.usage_date === '2026-11-09')
-          .map(row => row.request_count)
-      ).toEqual([requests]);
-    }
-  );
-
   test('stops starting new days once the deadline has passed', async () => {
     const result = await buildLeaderboardUsageDays({
       readDb: db,

@@ -6,13 +6,11 @@ import type { DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
 /** Complete UTC days before today that the leaderboard routes read. */
 export const LEADERBOARD_USAGE_LOOKBACK_DAYS = 7;
 
-/** Runs before this UTC hour rebuild yesterday even when it is already built. */
-export const YESTERDAY_SETTLING_HOURS = 6;
-
 /**
- * How long after a day ends before it is first built. Usage-ingest queue
- * retries can write a row ~20 minutes after its `created_at`, so building
- * earlier would publish a day that is visibly short.
+ * How long after a day ends before it is built. Usage-ingest queue retries can
+ * write a row ~20 minutes after its `created_at`, so building earlier would
+ * publish a day that is visibly short. Rows later than this are not counted;
+ * to recount a day, delete its rows and the next run rebuilds it.
  */
 export const DAY_SETTLE_MS = 60 * 60 * 1000;
 
@@ -210,17 +208,15 @@ export function settledLeaderboardUsageDays(
 
 /**
  * Builds the days in the leaderboard window that have no rollup rows yet,
- * newest first, then rebuilds yesterday during its settling period. A run
- * builds at most `MAX_DAYS_PER_RUN` days and stops at `deadline`, even partway
- * through a day; whatever is left is reported as `remaining` for the next run.
+ * newest first. A run builds at most `MAX_DAYS_PER_RUN` days and stops at
+ * `deadline`, even partway through a day; whatever is left is reported as
+ * `remaining` for the next run.
  *
- * Each day is written whole, so the routes never see a partly built day. A day
- * is first built `DAY_SETTLE_MS` after it ends, and only once `readDb` has
- * replayed past that point, because a usage row's `created_at` is stamped when
- * the gateway sends it, before usage-ingest queue retries can delay its write.
- * Stragglers after that are picked up by rebuilding yesterday on every run until
- * `YESTERDAY_SETTLING_HOURS` UTC. Rows landing later, such as dead-letter
- * replays, are not reflected.
+ * Each day is built once and written whole, so the routes never see a partly
+ * built day. A day is built `DAY_SETTLE_MS` after it ends, and only once
+ * `readDb` has replayed past that point, because a usage row's `created_at` is
+ * stamped when the gateway sends it, before usage-ingest queue retries can
+ * delay its write.
  */
 export async function buildLeaderboardUsageDays({
   readDb,
@@ -244,16 +240,11 @@ export async function buildLeaderboardUsageDays({
   const replay = await readDb.execute<{ replayed_at_ms: number | null }>(sql`
     SELECT (extract(epoch FROM pg_last_xact_replay_timestamp()) * 1000)::float8 AS replayed_at_ms
   `);
-  const settled = settledLeaderboardUsageDays(window, now, replay.rows[0]?.replayed_at_ms ?? null);
-  const yesterday = window[0];
-  const rebuildYesterday =
-    now.getUTCHours() < YESTERDAY_SETTLING_HOURS &&
-    builtDates.has(yesterday) &&
-    settled.includes(yesterday);
-  const toBuild = [
-    ...settled.filter(usageDate => !builtDates.has(usageDate)),
-    ...(rebuildYesterday ? [yesterday] : []),
-  ];
+  const toBuild = settledLeaderboardUsageDays(
+    window,
+    now,
+    replay.rows[0]?.replayed_at_ms ?? null
+  ).filter(usageDate => !builtDates.has(usageDate));
 
   const built: { usageDate: string; rows: number }[] = [];
   for (const usageDate of toBuild.slice(0, MAX_DAYS_PER_RUN)) {

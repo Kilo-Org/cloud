@@ -53,11 +53,7 @@ const NON_PRODUCTION_SECRET = /_(DEV|DEVELOPMENT|LOCAL|STAGING|TEST)$/;
 const NAMES: readonly CloudAgentNextSecretName[] = [
   'INTERNAL_API_SECRET',
   'NEXTAUTH_SECRET',
-  'GITHUB_APP_PRIVATE_KEY',
-  'GITHUB_LITE_APP_PRIVATE_KEY',
   'AGENT_ENV_VARS_PRIVATE_KEY',
-  'SSEC_KEY',
-  'R2_SECRET_ACCESS_KEY',
   'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
 ];
 
@@ -74,6 +70,45 @@ type CopierRow = {
   /** The entry services/sts/policy/cloud-agent-next.yaml grants. */
   policyEntry: string;
 };
+
+/**
+ * The table this PR body publishes, copied literally and in the order the rows are derived. The
+ * rows below come from the shipped policy, the readers and the manifest, so this list is what makes
+ * the published copy checkable — including `stsLookup`, which the derivation itself computes from
+ * this test's `SHARED_NAMES`. A mapping change now has to be made in the body and here.
+ */
+const PUBLISHED_ROWS: readonly CopierRow[] = [
+  {
+    oldBinding: 'INTERNAL_API_SECRET',
+    storeSecretName: '—',
+    stsLookup: '/shared/INTERNAL_API_SECRET',
+    policyEntry: 'INTERNAL_API_SECRET',
+  },
+  {
+    oldBinding: 'NEXTAUTH_SECRET',
+    storeSecretName: '—',
+    stsLookup: '/shared/NEXTAUTH_SECRET',
+    policyEntry: 'NEXTAUTH_SECRET',
+  },
+  {
+    oldBinding: 'AGENT_ENV_VARS_PRIVATE_KEY',
+    storeSecretName: '—',
+    stsLookup: '/workloads/cloud-agent-next/AGENT_ENV_VARS_PRIVATE_KEY',
+    policyEntry: 'AGENT_ENV_VARS_PRIVATE_KEY',
+  },
+  {
+    oldBinding: 'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
+    storeSecretName: '—',
+    stsLookup: '/workloads/cloud-agent-next/R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
+    policyEntry: 'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
+  },
+  {
+    oldBinding: 'INTERNAL_API_SECRET_PROD',
+    storeSecretName: 'INTERNAL_API_SECRET_PROD',
+    stsLookup: '/shared/INTERNAL_API_SECRET',
+    policyEntry: 'INTERNAL_API_SECRET',
+  },
+];
 
 /**
  * Reads a config with Wrangler's own JSON, JSONC and TOML parser, the one a deploy uses. It lives
@@ -202,9 +237,13 @@ describe('the secrets copier table for cloud-agent-next', () => {
       expect(row.stsLookup, `${WORKLOAD}: ${row.oldBinding}`).toBe(stsLookup(row.policyEntry));
     }
 
+    // The published table: the derived rows equal the copy in this PR body, row for row.
+    expect(rows, WORKLOAD).toEqual(PUBLISHED_ROWS);
     // The `dev` block reads only non-production store secrets: a config that binds STS may not
     // read a production-named secret from a non-production block (worker-configs.ts).
-    for (const entry of config.env?.['dev']?.secrets_store_secrets ?? []) {
+    const devStoreEntries = config.env?.['dev']?.secrets_store_secrets ?? [];
+    expect(devStoreEntries.length, `${WORKLOAD}: dev block store bindings`).toBeGreaterThan(0);
+    for (const entry of devStoreEntries) {
       expect(entry.secret_name, `${WORKLOAD}: dev ${entry.binding}`).toMatch(NON_PRODUCTION_SECRET);
     }
   });

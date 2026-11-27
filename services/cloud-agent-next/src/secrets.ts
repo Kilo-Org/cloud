@@ -23,15 +23,17 @@ import {
  * `instrumentDurableObjectWithSentry` options callbacks, and the egress envelope hostname check),
  * and a Durable Object is instrumented in a synchronous constructor trap, so no read of it can
  * await a broker.
+ *
+ * The deployment still holds `GITHUB_APP_PRIVATE_KEY`, `GITHUB_LITE_APP_PRIVATE_KEY`, `SSEC_KEY`
+ * and `R2_SECRET_ACCESS_KEY` as plain Worker secrets that nothing in this package reads (not the
+ * Worker, not the runtime scripts, not the wrapper). They are left out on purpose: an STS policy
+ * grants only what a workload reads, and the four should be deleted from the deployment rather
+ * than copied into Infisical.
  */
 const BINDINGS = {
   INTERNAL_API_SECRET: 'INTERNAL_API_SECRET',
   NEXTAUTH_SECRET: 'NEXTAUTH_SECRET',
-  GITHUB_APP_PRIVATE_KEY: 'GITHUB_APP_PRIVATE_KEY',
-  GITHUB_LITE_APP_PRIVATE_KEY: 'GITHUB_LITE_APP_PRIVATE_KEY',
   AGENT_ENV_VARS_PRIVATE_KEY: 'AGENT_ENV_VARS_PRIVATE_KEY',
-  SSEC_KEY: 'SSEC_KEY',
-  R2_SECRET_ACCESS_KEY: 'R2_SECRET_ACCESS_KEY',
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY: 'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
 } as const;
 

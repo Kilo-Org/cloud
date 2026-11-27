@@ -10,6 +10,7 @@ const deletedId = 'bbbbbbbb-2222-4222-8222-222222222222';
 const unknownId = 'cccccccc-3333-4333-8333-333333333333';
 const emptyFeatures: OrganizationFeatures = {
   experimental_byok: [],
+  byok_private_providers: [],
   enkrypt_output_guardrail: [],
   gateway_settings: [],
   org_permission_policy: [],
@@ -79,6 +80,7 @@ describe('OrganizationFeaturesContent', () => {
     Object.assign(mockConfigQuery, {
       data: {
         experimental_byok: [activeId],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
         org_permission_policy: [],
@@ -153,6 +155,7 @@ describe('OrganizationFeaturesContent', () => {
   it('shows organization names, IDs and admin links with deleted and unknown labels per feature', () => {
     mockConfigQuery.data = {
       experimental_byok: [activeId, unknownId],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [activeId],
       gateway_settings: [deletedId, activeId],
       org_permission_policy: [activeId],
@@ -166,11 +169,12 @@ describe('OrganizationFeaturesContent', () => {
     const sections = Array.from(container.querySelectorAll('section'));
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
+      'BYOK private providers (0)',
       'Enkrypt output guardrails (1)',
       'Advanced policies (2)',
       'Organization permission policy (1)',
     ]);
-    expect(Array.from(sections[2].querySelectorAll('a')).map(link => link.textContent)).toEqual([
+    expect(Array.from(sections[3].querySelectorAll('a')).map(link => link.textContent)).toEqual([
       'Deleted organization',
       'Active organization',
     ]);
@@ -185,7 +189,7 @@ describe('OrganizationFeaturesContent', () => {
     const unknown = sections[0].querySelectorAll('li')[1];
     expect(unknown.textContent).toContain('Organization not found');
     expect(unknown.querySelector('a')).toBeNull();
-    const deleted = sections[2].querySelector('li');
+    const deleted = sections[3].querySelector('li');
     expect(deleted?.querySelector('a')?.textContent).toBe('Deleted organization');
     expect(deleted?.querySelector('a')?.getAttribute('href')).toBe(
       `/admin/organizations/${deletedId}`
@@ -207,6 +211,7 @@ describe('OrganizationFeaturesContent', () => {
 
     const input = {
       experimental_byok: [deletedId],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [deletedId],
       gateway_settings: [deletedId],
       org_permission_policy: [deletedId],
@@ -286,7 +291,7 @@ describe('OrganizationFeaturesContent', () => {
       enabled: false,
     });
     expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual(
-      Array.from({ length: 4 }, () => 'No organizations enabled.')
+      Array.from({ length: 5 }, () => 'No organizations enabled.')
     );
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.querySelector('section li')).toBeNull();

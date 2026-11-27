@@ -13,8 +13,9 @@
 --
 -- A CI token has no grant and no `sid`. It stops at its expiry, at most 1 hour after it was issued.
 -- Removing its policy from the config stops new CI tokens only; tokens already issued live until
--- their expiry. To stop them at once, block the policy's CI account or revoke its subject
--- (`revoked_before` on the revocation feed).
+-- their expiry. To stop them early, block the policy's CI account or revoke its subject
+-- (`revoked_before` on the revocation feed); verifiers refuse them once their feed copy holds the
+-- entry (README, "CI token exchange").
 
 SET LOCAL ROLE uts_owner;
 

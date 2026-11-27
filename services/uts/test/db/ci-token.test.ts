@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { IdentityStore } from '../../src/db/client';
 import { type CiExchangeInput, type CiTokenStore, identityStoreCiTokens } from '../../src/ci/store';
+import { type SubjectStore, identityStoreSubjects } from '../../src/subjects/store';
 import { TestDatabase, insertAccount, sqlStateOf } from './harness';
 
 /**
@@ -15,11 +16,14 @@ import { TestDatabase, insertAccount, sqlStateOf } from './harness';
 let db: TestDatabase;
 let owner: pg.Client;
 let store: CiTokenStore;
+let subjects: SubjectStore;
 
 beforeAll(async () => {
   db = await TestDatabase.create();
   owner = await db.connectAsOwner();
-  store = identityStoreCiTokens(new IdentityStore(await db.connect('uts_app_a')));
+  const app = new IdentityStore(await db.connect('uts_app_a'));
+  store = identityStoreCiTokens(app);
+  subjects = identityStoreSubjects(app);
 });
 afterAll(() => db.drop());
 
@@ -126,6 +130,37 @@ describe('uts.exchange_ci_token', () => {
       ['ai.kilo.uts.ci_token.denied', 'binding_mismatch'],
       ['ai.kilo.uts.ci_token.denied', 'scope_not_granted'],
     ]);
+  });
+
+  it('blocking the CI account puts a subject entry on the feed that covers every token it was issued, and refuses new ones', async () => {
+    const accountId = await insertAccount(owner);
+    // The token's iat: the Worker stamps it just before the statement runs.
+    const issuedAtSeconds = Math.floor(Date.now() / 1000);
+    const issued = await store.exchange(input(accountId));
+    if (issued.outcome !== 'issued') throw new Error(`expected issued, got ${issued.outcome}`);
+    const blocked = await subjects.applyOperation({
+      environment: 'development',
+      workload: 'web',
+      operation: 'revoke',
+      operationId: randomUUID(),
+      subject: accountId,
+      reason: 'access_block',
+      actor: 'admin:staff-1',
+      sourceVersion: 1,
+    });
+    if (blocked.outcome !== 'applied') throw new Error(`block answered ${blocked.outcome}`);
+    const subject = blocked.feedEntries.find(entry => entry.kind === 'subject');
+    if (subject?.kind !== 'subject') throw new Error('expected a subject entry');
+    expect(subject.id).toBe(accountId);
+    // The feed compares whole seconds: every token whose iat is at or before this is revoked.
+    expect(Math.floor(subject.revokedBefore / 1000)).toBeGreaterThanOrEqual(issuedAtSeconds);
+    // The entry stays on the feed past the longest CI token issued before the block.
+    expect(subject.expiresAt - subject.revokedAt).toBeGreaterThan(3600 * 1000);
+    expect(blocked.feedEntries.map(entry => [entry.kind, entry.id])).toContainEqual([
+      'blocked_account',
+      accountId,
+    ]);
+    expect(await store.exchange(input(accountId))).toEqual({ outcome: 'account_inactive' });
   });
 
   it('raises for a lifetime outside 60 to 3600 seconds, an unknown refusal, a malformed scope and a missing input', async () => {

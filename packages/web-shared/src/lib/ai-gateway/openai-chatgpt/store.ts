@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { type IndexColumn } from 'drizzle-orm/pg-core';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
@@ -387,25 +387,49 @@ export async function saveOpenAiChatGptConnection(
     ...NO_USAGE_LIMIT,
   };
 
-  await db
-    .insert(openai_chatgpt_connections)
-    .values(values)
-    // Each owner shape upserts through its own partial unique index.
-    .onConflictDoUpdate({
-      ...shape.conflict,
-      // A reconnect replaces the credential and the connector with it: the
-      // shared-services row is the one place a conflict can change the person
-      // recorded on the row, and it must name the person who connected the
-      // credential it now holds. `created_by` follows the same person, so the
-      // row never names a connector who is no longer responsible for it.
-      set: {
-        kilo_user_id: values.kilo_user_id,
-        created_by: values.created_by,
-        encrypted_connection_envelope: columns.encrypted_connection_envelope,
-        is_enabled: true,
-        ...NO_USAGE_LIMIT,
-      },
-    });
+  // A reconnect replaces the credential and the connector with it: the
+  // shared-services row is the one place a conflict can change the person
+  // recorded on the row, and it must name the person who connected the
+  // credential it now holds. `created_by` follows the same person, so the
+  // row never names a connector who is no longer responsible for it.
+  const conflictSet = {
+    kilo_user_id: values.kilo_user_id,
+    created_by: values.created_by,
+    encrypted_connection_envelope: columns.encrypted_connection_envelope,
+    is_enabled: true,
+    ...NO_USAGE_LIMIT,
+  };
+  const tableColumns = getTableColumns(openai_chatgpt_connections);
+  const insertKeys = Object.keys(values) as (keyof typeof values)[];
+  const conflictKeys = Object.keys(conflictSet) as (keyof typeof conflictSet)[];
+  // A Drizzle insert names every column the schema declares. The migration that drops the
+  // obsolete `encrypted_connection` runs while this code still serves, so this names only the
+  // columns it sets. Each owner shape upserts through its own partial unique index.
+  await db.execute(sql`
+    INSERT INTO ${openai_chatgpt_connections} (${sql.join(
+      insertKeys.map(key => sql.identifier(tableColumns[key].name)),
+      sql`, `
+    )})
+    VALUES (${sql.join(
+      insertKeys.map(key => sql.param(values[key], tableColumns[key])),
+      sql`, `
+    )})
+    ON CONFLICT (${sql.join(
+      shape.conflict.target.map(column => sql.identifier(column.name)),
+      sql`, `
+    )}) WHERE ${shape.conflict.targetWhere}
+    DO UPDATE SET ${sql.join(
+      [
+        ...conflictKeys.map(
+          key =>
+            sql`${sql.identifier(tableColumns[key].name)} = ${sql.param(conflictSet[key], tableColumns[key])}`
+        ),
+        // Drizzle's conflict update also sets this through the column's `$onUpdateFn`.
+        sql`${sql.identifier(tableColumns.updated_at.name)} = now()`,
+      ],
+      sql`, `
+    )}
+  `);
   return { credentialKeyId: sealingKey.keyId };
 }
 

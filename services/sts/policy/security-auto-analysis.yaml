@@ -1,0 +1,4 @@
+# Registration only: services/security-auto-analysis/wrangler.jsonc. No environment, identity or grant.
+workload: security-auto-analysis
+registered: true
+secrets: []

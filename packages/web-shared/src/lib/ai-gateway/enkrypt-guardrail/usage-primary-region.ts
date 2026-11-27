@@ -2,7 +2,7 @@ import 'server-only';
 
 import { types } from 'node:util';
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import {
@@ -38,7 +38,13 @@ export async function recordEnkryptUsageInPrimaryRegion(
 }
 
 async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | null> {
-  if (!INTERNAL_API_SECRET) return 'missing_internal_api_secret';
+  let internalApiSecret: string;
+  try {
+    internalApiSecret = await readInternalApiSecret();
+  } catch {
+    return 'internal_api_secret_unavailable';
+  }
+  if (!internalApiSecret) return 'missing_internal_api_secret';
   if (!APP_URL) return 'missing_app_url';
   if (!parseInternalServiceUrl(APP_URL)) return 'unsupported_app_url';
 
@@ -48,7 +54,7 @@ async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | nul
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_SECRET,
+        'x-internal-api-key': internalApiSecret,
       },
       body: JSON.stringify(usageWrite),
       signal: AbortSignal.timeout(HANDOFF_TIMEOUT_MS),

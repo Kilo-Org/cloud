@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
+  STS_O11Y_ALERTING_READ,
+  STS_O11Y_ALERTING_WRITE,
+  STS_O11Y_API_METRICS_WRITE,
   STS_SECURE_PROXY_FORWARD,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
@@ -169,6 +172,7 @@ describe('STS scope registry', () => {
         ],
       },
       'ai-gateway-secure-proxy': { scopes: ['ai-gateway-secure-proxy:request.forward'] },
+      o11y: { scopes: ['o11y:api-metrics.write', 'o11y:alerting.read', 'o11y:alerting.write'] },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
@@ -192,6 +196,9 @@ describe('STS scope registry', () => {
     ],
     ['usage-ingest:usage.publish', 'usage-ingest', STS_USAGE_PUBLISH],
     ['web:usage.record', 'web', STS_USAGE_RECORD],
+    ['o11y:api-metrics.write', 'o11y', STS_O11Y_API_METRICS_WRITE],
+    ['o11y:alerting.read', 'o11y', STS_O11Y_ALERTING_READ],
+    ['o11y:alerting.write', 'o11y', STS_O11Y_ALERTING_WRITE],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });
     expect(scopeAudience(pair.scope)).toBe(pair.audience);

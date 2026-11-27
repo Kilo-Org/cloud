@@ -1,0 +1,4 @@
+# Registration only: services/kilo-mcp/wrangler.jsonc. No environment, identity or grant.
+workload: kilo-mcp
+registered: true
+secrets: []

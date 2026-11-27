@@ -10,7 +10,7 @@ import { inArray } from 'drizzle-orm';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 /**
  * The authenticated read that turns a deferred usage id into an actual charge.
@@ -26,7 +26,7 @@ import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
  * unrelated usage and cannot become a second billing path.
  */
 export async function handleBenchmarkUsageReceipts(request: Request): Promise<Response> {
-  const unauthorized = authorize(request);
+  const unauthorized = await authorize(request);
   if (unauthorized) return unauthorized;
 
   const parsed = BenchmarkUsageReceiptRequestSchema.safeParse(
@@ -87,10 +87,11 @@ export async function handleBenchmarkUsageReceipts(request: Request): Promise<Re
   return Response.json({ receipts });
 }
 
-function authorize(request: Request): Response | null {
+async function authorize(request: Request): Promise<Response | null> {
   const presented =
     request.headers.get('x-internal-api-key') ?? request.headers.get('x-internal-secret');
-  if (!INTERNAL_API_SECRET || !presented || !timingSafeEqual(presented, INTERNAL_API_SECRET)) {
+  const expected = presented ? await readInternalApiSecret() : '';
+  if (!expected || !presented || !timingSafeEqual(presented, expected)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return null;

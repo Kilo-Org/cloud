@@ -1,0 +1,5 @@
+# Registration only: Vercel project kilocode-ai-gateway (apps/ai-gateway).
+# No environment, identity or grant.
+workload: ai-gateway
+registered: true
+secrets: []

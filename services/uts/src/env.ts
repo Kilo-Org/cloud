@@ -38,8 +38,10 @@ const OriginSchema = z.string().refine(value => {
  * (`patLookupsInFlight`). Staging and production must set it; development may leave it out.
  *
  * `SECRETS_SOURCE` picks where the runtime secrets come from (src/secrets.ts): `worker` (the legacy
- * Worker secrets) or `sts` (the UTS STS bundle). Staging and production must name one, so a flip
- * or a rollback is one var in one environment; development without it reads `worker`.
+ * Worker secrets) or `sts` (the UTS STS bundle). `secrets-store`, the legacy value other services
+ * roll back to, is read as `worker`, so one rollback value fits every service; any other value
+ * refuses to start. Staging and production must name one, so a flip or a rollback is one var in one
+ * environment; development without it reads `worker`.
  */
 const EnvVarsSchema = z
   .object({
@@ -63,7 +65,10 @@ const EnvVarsSchema = z
       .regex(/^[1-9][0-9]{0,7}$/, 'a period from 1 second')
       .transform(seconds => Number(seconds) * 1000)
       .optional(),
-    SECRETS_SOURCE: z.enum(['worker', 'sts']).optional(),
+    SECRETS_SOURCE: z
+      .enum(['worker', 'secrets-store', 'sts'])
+      .transform(source => (source === 'sts' ? 'sts' : 'worker'))
+      .optional(),
   })
   .refine(
     vars => (vars.UTS_ENVIRONMENT === 'development') === (vars.DO_JURISDICTION === 'none'),
@@ -75,7 +80,7 @@ const EnvVarsSchema = z
   )
   .refine(
     vars => vars.UTS_ENVIRONMENT === 'development' || vars.SECRETS_SOURCE !== undefined,
-    'production and staging set SECRETS_SOURCE to worker or sts'
+    'production and staging set SECRETS_SOURCE to worker, secrets-store or sts'
   )
   .refine(
     vars =>

@@ -1262,7 +1262,9 @@ GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSE
   the Worker secrets. `@kilocode/secrets-client` keeps one bundle per isolate, revalidates it in
   the background after 4 minutes, waits for STS only on a cold isolate or past the 5-minute cache
   life, and serves the held copy for up to 24 hours while STS fails.
-- `worker`: the Worker secrets of the same names, read once per isolate.
+- `worker`: the Worker secrets of the same names, read once per isolate. `secrets-store`, the
+  legacy value other services use, means the same here (it logs `source` `worker`), so the
+  standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
 
 Both environments read `worker` until their flips (below). Staging and production refuse to start
 without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
@@ -1320,9 +1322,10 @@ environment's `uts` policy live in STS:
    `uts.signin.misconfigured`; the issuer metadata still lists `device_authorization_endpoint`
    where the device grant was served; the sign-in proofs of that environment pass; and STS audit
    rows for the `uts` deliveries.
-4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker`, after re-running the parity check of
-   step 1 the other way: a value changed in the bundle while on `sts` (a rotated provider secret)
-   must reach the Worker secret first, or the rollback serves the old one.
+4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker` (or the standard `secrets-store`, read as
+   `worker`), after re-running the parity check of step 1 the other way: a value changed in the
+   bundle while on `sts` (a rotated provider secret) must reach the Worker secret first, or the
+   rollback serves the old one.
 
 ### Provisioning per environment
 
@@ -1336,7 +1339,7 @@ environment's `uts` policy live in STS:
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
 | `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID` | var | The OAuth client ids of the GitHub and Google sign-in registrations; staging sets both, production sets neither, so production offers neither provider (Sign-in providers, "Configuration") |
 | `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
-| `SECRETS_SOURCE` | var | `sts` or `worker` (Deploys, "Runtime secrets"); both environments `worker` until their flips |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ## Identity store

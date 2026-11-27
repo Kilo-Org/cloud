@@ -2,7 +2,7 @@ import { createExecutionContext } from 'cloudflare:test';
 import type { BundleBinding } from '@kilocode/secrets-client';
 import type { BundleResult } from '@kilocode/sts-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../../src/env';
+import { type Env, readConfig } from '../../src/env';
 import { handleRequest } from '../../src/http';
 import { readUtsSecrets, type UtsSecrets } from '../../src/secrets';
 import { mailSettingsFor, signInConfigFor } from '../../src/signin/providers/config';
@@ -93,6 +93,24 @@ describe('readUtsSecrets', () => {
     if (read.status !== 'read') return;
     expect(read.values.SIGNIN_GITHUB_CLIENT_SECRET).toBe(WORKER_VALUE);
     expect(sts.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('reads secrets-store, the shared rollback value, as the worker source', async () => {
+    const sts = stsBinding(okBundle({ SIGNIN_GITHUB_CLIENT_SECRET: BUNDLE_VALUE }));
+    const target: Env = { ...sourcesEnv('worker', sts.binding), SECRETS_SOURCE: 'secrets-store' };
+    const parsed = readConfig(target);
+    expect(parsed.secretsSource).toBe('worker');
+    const read = await readUtsSecrets(target, parsed, lifetime());
+    expect(read).toMatchObject({
+      status: 'read',
+      source: 'worker',
+      values: { SIGNIN_GITHUB_CLIENT_SECRET: WORKER_VALUE },
+    });
+    expect(sts.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('refuses to start with any other source', () => {
+    expect(() => readConfig({ ...env, SECRETS_SOURCE: 'foo' })).toThrow(/SECRETS_SOURCE/);
   });
 
   it('reads only the bundle under the sts source; a missing or ungranted name is absent', async () => {

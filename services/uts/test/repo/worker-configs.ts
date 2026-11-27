@@ -566,9 +566,9 @@ function secretsSourceProblems(
 ): string[] {
   const problems: string[] = [];
   const source = bindings.vars?.SECRETS_SOURCE;
-  if (source !== 'worker' && source !== 'sts') {
+  if (source !== 'worker' && source !== 'secrets-store' && source !== 'sts') {
     problems.push(
-      `${where}: SECRETS_SOURCE resolves to ${String(source)}; it must be worker or sts`
+      `${where}: SECRETS_SOURCE resolves to ${String(source)}; it must be worker, secrets-store or sts`
     );
   }
   const bound = (bindings.services ?? [])

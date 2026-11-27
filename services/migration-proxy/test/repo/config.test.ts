@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { experimental_readRawConfig } from 'wrangler';
 import { claimsMismatch } from '../../src/attest';
-import { expectedRun, readConfig } from '../../src/config';
+import { GITHUB_RELAY_URL, expectedRun, readConfig } from '../../src/config';
 
 /**
  * The three-barrier production refusal's first barrier (contract §3), against the real top-level
@@ -133,6 +133,38 @@ describe('the real wrangler.jsonc', () => {
     expect(development.ok && development.config.github.apiUrl).toBe('http://127.0.0.1:8787');
     const deployed = readConfig({ ...topLevelVars(), ...SET_BY_E });
     expect(deployed.ok && deployed.config.github.apiUrl).toBe('https://api.github.com');
+  });
+
+  it('ships the relay off, and accepts only the real relay outside development', () => {
+    for (const vars of [{ ...topLevelVars(), ...SET_BY_E }, stagingVars()]) {
+      const shipped = readConfig(vars);
+      expect(shipped.ok && shipped.config.github.relayUrl).toBeNull();
+      const relayed = readConfig({ ...vars, MIGRATION_PROXY_GITHUB_RELAY_URL: GITHUB_RELAY_URL });
+      expect(relayed.ok && relayed.config.github).toMatchObject({
+        apiUrl: 'https://api.github.com',
+        relayUrl: 'https://github-relay.kiloapps.io/migration-proxy',
+      });
+      for (const other of [
+        'https://github-relay.kiloapps.io',
+        'https://github-relay.kiloapps.io/migration-proxy/',
+        'http://github-relay.kiloapps.io/migration-proxy',
+        'https://relay.example.com/migration-proxy',
+      ]) {
+        expect(readConfig({ ...vars, MIGRATION_PROXY_GITHUB_RELAY_URL: other })).toEqual({
+          ok: false,
+          problems: [`MIGRATION_PROXY_GITHUB_RELAY_URL: only empty or ${GITHUB_RELAY_URL}`],
+        });
+      }
+    }
+    const development = readConfig({
+      ...topLevelVars(),
+      ...SET_BY_E,
+      MIGRATION_PROXY_ENVIRONMENT: 'development',
+      MIGRATION_PROXY_GITHUB_RELAY_URL: 'http://127.0.0.1:8790/migration-proxy',
+    });
+    expect(development.ok && development.config.github.relayUrl).toBe(
+      'http://127.0.0.1:8790/migration-proxy'
+    );
   });
 
   it('refuses port 6543 and a target without a port', () => {

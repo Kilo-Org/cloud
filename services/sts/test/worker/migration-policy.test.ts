@@ -70,6 +70,17 @@ describe('migration-run policies', () => {
     expect(policyIndex.get('development', 'migration-proxy')).toBeNull();
   });
 
+  it('grants the migration proxy its GitHub relay reads in staging only', () => {
+    expect(policyIndex.get('staging', 'migration-proxy')).toMatchObject({
+      audiences: ['github-relay'],
+      scopes: ['github-relay:migration-proxy.read'],
+    });
+    expect(policyIndex.get('production', 'migration-proxy')).toMatchObject({
+      audiences: [],
+      scopes: [],
+    });
+  });
+
   it('accepts the trigger-only policy with workflow_run and production (Q71 carve-out)', () => {
     expect(loadPolicies({ 'ci-db-migrate.yaml': triggerOnly() }).has('ci-db-migrate')).toBe(true);
   });

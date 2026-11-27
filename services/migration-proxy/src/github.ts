@@ -6,6 +6,11 @@ import { REPOSITORY } from './config';
  * `kilo-migration-proxy` App: minted for this one repository with read permissions only, and
  * cached until 10 minutes before it expires. Every call that cannot answer now (a rate limit, a
  * 5xx, a network failure, a refused token) throws `GithubUnavailableError`; a later alarm retries.
+ *
+ * The Kilo-Org IP allow list refuses repository reads from Cloudflare's addresses, but not the
+ * token mint. With `relay` set, the reads go through the GitHub relay (services/github-relay),
+ * whose fixed address is on the list, with an STS token for the relay beside the installation
+ * token; the mint still goes to `apiUrl`.
  */
 
 /** GitHub's REST API; only the local stack (`development`) points elsewhere, at a fake. */
@@ -65,7 +70,12 @@ export type GithubAppCredentials = {
   apiUrl: string;
   /** The App's PEM private key (PKCS#1, as GitHub issues it, or PKCS#8), read when needed. */
   privateKey: () => Promise<string>;
+  /** The relay's base URL (its caller prefix included) and its STS token, read per call. */
+  relay?: { url: string; token: () => Promise<string> };
 };
+
+/** The header that carries the STS token to the relay; `Authorization` stays GitHub's. */
+export const RELAY_AUTHORIZATION_HEADER = 'Kilo-Relay-Authorization';
 
 const CompareSchema = z.object({
   status: z.enum(['identical', 'ahead', 'behind', 'diverged']),
@@ -162,11 +172,15 @@ async function appJwt(appId: string, pem: string, now: number): Promise<string> 
   return `${signingInput}.${base64url(new Uint8Array(signature))}`;
 }
 
-/** A rate-limit answer (403/429 with no remaining quota, or `Retry-After`) and its reset time. */
+/**
+ * When to come back: a rate-limit answer (403/429 with no remaining quota, or `Retry-After`), or a
+ * 503 with `Retry-After` (the GitHub relay when busy); null for any other answer.
+ */
 function rateLimitedUntil(response: Response, now: number): number | null {
-  if (response.status !== 403 && response.status !== 429) return null;
+  if (response.status !== 403 && response.status !== 429 && response.status !== 503) return null;
   const retryAfter = response.headers.get('retry-after');
   if (retryAfter !== null && /^[0-9]+$/.test(retryAfter)) return now + Number(retryAfter) * 1000;
+  if (response.status === 503) return null;
   if (response.headers.get('x-ratelimit-remaining') === '0') {
     const reset = Number(response.headers.get('x-ratelimit-reset'));
     return Number.isFinite(reset) && reset > 0 ? reset * 1000 : now + 60_000;
@@ -199,7 +213,8 @@ export function createGithubClient(
 ): GithubClient {
   let cached: { token: string; expiresAt: number } | null = null;
   const API = credentials.apiUrl;
-  const REPO = `${API}/repos/${REPOSITORY.fullName}`;
+  const relay = credentials.relay;
+  const REPO = `${relay?.url ?? API}/repos/${REPOSITORY.fullName}`;
 
   const headers = (authorization: string) => ({
     Accept: 'application/vnd.github+json',
@@ -256,9 +271,21 @@ export function createGithubClient(
     return parsed.token;
   };
 
+  /** The relay's header with its STS token; none when the reads go straight to GitHub. */
+  const relayHeaders = async (): Promise<Record<string, string>> => {
+    if (relay === undefined) return {};
+    try {
+      return { [RELAY_AUTHORIZATION_HEADER]: `Bearer ${await relay.token()}` };
+    } catch {
+      throw new GithubUnavailableError('relay token unavailable');
+    }
+  };
+
   /** GET with the installation token; null on 404 (and on 422 where GitHub means "no such ref"). */
   const get = async (url: string, notFound: readonly number[] = [404]): Promise<unknown> => {
-    const response = await send(url, { headers: headers(`token ${await token()}`) });
+    const response = await send(url, {
+      headers: { ...headers(`token ${await token()}`), ...(await relayHeaders()) },
+    });
     if (notFound.includes(response.status)) return null;
     if (!response.ok) {
       if (response.status === 401) cached = null;

@@ -4,6 +4,7 @@ import {
   STS_DENIED_PROBE_REASON,
   STS_DENIED_PROBE_WORKLOAD,
   STS_ENVIRONMENTS,
+  STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
   STS_SECURE_PROXY_FORWARD,
   STS_SECURITY_SYNC_DISMISS_FINDING,
   STS_SECURITY_SYNC_MANUAL_SYNC,
@@ -921,6 +922,43 @@ describe('phase 4 service scopes under the shipped policies', () => {
       }
     }
   );
+
+  it('hands the migration proxy its GitHub relay read only in staging', async () => {
+    const entry = STS_GITHUB_RELAY_MIGRATION_PROXY_READ;
+    const signed: Array<Parameters<TokenSignerDO['mint']>[0]> = [];
+    const spy = vi.spyOn(env.STS_TOKEN_SIGNER_DO, 'get').mockImplementation(
+      id =>
+        ({
+          id,
+          mint: async (request: Parameters<TokenSignerDO['mint']>[0]) => {
+            signed.push(request);
+            return { status: 'unavailable' };
+          },
+        }) as unknown as DurableObjectStub<TokenSignerDO>
+    );
+    try {
+      await mintAsShipped('staging', 'migration-proxy', entry);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(signed).toEqual([
+      expect.objectContaining({
+        environment: 'staging',
+        workload: 'migration-proxy',
+        request: { tokens: [{ audience: entry.audience, scope: entry.scope }] },
+      }),
+    ]);
+    for (const [environment, workload] of [
+      ['production', 'migration-proxy'],
+      ['staging', 'web'],
+      ['staging', 'ai-gateway'],
+    ] as const) {
+      expect(await mintAsShipped(environment, workload, entry)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...entry, reason: 'audience_not_allowed' }],
+      });
+    }
+  });
 });
 
 describe('canary denied probe', () => {

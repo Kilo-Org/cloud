@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   STS_O11Y_ALERTING_READ,
@@ -160,7 +161,7 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, the reserved probe, the UTS scopes and the phase 4 service scopes, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes and the GitHub relay scope, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: {
         scopes: ['web:sts.canary', 'web:usage.record', 'web:security-notifications.dispatch'],
@@ -181,6 +182,7 @@ describe('STS scope registry', () => {
       'security-sync': {
         scopes: ['security-sync:manual-sync.enqueue', 'security-sync:dismiss-finding.enqueue'],
       },
+      'github-relay': { scopes: ['github-relay:migration-proxy.read'] },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
@@ -214,6 +216,11 @@ describe('STS scope registry', () => {
     ['security-sync:manual-sync.enqueue', 'security-sync', STS_SECURITY_SYNC_MANUAL_SYNC],
     ['security-sync:dismiss-finding.enqueue', 'security-sync', STS_SECURITY_SYNC_DISMISS_FINDING],
     ['web:security-notifications.dispatch', 'web', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
+    [
+      'github-relay:migration-proxy.read',
+      'github-relay',
+      STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
+    ],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });
     expect(scopeAudience(pair.scope)).toBe(pair.audience);

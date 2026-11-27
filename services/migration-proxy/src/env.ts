@@ -1,4 +1,5 @@
 import type { BundleBinding } from '@kilocode/secrets-client';
+import type { MintBinding } from '@kilocode/service-token-client';
 import type { AttestBinding } from './attest';
 import type { MigrationRunDO } from './dos/MigrationRunDO';
 import type * as MainModule from './index';
@@ -6,7 +7,7 @@ import type * as MainModule from './index';
 /** The bindings and vars of `wrangler.jsonc`. The vars are read only through `readConfig`. */
 export type Env = {
   /** STS's `SecretsBroker`, bound with `props: { caller: 'migration-proxy' }`. */
-  STS: BundleBinding & AttestBinding;
+  STS: BundleBinding & AttestBinding & MintBinding;
   MIGRATION_RUN_DO: DurableObjectNamespace<MigrationRunDO>;
   AUDIT_QUEUE: Queue;
   MIGRATION_PROXY_ENVIRONMENT?: string;
@@ -21,6 +22,8 @@ export type Env = {
   MIGRATION_REVIEW_BASELINE_SHA?: string;
   /** The local stack's fake GitHub; readConfig refuses it outside `development`. */
   MIGRATION_PROXY_GITHUB_API_URL?: string;
+  /** Empty: reads go straight to GitHub; else the GitHub relay (readConfig pins the value). */
+  MIGRATION_PROXY_GITHUB_RELAY_URL?: string;
 };
 
 declare global {

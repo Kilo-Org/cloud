@@ -72,6 +72,15 @@ export const STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH = {
 } as const;
 
 /**
+ * The migration proxy reads Kilo-Org/cloud through the GitHub relay, whose fixed address is on the
+ * Kilo-Org IP allow list (services/github-relay). Each relay caller has a scope of its own.
+ */
+export const STS_GITHUB_RELAY_MIGRATION_PROXY_READ = {
+  audience: 'github-relay',
+  scope: 'github-relay:migration-proxy.read',
+} as const;
+
+/**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
  * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
  * reserved denied probe. The UTS scopes are those UTS and its feed accept from a service: the web
@@ -80,9 +89,10 @@ export const STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH = {
  * phase 4 are the Secure Proxy forward (`STS_SECURE_PROXY_FORWARD`), the usage publish to Usage
  * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
  * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
- * finding dismissal (`STS_SECURITY_SYNC_*`), and the web app's security notification dispatch
- * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`). STS mints each one only where a policy grants it
- * (default deny).
+ * finding dismissal (`STS_SECURITY_SYNC_*`), the web app's security notification dispatch
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`) and the migration proxy's reads through the GitHub
+ * relay (`STS_GITHUB_RELAY_MIGRATION_PROXY_READ`). STS mints each one only where a policy grants
+ * it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   web: {
@@ -113,6 +123,9 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   'security-sync': {
     scopes: [STS_SECURITY_SYNC_MANUAL_SYNC.scope, STS_SECURITY_SYNC_DISMISS_FINDING.scope],
+  },
+  [STS_GITHUB_RELAY_MIGRATION_PROXY_READ.audience]: {
+    scopes: [STS_GITHUB_RELAY_MIGRATION_PROXY_READ.scope],
   },
 };
 

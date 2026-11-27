@@ -18,7 +18,7 @@ export const AWS_TEST_CONFIGURATION: AwsByocConfiguration = {
   imageIdentifier: 'arn:aws:lambda:us-east-1:123456789012:microvm-image:kilo',
   imageVersion: '1.0',
   connectorArn: 'arn:aws:lambda:us-east-1:123456789012:network-connector:customer:1',
-  templateVersion: 1,
+  templateVersion: 2,
   proxyProtocolVersion: 1,
 };
 
@@ -125,6 +125,7 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     return createAwsProviderAdapter({
       sandboxId,
       storage: operationStorage,
+      prepareStartup: async ({ startup }) => startup,
       now: () => now,
       async resolveRuntime(config = AWS_TEST_CONFIGURATION) {
         runtimeReads++;

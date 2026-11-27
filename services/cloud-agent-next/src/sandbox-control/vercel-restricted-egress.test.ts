@@ -70,7 +70,7 @@ function handles(value: SessionCredentialGrant): ReadonlyMap<string, readonly st
 }
 
 function allowlist(extra: string[] = ['example.com']): string[] {
-  return buildNativeEgressAllowlist({ allowlist: extra, env, kiloToken });
+  return buildNativeEgressAllowlist({ allowlist: extra, env });
 }
 
 function harness(restricted: { allowlist: readonly string[]; logicalSandboxId: string }) {

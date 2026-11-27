@@ -72,8 +72,8 @@ with `provider_lifetime_exhausted`. Renewable leases cannot extend the deadline.
 
 ## Template and permission boundary
 
-`deploy/aws/template.json` is the internal M1 foundation. It currently permits HTTPS through the customer NAT.
-Customer enablement requires the forced proxy, DNS controls and reviewed admission from P4.
+`deploy/aws/template.json` version 2 includes the authenticated proxy and DNS controls.
+AWS remains enrolled for internal testing. Customer enablement still requires M2, M3, M4 and cross-account proof.
 
 The customer role trusts one fixed Kilo role ARN and an owner-bound ExternalId. It does not trust an IAM user.
 Compute operations target one MicroVM image. The role has no image mutation, connector mutation, shell-token or
@@ -95,3 +95,65 @@ The public `octocat/Hello-World` repository prepared successfully. Kilo complete
 the model facade. A terminal accepted input in the repository. Preview ticket admission returned the fixture through
 PreviewTunnel and the wrapper; the same preview refused a request without its cookie. This is same-account proof.
 It does not verify a paid model, private repositories, forced production egress or a second customer account.
+
+
+## Proxy boundary
+
+Two Fargate tasks share one immutable deployment generation behind a private network load balancer.
+The MVP places both tasks in one availability zone. It does not provide availability-zone resilience.
+The sandbox security group reaches only the load balancer on port 3128. The proxy accepts HTTPS CONNECT on port 443.
+It refuses plain HTTP, private destinations, nested CONNECT and upgrades on intercepted SCM connections.
+Each raw connection uses a checked public IPv4 address. IPv6 is outside the MVP.
+Only port 443 is permitted, including unrestricted mode. Tools that use plain `http://` or ignore the proxy cannot connect.
+Ordinary tunnels check the CONNECT hostname, not inner SNI or HTTP Host; these can differ on a shared CDN.
+Tunnel audit records carry `scope: connection`. Their `CONNECT` method describes the outer proxy operation, not an inner request.
+Intercepted SCM requests carry `scope: request` and their actual method.
+See [AWS network access](aws-network-access.md) for the user-facing contract.
+
+VPC-wide DNS Firewall allows the proxy name and exact infrastructure bootstrap names for ECR, S3 and logs.
+It blocks other names and fails closed. These bootstrap names also resolve in sandboxes; their security group still blocks access.
+The proxy resolves public upstreams through verified HTTPS to fixed public resolver addresses.
+
+The Worker verifies the allocation credential, deployment identity, current owner connection and pinned configuration.
+It checks durable state again after external reads. A startup request requires a checkpointed launch, but no wrapper welcome.
+Deployment metadata reads share one in-memory cache entry per admission owner, keyed by the exact source and pinned configuration.
+The entry lasts at most 15 seconds, never beyond the policy TTL or certificate expiry. Concurrent readers share the same read.
+Failed refreshes fail closed and leave no stale fallback. Every request still resolves current owner/connection authorization and checks durable allocation state.
+A metadata-only change can remain unseen until cache expiry; a previously issued proxy policy keeps its existing 30-second maximum lifetime.
+Normal deployment rotation must change the saved generation and drain old allocations as described below.
+
+Cached STS sessions do not replace current connection authorization. A replacement configuration never silently takes over an active allocation.
+The proxy holds a separate allocation credential. It cannot use that credential to connect a wrapper.
+Real SCM credentials remain inside the Worker, where the existing broker owns repository authorization and credential exchange.
+
+The shared native allowlist builder owns the policy content, including the pinned S3 bucket as a provider routing target.
+The stored request pin stays unchanged. An unrestricted allocation still has no allowlist.
+
+Policy refresh runs every 15 seconds. The last accepted policy expires within 30 seconds.
+Existing connections close when policy expires, the destination becomes disallowed, or its SCM interception mode changes.
+Every SCM CONNECT and intercepted request refreshes policy. A denied broker request never falls back to a raw tunnel.
+Each task bounds sockets to 256, active connections per allocation to 32, and policy cache entries to 256.
+Audit acknowledgment precedes forwarding. Tunnels record CONNECT, destination and decision. Intercepted SCM requests also record their actual HTTP method.
+Raw tunnels do not expose inner SNI, Host, method, path or content. The allowlist checks the declared CONNECT hostname.
+
+One constrained CA signs a static certificate for supported public SCM hosts. Its signing key is destroyed during initialization.
+Only the leaf private key persists in the proxy-private S3 object. The customer role cannot read that object.
+Managed custom GitLab hosts fail before capability issuance, including additional environment repositories.
+Public roots remain in the runtime trust bundle. New allocations require certificate validity for their full eight-hour lifetime.
+Existing allocations and replacement proxy tasks use the certificate until its actual expiry.
+
+The proxy image is an immutable ECR digest supplied to the template. This exploratory stack has no automatic image or CA update.
+A generation change requires draining old allocations, replacing deployment material, and saving the new connection pins.
+The operator must perform this before certificate expiry. Onboarding and the final update flow remain P7 work.
+
+Local tests cover actual CONNECT/TLS transport, constrained-CA rejection in Node, Bun, Git and gh, policy expiry,
+allocation races, audit effects, and metadata admission through actual Sandbox DO RPC. A 1 MiB SCM stream stays in the Worker route.
+They do not prove the final security groups, DNS Firewall, task replacement or private repository push on AWS.
+
+## SCM forwarding boundary
+
+The Sandbox DO admits the allocation, target, method and presented authorization. Its RPC returns an authority or a denial.
+The RPC carries no request or response body. The Worker route owns header cleanup, broker redemption and upstream streaming.
+A denied request leaves the body unread. An ambiguous push failure never retries the upstream write.
+The local proxy flow test connects real CONNECT/TLS handling and the control client to this route and admission implementation.
+That test simulates AWS metadata and the broker; it does not prove customer VPC or live provider behavior.

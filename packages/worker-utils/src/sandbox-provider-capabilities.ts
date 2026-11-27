@@ -13,10 +13,11 @@ export type SandboxProviderId = 'cloudflare' | 'vercel' | 'cloudflare-containers
  * providers is measured on this list, so it holds features only, not
  * provider facts such as labels or credential transport.
  *
- * - `egressProxy`: sandbox egress reaches the Worker egress proxy with a
- *   verified sandbox identity, so the proxy can enforce an allowlist.
- * - `egressProxySeesAll`: the proxy sees all HTTP(S) egress, not only the
- *   listed hosts, so it can audit a session without an allowlist.
+ * - `egressProxy`: sandbox egress is enforced against an allowlist using a
+ *   verified sandbox identity. Enforcement can run in the customer VPC.
+ * - `egressProxySeesAll`: enforcement covers all supported egress destinations,
+ *   so it can audit without an allowlist. Audit scope can be a request or a
+ *   connection; this feature does not imply HTTP inspection or HTTP support.
  */
 export const SANDBOX_PROVIDER_FEATURES = [
   'preview',
@@ -43,8 +44,8 @@ export const SANDBOX_PROVIDER_CAPABILITIES: Readonly<
     preview: true,
     workspaceSnapshots: false,
     environmentSnapshots: false,
-    egressProxy: false,
-    egressProxySeesAll: false,
+    egressProxy: true,
+    egressProxySeesAll: true,
     scmCliTools: true,
     meteredBilling: false,
   },

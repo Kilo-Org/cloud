@@ -12,6 +12,7 @@ import type {
   ControlPlaneScmForwardAdmissionResult,
 } from '../shared/control-plane-protocol.js';
 import {
+  activeCredentialGrants,
   withCredentialAdmission,
   type CredentialAdmissionContext,
   type CredentialIdentityVerification,
@@ -39,6 +40,11 @@ export type ScmAdmissionDependencies<C extends ScmAdmissionContext = ScmAdmissio
   persist: (grant: SessionCredentialGrant) => void;
   now?: () => number;
 };
+
+/** The grants that admit a managed SCM request in this context. */
+export function activeScmGrants(context: ScmAdmissionContext, now: number) {
+  return activeCredentialGrants(context, now, hasRuntimeCredentialProxy);
+}
 
 async function grantForPresentedAlias(
   grants: readonly SessionCredentialGrant[],

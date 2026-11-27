@@ -1,3 +1,5 @@
+import { type AwsScmAdmission, type AwsEgressProof } from '../../egress/aws-admission.js';
+import { createAwsSandboxEgress } from '../../egress/aws-sandbox-context.js';
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
 import { isContainersLaunchInterrupted } from '../../sandbox-containers/launch-interrupted.js';
@@ -2602,6 +2604,36 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  private readonly awsEgressAdmission = createAwsSandboxEgress({
+    env: this.env,
+    admission: this.scmAdmissionDependencies(),
+    readContext: () => this.readScmAdmissionContext(),
+    operationStorage: this.ctx.storage,
+    readCredentialHash: () => this.ctx.storage.get<string>(CREDENTIAL_HASH_KEY),
+    readPolicy: () => ({
+      allowlist: this.providerPin?.egressAllowlist,
+      audit: this.providerPin?.egressAudit === true,
+    }),
+  });
+
+  async getAwsEgressPolicy(proof: AwsEgressProof): Promise<Response> {
+    await this.initialized;
+    return this.awsEgressAdmission.policy(proof);
+  }
+
+  async recordAwsEgressAudit(proof: AwsEgressProof, value: unknown): Promise<Response> {
+    await this.initialized;
+    return this.awsEgressAdmission.audit(proof, value);
+  }
+
+  async admitAwsScm(
+    proof: AwsEgressProof,
+    request: AwsScmAdmission
+  ): Promise<ControlPlaneScmForwardAdmissionResult> {
+    await this.initialized;
+    return this.awsEgressAdmission.admitScm(proof, request);
+  }
+
   private scmAdmissionDependencies() {
     return {
       serial: <T>(operation: () => Promise<T>) => this.enqueue(operation),
@@ -3327,7 +3359,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private pinFromInput(
     input: EnsureAllocationInput,
     repositoryUrl?: string,
-    kiloToken?: string,
     networkSecrets: readonly NetworkSecretGrant[] = [],
     cloudAgentMcp?: boolean
   ): StoredProviderPin {
@@ -3367,7 +3398,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
               networkSecretHosts: networkSecrets.flatMap(secret => secret.allowedHosts),
               env: this.env,
               repositoryUrl,
-              kiloToken,
               cloudAgentMcp,
             }),
           }),
@@ -3692,7 +3722,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
         selectedPin = this.pinFromInput(
           sandboxSelection,
           repository && repository.type !== 'github' ? repository.url : undefined,
-          source.kiloToken,
           networkSecrets,
           source.allowSubagentSessions
         );

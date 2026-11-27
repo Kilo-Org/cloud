@@ -1806,6 +1806,34 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | Optional egress restriction | Native Containers checks its trusted allowlist before credential handling. Unrestricted native requests without managed carriers retain their original headers and redirect policy. Containment does not require restricted general egress. |
 | Retry and bounds | Only eligible GitHub upload-pack reads retry 429 responses: three retries, 30 seconds per scheduled wait, and 60 seconds of total scheduled waits. An excessive next wait returns the current response. POST replay includes exactly 1 MiB; over-cap or unavailable bodies forward once. This is not a total request deadline. Diagnostics read at most 2 KiB within 100 milliseconds. |
 
+### AWS egress admission modules
+
+`aws-admission.ts` connects one `aws-egress-identity.ts` owner to policy, audit and SCM admission modules.
+The identity owner checks the signed proof, current owner connection and pinned deployment, then rechecks durable allocation state.
+Deployment metadata uses one cache entry for at most 15 seconds. Source/configuration changes replace it; failed reads are not cached.
+Each request rechecks current owner authorization, allocation state and credential hash. SCM admission rereads current grants.
+Policy and SCM replies use current allocation checks. Audit persistence runs outside the serial queue and requires a final allocation check before acknowledgement.
+The Worker route owns SCM redemption and request/response bodies.
+
+### AWS egress behavior
+
+AWS enforces egress in the customer VPC. The customer proxy forwards general traffic directly to public destinations. Managed SCM traffic uses the Worker credential broker.
+Only port 443 is permitted. Plain `http://` fails in allowlist and unrestricted modes.
+A tool that ignores the proxy cannot connect directly.
+
+For ordinary TLS tunnels, the allowlist checks the hostname declared in CONNECT and the resolved public address.
+The proxy does not inspect the inner TLS SNI or HTTP Host. Those names can differ on shared CDN infrastructure.
+An allowed CONNECT hostname therefore does not prove that each inner request uses that hostname.
+Managed SCM interception separately validates its supported TLS name and request destination.
+
+Both providers use `worker-utils/egress-audit` and the same bounded audit store.
+New records carry `scope: connection` for AWS CONNECT decisions or `scope: request` for inspected HTTP requests.
+A connection record describes one tunnel decision. Its `CONNECT` method is the outer proxy method, not an inner HTTP method.
+It does not count inner requests or record their methods. Intercepted SCM requests have separate request records.
+Historical records without scope remain readable; their scope is unspecified.
+Paths, query values, headers and bodies are not audit fields.
+See [AWS network access](aws-network-access.md) for user guidance.
+
 **Intentionally denied**
 
 | Case | Existing decision |

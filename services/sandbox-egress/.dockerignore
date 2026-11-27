@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!dist/
+!dist/main.mjs

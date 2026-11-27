@@ -9,6 +9,7 @@ import type { Env, UtsConfig } from '../env';
 import type { UtsFeedDO } from '../feed/UtsFeedDO';
 import type { UtsAuditRelayDO } from './UtsAuditRelayDO';
 import type { UtsKeySetDO } from './UtsKeySetDO';
+import type { UtsLoginRotationDO } from './UtsLoginRotationDO';
 import type { UtsManagerAuthDO } from './UtsManagerAuthDO';
 import type { UtsSignerDO } from './UtsSignerDO';
 
@@ -245,6 +246,29 @@ export function getManagerAuthStub(
   config: UtsConfig
 ): DurableObjectStub<UtsManagerAuthDO> {
   return managerAuthNamespace(env, config).get(managerAuthObjectId(env, config), {
+    locationHint: UTS_OBJECT_LOCATION_HINT,
+  });
+}
+
+function loginRotationNamespace(
+  env: Env,
+  config: UtsConfig
+): DurableObjectNamespace<UtsLoginRotationDO> {
+  return config.jurisdiction === 'eu'
+    ? env.UTS_LOGIN_ROTATION_DO.jurisdiction('eu')
+    : env.UTS_LOGIN_ROTATION_DO;
+}
+
+/** The id of the one login rotation object of this environment (src/dos/UtsLoginRotationDO.ts). */
+export function loginRotationObjectId(env: Env, config: UtsConfig): DurableObjectId {
+  return loginRotationNamespace(env, config).idFromName(`${config.environment}:login-rotation`);
+}
+
+export function getLoginRotationStub(
+  env: Env,
+  config: UtsConfig
+): DurableObjectStub<UtsLoginRotationDO> {
+  return loginRotationNamespace(env, config).get(loginRotationObjectId(env, config), {
     locationHint: UTS_OBJECT_LOCATION_HINT,
   });
 }

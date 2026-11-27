@@ -12,6 +12,7 @@ const config: UtsConfig = {
   jurisdiction: 'eu',
   relyingParty: { rpId: 'staging-app.kilo.ai', origins: ['https://uts-staging.kiloapps.io'] },
   managerBaseUrl: null,
+  loginRotation: { status: 'off' },
 };
 
 const vars = {

@@ -15,6 +15,7 @@ const config: UtsConfig = {
   jurisdiction: 'eu',
   relyingParty: { rpId: 'app.kilo.ai', origins: ['https://uts.kiloapps.io'] },
   managerBaseUrl: null,
+  loginRotation: { status: 'off' },
 };
 const NOW = 1_800_000_000;
 const grantId = '6f1c1b8e-4b55-4c1a-9a43-0d3b1f7d2c10';

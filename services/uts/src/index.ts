@@ -1,5 +1,6 @@
 export { UtsAuditRelayDO } from './dos/UtsAuditRelayDO';
 export { UtsKeySetDO } from './dos/UtsKeySetDO';
+export { UtsLoginRotationDO } from './dos/UtsLoginRotationDO';
 export { UtsManagerAuthDO } from './dos/UtsManagerAuthDO';
 export { UtsSignerDO } from './dos/UtsSignerDO';
 export { FeedReads } from './feed/reads';

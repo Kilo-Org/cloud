@@ -3859,6 +3859,9 @@ importers:
 
   services/uts:
     dependencies:
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/sts-contracts':
         specifier: workspace:*
         version: link:../../packages/sts-contracts

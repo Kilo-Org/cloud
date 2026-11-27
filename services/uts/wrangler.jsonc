@@ -42,6 +42,10 @@
     // WebAuthn related origin that the app host lists (design 5.14).
     "WEBAUTHN_RP_ID": "app.kilo.ai",
     "WEBAUTHN_ORIGINS": "https://uts.kiloapps.io",
+    // The identity-store login rotation (src/rotation/config.ts) ships off; turning it on here
+    // belongs to the later rotation phase, after STS delivers UTS_HYPERDRIVE_SWITCH_TOKEN and
+    // UTS_IDENTITY_STORE_LOGIN_SEEDS (README, "Login rotation").
+    "LOGIN_ROTATION": "off",
     // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
     // UTS_TURNSTILE_SITE_KEY are added here, after the secrets SIGNIN_EMAIL_HASH_KEY,
     // UTS_MAILGUN_SENDING_KEY and UTS_TURNSTILE_SECRET_KEY are set. Staging also needs
@@ -57,6 +61,8 @@
       // The login key of the environment's `uts-rotation-<environment>` identity in the secrets
       // manager; the key set is served at /manager-auth/.well-known/jwks.json (src/dos/UtsManagerAuthDO.ts).
       { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
+      // The identity-store login rotation and its sealed login passwords (src/dos/UtsLoginRotationDO.ts).
+      { "name": "UTS_LOGIN_ROTATION_DO", "class_name": "UtsLoginRotationDO" },
     ],
   },
   "migrations": [
@@ -65,11 +71,22 @@
     { "tag": "v3", "new_sqlite_classes": ["UtsFeedDO"] },
     { "tag": "v4", "new_sqlite_classes": ["UtsAuditRelayDO"] },
     { "tag": "v5", "new_sqlite_classes": ["UtsManagerAuthDO"] },
+    { "tag": "v6", "new_sqlite_classes": ["UtsLoginRotationDO"] },
   ],
   // The audit outbox relay sends each shard's batches to the environment's UTS audit queue, which
   // services/audit-relay consumes; only UTS produces to it, so the consumer accepts only UTS
   // streams from it (design 8.1).
   "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts" }] },
+  // The rotation job's two secrets arrive through STS (src/rotation/secrets.ts); no Worker secret
+  // holds them.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "uts" },
+    },
+  ],
   // Every minute: keep the 8 audit shard relays running, maintain audit partitions, OAuth rows and
   // sign-in rows, end long transactions, sweep notices, and check relay lag (src/scheduled.ts).
   "triggers": { "crons": ["* * * * *"] },
@@ -102,6 +119,7 @@
         // on the staging app (design 5.14).
         "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
+        "LOGIN_ROTATION": "off",
       },
       "durable_objects": {
         "bindings": [
@@ -110,9 +128,18 @@
           { "name": "UTS_FEED_DO", "class_name": "UtsFeedDO" },
           { "name": "UTS_AUDIT_RELAY_DO", "class_name": "UtsAuditRelayDO" },
           { "name": "UTS_MANAGER_AUTH_DO", "class_name": "UtsManagerAuthDO" },
+          { "name": "UTS_LOGIN_ROTATION_DO", "class_name": "UtsLoginRotationDO" },
         ],
       },
       "queues": { "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-uts-staging" }] },
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-staging",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "uts" },
+        },
+      ],
       "triggers": { "crons": ["* * * * *"] },
       "hyperdrive": [
         { "binding": "IDENTITY_STORE", "id": "5dd523ea0fa447ebaf442a0300d8f848" },

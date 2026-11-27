@@ -6,10 +6,15 @@ import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
+  SENSITIVE_PATHS,
   isSharedSessionPath,
   sanitizeAnalyticsUrl,
 } from '@kilocode/web-shared/lib/sanitize-analytics-url';
 import { sanitizePostHogEvent } from '@/lib/posthog-event-sanitizer';
+
+function shouldDisableSessionRecording(pathname: string): boolean {
+  return SENSITIVE_PATHS.has(pathname) || isSharedSessionPath(pathname);
+}
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -31,7 +36,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
-      disable_session_recording: isSharedSessionPath(window.location.pathname),
+      disable_session_recording: shouldDisableSessionRecording(window.location.pathname),
       before_send: event => sanitizePostHogEvent(event),
       loaded: function (ph) {
         if (!isProduction) {
@@ -77,10 +82,10 @@ function PostHogPageView() {
 
   useEffect(() => {
     if (!pathname || !posthog) return;
-    if (isSharedSessionPath(pathname)) {
+    if (shouldDisableSessionRecording(pathname)) {
       posthog.stopSessionRecording();
-      return;
     }
+    if (isSharedSessionPath(pathname)) return;
     const url = sanitizeAnalyticsUrl(window.origin, pathname, searchParams.toString());
     posthog.capture('$pageview', { $current_url: url });
   }, [pathname, searchParams, posthog]);

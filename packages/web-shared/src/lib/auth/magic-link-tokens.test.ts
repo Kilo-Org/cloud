@@ -87,12 +87,16 @@ describe('Magic Link Tokens', () => {
   });
 
   describe('getMagicLinkUrl', () => {
-    it('does not include email addresses in magic link URLs', async () => {
+    it('keeps the token in the fragment and the callback URL in the query', async () => {
       const token = await createMagicLinkToken(testEmail);
-      const url = new URL(getMagicLinkUrl(token));
+      const callbackUrl = '/users/after-sign-in?source=example#next';
+      const url = new URL(getMagicLinkUrl(token, callbackUrl));
 
       expect(url.pathname).toBe('/auth/verify-magic-link');
-      expect(url.searchParams.get('token')).toBe(token.plaintext_token);
+      expect(new URLSearchParams(url.hash.slice(1)).get('token')).toBe(token.plaintext_token);
+      expect(url.searchParams.get('callbackUrl')).toBe(callbackUrl);
+      expect(url.search).not.toContain(token.plaintext_token);
+      expect(url.searchParams.has('token')).toBe(false);
       expect(url.searchParams.has('email')).toBe(false);
       expect(url.toString()).not.toContain(encodeURIComponent(testEmail));
     });

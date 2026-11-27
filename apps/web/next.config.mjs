@@ -212,6 +212,10 @@ const nextConfig = {
         source: '/s/:path*',
         headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
       },
+      {
+        source: '/auth/verify-magic-link',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
     ];
   },
 

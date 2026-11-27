@@ -30,6 +30,11 @@ permissions:
 
 jobs:
   release:
+    # The release environment admits only main and holds the kilo-maintainer
+    # app key (KILO_MAINTAINER_APP_SECRET) that the tag push mints a token with.
+    # A called workflow cannot receive an environment secret from its caller;
+    # the job must name the environment itself.
+    environment: release
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -168,22 +173,48 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-      # Same token as the kilo-app release tags: GitHub refuses a GITHUB_TOKEN
-      # tag push when the tagged commit's .github/workflows differs from every
-      # branch tip, and the deployed commit is often behind main. The token
-      # reaches only this step, never .git/config.
-      - name: Tag the release
+      # A rerun of a failed attempt reuses the tag that attempt pushed, so it
+      # mints no token.
+      - name: Check for the release tag
+        id: tag
         if: steps.bundle.outputs.release == 'true'
         env:
-          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
           TAG: ${{ steps.check.outputs.tag }}
-          BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
         run: |
           set -euo pipefail
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null 2>&1; then
             echo "Tag $TAG already exists — reusing it."
-            exit 0
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # A kilo-maintainer GitHub App token, as for the kilo-app release tags:
+      # GitHub refuses a GITHUB_TOKEN tag push when the tagged commit's
+      # .github/workflows differs from every branch tip, and the deployed commit
+      # is often behind main, so the token needs Workflows: write as well as
+      # Contents: write. The app key is a secret of the release environment,
+      # available only to main. The token reaches only this step, never
+      # .git/config.
+      - name: Mint the release tag token
+        id: release-token
+        if: steps.bundle.outputs.release == 'true' && steps.tag.outputs.exists != 'true'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: Iv23liaoCOSZgYYc58tR # kilo-maintainer
+          private-key: ${{ secrets.KILO_MAINTAINER_APP_SECRET }}
+          repositories: cloud
+          permission-contents: write
+          permission-workflows: write
+
+      - name: Tag the release
+        if: steps.bundle.outputs.release == 'true' && steps.tag.outputs.exists != 'true'
+        env:
+          RELEASE_TOKEN: ${{ steps.release-token.outputs.token }}
+          TAG: ${{ steps.check.outputs.tag }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
+        run: |
+          set -euo pipefail
           AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
           echo "::add-mask::$AUTH"
           export GIT_CONFIG_COUNT=2

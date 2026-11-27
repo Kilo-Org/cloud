@@ -9,6 +9,7 @@ import { applySentryContext } from '@/lib/sentry-context';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { beforeSendScrubbedEvent } from '@/lib/telemetry/sentry-before-send';
 import { scrubBreadcrumb } from '@/lib/telemetry/sentry-scrub';
+import { scrubTransactionEvent } from '@/lib/telemetry/sentry-scrub-transaction';
 
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -174,6 +175,8 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     beforeSend: beforeSendScrubbedEvent as NonNullable<
       Parameters<typeof Sentry.init>[0]
     >['beforeSend'],
+    // Core sends transactions through this hook, never through `beforeSend`.
+    beforeSendTransaction: scrubTransactionEvent,
     beforeBreadcrumb: scrubBreadcrumb as NonNullable<
       Parameters<typeof Sentry.init>[0]
     >['beforeBreadcrumb'],

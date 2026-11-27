@@ -11,6 +11,22 @@ const REGISTRY = {
   o11y: { scopes: ['o11y:alerts.read'] },
 };
 
+/** The shipped web policy's grants in every environment. */
+const WEB_BASE_SCOPES = [
+  'usage-ingest:sts.canary',
+  'usage-ingest:usage.publish',
+  'o11y:api-metrics.write',
+  'o11y:alerting.read',
+  'o11y:alerting.write',
+];
+
+/** The shipped ai-gateway policy's grants in every environment. */
+const GATEWAY_BASE_SCOPES = [
+  'usage-ingest:usage.publish',
+  'o11y:api-metrics.write',
+  'ai-gateway-secure-proxy:request.forward',
+];
+
 function withGrants(grants: string): string {
   return `${valid}${grants}`;
 }
@@ -86,13 +102,8 @@ describe('policy token grants', () => {
     ).toThrow('audience canary is reserved and no policy may grant it');
     // The shipped web policy, which sends the probe, grants neither.
     expect(policyIndex.get('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'bouncer'],
-      scopes: [
-        'usage-ingest:sts.canary',
-        'bouncer:decide',
-        'bouncer:usage.write',
-        'bouncer:signup.decide',
-      ],
+      audiences: ['usage-ingest', 'o11y', 'bouncer'],
+      scopes: [...WEB_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'],
     });
   });
 
@@ -326,6 +337,90 @@ ${options.extra ?? ''}`;
         },
         'a github-oidc policy that grants production accepts only refs/heads/main'
       );
+    });
+
+    describe('the production exception for kilocode v2 (M76)', () => {
+      const V2_WORKFLOW = 'Kilo-Org/kilocode/.github/workflows/kilo-v2.yml@refs/heads/v2';
+      const exact = `
+workload: ci-kilocode-app-key-v2
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  legacySubject: true
+  environment: automation
+  refs: [refs/heads/v2]
+  jobWorkflowRefs: [${V2_WORKFLOW}]
+  events: [push]
+secrets: [KILOCODE_MAINTAINER_APP_KEY]
+`;
+      const REFUSED = 'a github-oidc policy that grants production accepts only refs/heads/main';
+
+      it('loads the exact entry on refs/heads/v2', () => {
+        const loaded = loadPolicies({ 'ci-kilocode-app-key-v2.yaml': exact });
+        expect(loaded.get('production', 'ci-kilocode-app-key-v2')?.identity).toMatchObject({
+          refs: ['refs/heads/v2'],
+          jobWorkflowRefs: [V2_WORKFLOW],
+        });
+      });
+
+      // Each change keeps refs/heads/v2 and alters one pinned field, so the policy is a production
+      // policy off main that no longer equals the entry.
+      it.each([
+        [
+          'another workload',
+          'workload: ci-kilocode-app-key-v2',
+          'workload: ci-kilocode-app-key-v3',
+        ],
+        ['another repository id', "repositoryId: '946087422'", "repositoryId: '999999999'"],
+        ['another owner id', "repositoryOwnerId: '201822503'", "repositoryOwnerId: '1'"],
+        ['another repository', 'repository: Kilo-Org/kilocode', 'repository: Kilo-Org/bouncer'],
+        ['another environment', 'environment: automation', 'environment: release'],
+        ['another ref', 'refs: [refs/heads/v2]', 'refs: [refs/heads/v3]'],
+        ['main as well', 'refs: [refs/heads/v2]', 'refs: [refs/heads/v2, refs/heads/main]'],
+        [
+          'another workflow file',
+          `jobWorkflowRefs: [${V2_WORKFLOW}]`,
+          'jobWorkflowRefs: [Kilo-Org/kilocode/.github/workflows/ci.yml@refs/heads/v2]',
+        ],
+        [
+          'a second workflow file',
+          `jobWorkflowRefs: [${V2_WORKFLOW}]`,
+          `jobWorkflowRefs: [${V2_WORKFLOW}, Kilo-Org/kilocode/.github/workflows/nix-hashes.yml@refs/heads/v2]`,
+        ],
+        ['another event', 'events: [push]', 'events: [workflow_dispatch]'],
+        ['a second event', 'events: [push]', 'events: [push, workflow_dispatch]'],
+        [
+          'a second secret',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY]',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY, KILOCODE_AUR_KEY]',
+        ],
+        ['another secret', 'secrets: [KILOCODE_MAINTAINER_APP_KEY]', 'secrets: [KILOCODE_AUR_KEY]'],
+        ['staging as well', 'environments: [production]', 'environments: [production, staging]'],
+        [
+          'an environment grant',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY]',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY]\nenvironmentGrants:\n  production:\n    secrets: [KILOCODE_AUR_KEY]',
+        ],
+      ])('refuses it with %s', (_label, from, to) => {
+        expect(exact).toContain(from);
+        const source = exact.replace(from, to);
+        const workload = /^workload: (\S+)$/m.exec(source)?.[1];
+        expectThrow({ [`${workload}.yaml`]: source }, REFUSED);
+      });
+
+      it('refuses it with a token grant', () => {
+        expect(() =>
+          loadPolicies(
+            {
+              'ci-kilocode-app-key-v2.yaml': `${exact}audiences: [gateway]\nscopes: ['gateway:models.read']\n`,
+            },
+            { scopeRegistry: REGISTRY }
+          )
+        ).toThrow(REFUSED);
+      });
     });
 
     it('allows identity.legacySubject only for Kilo-Org/kilocode with its ids', () => {
@@ -765,33 +860,91 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway previews and production, with the UTS feed in development and two Bouncer scopes in production', () => {
-    const gateway = policyFor('development', 'ai-gateway');
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development and two Bouncer scopes in production only', () => {
+    const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
       teamSlug: 'kilocode',
       teamId: 'team_ItxRShuUkJaEd9GmXMEEgunb',
       projectId: 'prj_cFtsRYRBCm4qa8D35LC2j183FohC',
       projectName: 'kilocode-ai-gateway',
-      environments: ['preview', 'production'],
+      environments: [
+        'production',
+        'preview',
+        { customEnvironmentId: 'env_t9p3Xr8paMqpucgHbz0gg1Xrd4PV' },
+      ],
     });
-    expect(gateway).toMatchObject({
-      environments: ['development', 'production'],
-      audiences: ['uts-feed'],
-      scopes: ['uts-feed:revocation.read'],
+    expect(policyFor('staging', 'ai-gateway')).toMatchObject({
+      environments: ['development', 'staging', 'production'],
+      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
+      scopes: GATEWAY_BASE_SCOPES,
       secrets: [],
       dynamic: [],
       environmentGrants: {},
     });
     expect(policyFor('production', 'ai-gateway')).toMatchObject({
-      audiences: ['bouncer'],
-      scopes: ['bouncer:decide', 'bouncer:usage.write'],
+      environments: ['development', 'staging', 'production'],
+      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'bouncer'],
+      scopes: [...GATEWAY_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write'],
       secrets: [],
       dynamic: [],
       environmentGrants: {},
     });
-    expect(policyFor('staging', 'ai-gateway')).toBeNull();
+    expect(policyFor('development', 'ai-gateway')).toMatchObject({
+      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'uts-feed'],
+      scopes: [...GATEWAY_BASE_SCOPES, 'uts-feed:revocation.read'],
+      secrets: [],
+      environmentGrants: {},
+    });
   });
+});
+
+describe('dual-accept grants of the shipped policies', () => {
+  /** Each dual-accept scope and the one set of workloads its receiver admits (default deny). */
+  const CALLERS: Readonly<Record<string, readonly string[]>> = {
+    'web:usage.record': ['usage-ingest'],
+    'usage-ingest:usage.publish': ['ai-gateway', 'web'],
+    'o11y:api-metrics.write': ['ai-gateway', 'web'],
+    'o11y:alerting.read': ['web'],
+    'o11y:alerting.write': ['web'],
+    'ai-gateway-secure-proxy:request.forward': ['ai-gateway'],
+  };
+
+  it.each(['development', 'staging', 'production'] as const)(
+    'grants each scope to exactly its callers and to no other policy in %s',
+    environment => {
+      const policies = policyIndex.forEnvironment(environment);
+      for (const [scope, callers] of Object.entries(CALLERS)) {
+        expect(
+          policies
+            .filter(policy => policy.scopes.includes(scope))
+            .map(policy => policy.workload)
+            .sort()
+        ).toEqual(callers);
+      }
+    }
+  );
+
+  it.each(['staging', 'production'] as const)(
+    'grants the callers only these scopes and audiences in %s',
+    environment => {
+      expect(policyFor(environment, 'usage-ingest')).toMatchObject({
+        audiences: ['web'],
+        scopes: ['web:sts.canary', 'web:usage.record'],
+        secrets: [],
+      });
+      expect(policyFor(environment, 'web')).toMatchObject({
+        audiences: ['usage-ingest', 'o11y'],
+        scopes: WEB_BASE_SCOPES,
+        secrets: [],
+      });
+      expect(policyFor(environment, 'ai-gateway')).toMatchObject({
+        audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
+        scopes: GATEWAY_BASE_SCOPES,
+        secrets: [],
+      });
+    }
+  );
 });
 
 describe('policy registrations', () => {
@@ -1147,9 +1300,9 @@ scopes: ['gateway:models.read']
   it('grants web its UTS audiences, scopes and client keys in development only, and the Bouncer scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
-      audiences: ['usage-ingest', 'uts-feed', 'uts'],
+      audiences: ['usage-ingest', 'o11y', 'uts-feed', 'uts'],
       scopes: [
-        'usage-ingest:sts.canary',
+        ...WEB_BASE_SCOPES,
         'uts-feed:revocation.read',
         'uts:subjects.revoke',
         'uts:browser-sessions.end',
@@ -1158,18 +1311,13 @@ scopes: ['gateway:models.read']
       secrets: ['UTS_KILO_WEB_CLIENT_KEY', 'UTS_KILO_WEB_CLIENT_KEY_NEXT'],
     });
     expect(policyFor('staging', 'web')).toMatchObject({
-      audiences: ['usage-ingest'],
-      scopes: ['usage-ingest:sts.canary'],
+      audiences: ['usage-ingest', 'o11y'],
+      scopes: WEB_BASE_SCOPES,
       secrets: [],
     });
     expect(policyFor('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'bouncer'],
-      scopes: [
-        'usage-ingest:sts.canary',
-        'bouncer:decide',
-        'bouncer:usage.write',
-        'bouncer:signup.decide',
-      ],
+      audiences: ['usage-ingest', 'o11y', 'bouncer'],
+      scopes: [...WEB_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'],
       secrets: [],
     });
   });

@@ -1,15 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { createServer } from 'node:http';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -712,76 +703,55 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   }
 });
 
-// Staging's db-gate migrates through the migration proxy; production's switches the same way in a
-// later change and until then keeps the credential, the probe and drizzle migrate (test below).
-const PROXY_GATES = [
-  ['staging', staging, 'staging', 'https://migration-proxy-staging.kiloapps.io', 15, '780'],
-];
+test('one database gate per deployment checks out, installs and migrates once', () => {
+  const dbGateInstall =
+    "pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo";
+  // The deploy gate narrows its install to the workspace set the CI drizzle
+  // check already proves: the probe and drizzle-kit both resolve there.
+  const ciDrizzleInstall = ci.jobs['drizzle-check'].steps.find(
+    step => step.name === 'Install dependencies'
+  ).run;
+  assert.equal(dbGateInstall, ciDrizzleInstall);
 
-test('a switched database gate runs the migration proxy script and holds no database credential', () => {
-  for (const [name, deployment, environment, proxyUrl, timeout, budget] of PROXY_GATES) {
+  for (const [name, deployment, startupStep, migrateStep, environment] of [
+    [
+      'production',
+      production,
+      'Check production DB startup path',
+      'Run Drizzle migrations',
+      'production',
+    ],
+    ['staging', staging, 'Check staging DB startup path', 'Run Drizzle migrations', 'staging'],
+  ]) {
+    const dbJobs = Object.keys(deployment.jobs).filter(
+      job => !deployment.jobs[job].uses && deployment.jobs[job].env?.POSTGRES_URL
+    );
+    assert.deepEqual(dbJobs, ['db-gate'], `${name} must gate the database with one job`);
+
     const job = deployment.jobs['db-gate'];
     assert.equal(job.environment, environment);
-    assert.equal(job['timeout-minutes'], timeout);
-    assert.deepEqual(job.permissions, { contents: 'read', 'id-token': 'write' });
-    assert.equal(job.env, undefined, `${name} db-gate must hold no job-level env`);
-    for (const secret of ['POSTGRES_URL', 'DATABASE_CA']) {
-      assert.doesNotMatch(
-        JSON.stringify(deployment),
-        new RegExp(`secrets\\.${secret}\\b`),
-        `${name} must not read the ${secret} secret`
-      );
-    }
+    assert.equal(job.env.POSTGRES_URL, '${{ secrets.POSTGRES_URL }}');
+    assert.equal(job.env.DATABASE_CA, '${{ secrets.DATABASE_CA }}');
 
-    // Two steps: the checkout that brings the script, and the script.
-    assert.equal(job.steps.length, 2);
-    const [checkout, run] = job.steps;
-    assert.match(checkout.uses, /^useblacksmith\/checkout@[0-9a-f]{40}$/);
-    assert.deepEqual(checkout.with, {
-      ref: '${{ needs.check-changes.outputs.target_sha }}',
-      'persist-credentials': false,
-    });
-    // It builds nothing, so it must not pay for the LFS objects only the web build reads.
+    const steps = job.steps;
+    assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
+    assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
+    const checkout = steps.find(step => step.uses?.startsWith('useblacksmith/checkout@'));
+    assert.equal(checkout.with.ref, '${{ needs.check-changes.outputs.target_sha }}');
+    // The job installs two workspaces and migrates; it never builds apps/web, so
+    // it must not pay for the LFS objects only the web build reads.
     assert.equal(checkout.with.lfs, undefined, `${name} db-gate checkout must skip LFS`);
-    assert.equal(run.run, 'bash scripts/migration-proxy-run.sh');
-    assert.deepEqual(run.env, {
-      MIGRATION_PROXY_URL: proxyUrl,
-      MIGRATION_PROXY_AUDIENCE: proxyUrl,
-      TARGET_SHA: '${{ needs.check-changes.outputs.target_sha }}',
-      MIGRATION_PROXY_BUDGET_SECONDS: budget,
-    });
-    // The script's wait budget ends before the runner's timeout, so it stops with a message.
-    assert.ok(Number(budget) < timeout * 60, `${name} wait budget must end before the timeout`);
 
-    // The job installs, probes and migrates nothing itself.
-    const text = JSON.stringify(job);
-    for (const removed of [
-      /pnpm/,
-      /setup-node/,
-      /drizzle/,
-      /check-production-db-startup/,
-      /POSTGRES_URL/,
-      /DATABASE_CA/,
-    ]) {
-      assert.doesNotMatch(text, removed, `${name} db-gate must not contain ${removed}`);
-    }
-
-    // The gate reads nothing from the triggering run: no payload, no artifact, no input.
-    assert.doesNotMatch(text, /github\.event\.workflow_run/);
-    assert.doesNotMatch(text, /actions\/download-artifact/);
-    assert.doesNotMatch(text, /inputs\./);
+    const startupIndex = steps.findIndex(step => step.name === startupStep);
+    const migrateIndex = steps.findIndex(step => step.name === migrateStep);
+    const installIndex = steps.findIndex(step => step.run === dbGateInstall);
+    assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
+    assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
+    assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');
+    assert.equal(steps[migrateIndex].if, undefined);
   }
 
-  const wrangler = readFileSync(
-    new URL('../services/migration-proxy/wrangler.jsonc', import.meta.url),
-    'utf8'
-  );
-  for (const host of PROXY_GATES.map(([, , , proxyUrl]) => new URL(proxyUrl).host)) {
-    assert.ok(
-      wrangler.includes(`"pattern": "${host}"`),
-      `the proxy Worker must serve ${host}, the URL db-gate calls`
-    );
-  }
+  assert.equal(production.jobs['db-gate']['timeout-minutes'], 45);
 
   // Counterweight to the skipped LFS above: the web build itself keeps its
   // objects, because next.config.mjs fails on the kilo-anim pointer file.
@@ -812,493 +782,6 @@ test('a switched database gate runs the migration proxy script and holds no data
     assert.match(production.jobs[job].if, /needs\.db-gate\.result == 'success'/);
   }
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
-});
-
-test('only a switched db-gate may mint a GitHub OIDC token in a deploy workflow', () => {
-  for (const [name, deployment, expected] of [
-    ['production', production, []],
-    ['staging', staging, [['db-gate', 'write']]],
-  ]) {
-    assert.equal(deployment.permissions['id-token'], undefined, `${name} workflow-level block`);
-    const minting = Object.entries(deployment.jobs)
-      .filter(([, job]) => job.permissions?.['id-token'] !== undefined)
-      .map(([id, job]) => [id, job.permissions['id-token']]);
-    assert.deepEqual(minting, expected, `${name} jobs with id-token`);
-  }
-});
-
-test('the unswitched production database gate checks out, installs, probes and migrates once', () => {
-  const dbGateInstall =
-    "pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo";
-  // The deploy gate narrows its install to the workspace set the CI drizzle
-  // check already proves: the probe and drizzle-kit both resolve there.
-  const ciDrizzleInstall = ci.jobs['drizzle-check'].steps.find(
-    step => step.name === 'Install dependencies'
-  ).run;
-  assert.equal(dbGateInstall, ciDrizzleInstall);
-
-  const dbJobs = Object.keys(production.jobs).filter(
-    job => !production.jobs[job].uses && production.jobs[job].env?.POSTGRES_URL
-  );
-  assert.deepEqual(dbJobs, ['db-gate'], 'production must gate the database with one job');
-
-  const job = production.jobs['db-gate'];
-  assert.equal(job.environment, 'production');
-  assert.equal(job['timeout-minutes'], 45);
-  assert.equal(job.permissions, undefined, 'the unswitched db-gate must not mint an OIDC token');
-  assert.equal(job.env.POSTGRES_URL, '${{ secrets.POSTGRES_URL }}');
-  assert.equal(job.env.DATABASE_CA, '${{ secrets.DATABASE_CA }}');
-
-  const steps = job.steps;
-  assert.equal(steps.filter(step => step.uses?.startsWith('useblacksmith/checkout@')).length, 1);
-  assert.equal(steps.filter(step => step.run === dbGateInstall).length, 1);
-  const checkout = steps.find(step => step.uses?.startsWith('useblacksmith/checkout@'));
-  assert.equal(checkout.with.ref, '${{ needs.check-changes.outputs.target_sha }}');
-  // The job installs two workspaces and migrates; it never builds apps/web, so
-  // it must not pay for the LFS objects only the web build reads.
-  assert.equal(checkout.with.lfs, undefined, 'production db-gate checkout must skip LFS');
-
-  const startupIndex = steps.findIndex(step => step.name === 'Check production DB startup path');
-  const migrateIndex = steps.findIndex(step => step.name === 'Run Drizzle migrations');
-  const installIndex = steps.findIndex(step => step.run === dbGateInstall);
-  assert.ok(installIndex < startupIndex && startupIndex < migrateIndex);
-  assert.match(steps[startupIndex].run, /scripts\/check-production-db-startup\.ts/);
-  assert.ok(
-    existsSync(new URL('./check-production-db-startup.ts', import.meta.url)),
-    'the production probe script must exist while production db-gate runs it'
-  );
-  assert.equal(steps[migrateIndex].run, 'NODE_ENV=production pnpm run drizzle migrate');
-  assert.equal(steps[migrateIndex].if, undefined);
-});
-
-// The db-gate script against a mocked proxy and a mocked runner token endpoint. Every token is a
-// sentinel, and every mocked body carries fields outside RunView and the status bodies; none of
-// them may reach the output.
-const MIGRATION_SCRIPT = fileURLToPath(new URL('./migration-proxy-run.sh', import.meta.url));
-const OIDC_SENTINEL = 'OIDC-TOKEN-SENTINEL';
-const REQUEST_SENTINEL = 'RUNNER-REQUEST-TOKEN-SENTINEL';
-const LEAK = 'LEAK-NOT-A-RUNVIEW-FIELD';
-const PROXY_AUDIENCE = 'https://migration-proxy-staging.kiloapps.io';
-const TARGET = '0123456789abcdef0123456789abcdef01234567';
-const RUN_A = '11111111-1111-4111-8111-111111111111';
-const RUN_B = '22222222-2222-4222-9222-222222222222';
-const RUN_C = '33333333-3333-4333-a333-333333333333';
-
-function runView(id, state, extra = {}) {
-  const final = state === 'succeeded' || state === 'failed';
-  return {
-    id,
-    environment: 'staging',
-    state,
-    phase: final ? 'done' : state === 'running' ? 'migrating' : 'fetching',
-    sha: TARGET,
-    attestedSha: TARGET,
-    github: { runId: '123', runAttempt: '1', eventName: 'workflow_run' },
-    createdAt: '2026-11-27T10:00:00.000Z',
-    startedAt: state === 'pending' ? null : '2026-11-27T10:00:20.000Z',
-    finishedAt: final ? '2026-11-27T10:01:00.000Z' : null,
-    heartbeatAt: null,
-    pending: state === 'succeeded' ? [] : ['0390_new_table'],
-    applied:
-      state === 'succeeded'
-        ? [{ tag: '0390_new_table', hash: 'a'.repeat(64), createdAt: 1769695991111 }]
-        : [],
-    failure: null,
-    pollAfterSeconds: 20,
-    message: LEAK,
-    ...extra,
-  };
-}
-
-function failedView(id, failure) {
-  return runView(id, 'failed', {
-    failure: { sqlstate: null, migrationTag: null, message: LEAK, detail: LEAK, ...failure },
-  });
-}
-
-async function runMigrationScript({ posts, gets = {}, env = {} }) {
-  const issued = [];
-  const requests = [];
-  const problems = [];
-  const server = createServer((request, response) => {
-    const url = new URL(request.url, 'http://127.0.0.1');
-    let body = '';
-    request.on('data', chunk => (body += chunk));
-    request.on('end', () => {
-      const reply = (status, payload) => {
-        response.writeHead(status, { 'Content-Type': 'application/json' });
-        response.end(typeof payload === 'string' ? payload : JSON.stringify(payload));
-      };
-      if (url.pathname === '/oidc') {
-        if (request.headers.authorization !== `bearer ${REQUEST_SENTINEL}`) {
-          problems.push('runner token request without the request token');
-        }
-        if (url.searchParams.get('audience') !== PROXY_AUDIENCE) {
-          problems.push(`audience ${url.searchParams.get('audience')}`);
-        }
-        const token = `${OIDC_SENTINEL}-${issued.length}`;
-        issued.push(token);
-        return reply(200, { count: issued.length, value: token });
-      }
-      // A fresh token for every proxy request: the newest issued one, used once.
-      const expected = `Bearer ${issued.at(-1)}`;
-      if (request.headers.authorization !== expected || issued.length !== requests.length + 1) {
-        problems.push(`${request.method} ${url.pathname} without a fresh token`);
-      }
-      requests.push({ method: request.method, path: url.pathname, body });
-      const queue = request.method === 'POST' ? posts : gets[url.pathname.split('/').at(-1)];
-      const next = queue?.shift();
-      if (next === undefined) {
-        problems.push(`unexpected ${request.method} ${url.pathname}`);
-        return reply(599, {});
-      }
-      return reply(next.status, next.body);
-    });
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const dir = mkdtempSync(join(tmpdir(), 'migration-proxy-run-'));
-  try {
-    // A sleep that records its argument and returns at once.
-    const bin = join(dir, 'bin');
-    mkdirSync(bin);
-    const sleepLog = join(dir, 'sleeps');
-    writeFileSync(sleepLog, '');
-    writeFileSync(join(bin, 'sleep'), `#!/bin/sh\necho "$1" >> '${sleepLog}'\n`, { mode: 0o755 });
-    const child = spawn('bash', [MIGRATION_SCRIPT], {
-      env: {
-        PATH: `${bin}:${process.env.PATH}`,
-        HOME: dir,
-        MIGRATION_PROXY_URL: base,
-        MIGRATION_PROXY_AUDIENCE: PROXY_AUDIENCE,
-        TARGET_SHA: TARGET,
-        MIGRATION_PROXY_BUDGET_SECONDS: '3600',
-        ACTIONS_ID_TOKEN_REQUEST_URL: `${base}/oidc?api-version=2.0`,
-        ACTIONS_ID_TOKEN_REQUEST_TOKEN: REQUEST_SENTINEL,
-        ...env,
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let output = '';
-    child.stdout.on('data', chunk => (output += chunk));
-    child.stderr.on('data', chunk => (output += chunk));
-    const code = await new Promise(resolve => child.on('close', resolve));
-    const sleeps = readFileSync(sleepLog, 'utf8').split('\n').filter(Boolean);
-
-    assert.deepEqual(problems, [], output);
-    for (const secret of [OIDC_SENTINEL, REQUEST_SENTINEL, LEAK]) {
-      assert.ok(!output.includes(secret), `the output must not carry ${secret}:\n${output}`);
-    }
-    assert.doesNotMatch(output, /authorization|bearer/i);
-    assert.doesNotMatch(output, /^::(?!error::)/m, 'no workflow command but ::error');
-    for (const post of requests.filter(request => request.method === 'POST')) {
-      assert.equal(post.body, JSON.stringify({ sha: TARGET }));
-    }
-    return { code, output, requests, sleeps };
-  } finally {
-    server.close();
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-const accepted = view => ({ status: 202, body: { status: 'accepted', run: view } });
-const postCount = requests => requests.filter(request => request.method === 'POST').length;
-
-test('the db-gate script polls an accepted run to success and prints only RunView fields', async () => {
-  const { code, output, requests, sleeps } = await runMigrationScript({
-    posts: [accepted(runView(RUN_A, 'pending'))],
-    gets: {
-      [RUN_A]: [
-        { status: 200, body: runView(RUN_A, 'running') },
-        { status: 200, body: runView(RUN_A, 'succeeded') },
-      ],
-    },
-  });
-  assert.equal(code, 0, output);
-  assert.equal(postCount(requests), 1);
-  assert.deepEqual(
-    requests.filter(request => request.method === 'GET').map(request => request.path),
-    [`/v1/runs/${RUN_A}`, `/v1/runs/${RUN_A}`]
-  );
-  assert.deepEqual(sleeps, ['20', '20']);
-  assert.match(output, /running\/migrating/);
-  assert.match(output, new RegExp(`applied 0390_new_table ${'a'.repeat(64)} 1769695991111`));
-});
-
-test('the db-gate script re-POSTs once after a retryable failure, never twice', async () => {
-  const retryable = id =>
-    failedView(id, { code: 'probe_failed', reason: 'connect_timeout', retryable: true });
-
-  const recovered = await runMigrationScript({
-    posts: [accepted(runView(RUN_A, 'pending')), accepted(runView(RUN_B, 'pending'))],
-    gets: {
-      [RUN_A]: [{ status: 200, body: retryable(RUN_A) }],
-      [RUN_B]: [{ status: 200, body: runView(RUN_B, 'succeeded') }],
-    },
-  });
-  assert.equal(recovered.code, 0, recovered.output);
-  assert.equal(postCount(recovered.requests), 2);
-  assert.match(recovered.output, /code=probe_failed retryable=true reason=connect_timeout/);
-
-  const exhausted = await runMigrationScript({
-    posts: [accepted(runView(RUN_A, 'pending')), accepted(runView(RUN_B, 'pending'))],
-    gets: {
-      [RUN_A]: [{ status: 200, body: retryable(RUN_A) }],
-      [RUN_B]: [{ status: 200, body: retryable(RUN_B) }],
-    },
-  });
-  assert.equal(exhausted.code, 1, exhausted.output);
-  assert.equal(postCount(exhausted.requests), 2);
-  assert.match(exhausted.output, /::error::migration run failed: probe_failed/);
-});
-
-test('the db-gate script fails at once on a non-retryable failure and prints its fields', async () => {
-  const migrationFailed = await runMigrationScript({
-    posts: [accepted(runView(RUN_A, 'pending'))],
-    gets: {
-      [RUN_A]: [
-        {
-          status: 200,
-          body: failedView(RUN_A, {
-            code: 'migration_failed',
-            retryable: false,
-            sqlstate: '42P01',
-            // A hostile value cannot start its own log line or workflow command.
-            migrationTag: '0390_new_table\n::add-mask::x',
-          }),
-        },
-      ],
-    },
-  });
-  assert.equal(migrationFailed.code, 1, migrationFailed.output);
-  assert.equal(postCount(migrationFailed.requests), 1);
-  assert.match(
-    migrationFailed.output,
-    /failure code=migration_failed retryable=false sqlstate=42P01 migrationTag=0390_new_table\?::add-mask::x/
-  );
-
-  const existing = await runMigrationScript({
-    posts: [
-      {
-        status: 200,
-        body: {
-          status: 'existing',
-          run: failedView(RUN_A, {
-            code: 'invalid_index_present',
-            retryable: false,
-            indexes: ['idx_broken'],
-          }),
-        },
-      },
-    ],
-  });
-  assert.equal(existing.code, 1, existing.output);
-  assert.equal(existing.requests.length, 1);
-  assert.match(existing.output, /invalid index idx_broken/);
-
-  const unapproved = await runMigrationScript({
-    posts: [
-      {
-        status: 200,
-        body: {
-          status: 'existing',
-          run: failedView(RUN_A, {
-            code: 'migration_not_approved',
-            retryable: false,
-            files: [
-              {
-                path: 'packages/db/src/migrations/0390_new_table.sql',
-                reason: 'author_only',
-                pr: 42,
-              },
-            ],
-          }),
-        },
-      },
-    ],
-  });
-  assert.equal(unapproved.code, 1, unapproved.output);
-  assert.match(
-    unapproved.output,
-    /file packages\/db\/src\/migrations\/0390_new_table\.sql reason=author_only pr=42/
-  );
-});
-
-test('the db-gate script waits out busy, limited and unavailable answers without a new run', async () => {
-  const { code, output, requests, sleeps } = await runMigrationScript({
-    posts: [
-      {
-        status: 409,
-        body: { status: 'busy', activeRunId: RUN_C, retryAfterSeconds: 5, detail: LEAK },
-      },
-      { status: 429, body: { status: 'limited', reason: 'rate_limited', retryAfterSeconds: 120 } },
-      {
-        status: 503,
-        body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 15 },
-      },
-      { status: 200, body: { status: 'already_applied', run: runView(RUN_A, 'succeeded') } },
-    ],
-    gets: { [RUN_C]: [{ status: 200, body: runView(RUN_C, 'running') }] },
-  });
-  assert.equal(code, 0, output);
-  assert.equal(postCount(requests), 4);
-  // busy waits at least 30 s, then shows the active run before the next POST.
-  assert.deepEqual(sleeps, ['30', '120', '15']);
-  assert.deepEqual(
-    requests.map(request => `${request.method} ${request.path}`),
-    ['POST /v1/runs', `GET /v1/runs/${RUN_C}`, 'POST /v1/runs', 'POST /v1/runs', 'POST /v1/runs']
-  );
-  assert.match(output, new RegExp(`run ${RUN_C} staging: running/migrating`));
-  assert.match(output, /migration proxy: already_applied/);
-});
-
-test('the db-gate script fails at once on a refusal and prints only its documented fields', async () => {
-  const attempted = 'f'.repeat(40);
-  for (const [status, body, expected] of [
-    [
-      403,
-      { status: 'denied', reason: 'sha_behind_attempted', attemptedSha: attempted, detail: LEAK },
-      new RegExp(`HTTP 403 status=denied reason=sha_behind_attempted attemptedSha=${attempted}`),
-    ],
-    [
-      403,
-      { status: 'denied', reason: 'sha_diverged', attemptedSha: attempted },
-      /Never deploy the older commit by hand/,
-    ],
-    [
-      401,
-      { status: 'denied', reason: 'identity_rejected' },
-      /HTTP 401 status=denied reason=identity_rejected/,
-    ],
-    [400, { status: 'invalid_request' }, /HTTP 400 status=invalid_request/],
-    [500, { status: 'config_invalid' }, /HTTP 500 status=config_invalid/],
-    [502, `<html>${LEAK}</html>`, /HTTP 502 $/m],
-    [
-      429,
-      { status: 'limited', reason: 'too_many_attempts', retryAfterSeconds: 3600 },
-      /HTTP 429 status=limited reason=too_many_attempts\n.*re-run the job: a new attempt gets a fresh cap/,
-    ],
-  ]) {
-    const run = await runMigrationScript({ posts: [{ status, body }] });
-    assert.equal(run.code, 1, run.output);
-    assert.equal(run.requests.length, 1, `${status} must not be re-POSTed`);
-    assert.deepEqual(run.sleeps, [], `${status} must not wait`);
-    assert.match(run.output, expected);
-  }
-
-  const invalid = await runMigrationScript({ posts: [], env: { TARGET_SHA: 'main' } });
-  assert.equal(invalid.code, 1);
-  assert.equal(invalid.requests.length, 0);
-  assert.match(invalid.output, /TARGET_SHA must be 40 lowercase hex characters/);
-
-  for (const budget of ['0', 'soon', '1e3']) {
-    const refused = await runMigrationScript({
-      posts: [],
-      env: { MIGRATION_PROXY_BUDGET_SECONDS: budget },
-    });
-    assert.equal(refused.code, 1, budget);
-    assert.equal(refused.requests.length, 0);
-    assert.match(refused.output, /MIGRATION_PROXY_BUDGET_SECONDS must be a positive number/);
-  }
-});
-
-test('the db-gate script stops before a wait that would pass the job budget', async () => {
-  // Each wait is checked before it starts; the run, if any, continues on the proxy.
-  for (const [name, budget, posts, gets, posted] of [
-    [
-      'rate_limited',
-      '60',
-      [
-        {
-          status: 429,
-          body: { status: 'limited', reason: 'rate_limited', retryAfterSeconds: 120 },
-        },
-      ],
-      {},
-      1,
-    ],
-    [
-      'unavailable',
-      '10',
-      [
-        {
-          status: 503,
-          body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 15 },
-        },
-      ],
-      {},
-      1,
-    ],
-    [
-      'busy, at its 30 s floor',
-      '25',
-      [{ status: 409, body: { status: 'busy', activeRunId: RUN_C, retryAfterSeconds: 5 } }],
-      {},
-      1,
-    ],
-    ['poll', '10', [accepted(runView(RUN_A, 'pending'))], {}, 1],
-    [
-      '503 while polling',
-      '30',
-      [accepted(runView(RUN_A, 'pending'))],
-      {
-        [RUN_A]: [
-          {
-            status: 503,
-            body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 60 },
-          },
-        ],
-      },
-      1,
-    ],
-  ]) {
-    const run = await runMigrationScript({
-      posts,
-      gets,
-      env: { MIGRATION_PROXY_BUDGET_SECONDS: budget },
-    });
-    assert.equal(run.code, 1, `${name}: ${run.output}`);
-    assert.equal(postCount(run.requests), posted, name);
-    assert.ok(
-      run.sleeps.every(seconds => Number(seconds) <= Number(budget)),
-      `${name} must not start a wait past the budget: ${run.sleeps}`
-    );
-    assert.match(
-      run.output,
-      /::error::the job's wait budget ends before .*; re-run the job at or after \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ, or let the next deploy pick it up/,
-      name
-    );
-  }
-});
-
-test('the db-gate script reads again after a 503 while polling, without another poll interval', async () => {
-  const { code, output, sleeps } = await runMigrationScript({
-    posts: [accepted(runView(RUN_A, 'pending'))],
-    gets: {
-      [RUN_A]: [
-        {
-          status: 503,
-          body: { status: 'unavailable', reason: 'sts_unavailable', retryAfterSeconds: 7 },
-        },
-        { status: 200, body: runView(RUN_A, 'succeeded') },
-      ],
-    },
-  });
-  assert.equal(code, 0, output);
-  assert.deepEqual(sleeps, ['20', '7']);
-});
-
-test('the db-gate script prints the status of a failed read of the active run while busy', async () => {
-  const { code, output, requests } = await runMigrationScript({
-    posts: [
-      { status: 409, body: { status: 'busy', activeRunId: RUN_C, retryAfterSeconds: 30 } },
-      { status: 200, body: { status: 'already_applied', run: runView(RUN_A, 'succeeded') } },
-    ],
-    gets: { [RUN_C]: [{ status: 404, body: { status: 'not_found' } }] },
-  });
-  assert.equal(code, 0, output);
-  assert.equal(postCount(requests), 2);
-  assert.match(output, new RegExp(`could not read run ${RUN_C}: HTTP 404`));
 });
 
 test('every Worker deploy job retries a failed dependency install at most three times', () => {

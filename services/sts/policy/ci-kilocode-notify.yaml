@@ -1,0 +1,24 @@
+# kilocode Slack notifiers (kilocode CI design 6).
+# legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
+# GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
+workload: ci-kilocode-notify
+environments:
+  - production
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  legacySubject: true
+  environment: automation
+  jobWorkflowRefs:
+    - Kilo-Org/kilocode/.github/workflows/outdated-kilo-deps.yml@refs/heads/main
+    - Kilo-Org/kilocode/.github/workflows/stale-alerts-report.yml@refs/heads/main
+    - Kilo-Org/kilocode/.github/workflows/stale-bot-pr-notify.yml@refs/heads/main
+    - Kilo-Org/kilocode/.github/workflows/v2-upstream-release-notify.yml@refs/heads/main
+  events:
+    - schedule
+    - workflow_dispatch
+secrets:
+  - KILOCODE_SECURITY_ALERTS_SLACK_WEBHOOK
+  - KILOCODE_V2_SYNC_SLACK_WEBHOOK

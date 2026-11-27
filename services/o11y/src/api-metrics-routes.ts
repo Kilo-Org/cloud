@@ -48,7 +48,7 @@ export const ApiMetricsParamsSchema = z.object({
 export function registerApiMetricsRoutes(app: Hono<{ Bindings: Env }>): void {
   app.post(
     '/ingest/api-metrics',
-    requireAdmin,
+    requireAdmin('apiMetricsWrite'),
     zodJsonValidator(ApiMetricsParamsSchema),
     async c => {
       const params = c.req.valid('json');

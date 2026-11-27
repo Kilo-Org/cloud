@@ -7,7 +7,7 @@ import type {
 } from '@kilocode/worker-utils';
 import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
-import { internalApiSecretFromSts } from '@/lib/sts-secret-reader';
+import { internalApiSecretFromSts } from '@kilocode/web-shared/lib/sts-secret-reader';
 import type {
   ImageVersionEntry,
   ProvisionInput,

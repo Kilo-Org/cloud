@@ -91,7 +91,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/benchmark-case-admission';
 import { recordTerminalNoChargeReceipt } from '@kilocode/web-shared/lib/ai-gateway/terminal-no-charge-receipt';
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import type { BenchmarkGatewayAssignment } from '@kilocode/auto-routing-contracts';
 
 /**
@@ -571,9 +571,10 @@ export async function handleLlmProxyRequest(
       // benchmark case sends. Refuse instead of silently forwarding an unbounded request.
       return benchmarkRefusalResponse('pre_upstream_refused', false);
     }
-    const refusal = await requestBenchmarkAdmission(benchmark.assignment, {
-      secret: INTERNAL_API_SECRET ?? '',
-    });
+    // Read only for a benchmark case. A failed read sends no callback: the empty secret refuses as
+    // `admission_unavailable` before any request, and the error is neither logged nor returned.
+    const secret = await readInternalApiSecret().catch(() => '');
+    const refusal = await requestBenchmarkAdmission(benchmark.assignment, { secret });
     if (refusal) return benchmarkRefusalResponse(refusal.reason, refusal.retryable);
     benchmark.state.admitted = true;
   }

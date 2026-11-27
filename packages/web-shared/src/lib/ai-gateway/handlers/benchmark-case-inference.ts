@@ -10,7 +10,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { NextRequest } from 'next/server';
 import { timingSafeEqual } from '@kilocode/encryption';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { handleLlmProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy';
 import type { BenchmarkCaseContext } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy';
 import {
@@ -92,14 +92,22 @@ export function rebuildBenchmarkProxyRequest(
  * a public caller cannot forge one.
  */
 export async function handleBenchmarkCaseInference(request: Request): Promise<Response> {
-  if (!INTERNAL_API_SECRET) {
+  let secret: string;
+  try {
+    secret = await readInternalApiSecret();
+  } catch {
+    // The secret source is unavailable: a retryable infrastructure refusal, before the body is
+    // read or the proxy runs. The error is neither logged nor returned.
+    return benchmarkRefusalResponse('admission_unavailable', true);
+  }
+  if (!secret) {
     return new Response(JSON.stringify({ error: { code: 'not_configured' } }), {
       status: 503,
       headers: { 'content-type': 'application/json' },
     });
   }
 
-  const verified = await verifyBenchmarkAssignment(request.headers, INTERNAL_API_SECRET);
+  const verified = await verifyBenchmarkAssignment(request.headers, secret);
   if (!verified.ok) return verified.response;
   const { assignment } = verified;
 
@@ -131,10 +139,11 @@ export async function handleBenchmarkCaseInference(request: Request): Promise<Re
 }
 
 /** Kept so the route's own auth test and any facade share one comparison. */
-export function internalSecretMatches(presented: string | null): boolean {
-  return Boolean(
-    INTERNAL_API_SECRET && presented && timingSafeEqual(presented, INTERNAL_API_SECRET)
-  );
+export async function internalSecretMatches(presented: string | null): Promise<boolean> {
+  // A request without a credential is refused without reading the expected value; a failed read
+  // is the same refusal.
+  const expected = presented ? await readInternalApiSecret().catch(() => '') : '';
+  return Boolean(expected && presented && timingSafeEqual(presented, expected));
 }
 
 export { verifyBenchmarkAssignment };

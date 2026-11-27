@@ -323,6 +323,35 @@ ${options.extra ?? ''}`;
       );
     });
 
+    it('allows identity.legacySubject only for Kilo-Org/kilocode with its ids', () => {
+      const kilocode = (repository: string, repositoryId: string, ownerId: string) =>
+        github({
+          repository,
+          workflows: `[${repository}/.github/workflows/publish.yml@refs/heads/main]`,
+          identity: '\n  legacySubject: true',
+        })
+          .replace("repositoryId: '123'", `repositoryId: '${repositoryId}'`)
+          .replace("repositoryOwnerId: '456'", `repositoryOwnerId: '${ownerId}'`);
+      const loaded = loadPolicies({
+        'ci-release.yaml': kilocode('Kilo-Org/kilocode', '946087422', '201822503'),
+      });
+      expect(loaded.get('production', 'ci-release')?.identity).toMatchObject({
+        legacySubject: true,
+      });
+      expect(loaded.snapshot('production')[0]?.identity).toMatch(/\|legacy-subject$/);
+      for (const [repository, repositoryId, ownerId] of [
+        ['acme/repo', '123', '456'],
+        ['Kilo-Org/kilocode', '1395255492', '201822503'],
+        ['Kilo-Org/kilocode', '946087422', '1'],
+        ['Kilo-Org/bouncer', '946087422', '201822503'],
+      ] as const) {
+        expectThrow(
+          { 'ci-release.yaml': kilocode(repository, repositoryId, ownerId) },
+          'identity.legacySubject is allowed only for Kilo-Org/kilocode'
+        );
+      }
+    });
+
     it('rejects a workflow of another repository, a wildcard, and a ref refs does not list', () => {
       expectThrow(
         {
@@ -729,6 +758,28 @@ secrets: [APP_TWO_SECRET]
     ]);
     expect(policyIndex.has('audit-relay')).toBe(true);
     expect(policyFor('production', 'not-a-workload')).toBeNull();
+  });
+
+  it('binds ai-gateway to kilocode-ai-gateway previews and grants it only the UTS feed, in development only', () => {
+    const gateway = policyFor('development', 'ai-gateway');
+    expect(gateway?.identity).toEqual({
+      kind: 'vercel-oidc',
+      teamSlug: 'kilocode',
+      teamId: 'team_ItxRShuUkJaEd9GmXMEEgunb',
+      projectId: 'prj_cFtsRYRBCm4qa8D35LC2j183FohC',
+      projectName: 'kilocode-ai-gateway',
+      environments: ['preview'],
+    });
+    expect(gateway).toMatchObject({
+      environments: ['development'],
+      audiences: ['uts-feed'],
+      scopes: ['uts-feed:revocation.read'],
+      secrets: [],
+      dynamic: [],
+      environmentGrants: {},
+    });
+    expect(policyFor('staging', 'ai-gateway')).toBeNull();
+    expect(policyFor('production', 'ai-gateway')).toBeNull();
   });
 });
 

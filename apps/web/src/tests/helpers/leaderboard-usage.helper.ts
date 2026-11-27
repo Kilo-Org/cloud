@@ -6,9 +6,7 @@ type LeaderboardUsageInsert = typeof leaderboard_usage_daily.$inferInsert;
 /** A UTC date `daysAgo` days before today, as `YYYY-MM-DD`. */
 export function utcDaysAgo(daysAgo: number): string {
   const now = new Date();
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysAgo)
-  )
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysAgo))
     .toISOString()
     .slice(0, 10);
 }

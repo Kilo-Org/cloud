@@ -160,7 +160,9 @@ export async function rebuildLeaderboardUsageDay(
     );
     await tx.execute(sql`DELETE FROM leaderboard_usage_daily WHERE usage_date = ${usageDate}`);
     for (let index = 0; index < values.length; index += INSERT_BATCH_SIZE) {
-      await tx.insert(leaderboard_usage_daily).values(values.slice(index, index + INSERT_BATCH_SIZE));
+      await tx
+        .insert(leaderboard_usage_daily)
+        .values(values.slice(index, index + INSERT_BATCH_SIZE));
     }
   });
 

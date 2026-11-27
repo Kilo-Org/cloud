@@ -206,10 +206,10 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
       getPermissions: (...args) => client.getPermissions(...args),
     },
     terminals: {
-      createPty: input => client.createPty(input),
+      createPty: ({ cwd, title, env }) => client.createPty({ cwd, title, env }),
       resizePty: (id, size, directory) => client.resizePty(id, size, directory),
       deletePty: (id, directory) => client.deletePty(id, directory),
-      connectPty: (id, directory) => client.connectPty(id, directory),
+      connectPty: async (id, directory) => ({ socket: client.connectPty(id, directory) }),
       async isIdle(directory, signal) {
         const url = new URL('/pty', options.server.url);
         url.searchParams.set('directory', directory);

@@ -524,7 +524,12 @@ describe('control-plane terminal bridge routing on the Session DO (B10)', () => 
         headers: { Upgrade: 'websocket' },
       })
     );
-    expect(unknownPty.status).toBe(404);
+    expect(unknownPty.status).toBe(101);
+    const missingSocket = unknownPty.webSocket;
+    if (!missingSocket) throw new Error('Missing terminal browser socket');
+    const missingClosed = closedWith(missingSocket);
+    missingSocket.accept();
+    await expect(missingClosed).resolves.toEqual({ code: 1000, reason: 'PTY session ended' });
 
     const wrapperNoAuth = await sessionStub.fetch(
       new Request('https://control.test/terminal/wrapper?ptyId=pty_1', {

@@ -53,6 +53,13 @@ describe('security headers', () => {
     expect(getPolicyDirective(policy, 'img-src')).toContain(r2Origin);
   });
 
+  it('allows the Cloud Agent terminal to load its embedded WebAssembly', () => {
+    const policy = buildContentSecurityPolicy();
+
+    expect(getPolicyDirective(policy, 'connect-src').split(' ')).toContain('data:');
+    expect(getPolicyDirective(policy, 'script-src')).toContain("'wasm-unsafe-eval'");
+  });
+
   it('aligns Turnstile CSP sources with Cloudflare documentation', () => {
     const policy = buildContentSecurityPolicy();
 

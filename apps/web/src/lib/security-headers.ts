@@ -94,6 +94,8 @@ export function buildContentSecurityPolicy({
 
   const connectSrc = compactUnique([
     "'self'",
+    // ghostty-web fetches its embedded WebAssembly terminal from a data: URL.
+    'data:',
     'https://auth.kilo.ai',
     'https://us.i.posthog.com',
     'https://us-assets.i.posthog.com',

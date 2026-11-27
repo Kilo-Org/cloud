@@ -299,6 +299,7 @@ export function createControlTerminalRuntime(options: {
     const { kiloClient, env } = currentKiloRuntime(attached);
     try {
       const created = await kiloClient.createPty({
+        sessionId: attached.kiloSessionId,
         cwd: attached.directory,
         title: 'Workspace terminal',
         env: { ...env, ...WORKSPACE_TERMINAL_ENV },
@@ -366,12 +367,25 @@ export function createControlTerminalRuntime(options: {
         );
       }
 
-      const local = currentKiloRuntime(bridge.terminal).kiloClient.connectPty(
+      const { socket: local, greeting } = await currentKiloRuntime(
+        bridge.terminal
+      ).kiloClient.connectPty(
         bridge.terminal.ptyId,
-        bridge.terminal.directory
+        bridge.terminal.directory,
+        bridge.bridgeGeneration
       );
+      if (!isCurrentBridge(bridge)) {
+        closeSocket(local, 1000, 'Terminal connection replaced');
+        throw new ControlTerminalRuntimeError(
+          'not_ready',
+          'Terminal connection was replaced',
+          true
+        );
+      }
       local.binaryType = 'arraybuffer';
       bridge.local = local;
+      // The greeting precedes any socket message: those arrive in later tasks.
+      if (greeting !== undefined) forwardMessage(bridge, bridge.reverse, greeting);
       local.onmessage = event => forwardMessage(bridge, bridge.reverse, event.data);
       local.onerror = () => {
         if (isCurrentBridge(bridge)) closeBridge(bridge, 1011, 'Terminal transport failed');

@@ -39,8 +39,15 @@ export type HarnessTerminal = {
   status: 'running' | 'exited';
   pid: number;
 };
+export type HarnessTerminalConnection = {
+  socket: WebSocket;
+  /** Sent to the browser before any socket message, to restore the screen. */
+  greeting?: string;
+};
 export type HarnessTerminals = {
   createPty(input: {
+    /** The Kilo session that owns the terminal. */
+    sessionId: string;
     cwd: string;
     title: string;
     env: Record<string, string>;
@@ -51,7 +58,12 @@ export type HarnessTerminals = {
     directory?: string
   ): Promise<HarnessTerminal>;
   deletePty(id: string, directory?: string): Promise<boolean>;
-  connectPty(id: string, directory: string): WebSocket;
+  /** `attachmentId` is unique to one browser connection. */
+  connectPty(
+    id: string,
+    directory: string,
+    attachmentId: string
+  ): Promise<HarnessTerminalConnection>;
   isIdle(directory: string, signal: AbortSignal): Promise<boolean>;
 };
 

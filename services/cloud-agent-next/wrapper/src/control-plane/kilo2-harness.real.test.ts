@@ -27,9 +27,62 @@ import { createTurnManager } from './turn.js';
 import { runtimeKey } from './prepare.js';
 import { prepareKilo2RuntimeEnvironment } from './runtime-harness.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
+import type { Harness } from './harness.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
+
+function persistentSnapshot(greeting: string | undefined) {
+  return z
+    .object({
+      type: z.literal('snapshot'),
+      size: z.object({ cols: z.number(), rows: z.number() }),
+      checkpoint: z.string(),
+    })
+    .parse(JSON.parse(greeting ?? 'null'));
+}
+
+function persistentInputFrame(size: { cols: number; rows: number }, text: string) {
+  const data = new TextEncoder().encode(text);
+  const frame = new Uint8Array(5 + data.byteLength);
+  const view = new DataView(frame.buffer);
+  frame[0] = 1;
+  view.setUint16(1, size.cols);
+  view.setUint16(3, size.rows);
+  frame.set(data, 5);
+  return frame;
+}
+
+/** Attaches like the browser does, types a command, and reads its output. */
+async function expectPersistentTerminalRoundTrip(
+  harness: Harness,
+  ptyId: string,
+  directory: string
+) {
+  const { socket, greeting } = await harness.terminals.connectPty(ptyId, directory, 'att_first');
+  expect(persistentSnapshot(greeting).size).toEqual({ cols: 90, rows: 25 });
+  socket.binaryType = 'arraybuffer';
+  const messages: string[] = [];
+  let output = '';
+  socket.onmessage = event => {
+    if (typeof event.data === 'string') messages.push(event.data);
+    else output += new TextDecoder().decode(event.data as ArrayBuffer);
+  };
+  await new Promise((resolve, reject) => {
+    socket.onopen = resolve;
+    socket.onerror = reject;
+  });
+  socket.send(persistentInputFrame({ cols: 90, rows: 25 }, 'echo ghostty-v2-$((40+2))\r'));
+  const deadline = Date.now() + 10_000;
+  while (!output.includes('ghostty-v2-42') && Date.now() < deadline) await Bun.sleep(25);
+  socket.close(1000);
+  expect(output).toContain('ghostty-v2-42');
+  const types = messages.map(message => z.object({ type: z.string() }).parse(JSON.parse(message)));
+  expect(types.map(message => message.type)).toEqual(
+    expect.arrayContaining(['attached', 'replay_complete', 'controller_changed'])
+  );
+  expect(JSON.parse(messages[0] ?? '{}')).toMatchObject({ type: 'attached', inputProtocol: 1 });
+}
 
 suite('real Kilo v2 harness', () => {
   it('accepts web search config in file, repository, and inline precedence order', async () => {
@@ -698,13 +751,23 @@ suite('real Kilo v2 harness', () => {
         })
       ).toBe('executed');
       const pty = await harness.terminals.createPty({
+        sessionId,
         cwd: directory,
         title: 'Local v2 PTY',
         env: {},
       });
+      expect(pty.cwd).toBe(directory);
       expect(
         (await harness.terminals.resizePty(pty.id, { cols: 90, rows: 25 }, directory)).id
       ).toBe(pty.id);
+      expect(await harness.terminals.isIdle(directory, signal)).toBe(false);
+      await expectPersistentTerminalRoundTrip(harness, pty.id, directory);
+      // A second connection restores the screen that the first one produced.
+      const reconnected = await harness.terminals.connectPty(pty.id, directory, 'att_second');
+      reconnected.socket.close(1000);
+      const snapshot = persistentSnapshot(reconnected.greeting);
+      expect(snapshot.size).toEqual({ cols: 90, rows: 25 });
+      expect(Buffer.from(snapshot.checkpoint, 'base64').toString()).toContain('ghostty-v2-42');
       expect(await harness.terminals.deletePty(pty.id, directory)).toBe(true);
       expect(await harness.terminals.isIdle(directory, signal)).toBe(true);
       expect((await harness.release({ sessionId, directory, deadlineMs: 10_000, signal })).ok).toBe(

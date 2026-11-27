@@ -51,6 +51,7 @@ export type TerminalConnectionDecision =
   | { kind: 'retry'; statusText: string }
   | { kind: 'final-error'; statusText: string }
   | { kind: 'sleeping'; statusText: string }
+  | { kind: 'replaced'; statusText: string }
   | { kind: 'exited'; statusText: string };
 
 function readErrorCode(error: unknown): string | undefined {
@@ -129,6 +130,10 @@ export function classifyTerminalSocketClose(event: {
   code: number;
   reason: string;
 }): TerminalConnectionDecision {
+  if (event.code === 4000) {
+    return { kind: 'replaced', statusText: 'Terminal is open in another window' };
+  }
+
   if (event.code === 1000 && event.reason.includes('PTY session ended')) {
     return { kind: 'exited', statusText: 'Terminal exited' };
   }

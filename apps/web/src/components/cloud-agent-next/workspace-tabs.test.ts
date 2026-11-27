@@ -11,6 +11,7 @@ import {
   resetWorkspaceTabs,
   selectWorkspaceTab,
   setFileTabMode,
+  setTerminalTabPty,
   terminalIdFromTabId,
   terminalTabId,
   type WorktreeFileViewMode,
@@ -79,6 +80,26 @@ describe('cloud agent workspace tabs', () => {
     }
     expect(chat.files).toBe(state.files);
     expect(chat.terminals).toBe(state.terminals);
+  });
+
+  it('records and clears the PTY of one terminal tab', () => {
+    const state = addTerminalTab(addTerminalTab(createWorkspaceTabsState(), 'tab-a'), 'tab-b');
+
+    const attached = setTerminalTabPty(state, 'tab-b', 'pty_b');
+    expect(attached.terminals).toEqual([
+      { id: 'tab-a', title: 'Terminal 1', cloudAgentSessionId: 'workspace-fixture' },
+      {
+        id: 'tab-b',
+        title: 'Terminal 2',
+        cloudAgentSessionId: 'workspace-fixture',
+        ptyId: 'pty_b',
+      },
+    ]);
+    expect(attached.activeTabId).toBe(state.activeTabId);
+    expect(setTerminalTabPty(attached, 'tab-b', 'pty_b')).toBe(attached);
+    expect(setTerminalTabPty(attached, 'missing', 'pty_c')).toBe(attached);
+    expect(setTerminalTabPty(attached, 'tab-b', null).terminals).toEqual(state.terminals);
+    expect(setTerminalTabPty(state, 'tab-a', null)).toBe(state);
   });
 
   it('keeps the current tab when a background terminal closes', () => {

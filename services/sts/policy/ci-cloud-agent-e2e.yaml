@@ -1,9 +1,7 @@
-# The Cloud Agent e2e deploy and tests jobs (GitHub environment cloud-agent-e2e): the Cloudflare
-# Access service token of the e2e Worker's ingress (D35/D39, manager ruling M83). The deploy job
-# uploads both values as Worker secrets; the tests job sends them. The nightly workflow calls both
-# files as reusable workflows; those jobs carry the called file's job_workflow_ref with the
-# caller's ref and event, so they are covered too, and any other workflow on main that calls them
-# with workflow_dispatch in this environment would get the bundle (README "GitHub Actions callers").
+# The Cloud Agent e2e tests job (cloud-agent-e2e.yml on main, GitHub environment cloud-agent-e2e):
+# the Cloudflare Access service token of the e2e Worker's ingress (D35/D39, manager ruling M83).
+# Only the tests job reads the bundle. cloud-agent-e2e.yml has no workflow_call trigger, so no other
+# workflow can run its jobs under its job_workflow_ref.
 workload: ci-cloud-agent-e2e
 environments: [production]
 identity:
@@ -13,8 +11,6 @@ identity:
   repositoryOwnerId: '201822503'
   environment: cloud-agent-e2e
   refs: [refs/heads/main]
-  jobWorkflowRefs:
-    - Kilo-Org/cloud/.github/workflows/cloud-agent-e2e-deploy.yml@refs/heads/main
-    - Kilo-Org/cloud/.github/workflows/cloud-agent-e2e-tests.yml@refs/heads/main
-  events: [workflow_dispatch] # the nightly's schedule is paused; restoring it adds schedule here
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/cloud-agent-e2e.yml@refs/heads/main]
+  events: [workflow_dispatch] # schedule is added when the nightly schedule returns
 secrets: [E2E_ACCESS_CLIENT_ID, E2E_ACCESS_CLIENT_SECRET]

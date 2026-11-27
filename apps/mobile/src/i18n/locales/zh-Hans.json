@@ -3506,6 +3506,7 @@
         "scanBeforeUseOn": "使用前扫描：开",
         "scanBeforeUseOff": "使用前扫描：关",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "已禁用 {{provider}}：{{models}}",
         "autoRoutingRemoved": "已移除：{{models}}",
         "browserPolicyOff": "浏览器使用受阻",
         "browserPolicyAllow": "仅允许的来源",

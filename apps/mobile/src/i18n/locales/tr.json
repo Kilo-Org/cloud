@@ -3569,6 +3569,7 @@
         "scanBeforeUseOn": "Kullanımdan önce tarama açık",
         "scanBeforeUseOff": "Kullanımdan önce tarama kapalı",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Devre dışı bırakıldı {{provider}}: {{models}}",
         "autoRoutingRemoved": "Kaldırıldı: {{models}}",
         "browserPolicyOff": "Tarayıcı kullanımı engellendi",
         "browserPolicyAllow": "Yalnızca izin verilen kaynaklar",

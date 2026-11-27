@@ -3510,6 +3510,7 @@
         "scanBeforeUseOn": "Pemindaian sebelum digunakan aktif",
         "scanBeforeUseOff": "Pemindaian sebelum digunakan nonaktif",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Dinonaktifkan {{provider}}: {{models}}",
         "autoRoutingRemoved": "Dihapus: {{models}}",
         "browserPolicyOff": "Penggunaan browser diblokir",
         "browserPolicyAllow": "Hanya origin yang diizinkan",

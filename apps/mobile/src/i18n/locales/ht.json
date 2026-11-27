@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skane anvan itilizasyon aktive",
         "scanBeforeUseOff": "Skane anvan itilizasyon dezaktive",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Dezaktive {{provider}}: {{models}}",
         "autoRoutingRemoved": "Retire: {{models}}",
         "browserPolicyOff": "Itilizasyon navigatè bloke",
         "browserPolicyAllow": "Sèlman orijin otorize",

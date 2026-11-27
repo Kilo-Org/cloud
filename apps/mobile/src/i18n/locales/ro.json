@@ -3645,6 +3645,7 @@
         "scanBeforeUseOn": "Scanare înainte de utilizare activată",
         "scanBeforeUseOff": "Scanare înainte de utilizare dezactivată",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Dezactivate {{provider}}: {{models}}",
         "autoRoutingRemoved": "Eliminate: {{models}}",
         "browserPolicyOff": "Utilizarea browserului blocată",
         "browserPolicyAllow": "Doar origini permise",

@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Скенирање пред употреба вклучено",
         "scanBeforeUseOff": "Скенирање пред употреба исклучено",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Оневозможени {{provider}}: {{models}}",
         "autoRoutingRemoved": "Отстранети: {{models}}",
         "browserPolicyOff": "Користење на прелистувач блокирано",
         "browserPolicyAllow": "Само дозволени потекла",

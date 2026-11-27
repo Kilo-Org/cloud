@@ -3849,6 +3849,7 @@
         "scanBeforeUseOn": "Sganio cyn defnyddio wedi'i alluogi",
         "scanBeforeUseOff": "Sganio cyn defnyddio wedi'i analluogi",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Analluogwyd {{provider}}: {{models}}",
         "autoRoutingRemoved": "Tynnwyd: {{models}}",
         "browserPolicyOff": "Defnyddio porwr wedi'i rwystro",
         "browserPolicyAllow": "Dim ond tarddiadau caniatëedig",

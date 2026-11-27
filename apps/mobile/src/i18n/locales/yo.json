@@ -3521,6 +3521,7 @@
         "scanBeforeUseOn": "Ṣàyẹ̀wò ṣáájú lílò: tàn",
         "scanBeforeUseOff": "Ṣàyẹ̀wò ṣáájú lílò: pa",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "A ti pa {{provider}}: {{models}}",
         "autoRoutingRemoved": "A yọ kúrò: {{models}}",
         "browserPolicyOff": "Lílo búràúsà ti díwọ́",
         "browserPolicyAllow": "Àwọn orísun tí a gbà nìkan",

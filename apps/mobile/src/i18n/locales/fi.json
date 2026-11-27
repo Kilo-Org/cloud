@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skannaus ennen käyttöä päällä",
         "scanBeforeUseOff": "Skannaus ennen käyttöä pois päältä",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Poistettu käytöstä {{provider}}: {{models}}",
         "autoRoutingRemoved": "Poistettu: {{models}}",
         "browserPolicyOff": "Selaimen käyttö estetty",
         "browserPolicyAllow": "Vain sallitut alkuperät",

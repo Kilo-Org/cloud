@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "ከመጠቀም በፊት ቅኝት ነቅቷል",
         "scanBeforeUseOff": "ከመጠቀም በፊት ቅኝት ተሰናክሏል",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ተሰናክሏል {{provider}}: {{models}}",
         "autoRoutingRemoved": "ተወግዷል: {{models}}",
         "browserPolicyOff": "የአሳሽ አጠቃቀም ተከልክሏል",
         "browserPolicyAllow": "የተፈቀዱ መነሻዎች ብቻ",

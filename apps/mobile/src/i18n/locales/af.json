@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skandeer voor gebruik aan",
         "scanBeforeUseOff": "Skandeer voor gebruik af",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Afgeskakel {{provider}}: {{models}}",
         "autoRoutingRemoved": "Verwyder: {{models}}",
         "browserPolicyOff": "Blaaiergebruik geblokkeer",
         "browserPolicyAllow": "Slegs toegelate oorspronge",

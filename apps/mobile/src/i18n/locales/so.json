@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Baaritaanka ka hor isticmaalka la shiday",
         "scanBeforeUseOff": "Baaritaanka ka hor isticmaalka la damiyay",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "La damiyay {{provider}}: {{models}}",
         "autoRoutingRemoved": "La saaray: {{models}}",
         "browserPolicyOff": "Isticmaalka biraawsarka waa la xannibay",
         "browserPolicyAllow": "Asalada la oggolaaday oo keliya",

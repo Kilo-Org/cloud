@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Kua whakahohea te tirotiro i mua i te whakamahi",
         "scanBeforeUseOff": "Kua monokia te tirotiro i mua i te whakamahi",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Kua monokia {{provider}}: {{models}}",
         "autoRoutingRemoved": "I tangohia: {{models}}",
         "browserPolicyOff": "Kua āraitia te whakamahi pūtiro",
         "browserPolicyAllow": "Ngā takenga kua whakaaetia anake",

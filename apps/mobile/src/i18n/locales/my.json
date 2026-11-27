@@ -3520,6 +3520,7 @@
         "scanBeforeUseOn": "အသုံးမပြုမီ စစ်ဆေးမှု ဖွင့်ထား",
         "scanBeforeUseOff": "အသုံးမပြုမီ စစ်ဆေးမှု ပိတ်ထား",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ပိတ်ထားသည် {{provider}}: {{models}}",
         "autoRoutingRemoved": "ဖယ်ရှားခဲ့သည်: {{models}}",
         "browserPolicyOff": "ဘရောက်ဇာ အသုံးပြုမှု ပိတ်ဆို့ထား",
         "browserPolicyAllow": "ခွင့်ပြုထားသော မူလရင်းမြစ်များသာ",

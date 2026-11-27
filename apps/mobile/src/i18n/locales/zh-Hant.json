@@ -3508,6 +3508,7 @@
         "scanBeforeUseOn": "使用前掃描：開啟",
         "scanBeforeUseOff": "使用前掃描：關閉",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "已停用 {{provider}}：{{models}}",
         "autoRoutingRemoved": "已移除：{{models}}",
         "browserPolicyOff": "瀏覽器使用受阻",
         "browserPolicyAllow": "僅限允許的來源",

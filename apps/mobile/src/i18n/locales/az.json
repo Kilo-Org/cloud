@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "İstifadədən əvvəl skanlama aktiv",
         "scanBeforeUseOff": "İstifadədən əvvəl skanlama deaktiv",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Deaktiv edildi {{provider}}: {{models}}",
         "autoRoutingRemoved": "Çıxarıldı: {{models}}",
         "browserPolicyOff": "Brauzer istifadəsi bloklandı",
         "browserPolicyAllow": "Yalnız icazəli mənbələr",

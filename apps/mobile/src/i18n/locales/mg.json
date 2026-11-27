@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Fandinihana alohan'ny fampiasana: mandeha",
         "scanBeforeUseOff": "Fandinihana alohan'ny fampiasana: tsy mandeha",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Tsy mandeha {{provider}}: {{models}}",
         "autoRoutingRemoved": "Nesorina: {{models}}",
         "browserPolicyOff": "Voasakana ny fampiasana mpitety tranonkala",
         "browserPolicyAllow": "Fiaviana avela ihany",

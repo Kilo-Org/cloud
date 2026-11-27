@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skanim para përdorimit aktiv",
         "scanBeforeUseOff": "Skanim para përdorimit joaktiv",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "U çaktivizuan {{provider}}: {{models}}",
         "autoRoutingRemoved": "U hoqën: {{models}}",
         "browserPolicyOff": "Përdorimi i shfletuesit i bllokuar",
         "browserPolicyAllow": "Vetëm origjinat e lejuara",

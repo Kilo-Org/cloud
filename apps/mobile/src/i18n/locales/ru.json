@@ -3705,6 +3705,7 @@
         "scanBeforeUseOn": "Сканирование перед использованием: включено",
         "scanBeforeUseOff": "Сканирование перед использованием: отключено",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Отключено {{provider}}: {{models}}",
         "autoRoutingRemoved": "Удалено: {{models}}",
         "browserPolicyOff": "Использование браузера заблокировано",
         "browserPolicyAllow": "Только разрешённые источники",

@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "გამოყენებამდე სკანირება ჩართულია",
         "scanBeforeUseOff": "გამოყენებამდე სკანირება გამორთულია",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "გამორთულია {{provider}}: {{models}}",
         "autoRoutingRemoved": "მოიხსნა: {{models}}",
         "browserPolicyOff": "ბრაუზერის გამოყენება დაბლოკილია",
         "browserPolicyAllow": "მხოლოდ ნებადართული წყაროები",

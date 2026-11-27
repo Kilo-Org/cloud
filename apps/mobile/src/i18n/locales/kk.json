@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Пайдалану алдында сканерлеу қосулы",
         "scanBeforeUseOff": "Пайдалану алдында сканерлеу өшірулі",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Өшірілді {{provider}}: {{models}}",
         "autoRoutingRemoved": "Жойылды: {{models}}",
         "browserPolicyOff": "Браузерді пайдалану бұғатталған",
         "browserPolicyAllow": "Тек рұқсат етілген шығу көздері",

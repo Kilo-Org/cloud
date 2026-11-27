@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skann før bruk på",
         "scanBeforeUseOff": "Skann før bruk av",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Deaktivert {{provider}}: {{models}}",
         "autoRoutingRemoved": "Fjernet: {{models}}",
         "browserPolicyOff": "Nettleserbruk blokkert",
         "browserPolicyAllow": "Kun tillatte opprinnelser",

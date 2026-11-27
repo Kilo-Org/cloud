@@ -3519,6 +3519,7 @@
         "scanBeforeUseOn": "ສະແກນກ່ອນໃຊ້ ເປີດ",
         "scanBeforeUseOff": "ສະແກນກ່ອນໃຊ້ ປິດ",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ປິດໃຊ້ແລ້ວ {{provider}}: {{models}}",
         "autoRoutingRemoved": "ລຶບແລ້ວ: {{models}}",
         "browserPolicyOff": "ການໃຊ້ບຣາວເຊີຖືກຕິດຂັດ",
         "browserPolicyAllow": "ສະເພາະຕົ້ນກຳເນີດທີ່ອະນຸຍາດ",

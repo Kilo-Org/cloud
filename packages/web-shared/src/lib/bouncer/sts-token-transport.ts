@@ -29,12 +29,6 @@ import { getVercelOidcToken } from '@vercel/oidc';
 export const BOUNCER_FIRST_MINT_JITTER_MS = 2_000;
 /** A readiness check that found no exchanged token is not repeated for this long. */
 export const BOUNCER_NOT_HELD_MEMORY_MS = 250;
-/**
- * After `skipJitter`, a first-mint jitter that starts within this long is skipped. It covers an
- * admission call's whole token wait (250 ms, `BOUNCER_TOKEN_WAIT_MS` in `sts-auth.ts`), so the mint
- * its read starts goes to STS at once.
- */
-export const BOUNCER_JITTER_SKIP_MS = 250;
 
 type Connection = {
   tokens: { get: BouncerTokenRead };
@@ -86,9 +80,11 @@ export function createBouncerTransportFor(options: {
  *   through an exchange or a jitter.
  * - Jitter: when the step finds no held exchanged token, this instance exchanges or polls for the
  *   deployment's first one; the mint then waits a random 0 to `BOUNCER_FIRST_MINT_JITTER_MS`
- *   before it goes to STS, so a deployment's instances spread out. `skipJitter` ends a running
- *   jitter and skips one that starts within `BOUNCER_JITTER_SKIP_MS`; only an `sts` admission call
- *   asks for it, so `dual` and background renewals keep the jitter. A deployment's first `sts`
+ *   before it goes to STS, so a deployment's instances spread out. `skipJitter` is a one-shot
+ *   request: the next jitter decision skips the jitter (or a running one ends), however long the
+ *   exchange before it took, and the request clears with that decision or when the mint settles.
+ *   Only an `sts` admission call asks for it, so `dual` and background renewals keep the jitter. A
+ *   deployment's first `sts`
  *   mints are then spread only by the exchange step itself (one instance exchanges, the others
  *   poll the Runtime Cache with backoff for its token).
  * - Counter: every STS answer reaches `hooks.mint`: `true` only for an answer that issued a token,
@@ -110,7 +106,8 @@ export function connectBouncerSts(options: {
   let notHeldUntil = 0;
   let firstMintPending = false;
   let step: Promise<string> | null = null;
-  let skipJitterUntil = Number.NEGATIVE_INFINITY;
+  /** One-shot: the next jitter decision skips the jitter; cleared by it or when the mint settles. */
+  let jitterSkipRequested = false;
   let endJitter: (() => void) | null = null;
 
   function held(): Promise<boolean> {
@@ -132,7 +129,7 @@ export function connectBouncerSts(options: {
   }
 
   function skipJitter(): void {
-    skipJitterUntil = now() + BOUNCER_JITTER_SKIP_MS;
+    jitterSkipRequested = true;
     endJitter?.();
   }
 
@@ -147,7 +144,9 @@ export function connectBouncerSts(options: {
         return await identity;
       }
       const token = await identity;
-      if (now() >= skipJitterUntil) {
+      if (jitterSkipRequested) {
+        jitterSkipRequested = false;
+      } else {
         const jitter = Promise.withResolvers<void>();
         endJitter = jitter.resolve;
         const timer = setTimeout(
@@ -161,6 +160,8 @@ export function connectBouncerSts(options: {
       return token;
     } finally {
       firstMintPending = false;
+      // A request that arrived after this step's decision (its jitter ended above) is spent here.
+      jitterSkipRequested = false;
     }
   }
 
@@ -182,6 +183,9 @@ export function connectBouncerSts(options: {
     } catch (error) {
       options.hooks.mint(false);
       throw error;
+    } finally {
+      // A skip asked for while this mint was already past its identity step ends with it.
+      jitterSkipRequested = false;
     }
   }) as typeof fetch;
 

@@ -53,9 +53,10 @@ export type BouncerTokenRead = (
  * What the lazily loaded transport gives the auth: the token read, whether the deployment's
  * exchanged Vercel token is already held (instance memory or the shared Runtime Cache), so a mint
  * now takes one STS call and no Vercel exchange (readiness never exchanges or writes anything), and
- * `skipJitter`, which ends a running first-mint jitter and skips one that starts within the next
- * `BOUNCER_JITTER_SKIP_MS` (`sts-token-transport.ts`): a call that waits for its token in `sts` has
- * no legacy fallback, so its mint must not sit out a 0 to 2 s jitter.
+ * `skipJitter`, a one-shot request that the next first-mint jitter decision consumes (it skips that
+ * jitter, or ends one already running), however long the exchange before it takes: a call that
+ * waits for its token in `sts` has no legacy fallback, so its mint must not sit out a 0 to 2 s
+ * jitter. The request also clears when that mint settles.
  */
 export type BouncerTransport = {
   read: BouncerTokenRead;

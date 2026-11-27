@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { repoRoot, shippedPolicyDocuments } from './repo';
+import { shippedPolicyDocuments } from './repo';
 
 /**
  * The shared Bouncer client of `apps/web` and `apps/ai-gateway` installs the Bouncer scopes listed
@@ -9,10 +10,14 @@ import { repoRoot, shippedPolicyDocuments } from './repo';
  * exactly the Bouncer scopes the app's policy grants in production, or the app would mint a scope
  * STS denies or never send one it holds; and no other place in the policy may grant one, because
  * Bouncer runs in production only. This package does not import web-shared, so the table is read
- * as text.
+ * as text, through a relative path literal so the CI change detector runs this test when the
+ * contract changes.
  */
 
-const CONTRACT = join(repoRoot, 'packages/web-shared/src/lib/bouncer/sts-auth-contract.ts');
+const CONTRACT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../packages/web-shared/src/lib/bouncer/sts-auth-contract.ts'
+);
 
 const APPS = [
   { caller: 'kilocode-app', workload: 'web' },

@@ -216,6 +216,37 @@ describe('the installed Bouncer auth with the real transport', () => {
     }
   );
 
+  it.each([600, 1_200])(
+    'gets an sts signup its token inside 1,500 ms behind a %i ms exchange, with no jitter',
+    async exchangeMs => {
+      setRuntime({
+        VERCEL_ENV: 'production',
+        VERCEL_TARGET_ENV: 'production',
+        BOUNCER_CLIENT_AUTH: 'sts',
+      });
+      installBouncerAuth('kilocode-app');
+      mockExchangeHeld = false;
+      mockIdentity.mockImplementationOnce(async () => {
+        await new Promise(resolve => setTimeout(resolve, exchangeMs));
+        return IDENTITY_TOKEN;
+      });
+      // A jitter would be 1.8 s: past the signup wait on its own.
+      const random = jest.spyOn(Math, 'random').mockReturnValue(0.9);
+      try {
+        const started = Date.now();
+        await signupDecide({ operationId: 'signup:operation-sts', ip: '203.0.113.7' });
+        const elapsed = Date.now() - started;
+        const [headers] = bouncerCalls();
+        expect(headers.get('authorization')).toBe('Bearer sts-signup.decide-token');
+        expect(headers.get('x-internal-api-key')).toBeNull();
+        expect(elapsed).toBeLessThan(1_500);
+        expect(elapsed).toBeLessThan(exchangeMs + 300);
+      } finally {
+        random.mockRestore();
+      }
+    }
+  );
+
   it('reads no token at install in sts, even with an OIDC token in the environment', async () => {
     setRuntime({
       VERCEL_ENV: 'production',
@@ -455,14 +486,42 @@ describe('connectBouncerSts', () => {
     expect(stsFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('skips a first-mint jitter that starts within the skip window', async () => {
+  it('skips the next first-mint jitter after skipJitter, however long the exchange takes', async () => {
     jest.useFakeTimers();
-    const { connected, stsFetch } = connection({ held: { value: false } });
+    const { connected, identity, stsFetch } = connection({ held: { value: false } });
+    identity.mockImplementationOnce(async () => {
+      await new Promise(resolve => setTimeout(resolve, 3_000));
+      return IDENTITY_TOKEN;
+    });
     connected.skipJitter();
     const token = connected.tokens.get(DECIDE, ctx);
-    await jest.advanceTimersByTimeAsync(20);
+    await jest.advanceTimersByTimeAsync(3_020);
     await expect(token).resolves.toBe('sts-token');
     expect(stsFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends a skip request on one mint: a later first mint jitters again', async () => {
+    jest.useFakeTimers();
+    const held = { value: false };
+    const { connected, stsFetch } = connection({ held });
+    connected.skipJitter();
+    await expect(
+      (async () => {
+        const first = connected.tokens.get(DECIDE, ctx);
+        await jest.advanceTimersByTimeAsync(20);
+        return await first;
+      })()
+    ).resolves.toBe('sts-token');
+    const second = connected.tokens.get(
+      { audience: 'bouncer', scope: 'bouncer:usage.write' },
+      ctx
+    );
+    await jest.advanceTimersByTimeAsync(BOUNCER_NOT_HELD_MEMORY_MS + 20);
+    // Half the jitter range (random 0.5) has not passed: the second mint still waits.
+    expect(stsFetch).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(BOUNCER_FIRST_MINT_JITTER_MS / 2);
+    await expect(second).resolves.toBe('sts-token');
+    expect(stsFetch).toHaveBeenCalledTimes(2);
   });
 
   it('delays a first-exchange mint by the jitter and reports not ready meanwhile', async () => {

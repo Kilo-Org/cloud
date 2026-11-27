@@ -5,7 +5,8 @@ import {
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
 } from '@kilocode/sts-contracts';
-import { resolveO11yAlertingSender, type O11yAlertingMethod } from './o11y-client';
+import type { O11yAlertingMethod } from './o11y-alerting-sts';
+import { resolveO11yAlertingSender } from './o11y-client';
 import type * as O11yClient from './o11y-client';
 
 // The client end to end in one process: the real switch, the real lazy STS module and the shared

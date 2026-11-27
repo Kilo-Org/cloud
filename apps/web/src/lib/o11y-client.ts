@@ -10,7 +10,7 @@ import {
   type O11yStsEnvironment,
   type VercelRuntime,
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics-sender';
-import type { O11yAlertingToken } from './o11y-alerting-sts';
+import type { O11yAlertingMethod, O11yAlertingToken } from './o11y-alerting-sts';
 
 /** The client of o11y's `/alerting/*` admin routes, for the admin alerts router. */
 
@@ -75,8 +75,6 @@ const sender = resolveO11yAlertingSender({
   secret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
   runtime: process.env,
 });
-
-export type O11yAlertingMethod = 'GET' | 'PUT' | 'DELETE';
 
 /** The credential header of one request; throws `O11yRequestError` rather than send without one. */
 async function credentialHeaders(method: O11yAlertingMethod): Promise<Record<string, string>> {

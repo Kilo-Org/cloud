@@ -10,12 +10,13 @@ import {
   stsTokenFailure,
   type StsTokenFailure,
 } from '@kilocode/web-shared/lib/sts-service-tokens';
-import type { O11yAlertingMethod } from './o11y-client';
 
 /**
  * The STS side of `O11Y_ALERTING_SENDER_AUTH=sts`. `o11y-client.ts` imports this module only for an
  * STS request, so a `legacy` deployment never loads the token client or the Vercel OIDC exchange.
  */
+
+export type O11yAlertingMethod = 'GET' | 'PUT' | 'DELETE';
 
 /**
  * The scope each method needs, as `services/o11y/src/alerting/config-routes.ts` guards the

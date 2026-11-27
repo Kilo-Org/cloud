@@ -18,7 +18,7 @@ export default defineConfig({
         },
         // Worker unit tests resolve the STS binding to the stub below instead of the deployed
         // broker. The binding names the `SecretsBroker` entrypoint, so the stub exports it.
-        // Nothing reaches it while SECRETS_SOURCE is `env`.
+        // Nothing reaches it while SECRETS_SOURCE is `secrets-store`.
         workers: [
           {
             name: 'sts-stub',

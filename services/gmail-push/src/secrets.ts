@@ -50,8 +50,8 @@ const stsClients = new WeakMap<BundleBinding, Secrets>();
 /**
  * Reads one secret from the selected source and returns it as stored, empty included, so every
  * caller keeps its own empty-value handling. `ctx` belongs to the invocation doing the read (the
- * Worker request, queue batch or Durable Object): a bundle revalidation it starts runs under that
- * invocation's `waitUntil`.
+ * Worker request or queue batch): a bundle revalidation it starts runs under that invocation's
+ * `waitUntil`.
  */
 export async function readGmailPushSecret(
   env: GmailPushSecretsEnv,

@@ -52,8 +52,7 @@ const stsClients = new WeakMap<BundleBinding, Secrets>();
 /**
  * Reads one secret from the selected source and returns it as stored, empty included, so every
  * caller keeps its own empty-value handling. `ctx` belongs to the invocation doing the read (the
- * queue batch or Durable Object): a bundle revalidation it starts runs under that invocation's
- * `waitUntil`.
+ * queue batch): a bundle revalidation it starts runs under that invocation's `waitUntil`.
  */
 export async function readKiloclawInboundEmailSecret(
   env: KiloclawInboundEmailSecretsEnv,

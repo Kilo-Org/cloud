@@ -35,6 +35,11 @@
   "vars": {
     "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
+    // The credential of the lifecycle push to `/api/internal/security-agent/notifications`
+    // (decision D59): `sts` sends a `web:security-notifications.dispatch` STS service token over
+    // the `STS` binding, `legacy` the `INTERNAL_API_SECRET` as `X-Internal-Secret`. Rollback is
+    // `legacy`.
+    "WEB_INTERNAL_AUTH": "sts",
     "SESSION_INGEST_WORKER_URL": "https://ingest.kilosessions.ai",
     "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
     "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "https://app.kilo.ai",
@@ -169,6 +174,8 @@
       "vars": {
         "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
+        // The local app accepts only the secret.
+        "WEB_INTERNAL_AUTH": "legacy",
         "SESSION_INGEST_WORKER_URL": "http://localhost:8800",
         "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
         "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "http://localhost:3000",

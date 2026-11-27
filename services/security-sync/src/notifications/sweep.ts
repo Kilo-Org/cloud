@@ -24,6 +24,12 @@ import {
 } from '@kilocode/worker-utils/security-notification-policy';
 import { and, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH } from '@kilocode/sts-contracts';
+import {
+  webInternalCredential,
+  type WebInternalAuthEnv,
+  type WebInternalCredential,
+} from '@kilocode/worker-utils/web-internal-credential';
 import {
   isOrganizationNotificationOwner,
   resolveNotificationRecipientUserIds,
@@ -43,13 +49,16 @@ const MAX_ATTEMPTS = 4;
 
 type SecretBinding = { get(): Promise<string> };
 
-export type SecurityNotificationSweepEnv = {
+export type SecurityNotificationSweepEnv = WebInternalAuthEnv & {
   HYPERDRIVE?: { connectionString: string };
   BACKEND_API_URL?: string;
   INTERNAL_API_SECRET?: SecretBinding;
   SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED?: string;
   SECURITY_NOTIFICATION_DISPATCH_ENABLED?: string;
 };
+
+/** The credential of one dispatch; a held STS token is a memory read. */
+type DispatchCredentials = () => Promise<WebInternalCredential>;
 
 type OwnerKey = `org:${string}` | `user:${string}`;
 
@@ -866,18 +875,24 @@ async function claimNotification(db: WorkerDb, notificationId: string): Promise<
   return rows.length > 0;
 }
 
-async function dispatchNotification(
+export async function dispatchNotification(
   backendUrl: string,
-  internalSecret: string,
+  credentials: DispatchCredentials,
   notificationId: string
 ): Promise<EndpointResponse> {
+  // The sweep checked for a credential before claiming anything; losing it mid-tick (STS stopped
+  // answering) is a transient failure of the dispatch path, retried like an unreachable app.
+  const credential = await credentials();
+  if (credential.kind === 'unavailable') {
+    return { outcome: 'retryable_failure', reason: 'provider_unavailable' };
+  }
   try {
     const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
       method: 'POST',
       signal: AbortSignal.timeout(DISPATCH_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
-        'X-Internal-Secret': internalSecret,
+        [credential.header]: credential.value,
       },
       body: JSON.stringify({ notificationId }),
     });
@@ -1001,7 +1016,7 @@ async function dispatchPendingRows(
   states: Map<OwnerKey, OwnerConfigState>,
   recipients: Map<OwnerKey, Set<string>>,
   backendUrl: string,
-  internalSecret: string,
+  credentials: DispatchCredentials,
   now: Date
 ): Promise<
   Pick<
@@ -1044,7 +1059,7 @@ async function dispatchPendingRows(
       batch.map(async row => {
         const claimed = await claimNotification(db, row.notificationId);
         if (!claimed) return 'skipped' as const;
-        const outcome = await dispatchNotification(backendUrl, internalSecret, row.notificationId);
+        const outcome = await dispatchNotification(backendUrl, credentials, row.notificationId);
         switch (outcome.outcome) {
           case 'sent':
             await markSent(db, row.notificationId);
@@ -1180,10 +1195,16 @@ export async function runSecurityNotificationSweep(
   let dispatchCapReached = false;
 
   if (dispatchEnabled) {
-    const [backendUrl, internalSecret] = [env.BACKEND_API_URL, await readInternalSecret(env)];
-    if (!backendUrl || !internalSecret) {
+    const backendUrl = env.BACKEND_API_URL;
+    const credentials: DispatchCredentials = () =>
+      webInternalCredential(env, STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH, {
+        header: 'X-Internal-Secret',
+        secret: () => readInternalSecret(env),
+      });
+    // Checked before any row is claimed, so an STS outage or a missing secret costs no attempt.
+    if (!backendUrl || (await credentials()).kind === 'unavailable') {
       console.warn(
-        '[security-notifications] BACKEND_API_URL or internal secret missing; skipping dispatch'
+        '[security-notifications] BACKEND_API_URL or app credential missing; skipping dispatch'
       );
     } else {
       const dispatchResult = await dispatchPendingRows(
@@ -1191,7 +1212,7 @@ export async function runSecurityNotificationSweep(
         states,
         recipients,
         backendUrl,
-        internalSecret,
+        credentials,
         now
       );
       processed = dispatchResult.processed;

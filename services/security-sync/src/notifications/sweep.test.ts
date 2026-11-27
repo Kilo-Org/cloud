@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getWorkerDb } from '@kilocode/db/client';
-import { runSecurityNotificationSweep } from './sweep.js';
+import { dispatchNotification, runSecurityNotificationSweep } from './sweep.js';
 
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 
@@ -245,5 +245,60 @@ describe('runSecurityNotificationSweep', () => {
       'insert-audit:security.finding.superseded',
       'publish-staged',
     ]);
+  });
+});
+
+describe('dispatchNotification', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('presents the credential header it is given and reads the endpoint outcome', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ outcome: 'sent' }));
+
+    const outcome = await dispatchNotification(
+      'https://app.test',
+      async () => ({ kind: 'ready', header: 'authorization', value: 'Bearer sts-token' }),
+      'notification-1'
+    );
+
+    expect(outcome).toEqual({ outcome: 'sent' });
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe('https://app.test/api/internal/security-agent/notifications');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe('Bearer sts-token');
+    expect(headers.has('X-Internal-Secret')).toBe(false);
+  });
+
+  it('retries later without calling the app when no credential can be had', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    const outcome = await dispatchNotification(
+      'https://app.test',
+      async () => ({ kind: 'unavailable', reason: 'token_unavailable' }),
+      'notification-1'
+    );
+
+    expect(outcome).toEqual({ outcome: 'retryable_failure', reason: 'provider_unavailable' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the whole dispatch phase when STS cannot be reached', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const { db } = createStagedRecoveryDb();
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await runSecurityNotificationSweep({
+      HYPERDRIVE: { connectionString: 'postgres://worker' },
+      BACKEND_API_URL: 'https://app.test',
+      SECURITY_NOTIFICATION_DISPATCH_ENABLED: 'true',
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      '[security-notifications] BACKEND_API_URL or app credential missing; skipping dispatch'
+    );
   });
 });

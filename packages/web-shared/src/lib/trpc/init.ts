@@ -2,6 +2,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { accountBlockedRefusalReason, isSelfCleanupProcedureCall } from '@kilocode/app-shared/auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { SessionCheckUnavailableError } from '@kilocode/web-shared/lib/uts-bff/browser-session-config';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
@@ -126,6 +127,8 @@ export type TRPCContext = {
    */
   webSessionId?: string;
   webSessionPepper?: string | null;
+  /** `uts` when a UTS browser session (`kilo-web`) authenticated the request. */
+  browserSessionFamily?: 'uts';
   /**
    * Step-up state measured by `adminProcedure` for a request proof, so a
    * specialized guard chained on it can reuse the result instead of
@@ -202,9 +205,22 @@ export type CreateTRPCContextOpts = {
  * context from `getUserFromAuth` uses it to keep the tRPC context's answers.
  */
 export function contextAuthRefusal(
-  auth: { user: unknown; refusalReason?: unknown },
+  auth: {
+    user: unknown;
+    refusalReason?: unknown;
+    sessionCheckUnavailable?: { retryAfterSeconds: number | null };
+  },
   headersList: Pick<Headers, 'get'> | null | undefined
 ): TRPCError | null {
+  // A UTS browser session that could not be checked is neither signed in nor signed out: a
+  // retryable 503, never the AuthContextError that makes a client sign out.
+  if (auth.sessionCheckUnavailable) {
+    return new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'The browser session could not be checked; retry later',
+      cause: new SessionCheckUnavailableError(auth.sessionCheckUnavailable.retryAfterSeconds),
+    });
+  }
   // Authorization refused the account itself (R0 domain blacklist / R1 blocked
   // account) while the session is intact. That is a different answer from a
   // missing session: the mobile app must show why the account cannot be used
@@ -293,6 +309,8 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionId,
     webSessionPepper,
     refusalReason,
+    sessionCheckUnavailable,
+    browserSessionFamily,
   } = await readContextAuth({
     headersList,
     requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
@@ -300,7 +318,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     startedAt,
   });
   // Non-null whenever `user` is null, so the second test only narrows `user`.
-  const refusal = contextAuthRefusal({ user, refusalReason }, headersList);
+  const refusal = contextAuthRefusal({ user, refusalReason, sessionCheckUnavailable }, headersList);
   if (refusal !== null || !user) throw refusal;
   setTag('userId', user.id);
   const authViaToken = authViaTokenFromHeaders(headersList);
@@ -314,11 +332,13 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
       tokenSource,
       internalApiUse,
       cloudAgentAuthority,
+      browserSessionFamily,
     }),
     internalApiUse,
     tokenSource: tokenSource ?? null,
     webSessionId,
     webSessionPepper: webSessionPepper ?? null,
+    browserSessionFamily,
     ip: clientIpFromHeaders(headersList),
     headersList,
     controlPlaneStartedAt: isMobileClient(headersList?.get(APP_CLIENT_HEADER))
@@ -514,12 +534,14 @@ function deriveContextCredential(ctx: {
   tokenSource?: string | null;
   internalApiUse?: boolean;
   cloudAgentAuthority?: CloudAgentAuthority;
+  browserSessionFamily?: 'uts';
 }): PrivilegedCredentialKind {
   return deriveCredentialKind({
     authViaToken: ctx.authViaToken ?? false,
     tokenSource: ctx.tokenSource ?? null,
     internalApiUse: ctx.internalApiUse,
     delegatedWorkload: ctx.cloudAgentAuthority !== undefined,
+    utsBrowserSession: ctx.browserSessionFamily === 'uts',
   });
 }
 

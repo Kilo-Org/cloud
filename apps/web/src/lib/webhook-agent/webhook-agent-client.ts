@@ -3,8 +3,10 @@ import type { WebhookTriggerTarget } from '@kilocode/worker-utils/webhook-trigge
 import 'server-only';
 import { WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 /**
@@ -155,7 +157,28 @@ function buildTriggerPath(namespace: string, triggerId: string): string {
   throw new Error(`Invalid namespace: ${namespace}`);
 }
 
+const UNCONFIGURED_ERROR = 'Webhook agent worker is not configured';
+
+/**
+ * False when `WEBHOOK_AGENT_URL` is unset or refused for this deployment (see config.server.ts).
+ * Nothing is sent then: every worker call answers 503, and no inbound URL is built.
+ */
+export function isWebhookAgentConfigured(): boolean {
+  return parseInternalServiceUrl(WEBHOOK_AGENT_URL) !== null;
+}
+
+/** What a trigger procedure throws when it refuses because the worker is not configured. */
+export function webhookTriggersUnavailable(): TRPCError {
+  return new TRPCError({
+    code: 'SERVICE_UNAVAILABLE',
+    message: 'Webhook triggers are unavailable',
+  });
+}
+
 async function workerFetch<T>(path: string, options: RequestInit = {}): Promise<WorkerResponse<T>> {
+  if (!isWebhookAgentConfigured()) {
+    return { success: false, error: UNCONFIGURED_ERROR, status: 503 };
+  }
   const url = `${WEBHOOK_AGENT_URL}${path}`;
 
   const response = await fetch(url, {
@@ -321,6 +344,9 @@ export async function invokeWorkerScheduledTrigger(
 > {
   const namespace = buildNamespace(userId, organizationId);
   const path = `${buildTriggerPath(namespace, triggerId)}/invoke`;
+  if (!isWebhookAgentConfigured()) {
+    return { success: false, error: UNCONFIGURED_ERROR, status: 503 };
+  }
 
   try {
     const response = await fetch(`${WEBHOOK_AGENT_URL}${path}`, {
@@ -412,6 +438,7 @@ export function buildInboundUrl(
   organizationId: string | undefined,
   triggerId: string
 ): string {
+  if (!isWebhookAgentConfigured()) throw webhookTriggersUnavailable();
   if (organizationId) {
     return `${WEBHOOK_AGENT_URL}/inbound/org/${organizationId}/${triggerId}`;
   }

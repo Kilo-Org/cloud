@@ -1,6 +1,7 @@
 export * from './account';
 export * from './attestation';
 export * from './browser-sessions';
+export * from './ci';
 export * from './clients';
 export * from './environment';
 export * from './exchange';

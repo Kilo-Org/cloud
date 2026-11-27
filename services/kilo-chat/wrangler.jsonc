@@ -5,7 +5,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-04-25",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
+  "observability": { "enabled": true, "traces": { "enabled": false } },
   "logpush": true,
   "placement": { "mode": "smart" },
   "dev": { "port": 8808 },
@@ -14,6 +16,10 @@
     "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "R2_BUCKET_NAME": "kilo-chat-media",
     "KEY_PREFIX": "",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
 
@@ -55,6 +61,16 @@
       "binding": "NOTIFICATIONS",
       "service": "notifications",
       "entrypoint": "NotificationsService",
+    },
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // kilo-chat.yaml grants the five secrets below. Nothing reads it while SECRETS_SOURCE is
+    // `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "kilo-chat" },
     },
   ],
 

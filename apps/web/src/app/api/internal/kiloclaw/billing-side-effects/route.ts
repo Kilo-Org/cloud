@@ -1,4 +1,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -403,6 +408,13 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  observeInternalAuth(
+    'web',
+    'kiloclaw_billing_side_effects',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   const rawBody: unknown = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(rawBody);

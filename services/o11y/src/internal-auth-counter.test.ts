@@ -18,8 +18,8 @@ function lines(log: { mock: { calls: unknown[][] } }): Record<string, unknown>[]
 }
 
 function stubQuery(rows: unknown[]) {
-  const fetchMock = vi.fn(
-    async (_input: RequestInfo | URL, _init?: RequestInit) => Response.json({ data: rows })
+  const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+    Response.json({ data: rows })
   );
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -90,6 +90,12 @@ describe('summarizeInternalAuthCounter', () => {
     await summarizeInternalAuthCounter(env, undefined, SCHEDULED_MS);
 
     const sql = String((fetchMock.mock.calls[0]?.[1] as { body?: string } | undefined)?.body);
+    expect(sql).toContain('FROM kilo_internal_auth');
+    expect(sql).toContain('SUM(_sample_interval * double1) AS accepted');
+    expect(sql).toContain('blob1 AS receiver');
+    expect(sql).toContain('blob2 AS route');
+    expect(sql).toContain('blob3 AS auth');
+    expect(sql).toContain('blob4 AS caller');
     expect(sql).toContain(`toDateTime(${WINDOW})`);
     expect(sql).toContain(`toDateTime(${WINDOW + 60})`);
     expect(sql).toContain('toUInt32(index1)');

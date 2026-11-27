@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import worker from './index';
 import type { Env } from './publish-usage';
 import { usage, wireUsage } from './usage.test-fixture';
@@ -16,8 +16,12 @@ afterEach(() => {
 // A named handle, not an inline cast: the pool shares `globalThis` with the Worker under test.
 const OBSERVATION_SEAM = '__KILO_INTERNAL_AUTH_OBSERVATION__';
 const testGlobals = globalThis as unknown as Record<string, unknown>;
-testGlobals[OBSERVATION_SEAM] = false;
-process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
+
+// Per test, not once at module load: `afterEach` clears it and suites share one process.
+beforeEach(() => {
+  process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
+  testGlobals[OBSERVATION_SEAM] = false;
+});
 
 function setup() {
   const info = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -169,13 +173,12 @@ it('keeps an enqueue failure a safe 503 even when its diagnostic sink throws', a
 
 it('emits the full unavailable enqueue fields without a flag', async () => {
   const { env, send, logs } = setup();
-  // With the item-9 counter on, the three readings are the publisher entry, the counter's own
-  // minute, and the pre-send stamp; every later call reads the completion time.
+  // The counter is off for this suite (see the flag at the top of the file), so these are the only
+  // clock reads: the publisher entry, the pre-send stamp and the completion.
   vi.spyOn(Date, 'now')
-    .mockReturnValue(1250)
     .mockReturnValueOnce(1000)
-    .mockReturnValueOnce(1250)
-    .mockReturnValueOnce(1000);
+    .mockReturnValueOnce(1000)
+    .mockReturnValueOnce(1250);
   vi.spyOn(performance, 'now').mockReturnValueOnce(10).mockReturnValueOnce(47);
   send.mockRejectedValue(new Error('sensitive-queue-error'));
   expect((await publish(env)).status).toBe(503);

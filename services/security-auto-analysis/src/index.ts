@@ -6,6 +6,11 @@ import {
 } from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { verifyCallbackToken } from '@kilocode/worker-utils';
 import {
   buildScheduledJobFailureEvent,
@@ -32,6 +37,29 @@ import {
   startManualRemediation,
 } from './remediation.js';
 
+/**
+ * Compares the internal API secret for one route family and reports each acceptance for the
+ * item-9 counter (design section 9.4). Resolves the refusal to send, or null when it admits.
+ */
+async function internalAuthRefusal(
+  request: Request,
+  env: CloudflareEnv,
+  route: string
+): Promise<Response | null> {
+  const internalSecret = await env.INTERNAL_API_SECRET.get();
+  const authHeader = request.headers.get('x-internal-api-key');
+  if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  observeInternalAuth(
+    'security-auto-analysis',
+    route,
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
+  return null;
+}
+
 async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
   const url = new URL(request.url);
 
@@ -44,12 +72,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/dispatch') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
-    const authHeader = request.headers.get('x-internal-api-key');
-
-    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const refusal = await internalAuthRefusal(request, env, 'dispatch');
+    if (refusal !== null) return refusal;
 
     const result = await dispatchDueOwners(env);
     return Response.json({
@@ -65,11 +89,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
         { status: 503 }
       );
     }
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
-    const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const refusal = await internalAuthRefusal(request, env, 'manual_analysis_start');
+    if (refusal !== null) return refusal;
 
     let payload: unknown;
     try {
@@ -106,11 +127,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/start') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
-    const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const refusal = await internalAuthRefusal(request, env, 'remediation_start');
+    if (refusal !== null) return refusal;
 
     let payload: unknown;
     try {
@@ -147,11 +165,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/cancel') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
-    const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const refusal = await internalAuthRefusal(request, env, 'remediation_cancel');
+    if (refusal !== null) return refusal;
 
     let payload: unknown;
     try {
@@ -172,11 +187,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/apply-auto-remediation') {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
-    const authHeader = request.headers.get('x-internal-api-key');
-    if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const refusal = await internalAuthRefusal(request, env, 'apply_auto_remediation');
+    if (refusal !== null) return refusal;
 
     let payload: unknown;
     try {
@@ -238,6 +250,10 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
         secret: callbackTokenSecret,
         scope: 'security-remediation-callback',
         resourceParts: [attemptId, attemptToken],
+        observation: {
+          receiver: 'security-auto-analysis',
+          caller: request.headers.get(INTERNAL_CALLER_HEADER),
+        },
       }));
     if (!validCallbackToken) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -294,6 +310,10 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
         secret: callbackTokenSecret,
         scope: 'security-analysis-callback',
         resourceParts: [findingId, attemptToken],
+        observation: {
+          receiver: 'security-auto-analysis',
+          caller: request.headers.get(INTERNAL_CALLER_HEADER),
+        },
       }));
     if (!validCallbackToken) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });

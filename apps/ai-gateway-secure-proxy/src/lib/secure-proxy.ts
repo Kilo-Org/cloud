@@ -3,10 +3,16 @@ import {
   SecureProxyRequestBodySchema,
 } from '@kilocode/ai-gateway-secure-proxy-contracts';
 import type { WaitUntil } from '@kilocode/verify';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { NextResponse, after } from 'next/server';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
   CREDENTIAL_ACCEPT_ENV,
+  SECURE_PROXY_SENDER,
   createServiceTokenAdmission,
   credentialAcceptance,
   misconfigured,
@@ -90,13 +96,25 @@ export function createSecureProxyHandler({ waitUntil = after }: SecureProxyHandl
         console.error('[secure-proxy] KILO_AI_GATEWAY_SECURE_PROXY_SECRET is not configured');
         return errorResponse(500, 'Secure proxy secret is not configured');
       }
-      if (isAuthorized(request, secret)) return 'legacy';
+      if (isAuthorized(request, secret)) {
+        observeInternalAuth(
+          'ai-gateway-secure-proxy',
+          'forward',
+          'legacy_shared_secret',
+          callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+        );
+        return 'legacy';
+      }
     }
     if (!acceptance.sts) {
       console.warn('[secure-proxy] Rejected request with missing or invalid authorization');
       return errorResponse(401, 'Unauthorized');
     }
-    return (await admitServiceToken(request)) ?? 'sts';
+    const refused = await admitServiceToken(request);
+    if (refused !== null) return refused;
+    // The admission accepts only this workload, so the label is the verified sender.
+    observeInternalAuth('ai-gateway-secure-proxy', 'forward', 'sts', SECURE_PROXY_SENDER);
+    return 'sts';
   }
 
   return async request => {

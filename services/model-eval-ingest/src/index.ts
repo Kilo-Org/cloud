@@ -6,6 +6,11 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import * as z from 'zod';
 import { createPromotionStore, syncPromotionsFromBench } from './sync.js';
 
@@ -44,6 +49,12 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
   if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'model-eval-ingest',
+    'sync',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   const rawBody = await request.text();
   let requestBody: unknown;

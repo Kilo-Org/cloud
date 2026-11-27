@@ -1,6 +1,11 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { STS_USAGE_PUBLISH } from '@kilocode/sts-contracts';
 import { failureResponse } from '@kilocode/verify';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { logSafely } from './diagnostics';
 import {
   publishVerifierFor,
@@ -46,6 +51,13 @@ export const PUBLISH_WORKLOADS: Readonly<Record<PublishPath, string>> = {
   '/usage': 'ai-gateway',
   '/enkrypt-usage': 'ai-gateway',
   '/exa-usage': 'web',
+};
+
+/** The observation label of each publish path (design section 9.4, item 9). */
+const PUBLISH_ROUTE_LABELS: Readonly<Record<PublishPath, string>> = {
+  '/usage': 'usage_publish',
+  '/enkrypt-usage': 'enkrypt_usage_publish',
+  '/exa-usage': 'exa_usage_publish',
 };
 
 /**
@@ -101,7 +113,15 @@ export async function authorizePublish(
     const legacy = Boolean(
       secret && authorization && timingSafeEqual(authorization, `Bearer ${secret}`)
     );
-    if (legacy) return mode === 'legacy' ? {} : { auth: 'legacy' };
+    if (legacy) {
+      observeInternalAuth(
+        'usage-ingest',
+        PUBLISH_ROUTE_LABELS[path],
+        'legacy_shared_secret',
+        callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+      );
+      return mode === 'legacy' ? {} : { auth: 'legacy' };
+    }
     if (mode === 'legacy' || authorization === null || !JWS_BEARER.test(authorization)) {
       return secret
         ? errorResponse('Unauthorized', 401)
@@ -148,5 +168,6 @@ export async function authorizePublish(
       { status: 403, headers: { 'cache-control': 'no-store' } }
     );
   }
+  observeInternalAuth('usage-ingest', PUBLISH_ROUTE_LABELS[path], 'sts', callerLabel(workload));
   return { auth: 'sts', auth_caller: workload };
 }

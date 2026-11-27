@@ -1,5 +1,6 @@
 import { installInternalApiSecretRead } from '@kilocode/web-shared/lib/internal-api-secret';
 import { createSelectedInternalApiSecretRead } from '@kilocode/web-shared/lib/sts-secret-reader';
+import { resetInternalAuthObservation } from '@kilocode/worker-utils/internal-auth-observation';
 import { authorizeInternalApiRequest } from './internal-api-auth';
 
 let mockEnvSecret = 'env-only-secret';
@@ -13,13 +14,14 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 const DELIVERED = 'sts-delivered-secret';
 const readSts = jest.fn<Promise<string>, [string]>();
+let observed: jest.SpyInstance;
 
 function request(headers: Record<string, string>): Request {
   return new Request('https://app.test/api/internal/usage/record', { method: 'POST', headers });
 }
 
 async function statusOf(headers: Record<string, string>): Promise<number | null> {
-  const refusal = await authorizeInternalApiRequest(request(headers));
+  const refusal = await authorizeInternalApiRequest(request(headers), 'usage_record');
   if (refusal === null) return null;
   expect(await refusal.json()).toEqual({ error: 'Unauthorized' });
   return refusal.status;
@@ -28,6 +30,9 @@ async function statusOf(headers: Record<string, string>): Promise<number | null>
 beforeEach(() => {
   mockEnvSecret = 'env-only-secret';
   delete process.env.SECRETS_SOURCE;
+  delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
+  resetInternalAuthObservation();
+  observed = jest.spyOn(console, 'log').mockImplementation(() => {});
   readSts.mockReset();
   readSts.mockResolvedValue(DELIVERED);
   // The web app's own selection with a stand-in STS read; the shipped wiring is covered in
@@ -43,6 +48,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.SECRETS_SOURCE;
+  delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
+  observed.mockRestore();
   globalThis.__kilocodeInternalApiSecretRead = undefined;
 });
 
@@ -89,7 +96,7 @@ describe('authorizeInternalApiRequest', () => {
     process.env.SECRETS_SOURCE = 'sts';
     readSts.mockRejectedValue(new Error('STS denied the bundle request for this workload'));
     await expect(
-      authorizeInternalApiRequest(request({ 'x-internal-api-key': 'env-only-secret' }))
+      authorizeInternalApiRequest(request({ 'x-internal-api-key': 'env-only-secret' }), 'x')
     ).rejects.toThrow('STS denied');
   });
 
@@ -98,9 +105,49 @@ describe('authorizeInternalApiRequest', () => {
     async source => {
       process.env.SECRETS_SOURCE = source;
       await expect(
-        authorizeInternalApiRequest(request({ 'x-internal-api-key': 'env-only-secret' }))
+        authorizeInternalApiRequest(request({ 'x-internal-api-key': 'env-only-secret' }), 'x')
       ).rejects.toThrow('SECRETS_SOURCE must be either "env" or "sts"');
       expect(readSts).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('authorizeInternalApiRequest observation (design 9.4 item 9)', () => {
+  it('writes one line for an accepted shared-secret request and never the secret', async () => {
+    expect(
+      await statusOf({ 'x-internal-api-key': 'env-only-secret', 'x-kilo-caller': 'usage-ingest' })
+    ).toBeNull();
+
+    expect(observed).toHaveBeenCalledTimes(1);
+    const line = String(observed.mock.calls[0][0]);
+    expect(line).not.toContain('env-only-secret');
+    expect(JSON.parse(line)).toMatchObject({
+      event: 'kilo_internal_auth',
+      v: 1,
+      receiver: 'web',
+      route: 'usage_record',
+      auth: 'legacy_shared_secret',
+      caller: 'usage-ingest',
+      count: 1,
+    });
+  });
+
+  it('labels a caller outside the allowlist unknown', async () => {
+    await statusOf({ 'x-internal-api-key': 'env-only-secret', 'x-kilo-caller': 'anyone' });
+
+    expect(JSON.parse(String(observed.mock.calls[0][0])).caller).toBe('unknown');
+  });
+
+  it('writes nothing for a refused request', async () => {
+    expect(await statusOf({ 'x-internal-api-key': 'wrong' })).toBe(401);
+    expect(await statusOf({})).toBe(401);
+    expect(observed).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the observation flag is exactly false', async () => {
+    process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
+
+    expect(await statusOf({ 'x-internal-api-key': 'env-only-secret' })).toBeNull();
+    expect(observed).not.toHaveBeenCalled();
+  });
 });

@@ -8,6 +8,11 @@
 
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
@@ -68,6 +73,12 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
   }
 
   logger.info('Internal API request authenticated');
+  observeInternalAuth(
+    'webhook-agent-ingest',
+    'api',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
 
   await next();
 });

@@ -41,7 +41,10 @@ const app = new Hono<HonoEnv>();
 // Authentication middleware
 app.use(
   '*',
-  backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN)
+  backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN, {
+    receiver: 'code-review-infra',
+    route: 'review',
+  })
 );
 
 // Route: POST /review

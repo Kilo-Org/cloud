@@ -50,27 +50,30 @@ describe('secretsSource', () => {
 });
 
 describe('readContainerUsageMeterSecret', () => {
-  it.each(NAMES)('reads %s from its binding by default and from the bundle under sts', async name => {
-    const store = storeSecret('legacy-value');
-    const sts = stsBinding(okBundle({ [name]: 'bundle-value' }));
-    const env = { INTERNAL_API_SECRET_PROD: store.secret, STS: sts.binding };
+  it.each(NAMES)(
+    'reads %s from its binding by default and from the bundle under sts',
+    async name => {
+      const store = storeSecret('legacy-value');
+      const sts = stsBinding(okBundle({ [name]: 'bundle-value' }));
+      const env = { INTERNAL_API_SECRET_PROD: store.secret, STS: sts.binding };
 
-    expect(await readContainerUsageMeterSecret(env, name)).toBe('legacy-value');
-    expect(sts.getBundle).not.toHaveBeenCalled();
+      expect(await readContainerUsageMeterSecret(env, name)).toBe('legacy-value');
+      expect(sts.getBundle).not.toHaveBeenCalled();
 
-    expect(await readContainerUsageMeterSecret({ ...env, SECRETS_SOURCE: 'sts' }, name)).toBe(
-      'bundle-value'
-    );
-    expect(store.get).toHaveBeenCalledOnce();
-    expect(sts.getBundle).toHaveBeenCalledOnce();
+      expect(await readContainerUsageMeterSecret({ ...env, SECRETS_SOURCE: 'sts' }, name)).toBe(
+        'bundle-value'
+      );
+      expect(store.get).toHaveBeenCalledOnce();
+      expect(sts.getBundle).toHaveBeenCalledOnce();
 
-    // Flipping the variable back reads the legacy binding again.
-    expect(await readContainerUsageMeterSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
-      'legacy-value'
-    );
-    expect(store.get).toHaveBeenCalledTimes(2);
-    expect(sts.getBundle).toHaveBeenCalledOnce();
-  });
+      // Flipping the variable back reads the legacy binding again.
+      expect(await readContainerUsageMeterSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
+        'legacy-value'
+      );
+      expect(store.get).toHaveBeenCalledTimes(2);
+      expect(sts.getBundle).toHaveBeenCalledOnce();
+    }
+  );
 
   it('reads a plain Worker secret, which arrives as a string', async () => {
     expect(
@@ -90,9 +93,9 @@ describe('readContainerUsageMeterSecret', () => {
       SECRETS_SOURCE: 'sts',
     };
 
-    await expect(
-      readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET')
-    ).rejects.toBeInstanceOf(SecretUnavailableError);
+    await expect(readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET')).rejects.toBeInstanceOf(
+      SecretUnavailableError
+    );
     expect(store.get).not.toHaveBeenCalled();
   });
 
@@ -104,10 +107,7 @@ describe('readContainerUsageMeterSecret', () => {
       /STS service binding is missing/
     );
     await expect(
-      readContainerUsageMeterSecret(
-        { ...env, SECRETS_SOURCE: 'infisical' },
-        'INTERNAL_API_SECRET'
-      )
+      readContainerUsageMeterSecret({ ...env, SECRETS_SOURCE: 'infisical' }, 'INTERNAL_API_SECRET')
     ).rejects.toThrow(/SECRETS_SOURCE/);
     expect(store.get).not.toHaveBeenCalled();
   });
@@ -122,12 +122,8 @@ describe('readContainerUsageMeterSecret', () => {
     const sts = stsBinding(okBundle({ INTERNAL_API_SECRET: 'bundle-internal' }));
     const env = { STS: sts.binding, SECRETS_SOURCE: 'sts' };
 
-    expect(await readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET')).toBe(
-      'bundle-internal'
-    );
-    expect(await readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET')).toBe(
-      'bundle-internal'
-    );
+    expect(await readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET')).toBe('bundle-internal');
+    expect(await readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET')).toBe('bundle-internal');
     expect(sts.getBundle).toHaveBeenCalledOnce();
   });
 });

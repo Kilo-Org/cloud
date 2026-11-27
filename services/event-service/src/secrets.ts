@@ -35,9 +35,7 @@ export type EventServiceSecretsEnv = Partial<Record<BindingName, LegacySecretVal
 export type SecretsSource = 'env' | 'sts';
 
 /** Fails closed: an unrecognised value refuses every read instead of guessing a source. */
-export function secretsSource(
-  env: Pick<EventServiceSecretsEnv, 'SECRETS_SOURCE'>
-): SecretsSource {
+export function secretsSource(env: Pick<EventServiceSecretsEnv, 'SECRETS_SOURCE'>): SecretsSource {
   const source = env.SECRETS_SOURCE ?? 'env';
   if (source !== 'env' && source !== 'sts') {
     throw new Error('SECRETS_SOURCE must be either "env" or "sts"');

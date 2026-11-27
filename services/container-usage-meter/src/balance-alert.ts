@@ -1,8 +1,5 @@
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
-import {
-  readContainerUsageMeterSecret,
-  type ContainerUsageMeterSecretsEnv,
-} from './secrets';
+import { readContainerUsageMeterSecret, type ContainerUsageMeterSecretsEnv } from './secrets';
 
 export async function notifyOrganizationBalanceAlert(
   env: Pick<Cloudflare.Env, 'KILOCODE_BACKEND_BASE_URL'> & ContainerUsageMeterSecretsEnv,

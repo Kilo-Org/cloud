@@ -8,11 +8,7 @@ export async function deliverInboundEmail(
   env: AppEnv,
   ctx?: ExecutionContext
 ): Promise<void> {
-  const internalApiSecret = await readKiloclawInboundEmailSecret(
-    env,
-    'INTERNAL_API_SECRET',
-    ctx
-  );
+  const internalApiSecret = await readKiloclawInboundEmailSecret(env, 'INTERNAL_API_SECRET', ctx);
   const response = await env.KILOCLAW.fetch(
     new Request('https://kiloclaw/api/platform/inbound-email', {
       method: 'POST',

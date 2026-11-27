@@ -335,6 +335,7 @@ export function confirmAppPage(appName: string, redirectUri: string): Response {
     'Continue to the app',
     'confirm-app',
     `<p>Open ${escapeHtml(appName)} signed in as you? Only continue if you started this sign-in in the app yourself.</p>
+<p>The app receives the sign-in at <code>${escapeHtml(redirectUri)}</code>.</p>
 <form method="post">
 <button type="submit" id="confirm-app">Continue</button>
 </form>`

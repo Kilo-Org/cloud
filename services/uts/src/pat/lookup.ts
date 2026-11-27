@@ -34,10 +34,35 @@ export type PatRow = {
 /** One lookup by the raw SHA-256; throws `IdentityStoreError` when the identity store fails. */
 export type PatLookupStore = (hash: Uint8Array) => Promise<PatRow | null>;
 
-/** In-flight lookups of one isolate, as plain data. */
-export type LookupLimiter = { inFlight: number };
+/**
+ * A lookup that has not answered after this long answers `unavailable`, connecting included.
+ * `pg`'s own `connectionTimeoutMillis` cannot end a hung connect on a Workers socket: on timeout
+ * it destroys the socket, and `pg-cloudflare` ends a socket by first writing to it, which waits
+ * for a connect that never completes. So the deadline races the whole lookup instead.
+ */
+export const PAT_LOOKUP_DEADLINE_MS = 5 * 1000;
 
-const ISOLATE_LIMITER: LookupLimiter = { inFlight: 0 };
+/**
+ * How long a lookup holds its in-flight slot at most: twice its deadline. Workers cancels the work
+ * of a request whose client went away, and a cancelled lookup's promises never settle, so its
+ * `finally` never runs; the slot then lapses here instead of staying taken for the life of the
+ * isolate.
+ */
+export const PAT_LOOKUP_LEASE_MS = 2 * PAT_LOOKUP_DEADLINE_MS;
+
+/**
+ * In-flight lookups of one isolate, as plain data: each holds a lease, keyed by a number, that
+ * names when it started. Leases past `PAT_LOOKUP_LEASE_MS` no longer count.
+ */
+export type LookupLimiter = { leases: Map<number, number>; nextLease: number };
+
+export function lookupLimiter(): LookupLimiter {
+  return { leases: new Map(), nextLease: 0 };
+}
+
+const ISOLATE_LIMITER = lookupLimiter();
+
+const TIMED_OUT = Symbol('timed out');
 
 /** The PAT config as the mint Worker sees it: bound once the environment provisions it. */
 export type PatStoreBinding =
@@ -73,22 +98,35 @@ export function identityStorePatLookup(
 
 /**
  * The answer for `hash`, the lowercase-hex SHA-256 of the whole PAT, with at most `inFlightCap`
- * lookups of this isolate in flight.
+ * lookups of this isolate in flight at `now`. The admission check and the lease are taken before
+ * the first await.
  */
 export async function lookupPatHash(
   hash: string,
   store: PatLookupStore,
   inFlightCap: number,
-  limiter: LookupLimiter = ISOLATE_LIMITER
+  limiter: LookupLimiter = ISOLATE_LIMITER,
+  now: number = Date.now()
 ): Promise<UtsPatLookupResult> {
   if (!PatHashSchema.safeParse(hash).success) return { status: 'not_found' };
-  if (limiter.inFlight >= inFlightCap) {
+  for (const [lease, startedAt] of limiter.leases) {
+    if (now - startedAt >= PAT_LOOKUP_LEASE_MS) limiter.leases.delete(lease);
+  }
+  if (limiter.leases.size >= inFlightCap) {
     return { status: 'rate_limited', retryAfterSeconds: RATE_LIMITED_RETRY_SECONDS };
   }
-  limiter.inFlight += 1;
+  const lease = limiter.nextLease;
+  limiter.nextLease += 1;
+  limiter.leases.set(lease, now);
   let row: PatRow | null;
   try {
-    row = await store(hashOfHex(hash));
+    const deadline = scheduler.wait(PAT_LOOKUP_DEADLINE_MS).then((): typeof TIMED_OUT => TIMED_OUT);
+    const answer = await Promise.race([store(hashOfHex(hash)), deadline]);
+    if (answer === TIMED_OUT) {
+      console.error(JSON.stringify({ event: 'uts.pat_lookup.timed_out' }));
+      return { status: 'unavailable', retryAfterSeconds: UNAVAILABLE_RETRY_SECONDS };
+    }
+    row = answer;
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -100,7 +138,7 @@ export async function lookupPatHash(
     );
     return { status: 'unavailable', retryAfterSeconds: UNAVAILABLE_RETRY_SECONDS };
   } finally {
-    limiter.inFlight -= 1;
+    limiter.leases.delete(lease);
   }
   if (row === null) return { status: 'not_found' };
   return {

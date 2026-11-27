@@ -32,8 +32,22 @@ export type DeliveryResult = {
   finish: FinishResult;
 };
 
-/** Delivery rounds a background pass claims at most; each round makes at most 2 provider calls. */
+/** Delivery rounds one claim takes at most; each round makes at most 2 provider calls. */
 export const NOTICE_SWEEP_LIMIT = 20;
+
+/**
+ * Claims one background pass makes at most: while a claim comes back full, the pass claims again,
+ * so up to 100 due notices go out each minute, oldest first, and a burst drains in minutes instead
+ * of waiting past the 24-hour limit at 20 a minute.
+ */
+export const NOTICE_SWEEP_ROUNDS = 5;
+
+/**
+ * A pass starts no further claim this long after it began. A round waits at most 2 provider
+ * timeouts, so a pass ends within about 50 seconds; a pass that overlaps the next minute's is still
+ * safe, because a claim skips the rows another holds.
+ */
+export const NOTICE_SWEEP_DEADLINE_MS = 30_000;
 
 /** Rows of each kind one background pass deletes at most (`uts.maintain_notice_rows`). */
 export const NOTICE_RETENTION_BATCH = 500;
@@ -160,30 +174,39 @@ export async function retainNotices(notices: NoticesAccess): Promise<SweepResult
 
 /**
  * The background pass: claims up to `NOTICE_SWEEP_LIMIT` due notices (new ones whose immediate
- * delivery never ran, retries, and claims left by a stopped Worker), delivers them in parallel, and
- * then runs one retention step. A failed retention step is logged and does not fail the pass.
+ * delivery never ran, retries, and claims left by a stopped Worker), delivers them in parallel,
+ * and claims again while the claim came back full, at most `NOTICE_SWEEP_ROUNDS` times and never
+ * after `NOTICE_SWEEP_DEADLINE_MS`; then it runs one retention step. A delivered round's notices
+ * are finished or pending for a later minute, so no round claims them again. A failed retention
+ * step is logged and does not fail the pass.
  */
 export async function sweepNotices(deps: NoticeDeps): Promise<SweepResult> {
-  const claimed = await deps.notices(store => store.claimDueNotices(NOTICE_SWEEP_LIMIT));
-  const results = await Promise.allSettled(claimed.map(notice => deliverClaimed(deps, notice)));
+  const startedAt = deps.now().getTime();
   const result: SweepResult = {
-    claimed: claimed.length,
+    claimed: 0,
     delivered: 0,
     pending: 0,
     failed: 0,
     unfinished: 0,
     retention: { status: 'failed' },
   };
-  for (const settled of results) {
-    if (settled.status === 'rejected') {
-      result.unfinished += 1;
-      console.error(
-        JSON.stringify({ event: 'uts.notice.finish_failed', ...errorFields(settled.reason) })
-      );
-      continue;
+  for (let round = 0; round < NOTICE_SWEEP_ROUNDS; round += 1) {
+    if (round > 0 && deps.now().getTime() - startedAt >= NOTICE_SWEEP_DEADLINE_MS) break;
+    const claimed = await deps.notices(store => store.claimDueNotices(NOTICE_SWEEP_LIMIT));
+    result.claimed += claimed.length;
+    const results = await Promise.allSettled(claimed.map(notice => deliverClaimed(deps, notice)));
+    for (const settled of results) {
+      if (settled.status === 'rejected') {
+        result.unfinished += 1;
+        console.error(
+          JSON.stringify({ event: 'uts.notice.finish_failed', ...errorFields(settled.reason) })
+        );
+        continue;
+      }
+      const { finish } = settled.value;
+      if (finish.outcome === 'finished') result[finish.delivery] += 1;
     }
-    const { finish } = settled.value;
-    if (finish.outcome === 'finished') result[finish.delivery] += 1;
+    if (claimed.length < NOTICE_SWEEP_LIMIT) break;
   }
   result.retention = await retainNotices(deps.notices);
   return result;

@@ -4,7 +4,7 @@ import { withIdentityStore } from '../db/client';
 import { dataCenter } from '../dos/data-center';
 import { feedOfObjectId, storedFeedCheck } from '../dos/stubs';
 import { readConfig, type Env, type UtsConfig } from '../env';
-import { identityStoreBinding } from '../grants/binding';
+import { type IdentityStoreBinding, identityStoreBinding } from '../grants/binding';
 import { generateFeedKey, importSigningKey } from '../keys/ed25519';
 import {
   advance,
@@ -26,6 +26,18 @@ const KEY_STATE = 'feed-key-state';
 
 /** The alarm period: backfill, expiry and key rotation run every 5 seconds (design 5.6). */
 export const FEED_ALARM_INTERVAL_MS = 5 * 1000;
+
+/**
+ * The alarm period while the environment binds no identity store: there is nothing to backfill,
+ * so the alarm only rotates the feed key, which changes once in 30 days. Loading moves an alarm
+ * this far out back to now once the store is bound (`#load`).
+ */
+export const FEED_UNBOUND_ALARM_INTERVAL_MS = 60 * 60 * 1000;
+
+/** The time to the next alarm run: 5 seconds while the identity store is bound, else an hour. */
+export function feedAlarmIntervalMs(binding: IdentityStoreBinding): number {
+  return binding.kind === 'unprovisioned' ? FEED_UNBOUND_ALARM_INTERVAL_MS : FEED_ALARM_INTERVAL_MS;
+}
 
 /** A backfill gives up after this long, connecting included (design 3, "Revocation feed"). */
 export const FEED_BACKFILL_DEADLINE_MS = 10 * 1000;
@@ -116,14 +128,25 @@ export class UtsFeedDO extends DurableObject<Env> {
     return list === null ? { status: 'not_found' } : { status: 'ok', list: list.text };
   }
 
-  /** Adds the entries one revoking statement wrote; `stored` confirms the object holds them. */
+  /**
+   * Adds the entries one revoking statement wrote; `stored` confirms the object holds them. When
+   * they change a list whose head date already went out, the next backfill moves forward to the
+   * start of the next second (`FeedLedger.backfillWantedAt`), so their head follows within about
+   * a second.
+   */
   async publish(entries: unknown): Promise<FeedPublishResult> {
     const phase = this.#settled();
     if (phase.status === 'refused') return { status: 'misconfigured', reason: phase.reason };
     const parsed = FeedEntriesSchema.safeParse(entries);
     if (!parsed.success) return { status: 'refused', reason: 'invalid_entries' };
     const now = Date.now();
-    this.#ledger.take(parsed.data, now);
+    if (this.#ledger.take(parsed.data, now)) {
+      const wanted = this.#ledger.backfillWantedAt(now);
+      const scheduled = await this.ctx.storage.getAlarm();
+      if (wanted !== null && (scheduled === null || scheduled > wanted)) {
+        await this.ctx.storage.setAlarm(wanted);
+      }
+    }
     return { status: 'stored', vouching: this.#ledger.vouches(now) };
   }
 
@@ -132,7 +155,7 @@ export class UtsFeedDO extends DurableObject<Env> {
     if (phase.status === 'refused') return;
     const now = Date.now();
     // Set first, so a failure below still leaves the next run in place.
-    await this.ctx.storage.setAlarm(now + FEED_ALARM_INTERVAL_MS);
+    await this.ctx.storage.setAlarm(now + feedAlarmIntervalMs(identityStoreBinding(this.env)));
     await this.#rotateKeys(phase, now);
     await this.#backfill(now);
     this.#ledger.expire(Date.now());
@@ -233,8 +256,13 @@ export class UtsFeedDO extends DurableObject<Env> {
         })
       );
     }
-    // The first run starts at once, so a restarted object backfills before its first head.
-    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(now);
+    // The first run starts at once, so a restarted object backfills before its first head. An
+    // alarm set an hour out while the store was unbound also moves to now, so the deploy that
+    // binds the store does not wait for it.
+    const alarm = await this.ctx.storage.getAlarm();
+    if (alarm === null || alarm > now + feedAlarmIntervalMs(identityStoreBinding(this.env))) {
+      await this.ctx.storage.setAlarm(now);
+    }
   }
 
   #refuse(refused: { status: 'refused'; reason: string }): void {

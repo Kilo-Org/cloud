@@ -5,9 +5,9 @@ import { type FeedEntry, StatementFeedEntriesSchema } from '../revocation/entrie
 import type { ClientMetadata } from './metadata';
 
 /**
- * The third-party client and consent statements (migrations 0001 and 0012). Each call is one SQL
- * statement: a plain read or upsert of the cached client document, or a SECURITY DEFINER function
- * that writes the consent rows with their audit row.
+ * The third-party client and consent statements (migrations 0001, 0012 and 0021). Each call is one
+ * SQL statement: a plain read of a cached client or consent, or a SECURITY DEFINER function that
+ * writes the client document, or the consent rows with their audit row.
  */
 
 /** A cached third-party client that may authorize. */
@@ -168,28 +168,8 @@ export function identityStoreThirdParty(store: IdentityStore): ThirdPartyStore {
     },
 
     async saveClient(input) {
-      // One statement: insert, or refresh an active client's copy; a blocked row is read back.
       const row = await one(
-        `WITH saved AS (
-           INSERT INTO uts.third_party_clients AS client (
-             client_id, client_name, redirect_uris, document, etag, fetched_at, cache_expires_at
-           ) VALUES ($1, $2, $3, $4, $5, now(), now() + make_interval(secs => $6))
-           ON CONFLICT (client_id) DO UPDATE SET
-             client_name = EXCLUDED.client_name,
-             redirect_uris = EXCLUDED.redirect_uris,
-             document = EXCLUDED.document,
-             etag = EXCLUDED.etag,
-             fetched_at = EXCLUDED.fetched_at,
-             cache_expires_at = EXCLUDED.cache_expires_at
-           WHERE client.status = 'active'
-           RETURNING client.status, client.client_name, client.redirect_uris, client.etag,
-             true AS fresh
-         )
-         SELECT * FROM saved
-         UNION ALL
-         SELECT client.status, client.client_name, client.redirect_uris, client.etag, false
-         FROM uts.third_party_clients AS client
-         WHERE client.client_id = $1 AND NOT EXISTS (SELECT 1 FROM saved)`,
+        'SELECT * FROM uts.save_third_party_client($1, $2, $3, $4, $5, $6)',
         [
           input.clientId,
           input.metadata.client_name,
@@ -206,9 +186,7 @@ export function identityStoreThirdParty(store: IdentityStore): ThirdPartyStore {
     async extendClient(clientId, cacheSeconds) {
       await store.rows(
         {
-          text: `UPDATE uts.third_party_clients
-                 SET fetched_at = now(), cache_expires_at = now() + make_interval(secs => $2)
-                 WHERE client_id = $1 AND status = 'active'`,
+          text: 'SELECT uts.extend_third_party_client($1, $2)',
           values: [clientId, cacheSeconds],
         },
         z.unknown()

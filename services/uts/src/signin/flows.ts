@@ -8,6 +8,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { UtsConfig } from '../env';
+import { readBoundedText } from '../request-body';
 import { classifyFailure } from '../oauth/errors';
 import { base64url, isRandomCredential, randomCredential, sha256 } from '../token/credentials';
 import type { EmailSignIn } from './email/delivery';
@@ -192,7 +193,8 @@ export type SignInRefusal =
   | 'codes_stopped'
   | 'network_limited'
   | 'check_failed'
-  | 'recipient_not_allowed';
+  | 'recipient_not_allowed'
+  | 'send_limited';
 
 const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   invalid_state: {
@@ -257,6 +259,11 @@ const REFUSALS: Record<SignInRefusal, { status: number; message: string }> = {
   recipient_not_allowed: {
     status: 403,
     message: 'This test environment sends sign-in email only to test addresses.',
+  },
+  send_limited: {
+    status: 429,
+    message:
+      'Too many sign-in emails for this address. Use the link in an email already sent, or try again in an hour.',
   },
 };
 
@@ -344,8 +351,8 @@ export async function readForm(request: Request): Promise<URLSearchParams | null
     return null;
   }
   if (Number(request.headers.get('Content-Length') ?? '0') > MAX_FORM_BYTES) return null;
-  const text = await request.text();
-  return text.length > MAX_FORM_BYTES ? null : new URLSearchParams(text);
+  const text = await readBoundedText(request.body, MAX_FORM_BYTES);
+  return text === null ? null : new URLSearchParams(text);
 }
 
 /**

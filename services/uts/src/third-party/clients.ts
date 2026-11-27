@@ -14,7 +14,9 @@ import type { CachedClient, ThirdPartyAccess, ThirdPartyClientRecord } from './s
  *
  * Each isolate fetches one document at a time per client id, and after a failed fetch it does not
  * fetch that id again for 60 seconds, so a client id that keeps failing costs its host at most one
- * fetch a minute per isolate, whatever the request rate.
+ * fetch a minute per isolate, whatever the request rate. A fetch happens before anyone signs in and
+ * can store a row, so each fetch also counts against the requesting network's anonymous-write
+ * allowance (`fetchRetryAfter`, src/signin/limits.ts); a cached client costs no allowance.
  */
 
 export type ClientResolution =
@@ -22,9 +24,15 @@ export type ClientResolution =
   /** Not a client UTS serves: a bad URL, a document that is missing or refused, or blocked. */
   | { kind: 'refused'; reason: string }
   /** The store or the document host failed; a retry can succeed. */
-  | { kind: 'unavailable' };
+  | { kind: 'unavailable' }
+  /** The requesting network used its fetch allowance; nothing was fetched or stored. */
+  | { kind: 'rate_limited'; retryAfterSeconds: number };
 
-export type ThirdPartyClients = (clientId: string) => Promise<ClientResolution>;
+/** Resolves `clientId` for a request from `address` (`CF-Connecting-IP`, null when absent). */
+export type ThirdPartyClients = (
+  clientId: string,
+  address: string | null
+) => Promise<ClientResolution>;
 
 /** After a failed fetch, the client id waits this long before the next fetch in the isolate. */
 export const FAILED_FETCH_PAUSE_MS = 60_000;
@@ -39,6 +47,8 @@ export type ThirdPartyClientsDeps = {
   failures: Map<string, { until: number; outcome: ClientResolution }>;
   /** Per isolate: the fetch in flight, by id. */
   inFlight: Map<string, Promise<ClientResolution>>;
+  /** Null when `address` may start one more fetch now (and counts it), else the seconds to wait. */
+  fetchRetryAfter: (address: string | null) => number | null;
 };
 
 function remember(
@@ -102,7 +112,7 @@ async function refresh(
 }
 
 export function thirdPartyClients(deps: ThirdPartyClientsDeps): ThirdPartyClients {
-  return async clientId => {
+  return async (clientId, address) => {
     const problem = clientIdUrlProblem(clientId);
     if (problem !== null) return { kind: 'refused', reason: `client id ${problem}` };
     try {
@@ -112,6 +122,8 @@ export function thirdPartyClients(deps: ThirdPartyClientsDeps): ThirdPartyClient
       if (failed !== undefined && failed.until > deps.now()) return failed.outcome;
       const running = deps.inFlight.get(clientId);
       if (running !== undefined) return await running;
+      const retryAfter = deps.fetchRetryAfter(address);
+      if (retryAfter !== null) return { kind: 'rate_limited', retryAfterSeconds: retryAfter };
       const started = refresh(deps, clientId, cached);
       deps.inFlight.set(clientId, started);
       try {

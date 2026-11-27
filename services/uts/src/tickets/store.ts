@@ -47,7 +47,9 @@ export type TicketStore = {
   redeem(
     environment: UtsEnvironment,
     ticketHash: Uint8Array,
-    audience: string
+    audience: string,
+    purpose: UtsTicketPurpose,
+    resource: string | null
   ): Promise<RedeemTicketResult>;
 };
 
@@ -113,10 +115,10 @@ export function identityStoreTickets(store: IdentityStore): TicketStore {
       return { outcome: 'issued', expiresAt: row.ticket_expires_at };
     },
 
-    async redeem(environment, ticketHash, audience) {
+    async redeem(environment, ticketHash, audience, purpose, resource) {
       const row = await one(
-        'SELECT * FROM uts.redeem_ticket($1, $2, $3)',
-        [environment, ticketHash, audience],
+        'SELECT * FROM uts.redeem_ticket($1, $2, $3, $4, $5)',
+        [environment, ticketHash, audience, purpose, resource],
         RedeemRowSchema
       );
       if (row.outcome !== 'redeemed') return { outcome: 'unknown' };

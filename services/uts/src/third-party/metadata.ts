@@ -65,7 +65,12 @@ export function clientIdUrlProblem(clientId: string): string | null {
   return null;
 }
 
-/** Schemes a redirect URI never uses: they run code, read local data or leave the browser. */
+/**
+ * Schemes a redirect URI never uses: they run code, read local data or leave the browser. Any
+ * other private-use scheme is allowed, short ones included: RFC 8252 section 7.1 asks for a
+ * reverse-domain scheme (a SHOULD), but real MCP clients register `cursor://` and `vscode://`. The
+ * consent and confirm pages show the whole redirect URI, so the user sees which app gets the code.
+ */
 const REFUSED_SCHEMES = new Set([
   'javascript:',
   'data:',
@@ -88,8 +93,8 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 /**
  * A redirect URI a third-party client may register: an exact HTTPS URL, an HTTP loopback URL on
  * `127.0.0.1` or `localhost` (RFC 8252 section 7.3), or a private-use scheme of a native app
- * (section 7.1); never a fragment or credentials. The authorization endpoint matches the
- * registered string exactly.
+ * (section 7.1) that `REFUSED_SCHEMES` does not name; never a fragment or credentials. The
+ * authorization endpoint matches the registered string exactly and checks a cached copy again.
  */
 export function isAllowedThirdPartyRedirect(uri: string): boolean {
   let url: URL;

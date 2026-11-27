@@ -31,10 +31,10 @@ import {
 import { SignJWT, decodeJwt, exportJWK, generateKeyPair } from 'jose';
 import pg from 'pg';
 import { z } from 'zod';
-import { isLoopbackHost } from './connection';
+import { localDatabaseUrl } from './e2e-store';
 
 const base = z.url().parse(process.env.UTS_E2E_BASE_URL);
-const adminUrl = z.url().parse(process.env.UTS_E2E_ADMIN_URL);
+const adminUrl = localDatabaseUrl('UTS_E2E_ADMIN_URL').toString();
 const cimdPort = z.coerce
   .number()
   .int()
@@ -43,7 +43,6 @@ const stsPort = z.coerce
   .number()
   .int()
   .parse(process.env.UTS_E2E_STS_PORT ?? '9131');
-if (!isLoopbackHost(new URL(adminUrl))) throw new Error('the run uses a local database only');
 
 const issuer = UTS_ENDPOINTS.development.issuer;
 const origin = new URL(base).origin;

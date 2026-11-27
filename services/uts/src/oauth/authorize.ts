@@ -17,8 +17,13 @@ import {
   needsStepUp,
   orgScopeRefusal,
 } from '../scopes/policy';
+import { requestNetwork } from '../signin/network';
 import type { ThirdPartyClients } from '../third-party/clients';
-import { type ThirdPartyRedirectKind, thirdPartyRedirectKind } from '../third-party/metadata';
+import {
+  type ThirdPartyRedirectKind,
+  isAllowedThirdPartyRedirect,
+  thirdPartyRedirectKind,
+} from '../third-party/metadata';
 import { randomCredential, sha256 } from '../token/credentials';
 import {
   type FirstPartyClient,
@@ -36,9 +41,13 @@ import { CodeChallengeSchema } from './pkce';
  * GET /authorize: OAuth 2.1 authorization code with PKCE S256 (design 5.4). The client id and the
  * redirect URI are checked first; an error there is shown to the user and never redirected
  * (RFC 6749 section 4.1.2.1). Every later error, and the code itself, goes back to the redirect
- * URI with `state` and `iss` (RFC 9207). The user's sign-in and consent come from the
- * authorization hand-off, which the sign-in and consent screens implement. A POST carries the same
- * query; only the hand-off's confirm page sends one, and its parameters stay those of the URL.
+ * URI with `state` and `iss` (RFC 9207), with one exception: a third-party client registered its
+ * own redirect URIs in a document anyone can publish, so until the user acts in the hand-off (signs
+ * in and consents, or denies), its errors are shown too and never redirected; otherwise any host
+ * with a metadata document would make `/authorize` an open redirector (RFC 9700 section 4.11.2).
+ * The user's sign-in and consent come from the authorization hand-off, which the sign-in and
+ * consent screens implement. A POST carries the same query; only the hand-off's confirm page sends
+ * one, and its parameters stay those of the URL.
  */
 
 /**
@@ -183,11 +192,17 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       redirectKind: identity.client.redirect.kind,
     };
   } else if (identity.kind === 'third_party') {
-    const resolved = await deps.clients(identity.clientId);
+    const resolved = await deps.clients(identity.clientId, requestNetwork(request).clientIp);
     if (resolved.kind === 'unavailable') return temporarilyUnavailable();
+    if (resolved.kind === 'rate_limited') {
+      return oauthError('temporarily_unavailable', 429, 'too many new clients from this network', {
+        'Retry-After': String(resolved.retryAfterSeconds),
+      });
+    }
     if (resolved.kind === 'refused') return directError('invalid_client', 'unknown client', 401);
     const record = resolved.client;
-    if (!record.redirectUris.includes(redirectUri)) {
+    // A copy cached under an earlier rule is checked again, never trusted.
+    if (!record.redirectUris.includes(redirectUri) || !isAllowedThirdPartyRedirect(redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
     client = {
@@ -206,7 +221,8 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     return directError('invalid_client', 'unknown client', 401);
   }
 
-  // The redirect URI is trusted from here on.
+  // The redirect URI is registered from here on; it is trusted before the hand-off only for a
+  // first-party client, whose redirect URIs UTS itself lists.
   const stateParam = params.one('state');
   const state = stateParam.status === 'present' ? stateParam.value : null;
   const back = (outcome: Record<string, string>): Response => {
@@ -218,13 +234,16 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   };
   const fail = (error: OAuthErrorCode, description: string): Response =>
     back({ error, error_description: description });
+  /** An error before the hand-off. */
+  const refuse = (error: OAuthErrorCode, description: string): Response =>
+    client.kind === 'third_party' ? directError(error, description) : fail(error, description);
 
   if (stateParam.status === 'repeated' || (state !== null && state.length > MAX_STATE_LENGTH)) {
-    return fail('invalid_request', 'state must appear once and hold at most 1024 characters');
+    return refuse('invalid_request', 'state must appear once and hold at most 1024 characters');
   }
   const responseType = params.one('response_type');
   if (responseType.status !== 'present' || responseType.value !== 'code') {
-    return fail('unsupported_response_type', 'response_type must be code');
+    return refuse('unsupported_response_type', 'response_type must be code');
   }
   const challenge = params.one('code_challenge');
   const method = params.one('code_challenge_method');
@@ -234,21 +253,24 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     method.status !== 'present' ||
     method.value !== 'S256'
   ) {
-    return fail('invalid_request', 'PKCE with code_challenge_method S256 is required');
+    return refuse('invalid_request', 'PKCE with code_challenge_method S256 is required');
   }
 
   const scopeParam = params.one('scope');
   const requested =
     scopeParam.status === 'present' ? parseScopes(scopeParam.value, MAX_AUTHORIZED_SCOPES) : null;
   if (requested === null) {
-    return fail('invalid_scope', 'scope must name at most 8 UTS scopes once each');
+    return refuse('invalid_scope', 'scope must name at most 8 UTS scopes once each');
   }
   const scopes = [...requested].sort();
   if (clientScopeRefusal(scopes, client, deps.scopes) !== null) {
-    return fail('invalid_scope', 'a requested scope is not registered for this client');
+    return refuse('invalid_scope', 'a requested scope is not registered for this client');
   }
   if (client.kind === 'confidential_web' && needsStepUp(scopes, deps.scopes)) {
-    return fail('invalid_scope', 'a scope that needs a step-up is minted only per browser session');
+    return refuse(
+      'invalid_scope',
+      'a scope that needs a step-up is minted only per browser session'
+    );
   }
 
   const resources = params.all('resource');
@@ -258,13 +280,13 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
     client.kind === 'confidential_web' &&
     resources.some(resource => resource !== deps.config.endpoints.issuer)
   ) {
-    return fail('invalid_target', 'resource must be the UTS issuer');
+    return refuse('invalid_target', 'resource must be the UTS issuer');
   }
   let audiences = [...new Set(scopes.map(audienceOfScope))];
   if (resources.length > 0) {
     const named = audiencesOfResources(resources, deps.config.environment);
     if (named === null || targetMismatch(scopes, named)) {
-      return fail(
+      return refuse(
         'invalid_target',
         'each resource must name a Kilo service that a scope belongs to'
       );
@@ -277,16 +299,16 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
   let dpopJkt: Uint8Array | null = null;
   if (client.kind === 'first_party') {
     dpopJkt = jktParam.status === 'present' ? jktOfParameter(jktParam.value) : null;
-    if (dpopJkt === null) return fail('invalid_request', 'dpop_jkt is required for this client');
+    if (dpopJkt === null) return refuse('invalid_request', 'dpop_jkt is required for this client');
   } else if (jktParam.status !== 'absent') {
-    return fail('invalid_request', 'DPoP binding is available to first-party clients only');
+    return refuse('invalid_request', 'DPoP binding is available to first-party clients only');
   }
 
   const orgParam = params.one('org');
   const orgHint =
     orgParam.status === 'present' ? (z.uuid().safeParse(orgParam.value).data ?? null) : null;
   if (orgParam.status === 'repeated' || (orgParam.status === 'present' && orgHint === null)) {
-    return fail('invalid_request', 'org must be one organization id');
+    return refuse('invalid_request', 'org must be one organization id');
   }
 
   const decision = await deps.handoff(request, {

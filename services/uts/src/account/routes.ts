@@ -18,6 +18,7 @@ import type { UtsConfig } from '../env';
 import { gateRequiredResponse } from '../gates/challenge';
 import { failureResponse } from '../oauth/errors';
 import { createSecret, lastFour, secretHash, type SecretKind } from '../pat/format';
+import { readBoundedText } from '../request-body';
 import { jsonResponse } from '../responses';
 import type { FeedPublish } from '../revocation/publish';
 import { credentialScopeCheck } from '../scopes/policy';
@@ -118,8 +119,8 @@ async function readJson<Schema extends z.ZodType>(
   if (Number(request.headers.get('Content-Length') ?? '0') > MAX_BODY_BYTES) {
     return invalid('the body is too large');
   }
-  const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) return invalid('the body is too large');
+  const text = await readBoundedText(request.body, MAX_BODY_BYTES);
+  if (text === null) return invalid('the body is too large');
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -215,6 +216,8 @@ async function createPat(request: Request, caller: AccountCaller, deps: AccountD
       return accountError('access_denied', 403, 'the account cannot act in this organization');
     case 'limit_reached':
       return accountError('limit_reached', 409, 'the account holds 100 live PATs');
+    case 'rate_limited':
+      return createRateLimited('the account created 20 PATs in the last hour');
     case 'created': {
       notify(deps, { kind: 'pat_created', accountId: caller.accountId, credentialId: result.id });
       const created: CreatedPat = {
@@ -267,6 +270,8 @@ async function createBotKey(
       return notOrgAdmin();
     case 'limit_reached':
       return accountError('limit_reached', 409, 'the organization holds 100 live bot keys');
+    case 'rate_limited':
+      return createRateLimited('the organization got 20 bot keys in the last hour');
     case 'created': {
       notify(deps, {
         kind: 'bot_key_created',
@@ -288,6 +293,14 @@ async function createBotKey(
       return jsonResponse(created, 201);
     }
   }
+}
+
+/**
+ * 429 for a create past the hourly create count (migration 0019). The count is over the last hour,
+ * so a client that waits an hour is sure to fit; an earlier retry may fit too.
+ */
+function createRateLimited(description: string): Response {
+  return accountError('too_many_requests', 429, description, { 'Retry-After': '3600' });
 }
 
 /** Seconds a client waits before it retries a revoke whose feed entry no feed object took. */

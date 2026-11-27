@@ -1,9 +1,11 @@
 import {
+  KILO_BRIDGE_KID_PREFIX,
   KILO_LEGACY_SESSION_MAX_LIFETIME_SECONDS,
   KILO_LEGACY_SESSION_TOKEN_TYP,
   KILO_WEB_ASSERTION_MAX_LIFETIME_SECONDS,
   KILO_WEB_CLIENT_ID,
   KILO_WEB_KID_PREFIX,
+  KiloBridgeJwksSchema,
   KiloWebClientJwksSchema,
   UTS_CLIENT_ASSERTION_TYPE,
 } from '@kilocode/uts-contracts';
@@ -19,8 +21,10 @@ import type { Params } from '../oauth/params';
  * or two keys, so a rotation has no gap). The assertion's `iss` and `sub` are `kilo-web`, its
  * `aud` is the exact URL of the endpoint called and nothing else, it lives at most 300 seconds,
  * and the statement it authorizes records its `jti` under the key's RFC 7638 thumbprint, so it is
- * accepted once. The legacy bridge's subject token is a JWT of the same key pair with its own
- * `typ`; a JWT of one kind is never accepted as the other.
+ * accepted once. The legacy bridge's subject token, which vouches for a legacy session of any app
+ * user, is a JWT with its own `typ` under a key of its own (`KILO_WEB_BRIDGE_JWKS`, kid prefix
+ * `kilo-bridge-`), never a client key: a JWT of one kind is never accepted as the other, and the
+ * bridge serves nothing while its key set shares a key with the client's.
  */
 
 /** Clock skew the checks allow, as the verifier library does (design 7). */
@@ -33,35 +37,43 @@ type ClientKey = { key: CryptoKey; jkt: Uint8Array };
 export type ClientKeys = ReadonlyMap<string, ClientKey>;
 
 /**
- * `unconfigured`: the var is not set, so `kilo-web` is not served. `misconfigured`: the var is set
- * but is not one or two well-formed keys whose `kid` is `kilo-web-` and the key's thumbprint;
- * nothing is served either, and the failure is logged. Both answer 503, never 500.
+ * `unconfigured`: the var is not set, so `kilo-web` (or the legacy bridge) is not served.
+ * `misconfigured`: the var is set but is not one or two well-formed keys whose `kid` is the
+ * expected prefix and the key's thumbprint, or a bridge key is also a client key; nothing is
+ * served either, and the failure is logged. Both answer 503, never 500.
  */
 export type WebClientKeys =
   | { status: 'unconfigured' }
   | { status: 'misconfigured' }
   | { status: 'ready'; keys: ClientKeys };
 
-/** The keys of the last var value this isolate parsed: one var per Worker version. */
-let parsed: { raw: string; keys: Promise<WebClientKeys> } | null = null;
+type ParsedKeys = { raw: string; keys: Promise<WebClientKeys> } | null;
+/** The keys of the last value of each var this isolate parsed: one value per Worker version. */
+let parsedClient: ParsedKeys = null;
+let parsedBridge: ParsedKeys = null;
 
-async function parseKeys(raw: string): Promise<WebClientKeys> {
+async function parseKeys(
+  raw: string,
+  schema: typeof KiloWebClientJwksSchema | typeof KiloBridgeJwksSchema,
+  kidPrefix: string,
+  logPrefix: string
+): Promise<WebClientKeys> {
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
     value = null;
   }
-  const jwks = KiloWebClientJwksSchema.safeParse(value);
+  const jwks = schema.safeParse(value);
   if (!jwks.success) {
-    console.error(JSON.stringify({ event: 'uts.kilo_web.jwks_invalid' }));
+    console.error(JSON.stringify({ event: `${logPrefix}.jwks_invalid` }));
     return { status: 'misconfigured' };
   }
   const keys = new Map<string, ClientKey>();
   for (const jwk of jwks.data.keys) {
     const thumbprint = await calculateJwkThumbprint({ kty: jwk.kty, crv: jwk.crv, x: jwk.x });
-    if (jwk.kid !== `${KILO_WEB_KID_PREFIX}${thumbprint}`) {
-      console.error(JSON.stringify({ event: 'uts.kilo_web.kid_mismatch', kid: jwk.kid }));
+    if (jwk.kid !== `${kidPrefix}${thumbprint}`) {
+      console.error(JSON.stringify({ event: `${logPrefix}.kid_mismatch`, kid: jwk.kid }));
       return { status: 'misconfigured' };
     }
     const key = await importJWK(jwk, 'EdDSA');
@@ -77,8 +89,44 @@ export async function webClientKeys(
 ): Promise<WebClientKeys> {
   const raw = env.KILO_WEB_CLIENT_JWKS;
   if (raw === undefined || raw === '') return { status: 'unconfigured' };
-  if (parsed === null || parsed.raw !== raw) parsed = { raw, keys: parseKeys(raw) };
-  return await parsed.keys;
+  if (parsedClient === null || parsedClient.raw !== raw) {
+    parsedClient = {
+      raw,
+      keys: parseKeys(raw, KiloWebClientJwksSchema, KILO_WEB_KID_PREFIX, 'uts.kilo_web'),
+    };
+  }
+  return await parsedClient.keys;
+}
+
+/**
+ * The legacy bridge's public keys (`KILO_WEB_BRIDGE_JWKS`). A bridge key that is also a
+ * `KILO_WEB_CLIENT_JWKS` key (the same thumbprint under another kid) makes the set
+ * `misconfigured`, logged as `uts.legacy_bridge.key_reused`.
+ */
+export async function legacyBridgeKeys(
+  env: Pick<Env, 'KILO_WEB_BRIDGE_JWKS' | 'KILO_WEB_CLIENT_JWKS'>
+): Promise<WebClientKeys> {
+  const raw = env.KILO_WEB_BRIDGE_JWKS;
+  if (raw === undefined || raw === '') return { status: 'unconfigured' };
+  if (parsedBridge === null || parsedBridge.raw !== raw) {
+    parsedBridge = {
+      raw,
+      keys: parseKeys(raw, KiloBridgeJwksSchema, KILO_BRIDGE_KID_PREFIX, 'uts.legacy_bridge'),
+    };
+  }
+  const bridge = await parsedBridge.keys;
+  const client = await webClientKeys(env);
+  if (bridge.status !== 'ready' || client.status !== 'ready') return bridge;
+  const clientKeys = new Set(
+    [...client.keys.values()].map(key => Buffer.from(key.jkt).toString('base64url'))
+  );
+  for (const key of bridge.keys.values()) {
+    if (clientKeys.has(Buffer.from(key.jkt).toString('base64url'))) {
+      console.error(JSON.stringify({ event: 'uts.legacy_bridge.key_reused' }));
+      return { status: 'misconfigured' };
+    }
+  }
+  return bridge;
 }
 
 /** A verified JWT's single-use id: the statement records `jti` under `jkt` until `expiresAt`. */
@@ -241,8 +289,8 @@ const LegacyClaimsSchema = z
 
 /**
  * Verifies the legacy bridge's subject token: `typ` `kilo-legacy-session+jwt`, signed by a
- * `kilo-web` key, `aud` the token endpoint, at most 60 seconds long, with the app user id in
- * `sub` and a legacy sign-in time not in the future. Null for any failure.
+ * legacy bridge key (`legacyBridgeKeys`), `aud` the token endpoint, at most 60 seconds long, with
+ * the app user id in `sub` and a legacy sign-in time not in the future. Null for any failure.
  */
 export async function verifyLegacySessionToken(
   token: string,

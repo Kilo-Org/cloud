@@ -342,6 +342,7 @@ export const EmailCodeLimitRowSchema = z.strictObject({
   failures_in_day: z.number().int(),
   status: z.enum(enums.EMAIL_CODE_LIMIT_STATUSES),
   stopped_until: timestamp.nullable(),
+  links_in_hour: z.number().int(),
 });
 
 export const TicketRowSchema = z.strictObject({

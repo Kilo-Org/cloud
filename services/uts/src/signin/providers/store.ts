@@ -96,9 +96,13 @@ export type StartEmailInput = {
   returnTo: string;
 };
 
+/**
+ * `send_limited`: codes are stopped for the address and its 5 link-only emails of the hour are
+ * spent (migration 0020); nothing was stored, so nothing may be mailed.
+ */
 export type StartEmailResult =
   | { outcome: 'stored'; withCode: boolean; expiresAt: Date }
-  | { outcome: 'sso_required' };
+  | { outcome: 'sso_required' | 'send_limited' };
 
 export type VerifyCodeInput = {
   environment: UtsEnvironment;
@@ -203,7 +207,7 @@ const CompleteFlowRowSchema = z.discriminatedUnion('outcome', [
 
 const StartEmailRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('stored'), with_code: z.boolean(), email_expires_at: z.date() }),
-  z.object({ outcome: z.literal('sso_required') }),
+  z.object({ outcome: z.enum(['sso_required', 'send_limited']) }),
 ]);
 
 const VerifyCodeRowSchema = z.discriminatedUnion('outcome', [
@@ -324,7 +328,7 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
         ],
         StartEmailRowSchema
       );
-      if (row.outcome === 'sso_required') return { outcome: 'sso_required' };
+      if (row.outcome !== 'stored') return { outcome: row.outcome };
       return { outcome: 'stored', withCode: row.with_code, expiresAt: row.email_expires_at };
     },
 

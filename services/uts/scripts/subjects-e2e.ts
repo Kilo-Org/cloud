@@ -30,11 +30,11 @@ import pg from 'pg';
 import { z } from 'zod';
 import { isLoopbackHost } from './connection';
 import { startFakeSts } from './fake-sts';
+import { localDatabaseUrl } from './e2e-store';
 
 const base = z.url().parse(process.env.UTS_E2E_BASE_URL);
 const feedUrl = z.url().parse(process.env.UTS_E2E_FEED_URL);
-const adminUrl = z.url().parse(process.env.UTS_E2E_ADMIN_URL);
-if (!isLoopbackHost(new URL(adminUrl))) throw new Error('the end-to-end run uses a local database');
+const adminUrl = localDatabaseUrl('UTS_E2E_ADMIN_URL').toString();
 
 const issuer = UTS_ENDPOINTS.development.issuer;
 /** The account the development sign-in hand-off signs in; this run imports it first. */

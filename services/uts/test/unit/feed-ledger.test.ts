@@ -25,7 +25,7 @@ import {
   type HeadSigner,
   type SignedHead,
 } from '../../src/feed/ledger';
-import { FEED_MAX_ENTRIES, type FeedEntry } from '../../src/revocation/entries';
+import { FEED_MAX_ENTRIES, type FeedEntry, serializeList } from '../../src/revocation/entries';
 
 const T0 = 1_800_000_000_000;
 const MINUTE = 60_000;
@@ -157,14 +157,40 @@ describe('heads', () => {
     const ledger = backfilled([], T0);
     const first = await signed(ledger, T0 + 20_000);
     expect(first.issuedAt).toBe(T0 / 1000);
-    // A publish changes the list; the head is signed again, still dated by the backfill.
-    ledger.take([grant('g-1')], T0 + 21_000);
-    const published = await signed(ledger, T0 + 21_000);
-    expect(published.issuedAt).toBe(T0 / 1000);
-    expect(published.listHash).not.toBe(first.listHash);
     // Only a good backfill moves the date forward.
     backfill(ledger, T0 + 25_000);
     expect((await signed(ledger, T0 + 26_000)).issuedAt).toBe((T0 + 25_000) / 1000);
+  });
+
+  it('never signs another list under a date it already signed, and asks for the backfill that dates the new list', async () => {
+    // A verifier that holds a head refuses a head of the same second over another list, so a
+    // publish that changes the list keeps the held head until a backfill that started in a later
+    // second dates a head for the new list.
+    const ledger = backfilled([], T0 + 200);
+    const first = await signed(ledger, T0 + 300);
+    expect(ledger.backfillWantedAt(T0 + 300)).toBeNull();
+    ledger.take([grant('g-1')], T0 + 400);
+    expect(await signed(ledger, T0 + 400)).toEqual(first);
+    expect(ledger.backfillWantedAt(T0 + 400)).toBe(T0 + 1000);
+    backfill(ledger, T0 + 900);
+    expect(await signed(ledger, T0 + 900)).toEqual(first);
+    expect(ledger.backfillWantedAt(T0 + 900)).toBe(T0 + 1000);
+    backfill(ledger, T0 + 1000);
+    const next = await signed(ledger, T0 + 1000);
+    expect(next.issuedAt).toBe(first.issuedAt + 1);
+    expect(sidsOf(ledger, next, T0 + 1000)).toEqual(['g-1']);
+    expect(ledger.backfillWantedAt(T0 + 1000)).toBeNull();
+    // The held head's list stays readable while that head is served.
+    expect(ledger.list(first.listHash, T0 + 1000)).not.toBeNull();
+  });
+
+  it('signs a changed list under the same date while no head of that date went out', async () => {
+    const ledger = backfilled([], T0);
+    ledger.take([grant('g-1')], T0 + 100);
+    expect(ledger.backfillWantedAt(T0 + 100)).toBeNull();
+    const head = await signed(ledger, T0 + 100);
+    expect(head.issuedAt).toBe(T0 / 1000);
+    expect(sidsOf(ledger, head, T0 + 100)).toEqual(['g-1']);
   });
 
   it('keeps the held head while its list and backfill stand', async () => {
@@ -173,13 +199,13 @@ describe('heads', () => {
     expect(await signed(ledger, T0 + 10_000)).toBe(first);
   });
 
-  it('does not keep a head signed for a list that changed while it was signed', async () => {
+  it('signs no second list under one date, even when the list changes while a head is signed', async () => {
     const ledger = backfilled();
     const signing = ledger.head(signer, T0);
     ledger.take([grant('g-1')], T0);
-    const stale = await signing;
+    const first = await signing;
     const next = await signed(ledger, T0 + 1);
-    expect(stale.status === 'signed' && stale.head.listHash).not.toBe(next.listHash);
+    expect(first.status === 'signed' && first.head.listHash).toBe(next.listHash);
     expect(ledger.list(next.listHash, T0 + 1)).not.toBeNull();
   });
 
@@ -221,10 +247,13 @@ describe('lists', () => {
     const big = (step: number) =>
       Array.from({ length: 9_000 }, (_, index) => grant(`${step}-${index}-${'x'.repeat(240)}`));
     const ledger = backfilled();
+    const held: FeedEntry[] = [];
     const hashes: string[] = [];
     for (let step = 0; step < 5; step += 1) {
-      ledger.take(big(step), T0 + step);
-      hashes.push((await signed(ledger, T0 + step)).listHash);
+      const entries = big(step);
+      held.push(...entries);
+      ledger.take(entries, T0 + step);
+      hashes.push(serializeList(held).hash);
     }
     const now = T0 + 10;
     expect(hashes.map(hash => ledger.list(hash, now) !== null)).toEqual([
@@ -242,12 +271,15 @@ describe('lists', () => {
 
   it('keeps more than 64 small lists while they fit the byte bound', async () => {
     const ledger = backfilled();
+    const held: FeedEntry[] = [];
     const hashes: string[] = [];
     // 100 changes in 10 seconds; each list is far under the byte bound.
     for (let step = 0; step < 100; step += 1) {
       const at = T0 + step * 100;
-      ledger.take([grant(`many-${step}`)], at);
-      hashes.push((await signed(ledger, at)).listHash);
+      const entry = grant(`many-${step}`);
+      held.push(entry);
+      ledger.take([entry], at);
+      hashes.push(serializeList(held).hash);
     }
     const now = T0 + 10_000;
     expect(hashes.filter(hash => ledger.list(hash, now) !== null)).toHaveLength(100);
@@ -255,12 +287,15 @@ describe('lists', () => {
 
   it('keeps every list for 30 seconds after it was replaced, at more than 4 changes per second', async () => {
     const ledger = backfilled();
+    const held: FeedEntry[] = [];
     const hashes: string[] = [];
     // 40 changes in 4 seconds: 10 per second.
     for (let step = 0; step < 40; step += 1) {
       const at = T0 + step * 100;
-      ledger.take([grant(`g-${step}`)], at);
-      hashes.push((await signed(ledger, at)).listHash);
+      const entry = grant(`g-${step}`);
+      held.push(entry);
+      ledger.take([entry], at);
+      hashes.push(serializeList(held).hash);
     }
     const now = T0 + 4000;
     for (const hash of hashes) expect(ledger.list(hash, now)).not.toBeNull();

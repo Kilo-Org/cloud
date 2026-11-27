@@ -407,7 +407,10 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
 
     async revoke(input) {
       const row = await one(
-        `SELECT ${WITH_FEED_ENTRIES} FROM uts.revoke_refresh_token($1, $2, $3) AS result`,
+        `SELECT result.*, CASE result.outcome
+           WHEN 'already_revoked' THEN uts.live_feed_entries_of_refresh_token($2, $3)
+           ELSE uts.feed_entries_of_statement() END AS feed_entries
+         FROM uts.revoke_refresh_token($1, $2, $3) AS result`,
         [input.environment, input.tokenHash, input.clientId],
         RevokeRowSchema
       );

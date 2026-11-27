@@ -3,10 +3,13 @@ import type { AccountImportRequest, SubjectOperation } from '@kilocode/uts-contr
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { IdentityStore } from '../../src/db/client';
+import { type DeviceContext, type GrantStore, identityStoreGrants } from '../../src/grants/store';
 import type { FeedEntry } from '../../src/revocation/entries';
 import { identityStoreProviderSignIn } from '../../src/signin/providers/store';
+import { type SignInStore, identityStoreSignIn } from '../../src/signin/store';
 import { identityStoreSsoAuthority } from '../../src/subjects/authority';
 import { type SubjectStore, identityStoreSubjects } from '../../src/subjects/store';
+import { identityStoreThirdParty } from '../../src/third-party/store';
 import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
 /**
@@ -19,12 +22,17 @@ let db: TestDatabase;
 let owner: pg.Client;
 let app: pg.Client;
 let subjects: SubjectStore;
+let signIn: SignInStore;
+let grants: GrantStore;
 
 beforeAll(async () => {
   db = await TestDatabase.create();
   owner = await db.connectAsOwner();
   app = await db.connect('uts_app_a');
-  subjects = identityStoreSubjects(new IdentityStore(app));
+  const store = new IdentityStore(app);
+  subjects = identityStoreSubjects(store);
+  signIn = identityStoreSignIn(store);
+  grants = identityStoreGrants(store);
 });
 afterAll(() => db.drop());
 
@@ -659,7 +667,7 @@ describe('uts.apply_subject_operation', () => {
 });
 
 describe('authority sync', () => {
-  it('moves the primary email forward only, and refuses an address another account holds', async () => {
+  it('moves the primary email forward only, and waits for an address another account holds', async () => {
     const accountId = await insertAccount(owner);
     const other = await insertAccount(owner);
     const taken = (
@@ -680,7 +688,7 @@ describe('authority sync', () => {
       });
     expect((await sync('moved@example.com', 3)).outcome).toBe('applied');
     expect((await sync('older@example.com', 2)).outcome).toBe('already_applied');
-    expect(await sync(taken, 4)).toEqual({ outcome: 'refused', error: 'email_taken' });
+    expect(await sync(taken, 4)).toEqual({ outcome: 'retry_later', error: 'email_taken' });
     const row = await owner.query('SELECT primary_email FROM uts.accounts WHERE id = $1', [
       accountId,
     ]);
@@ -1190,9 +1198,10 @@ describe('SSO domain sync (migration 0015)', () => {
 describe('the user-created event', () => {
   it('is written with every uts_ account, read oldest first, and leaves on acknowledgement', async () => {
     const id = `uts_${Array.from(randomBytes(26), byte => 'abcdefghijklmnopqrstuvwxyz234567'[byte % 32]).join('')}`;
-    await app.query("INSERT INTO uts.accounts (id, primary_email) VALUES ($1, 'new@example.com')", [
-      id,
-    ]);
+    await owner.query(
+      "INSERT INTO uts.accounts (id, primary_email) VALUES ($1, 'new@example.com')",
+      [id]
+    );
     const events = await subjects.readAppEvents(100);
     const event = events.find(item => item.account.id === id);
     expect(event).toMatchObject({
@@ -1208,11 +1217,292 @@ describe('the user-created event', () => {
 
   it('leaves with an account deleted before the app read it', async () => {
     const id = `uts_${'b'.repeat(26)}`;
-    await app.query(
+    await owner.query(
       "INSERT INTO uts.accounts (id, primary_email) VALUES ($1, 'gone@example.com')",
       [id]
     );
     await operation('revoke', id, 'account_deleted', 0);
     expect((await subjects.readAppEvents(100)).some(item => item.account.id === id)).toBe(false);
+  });
+});
+
+const sha256 = (value: string) => createHash('sha256').update(value).digest();
+const token = () => randomBytes(32).toString('base64url');
+const device: DeviceContext = {
+  label: 'Kilo CLI',
+  platform: 'linux',
+  clientIp: '198.51.100.7',
+  asn: 64501,
+  country: 'FR',
+  city: 'Paris',
+};
+
+/** A device code the account approved from a fresh browser session; returns the device code. */
+async function approvedDeviceCode(accountId: string): Promise<string> {
+  const code = token();
+  const userCodeHash = randomBytes(32);
+  expect(
+    await signIn.createDeviceCode({
+      deviceCodeHash: sha256(code),
+      userCodeHash,
+      clientId: 'kilo-cli',
+      scopes: ['gateway:models.read'],
+      network: {
+        userAgent: 'test browser',
+        clientIp: `10.${randomBytes(3).join('.')}`,
+        asn: 64500,
+        country: 'DE',
+        city: 'Berlin',
+      },
+    })
+  ).toMatchObject({ outcome: 'created' });
+  const cookie = token();
+  await owner.query(
+    `INSERT INTO uts.browser_sessions (account_id, token_hash, auth_time, amr, idle_expires_at, expires_at)
+     VALUES ($1, $2, now(), '{oauth}', now() + interval '14 days', now() + interval '29 days')`,
+    [accountId, sha256(cookie)]
+  );
+  expect(
+    await signIn.decideDeviceCode({
+      environment,
+      userCodeHash,
+      sessionTokenHash: sha256(cookie),
+      clientIp: '192.0.2.10',
+      source: 'typed',
+      approve: true,
+    })
+  ).toBe('approved');
+  return code;
+}
+
+function deviceExchange(code: string) {
+  return signIn.exchangeDeviceCode({
+    environment,
+    deviceCodeHash: sha256(code),
+    clientId: 'kilo-cli',
+    clientClass: 'desktop',
+    proof: { jkt: randomBytes(32), jti: randomUUID() },
+    grantId: randomUUID(),
+    refreshTokenHash: sha256(token()),
+    device,
+    scopes: null,
+    resources: null,
+  });
+}
+
+/** A first-party authorization code of the account, not yet exchanged; returns its exchange. */
+async function freshCode(accountId: string) {
+  const code = token();
+  const challenge = sha256(token()).toString('base64url');
+  const jkt = randomBytes(32);
+  expect(
+    await grants.issueCode({
+      environment,
+      codeHash: sha256(code),
+      client: { kind: 'first_party', clientId: 'kilo-cli', dpopJkt: jkt },
+      accountId,
+      browserSessionId: null,
+      redirectUri: 'http://127.0.0.1:4100/callback',
+      audiences: ['gateway'],
+      scopes: ['gateway:models.read'],
+      orgId: null,
+      codeChallenge: challenge,
+      authTime: new Date(),
+      amr: ['passkey'],
+    })
+  ).toMatchObject({ outcome: 'issued' });
+  return () =>
+    grants.exchangeCode({
+      environment,
+      codeHash: sha256(code),
+      clientId: 'kilo-cli',
+      redirectUri: 'http://127.0.0.1:4100/callback',
+      codeChallenge: challenge,
+      binding: {
+        kind: 'first_party',
+        proof: { jkt, jti: randomUUID() },
+        clientClass: 'desktop',
+        device,
+      },
+      grantId: randomUUID(),
+      refreshTokenHash: sha256(token()),
+      scopes: null,
+      resources: null,
+    });
+}
+
+/** An active third-party consent of the account, and the client it names. */
+async function activeConsent(accountId: string) {
+  const clientId = `https://client.example.com/${randomUUID()}`;
+  await owner.query(
+    `INSERT INTO uts.third_party_clients (client_id, client_name, redirect_uris, document,
+       fetched_at, cache_expires_at)
+     VALUES ($1, 'Test client', '{https://client.example.com/cb}', '{}', now(), now() + interval '1 day')`,
+    [clientId]
+  );
+  await owner.query(
+    `INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
+     VALUES ($1, $2, '{uts:probe.read}', $3)`,
+    [accountId, clientId, await insertGatePass(owner, accountId, 'third_party_approve')]
+  );
+  return clientId;
+}
+
+describe('round-2 review fixes', () => {
+  it.each(['account_recovery', 'account_reset', 'access_block'] as const)(
+    'a %s revocation stops an approved device code, an unexchanged code, the consents and the bot keys',
+    async reason => {
+      const accountId = await insertAccount(owner);
+      const adminId = await insertAccount(owner);
+      const orgId = randomUUID();
+      await owner.query(
+        `INSERT INTO uts.org_memberships (org_id, account_id, role, event_version)
+         VALUES ($1, $2, 'member', 1), ($1, $3, 'admin', 1)`,
+        [orgId, accountId, adminId]
+      );
+      await owner.query(
+        `INSERT INTO uts.org_bot_keys (org_id, created_by, name, token_hash, last_four, audience,
+           scope, gate_pass_id, expires_at)
+         VALUES ($1, $2, 'bot', $3, 'wxyz', 'uts', 'uts:probe.read', $4, now() + interval '30 days')`,
+        [
+          orgId,
+          accountId,
+          randomBytes(32),
+          await insertGatePass(owner, accountId, 'bot_key_create'),
+        ]
+      );
+      const deviceCode = await approvedDeviceCode(accountId);
+      const exchangeCode = await freshCode(accountId);
+      const clientId = await activeConsent(accountId);
+
+      const revoked = await operation('revoke', accountId, reason, 1);
+      expect(revoked.outcome).toBe('applied');
+
+      // Neither pending credential becomes a grant dated after `revoked_before`.
+      expect((await deviceExchange(deviceCode)).outcome).toBe('access_denied');
+      expect((await exchangeCode()).outcome).toBe('invalid_grant');
+      // GET /authorize finds no consent to approve with, so the user consents again.
+      expect(
+        await identityStoreThirdParty(new IdentityStore(app)).findConsent({
+          accountId,
+          clientId,
+          orgId: null,
+          scopes: ['uts:probe.read'],
+        })
+      ).toBeNull();
+      // The organization's key stays the organization's: flagged, with a notice to its admins.
+      const keys = await owner.query<{ status: string }>(
+        'SELECT status::text FROM uts.org_bot_keys WHERE created_by = $1',
+        [accountId]
+      );
+      expect(keys.rows).toEqual([{ status: 'flagged' }]);
+      const notices = await owner.query(
+        "SELECT 1 FROM uts.notices WHERE account_id = $1 AND kind = 'bot_key_flagged'",
+        [adminId]
+      );
+      expect(notices.rowCount).toBe(1);
+      const audit = await owner.query<{ event_type: string; data: Record<string, unknown> }>(
+        `SELECT event_type, event #> '{data,attributes}' AS data FROM uts.audit_events
+         WHERE account_id = $1 ORDER BY id`,
+        [accountId]
+      );
+      expect(audit.rows.map(row => row.event_type).slice(-2)).toEqual([
+        'ai.kilo.uts.bot_key.flagged',
+        'ai.kilo.uts.subject.revoked',
+      ]);
+      expect(audit.rows.at(-1)?.data).toMatchObject({
+        deviceCodes: 1,
+        authorizationCodes: 1,
+        consents: 1,
+        flaggedBotKeys: 1,
+      });
+    }
+  );
+
+  it('drops the old address as an email sign-in method, and waits for an address another subject still holds', async () => {
+    const first = await insertAccount(owner);
+    const second = await insertAccount(owner);
+    const firstEmail = (
+      await owner.query<{ primary_email: string }>(
+        'SELECT primary_email FROM uts.accounts WHERE id = $1',
+        [first]
+      )
+    ).rows[0].primary_email;
+    await owner.query(
+      `INSERT INTO uts.sign_in_methods (account_id, provider, provider_subject, verified_email)
+       VALUES ($1, 'email', $2, $3)`,
+      [first, firstEmail, firstEmail]
+    );
+    const sync = (subject: string, email: string, version: number) =>
+      subjects.syncPrimaryEmail({
+        environment,
+        workload,
+        operationId: randomUUID(),
+        actor: 'system:scim',
+        sourceVersion: version,
+        subject,
+        primaryEmail: email,
+      });
+    // A mailbox move delivered before the move that frees the address: the outbox retries it.
+    expect(await sync(second, firstEmail, 1)).toEqual({
+      outcome: 'retry_later',
+      error: 'email_taken',
+    });
+    expect((await sync(first, `moved-${randomUUID()}@example.com`, 1)).outcome).toBe('applied');
+    // The old mailbox no longer signs in to the first account.
+    const methods = await owner.query(
+      `SELECT 1 FROM uts.sign_in_methods WHERE provider = 'email' AND provider_subject = $1`,
+      [firstEmail]
+    );
+    expect(methods.rowCount).toBe(0);
+    expect((await sync(second, firstEmail, 1)).outcome).toBe('applied');
+  });
+
+  it('waits while another account still signs in by email with the address', async () => {
+    const holder = await insertAccount(owner);
+    const mover = await insertAccount(owner);
+    const address = `kept-${randomUUID()}@example.com`;
+    await owner.query(
+      `INSERT INTO uts.sign_in_methods (account_id, provider, provider_subject, verified_email)
+       VALUES ($1, 'email', $2, $3)`,
+      [holder, address, address]
+    );
+    expect(
+      await subjects.syncPrimaryEmail({
+        environment,
+        workload,
+        operationId: randomUUID(),
+        actor: 'system:scim',
+        sourceVersion: 1,
+        subject: mover,
+        primaryEmail: address,
+      })
+    ).toEqual({ outcome: 'retry_later', error: 'email_taken' });
+  });
+
+  it('raises the membership version on a sync that changes nothing, so an older event cannot win', async () => {
+    const accountId = await insertAccount(owner);
+    const orgId = randomUUID();
+    const sync = (role: 'member' | 'admin', version: number) =>
+      subjects.syncMembership({
+        environment,
+        workload,
+        operationId: randomUUID(),
+        actor: 'admin:owner-1',
+        sourceVersion: version,
+        subject: accountId,
+        orgId,
+        role,
+      });
+    expect((await sync('member', 5)).outcome).toBe('applied');
+    // The demotion of version 11 arrives before the promotion of version 9.
+    expect((await sync('member', 11)).outcome).toBe('already_applied');
+    expect((await sync('admin', 9)).outcome).toBe('already_applied');
+    const membership = await owner.query(
+      `SELECT role::text, event_version FROM uts.org_memberships
+       WHERE org_id = $1 AND account_id = $2`,
+      [orgId, accountId]
+    );
+    expect(membership.rows).toEqual([{ role: 'member', event_version: 11n }]);
   });
 });

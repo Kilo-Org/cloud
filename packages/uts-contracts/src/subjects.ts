@@ -337,10 +337,11 @@ export type AuthorityKind = z.infer<typeof AuthorityKindSchema>;
 /**
  * `applied`, `already_applied` (the same `operation_id`, an effect that already holds, or a
  * source version older than one UTS applied) and `no_subject` are 200. `retry_later` (409,
- * `Retry-After: 30`): with `connection_conflict`, a WorkOS connection is still active in another
- * organization; with `domain_conflict`, a domain is still verified by another organization.
- * Nothing was written, and the outbox retries until that organization's sync releases it.
- * `refused` with `email_taken` (409) is final for this request.
+ * `Retry-After: 30`) writes nothing, and the outbox retries it: with `connection_conflict`, a
+ * WorkOS connection is still active in another organization; with `domain_conflict`, a domain is
+ * still verified by another organization (each until that organization's sync releases it); with
+ * `email_taken`, another account still holds the address, until the email sync that moves that
+ * account away arrives (deliveries of two subjects' syncs can arrive in either order).
  */
 export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -349,14 +350,16 @@ export const AuthorityAnswerSchema = z.discriminatedUnion('outcome', [
   }),
   z.strictObject({
     outcome: z.literal('retry_later'),
-    error: z.enum(['connection_conflict', 'domain_conflict']),
+    error: z.enum(['connection_conflict', 'domain_conflict', 'email_taken']),
     operation_id: z.uuid(),
   }),
-  z.strictObject({ outcome: z.literal('refused'), error: z.literal('email_taken') }),
 ]);
 
-/** Seconds an SSO sync waits for another organization to release a connection or a domain. */
-export const UTS_SSO_CONFLICT_RETRY_SECONDS = 30;
+/**
+ * Seconds an authority sync waits before its retry: for another organization to release a
+ * connection or a domain, or for another account to release an address.
+ */
+export const UTS_AUTHORITY_CONFLICT_RETRY_SECONDS = 30;
 export type AuthorityAnswer = z.infer<typeof AuthorityAnswerSchema>;
 
 /**

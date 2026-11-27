@@ -11,7 +11,7 @@ import {
   identityStoreGrants,
 } from '../../src/grants/store';
 import { type ThirdPartyStore, identityStoreThirdParty } from '../../src/third-party/store';
-import { TestDatabase, insertAccount } from './harness';
+import { TestDatabase, insertAccount, insertGatePass, sqlStateOf } from './harness';
 
 /**
  * Third-party clients, consent and the broker exchange (migration 0012) through the Worker's own
@@ -230,6 +230,61 @@ describe('client metadata cache', () => {
     );
     expect(row.rows).toEqual([{ status: 'blocked', client_name: 'Example MCP client' }]);
     expect(await thirdParty.readClient(`https://client.example.com/${randomUUID()}`)).toBeNull();
+  });
+
+  it('writes a client only through its functions, which bound the cache time', async () => {
+    const clientId = `https://client.example.com/${randomUUID()}/client.json`;
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `INSERT INTO uts.third_party_clients (client_id, client_name, redirect_uris, document,
+             fetched_at, cache_expires_at)
+           VALUES ($1, 'Direct', '{https://client.example.com/callback}', '{}', now(), now())`,
+          [clientId]
+        )
+      )
+    ).toBe('42501');
+    expect(
+      await sqlStateOf(() =>
+        app.query(
+          `SELECT * FROM uts.save_third_party_client($1, 'Long', '{https://client.example.com/callback}', '{}', NULL, 86401)`,
+          [clientId]
+        )
+      )
+    ).toBe('22023');
+  });
+
+  it('prunes an active client that no consent names a day after its cache time, and keeps the rest', async () => {
+    const [stale, consented, blocked, fresh] = [
+      await client(),
+      await client(),
+      await client(),
+      await client(),
+    ];
+    const accountId = await insertAccount(owner);
+    await owner.query(
+      `INSERT INTO uts.third_party_consents (account_id, client_id, scopes, gate_pass_id)
+       VALUES ($1, $2, $3, $4)`,
+      [accountId, consented, [SCOPE], await insertGatePass(owner, accountId, 'third_party_approve')]
+    );
+    await owner.query(
+      `UPDATE uts.third_party_clients
+       SET fetched_at = now() - interval '3 days', cache_expires_at = now() - interval '25 hours'
+       WHERE client_id = ANY ($1)`,
+      [[stale, consented, blocked]]
+    );
+    await owner.query(
+      `UPDATE uts.third_party_clients SET status = 'blocked' WHERE client_id = $1`,
+      [blocked]
+    );
+    const pruned = await app.query(
+      'SELECT kind, deleted FROM uts.maintain_third_party_client_rows()'
+    );
+    expect(pruned.rows).toEqual([{ kind: 'third_party_clients', deleted: 1 }]);
+    expect(await thirdParty.readClient(stale)).toBeNull();
+    expect(await thirdParty.readClient(consented)).toMatchObject({ status: 'active' });
+    expect(await thirdParty.readClient(blocked)).toEqual({ status: 'blocked' });
+    expect(await thirdParty.readClient(fresh)).toMatchObject({ status: 'active', fresh: true });
   });
 });
 

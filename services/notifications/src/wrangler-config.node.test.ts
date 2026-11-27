@@ -79,6 +79,7 @@ describe('notifications wrangler.jsonc', () => {
       APNS_TEAM_ID: 'X96D76J65Z',
       APNS_KEY_ID: 'KRYMZL626P',
       SECRETS_SOURCE: 'secrets-store',
+      GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'legacy',
     });
     expect(boundKinds(production)).toEqual([
       'durable_objects',
@@ -149,6 +150,7 @@ describe('notifications wrangler.jsonc', () => {
       WORKER_ENV: 'staging',
       NOTIFICATIONS_PUSH_ENABLED: 'false',
       SECRETS_SOURCE: 'secrets-store',
+      GLANCEABLE_SNAPSHOT_SENDER_AUTH: 'legacy',
     });
     // The current `workers.dev` and preview URL settings, pinned so a deploy
     // neither re-enables nor adds ingress; no route and no custom domain.

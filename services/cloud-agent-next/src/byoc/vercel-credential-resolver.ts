@@ -16,6 +16,12 @@ import type {
   VercelComputeSetupStep,
 } from '@kilocode/db/schema-types';
 import type { Env } from '../types.js';
+import { logger } from '../logger.js';
+import {
+  WEB_BYOC_CREDENTIALS_READ,
+  WEB_BYOC_CREDENTIALS_WRITE,
+  webInternalCredential,
+} from '../web-internal-auth.js';
 import { z } from 'zod';
 
 const BYOC_VERCEL_ENVELOPE_SCHEME =
@@ -180,13 +186,30 @@ function ownerMatches(left: ByocVercelOwner, right: ByocVercelOwner): boolean {
   return false;
 }
 
-async function internalSecret(env: Env): Promise<string> {
-  try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
-    if (secret) return secret;
-  } catch {
-    // Convert secret-store failures into the same safe resolver error.
-  }
+/**
+ * The credential of one request to a BYOC route under `BYOC_LOOKUP_SENDER_AUTH`. Every failure is
+ * the same safe resolver error; the log names only the closed reason.
+ */
+async function byocRouteHeaders(
+  env: Env,
+  url: string,
+  token: typeof WEB_BYOC_CREDENTIALS_READ | typeof WEB_BYOC_CREDENTIALS_WRITE
+): Promise<Record<string, string>> {
+  const credential = await webInternalCredential({
+    auth: env.BYOC_LOOKUP_SENDER_AUTH,
+    sts: env.STS,
+    url,
+    token,
+    legacySecret: () => env.INTERNAL_API_SECRET_PROD.get(),
+  });
+  if (credential.kind === 'headers') return credential.headers;
+  logger
+    .withFields({
+      provider: 'vercel',
+      credentialReason: credential.reason,
+      ...(credential.deniedReason === undefined ? {} : { deniedReason: credential.deniedReason }),
+    })
+    .warn('BYOC credential route request has no credential');
   throw new ByocCredentialResolverError();
 }
 
@@ -198,17 +221,16 @@ export async function fetchByocVercelCredential(
     input.organizationId !== undefined
       ? `organizationId=${encodeURIComponent(input.organizationId)}`
       : `userId=${encodeURIComponent(input.userId)}`;
+  const url = `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}?${ownerQuery}`;
+  const headers = await byocRouteHeaders(env, url, WEB_BYOC_CREDENTIALS_READ);
   let response: Response;
   try {
-    response = await fetch(
-      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}?${ownerQuery}`,
-      {
-        method: 'GET',
-        headers: { 'x-internal-api-key': await internalSecret(env) },
-        cache: 'no-store',
-        redirect: 'manual',
-      }
-    );
+    response = await fetch(url, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+      redirect: 'manual',
+    });
   } catch {
     throw new ByocCredentialResolverError();
   }
@@ -247,17 +269,16 @@ async function fetchByocVercelEnrollmentForOwner(
   owner: ByocVercelOwner,
   path: 'organization' | 'user'
 ): Promise<ByocVercelEnrollment> {
+  const url = `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${path}/${encodeURIComponent(ownerId(owner))}`;
+  const headers = await byocRouteHeaders(env, url, WEB_BYOC_CREDENTIALS_READ);
   let response: Response;
   try {
-    response = await fetch(
-      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${path}/${encodeURIComponent(ownerId(owner))}`,
-      {
-        method: 'GET',
-        headers: { 'x-internal-api-key': await internalSecret(env) },
-        cache: 'no-store',
-        redirect: 'manual',
-      }
-    );
+    response = await fetch(url, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+      redirect: 'manual',
+    });
   } catch {
     throw new ByocCredentialResolverError();
   }
@@ -278,21 +299,17 @@ export async function projectByocVercelStatus(
   env: Env,
   input: ByocVercelStatusProjection
 ): Promise<boolean> {
+  const url = `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}`;
+  const headers = await byocRouteHeaders(env, url, WEB_BYOC_CREDENTIALS_WRITE);
   let response: Response;
   try {
-    response = await fetch(
-      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': await internalSecret(env),
-        },
-        body: JSON.stringify(input),
-        cache: 'no-store',
-        redirect: 'manual',
-      }
-    );
+    response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(input),
+      cache: 'no-store',
+      redirect: 'manual',
+    });
   } catch {
     throw new ByocCredentialResolverError();
   }

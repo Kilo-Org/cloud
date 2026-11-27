@@ -2674,6 +2674,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../../packages/service-token-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts
@@ -2720,6 +2723,9 @@ importers:
       '@kilocode/sdk':
         specifier: 7.8.17
         version: 7.8.17
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@sentry/cli':
         specifier: 'catalog:'
         version: 3.8.0
@@ -3448,6 +3454,9 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../../packages/service-token-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3470,6 +3479,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
         version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.12)(@vitest/snapshot@4.1.12)(bufferutil@4.2.0)(utf-8-validate@6.0.6)(vitest@4.1.12)
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4

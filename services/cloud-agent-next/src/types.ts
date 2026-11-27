@@ -28,6 +28,7 @@ import type {
   ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
+import type { MintBinding } from '@kilocode/service-token-client';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
@@ -500,6 +501,11 @@ export type Env = {
    * production with the top-level config and development with `env.dev`.
    */
   ENVIRONMENT?: string;
+  /**
+   * STS `SecretsBroker` binding (services/sts/policy/cloud-agent-next.yaml): mints the service
+   * tokens of the outbound edges below (sts-service-tokens.ts).
+   */
+  STS?: MintBinding;
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
   CF_VERSION_METADATA?: { id: string };
@@ -536,6 +542,17 @@ export type Env = {
   WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
   /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
   WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
+  /**
+   * Outbound credential switches (sts-service-tokens.ts, ENVIRONMENT.md): unset or `sts` sends only
+   * an STS token for the receiver, `legacy` the shared credential. `BYOC_LOOKUP_SENDER_AUTH` covers
+   * the web BYOC routes, `PR_REFRESH_SENDER_AUTH` the hosted-workspace pull request refresh, and
+   * each `CALLBACK_SENDER_AUTH_*` one callback receiver (callbacks/callback-auth.ts).
+   */
+  BYOC_LOOKUP_SENDER_AUTH?: string;
+  PR_REFRESH_SENDER_AUTH?: string;
+  CALLBACK_SENDER_AUTH_WEB?: string;
+  CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST?: string;
+  CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;

@@ -1,3 +1,4 @@
+import type { ServiceTokensExecutionContext } from '@kilocode/service-token-client';
 import { TRPCError } from '@trpc/server';
 import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
 import type {
@@ -6,6 +7,7 @@ import type {
   ExecutionCallbackPayload,
 } from './types.js';
 import { logger } from '../logger.js';
+import { callbackAuth, type CallbackSenderAuthEnv } from './callback-auth.js';
 
 /** Initial callback delivery plus configured Queue redeliveries. Keep wrangler consumer max_retries in sync. */
 export const CALLBACK_DELIVERY_MAX_ATTEMPTS = 5;
@@ -47,13 +49,9 @@ export function classifyCallbackError(
 
 async function deliverToTarget(
   target: CallbackTarget,
-  payload: ExecutionCallbackPayload
+  payload: ExecutionCallbackPayload,
+  headers: Record<string, string>
 ): Promise<{ ok: boolean; status?: number; error?: string }> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...target.headers,
-  };
-
   try {
     const requestInit: RequestInit = {
       method: 'POST',
@@ -89,12 +87,35 @@ async function deliverToTarget(
   }
 }
 
+/**
+ * Delivers one execution callback with the headers `callbackAuth` resolves for its target. With no
+ * credential under `sts` nothing is sent and the delivery retries like an unanswered request, so
+ * a token outage or a switch fix within the retry window still delivers.
+ */
 export async function deliverCallbackJob(
   target: CallbackTarget,
   payload: ExecutionCallbackPayload,
-  attempts: number
+  attempts: number,
+  sender: { env: CallbackSenderAuthEnv; ctx?: ServiceTokensExecutionContext }
 ): Promise<DeliveryResult> {
-  const result = await deliverToTarget(target, payload);
+  const auth = await callbackAuth(sender.env, target, sender.ctx);
+  if (auth.kind === 'unavailable') {
+    logger
+      .withFields({
+        cloudAgentSessionId: payload.cloudAgentSessionId,
+        kiloSessionId: payload.kiloSessionId,
+        messageId: payload.messageId,
+        credentialReason: auth.reason,
+        ...(auth.deniedReason === undefined ? {} : { deniedReason: auth.deniedReason }),
+      })
+      .error('Callback delivery has no credential');
+    return classifyCallbackDelivery(
+      { ok: false, error: `callback credential unavailable: ${auth.reason}` },
+      payload,
+      attempts
+    );
+  }
+  const result = await deliverToTarget(target, payload, auth.headers);
 
   return classifyCallbackDelivery(result, payload, attempts);
 }

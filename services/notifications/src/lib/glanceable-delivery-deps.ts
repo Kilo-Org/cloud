@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { readNotificationsSecret, secretsSource } from '../secrets';
 import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity';
 import { sendWidgetApns } from './apns-widget';
+import { glanceableSnapshotAuth } from './glanceable-snapshot-auth';
 import { sendPushNotifications } from './expo-push';
 import type { GlanceableDeliveryDeps, IosActivityToken } from './glanceable-delivery';
 import { skipProviderPush } from './push-gate';
@@ -58,14 +59,16 @@ export function glanceableDeliveryDeps(
         console.warn('KILO_WEB_API_BASE_URL missing; skipping glanceable aggregate delivery');
         return null;
       }
-      let internalApiSecret: string | undefined;
-      try {
-        internalApiSecret = await readNotificationsSecret(env, 'INTERNAL_API_SECRET', ctx);
-      } catch {
-        internalApiSecret = undefined;
-      }
-      if (!internalApiSecret) {
-        console.warn('INTERNAL_API_SECRET missing; skipping glanceable aggregate delivery');
+      const auth = await glanceableSnapshotAuth(env, baseUrl, ctx);
+      if (auth.kind === 'unavailable') {
+        if (auth.reason === 'internal_secret_missing') {
+          console.warn('INTERNAL_API_SECRET missing; skipping glanceable aggregate delivery');
+        } else {
+          console.warn('Glanceable snapshot credential unavailable; skipping aggregate delivery', {
+            reason: auth.reason,
+            ...(auth.deniedReason === undefined ? {} : { deniedReason: auth.deniedReason }),
+          });
+        }
         return null;
       }
 
@@ -74,15 +77,19 @@ export function glanceableDeliveryDeps(
         headers: {
           accept: 'application/json',
           'content-type': 'application/json',
-          'x-internal-secret': internalApiSecret,
+          ...auth.headers,
         },
         body: JSON.stringify({ userId, organizationId }),
       });
       if (!response.ok) {
         console.warn('Glanceable snapshot route failed', { status: response.status });
         // The route rechecks organization membership: a 403 means the user
-        // lost the scope, so its session cards must end at once.
-        return response.status === 403 ? 'access_denied' : null;
+        // lost the scope, so its session cards must end at once. A 403 with a
+        // `WWW-Authenticate` challenge refuses this Worker's credential
+        // instead and says nothing about the user, so the cards stay.
+        return response.status === 403 && !response.headers.has('www-authenticate')
+          ? 'access_denied'
+          : null;
       }
       if (response.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') {
         console.warn('Glanceable snapshot route returned a non-JSON response');

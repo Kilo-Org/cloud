@@ -8,6 +8,12 @@
     "ENVIRONMENT": "production",
     "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",
     "WORKER_URL": "https://worker.example.com",
+    // No STS binding here: every outbound edge keeps its shared credential.
+    "BYOC_LOOKUP_SENDER_AUTH": "legacy",
+    "PR_REFRESH_SENDER_AUTH": "legacy",
+    "CALLBACK_SENDER_AUTH_WEB": "legacy",
+    "CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST": "legacy",
+    "CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS": "legacy",
     "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",
   },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],

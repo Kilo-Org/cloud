@@ -283,6 +283,27 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
   });
 });
 
+it('renders a deployed E2E Worker that binds no STS and keeps every sender on legacy', () => {
+  const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  expect(source.services).toContainEqual(expect.objectContaining({ service: 'sts' }));
+  const output = buildE2eWorkerConfig(
+    renderRuntimeTarget({ config: source, environment: 'production', startup, release }),
+    {
+      workerUrl: 'https://e2e.example.test',
+      kiloOpenRouterBase: 'https://fake.example.test/api/openrouter',
+    }
+  );
+  expect(output.services).not.toContainEqual(expect.objectContaining({ service: 'sts' }));
+  expect(output.services.length).toBe(source.services.length - 1);
+  expect(output.vars).toMatchObject({
+    BYOC_LOOKUP_SENDER_AUTH: 'legacy',
+    PR_REFRESH_SENDER_AUTH: 'legacy',
+    CALLBACK_SENDER_AUTH_WEB: 'legacy',
+    CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST: 'legacy',
+    CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS: 'legacy',
+  });
+});
+
 it('rebases only the runtime-free base for local HTTP E2E startup', () => {
   const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
   const output = buildLocalE2eWorkerConfig(source);

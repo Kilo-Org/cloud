@@ -1,4 +1,5 @@
 import type { BundleBinding } from '@kilocode/secrets-client';
+import type { MintBinding } from '@kilocode/service-token-client';
 import type {} from './worker-configuration.d.ts';
 
 // Augment the wrangler-generated Env with RPC method signatures for service
@@ -11,8 +12,12 @@ declare global {
       isUserInContext(userId: string, context: string): Promise<boolean>;
     };
     // `wrangler types` types the cross-Worker entrypoint binding as a plain
-    // `Service`; this layers on the `SecretsBroker` RPC shape.
-    STS?: Service & BundleBinding;
+    // `Service`; this layers on the `SecretsBroker` RPC shape: the secret
+    // bundle and the service-token mint.
+    STS?: Service & BundleBinding & MintBinding;
+    // The glanceable snapshot request's credential switch
+    // (`lib/glanceable-snapshot-auth.ts`, ENVIRONMENT.md): unset means `sts`.
+    GLANCEABLE_SNAPSHOT_SENDER_AUTH?: string;
     // Local dev / E2E push sink mode. Absent from `wrangler.jsonc` (which
     // is single-config production); supplied via `.dev.vars` by
     // `pnpm dev:env`. The runtime check is string equality on `'log'`.

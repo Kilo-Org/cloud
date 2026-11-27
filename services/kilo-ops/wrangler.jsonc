@@ -65,7 +65,9 @@
   // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is what
   // STS authorizes on and must equal this Worker's top-level name; services/sts/policy/kilo-ops.yaml
   // grants CF_ANALYTICS_API_KEY's secret (O11Y_CF_AE_API_TOKEN) and GF_SECRET_KEY. Nothing reads it
-  // while SECRETS_SOURCE is `secrets-store`.
+  // while SECRETS_SOURCE is `secrets-store`. Wrangler does not carry `services` into an env block,
+  // so `deploy --env dev` warns that STS is not on `env.dev`: that is intended, because dev binds no
+  // STS and runs the analytics proxy off (see the dev block's secrets comment).
   "services": [
     {
       "binding": "STS",

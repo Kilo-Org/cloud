@@ -72,9 +72,10 @@ GrafanaContainer.outboundByHost = {
     const token = await readSecretState(env, 'O11Y_CF_AE_API_TOKEN');
     if (token.state === 'off') {
       // The `dev` block binds no Analytics Engine token: none has been minted for dev, and a
-      // production-named store secret may not be read from a non-production block. That deployment
-      // therefore runs this proxy off; adding a `_DEV` store entry and its dev binding turns it
-      // back on with no code change. Answer it as a missing feature, not a broken read.
+      // non-production block of a config that binds STS may not read a production-named store
+      // secret. That deployment therefore runs this proxy off; adding a `_DEV` store entry and its
+      // dev binding turns it back on with no code change. Answer it as a missing feature, not a
+      // broken read.
       return new Response('Analytics Engine proxy is not configured for this deployment', {
         status: 503,
       });

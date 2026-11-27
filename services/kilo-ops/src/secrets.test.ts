@@ -127,6 +127,33 @@ describe('readSecretState', () => {
     expect(await readSecretState({ SECRETS_SOURCE: 'infisical' }, 'GF_SECRET_KEY')).toEqual({
       state: 'failed',
     });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('reports a failed read, not off, when sts is selected without its binding', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await readSecretState({ SECRETS_SOURCE: 'sts' }, 'O11Y_CF_AE_API_TOKEN')).toEqual({
+      state: 'failed',
+    });
+    expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it('logs a missing source in production and stays quiet in development', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await readSecretState({ ENVIRONMENT: 'production' }, 'O11Y_CF_AE_API_TOKEN')).toEqual({
+      state: 'off',
+    });
+    expect(logged).toHaveBeenCalledOnce();
+
+    logged.mockClear();
+    expect(await readSecretState({ ENVIRONMENT: 'development' }, 'O11Y_CF_AE_API_TOKEN')).toEqual({
+      state: 'off',
+    });
+    expect(logged).not.toHaveBeenCalled();
     logged.mockRestore();
   });
 });

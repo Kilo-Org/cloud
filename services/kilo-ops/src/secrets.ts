@@ -33,9 +33,11 @@ type LegacySecretValue = string | { get(): Promise<string> };
 export type KiloOpsSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {
   SECRETS_SOURCE?: string;
   STS?: BundleBinding;
+  /** `production` or `development`: only a production deployment gets logged for a missing source. */
+  ENVIRONMENT?: string;
 };
 
-export type SecretsSource = 'secrets-store' | 'sts';
+type SecretsSource = 'secrets-store' | 'sts';
 
 /** Fails closed: an unrecognised value refuses every read instead of guessing a source. */
 export function secretsSource(env: Pick<KiloOpsSecretsEnv, 'SECRETS_SOURCE'>): SecretsSource {
@@ -92,12 +94,13 @@ export async function readKiloOpsSecret(
 }
 
 /** What one read produced, for a caller that has to answer its own HTTP. */
-export type SecretRead = { state: 'value'; value: string } | { state: 'off' } | { state: 'failed' };
+type SecretRead = { state: 'value'; value: string } | { state: 'off' } | { state: 'failed' };
 
 /**
  * One read, classified: `off` when this deployment binds no source for the name, so the feature it
  * feeds is not deployed here; `failed` when a configured source refused the read. Neither returns a
- * value, and a caller tells them apart so an absent feature does not read as a broken one.
+ * value, and a caller tells them apart so an absent feature does not read as a broken one. An `off`
+ * in production is logged, because there the absence is a broken deploy rather than a choice.
  */
 export async function readSecretState(
   env: KiloOpsSecretsEnv,
@@ -105,7 +108,15 @@ export async function readSecretState(
   ctx?: SecretsExecutionContext
 ): Promise<SecretRead> {
   try {
-    if (!secretConfigured(env, name)) return { state: 'off' };
+    if (!secretConfigured(env, name)) {
+      // A deployment that never binds the source runs the feature off (dev), so it stays quiet. The
+      // same absence in production is a broken deploy, not a choice, and has no read to fail: say
+      // so, or it answers 503 with nothing in the logs.
+      if (env.ENVIRONMENT === 'production') {
+        console.error(`[readSecretState] ${name} has no source bound in this deployment`);
+      }
+      return { state: 'off' };
+    }
     return { state: 'value', value: await readKiloOpsSecret(env, name, ctx) };
   } catch (err) {
     console.error(

@@ -1,3 +1,5 @@
+// Hand-maintained: this Worker's `wrangler types` refuses to overwrite a file it did not generate
+// ("A non-Wrangler worker-configuration.d.ts already exists"), so edit these entries by hand.
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import('./src/worker');

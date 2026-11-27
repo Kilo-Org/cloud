@@ -17,19 +17,25 @@
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "head_sampling_rate": 1 },
-    "traces": { "enabled": true, "head_sampling_rate": 0.01 },
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "vars": {
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the compute-balance-alert call sends
-    // `INTERNAL_API_SECRET` as `X-Internal-Secret`. `"sts"` sends a `web:compute-balance-alert.send`
-    // STS service token over the `STS` binding instead; set it only once the Worker has that
-    // binding, STS grants the scope and the route accepts STS. Removing it is the rollback.
+    // `INTERNAL_API_SECRET` (read through `SECRETS_SOURCE`) as `X-Internal-Secret`. `"sts"` sends a
+    // `web:compute-balance-alert.send` STS service token minted over the `STS` binding instead; set
+    // it only once STS grants the scope and the route accepts STS. Removing it is the rollback.
     "CONTAINER_BILLING_SERVICES": "cloud-agent-next",
     "CONTAINER_BILLING_USER_IDS": "",
     "CONTAINER_BILLING_ORG_IDS": "",
     "CONTAINER_BILLING_CLOUD_AGENT_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
     "CONTAINER_BILLING_WARN_REMAINING_MICRODOLLARS": "10000000",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
   // CONTAINER_BILLING_CLOUD_AGENT_USER_IDS (personal Cloud Agent payers) is a
   // Worker secret, not a checked-in var. Both Cloud Agent payer lists are
@@ -45,6 +51,18 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // container-usage-meter.yaml grants INTERNAL_API_SECRET. Nothing reads it while SECRETS_SOURCE
+  // is `secrets-store`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "container-usage-meter" },
     },
   ],
   "secrets_store_secrets": [

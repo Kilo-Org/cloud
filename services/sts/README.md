@@ -378,10 +378,12 @@ Identity kinds:
 Token grants: `audiences` lists the services a workload may mint for and `scopes` the scopes it may
 hold; both default to empty, so a policy without them mints nothing. Every scope must be in
 `STS_SCOPE_REGISTRY` (`@kilocode/sts-contracts`: the canary scopes `web:sts.canary` and
-`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`, and
+`usage-ingest:sts.canary`, the reserved `canary:denied-probe`, `uts-feed:revocation.read`,
 under `uts` the scopes `uts:subjects.revoke`, `uts:browser-sessions.end`,
-`uts:api-credentials.revoke` and `uts:token-exchange`) and belong to a listed audience, every
-audience needs at least one scope, and no audience may be the workload itself. A reserved scope
+`uts:api-credentials.revoke` and `uts:token-exchange`, under `bouncer` the scopes `bouncer:decide`,
+`bouncer:usage.write`, `bouncer:signup.decide` and `bouncer:signup.history`, and the phase 4
+service scopes) and belong to a listed audience, every audience needs at least one scope, and no
+audience may be the workload itself. A reserved scope
 (`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its audience fail the load whatever the
 registry says: no policy may grant them (see [Alerts on token denials](#alerts-on-token-denials)).
 `dynamic` lists the database lease grants the workload may request
@@ -451,11 +453,16 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
+| `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 
-Staging and production get the `web` UTS grants with phase 4's activation go. The `kilo-mcp` grant
+Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
+are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only and accepts only
+production STS tokens. `bouncer:signup.history` is registered for the signup-history import job,
+and no policy grants it yet. The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
 config check below refuses a `worker-binding` policy that no config here binds. Its local block
@@ -475,11 +482,13 @@ workload check, so a grant alone opens no route to another caller.
 The `ai-gateway` policy (Vercel project `kilocode-ai-gateway`, see [Vercel callers](#vercel-callers))
 lists the project's `production`, its custom environment `staging` and its previews, mapped to
 production, staging and development STS as for `web`. Its UTS feed read stays development only, in
-`environmentGrants`; staging and production get it with phase 4's activation go.
+`environmentGrants`; staging and production get it with phase 4's activation go. Phase 4 activated
+it for Bouncer: `bouncer:decide` and `bouncer:usage.write` are a production grant in
+`environmentGrants`, and it holds neither signup scope, since the gateway sends no signup call.
 
-Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every `ai-gateway` scope on
-development STS, the same as `web`'s development grants. If fork or outside pull-request previews
-are ever enabled on that project, these grants need a review first.
+Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every scope `ai-gateway`
+holds on development STS, the same as `web`'s development grants. If fork or outside pull-request
+previews are ever enabled on that project, these grants need a review first.
 
 Workloads with a policy, all over `worker-binding`:
 
@@ -490,6 +499,11 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-gmail-push` | production | `services/gmail-push/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `kiloclaw-inbound-email` | production | `services/kiloclaw-inbound-email/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
@@ -502,7 +516,7 @@ pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2` on `refs/heads/v2`
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
-| `ci-kilocode-release` | `release` | `publish.yml` | `workflow_dispatch` |
+| `ci-kilocode-release` | `release-keys` | `publish.yml` | `workflow_dispatch` |
 | `ci-kilocode-release-jetbrains` | `release-jetbrains` | `publish-jetbrains.yml`, `publish-jetbrains-bundled.yml` | `workflow_dispatch` |
 | `ci-kilocode-app-key` | `automation` | `nix-hashes.yml`, `prepare-jetbrains-release.yml` | `push`, `workflow_dispatch` |
 | `ci-kilocode-app-key-v2` | `automation` | `kilo-v2.yml` at `refs/heads/v2` (its `progress-commit` job) | `push` |
@@ -519,15 +533,21 @@ admits the `v2` branch (manager ruling M76): it accepts `refs/heads/v2` alone, w
 `GITHUB_PRODUCTION_REF_EXCEPTIONS` entry in every field (`src/policy/schema.ts`). No policy admits
 `release-v2`.
 
-Two kilocode-side rules hold these policies to what they name:
+Three kilocode-side rules hold these policies to what they name:
 
 - None of these workflow files may gain an `on: workflow_call` trigger. A called workflow's jobs
   carry its own `job_workflow_ref` with the caller's `ref` and `event_name`, so any workflow on
   `main` that called it with a listed event would get the bundle.
-- The GitHub environments `release` and `release-jetbrains` admit deployments from `main` only,
-  and `automation` from `main` and `v2` only (a deployment branch policy; `automation` read back on
-  2026-11-27). STS trusts the `environment` claim; the branch rule is what makes it mean those
-  branches, and the policy's ref and workflow pins hold each policy to its own branch.
+- The GitHub environments `automation`, `release-keys` and `release-jetbrains` admit deployments
+  from `main` only, except `automation`, which admits `main` and `v2` (a deployment branch policy;
+  `automation` read back on 2026-11-27). STS trusts the `environment` claim; the branch rule is
+  what makes it mean those branches, and the policy's ref and workflow pins hold each policy to its
+  own branch.
+- `publish.yml`'s `release-push`, `package-managers` and `jetbrains-pin` jobs are the only jobs
+  that may declare `environment: release-keys`, and they may run only SHA-pinned GitHub-org actions,
+  repository code and runtimes pinned by version and digest: STS cannot tell the jobs of one
+  workflow file apart, so another job of `publish.yml` declaring the environment receives the
+  bundle too.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -742,13 +762,12 @@ identity:
   repository: Kilo-Org/kilocode
   repositoryId: '<repository id>'
   repositoryOwnerId: '<owner id>'
-  environment: release
+  environment: release-keys
   refs: [refs/heads/main]   # the default
   jobWorkflowRefs:
     - Kilo-Org/kilocode/.github/workflows/publish.yml@refs/heads/main
-    - Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main
   events: [workflow_dispatch]
-secrets: [KILOCODE_ANACONDA_API_KEY, KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
+secrets: [KILOCODE_AUR_KEY, KILOCODE_MAINTAINER_APP_KEY]
 ```
 
 How a token finds its policy, in this order:

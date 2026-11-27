@@ -69,12 +69,19 @@ describe('feed objects', () => {
     await runInDurableObject(feedStub(0), (_instance, state) => state.abort('test restart')).catch(
       () => undefined
     );
-    await feedStub(0).publicKeys();
-    const alarm = await runInDurableObject(feedStub(0), (_instance, state) =>
-      state.storage.getAlarm()
-    );
-    expect(alarm ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
-      Date.now() + FEED_ALARM_INTERVAL_MS
+    // The restart lands asynchronously, so a call can still reach the old instance; poll until the
+    // reloaded one has moved the alarm.
+    await vi.waitFor(
+      async () => {
+        await feedStub(0).publicKeys();
+        const alarm = await runInDurableObject(feedStub(0), (_instance, state) =>
+          state.storage.getAlarm()
+        );
+        expect(alarm ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+          Date.now() + FEED_ALARM_INTERVAL_MS
+        );
+      },
+      { timeout: 5000, interval: 100 }
     );
   });
 

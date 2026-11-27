@@ -395,6 +395,7 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'services/sts/policy/**'
               - 'services/*/wrangler.json'
               - 'services/*/wrangler.jsonc'
               - 'services/*/wrangler.toml'
@@ -420,6 +421,7 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'services/sts/policy/**'
               - 'services/*/wrangler.json'
               - 'services/*/wrangler.jsonc'
               - 'services/*/wrangler.toml'
@@ -712,6 +714,7 @@ jobs:
           scripts/sts-deployment-watch.test.mjs
           scripts/wrangler-nonproduction-fence.test.mjs
           scripts/sts-bundle-action.test.mjs
+          scripts/sts-bundle-callers.test.mjs
 
       # The same split for the release workflow: a PR that changes it alone
       # trips no product filter, and its test runs in no other job, so its

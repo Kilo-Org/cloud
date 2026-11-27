@@ -24,6 +24,36 @@ outputs:
   E2E_ACCESS_CLIENT_SECRET:
     description: 'Cloudflare Access service token client secret of the Cloud Agent e2e Worker (ci-cloud-agent-e2e)'
     value: ${{ steps.bundle.outputs.E2E_ACCESS_CLIENT_SECRET }}
+  VERCEL_TOKEN_APP:
+    description: 'Vercel token of the kilocode-app project (ci-vercel-stage, ci-vercel-stage-staging)'
+    value: ${{ steps.bundle.outputs.VERCEL_TOKEN_APP }}
+  VERCEL_TOKEN_AI_GATEWAY:
+    description: 'Vercel token of the AI gateway project (ci-vercel-stage, ci-vercel-stage-staging)'
+    value: ${{ steps.bundle.outputs.VERCEL_TOKEN_AI_GATEWAY }}
+  VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY:
+    description: 'Vercel token of the AI gateway secure proxy project (ci-vercel-stage)'
+    value: ${{ steps.bundle.outputs.VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY }}
+  VERCEL_TOKEN:
+    description: 'Vercel token that promotes and inspects deployments (ci-vercel-promote)'
+    value: ${{ steps.bundle.outputs.VERCEL_TOKEN }}
+  AXIOM_ANNOTATION_TOKEN:
+    description: 'Axiom token that writes deployment annotations (ci-vercel-promote)'
+    value: ${{ steps.bundle.outputs.AXIOM_ANNOTATION_TOKEN }}
+  SENTRY_AUTH_TOKEN:
+    description: 'Sentry token that uploads Cloud Agent source maps (ci-cloud-agent-sentry, ci-cloud-agent-sentry-staging)'
+    value: ${{ steps.bundle.outputs.SENTRY_AUTH_TOKEN }}
+  EXPO_TOKEN:
+    description: 'Expo access token of the kilo-app release (ci-kilo-app-release)'
+    value: ${{ steps.bundle.outputs.EXPO_TOKEN }}
+  DOC_WEBHOOK_URL:
+    description: 'Docs intake webhook URL (ci-auto-docs)'
+    value: ${{ steps.bundle.outputs.DOC_WEBHOOK_URL }}
+  DOC_WEBHOOK_SECRET:
+    description: 'Docs intake webhook shared secret (ci-auto-docs)'
+    value: ${{ steps.bundle.outputs.DOC_WEBHOOK_SECRET }}
+  FLY_DEV_API_TOKEN:
+    description: 'Fly development registry token (ci-kiloclaw-dev-push)'
+    value: ${{ steps.bundle.outputs.FLY_DEV_API_TOKEN }}
 runs:
   using: 'composite'
   steps:

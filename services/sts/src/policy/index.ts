@@ -4,9 +4,14 @@ import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import autoRoutingBenchmarkPolicy from '../../policy/auto-routing-benchmark.yaml';
 import autoRoutingPolicy from '../../policy/auto-routing.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import ciAutoDocsPolicy from '../../policy/ci-auto-docs.yaml';
+import ciCloudAgentSentryStagingPolicy from '../../policy/ci-cloud-agent-sentry-staging.yaml';
+import ciCloudAgentSentryPolicy from '../../policy/ci-cloud-agent-sentry.yaml';
 import ciDbMigrateStagingPolicy from '../../policy/ci-db-migrate-staging.yaml';
 import ciDbMigratePolicy from '../../policy/ci-db-migrate.yaml';
 import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
+import ciKiloAppReleasePolicy from '../../policy/ci-kilo-app-release.yaml';
+import ciKiloclawDevPushPolicy from '../../policy/ci-kiloclaw-dev-push.yaml';
 import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
 import ciKilocodeAppKeyV2Policy from '../../policy/ci-kilocode-app-key-v2.yaml';
 import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
@@ -15,6 +20,9 @@ import ciKilocodeOpencodeWatchPolicy from '../../policy/ci-kilocode-opencode-wat
 import ciKilocodeReleaseJetbrainsPolicy from '../../policy/ci-kilocode-release-jetbrains.yaml';
 import ciKilocodeReleasePolicy from '../../policy/ci-kilocode-release.yaml';
 import ciKilocodeScanNotifyPolicy from '../../policy/ci-kilocode-scan-notify.yaml';
+import ciVercelPromotePolicy from '../../policy/ci-vercel-promote.yaml';
+import ciVercelStageStagingPolicy from '../../policy/ci-vercel-stage-staging.yaml';
+import ciVercelStagePolicy from '../../policy/ci-vercel-stage.yaml';
 import cloudAgentNextPolicy from '../../policy/cloud-agent-next.yaml';
 import cloudflareGmailPushPolicy from '../../policy/cloudflare-gmail-push.yaml';
 import cloudflareScimSyncPolicy from '../../policy/cloudflare-scim-sync.yaml';
@@ -54,6 +62,14 @@ const sources: Record<PolicyFile, string> = {
   'auto-routing.yaml': autoRoutingPolicy,
   'auto-routing-benchmark.yaml': autoRoutingBenchmarkPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'ci-vercel-stage.yaml': ciVercelStagePolicy,
+  'ci-vercel-stage-staging.yaml': ciVercelStageStagingPolicy,
+  'ci-vercel-promote.yaml': ciVercelPromotePolicy,
+  'ci-cloud-agent-sentry.yaml': ciCloudAgentSentryPolicy,
+  'ci-cloud-agent-sentry-staging.yaml': ciCloudAgentSentryStagingPolicy,
+  'ci-kilo-app-release.yaml': ciKiloAppReleasePolicy,
+  'ci-auto-docs.yaml': ciAutoDocsPolicy,
+  'ci-kiloclaw-dev-push.yaml': ciKiloclawDevPushPolicy,
   'ci-db-migrate.yaml': ciDbMigratePolicy,
   'ci-db-migrate-staging.yaml': ciDbMigrateStagingPolicy,
   'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,

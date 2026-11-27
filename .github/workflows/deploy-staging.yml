@@ -98,25 +98,31 @@ jobs:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # Ceiling for the called workflow: its stage job reads the STS bundle.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
+      vercel_token_key: VERCEL_TOKEN_APP
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-ai-gateway:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # Ceiling for the called workflow: its stage job reads the STS bundle.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
+      vercel_token_key: VERCEL_TOKEN_AI_GATEWAY
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   # Worker change detection reads only the SHAs check-changes publishes, so this
   # call runs beside the Vercel staging deploys instead of after them: the matrix
@@ -125,6 +131,12 @@ jobs:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # GitHub checks every job of the called workflow against this ceiling,
+    # including the Cloud Agent source map upload a detection call skips.
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     uses: ./.github/workflows/deploy-workers.yml
     with:
       base_sha: ${{ needs.check-changes.outputs.base_sha }}
@@ -139,6 +151,12 @@ jobs:
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
     # workflow inherits repo secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # Ceiling for the called workflow: its Cloud Agent source map upload reads
+    # the STS bundle; every other job there declares no id-token.
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging

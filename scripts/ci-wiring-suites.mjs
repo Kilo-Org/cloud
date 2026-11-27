@@ -20,6 +20,7 @@ export const wiringSuites = [
   'scripts/sts-deployment-watch.test.mjs',
   'scripts/wrangler-nonproduction-fence.test.mjs',
   'scripts/sts-bundle-action.test.mjs',
+  'scripts/sts-bundle-callers.test.mjs',
 ];
 
 export const wiringCommand = `node --test ${wiringSuites.join(' ')}`;

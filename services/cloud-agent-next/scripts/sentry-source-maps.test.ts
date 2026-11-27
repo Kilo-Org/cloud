@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { SourceMap, type SourceMapPayload } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -14,8 +14,9 @@ import {
   prepareBunSentryArtifact,
   readSentryArtifact,
   runSentryCli,
-  sentryUploadConfigured,
+  sentryCliBinary,
   sha256,
+  stageSentryUploads,
   validateSentryArtifacts,
   workerBuildArgs,
 } from './sentry-source-maps.js';
@@ -67,52 +68,75 @@ describe('Cloud Agent Sentry build artifacts', () => {
     ).toHaveLength(WRAPPER_BUNDLES.filter(bundle => bundle.installName.endsWith('.js')).length);
   }, 40_000);
 
-  it('requires only the shared auth token to upload', () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    expect(sentryUploadConfigured({})).toBe(false);
-    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: '' })).toBe(false);
-    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: ' \t ' })).toBe(false);
-    expect(log).toHaveBeenLastCalledWith(
-      expect.stringContaining('SENTRY_AUTH_TOKEN is not configured')
-    );
-    expect(sentryUploadConfigured({ SENTRY_AUTH_TOKEN: 'shared-web-token' })).toBe(true);
+  it('stages Worker and wrapper maps for the fixed Cloud Agent project, with the CLI binary', async () => {
+    const root = await fixture();
+    const outDir = join(await fixture(), 'stage');
+    const release = `cloud-agent-wrapper@${'c'.repeat(64)}`;
+    const debugIds = [
+      '2f361bcc-1d43-4fa2-b8d4-c6db9a131c85',
+      '7d2c4f0e-5b1a-4c3e-9f8d-0a1b2c3d4e5f',
+    ];
+    const sources: Array<[string, string, string | undefined]> = [
+      ['wrapper/dist/sentry', 'wrapper/dist/runtime', release],
+      ['dist/worker', 'dist/worker', undefined],
+    ];
+    for (const [index, [source, shipped, artifactRelease]] of sources.entries()) {
+      const debugId = debugIds[index] ?? '';
+      const code = `globalThis._sentryDebugIds = { x: "${debugId}" };\n`;
+      const map = JSON.stringify({ version: 3, debug_id: debugId });
+      for (const directory of new Set([source, shipped])) {
+        await mkdir(join(root, directory), { recursive: true });
+        await writeFile(join(root, directory, 'index.js'), code);
+      }
+      await writeFile(join(root, source, 'index.js.map'), map);
+      await writeFile(
+        join(root, source, 'sentry-artifacts.json'),
+        JSON.stringify([
+          {
+            file: 'index.js',
+            sha256: sha256(code),
+            mapSha256: sha256(map),
+            debugId,
+            ...(artifactRelease ? { release: artifactRelease } : {}),
+          },
+        ])
+      );
+    }
+    const cli = join(root, 'fake-sentry-cli');
+    await writeFile(cli, '#!/bin/sh\n');
+
+    const uploads = await stageSentryUploads(root, outDir, cli);
+
+    const fixed = ['sourcemaps', 'upload', '--org', 'kilo-code', '--project', 'kilo-cloud-agent'];
+    const flags = ['--strict', '--validate', '--no-rewrite', '--wait-for', '120'];
+    expect(uploads).toEqual([
+      [...fixed, '--release', release, ...flags, '0/index.js', '0/index.js.map'],
+      [...fixed, ...flags, '1/index.js', '1/index.js.map'],
+    ]);
+    expect(JSON.parse(await readFile(join(outDir, 'uploads.json'), 'utf8'))).toEqual(uploads);
+    for (const [folder, source] of [
+      ['0', 'wrapper/dist/sentry'],
+      ['1', 'dist/worker'],
+    ]) {
+      for (const file of ['index.js', 'index.js.map']) {
+        expect(
+          (await readFile(join(outDir, folder, file))).equals(
+            await readFile(join(root, source, file))
+          )
+        ).toBe(true);
+      }
+    }
+    expect((await stat(join(outDir, 'sentry-cli'))).mode & 0o777).toBe(0o755);
+
+    // A map changed after the build is refused.
+    await writeFile(join(root, 'dist/worker/index.js.map'), '{}');
+    await expect(stageSentryUploads(root, join(outDir, 'again'), cli)).rejects.toThrow();
   });
 
-  it('uploads Worker and wrapper maps to the fixed Cloud Agent project', async () => {
-    const sourceMaps = await import('./sentry-source-maps.js');
-    vi.stubEnv('SENTRY_AUTH_TOKEN', 'shared-web-token');
-    vi.stubEnv('SENTRY_ORG', 'unrelated-org');
-    vi.stubEnv('SENTRY_PROJECT', 'unrelated-project');
-    vi.spyOn(sourceMaps, 'validateSentryArtifacts').mockResolvedValue([
-      {
-        file: 'index.js',
-        sha256: 'a'.repeat(64),
-        mapSha256: 'b'.repeat(64),
-        debugId: '2f361bcc-1d43-4fa2-b8d4-c6db9a131c85',
-      },
-    ]);
-    const cli = vi.spyOn(sourceMaps, 'runSentryCli').mockImplementation(() => {});
-
-    await import('./upload-sentry-source-maps.js');
-
-    expect(cli).toHaveBeenCalledTimes(2);
-    for (const [index, directory] of ['wrapper/dist/sentry', 'dist/worker'].entries()) {
-      expect(cli).toHaveBeenNthCalledWith(index + 1, [
-        'sourcemaps',
-        'upload',
-        '--org',
-        'kilo-code',
-        '--project',
-        'kilo-cloud-agent',
-        '--strict',
-        '--validate',
-        '--no-rewrite',
-        '--wait-for',
-        '120',
-        resolve(directory, 'index.js'),
-        resolve(directory, 'index.js.map'),
-      ]);
-    }
+  it('hands over the native Sentry CLI binary of the lockfile', async () => {
+    const binary = sentryCliBinary();
+    expect((await stat(binary)).mode & 0o111).not.toBe(0);
+    expect(execFileSync(binary, ['--version'], { encoding: 'utf8' })).toMatch(/sentry-cli \d/);
   });
 
   it('uses a dry run with external maps and the actual target environment for the Worker build', () => {
@@ -372,10 +396,9 @@ console.log(JSON.stringify(events));
       expect(dockerfile).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
     }
     const workflow = await readFile(resolve('../../.github/workflows/deploy-workers.yml'), 'utf8');
-    expect(workflow.match(/name: Upload Cloud Agent Sentry source maps/g)).toHaveLength(3);
-    expect(
-      workflow.match(/SENTRY_AUTH_TOKEN: \$\{\{ secrets\.SENTRY_AUTH_TOKEN \}\}/g)
-    ).toHaveLength(3);
+    // The deploy jobs stage the maps without the token; the upload job reads it from STS.
+    expect(workflow.match(/name: Stage Cloud Agent Sentry source maps/g)).toHaveLength(3);
+    expect(workflow).not.toContain('SENTRY_AUTH_TOKEN');
     expect(workflow).not.toContain('CLOUD_AGENT_SENTRY_ORG');
     expect(workflow).not.toContain('CLOUD_AGENT_SENTRY_PROJECT');
     expect(workflow.match(/steps\.runtime\.outputs\.command/g)).toHaveLength(10);

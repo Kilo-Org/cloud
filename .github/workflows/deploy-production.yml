@@ -90,25 +90,31 @@ jobs:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # Ceiling for the called workflow: its stage job reads the STS bundle.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
+      vercel_token_key: VERCEL_TOKEN_APP
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   stage-ai-gateway:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # Ceiling for the called workflow: its stage job reads the STS bundle.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
+      vercel_token_key: VERCEL_TOKEN_AI_GATEWAY
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   promote-app:
     needs: [stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
@@ -124,19 +130,24 @@ jobs:
           (needs.stage-ai-gateway.result == 'skipped' && needs.promote-ai-gateway.result == 'skipped')
         )
       }}
+    # Ceiling for the called workflow: its promote job reads the STS bundle.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
       axiom_annotation_dataset: kilocode-app
-    secrets:
-      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-ai-gateway:
     needs: [stage-ai-gateway, db-gate]
     # stage-ai-gateway skips when there is nothing to deploy, which skips this job too.
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud'
+    # Ceiling for the called workflow: its promote job reads the STS bundle.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
@@ -145,9 +156,6 @@ jobs:
       # dataset, so annotate promotes there.
       axiom_annotation_dataset: vercel
       axiom_expected_project: kilocode-ai-gateway
-    secrets:
-      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   # Worker change detection reads only the SHAs check-changes publishes, so this
   # call runs beside the Vercel staging chain instead of after it: the matrix is
@@ -156,6 +164,12 @@ jobs:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # GitHub checks every job of the called workflow against this ceiling,
+    # including the Cloud Agent source map upload a detection call skips.
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     uses: ./.github/workflows/deploy-workers.yml
     with:
       base_sha: ${{ needs.check-changes.outputs.base_sha }}
@@ -178,6 +192,12 @@ jobs:
         needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success'
       }}
+    # Ceiling for the called workflow: its Cloud Agent source map upload reads
+    # the STS bundle; every other job there declares no id-token.
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     uses: ./.github/workflows/deploy-workers.yml
     with:
       worker_matrix: ${{ needs.detect-workers.outputs.matrix }}

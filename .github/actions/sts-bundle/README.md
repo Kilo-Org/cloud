@@ -8,10 +8,22 @@ a port of Kilo-Org/kilocode's `.github/actions/kilo-credentials` with this repos
 | Workflow | Job | Workload | Keys |
 |---|---|---|---|
 | `.github/workflows/cloud-agent-e2e.yml` | `tests` | `ci-cloud-agent-e2e` | `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` |
+| `.github/workflows/stage-vercel-deployment.yml` | `stage` | `ci-vercel-stage`, `ci-vercel-stage-staging` | the caller's `vercel_token_key`: `VERCEL_TOKEN_APP`, `VERCEL_TOKEN_AI_GATEWAY` or `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
+| `.github/workflows/promote-vercel-deployment.yml` | `promote` | `ci-vercel-promote` | `VERCEL_TOKEN`, `AXIOM_ANNOTATION_TOKEN` (best-effort) |
+| `.github/workflows/cloud-agent-sentry-sourcemaps.yml` | `upload` | `ci-cloud-agent-sentry`, `ci-cloud-agent-sentry-staging` | `SENTRY_AUTH_TOKEN` |
+| `.github/workflows/kilo-app-release.yml` | `preflight`, `build-and-submit` | `ci-kilo-app-release` | `EXPO_TOKEN` |
+| `.github/workflows/auto-docs.yml` | `call-valtown` | `ci-auto-docs` | `DOC_WEBHOOK_URL`, `DOC_WEBHOOK_SECRET` |
+| `.github/workflows/push-dev-kiloclaw.yml` | `push-dev` | `ci-kiloclaw-dev-push` (STS staging) | `FLY_DEV_API_TOKEN` |
 
-The `ci-cloud-agent-e2e` policy (`services/sts/policy/`) pins `cloud-agent-e2e.yml` at
-`refs/heads/main`, the environment `cloud-agent-e2e` and the event `workflow_dispatch`. Its values
-live in Infisical production `/ci/ci-cloud-agent-e2e`.
+Each policy (`services/sts/policy/`) pins its one workflow file at `refs/heads/main`, its GitHub
+environment and the events its workflow runs on; its values live in Infisical `/ci/<workload>`
+(production, except `ci-kiloclaw-dev-push` in staging). `scripts/sts-bundle-callers.test.mjs`
+holds every caller to the rules below.
+
+Not callers, by design: `notify-main-failure.yml`, `notify-production-deploy-failure.yml`,
+`sts-deployment-watch.yml` and `sts-deployment-watch-health.yml` keep reading
+`DEPLOY_NOTIFY_SLACK_WEBHOOK_URL` (and the watch its Cloudflare token) as GitHub secrets, because
+those alerts must still post when STS is down.
 
 ## What it does
 
@@ -63,6 +75,10 @@ requests it. Outputs of keys the job did not request are empty strings.
   allows `main` only, and it has `permissions: id-token: write`.
 - Its workflow is never callable with `workflow_call`: the OIDC token of a reusable workflow carries
   that workflow's `job_workflow_ref`, so any workflow allowed to call it would receive its bundle.
+  Exception: `stage-vercel-deployment.yml`, `promote-vercel-deployment.yml` and
+  `cloud-agent-sentry-sourcemaps.yml` are reusable, because a deploy workflow's own file belongs to
+  its trigger-only migration policy; `scripts/sts-bundle-callers.test.mjs` pins their callers, and
+  a caller passes no secret and grants `id-token: write` as the ceiling of the called reader job.
 - `secrets:` lists every key the job reads.
 - Each value goes to the step that needs it, with `env:` on that step only, never in the job's
   `env:` or in `GITHUB_ENV`.
@@ -79,6 +95,27 @@ job therefore installs nothing: the `build` job installs with `--frozen-lockfile
 has no `id-token`, and hands the installed workspace over as an artifact. The `tests` job reads the
 bundle, downloads that workspace and runs the driver with the package's own `tsx`, without a
 package manager. The exposure left is the runtime code of packages pinned by the lockfile.
+
+**Exception, a tool that consumes the token.** Where the credential's only consumer is a
+third-party CLI, that CLI runs with the token; no split can avoid it. Each such job installs
+nothing: a helper job that cannot read the bundle installs or builds, packs the result and uploads
+it as an artifact, and the reader job reads the bundle first, then downloads and unpacks it and runs
+the tool by its path, without a package manager and without adding it to `PATH`.
+
+- `stage-vercel-deployment.yml` `stage` and `promote-vercel-deployment.yml` `promote`: the pinned
+  Vercel CLI, installed by the `cli` job. Exposure: the runtime code of the pinned CLI version and
+  of the dependencies npm resolves for it at install time, as before this change.
+- `cloud-agent-sentry-sourcemaps.yml` `upload`: the native `sentry-cli` binary of the lockfile and
+  the maps the deploy job validated (`stageSentryUploads` in
+  `services/cloud-agent-next/scripts/sentry-source-maps.ts`). Exposure: that binary.
+- `kilo-app-release.yml` `preflight` and `build-and-submit`: `eas-cli` from the `kilo-app...`
+  closure the `app-workspace` job installs. `eas-cli` evaluates `app.config.ts`, so the exposure is
+  the runtime code of the packages this lockfile pins for the app, as in the e2e exception.
+
+**Exception, `push-dev-kiloclaw.yml` `push-dev`.** Its policy is a staging one for a development
+registry token and names no GitHub environment; the `refs/heads/main` pin keeps it to dispatches
+on main. The image build installs packages, but inside BuildKit, which receives neither the job's
+environment nor its OIDC request token; the read runs right after the checkout.
 
 ## Tests
 

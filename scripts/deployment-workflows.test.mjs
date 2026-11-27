@@ -28,13 +28,20 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
     const steps = workers.jobs[job].steps;
     const deploy = steps.find(step => step.id === (selector ? 'deploy' : 'deploy-cloud-agent'));
     const retry = steps.find(step => step.name?.endsWith('(retry)'));
-    const maps = steps.find(step => step.name === 'Upload Cloud Agent Sentry source maps');
-    assert.equal(maps['continue-on-error'], true);
-    assert.equal(maps.if, selector ? `${selector} == 'services/cloud-agent-next'` : undefined);
-    assert.doesNotMatch(maps.if ?? '', /always\(|failure\(/);
-    assert.ok(steps.indexOf(maps) > steps.indexOf(retry));
-    assert.equal(maps.run, 'pnpm run sentry:sourcemaps');
-    assert.equal(maps.env.SENTRY_AUTH_TOKEN, '${{ secrets.SENTRY_AUTH_TOKEN }}');
+    const stage = steps.find(step => step.name === 'Stage Cloud Agent Sentry source maps');
+    const handover = steps.find(step => step.name === 'Hand over Cloud Agent Sentry source maps');
+    assert.equal(stage['continue-on-error'], true);
+    assert.equal(stage.if, selector ? `${selector} == 'services/cloud-agent-next'` : undefined);
+    assert.doesNotMatch(stage.if ?? '', /always\(|failure\(/);
+    assert.ok(steps.indexOf(stage) > steps.indexOf(retry));
+    assert.match(stage.run, /^pnpm run sentry:stage "\$RUNNER_TEMP\/cloud-agent-sentry"\n/);
+    // The deploy job never holds the Sentry token: the upload job reads it from STS.
+    assert.equal(stage.env, undefined);
+    assert.equal(handover['continue-on-error'], true);
+    assert.equal(handover.if, "steps.sentry-stage.outcome == 'success'");
+    assert.equal(handover.with.name, 'cloud-agent-sentry');
+    assert.equal(steps.indexOf(handover), steps.indexOf(stage) + 1);
+    assert.doesNotMatch(JSON.stringify(workers.jobs[job]), /SENTRY_AUTH_TOKEN/);
     assert.equal(retry.if, `steps.${deploy.id}.outcome == 'failure'`);
     assert.equal(retry['continue-on-error'], undefined);
     assert.equal(deploy['continue-on-error'], true);
@@ -48,6 +55,22 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
       );
     }
   }
+
+  const upload = workers.jobs['upload-cloud-agent-sentry'];
+  assert.deepEqual(upload.needs, [
+    'deploy-manual',
+    'deploy-changed',
+    'deploy-cloud-agent-after-session-ingest',
+  ]);
+  assert.equal(upload.uses, './.github/workflows/cloud-agent-sentry-sourcemaps.yml');
+  assert.deepEqual(upload.with, { target_environment: '${{ inputs.target_environment }}' });
+  assert.match(upload.if, /!cancelled\(\)/);
+  const sentry = workflow('cloud-agent-sentry-sourcemaps');
+  assert.equal(
+    sentry.jobs.upload['continue-on-error'],
+    true,
+    'a failed upload never fails a deploy'
+  );
 });
 
 test('both Worker deployment paths prepare usage queues before direct consumer deployment', () => {
@@ -646,10 +669,8 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
   assert.equal(stageAiGateway.with.target_environment, 'production');
   assert.equal(stageAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
   assert.equal(stageAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
-  assert.equal(
-    stageAiGateway.secrets.VERCEL_PROJECT_TOKEN,
-    '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
-  );
+  assert.equal(stageAiGateway.with.vercel_token_key, 'VERCEL_TOKEN_AI_GATEWAY');
+  assert.equal(stageAiGateway.secrets, undefined);
 
   const promoteAiGateway = production.jobs['promote-ai-gateway'];
   assert.deepEqual(promoteAiGateway.needs, ['stage-ai-gateway', 'db-gate']);
@@ -658,20 +679,15 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
     axiom_annotation_dataset: 'vercel',
     axiom_expected_project: 'kilocode-ai-gateway',
   });
-  assert.equal(
-    promoteAiGateway.secrets.AXIOM_ANNOTATION_TOKEN,
-    '${{ secrets.AXIOM_ANNOTATION_TOKEN }}'
-  );
+  assert.equal(promoteAiGateway.secrets, undefined);
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
   assert.equal(deployAiGateway.needs, 'check-changes');
   assert.equal(deployAiGateway.with.target_environment, 'staging');
   assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
-  assert.equal(
-    deployAiGateway.secrets.VERCEL_PROJECT_TOKEN,
-    '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
-  );
+  assert.equal(deployAiGateway.with.vercel_token_key, 'VERCEL_TOKEN_AI_GATEWAY');
+  assert.equal(deployAiGateway.secrets, undefined);
 
   // Neither pipeline's Workers read anything the Vercel deploys produce, so both
   // start with the gate and the matrix lookup rather than with those deploys.
@@ -1454,7 +1470,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   // The order is a job dependency, so no job holds a runner while it waits: no
   // step reads the run's jobs or sleeps.
   for (const [name, job] of Object.entries(workers.jobs)) {
-    for (const step of job.steps) {
+    for (const step of job.steps ?? []) {
       assert.doesNotMatch(step.name ?? '', /Wait for session-ingest/, name);
       assert.doesNotMatch(step.run ?? '', /actions\/runs\/.*\/jobs|sleep \d/, name);
     }
@@ -1716,12 +1732,12 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
     const step = namedStep(document, name);
     const directory = mkdtempSync(join(tmpdir(), 'vercel-step-'));
     try {
-      const bin = join(directory, 'bin');
+      // The jobs run the handed-over CLI by its path under RUNNER_TEMP, never from PATH.
+      const bin = join(directory, 'runner-temp', 'vercel-cli', 'bin');
       const runnerTemp = join(directory, 'runner-temp');
       const argvLog = join(directory, 'argv');
       const githubOutput = join(directory, 'github-output');
-      mkdirSync(bin);
-      mkdirSync(runnerTemp);
+      mkdirSync(bin, { recursive: true });
       writeFileSync(argvLog, '');
       writeFileSync(githubOutput, '');
       writeFileSync(join(bin, 'vercel'), VERCEL_STUB, { mode: 0o755 });
@@ -1732,7 +1748,6 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
       };
       const env = {
         ...process.env,
-        PATH: `${bin}:${process.env.PATH}`,
         ARGV_LOG: argvLog,
         DEPLOY_OUTPUT: deployOutput ?? '',
         GITHUB_OUTPUT: githubOutput,
@@ -1781,7 +1796,7 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
       name: 'Promote Vercel deployment',
       values: {
         'inputs.deployment_url': probeUrl,
-        'secrets.VERCEL_TOKEN': 'probe-token',
+        'steps.sts.outputs.VERCEL_TOKEN': 'probe-token',
       },
     });
     assert.equal(promoted.status, 0, promoted.stderr);
@@ -1800,7 +1815,7 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
     assert.ok(promoted.argv.includes('--scope=kilocode'), 'the scope stays on the command');
 
     const stage = workflow('stage-vercel-deployment');
-    const stageValues = { 'secrets.VERCEL_PROJECT_TOKEN': 'probe-token' };
+    const stageValues = { 'steps.sts.outputs[inputs.vercel_token_key]': 'probe-token' };
 
     const staged = runStep({
       document: stage,

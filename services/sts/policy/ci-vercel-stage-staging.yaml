@@ -1,0 +1,17 @@
+# Kilo-Org/cloud's staging Vercel stage job: the `stage` job of the reusable
+# stage-vercel-deployment.yml, called by deploy-staging.yml in GitHub environment staging. The
+# project tokens can deploy production too, so they stay in the production manager. workflow_run
+# with the other events in production: D53/M112 (D53_M112_CI_BUNDLE_CARVE_OUT in
+# src/policy/schema.ts).
+workload: ci-vercel-stage-staging
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: staging
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/stage-vercel-deployment.yml@refs/heads/main]
+  events: [workflow_run, schedule, workflow_dispatch]
+secrets: [VERCEL_TOKEN_APP, VERCEL_TOKEN_AI_GATEWAY]

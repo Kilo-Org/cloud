@@ -1,0 +1,82 @@
+name: Upload Cloud Agent Sentry source maps
+
+# Called by deploy-workers.yml after a Cloud Agent deploy. The deploy job
+# validates the built maps and hands them over with the native Sentry CLI binary
+# of the lockfile (services/cloud-agent-next/scripts/sentry-source-maps.ts,
+# stageSentryUploads); this job reads the Sentry token from STS and runs only
+# that binary. Policies: ci-cloud-agent-sentry (production) and
+# ci-cloud-agent-sentry-staging (staging), D53/M112. Keep deploy-workers.yml its
+# only caller: any workflow on main that calls this file in one of those
+# environments receives the token.
+on:
+  workflow_call:
+    inputs:
+      target_environment:
+        description: 'GitHub environment of the deploy: production or staging'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    # Guard: only the canonical repo may run this workflow.
+    if: github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    # Best-effort, like the upload step it replaces: a failed upload never fails
+    # the deploy that called it.
+    continue-on-error: true
+    # The STS policy names this environment; its branch policy keeps it to main.
+    # The deploy job already records the deployment.
+    environment:
+      name: ${{ inputs.target_environment }}
+      deployment: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Only for the local sts-bundle action; nothing else is read from the tree.
+      - name: Checkout the STS action
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/sts-bundle
+
+      # First, while every earlier step is trusted: nothing from the deploy job
+      # has reached the runner yet.
+      - name: Read the Sentry token from STS
+        id: sts
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ${{ inputs.target_environment == 'production' && 'ci-cloud-agent-sentry' || format('ci-cloud-agent-sentry-{0}', inputs.target_environment) }}
+          secrets: SENTRY_AUTH_TOKEN
+
+      # A deploy that failed before staging its maps hands over nothing.
+      - name: Download the staged source maps
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: cloud-agent-sentry
+          path: ${{ runner.temp }}
+
+      - name: Upload source maps
+        if: steps.download.outcome == 'success'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ steps.sts.outputs.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/cloud-agent-sentry"
+          mkdir "$stage"
+          tar -xzf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$stage"
+          cd "$stage"
+          count=$(jq 'length' uploads.json)
+          for ((i = 0; i < count; i++)); do
+            args=()
+            while IFS= read -r -d '' arg; do
+              args+=("$arg")
+            done < <(jq -j --argjson i "$i" '.[$i][] | . + "\u0000"' uploads.json)
+            ./sentry-cli "${args[@]}"
+          done

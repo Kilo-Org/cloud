@@ -416,7 +416,12 @@ jobs:
     if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && (needs.check-changes.outputs.reuse == 'false' || needs.reuse.outputs.suite == 'fallback') && github.repository == 'Kilo-Org/cloud' }}
     uses: ./.github/workflows/kilo-app-ci.yml
 
-  preflight:
+  # Installs the app closure without id-token and hands its node_modules to the
+  # preflight and build-and-submit jobs, which read EXPO_TOKEN from STS and
+  # install nothing (.github/actions/sts-bundle/README.md, rules for a calling
+  # job). Both run eas-cli, the token's consumer, and it evaluates app.config.ts,
+  # so the code of the packages this lockfile pins still runs with the token.
+  app-workspace:
     needs: [check-changes]
     if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
@@ -437,30 +442,75 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      # The preflight only reads the EAS CLI and the evaluated Expo config, and
+      # The release jobs only read the EAS CLI and the evaluated Expo config, and
       # both come from the app's own closure: `eas-cli` is the app's development
       # dependency, and `app.config.ts` with scripts/assert-expo-config.mjs
-      # resolves app-local modules. Only that closure and the root project are
-      # installed, so the smaller runner stops linking the workspaces the
-      # preflight never reads. Widen the filter when a step here imports a
+      # resolves app-local modules. The repository scripts those jobs run use
+      # Node built-ins only. Widen the filter when a release step imports a
       # workspace outside the closure.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
-      - name: Check EXPO_TOKEN
+      # Symlinks into node_modules/.pnpm survive only inside an archive. Only
+      # the node_modules folders travel; each release job checks out the tree.
+      - name: Pack the installed closure
         run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "::error::EXPO_TOKEN secret is required for the release preflight"
-            exit 1
-          fi
-          echo "EXPO_TOKEN is present"
+          find . -path ./.git -prune -o -type d -name node_modules -prune -print0 |
+            tar --null -T - -czf "$RUNNER_TEMP/kilo-app-node-modules.tgz"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kilo-app-node-modules
+          path: ${{ runner.temp }}/kilo-app-node-modules.tgz
+          retention-days: 1
+          if-no-files-found: error
+
+  preflight:
+    needs: [check-changes, app-workspace]
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    # The ci-kilo-app-release STS policy names this environment; its branch
+    # policy keeps it to main. The preflight deploys nothing.
+    environment:
+      name: release
+      deployment: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # Before the installed closure reaches the runner: every step ahead of the
+      # read is trusted. A missing EXPO_TOKEN fails here.
+      - name: Read EXPO_TOKEN from STS
+        id: sts
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ci-kilo-app-release
+          secrets: EXPO_TOKEN
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: kilo-app-node-modules
+          path: ${{ runner.temp }}
+
+      - name: Unpack the installed closure
+        run: tar -xzf "$RUNNER_TEMP/kilo-app-node-modules.tgz" -C "$GITHUB_WORKSPACE"
 
       - name: Verify EAS production environment
         working-directory: apps/mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ steps.sts.outputs.EXPO_TOKEN }}
         run: |
-          if ! ENV_OUTPUT=$(pnpm exec eas env:list --environment production --format long 2>&1); then
+          if ! ENV_OUTPUT=$(./node_modules/.bin/eas env:list --environment production --format long 2>&1); then
             echo "$ENV_OUTPUT"
             echo "::error::eas env:list failed"
             exit 1
@@ -480,16 +530,17 @@ jobs:
       - name: Assert production config contract
         working-directory: apps/mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ steps.sts.outputs.EXPO_TOKEN }}
         # EAS_BUILD_PROFILE belongs inside the quoted command: eas-cli evaluates
         # app.config.ts itself to resolve the project, and the production profile
         # makes that evaluation throw on env the CLI never injects. SENTRY_AUTH_TOKEN
         # is a SECRET variable that only EAS builders can read, so the assertion run
-        # gets a placeholder. The step above proves the real secret exists.
-        run: pnpm exec eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
+        # gets a placeholder. The step above proves the real secret exists. The
+        # command is the app's assert:config script, run without a package manager.
+        run: ./node_modules/.bin/eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder node scripts/assert-expo-config.mjs'
 
   build-and-submit:
-    needs: [check-changes, validate, reuse, preflight]
+    needs: [check-changes, validate, reuse, preflight, app-workspace]
     # The suite must have passed for this commit, and it passed exactly once:
     # either `reuse` observed a passed run and `validate` did not run, or
     # `validate` ran the suite here and passed while `reuse` did not report a
@@ -499,8 +550,12 @@ jobs:
     # is wrapped because a bare condition that starts with `!` is a YAML tag.
     if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.preflight.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && ((needs.reuse.result == 'success' && needs.reuse.outputs.suite == 'passed' && needs.validate.result == 'skipped') || (needs.validate.result == 'success' && needs.reuse.outputs.suite != 'passed')) && github.repository == 'Kilo-Org/cloud' }}
     # The release environment admits only main and holds the kilo-maintainer
-    # app key (KILO_MAINTAINER_APP_SECRET) that the tag pushes mint tokens with.
+    # app key (KILO_MAINTAINER_APP_SECRET) that the tag pushes mint tokens with;
+    # the ci-kilo-app-release STS policy names it for EXPO_TOKEN.
     environment: release
+    permissions:
+      contents: write
+      id-token: write
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     outputs:
@@ -511,22 +566,32 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Before the installed closure reaches the runner: every step ahead of the
+      # read is trusted.
+      - name: Read EXPO_TOKEN from STS
+        id: sts
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ci-kilo-app-release
+          secrets: EXPO_TOKEN
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: kilo-app-node-modules
+          path: ${{ runner.temp }}
+
+      - name: Unpack the installed closure
+        run: tar -xzf "$RUNNER_TEMP/kilo-app-node-modules.tgz" -C "$GITHUB_WORKSPACE"
 
       - name: Build iOS and Android
         working-directory: apps/mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ steps.sts.outputs.EXPO_TOKEN }}
         # eas-cli evaluates app.config.ts itself before it submits, and it syncs
         # the App ID capabilities from what that evaluation returns. A release
         # must be evaluated as the production profile: an unset EAS_BUILD_PROFILE
@@ -539,7 +604,7 @@ jobs:
         # a builder can read, so the evaluation gets the preflight placeholder.
         run: |
           mkdir -p artifacts
-          pnpm exec eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm exec eas build --profile production --platform all --non-interactive --json --wait > build.json'
+          ./node_modules/.bin/eas env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder ./node_modules/.bin/eas build --profile production --platform all --non-interactive --json --wait > build.json'
           node ../../scripts/inspect-mobile-artifacts.mjs --select build.json > urls.txt
           echo "IOS_URL=$(sed -n '1p' urls.txt)" >> "$GITHUB_ENV"
           echo "ANDROID_URL=$(sed -n '2p' urls.txt)" >> "$GITHUB_ENV"
@@ -547,7 +612,7 @@ jobs:
       - name: Download artifacts
         working-directory: apps/mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_TOKEN: ${{ steps.sts.outputs.EXPO_TOKEN }}
         run: |
           download() {
             url="$1"
@@ -686,14 +751,14 @@ jobs:
       - name: Submit iOS
         working-directory: apps/mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpm exec eas submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
+          EXPO_TOKEN: ${{ steps.sts.outputs.EXPO_TOKEN }}
+        run: ./node_modules/.bin/eas submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
 
       - name: Submit Android
         working-directory: apps/mobile
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpm exec eas submit --profile production --platform android --non-interactive --path artifacts/app.aab
+          EXPO_TOKEN: ${{ steps.sts.outputs.EXPO_TOKEN }}
+        run: ./node_modules/.bin/eas submit --profile production --platform android --non-interactive --path artifacts/app.aab
 
       - name: Mint the release tag token
         id: release-token

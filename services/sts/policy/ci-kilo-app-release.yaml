@@ -1,0 +1,14 @@
+# Kilo-Org/cloud's kilo-app store release: the `preflight` and `build-and-submit` jobs
+# of kilo-app-release.yml in GitHub environment release.
+workload: ci-kilo-app-release
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: release
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/kilo-app-release.yml@refs/heads/main]
+  events: [push, schedule, workflow_dispatch]
+secrets: [EXPO_TOKEN]

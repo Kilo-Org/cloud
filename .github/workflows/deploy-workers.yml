@@ -233,13 +233,26 @@ jobs:
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ inputs.worker == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
-      - name: Upload Cloud Agent Sentry source maps
+      # Validated and handed over here; the upload-cloud-agent-sentry job uploads
+      # them with the Sentry token from STS, which this job never holds.
+      - name: Stage Cloud Agent Sentry source maps
+        id: sentry-stage
         if: inputs.worker == 'services/cloud-agent-next'
         continue-on-error: true
         working-directory: ${{ inputs.worker }}
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: pnpm run sentry:sourcemaps
+        run: |
+          pnpm run sentry:stage "$RUNNER_TEMP/cloud-agent-sentry"
+          tar -czf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$RUNNER_TEMP/cloud-agent-sentry" .
+
+      - name: Hand over Cloud Agent Sentry source maps
+        if: steps.sentry-stage.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloud-agent-sentry
+          path: ${{ runner.temp }}/cloud-agent-sentry.tgz
+          retention-days: 1
+          overwrite: true
 
   # The detection-only call: a deploy call passes `worker_matrix`, so this job
   # skips there and no caller runs the diff twice.
@@ -559,13 +572,26 @@ jobs:
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ matrix.worker == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
-      - name: Upload Cloud Agent Sentry source maps
+      # Validated and handed over here; the upload-cloud-agent-sentry job uploads
+      # them with the Sentry token from STS, which this job never holds.
+      - name: Stage Cloud Agent Sentry source maps
+        id: sentry-stage
         if: matrix.worker == 'services/cloud-agent-next'
         continue-on-error: true
         working-directory: ${{ matrix.worker }}
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: pnpm run sentry:sourcemaps
+        run: |
+          pnpm run sentry:stage "$RUNNER_TEMP/cloud-agent-sentry"
+          tar -czf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$RUNNER_TEMP/cloud-agent-sentry" .
+
+      - name: Hand over Cloud Agent Sentry source maps
+        if: steps.sentry-stage.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloud-agent-sentry
+          path: ${{ runner.temp }}/cloud-agent-sentry.tgz
+          retention-days: 1
+          overwrite: true
 
   deploy-session-ingest:
     # Guard: this reusable workflow can be invoked from a fork, and the job
@@ -727,12 +753,49 @@ jobs:
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }}
 
-      - name: Upload Cloud Agent Sentry source maps
+      # Validated and handed over here; the upload-cloud-agent-sentry job uploads
+      # them with the Sentry token from STS, which this job never holds.
+      - name: Stage Cloud Agent Sentry source maps
+        id: sentry-stage
         continue-on-error: true
         working-directory: services/cloud-agent-next
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: pnpm run sentry:sourcemaps
+        run: |
+          pnpm run sentry:stage "$RUNNER_TEMP/cloud-agent-sentry"
+          tar -czf "$RUNNER_TEMP/cloud-agent-sentry.tgz" -C "$RUNNER_TEMP/cloud-agent-sentry" .
+
+      - name: Hand over Cloud Agent Sentry source maps
+        if: steps.sentry-stage.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloud-agent-sentry
+          path: ${{ runner.temp }}/cloud-agent-sentry.tgz
+          retention-days: 1
+          overwrite: true
+
+  # Uploads the source maps a Cloud Agent deploy above handed over, with the
+  # Sentry token from STS. Best-effort, like the step it replaces: the called
+  # job continues on error, so a failed upload never fails the deploy.
+  upload-cloud-agent-sentry:
+    needs: [deploy-manual, deploy-changed, deploy-cloud-agent-after-session-ingest]
+    # Runs whenever this call deploys cloud-agent-next; a deploy that did not
+    # hand over its maps leaves the called job nothing to upload.
+    if: >-
+      ${{
+        !cancelled() &&
+        github.repository == 'Kilo-Org/cloud' &&
+        (
+          inputs.worker == 'services/cloud-agent-next' ||
+          contains(inputs.worker_matrix, '"services/cloud-agent-next"') ||
+          inputs.deploy_cloud_agent_after_session_ingest == 'true'
+        )
+      }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/cloud-agent-sentry-sourcemaps.yml
+    with:
+      target_environment: ${{ inputs.target_environment }}
 
   deploy-uts:
     # Guard: this reusable workflow can be invoked from a fork, and the job

@@ -1,0 +1,16 @@
+# Kilo-Org/cloud's Vercel promotion job: the `promote` job of the reusable
+# promote-vercel-deployment.yml, called by deploy-production.yml, redeploy-web.yml and
+# deploy-ai-gateway-secure-proxy.yml in GitHub environment production. workflow_run with the other
+# events in production: D53/M112 (D53_M112_CI_BUNDLE_CARVE_OUT in src/policy/schema.ts).
+workload: ci-vercel-promote
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: production
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/promote-vercel-deployment.yml@refs/heads/main]
+  events: [workflow_run, schedule, workflow_dispatch]
+secrets: [VERCEL_TOKEN, AXIOM_ANNOTATION_TOKEN]

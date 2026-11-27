@@ -97,8 +97,27 @@ export function callerLabel(raw: string | null | undefined): string {
   return raw !== null && raw !== undefined && CALLERS.has(raw) ? raw : 'unknown';
 }
 
-/** True unless the flag is exactly `false`. A runtime without `process.env` reads as enabled. */
+/** The test seam's global name; see `isInternalAuthObservationEnabled`. */
+export const INTERNAL_AUTH_OBSERVATION_SEAM = '__KILO_INTERNAL_AUTH_OBSERVATION__';
+
+/**
+ * True unless the flag is exactly `false`. A runtime without `process.env` reads as enabled.
+ *
+ * `globalThis.__KILO_INTERNAL_AUTH_OBSERVATION__ = false` also disables it. That seam exists because
+ * a Workers test pool keeps `process.env` as the deployment's own environment, which a test cannot
+ * write; it follows the existing `__kilocodeInternalApiSecretRead` seam. Nothing in production sets
+ * it.
+ */
 export function isInternalAuthObservationEnabled(): boolean {
+  const scope: unknown = globalThis;
+  if (
+    typeof scope === 'object' &&
+    scope !== null &&
+    INTERNAL_AUTH_OBSERVATION_SEAM in scope &&
+    scope[INTERNAL_AUTH_OBSERVATION_SEAM] === false
+  ) {
+    return false;
+  }
   return !(
     typeof process !== 'undefined' && process.env?.[INTERNAL_AUTH_OBSERVATION_FLAG] === 'false'
   );

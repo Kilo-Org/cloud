@@ -7,10 +7,16 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
+  delete testGlobals[OBSERVATION_SEAM];
 });
 
 // This suite asserts exact enqueue log lines and mocked `Date.now` sequences; the item-9 counter
-// has its own suite (src/publish-auth.test.ts), so it stays off here.
+// has its own suite (src/publish-auth.test.ts), so it stays off here. The seam is what a Workers
+// test pool honours: `process.env` there is the deployment's own environment.
+// A named handle, not an inline cast: the pool shares `globalThis` with the Worker under test.
+const OBSERVATION_SEAM = '__KILO_INTERNAL_AUTH_OBSERVATION__';
+const testGlobals = globalThis as unknown as Record<string, unknown>;
+testGlobals[OBSERVATION_SEAM] = false;
 process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
 
 function setup() {

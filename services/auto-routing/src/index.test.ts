@@ -277,11 +277,16 @@ function decideRequest(payload: unknown) {
   });
 }
 
+/** The counter's test seam; the Worker test pool shares `globalThis` with the module under test. */
+const OBSERVATION_SEAM = '__KILO_INTERNAL_AUTH_OBSERVATION__';
+const testGlobals = globalThis as unknown as Record<string, unknown>;
+
 describe('auto routing worker', () => {
   beforeEach(async () => {
     // This suite asserts the exact decision log lines; the item-9 counter has its own suite
     // (packages/worker-utils/src/backend-auth-middleware.test.ts).
     process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
+    testGlobals[OBSERVATION_SEAM] = false;
     clearClassifierConfigCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
@@ -366,6 +371,7 @@ describe('auto routing worker', () => {
     await drainBackgroundTasks();
     globalThis.fetch = originalFetch;
     delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
+    delete testGlobals[OBSERVATION_SEAM];
     vi.restoreAllMocks();
   });
 

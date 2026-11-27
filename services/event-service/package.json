@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/event-service": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

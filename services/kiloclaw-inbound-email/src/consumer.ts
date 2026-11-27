@@ -1,4 +1,5 @@
 import type { AppEnv, InboundEmailQueueMessage } from './types';
+import { readKiloclawInboundEmailSecret } from './secrets';
 
 const PERMANENT_DELIVERY_STATUSES = new Set([400, 404, 410, 422]);
 
@@ -6,7 +7,7 @@ export async function deliverInboundEmail(
   message: InboundEmailQueueMessage,
   env: AppEnv
 ): Promise<void> {
-  const internalApiSecret = await env.INTERNAL_API_SECRET.get();
+  const internalApiSecret = await readKiloclawInboundEmailSecret(env, 'INTERNAL_API_SECRET');
   const response = await env.KILOCLAW.fetch(
     new Request('https://kiloclaw/api/platform/inbound-email', {
       method: 'POST',

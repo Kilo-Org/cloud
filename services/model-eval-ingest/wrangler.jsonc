@@ -21,10 +21,17 @@
       "persist": true,
       "invocation_logs": false,
     },
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "vars": {
     "ENVIRONMENT": "production",
+    // Where every runtime secret read goes: `env` (the Secrets Store binding below) or `sts` (the
+    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
+    // read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "env",
   },
   "triggers": {
     "crons": ["*/15 * * * *"],
@@ -36,11 +43,21 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // model-eval-ingest.yaml grants INTERNAL_API_SECRET. Nothing reads it while SECRETS_SOURCE is
+  // `env`.
   "services": [
     {
       "binding": "BENCH_DASHBOARD",
       "service": "kilo-bench-dashboard",
       "entrypoint": "Dashboard",
+    },
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "model-eval-ingest" },
     },
   ],
   "secrets_store_secrets": [

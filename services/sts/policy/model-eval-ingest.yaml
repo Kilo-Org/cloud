@@ -1,4 +1,11 @@
-# Registration only: services/model-eval-ingest/wrangler.jsonc. No environment, identity or grant.
+# The model-eval-ingest Worker (services/model-eval-ingest/wrangler.jsonc). It reads its runtime
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets Store
+# binding) until secrets-cutover flips it. INTERNAL_API_SECRET resolves from /shared. The `dev`
+# block deploys no STS binding and reads INTERNAL_API_SECRET_DEV from the store.
 workload: model-eval-ingest
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET

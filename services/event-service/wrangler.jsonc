@@ -5,11 +5,19 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-04-25",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
+  "observability": { "enabled": true, "traces": { "enabled": false } },
   "logpush": true,
   "placement": { "mode": "smart" },
   "dev": { "port": 8809 },
-  "vars": { "WORKER_ENV": "production" },
+  "vars": {
+    "WORKER_ENV": "production",
+    // Where every runtime secret read goes: `env` (the Secrets Store binding below) or `sts` (the
+    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
+    // read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "env",
+  },
   "routes": [
     {
       "pattern": "events.kiloapps.io",
@@ -36,6 +44,18 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // event-service.yaml grants NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `env`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "event-service" },
     },
   ],
 

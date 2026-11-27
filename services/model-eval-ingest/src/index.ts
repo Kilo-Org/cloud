@@ -7,6 +7,7 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { timingSafeEqual } from '@kilocode/encryption';
 import * as z from 'zod';
+import { readModelEvalIngestSecret } from './secrets';
 import { createPromotionStore, syncPromotionsFromBench } from './sync.js';
 
 const SyncRequestSchema = z.object({ promotionName: z.string().min(1).optional() }).optional();
@@ -14,10 +15,6 @@ const SyncRequestSchema = z.object({ promotionName: z.string().min(1).optional()
 async function runSync(env: CloudflareEnv, promotionName?: string) {
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   return syncPromotionsFromBench(env.BENCH_DASHBOARD, createPromotionStore(db), { promotionName });
-}
-
-async function getInternalApiSecret(secret: SecretBinding | string): Promise<string> {
-  return typeof secret === 'string' ? secret : secret.get();
 }
 
 function scheduledEnvironment(env: CloudflareEnv): string | undefined {
@@ -39,7 +36,7 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     return Response.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const internalSecret = await getInternalApiSecret(env.INTERNAL_API_SECRET);
+  const internalSecret = await readModelEvalIngestSecret(env, 'INTERNAL_API_SECRET');
   const authHeader = request.headers.get('x-internal-api-key');
   if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });

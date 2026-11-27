@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readGmailPushSecret } from './secrets';
 import type { AppEnv, GmailPushQueueMessage } from './types';
 
 const MAX_RETRIES = 6;
@@ -95,7 +96,7 @@ async function processMessage(message: Message<GmailPushQueueMessage>, env: AppE
   }
 
   try {
-    const internalSecret = await env.INTERNAL_API_SECRET.get();
+    const internalSecret = await readGmailPushSecret(env, 'INTERNAL_API_SECRET');
 
     // Look up machine status via service binding
     const statusRes = await env.KILOCLAW.fetch(

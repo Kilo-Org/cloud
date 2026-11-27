@@ -180,7 +180,13 @@ export class ContainerUsageMeter
     }
     logRpcOutcome('heartbeat', parsed.service, 'accepted', { dedup: result.dedup });
     if (result.organizationBalanceAlert)
-      this.ctx.waitUntil(notifyOrganizationBalanceAlert(this.env, result.organizationBalanceAlert));
+      this.ctx.waitUntil(
+        notifyOrganizationBalanceAlert(
+          this.env,
+          result.organizationBalanceAlert,
+          this.ctx
+        )
+      );
     return {
       intervalId: id,
       durable: 'pg',
@@ -216,7 +222,13 @@ export class ContainerUsageMeter
     }
     logRpcOutcome('stop', parsed.service, 'accepted', { dedup: result.dedup });
     if (result.organizationBalanceAlert)
-      this.ctx.waitUntil(notifyOrganizationBalanceAlert(this.env, result.organizationBalanceAlert));
+      this.ctx.waitUntil(
+        notifyOrganizationBalanceAlert(
+          this.env,
+          result.organizationBalanceAlert,
+          this.ctx
+        )
+      );
     return { intervalId: id, durable: 'pg', dedup: result.dedup };
   }
 }

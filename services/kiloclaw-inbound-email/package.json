@@ -11,6 +11,7 @@
     "cf-typegen": "wrangler types --env-file /dev/null"
   },
   "devDependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
@@ -18,6 +19,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "drizzle-orm": "catalog:",
     "node-html-markdown": "2.0.0",
     "postal-mime": "2.7.4"

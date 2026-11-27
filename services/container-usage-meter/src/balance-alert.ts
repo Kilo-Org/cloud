@@ -1,9 +1,16 @@
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import {
+  readContainerUsageMeterSecret,
+  type ContainerUsageMeterSecretsEnv,
+} from './secrets';
+
 export async function notifyOrganizationBalanceAlert(
-  env: Pick<Cloudflare.Env, 'KILOCODE_BACKEND_BASE_URL' | 'INTERNAL_API_SECRET_PROD'>,
-  organizationId: string
+  env: Pick<Cloudflare.Env, 'KILOCODE_BACKEND_BASE_URL'> & ContainerUsageMeterSecretsEnv,
+  organizationId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
+    const secret = await readContainerUsageMeterSecret(env, 'INTERNAL_API_SECRET', ctx);
     if (!secret) throw new Error('Internal service authentication is unavailable');
     const response = await fetch(
       new URL('/api/internal/organizations/compute-balance-alert', env.KILOCODE_BACKEND_BASE_URL),

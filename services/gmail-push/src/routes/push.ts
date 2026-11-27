@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../types';
 import { validateOidcToken } from '../auth/oidc';
+import { readGmailPushSecret } from '../secrets';
 
 const PubSubMessageIdSchema = z.looseObject({
   message: z.looseObject({
@@ -21,7 +22,11 @@ pushRoute.post('/user/:userId', async c => {
   // This prevents cross-project forgery: an attacker with their own GCP project
   // can get Google-signed tokens with a matching audience, but not with the
   // victim's service account email.
-  const internalSecret = await c.env.INTERNAL_API_SECRET.get();
+  const internalSecret = await readGmailPushSecret(
+    c.env,
+    'INTERNAL_API_SECRET',
+    c.executionCtx
+  );
   const emailRes = await c.env.KILOCLAW.fetch(
     new Request(
       `https://kiloclaw/api/platform/gmail-oidc-email?userId=${encodeURIComponent(userId)}`,

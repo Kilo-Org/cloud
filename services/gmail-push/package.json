@@ -10,12 +10,14 @@
     "cf-typegen": "wrangler types --env-file /dev/null"
   },
   "dependencies": {
+    "@kilocode/secrets-client": "workspace:*",
     "hono": "catalog:",
     "jose": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@kilocode/sts-contracts": "workspace:*",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

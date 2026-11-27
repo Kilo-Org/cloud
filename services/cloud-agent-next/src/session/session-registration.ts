@@ -1236,8 +1236,8 @@ async function allocateNewSession(
       try {
         enrollment =
           orgId !== undefined
-            ? await fetchByocVercelEnrollment(ctx.env, orgId)
-            : await fetchByocVercelEnrollmentForUser(ctx.env, ctx.userId);
+            ? await fetchByocVercelEnrollment(ctx.env, orgId, ctx.executionCtx)
+            : await fetchByocVercelEnrollmentForUser(ctx.env, ctx.userId, ctx.executionCtx);
       } catch (error) {
         if (error instanceof ByocCredentialMissingError) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });

@@ -7,6 +7,11 @@ import { createR2Client } from '@kilocode/worker-utils/r2-client';
 import { verifyKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
+import {
   USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
   USER_DATA_EXPORT_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -27,8 +32,7 @@ function downloadExpiration(objectExpiresAt: string, now: number = Date.now()) {
 
 function authorized(request: Request, expected: string): boolean {
   const received = request.headers.get('x-internal-api-key');
-  if (!received) return false;
-  return timingSafeEqual(received, expected);
+  return Boolean(received && timingSafeEqual(received, expected));
 }
 
 /**
@@ -79,6 +83,13 @@ async function authenticatedUserId(
   ) {
     return { status: 'unauthorized' };
   }
+  // Both credentials are accepted: the shared secret and the caller's own assertion.
+  observeInternalAuth(
+    'user-data-export',
+    'internal',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
   return { status: 'authenticated', userId: payload.kiloUserId };
 }
 

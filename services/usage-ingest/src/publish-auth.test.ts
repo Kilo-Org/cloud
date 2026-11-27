@@ -4,6 +4,7 @@ import worker from './index';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaRecord } from './exa-usage.test-fixture';
 import { publishAuthMode } from './publish-auth';
+import { resetInternalAuthObservation } from '@kilocode/worker-utils/internal-auth-observation';
 import type { Env } from './publish-usage';
 import { RESOURCE_METADATA_PATH, USAGE_INGEST_RESOURCE_ORIGINS } from './sts';
 import { serviceClaims, signToken, testSigner, type TestSigner } from './sts-canary.test-fixture';
@@ -21,6 +22,7 @@ beforeAll(async () => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  resetInternalAuthObservation();
 });
 
 /** Serves the stand-in key set at the production issuer; `keySet: false` answers it with 500. */
@@ -166,6 +168,36 @@ describe('an unknown mode', () => {
 });
 
 describe('dual mode', () => {
+  it('reports each accepted request to the item-9 counter (design 9.4)', async () => {
+    stubKeySet();
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { env } = setup({ USAGE_INGEST_PUBLISH_AUTH: 'dual' });
+
+    expect((await worker.fetch(publish(`Bearer ${SECRET}`), env)).status).toBe(202);
+    expect((await worker.fetch(publish(await stsBearer()), env)).status).toBe(202);
+
+    const lines = log.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .filter(line => line.event === 'kilo_internal_auth');
+    expect(lines).toEqual([
+      expect.objectContaining({
+        receiver: 'usage-ingest',
+        route: 'usage_publish',
+        auth: 'legacy_shared_secret',
+        caller: 'unknown',
+        count: 1,
+      }),
+      expect.objectContaining({
+        receiver: 'usage-ingest',
+        route: 'usage_publish',
+        auth: 'sts',
+        caller: 'ai-gateway',
+        count: 1,
+      }),
+    ]);
+  });
+
   it('accepts the secret and a usage-ingest:usage.publish STS token, and labels each', async () => {
     stubKeySet();
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});

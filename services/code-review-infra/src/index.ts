@@ -61,16 +61,18 @@ function requestContext(c: {
 // error names the secret, never a value.
 app.use(
   '*',
-  backendAuthMiddleware<HonoEnv>(c =>
-    readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN', requestContext(c)).catch(error => {
-      // Name only: an outage means one line per request, and the name is enough to tell an outage
-      // from a bad token. The error's message names the secret, never its value.
-      console.warn(
-        '[CodeReviewWorker] BACKEND_AUTH_TOKEN unavailable',
-        error instanceof Error ? error.name : 'unknown'
-      );
-      return undefined;
-    })
+  backendAuthMiddleware<HonoEnv>(
+    c =>
+      readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN', requestContext(c)).catch(error => {
+        // Name only: an outage means one line per request, and the name is enough to tell an outage
+        // from a bad token. The error's message names the secret, never its value.
+        console.warn(
+          '[CodeReviewWorker] BACKEND_AUTH_TOKEN unavailable',
+          error instanceof Error ? error.name : 'unknown'
+        );
+        return undefined;
+      }),
+    { receiver: 'code-review-infra', route: 'review' }
   )
 );
 

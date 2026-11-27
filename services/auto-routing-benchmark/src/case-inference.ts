@@ -36,6 +36,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
 import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import type { Context, Hono } from 'hono';
 import * as z from 'zod';
@@ -1305,6 +1306,7 @@ export async function handleCaseAdmit(
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   if (!(await authorizedInternalBearer(authorization, secret)))
     return jsonResponse({ error: { code: 'unauthorized', message: 'Not authorized.' } }, 401);
+  observeInternalAuth('auto-routing-benchmark', 'case_admit', 'legacy_shared_secret');
   const parsed = BenchmarkCaseAdmitRequestSchema.safeParse(body);
   if (!parsed.success)
     return jsonResponse({ error: { code: 'invalid_admit', message: 'Invalid admission.' } }, 400);

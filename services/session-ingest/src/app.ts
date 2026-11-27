@@ -16,6 +16,11 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { withDORetry } from '@kilocode/worker-utils';
 
 const invalidateSessionAccessSchema = z.object({
@@ -32,9 +37,14 @@ async function hasValidInternalSecret(
 ): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
   const expected = await readSessionIngestSecret(c.env, 'INTERNAL_API_SECRET', ctx);
-  if (!provided || !expected) return false;
-
-  return timingSafeEqual(provided, expected);
+  if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  observeInternalAuth(
+    'session-ingest',
+    'cloud_agent_internal',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  return true;
 }
 
 const requireValidInternalSecret = createMiddleware<{

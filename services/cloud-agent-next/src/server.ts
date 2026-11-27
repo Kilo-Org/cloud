@@ -17,6 +17,11 @@ import {
 import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createNotFoundHandler } from '@kilocode/worker-utils';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackQueueJob } from './callbacks/types.js';
@@ -310,6 +315,18 @@ app.get('/health', (c: Context<HonoContext>) => {
 // nor an upstream authority. Register before the broad facade routes.
 app.all('/api/runtime-credential-proxy/:route/*', routeRuntimeCredentialProxy);
 
+/**
+ * The internal route families `requireInternalApi` guards. Registered literals only, so a request
+ * path can never introduce a label outside this set.
+ */
+const INTERNAL_ROUTE_FAMILIES: Readonly<Record<string, true>> = {
+  byoc: true,
+  'code-review': true,
+  containers: true,
+  streams: true,
+  widgets: true,
+};
+
 function requireInternalApi(c: Context<HonoContext>): Response | null {
   if (!c.env.INTERNAL_API_SECRET) {
     return c.text('Internal API secret not configured', 500);
@@ -318,6 +335,13 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
   if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
     return c.text('Invalid or missing internal API key', 401);
   }
+  const family = c.req.path.split('/')[2] ?? '';
+  observeInternalAuth(
+    'cloud-agent-next',
+    INTERNAL_ROUTE_FAMILIES[family] === true ? family : 'other',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
   return null;
 }
 

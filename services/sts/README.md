@@ -805,8 +805,11 @@ Preconditions on the GitHub side, which STS cannot check:
   subject: `...:environment:<env>` instead if that job runs in a GitHub environment; the kilocode
   CI owner checks this at upgrade time.
 - **Protected environment.** STS trusts the `environment` claim; the GitHub environment's branch
-  rule (`main`, plus `v2` for `automation`) and its required reviewers are what make that claim
-  mean something.
+  rule (`main`, plus `v2` for `automation`) is what makes that claim mean something. `automation`
+  has no required reviewers, so the branch rulesets carry the review: `v2` requires an approved
+  pull request with no bypass actor, the same bar as `main`. `ci-kilocode-app-key-v2` pins the
+  whole `kilo-v2.yml` file, so a job added to that file later with `environment: automation`
+  would also receive the key; such a change needs an approved pull request on `v2`.
 - **Environment names** use only letters, digits, `.`, `_` and `-`, and the workflow spells them
   exactly as the policy does.
 
@@ -828,8 +831,8 @@ copy. At the kilocode CI design's load (about 90 bundle reads a day, at most 1,0
 a day) that is under 1,000 Worker requests, `BundleDO` calls and audit rows a day. The refresher
 cost of `/ci` is one more conditional `GET /api/v4/secrets` every 4 minutes per environment that
 has a GitHub policy (360 a day per environment; a 304 when nothing changed), and one more bundle
-push per GitHub policy per refresh: with the 7 kilocode policies, 7 `BundleDO` calls every 4
-minutes, or 2,520 a day in production.
+push per GitHub policy per refresh: with the 8 kilocode policies, 8 `BundleDO` calls every 4
+minutes, or 2,880 a day in production.
 
 ## Migration run attestation
 

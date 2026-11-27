@@ -67,25 +67,16 @@ type LeaseRow = typeof schema.lease.$inferSelect;
  */
 export const LEASE_DYNAMIC_SECRETS: Readonly<Record<LeaseGrant, DynamicSecretRef>> = {
   'replica-read': { name: 'replica-read', path: '/dynamic/replica-read' },
-  'ci-migration': { name: 'ci-migration', path: '/dynamic/ci-migration' },
 };
 
 const MINUTE_MS = 60 * 1000;
 
+/** A lease caller is a Worker in the account: only `replica-read` exists, for worker bindings. */
 const CallerSchema = z.strictObject({
   workload: WorkloadNameSchema,
-  identity: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
-  channel: z.enum(['worker-binding', 'http']),
-  run: z
-    .strictObject({
-      jobWorkflowRef: z.string().min(1).max(512),
-      runId: z.string().regex(/^[0-9]{1,20}$/),
-      runAttempt: z
-        .string()
-        .regex(/^[0-9]{1,20}$/)
-        .optional(),
-    })
-    .nullable(),
+  identity: z.literal('worker-binding'),
+  channel: z.literal('worker-binding'),
+  run: z.null(),
 });
 
 /** What STS asks the lease object for, after its policy check allowed the grant and the lifetime. */
@@ -137,7 +128,7 @@ const LeaseRevokeRequestSchema = z.strictObject({
 export type LeaseRevokeOutcome =
   | { status: 'revoked' }
   /** The caller hears `not_found` in every case; the reason is for its denial row. */
-  | { status: 'not_found'; reason: 'not_owner' | 'other_run' | 'unknown_lease' }
+  | { status: 'not_found'; reason: 'not_owner' | 'unknown_lease' }
   | { status: 'unavailable'; retryAfterSeconds: number };
 
 function retryAfterSeconds(ms: number | null): number {
@@ -268,7 +259,6 @@ export class LeaseDO extends DurableObject<Env> {
       .values({
         workload: caller.workload,
         caller: JSON.stringify(caller),
-        runId: caller.run?.runId ?? null,
         grant,
         state: 'pending',
         createdAt: callStartedAt,
@@ -359,11 +349,10 @@ export class LeaseDO extends DurableObject<Env> {
 
   /**
    * Revokes one of the caller's own leases. A lease id STS never handed to this workload is
-   * `not_found`, whoever holds it, and so is a GitHub run's lease asked for by another run. A lease
-   * STS already revoked answers `revoked` without a manager call, and one whose revocation STS
-   * stopped unconfirmed answers `unavailable` without one; an expired one still goes to Infisical,
-   * since expiry alone does not end an open session (Infisical answers 404 once its own expiry
-   * revocation succeeded).
+   * `not_found`, whoever holds it. A lease STS already revoked answers `revoked` without a manager
+   * call, and one whose revocation STS stopped unconfirmed answers `unavailable` without one; an
+   * expired one still goes to Infisical, since expiry alone does not end an open session (Infisical
+   * answers 404 once its own expiry revocation succeeded).
    */
   async revoke(raw: LeaseRevokeRequest): Promise<LeaseRevokeOutcome> {
     const input = LeaseRevokeRequestSchema.parse(raw);
@@ -379,9 +368,6 @@ export class LeaseDO extends DurableObject<Env> {
       return { status: 'not_found', reason: 'unknown_lease' };
     }
     if (row.workload !== input.caller.workload) return { status: 'not_found', reason: 'not_owner' };
-    if (row.runId !== null && row.runId !== (input.caller.run?.runId ?? null)) {
-      return { status: 'not_found', reason: 'other_run' };
-    }
     if (row.state === 'revoked') return { status: 'revoked' };
     if (row.state === 'unconfirmed') {
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };

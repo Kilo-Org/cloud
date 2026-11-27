@@ -92,7 +92,7 @@ const surfaces: Record<string, Surface> = {
   // No binding to it in this pool; test/runtime calls its former `mintAuthority` over one.
   SecretsBroker: {
     prototype: SecretsBroker.prototype,
-    rpc: ['getBundle', 'lease', 'mintTokens', 'revokeLease'],
+    rpc: ['attestGithubRun', 'getBundle', 'lease', 'mintTokens', 'revokeLease'],
     stub: null,
     internal: [],
   },

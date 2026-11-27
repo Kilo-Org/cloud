@@ -15,6 +15,13 @@
       "when": 1795737592581,
       "tag": "0001_curvy_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795747891597,
+      "tag": "0002_drop_lease_run_id",
+      "breakpoints": true
     }
   ]
 }

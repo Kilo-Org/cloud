@@ -8,12 +8,17 @@ import type { AuditBatch } from '@kilocode/sts-contracts';
  *
  * * `kilo-audit-uts[-staging|-local]`: only `uts:<environment>:<0-7>`, one of the 8 UTS audit
  *   shards, with every event `source` equal to `kilo:uts:<environment>`;
- * * `kilo-audit[-staging|-local]`: only `sts:<environment>:<rest>` with `kilo:sts:<environment>`.
+ * * `kilo-audit[-staging|-local]`: only `sts:<environment>:<rest>` with `kilo:sts:<environment>`;
+ * * `kilo-audit-migration-proxy[-staging|-local]` (design Q66): only
+ *   `migration-proxy:<environment>:<rest>` with `kilo:migration-proxy:<environment>`.
  *
  * A dead-letter queue (`<queue>-dlq`) names the same producer as its queue.
  */
 
-type Producer = { kind: 'uts' | 'sts'; environment: 'production' | 'staging' | 'development' };
+type Producer = {
+  kind: 'uts' | 'sts' | 'migration-proxy';
+  environment: 'production' | 'staging' | 'development';
+};
 
 const DLQ_SUFFIX = '-dlq';
 
@@ -24,6 +29,9 @@ const QUEUE_PRODUCERS: ReadonlyMap<string, Producer> = new Map([
   ['kilo-audit-uts', { kind: 'uts', environment: 'production' }],
   ['kilo-audit-uts-staging', { kind: 'uts', environment: 'staging' }],
   ['kilo-audit-uts-local', { kind: 'uts', environment: 'development' }],
+  ['kilo-audit-migration-proxy', { kind: 'migration-proxy', environment: 'production' }],
+  ['kilo-audit-migration-proxy-staging', { kind: 'migration-proxy', environment: 'staging' }],
+  ['kilo-audit-migration-proxy-local', { kind: 'migration-proxy', environment: 'development' }],
 ]);
 
 const UTS_SHARD = /^[0-7]$/;

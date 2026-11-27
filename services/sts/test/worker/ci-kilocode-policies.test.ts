@@ -112,7 +112,7 @@ async function fixture(environment: 'production' | 'staging' | 'development'): P
   const verifier = new IdentityVerifier({
     policies: policyIndex.all(),
     environment,
-    issuer: STS_ISSUER,
+    audience: STS_ISSUER,
     fetch: providerFetch([github]).fetch,
   });
   return { verify: async body => verifier.verify(await signToken(github, body)) };
@@ -347,7 +347,7 @@ secrets: [APP_SECRET]
       const verifier = new IdentityVerifier({
         policies: policies.all(),
         environment: 'staging',
-        issuer: STS_ISSUER,
+        audience: STS_ISSUER,
         fetch: providerFetch([github]).fetch,
       });
       const { environment: _environment, ...base } = claims('', 'nightly.yml', 'schedule');

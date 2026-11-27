@@ -4,6 +4,8 @@ import auditRelayPolicy from '../../policy/audit-relay.yaml';
 import autoRoutingBenchmarkPolicy from '../../policy/auto-routing-benchmark.yaml';
 import autoRoutingPolicy from '../../policy/auto-routing.yaml';
 import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
+import ciDbMigrateStagingPolicy from '../../policy/ci-db-migrate-staging.yaml';
+import ciDbMigratePolicy from '../../policy/ci-db-migrate.yaml';
 import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
 import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
 import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
@@ -28,6 +30,7 @@ import kiloOpsPolicy from '../../policy/kilo-ops.yaml';
 import kiloclawBillingPolicy from '../../policy/kiloclaw-billing.yaml';
 import kiloclawInboundEmailPolicy from '../../policy/kiloclaw-inbound-email.yaml';
 import kiloclawPolicy from '../../policy/kiloclaw.yaml';
+import migrationProxyPolicy from '../../policy/migration-proxy.yaml';
 import modelEvalIngestPolicy from '../../policy/model-eval-ingest.yaml';
 import notificationsPolicy from '../../policy/notifications.yaml';
 import o11yPolicy from '../../policy/o11y.yaml';
@@ -50,6 +53,8 @@ const sources: Record<PolicyFile, string> = {
   'auto-routing.yaml': autoRoutingPolicy,
   'auto-routing-benchmark.yaml': autoRoutingBenchmarkPolicy,
   'bouncer-watch.yaml': bouncerWatchPolicy,
+  'ci-db-migrate.yaml': ciDbMigratePolicy,
+  'ci-db-migrate-staging.yaml': ciDbMigrateStagingPolicy,
   'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,
   'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
   'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,
@@ -74,6 +79,7 @@ const sources: Record<PolicyFile, string> = {
   'kiloclaw.yaml': kiloclawPolicy,
   'kiloclaw-billing.yaml': kiloclawBillingPolicy,
   'kiloclaw-inbound-email.yaml': kiloclawInboundEmailPolicy,
+  'migration-proxy.yaml': migrationProxyPolicy,
   'model-eval-ingest.yaml': modelEvalIngestPolicy,
   'notifications.yaml': notificationsPolicy,
   'o11y.yaml': o11yPolicy,

@@ -1,0 +1,1 @@
+ALTER TABLE `lease` DROP COLUMN `run_id`;

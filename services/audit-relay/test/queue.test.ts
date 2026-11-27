@@ -153,6 +153,34 @@ describe('queue handler', () => {
       source: 'kilo:sts:production',
       reason: 'refused_queue_not_allowed',
     },
+    {
+      label: 'an STS stream on the migration proxy queue',
+      queue: 'kilo-audit-migration-proxy',
+      stream: 'sts:production:bundle:forged',
+      source: 'kilo:sts:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a migration proxy stream on the STS queue',
+      queue: 'kilo-audit',
+      stream: 'migration-proxy:production:runs-forged',
+      source: 'kilo:migration-proxy:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a migration proxy stream on the STS dead-letter queue',
+      queue: 'kilo-audit-dlq',
+      stream: 'migration-proxy:production:runs-forged',
+      source: 'kilo:migration-proxy:production',
+      reason: 'refused_stream_not_allowed',
+    },
+    {
+      label: 'a migration proxy stream with STS sources on its own queue',
+      queue: 'kilo-audit-migration-proxy',
+      stream: 'migration-proxy:production:runs-forged',
+      source: 'kilo:sts:production',
+      reason: 'refused_source_mismatch',
+    },
   ])(
     'keeps $label under dead-letter/unknown and never archives it',
     async ({ queue, stream, source, reason }) => {
@@ -187,23 +215,43 @@ describe('queue handler', () => {
     }
   );
 
+  const UTS_TOKEN_ISSUED = 'ai.kilo.uts.token.issued';
+  const PROXY_SESSION_SAMPLED = 'ai.kilo.migration_proxy.session_sampled';
+
   it.each([
-    { queue: 'kilo-audit-uts', environment: 'production' },
-    { queue: 'kilo-audit-uts-local', environment: 'development' },
+    {
+      queue: 'kilo-audit-uts',
+      stream: 'uts:production:5',
+      source: 'kilo:uts:production',
+      type: UTS_TOKEN_ISSUED,
+    },
+    {
+      queue: 'kilo-audit-uts-local',
+      stream: 'uts:development:5',
+      source: 'kilo:uts:development',
+      type: UTS_TOKEN_ISSUED,
+    },
+    {
+      queue: 'kilo-audit-migration-proxy',
+      stream: 'migration-proxy:production:runs-own',
+      source: 'kilo:migration-proxy:production',
+      type: PROXY_SESSION_SAMPLED,
+    },
+    {
+      queue: 'kilo-audit-migration-proxy-staging',
+      stream: 'migration-proxy:staging:runs-own',
+      source: 'kilo:migration-proxy:staging',
+      type: PROXY_SESSION_SAMPLED,
+    },
   ])(
-    'archives a UTS shard stream with its own source from $queue',
-    async ({ queue, environment }) => {
+    'archives $stream with its own source from $queue',
+    async ({ queue, stream, source, type }) => {
       const http = recordingFetch(axiomOk);
       vi.stubGlobal('fetch', http.impl);
-      const stream = `uts:${environment}:5`;
       const batch = auditBatch(1, 2, stream);
       const body = await encodeAuditBatch({
         ...batch,
-        events: batch.events.map(event => ({
-          ...event,
-          source: `kilo:uts:${environment}`,
-          type: 'ai.kilo.uts.token.issued',
-        })),
+        events: batch.events.map(event => ({ ...event, source, type })),
       });
 
       const { result } = await runQueue(queue, [body.buffer]);

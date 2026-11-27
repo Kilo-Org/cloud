@@ -29,9 +29,10 @@ export const AUDIT_RELAY_DEPLOYMENTS: readonly string[] = [
 type Grant = readonly [worker: string, resource: string];
 
 /**
- * Each STS deployment produces only to its own environment's STS audit queue, and each UTS mint
- * deployment (its audit outbox relay) only to its environment's UTS audit queue. The relay trusts
- * the queue a batch arrives on to name its producer, so no producer shares a queue with another.
+ * Each STS deployment produces only to its own environment's STS audit queue, each UTS mint
+ * deployment (its audit outbox relay) only to its environment's UTS audit queue, and each migration
+ * proxy deployment only to its environment's migration proxy audit queue. The relay trusts the
+ * queue a batch arrives on to name its producer, so no producer shares a queue with another.
  */
 export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['sts', 'kilo-audit'],
@@ -44,6 +45,10 @@ export const AUDIT_QUEUE_PRODUCERS: readonly Grant[] = [
   ['uts-local', 'kilo-audit-uts-local'],
   // services/uts/wrangler.test.jsonc, which only the Workers test pool runs.
   ['uts-test', 'kilo-audit-uts-local'],
+  // The migration proxy (services/migration-proxy, design Q64a): its own queue per environment.
+  ['migration-proxy', 'kilo-audit-migration-proxy'],
+  ['migration-proxy-staging', 'kilo-audit-migration-proxy-staging'],
+  ['migration-proxy-local', 'kilo-audit-migration-proxy-local'],
 ];
 
 /**
@@ -63,6 +68,12 @@ export const AUDIT_QUEUE_CONSUMERS: readonly Grant[] = [
   ['audit-relay-local', 'kilo-audit-local-dlq'],
   ['audit-relay-local', 'kilo-audit-uts-local'],
   ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
+  ['audit-relay', 'kilo-audit-migration-proxy'],
+  ['audit-relay', 'kilo-audit-migration-proxy-dlq'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local-dlq'],
 ];
 
 export const AUDIT_QUEUE_DEAD_LETTERS: readonly Grant[] = [
@@ -72,6 +83,9 @@ export const AUDIT_QUEUE_DEAD_LETTERS: readonly Grant[] = [
   ['audit-relay-staging', 'kilo-audit-uts-staging-dlq'],
   ['audit-relay-local', 'kilo-audit-local-dlq'],
   ['audit-relay-local', 'kilo-audit-uts-local-dlq'],
+  ['audit-relay', 'kilo-audit-migration-proxy-dlq'],
+  ['audit-relay-staging', 'kilo-audit-migration-proxy-staging-dlq'],
+  ['audit-relay-local', 'kilo-audit-migration-proxy-local-dlq'],
 ];
 
 /**
@@ -121,6 +135,12 @@ const DEPLOYMENT_OWNERS: ReadonlyMap<string, string> = new Map<string, string>([
   ['uts-staging', 'uts'],
   ['uts-local', 'uts-local'],
   ['uts-test', 'uts-test'],
+  // The migration proxy holds an audit queue producer grant under these names, so only its own
+  // configs may deploy as them: services/migration-proxy/test/fixtures/e2e/wrangler.jsonc is the
+  // `migration-proxy-local` config.
+  ['migration-proxy', 'migration-proxy'],
+  ['migration-proxy-staging', 'migration-proxy'],
+  ['migration-proxy-local', 'migration-proxy-local'],
 ]);
 
 /**
@@ -735,8 +755,9 @@ function grantProblem(
 
 /**
  * A queue message carries no producer identity, so the audit relay takes the producer from the
- * queue a batch arrives on: an STS queue may carry only `sts:<env>:` streams with STS sources, and
- * a UTS queue only the 8 `uts:<env>:` shard streams with UTS sources. That holds only while each
+ * queue a batch arrives on: an STS queue may carry only `sts:<env>:` streams with STS sources, a
+ * UTS queue only the 8 `uts:<env>:` shard streams with UTS sources, and a migration proxy queue only
+ * `migration-proxy:<env>:` streams with migration proxy sources. That holds only while each
  * audit queue has exactly one producer per environment, which these grants enforce. A foreign
  * consumer (or dead-letter target) would take batches from the relay.
  */

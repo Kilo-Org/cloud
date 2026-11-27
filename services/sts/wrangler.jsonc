@@ -56,8 +56,9 @@
     "DO_JURISDICTION": "eu",
     // Emergency removal of a service-token signing key: comma list of kids (README runbook).
     "TOKEN_SIGNING_KIDS_REVOKED": "",
-    // `<host>:<port>/<database>` a ci-migration lease returns; empty returns none.
-    "LEASE_CI_MIGRATION_TARGET": "",
+    // Audience of a GitHub job's token for the migration proxy, which `attestGithubRun` alone
+    // accepts (README "Migration run attestation"); empty attests no run.
+    "MIGRATION_PROXY_AUDIENCE": "https://migration-proxy.kiloapps.io",
     // Cloudflare account STS mints CI deploy tokens in; empty mints none (README "Cloudflare deploy tokens").
     "CF_DEPLOY_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     // Hyperdrive bindings of the read replicas the lease object sweeps (README "Replica sessions");
@@ -107,7 +108,7 @@
         "MANAGER_IDENTITY_ID": "5bb6ddef-1c61-4bb2-ba3f-8af511fed4f4",
         "DO_JURISDICTION": "eu",
         "TOKEN_SIGNING_KIDS_REVOKED": "",
-        "LEASE_CI_MIGRATION_TARGET": "",
+        "MIGRATION_PROXY_AUDIENCE": "https://migration-proxy-staging.kiloapps.io",
         "CF_DEPLOY_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
         "LEASE_REPLICA_SWEEP_BINDINGS": "",
       },
@@ -143,7 +144,7 @@
         // workerd enforces no data residency, so local development keeps objects unscoped.
         "DO_JURISDICTION": "none",
         "TOKEN_SIGNING_KIDS_REVOKED": "",
-        "LEASE_CI_MIGRATION_TARGET": "",
+        "MIGRATION_PROXY_AUDIENCE": "",
         "CF_DEPLOY_ACCOUNT_ID": "",
         "LEASE_REPLICA_SWEEP_BINDINGS": "",
       },

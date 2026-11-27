@@ -147,9 +147,6 @@ export const TOKEN_AUDIT_RETENTION_MS = 60 * 60 * 1000;
 /** How often a token signer prunes; a prune that hits its batch bound runs again next alarm. */
 export const TOKEN_AUDIT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
 
-/** A lease or revoke request body is a grant and a lifetime, or a lease id; above this is refused. */
-export const LEASE_REQUEST_MAX_BODY_BYTES = 1024;
-
 /**
  * The lease object gives up on a lease whose creation took longer than this, measured from when
  * STS called the object (so the object's cold start and the call to it count), and checked again

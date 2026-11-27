@@ -27,7 +27,7 @@
     "MANAGER_IDENTITY_ID": "test-identity-id",
     "DO_JURISDICTION": "none",
     "TOKEN_SIGNING_KIDS_REVOKED": "",
-    "LEASE_CI_MIGRATION_TARGET": "db.sts-test.invalid:5432/postgres",
+    "MIGRATION_PROXY_AUDIENCE": "https://migration-proxy.sts-test.invalid",
     "CF_DEPLOY_ACCOUNT_ID": "0123456789abcdef0123456789abcdef",
     // The sweep tests build the lease object with their own replica bindings.
     "LEASE_REPLICA_SWEEP_BINDINGS": "",

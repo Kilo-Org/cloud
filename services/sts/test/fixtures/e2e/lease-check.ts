@@ -2,12 +2,11 @@
 // test Workers:
 //   ../../node_modules/.bin/tsx test/fixtures/e2e/lease-check.ts
 //   wrangler dev -c test/fixtures/e2e/wrangler.probe.jsonc -c test/fixtures/e2e/wrangler.sts.jsonc
-// The script serves a fake GitHub issuer and a fake Infisical (JWT Auth login and the lease API)
-// on port 8830; the test build of STS sends its requests for both there. It checks that the probe
-// Worker gets a replica-read lease over its binding with the lifetime it asked for, that a lifetime
-// above the policy maximum is shortened, that a third concurrent lease is refused, that a GitHub
-// job gets a ci-migration lease with the primary target, that each caller can revoke only its own
-// lease (a GitHub lease only from its own run), and that the lease rows reach the audit queue with
+// The script serves a fake Infisical (JWT Auth login and the lease API) on port 8830; the test
+// build of STS sends its requests there. It checks that the probe Worker gets a replica-read lease
+// over its binding with the lifetime it asked for, that a lifetime above the policy maximum is
+// shortened, that a third concurrent lease is refused, that a lease id STS never issued cannot be
+// revoked, that STS serves no lease over HTTP, and that the lease rows reach the audit queue with
 // no username or password. Every key, id and credential is synthetic. Exits 1 on the first failure.
 import {
   LeaseResultSchema,
@@ -17,12 +16,8 @@ import {
 } from '@kilocode/sts-contracts';
 import { createServer, type IncomingMessage } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { exportJWK, generateKeyPair, SignJWT, type JWTPayload } from 'jose';
 
 const BASE = 'http://localhost:8827';
-const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
-const WORKFLOW = 'kilo-e2e/ci-fixture/.github/workflows/deploy.yml@refs/heads/main';
-const KID = 'e2e-github-key';
 
 function check(condition: boolean, what: string, detail: unknown = ''): void {
   console.log(
@@ -31,9 +26,6 @@ function check(condition: boolean, what: string, detail: unknown = ''): void {
   );
   if (!condition) process.exit(1);
 }
-
-const { privateKey, publicKey } = await generateKeyPair('RS256');
-const jwks = { keys: [{ ...(await exportJWK(publicKey)), kid: KID, alg: 'RS256', use: 'sig' }] };
 
 type ManagerCall = { method: string; path: string; body: Record<string, unknown> };
 const managerCalls: ManagerCall[] = [];
@@ -53,10 +45,6 @@ const server = createServer((request, response) => {
       response.end(JSON.stringify(body));
     };
     const text = await readBody(request);
-    if (url.pathname === '/github/.well-known/openid-configuration') {
-      return json({ issuer: GITHUB_ISSUER, jwks_uri: `${GITHUB_ISSUER}/.well-known/jwks` });
-    }
-    if (url.pathname === '/github/.well-known/jwks') return json(jwks);
     if (url.pathname === '/manager/api/v1/auth/jwt-auth/login') {
       return json({ accessToken: 'e2e-manager-token', expiresIn: 600, tokenType: 'Bearer' });
     }
@@ -91,7 +79,7 @@ const server = createServer((request, response) => {
 const listening = Promise.withResolvers<void>();
 server.listen(8830, '127.0.0.1', listening.resolve);
 await listening.promise;
-console.log('fake GitHub issuer and manager on 127.0.0.1:8830; waiting for STS on', BASE);
+console.log('fake manager on 127.0.0.1:8830; waiting for STS on', BASE);
 
 for (let attempt = 0; ; attempt += 1) {
   try {
@@ -103,34 +91,6 @@ for (let attempt = 0; ; attempt += 1) {
   await sleep(2_000);
 }
 
-const JOB_CLAIMS: JWTPayload = {
-  sub: 'repo:kilo-e2e@2002/ci-fixture@1001:environment:migrations',
-  repository: 'kilo-e2e/ci-fixture',
-  repository_id: '1001',
-  repository_owner: 'kilo-e2e',
-  repository_owner_id: '2002',
-  environment: 'migrations',
-  ref: 'refs/heads/main',
-  ref_type: 'branch',
-  event_name: 'push',
-  workflow_ref: WORKFLOW,
-  job_workflow_ref: WORKFLOW,
-  run_id: '515151',
-  run_attempt: '1',
-  runner_environment: 'github-hosted',
-};
-
-async function jobToken(claims: JWTPayload = JOB_CLAIMS): Promise<string> {
-  return await new SignJWT(claims)
-    .setProtectedHeader({ alg: 'RS256', kid: KID, typ: 'JWT' })
-    .setIssuer(GITHUB_ISSUER)
-    .setAudience(BASE)
-    .setIssuedAt()
-    .setNotBefore('0s')
-    .setExpirationTime('5m')
-    .sign(privateKey);
-}
-
 async function probeLease(query: string): Promise<LeaseResult> {
   return LeaseResultSchema.parse(await (await fetch(`${BASE}/probe/lease?${query}`)).json());
 }
@@ -138,22 +98,6 @@ async function probeLease(query: string): Promise<LeaseResult> {
 async function probeRevoke(leaseId: string): Promise<LeaseRevokeResult> {
   const response = await fetch(`${BASE}/probe/revoke?leaseId=${encodeURIComponent(leaseId)}`);
   return LeaseRevokeResultSchema.parse(await response.json());
-}
-
-async function githubPost(
-  path: string,
-  body: unknown,
-  claims: JWTPayload = JOB_CLAIMS
-): Promise<{ status: number; result: unknown }> {
-  const response = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${await jobToken(claims)}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  return { status: response.status, result: await response.json() };
 }
 
 // 1. A worker-binding caller gets replica-read with the lifetime it asked for.
@@ -200,57 +144,21 @@ check(
   'the refused lease made no Infisical call'
 );
 
-// 4. A GitHub job gets ci-migration with the primary target.
-const migration = await githubPost('/v1/lease', { grant: 'ci-migration' });
-const migrationLease = LeaseResultSchema.parse(migration.result);
-check(
-  migration.status === 200 &&
-    migrationLease.status === 'ok' &&
-    migrationLease.grant === 'ci-migration' &&
-    migrationLease.ttlSeconds === 3600 &&
-    migrationLease.host === 'db.e2e-primary.invalid' &&
-    migrationLease.port === 5432 &&
-    migrationLease.database === 'postgres',
-  'the GitHub job gets a 1-hour ci-migration lease with the primary target',
-  { status: migration.status, leaseStatus: migrationLease.status }
-);
-if (migrationLease.status !== 'ok') process.exit(1);
+// 4. STS serves no lease over HTTP.
+for (const path of ['/v1/lease', '/v1/lease/revoke']) {
+  const response = await fetch(`${BASE}${path}`, { method: 'POST', body: '{}' });
+  check(response.status === 404, `POST ${path} is not served`, response.status);
+}
 
-// 5. Each caller revokes only its own lease.
-const stolen = await githubPost('/v1/lease/revoke', { leaseId: hourly.leaseId });
-check(
-  stolen.status === 404 && JSON.stringify(stolen.result) === '{"status":"not_found"}',
-  "the GitHub job cannot revoke the probe's lease (404 not_found)",
-  stolen
-);
-const crossed = await probeRevoke(migrationLease.leaseId);
-check(crossed.status === 'not_found', "the probe cannot revoke the GitHub job's lease", crossed);
-const otherRun = await githubPost(
-  '/v1/lease/revoke',
-  { leaseId: migrationLease.leaseId },
-  { ...JOB_CLAIMS, run_id: '515152' }
-);
-check(
-  otherRun.status === 404,
-  "another run of the same workflow cannot revoke the job's lease",
-  otherRun
-);
+// 5. A lease id STS never issued cannot be revoked; the caller's own lease can.
+const unknown = await probeRevoke(crypto.randomUUID());
+check(unknown.status === 'not_found', 'an unknown lease id answers not_found', unknown);
 check(
   managerCalls.filter(call => call.method === 'DELETE').length === 0,
-  'no refused revoke reached Infisical'
+  'the refused revoke never reached Infisical'
 );
 const own = await probeRevoke(hourly.leaseId);
 check(own.status === 'revoked', 'the probe revokes its own lease', own);
-const ownMigration = await githubPost('/v1/lease/revoke', { leaseId: migrationLease.leaseId });
-check(ownMigration.status === 200, 'the GitHub job revokes its own lease', ownMigration);
-check(
-  managerCalls
-    .filter(call => call.method === 'DELETE')
-    .map(call => call.path.split('/').pop())
-    .sort()
-    .join() === [hourly.leaseId, migrationLease.leaseId].sort().join(),
-  'Infisical got exactly the two owner revocations'
-);
 const refill = await probeLease('grant=replica-read');
 check(refill.status === 'ok', 'the revoked lease freed its slot', refill.status);
 if (refill.status === 'ok') await probeRevoke(refill.leaseId);
@@ -269,10 +177,9 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
   events = (await (await fetch(`${BASE}/probe/audit`)).json()) as SeenEvent[];
   if (
     denied('too_many_active') &&
-    denied('not_owner') &&
-    denied('other_run') &&
-    events.filter(event => event.type === 'ai.kilo.sts.lease.created').length >= 4 &&
-    events.filter(event => event.type === 'ai.kilo.sts.lease.revoked').length >= 4
+    denied('unknown_lease') &&
+    events.filter(event => event.type === 'ai.kilo.sts.lease.created').length >= 3 &&
+    events.filter(event => event.type === 'ai.kilo.sts.lease.revoked').length >= 3
   ) {
     break;
   }
@@ -281,30 +188,21 @@ for (let attempt = 0; attempt < 40; attempt += 1) {
 const created = events.filter(event => event.type === 'ai.kilo.sts.lease.created');
 const revoked = events.filter(event => event.type === 'ai.kilo.sts.lease.revoked');
 check(
-  created.length === 4,
-  'four lease.created rows',
+  created.length === 3,
+  'three lease.created rows',
   created.map(event => event.attributes)
 );
 check(
-  revoked.length === 4,
-  'four lease.revoked rows',
+  revoked.length === 3,
+  'three lease.revoked rows',
   revoked.map(event => event.attributes)
 );
 check(
   created.every(event => event.stream === 'sts:development:leases'),
   'the lease rows come from the sts:development:leases stream'
 );
-const ciCreated = created.find(event => event.attributes.workload === 'ci-e2e-migrate');
-check(
-  ciCreated?.attributes.grant === 'ci-migration' &&
-    ciCreated.attributes.runId === '515151' &&
-    ciCreated.attributes.jobWorkflowRef === WORKFLOW,
-  'the ci-migration row names the workflow file and run',
-  ciCreated?.attributes
-);
 check(denied('too_many_active'), 'the refused third lease is audited as lease.denied');
-check(denied('not_owner'), 'both cross revokes are audited as lease.denied not_owner');
-check(denied('other_run'), 'the other run is audited as lease.denied other_run');
+check(denied('unknown_lease'), 'the unknown revoke is audited as lease.denied unknown_lease');
 const all = JSON.stringify(events);
 check(
   !all.includes('e2e-password-') && !all.includes('e2e_lease_user_'),

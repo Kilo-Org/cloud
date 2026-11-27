@@ -36,7 +36,7 @@
     "MANAGER_IDENTITY_ID": "test-identity-id",
     "DO_JURISDICTION": "none",
     "TOKEN_SIGNING_KIDS_REVOKED": "",
-    "LEASE_CI_MIGRATION_TARGET": "",
+    "MIGRATION_PROXY_AUDIENCE": "",
     "CF_DEPLOY_ACCOUNT_ID": "",
     "LEASE_REPLICA_SWEEP_BINDINGS": "",
   },

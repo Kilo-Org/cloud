@@ -1,0 +1,16 @@
+# The staging deploy's db-gate job (README "Migration run attestation", design Q64a): the
+# trigger-only policy of ci-db-migrate, for the staging migration proxy.
+workload: ci-db-migrate-staging
+environments: [staging]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: staging
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/deploy-staging.yml@refs/heads/main]
+  events: [workflow_run, schedule, workflow_dispatch]
+secrets: []
+dynamic:
+  - grant: migration-run

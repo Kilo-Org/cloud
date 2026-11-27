@@ -17,6 +17,7 @@ import {
   bundleDeniedEvent,
   deployTokenDeniedEvent,
   leaseDeniedEvent,
+  migrationAttestDeniedEvent,
   tokenDeniedEvent,
 } from '../audit/events';
 import { AuditLog } from '../audit/log';
@@ -29,8 +30,8 @@ type DenialDatabase = DrizzleSqliteDODatabase<typeof schema>;
 /**
  * Distinct denials kept per minute. Further distinct ones in that minute only add to one overflow
  * row per kind and reason (3 bundle reasons, 7 token reasons, 8 lease reasons, 11 deploy-token
- * reasons), so a flood of varied valid tokens writes at most `MAX_DISTINCT_PER_MINUTE + 29` audit
- * events per minute.
+ * reasons, 5 migration-attest reasons), so a flood of varied valid tokens writes at most
+ * `MAX_DISTINCT_PER_MINUTE + 34` audit events per minute.
  */
 export const MAX_DISTINCT_PER_MINUTE = 100;
 
@@ -67,6 +68,8 @@ function deniedEvent(
       return leaseDeniedEvent({ ...window, denial });
     case 'deploy_token':
       return deployTokenDeniedEvent({ ...window, denial });
+    case 'migration_attest':
+      return migrationAttestDeniedEvent({ ...window, denial });
     default:
       return bundleDeniedEvent({ ...window, denial });
   }
@@ -77,9 +80,10 @@ function deniedEvent(
  * tokens, leases, deploy tokens and revokes from identified callers arrive here, at most one call
  * per request; identical denials merge per minute into one event with a count, written by the
  * alarm after the minute ends (`ai.kilo.sts.bundle.denied`, `ai.kilo.sts.token.denied`,
- * `ai.kilo.sts.lease.denied` or `ai.kilo.sts.deploy_token.denied`). A stub can call every prototype
- * method, so everything but `record` and `alarm` is ECMAScript-private: no caller writes a count
- * past `record`'s validation.
+ * `ai.kilo.sts.lease.denied`, `ai.kilo.sts.deploy_token.denied` or
+ * `ai.kilo.sts.migration_attest.denied`). A stub can call every prototype method, so everything
+ * but `record` and `alarm` is ECMAScript-private: no caller writes a count past `record`'s
+ * validation.
  */
 export class DenialDO extends DurableObject<Env> {
   readonly #config: StsConfig;

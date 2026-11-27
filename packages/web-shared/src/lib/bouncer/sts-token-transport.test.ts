@@ -122,7 +122,9 @@ describe('the installed Bouncer auth with the real transport', () => {
       decide({ requestId: 'r-1', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 })
     ).resolves.toEqual({ enforced: false, spendWatch: false, flags: [] });
 
-    // One attempt: one STS call per scope, as the client sends one token per audience per call.
+    // One STS call per scope (one token per audience per call): decide first, then the gateway's
+    // other scope, read in the background once decide's read settled.
+    await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
     expect(stsCalls()).toEqual([
       { tokens: [{ audience: 'bouncer', scope: 'bouncer:decide' }] },
       { tokens: [{ audience: 'bouncer', scope: 'bouncer:usage.write' }] },
@@ -172,6 +174,27 @@ describe('the installed Bouncer auth with the real transport', () => {
     } finally {
       random.mockRestore();
     }
+  });
+
+  it('mints every granted scope at install in sts, before any call, and sends no legacy key', async () => {
+    setRuntime({
+      VERCEL_ENV: 'production',
+      VERCEL_TARGET_ENV: 'production',
+      BOUNCER_CLIENT_AUTH: 'sts',
+    });
+    installBouncerAuth('kilocode-ai-gateway');
+    await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
+    expect(stsCalls().flatMap(call => call.tokens.map(token => token.scope)).sort()).toEqual([
+      'bouncer:decide',
+      'bouncer:usage.write',
+    ]);
+    expect(bouncerCalls()).toEqual([]);
+
+    await decide({ requestId: 'r-9', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
+    expect(stsCalls()).toHaveLength(2);
+    const [headers] = bouncerCalls();
+    expect(headers.get('authorization')).toBe('Bearer sts-decide-token');
+    expect(headers.get('x-internal-api-key')).toBeNull();
   });
 
   it('delivers a usage event with the legacy key alone while its token is not held yet', async () => {

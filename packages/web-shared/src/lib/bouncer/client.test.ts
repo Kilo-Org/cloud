@@ -876,15 +876,22 @@ describe('STS headers from the installed Bouncer auth', () => {
     return new Headers(mockFetch.mock.calls[index]?.[1]?.headers).get('authorization');
   }
 
-  it('reports a 401 to a decide that carried a token and sends it once more without the token', async () => {
+  const invalidToken = () =>
+    new Response('refused', {
+      status: 401,
+      headers: { 'www-authenticate': 'Bearer error="invalid_token", resource_metadata="https://x"' },
+    });
+
+  it('reports a 401 invalid_token to a decide and sends it once more without the token', async () => {
     const verdict = { enforced: false, spendWatch: false, flags: [] };
-    mockFetch
-      .mockResolvedValueOnce(new Response('refused', { status: 401 }))
-      .mockResolvedValueOnce(Response.json(verdict));
+    mockFetch.mockResolvedValueOnce(invalidToken()).mockResolvedValueOnce(Response.json(verdict));
     await expect(
       decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
     ).resolves.toEqual(verdict);
-    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 401, reason: 'http_401' });
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', {
+      status: 401,
+      reason: 'invalid_token',
+    });
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(authorizationOf(0)).toBe('Bearer token-for-bouncer:decide');
     expect(authorizationOf(1)).toBeNull();
@@ -895,21 +902,50 @@ describe('STS headers from the installed Bouncer auth', () => {
     expect(mockFetch.mock.calls[1]?.[1]?.signal).toBe(mockFetch.mock.calls[0]?.[1]?.signal);
   });
 
-  it('reports a 401 to a release but never resends it, and retries a decide at most once', async () => {
-    mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+  it('resends a decide refused with 403 insufficient_scope once without the token', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 403,
+          headers: { 'www-authenticate': 'Bearer error="insufficient_scope", scope="bouncer:decide"' },
+        })
+      )
+      .mockResolvedValueOnce(Response.json({ enforced: false, spendWatch: false, flags: [] }));
+    await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', {
+      status: 403,
+      reason: 'insufficient_scope',
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(authorizationOf(1)).toBeNull();
+  });
+
+  it('reports a 401 invalid_token to a release but never resends it, and a decide at most once', async () => {
+    mockFetch.mockImplementation(async () => invalidToken());
     await releaseDecideLease({ requestId: 'r', accountId: 'user:u' });
-    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 401, reason: 'http_401' });
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', {
+      status: 401,
+      reason: 'invalid_token',
+    });
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     mockFetch.mockClear();
-    mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
     await expect(
       decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
     ).resolves.toBeNull();
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('neither reports nor resends a 401 to a call without a token, and never resends a 403', async () => {
+  it('counts a plain 401 as the legacy key failing and never resends it', async () => {
+    mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
+    await expect(
+      decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
+    ).resolves.toBeNull();
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 401, reason: 'legacy_key' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('neither reports nor resends a 401 to a call without a token, and never resends a plain 403', async () => {
     headersOf.mockResolvedValue({ 'x-kilo-caller': 'kilocode-app' });
     mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
@@ -982,18 +1018,12 @@ describe('STS headers from the installed Bouncer auth', () => {
     );
   });
 
-  it('names the RFC 6750 error of a dual refusal too', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(null, {
-        status: 401,
-        headers: { 'www-authenticate': 'Bearer error="invalid_token"' },
-      })
-    );
-    await releaseDecideLease({ requestId: 'r', accountId: 'user:u' });
-    expect(refused).toHaveBeenCalledWith('bouncer:decide', {
-      status: 401,
-      reason: 'invalid_token',
-    });
+  it('never resends after a refusal in sts, even a plain 401', async () => {
+    mode.value = 'sts';
+    mockFetch.mockImplementation(async () => new Response(null, { status: 401 }));
+    await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
+    expect(refused).toHaveBeenCalledWith('bouncer:decide', { status: 401, reason: 'legacy_key' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('sends the legacy key alone when the token headers cannot be read', async () => {

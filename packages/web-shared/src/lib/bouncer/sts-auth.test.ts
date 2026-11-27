@@ -191,6 +191,7 @@ describe('createBouncerAuth', () => {
         attached: {},
         missed: { 'bouncer:decide': { config: 1 } },
         refused: {},
+        prewarm: {},
         mint: { ok: 0, failed: 0 },
         last_mint_age_s: null,
         level: 'info',
@@ -237,6 +238,7 @@ describe('createBouncerAuth', () => {
         attached: { [scope]: 1 },
         missed: {},
         refused: {},
+        prewarm: {},
         mint: { ok: 0, failed: 0 },
         last_mint_age_s: null,
         level: 'info',
@@ -408,18 +410,69 @@ describe('createBouncerAuth', () => {
     });
   });
 
-  it('counts a 403 in dual but holds nothing back', async () => {
+  it('holds a scope back after a 403 insufficient_scope in dual too', async () => {
     const h = harness('kilocode-app', WEB_SCOPES);
     h.read.mockResolvedValue(TOKEN);
     await h.auth.headers(decideCall);
     h.auth.refused('bouncer:decide', insufficientScope);
+    await expect(h.auth.headers(decideCall)).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+    expect(h.lines().filter(line => line.event === 'bouncer_sts_token_rejected')).toHaveLength(1);
+    await expect(counts(h)).resolves.toMatchObject({
+      missed: { 'bouncer:decide': { rejected: 1 } },
+      refused: { 'bouncer:decide': { insufficient_scope: 1 } },
+    });
+  });
+
+  it('counts a refused legacy key in dual but holds the token nothing back', async () => {
+    const h = harness('kilocode-app', WEB_SCOPES);
+    h.read.mockResolvedValue(TOKEN);
+    await h.auth.headers(decideCall);
+    h.auth.refused('bouncer:decide', { status: 401, reason: 'legacy_key' });
+    h.auth.refused('bouncer:decide', { status: 403, reason: 'http_403' });
     await expect(h.auth.headers(decideCall)).resolves.toMatchObject({
       authorization: `Bearer ${TOKEN}`,
     });
     expect(h.lines().some(line => line.event === 'bouncer_sts_token_rejected')).toBe(false);
     await expect(counts(h)).resolves.toMatchObject({
-      refused: { 'bouncer:decide': { insufficient_scope: 1 } },
+      refused: { 'bouncer:decide': { legacy_key: 1, http_403: 1 } },
     });
+  });
+
+  it('starts one read per granted scope at creation with prewarm, and counts each outcome', async () => {
+    const read = jest.fn<BouncerTokenRead>(async target => {
+      if (target.scope === 'bouncer:signup.decide') throw unavailable();
+      return TOKEN;
+    });
+    const h = harness('kilocode-app', WEB_SCOPES, {
+      prewarm: true,
+      loadTransport: async () => ({ read, exchangeReady: async () => true }),
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(read.mock.calls.map(([target]) => target.scope).sort()).toEqual([...WEB_SCOPES].sort());
+    await counts(h);
+    const prewarmed: Record<string, Record<string, number>> = {};
+    for (const line of h.lines()) {
+      for (const [scope, outcomes] of Object.entries(
+        (line.prewarm ?? {}) as Record<string, Record<string, number>>
+      )) {
+        for (const [outcome, n] of Object.entries(outcomes)) {
+          const byOutcome = (prewarmed[scope] ??= {});
+          byOutcome[outcome] = (byOutcome[outcome] ?? 0) + n;
+        }
+      }
+    }
+    expect(prewarmed).toEqual({
+      'bouncer:decide': { ok: 1 },
+      'bouncer:usage.write': { ok: 1 },
+      'bouncer:signup.decide': { unavailable: 1 },
+    });
+  });
+
+  it('starts no read at creation without prewarm', async () => {
+    const h = harness('kilocode-app', WEB_SCOPES);
+    await new Promise(resolve => setImmediate(resolve));
+    expect(h.read).not.toHaveBeenCalled();
+    expect(h.loadTransport).not.toHaveBeenCalled();
   });
 
   it('in sts never holds a refused scope back and counts each refusal under its reason', async () => {
@@ -522,6 +575,34 @@ describe('createBouncerAuth', () => {
         missed: { 'bouncer:decide': { exchange_pending: BOUNCER_BREAKER_THRESHOLD } },
       });
       expect(breakerOpened(h)).toBe(0);
+    });
+
+    it('in sts waits for a cold mint that lands inside the budget and sends its token', async () => {
+      const h = harness();
+      h.flag.value = 'sts';
+      h.exchangeReady.mockResolvedValue(false);
+      const mint = Promise.withResolvers<string>();
+      h.read.mockReturnValue(mint.promise);
+      const pending = h.auth.headers(decideCall);
+      expect(await settledAt(pending, 100)).toBe(false);
+      mint.resolve(TOKEN);
+      await expect(pending).resolves.toEqual({
+        'x-kilo-caller': 'kilocode-app',
+        authorization: `Bearer ${TOKEN}`,
+      });
+      expect(h.exchangeReady).not.toHaveBeenCalled();
+    });
+
+    it('in sts still ends a cold wait at the budget', async () => {
+      const h = harness();
+      h.flag.value = 'sts';
+      h.exchangeReady.mockResolvedValue(false);
+      h.read.mockReturnValue(Promise.withResolvers<string>().promise);
+      const pending = h.auth.headers(decideCall);
+      expect(await settledAt(pending, BOUNCER_TOKEN_WAIT_MS - 1)).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toEqual({ 'x-kilo-caller': 'kilocode-app' });
+      expect(h.lines()[0]).toMatchObject({ missed: { 'bouncer:decide': { timeout: 1 } } });
     });
 
     it('counts a readiness check that outlasts the wait as readiness_timeout, toward the breaker', async () => {

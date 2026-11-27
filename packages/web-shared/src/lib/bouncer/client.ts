@@ -6,6 +6,7 @@ import * as z from 'zod';
 
 import {
   bouncerAuthHeaders,
+  bouncerRefusalBlamesToken,
   bouncerSendsLegacyKey,
   bouncerTokenRefused,
   type BouncerAuthHeaders,
@@ -503,10 +504,11 @@ type PostResult =
  * the call's own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`,
  * `sts-auth.ts`, and only on a route that waits) and the request, so the call never takes longer
  * than `timeoutMs`; that read never fails, and a token goes only to `BOUNCER_STS_ORIGIN`. A 401 or
- * 403 to a call that carried a token is reported with its reason. In `dual` a 401 also makes the
- * auth hold that scope's token back for a while, and a route that waits sends the call once more
- * without the token, within the same deadline; `sts` does neither. That retry and the hold-back go
- * away with the legacy key (main design 9.5).
+ * 403 to a call that carried a token is reported with its reason. In `dual`, when Bouncer blamed
+ * the token (401 `invalid_token`, 403 `insufficient_scope`), the auth also holds that scope's token
+ * back for a while, and a route that waits sends the call once more without the token, within the
+ * same deadline; a 401 naming no token error is the legacy key's failure and gets neither. `sts`
+ * does neither. That retry and the hold-back go away with the legacy key (main design 9.5).
  */
 async function postWithResult(
   path: BouncerApiPath,
@@ -558,9 +560,10 @@ async function postWithResult(
     const refusal = auth.authorization === undefined ? null : tokenRefusal(response);
     if (refusal !== null) {
       bouncerTokenRefused(scope, refusal);
-      // `dual` only: the legacy key still carries a call there. Without it (`sts`) a call without
-      // the token is a certain refusal, so it is never sent.
-      if (legacyKey && refusal.status === 401 && wait) {
+      // `dual` only, and only when Bouncer blamed the token: the legacy key still carries a call
+      // there. A plain 401 is the legacy key's own failure, which a resend with the same key
+      // cannot fix; without the key (`sts`) a call without the token is a certain refusal.
+      if (legacyKey && wait && bouncerRefusalBlamesToken(refusal.reason)) {
         await response.body?.cancel();
         response = await send(
           Object.fromEntries(Object.entries(auth).filter(([name]) => name !== 'authorization'))
@@ -582,20 +585,16 @@ async function postWithResult(
   }
 }
 
-const TOKEN_REFUSAL_ERRORS = new Set(['invalid_token', 'insufficient_scope', 'invalid_request']);
-
 /**
- * Bouncer's refusal of a call's token: a 401 or 403 with the RFC 6750 `error` of its
- * `WWW-Authenticate` header, or the status when it names no known one. Null for any other status.
+ * Bouncer's refusal of a call that carried a token (`BouncerTokenRefusalReason`): a 401 or 403,
+ * read by the RFC 6750 `error` of its `WWW-Authenticate` header. Null for any other status.
  */
 function tokenRefusal(response: Response): BouncerTokenRefusal | null {
   const { status } = response;
   if (status !== 401 && status !== 403) return null;
   const error = /\berror="([a-z_]+)"/.exec(response.headers.get('www-authenticate') ?? '')?.[1];
-  if (error !== undefined && TOKEN_REFUSAL_ERRORS.has(error)) {
-    return { status, reason: error as BouncerTokenRefusal['reason'] };
-  }
-  return { status, reason: status === 401 ? 'http_401' : 'http_403' };
+  if (status === 401) return { status, reason: error === 'invalid_token' ? error : 'legacy_key' };
+  return { status, reason: error === 'insufficient_scope' ? error : 'http_403' };
 }
 
 /** A request that got no answer: a transport error, a timeout, or a secret that could not be read. */

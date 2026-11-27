@@ -397,8 +397,8 @@ describe('Cloud Agent create authorization parity with capability issuance', () 
     new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
       {
-        GITHUB_APP_SLUG: 'kiloconnect',
-        GITHUB_APP_BOT_USER_ID: '240665456',
+        GITHUB_APP_SLUG: 'example-app',
+        GITHUB_APP_BOT_USER_ID: '123',
         SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       } as unknown as CloudflareEnv
     );
@@ -421,7 +421,7 @@ describe('Cloud Agent create authorization parity with capability issuance', () 
     serviceMocks.selectUserAuthorization.mockResolvedValue({
       selected: true,
       token: 'user-token',
-      gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+      gitAuthor: { name: 'Example User', email: 'user-1@example.com' },
     });
   });
 

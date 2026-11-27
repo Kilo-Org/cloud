@@ -122,7 +122,15 @@ describe('providersAndModelsAllowListsReducer', () => {
       nextEnabled: false,
     });
 
-    state = providersAndModelsAllowListsReducer(state, { type: 'MARK_SAVED', modelDenyList: [] });
+    if (state.status !== 'ready') {
+      throw new Error('expected ready state');
+    }
+    const draftProviderAllowList = state.draftProviderAllowList;
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'MARK_SAVED',
+      modelDenyList: [],
+      submitted: { modelDenyList: [], providerAllowList: draftProviderAllowList },
+    });
 
     if (state.status !== 'ready') {
       throw new Error('expected ready state');
@@ -143,6 +151,7 @@ describe('providersAndModelsAllowListsReducer', () => {
     state = providersAndModelsAllowListsReducer(state, {
       type: 'MARK_SAVED',
       modelDenyList: ['anthropic/claude-3-opus', 'openai/new-model'],
+      submitted: { modelDenyList: ['anthropic/claude-3-opus'], providerAllowList: ['openai'] },
     });
 
     if (state.status !== 'ready') {
@@ -151,6 +160,59 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     expect(state.initialModelDenyList).toEqual(['anthropic/claude-3-opus', 'openai/new-model']);
     expect(state.draftModelDenyList).toEqual(state.initialModelDenyList);
+  });
+
+  test('mark saved keeps model and provider edits made after the save was submitted', () => {
+    let state: ProvidersAndModelsAllowListsState = createProvidersAndModelsAllowListsInitialState();
+
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'INIT_FROM_SERVER',
+      modelDenyList: ['openai/removed-later'],
+      providerAllowList: ['openai', 'anthropic'],
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'TOGGLE_MODEL',
+      modelId: 'openai/a',
+      nextAllowed: false,
+    });
+    if (state.status !== 'ready') {
+      throw new Error('expected ready state');
+    }
+    const submitted = {
+      modelDenyList: state.draftModelDenyList,
+      providerAllowList: state.draftProviderAllowList,
+    };
+    // Edits while the request is in flight.
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'TOGGLE_MODEL',
+      modelId: 'openai/b',
+      nextAllowed: false,
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'TOGGLE_MODEL',
+      modelId: 'openai/removed-later',
+      nextAllowed: true,
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'TOGGLE_PROVIDER',
+      providerSlug: 'anthropic',
+      nextEnabled: false,
+    });
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'MARK_SAVED',
+      // The server also merged in an automatic deny.
+      modelDenyList: ['openai/a', 'openai/auto', 'openai/removed-later'],
+      submitted,
+    });
+
+    if (state.status !== 'ready') {
+      throw new Error('expected ready state');
+    }
+
+    expect(state.initialModelDenyList).toEqual(['openai/a', 'openai/auto', 'openai/removed-later']);
+    expect(state.draftModelDenyList).toEqual(['openai/a', 'openai/auto', 'openai/b']);
+    expect(state.initialProviderAllowList).toEqual(['anthropic', 'openai']);
+    expect(state.draftProviderAllowList).toEqual(['openai']);
   });
 
   test('bulk model action updates the draft in one dispatch and reset restores it', () => {

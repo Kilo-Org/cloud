@@ -82,7 +82,13 @@ export type ProvidersAndModelsAllowListsAction =
     }
   | {
       type: 'MARK_SAVED';
+      /** The deny list the server answered with. */
       modelDenyList: ReadonlyArray<string>;
+      /** The lists the save request carried, to tell which edits came after it. */
+      submitted: {
+        modelDenyList: ReadonlyArray<string>;
+        providerAllowList: ReadonlyArray<string>;
+      };
     }
   | {
       type: 'SET_MODEL_SEARCH';
@@ -225,11 +231,25 @@ export function providersAndModelsAllowListsReducer(
       if (state.status !== 'ready') return state;
       // The server list is authoritative: it can include automatic denies merged in on save.
       const savedModelDenyList = canonicalizeDenyList(action.modelDenyList);
+      // The editor stays interactive while the save is pending, so edits made
+      // after submission are rebased onto the server list instead of dropped:
+      // the draft keeps what the save did not carry, and stays dirty for it.
+      const submittedModelDenyList = new Set(canonicalizeDenyList(action.submitted.modelDenyList));
+      const currentModelDenyList = new Set(state.draftModelDenyList);
+      const removedAfterSubmit = new Set(
+        [...submittedModelDenyList].filter(id => !currentModelDenyList.has(id))
+      );
+      const addedAfterSubmit = state.draftModelDenyList.filter(
+        id => !submittedModelDenyList.has(id)
+      );
       return {
         ...state,
-        draftModelDenyList: savedModelDenyList,
+        draftModelDenyList: sortUniqueStrings([
+          ...savedModelDenyList.filter(id => !removedAfterSubmit.has(id)),
+          ...addedAfterSubmit,
+        ]),
         initialModelDenyList: savedModelDenyList,
-        initialProviderAllowList: state.draftProviderAllowList,
+        initialProviderAllowList: canonicalizeProviderAllowList(action.submitted.providerAllowList),
       };
     }
 
@@ -253,6 +273,14 @@ export function providersAndModelsAllowListsReducer(
       return { ...state, infoProviderSlug: action.value };
   }
 }
+
+export type MarkSavedParams = {
+  modelDenyList: ReadonlyArray<string>;
+  submitted: {
+    modelDenyList: ReadonlyArray<string>;
+    providerAllowList: ReadonlyArray<string>;
+  };
+};
 
 export type ProvidersAndModelsAllowListsSelectors = {
   allProviderSlugsWithEndpoints: string[];
@@ -279,7 +307,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
     setModelsAllowed: (params: { modelIds: ReadonlyArray<string>; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
-    markSaved: (params: { modelDenyList: ReadonlyArray<string> }) => void;
+    markSaved: (params: MarkSavedParams) => void;
     setModelSearch: (value: string) => void;
     setModelSelectedOnly: (value: boolean) => void;
     setInfoModelId: (value: string | null) => void;
@@ -405,8 +433,12 @@ export function useProvidersAndModelsAllowListsState(params: {
       toggleModel,
       setModelsAllowed,
       resetToInitial: () => dispatch({ type: 'RESET_TO_INITIAL' }),
-      markSaved: (saved: { modelDenyList: ReadonlyArray<string> }) =>
-        dispatch({ type: 'MARK_SAVED', modelDenyList: saved.modelDenyList }),
+      markSaved: (saved: MarkSavedParams) =>
+        dispatch({
+          type: 'MARK_SAVED',
+          modelDenyList: saved.modelDenyList,
+          submitted: saved.submitted,
+        }),
       setModelSearch: (value: string) => dispatch({ type: 'SET_MODEL_SEARCH', value }),
       setModelSelectedOnly: (value: boolean) =>
         dispatch({ type: 'SET_MODEL_SELECTED_ONLY', value }),

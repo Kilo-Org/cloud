@@ -35,9 +35,10 @@ scopes:
 # subject's sessions and credentials (uts), and signs its kilo-web client assertion with
 # UTS_KILO_WEB_CLIENT_KEY (UTS_KILO_WEB_CLIENT_KEY_NEXT during a rotation).
 # Bouncer (repo Kilo-Org/bouncer) runs in production only and accepts only production STS tokens,
-# so its four scopes are a production grant: the shared Bouncer client sends one token per call
-# (decide, charge-decide and release; usage and credit events; signup decide; signup history),
-# beside the legacy key while Bouncer runs STS_AUTH=dual.
+# so its scopes are a production grant: the shared Bouncer client sends one token per call
+# (bouncer:decide for decide, charge-decide and release; bouncer:usage.write for usage and credit
+# events; bouncer:signup.decide for signup), beside the legacy key while Bouncer runs
+# STS_AUTH=dual. The web app makes no signup-history call, so it holds no bouncer:signup.history.
 environmentGrants:
   development:
     audiences:
@@ -58,4 +59,3 @@ environmentGrants:
       - bouncer:decide
       - bouncer:usage.write
       - bouncer:signup.decide
-      - bouncer:signup.history

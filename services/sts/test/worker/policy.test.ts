@@ -108,7 +108,6 @@ describe('policy token grants', () => {
         'bouncer:decide',
         'bouncer:usage.write',
         'bouncer:signup.decide',
-        'bouncer:signup.history',
       ],
     });
   });
@@ -1328,7 +1327,6 @@ scopes: ['gateway:models.read']
         'bouncer:decide',
         'bouncer:usage.write',
         'bouncer:signup.decide',
-        'bouncer:signup.history',
       ],
       secrets: [],
     });

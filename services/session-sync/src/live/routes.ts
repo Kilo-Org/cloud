@@ -26,7 +26,7 @@ function error(code: string, message: string, status = 400): Response {
   return json({ error: { code, message } }, status);
 }
 async function principal(c: C): Promise<Principal | Response> {
-  const auth = await authorize(c.req.raw, c.env);
+  const auth = await authorize(c.req.raw, c.env, requestContext(c));
   if (auth instanceof Response) return auth;
   return (await rateLimit(c.env.USER_REQUEST_LIMITER, auth.userID)) ?? auth;
 }

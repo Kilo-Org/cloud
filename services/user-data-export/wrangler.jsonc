@@ -38,10 +38,10 @@
     "R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "R2_BUCKET_NAME": "user-data-export",
     "USER_DATA_EXPORT_WEB_URL": "https://api.kilo.ai",
-    // Where every runtime secret read goes: `env` (the Worker secrets below) or `sts` (the bundle
-    // over the `STS` binding). An absent value means `env`; any other value refuses every read.
-    // The `sts` source never falls back to the legacy binding.
-    "SECRETS_SOURCE": "env",
+    // Where every runtime secret read goes: `secrets-store` (the Worker secrets below) or `sts`
+    // (the bundle over the `STS` binding). An absent value means `secrets-store`; any other value
+    // refuses every read. The `sts` source never falls back to the legacy binding.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "services": [
     // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is

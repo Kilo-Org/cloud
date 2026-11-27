@@ -490,8 +490,6 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
-| `cloudflare-security-sync` | production | `services/security-sync/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
-| `cloudflare-webhook-agent-ingest` | production | `services/webhook-agent-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `kilo-code-review-worker` | production | `services/code-review-infra/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
 | `session-sync` | production | `services/session-sync/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `user-data-export` | production | `services/user-data-export/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |

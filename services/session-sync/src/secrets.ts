@@ -7,8 +7,9 @@ import {
 
 /**
  * Every secret this Worker reads, by its STS bundle name (design 4.7: canonical names, no
- * environment suffix) mapped to the binding it reads today. All three resolve from `/shared`; the
- * internal API secret keeps the `_PROD` name its Secrets Store binding already uses.
+ * environment suffix) mapped to the binding it reads today. `NEXTAUTH_SECRET` and
+ * `INTERNAL_API_SECRET` resolve from `/shared` (the internal API secret keeps the `_PROD` name its
+ * Secrets Store binding already uses); `SESSION_SYNC_SECRET` from `/workloads/session-sync`.
  * services/sts/policy/session-sync.yaml grants them.
  */
 const BINDINGS = {
@@ -25,29 +26,47 @@ type BindingName = (typeof BINDINGS)[SessionSyncSecretName];
 type LegacySecretValue = string | { get(): Promise<string> };
 
 /**
- * `SECRETS_SOURCE` selects where every read goes: `env` reads the binding the deployment holds
- * today, `sts` reads the bundle over the `STS` service binding. An absent value means `env`, so
- * merging this path changes nothing until secrets-cutover flips the variable. The `sts` source
- * never falls back to the legacy binding: a failed bundle read fails the read.
+ * `SECRETS_SOURCE` selects where every read goes: `secrets-store` reads the binding the deployment
+ * holds today, `sts` reads the bundle over the `STS` service binding. An absent value means
+ * `secrets-store`, so merging this path changes nothing until secrets-cutover flips the variable.
+ * The `sts` source never falls back to the legacy binding: a failed bundle read fails the read.
  */
 export type SessionSyncSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {
   SECRETS_SOURCE?: string;
   STS?: BundleBinding;
 };
 
-export type SecretsSource = 'env' | 'sts';
+export type SecretsSource = 'secrets-store' | 'sts';
 
 /** Fails closed: an unrecognised value refuses every read instead of guessing a source. */
 export function secretsSource(env: Pick<SessionSyncSecretsEnv, 'SECRETS_SOURCE'>): SecretsSource {
-  const source = env.SECRETS_SOURCE ?? 'env';
-  if (source !== 'env' && source !== 'sts') {
-    throw new Error('SECRETS_SOURCE must be either "env" or "sts"');
+  const source = env.SECRETS_SOURCE ?? 'secrets-store';
+  if (source !== 'secrets-store' && source !== 'sts') {
+    throw new Error('SECRETS_SOURCE must be either "secrets-store" or "sts"');
   }
   return source;
 }
 
 /** One client per binding keeps one bundle per isolate across requests. */
 const stsClients = new WeakMap<BundleBinding, Secrets>();
+
+/**
+ * One resolved value per binding per isolate, keyed by the binding itself. The `secrets-store`
+ * source reads each Secrets Store item once, as `src/auth.ts` did before this switch (its
+ * `resolvedSecrets`), and returns the held value on every later read in the isolate. A failed read
+ * is not held, so the next read retries. The `sts` source needs no cache of its own: the client
+ * holds the bundle.
+ */
+const resolvedValues = new WeakMap<object, string>();
+
+async function legacyValue(value: LegacySecretValue): Promise<string> {
+  if (typeof value === 'string') return value;
+  const held = resolvedValues.get(value);
+  if (held !== undefined) return held;
+  const resolved = await value.get();
+  resolvedValues.set(value, resolved);
+  return resolved;
+}
 
 /**
  * Reads one secret from the selected source and returns it as stored, empty included, so every
@@ -77,5 +96,5 @@ export async function readSessionSyncSecret(
   if (value === undefined) {
     throw new Error(`${bindingName} is not configured`);
   }
-  return typeof value === 'string' ? value : value.get();
+  return legacyValue(value);
 }

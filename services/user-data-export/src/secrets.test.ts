@@ -50,10 +50,10 @@ function legacyEnv(secret: { get(): Promise<string> }) {
 
 describe('secretsSource', () => {
   it('defaults to the legacy binding source', () => {
-    expect(secretsSource({})).toBe('env');
+    expect(secretsSource({})).toBe('secrets-store');
   });
 
-  it.each(['env', 'sts'] as const)('accepts %s', source => {
+  it.each(['secrets-store', 'sts'] as const)('accepts %s', source => {
     expect(secretsSource({ SECRETS_SOURCE: source })).toBe(source);
   });
 

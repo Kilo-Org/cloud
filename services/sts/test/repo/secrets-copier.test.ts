@@ -2,24 +2,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { experimental_readRawConfig } from 'wrangler';
 import { readCodeReviewInfraSecret } from '../../../code-review-infra/src/secrets';
-import { readSecuritySyncSecret } from '../../../security-sync/src/secrets';
 import { readSessionSyncSecret } from '../../../session-sync/src/secrets';
 import { readUserDataExportSecret } from '../../../user-data-export/src/secrets';
-import { readWebhookAgentIngestSecret } from '../../../webhook-agent-ingest/src/secrets';
 import { PolicySchema, type Policy } from '../../src/policy/schema';
 import { repoRoot, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
-
-/**
- * The three names STS serves from `/shared`; every other name resolves from the Worker's own
- * `/workloads/<workload>` folder (src/policy/schema.ts `bundleFolder`). A copier row's STS lookup
- * name is therefore the canonical name itself, placed in the folder this list selects.
- */
-const SHARED_NAMES: readonly string[] = [
-  'INTERNAL_API_SECRET',
-  'NEXTAUTH_SECRET',
-  'CALLBACK_TOKEN_SECRET',
-];
 
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
@@ -31,7 +18,7 @@ type CopierRow = {
   oldBinding: string;
   /** The Secrets Store `secret_name` behind that binding, or `—` for a plain Worker secret. */
   storeSecretName: string;
-  /** The STS bundle name, which is also the Infisical key in the target path below. */
+  /** The STS bundle name, which is also the Infisical key, and the path the copier copies into. */
   stsLookup: string;
   /** The entry services/sts/policy/<workload>.yaml grants. */
   policyEntry: string;
@@ -54,6 +41,19 @@ function shippedPolicies(): Map<string, Policy> {
     })
   );
 }
+
+/** Which shipped policies grant each name: several holders means the value is a shared one. */
+function holdersBySecretName(): Map<string, string[]> {
+  const holders = new Map<string, string[]>();
+  for (const policy of shippedPolicies().values()) {
+    for (const name of policy.secrets) {
+      holders.set(name, [...(holders.get(name) ?? []), policy.workload]);
+    }
+  }
+  return holders;
+}
+
+const HOLDERS = holdersBySecretName();
 
 /**
  * Proves one Worker's rows against the three sources the copier table claims to agree: the shipped
@@ -101,14 +101,20 @@ async function proveWorker<N extends string>(worker: {
     if (binding === undefined) throw new Error(`no binding serves ${worker.workload}: ${name}`);
 
     const entry = storeEntries.find(candidate => candidate.binding === binding);
-    // Manifest ↔ store name: a Secrets Store binding names the secret after the binding or after
-    // its `_PROD` alias, and nothing else.
+    // Manifest ↔ store name: a production block binds the live item, never a dev or staging copy.
+    // The item's name is the binding's own name or its `_PROD` alias; the table records it verbatim.
     if (entry !== undefined) {
       expect([binding, `${binding}_PROD`], `${worker.workload}: ${name}`).toContain(
         entry.secret_name
       );
+    } else {
+      // A plain Worker secret carries the policy name itself: a `_PROD` binding with no store entry
+      // would mean the copier copies a name the deployment does not hold.
+      expect(binding, `${worker.workload}: ${name}`).toBe(name);
     }
-    const shared = SHARED_NAMES.includes(name);
+    // Folder: a name several policies grant cannot live in one Workload's folder, and a name only
+    // this Workload grants stays in its own.
+    const shared = (HOLDERS.get(name)?.length ?? 0) > 1;
     rows.push({
       workload: worker.workload,
       oldBinding: binding,
@@ -134,12 +140,6 @@ describe('the secrets copier table for the Workers that read STS', () => {
   it('maps every policy secret to one binding and one store name in its wrangler manifest', async () => {
     const rows = [
       ...(await proveWorker({
-        workload: 'cloudflare-security-sync',
-        configPath: 'services/security-sync/wrangler.jsonc',
-        names: ['INTERNAL_API_SECRET'],
-        read: readSecuritySyncSecret,
-      })),
-      ...(await proveWorker({
         workload: 'session-sync',
         configPath: 'services/session-sync/wrangler.jsonc',
         names: ['NEXTAUTH_SECRET', 'SESSION_SYNC_SECRET', 'INTERNAL_API_SECRET'],
@@ -157,12 +157,6 @@ describe('the secrets copier table for the Workers that read STS', () => {
         read: readUserDataExportSecret,
       })),
       ...(await proveWorker({
-        workload: 'cloudflare-webhook-agent-ingest',
-        configPath: 'services/webhook-agent-ingest/wrangler.jsonc',
-        names: ['INTERNAL_API_SECRET', 'CALLBACK_TOKEN_SECRET', 'NEXTAUTH_SECRET'],
-        read: readWebhookAgentIngestSecret,
-      })),
-      ...(await proveWorker({
         workload: 'kilo-code-review-worker',
         configPath: 'services/code-review-infra/wrangler.jsonc',
         names: ['INTERNAL_API_SECRET', 'CALLBACK_TOKEN_SECRET', 'BACKEND_AUTH_TOKEN'],
@@ -176,9 +170,23 @@ describe('the secrets copier table for the Workers that read STS', () => {
     expect(rows.map(row => `${row.workload}|${row.oldBinding}`)).toEqual([
       ...new Set(rows.map(row => `${row.workload}|${row.oldBinding}`)),
     ]);
-    expect(rows).toHaveLength(1 + 3 + 4 + 3 + 3);
+    expect(rows).toHaveLength(3 + 4 + 3);
     for (const row of rows) {
       expect(policies.get(row.workload)?.secrets, row.workload).toContain(row.policyEntry);
+      // The published table's fourth column is the lookup name; the path column is derived from
+      // how many policies grant the name, so a value copied anywhere else is a copier mistake.
+      expect(row.stsLookup.split('/').at(-1), row.workload).toBe(row.policyEntry);
     }
+    // The plain-Worker-secret rows and the store rows both appear: the table's second column must
+    // not claim a store item for a name the manifest does not bind one to.
+    expect(rows.filter(row => row.storeSecretName === '—').map(row => row.policyEntry)).toEqual([
+      'INTERNAL_API_SECRET',
+      'NEXTAUTH_SECRET',
+      'R2_ACCESS_KEY_ID',
+      'R2_SECRET_ACCESS_KEY',
+      'INTERNAL_API_SECRET',
+      'CALLBACK_TOKEN_SECRET',
+      'BACKEND_AUTH_TOKEN',
+    ]);
   });
 });

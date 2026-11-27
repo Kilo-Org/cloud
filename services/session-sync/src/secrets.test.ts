@@ -48,10 +48,10 @@ function legacyEnv(secret: { get(): Promise<string> }) {
 
 describe('secretsSource', () => {
   it('defaults to the legacy binding source', () => {
-    expect(secretsSource({})).toBe('env');
+    expect(secretsSource({})).toBe('secrets-store');
   });
 
-  it.each(['env', 'sts'] as const)('accepts %s', source => {
+  it.each(['secrets-store', 'sts'] as const)('accepts %s', source => {
     expect(secretsSource({ SECRETS_SOURCE: source })).toBe(source);
   });
 
@@ -77,14 +77,23 @@ describe('readSessionSyncSecret', () => {
       expect(store.get).toHaveBeenCalledOnce();
       expect(sts.getBundle).toHaveBeenCalledOnce();
 
-      // Flipping the variable back reads the legacy binding again.
-      expect(await readSessionSyncSecret({ ...env, SECRETS_SOURCE: 'env' }, name)).toBe(
+      // Flipping the variable back reads the legacy binding, whose value the isolate already holds.
+      expect(await readSessionSyncSecret({ ...env, SECRETS_SOURCE: 'secrets-store' }, name)).toBe(
         'legacy-value'
       );
-      expect(store.get).toHaveBeenCalledTimes(2);
+      expect(store.get).toHaveBeenCalledOnce();
       expect(sts.getBundle).toHaveBeenCalledOnce();
     }
   );
+
+  it.each(NAMES)('holds the resolved %s for the isolate, not the pending read', async name => {
+    const store = storeSecret('legacy-value');
+    const env = legacyEnv(store.secret);
+
+    expect(await readSessionSyncSecret(env, name)).toBe('legacy-value');
+    expect(await readSessionSyncSecret(env, name)).toBe('legacy-value');
+    expect(store.get).toHaveBeenCalledOnce();
+  });
 
   it('reads a plain Worker secret, which arrives as a string', async () => {
     expect(await readSessionSyncSecret({ NEXTAUTH_SECRET: 'plain-value' }, 'NEXTAUTH_SECRET')).toBe(

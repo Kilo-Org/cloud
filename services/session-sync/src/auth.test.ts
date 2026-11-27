@@ -164,7 +164,7 @@ describe('authorize', () => {
     ).toEqual({ status: 503, code: 'auth_unavailable' });
   });
 
-  it('retries a failed secret read on the next request', async () => {
+  it('retries a failed secret fetch and caches only the resolved value', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const get = vi
       .fn<() => Promise<string>>()
@@ -183,7 +183,7 @@ describe('authorize', () => {
     await expect(authorize(dataRequest(token), bindingEnv)).resolves.toMatchObject({
       userID: USER,
     });
-    expect(get).toHaveBeenCalledTimes(3);
+    expect(get).toHaveBeenCalledTimes(2);
   });
 });
 

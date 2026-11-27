@@ -1,7 +1,8 @@
 # The kilo-code-review-worker Worker (services/code-review-infra/wrangler.jsonc). It reads its
-# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the plain
-# Worker secrets) until secrets-cutover flips it. INTERNAL_API_SECRET and CALLBACK_TOKEN_SECRET
-# resolve from /shared; BACKEND_AUTH_TOKEN resolves from /workloads/kilo-code-review-worker.
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the
+# plain Worker secrets) until secrets-cutover flips it. INTERNAL_API_SECRET and
+# CALLBACK_TOKEN_SECRET resolve from /shared; BACKEND_AUTH_TOKEN resolves from
+# /workloads/kilo-code-review-worker.
 workload: kilo-code-review-worker
 environments:
   - production

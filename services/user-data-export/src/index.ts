@@ -31,34 +31,56 @@ function authorized(request: Request, expected: string): boolean {
   return timingSafeEqual(received, expected);
 }
 
+/**
+ * The outcome of authenticating one request. A secret read that fails (a missing binding, an
+ * unrecognised `SECRETS_SOURCE`, an unavailable STS bundle) is a dependency failure the sender
+ * retries; a bad or missing credential is the caller's problem. They answer differently, so a
+ * cutover rollback or an STS outage is not reported as an authorization failure.
+ */
+type Authentication =
+  | { status: 'authenticated'; userId: string }
+  | { status: 'unauthorized' }
+  | { status: 'unavailable' };
+
 async function authenticatedUserId(
   request: Request,
   env: ExportEnv,
   ctx?: SecretsExecutionContext
-): Promise<string | null> {
+): Promise<Authentication> {
+  let internalApiSecret: string;
   try {
-    const internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
-    if (!authorized(request, internalApiSecret)) return null;
-    const token = extractBearerToken(request.headers.get('authorization'));
-    if (!token) return null;
-    const payload = await verifyKiloToken(
-      token,
-      await readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx),
-      { audience: USER_DATA_EXPORT_AUDIENCE }
-    );
-    const now = Math.floor(Date.now() / 1000);
-    if (
-      payload.iat === undefined ||
-      payload.exp === undefined ||
-      payload.iat > now + 30 ||
-      payload.exp - payload.iat > USER_DATA_EXPORT_ASSERTION_TTL_SECONDS
-    ) {
-      return null;
-    }
-    return payload.kiloUserId;
+    internalApiSecret = await readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx);
   } catch {
-    return null;
+    return { status: 'unavailable' };
   }
+  if (!authorized(request, internalApiSecret)) return { status: 'unauthorized' };
+  const token = extractBearerToken(request.headers.get('authorization'));
+  if (!token) return { status: 'unauthorized' };
+
+  let nextAuthSecret: string;
+  try {
+    nextAuthSecret = await readUserDataExportSecret(env, 'NEXTAUTH_SECRET', ctx);
+  } catch {
+    return { status: 'unavailable' };
+  }
+  const verified = await verifyKiloToken(token, nextAuthSecret, {
+    audience: USER_DATA_EXPORT_AUDIENCE,
+  }).then(
+    payload => ({ payload }),
+    () => undefined
+  );
+  if (verified === undefined) return { status: 'unauthorized' };
+  const { payload } = verified;
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    payload.iat === undefined ||
+    payload.exp === undefined ||
+    payload.iat > now + 30 ||
+    payload.exp - payload.iat > USER_DATA_EXPORT_ASSERTION_TTL_SECONDS
+  ) {
+    return { status: 'unauthorized' };
+  }
+  return { status: 'authenticated', userId: payload.kiloUserId };
 }
 
 async function dispatchExport(
@@ -110,14 +132,25 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') {
       return Response.json({ ok: true, service: 'user-data-export' });
     }
-    const kiloUserId = await authenticatedUserId(request, env, ctx);
-    if (!kiloUserId) {
+    const authentication = await authenticatedUserId(request, env, ctx);
+    if (authentication.status === 'unavailable') {
+      logExportEvent('error', 'export_http_auth_unavailable', {
+        method: request.method,
+        path: url.pathname,
+      });
+      return Response.json(
+        { error: 'Authentication unavailable' },
+        { status: 503, headers: { 'Retry-After': '30' } }
+      );
+    }
+    if (authentication.status !== 'authenticated') {
       logExportEvent('warn', 'export_http_unauthorized', {
         method: request.method,
         path: url.pathname,
       });
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const kiloUserId = authentication.userId;
     try {
       if (request.method === 'POST' && url.pathname === '/internal/exports/dispatch') {
         const parsed = AdmitExportSchema.safeParse(await readJson(request));

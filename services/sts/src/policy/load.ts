@@ -81,7 +81,7 @@ function canonicalIdentity(policy: Policy): string {
     case 'fly-oidc':
       return `fly-oidc|${identity.org}|${identity.orgId}|${identity.app}|${identity.appId}`;
     case 'github-oidc':
-      return `github-oidc|${identity.repository}|${identity.repositoryId}|${identity.repositoryOwnerId}|${identity.environment ?? ''}|${sortedList(identity.refs)}|${sortedList(identity.jobWorkflowRefs)}|${sortedList(identity.events)}`;
+      return `github-oidc|${identity.repository}|${identity.repositoryId}|${identity.repositoryOwnerId}|${identity.environment ?? ''}|${sortedList(identity.refs)}|${sortedList(identity.jobWorkflowRefs)}|${sortedList(identity.events)}${identity.legacySubject === true ? '|legacy-subject' : ''}`;
     case 'vercel-oidc':
       return `vercel-oidc|${identity.teamSlug}|${identity.teamId}|${identity.projectId}|${identity.projectName}|${sortedList(identity.environments.map(vercelEnvironmentKey))}`;
   }

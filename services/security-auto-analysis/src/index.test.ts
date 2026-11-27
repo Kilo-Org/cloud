@@ -109,17 +109,19 @@ describe('scheduled dispatcher', () => {
       enqueuedRemediationMessages: 3,
     });
 
+    const executionCtx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
     await expect(
       worker.scheduled(
         { cron: '* * * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
-        { ENVIRONMENT: 'development' } as CloudflareEnv
+        { ENVIRONMENT: 'development' } as CloudflareEnv,
+        executionCtx
       )
     ).resolves.toBeUndefined();
     const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
     expect(dispatchDueOwners).toHaveBeenCalledWith(
       expect.objectContaining({ ENVIRONMENT: 'development' }),
       dispatchId,
-      undefined
+      executionCtx
     );
     expect(
       JSON.parse(

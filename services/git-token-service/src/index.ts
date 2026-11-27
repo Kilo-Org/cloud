@@ -55,7 +55,6 @@ import {
 import { DEFAULT_GITLAB_INSTANCE_URL } from '@kilocode/worker-utils/gitlab-url';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
 import { readGitTokenServiceSecret } from './secrets';
-import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { isGitHubDisconnectAssertion } from './github-disconnect-assertion.js';
 import {
   GitLabSessionCapabilityCodec,
@@ -522,7 +521,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private gitlabCredentialResolver: GitLabCredentialBroker;
   private githubUserAuthorizationService: GitHubUserAuthorizationService;
   /** The invocation context every secret read from this entrypoint runs under. */
-  private readonly secretsCtx: SecretsExecutionContext;
+  private readonly secretsCtx: ExecutionContext;
 
   constructor(ctx: ExecutionContext, env: CloudflareEnv) {
     super(ctx, env);

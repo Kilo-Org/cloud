@@ -1155,6 +1155,7 @@ export async function recoverStaleRemediationLaunchAttempts(
         cancelledCount += 1;
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'cancelled',
@@ -1182,6 +1183,7 @@ export async function recoverStaleRemediationLaunchAttempts(
         failedCount += 1;
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'failed',
@@ -1559,6 +1561,7 @@ export async function processRemediationAttempt(params: {
       if (applied) {
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'blocked',
@@ -1580,6 +1583,7 @@ export async function processRemediationAttempt(params: {
       if (applied) {
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'blocked',
@@ -1601,6 +1605,7 @@ export async function processRemediationAttempt(params: {
       if (transition.terminal) {
         await emitRemediationTerminalLifecycleEvent({
           env: params.env,
+          ctx: params.ctx,
           db,
           attempt,
           status: 'failed',
@@ -1620,6 +1625,7 @@ export async function processRemediationAttempt(params: {
     if (transition.terminal) {
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'failed',
@@ -1674,6 +1680,7 @@ export async function processRemediationAttempt(params: {
     if (transition.terminal) {
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'failed',
@@ -2407,6 +2414,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       });
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'cancelled',
@@ -2423,10 +2431,10 @@ export async function finalizeRemediationCallbackFromEnv(params: {
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
     await emitRemediationTerminalLifecycleEvent({
       env: params.env,
+      ctx: params.ctx,
       db,
       attempt,
       status: 'failed',
-      ctx: params.ctx,
     });
     return { status: 'failed-finalized' };
   }
@@ -2442,10 +2450,10 @@ export async function finalizeRemediationCallbackFromEnv(params: {
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
     await emitRemediationTerminalLifecycleEvent({
       env: params.env,
+      ctx: params.ctx,
       db,
       attempt,
       status: 'failed',
-      ctx: params.ctx,
     });
     return { status: 'failed-finalized' };
   }
@@ -2471,10 +2479,10 @@ export async function finalizeRemediationCallbackFromEnv(params: {
     await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
     await emitRemediationTerminalLifecycleEvent({
       env: params.env,
+      ctx: params.ctx,
       db,
       attempt,
       status: 'failed',
-      ctx: params.ctx,
     });
     return { status: 'failed-finalized' };
   }
@@ -2489,6 +2497,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
   await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: result.status });
   await emitRemediationTerminalLifecycleEvent({
     env: params.env,
+    ctx: params.ctx,
     db,
     attempt,
     status: result.status,
@@ -2767,6 +2776,7 @@ export async function cancelRemediation(params: {
       });
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
+        ctx: params.ctx,
         db,
         attempt,
         status: 'cancelled',

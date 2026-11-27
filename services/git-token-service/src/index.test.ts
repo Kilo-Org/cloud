@@ -200,6 +200,7 @@ describe('Bitbucket repository-list HTTP authorization', () => {
       audience: 'git-token-service:bitbucket-repositories',
       extra: { organizationId: '123e4567-e89b-12d3-a456-426614174030' },
     });
+    const executionCtx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
     const response = await gitTokenServiceWorker.fetch(
       new Request('https://git-token-service.test/internal/bitbucket/repositories', {
         method: 'POST',
@@ -209,7 +210,8 @@ describe('Bitbucket repository-list HTTP authorization', () => {
         },
         body: JSON.stringify({ orgId: '123e4567-e89b-12d3-a456-426614174099' }),
       }),
-      env
+      env,
+      executionCtx
     );
 
     expect(response.status).toBe(200);
@@ -221,7 +223,7 @@ describe('Bitbucket repository-list HTTP authorization', () => {
         orgId: '123e4567-e89b-12d3-a456-426614174030',
       },
       undefined,
-      undefined
+      executionCtx
     );
   });
 

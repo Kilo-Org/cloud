@@ -56,7 +56,7 @@ async function handleFetch(
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const result = await dispatchDueOwners(env);
+    const result = await dispatchDueOwners(env, undefined, ctx);
     return Response.json({
       success: true,
       ...result,

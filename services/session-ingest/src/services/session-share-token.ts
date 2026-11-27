@@ -126,7 +126,7 @@ async function getSessionShareSecret(
 ): Promise<string> {
   const secret = await readSessionIngestSecret(env, 'SESSION_SHARE_JWT_SECRET', ctx);
   if (!secret) {
-    throw new Error('SESSION_SHARE_JWT_SECRET_PROD is not configured');
+    throw new Error('SESSION_SHARE_JWT_SECRET is not configured');
   }
   return secret;
 }

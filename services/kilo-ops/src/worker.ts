@@ -1,6 +1,8 @@
 import { Container, ContainerProxy } from '@cloudflare/containers';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { Hono } from 'hono';
 import { withCloudflareAccess } from './cf-access.middleware';
+import { readKiloOpsSecret, type KiloOpsSecretName } from './secrets';
 
 export { ContainerProxy };
 
@@ -28,7 +30,7 @@ export class GrafanaContainer extends Container<Env> {
       state.status !== 'running' && state.status !== 'healthy' && state.status !== 'stopping';
 
     if (needsStart) {
-      const gfSecretKey = await resolveSecret(this.env.GF_SECRET_KEY);
+      const gfSecretKey = await resolveSecret(this.env, 'GF_SECRET_KEY', this.ctx);
       if (!gfSecretKey) {
         return new Response('Grafana secrets unavailable; cannot start container', {
           status: 503,
@@ -60,7 +62,7 @@ GrafanaContainer.outboundByHost = {
       return new Response('method not allowed', { status: 405 });
     }
 
-    const token = await resolveSecret(env.CF_ANALYTICS_API_KEY);
+    const token = await resolveSecret(env, 'O11Y_CF_AE_API_TOKEN');
     if (!token) {
       return new Response('Analytics Engine token unavailable', { status: 503 });
     }
@@ -85,13 +87,16 @@ function getGrafanaContainerStub(env: Env, country: string) {
   return env.GRAFANA_CONTAINER.get(env.GRAFANA_CONTAINER.idFromName(`grafana-${country}`));
 }
 
-async function resolveSecret(binding: SecretsStoreSecret | string): Promise<string | null> {
-  if (typeof binding === 'string') return binding;
+async function resolveSecret(
+  env: Env,
+  name: KiloOpsSecretName,
+  ctx?: SecretsExecutionContext
+): Promise<string | null> {
   try {
-    return await binding.get();
+    return await readKiloOpsSecret(env, name, ctx);
   } catch (err) {
     console.error(
-      '[resolveSecret] Secrets Store fetch failed:',
+      '[resolveSecret] secret read failed:',
       err instanceof Error ? err.message : err
     );
     return null;

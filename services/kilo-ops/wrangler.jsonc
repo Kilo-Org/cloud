@@ -15,11 +15,9 @@
       "persist": true,
       "invocation_logs": true,
     },
-    "traces": {
-      "enabled": true,
-      "persist": true,
-      "head_sampling_rate": 1,
-    },
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "upload_source_maps": true,
   "routes": [
@@ -58,7 +56,24 @@
     "CF_CLICKHOUSE_URL": "https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/analytics_engine/sql",
     "CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "GF_SERVER_ROOT_URL": "https://ops.kiloapps.io/",
+    // Where every runtime secret read goes: `env` (the Secrets Store bindings below) or `sts` (the
+    // bundle over the `STS` binding). An absent value means `env`; any other value refuses every
+    // read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "env",
   },
+
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is what
+  // STS authorizes on and must equal this Worker's top-level name; services/sts/policy/kilo-ops.yaml
+  // grants CF_ANALYTICS_API_KEY's secret (O11Y_CF_AE_API_TOKEN) and GF_SECRET_KEY. Nothing reads it
+  // while SECRETS_SOURCE is `env`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "kilo-ops" },
+    },
+  ],
 
   "secrets_store_secrets": [
     {
@@ -107,12 +122,16 @@
         {
           "binding": "CF_ANALYTICS_API_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "O11Y_CF_AE_API_TOKEN",
+          // A dev-only analytics token. A non-production block of a config that binds STS reads no
+          // production-named store secret (services/sts/test/repo/worker-configs.ts); this entry
+          // must exist before `wrangler deploy --env dev`.
+          "secret_name": "O11Y_CF_AE_API_TOKEN_DEV",
         },
         {
           "binding": "GF_SECRET_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "GF_SECRET_KEY",
+          // A fresh random Grafana secret key for dev deployments only.
+          "secret_name": "GF_SECRET_KEY_DEV",
         },
       ],
     },

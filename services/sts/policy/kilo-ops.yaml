@@ -1,4 +1,20 @@
-# Registration only: services/kilo-ops/wrangler.jsonc. No environment, identity or grant.
+# The kilo-ops Worker (services/kilo-ops/wrangler.jsonc). It reads its runtime secrets over the
+# `STS` SecretsBroker binding; SECRETS_SOURCE stays `env` (the Secrets Store bindings) until
+# secrets-cutover flips it.
+#
+# `O11Y_CF_AE_API_TOKEN` is the shared Cloudflare analytics token (bound as `CF_ANALYTICS_API_KEY`)
+# and resolves from /shared; `GF_SECRET_KEY` is this Worker's own Grafana key in
+# /workloads/kilo-ops.
+#
+# Before `wrangler deploy --env dev` works, the Secrets Store needs `O11Y_CF_AE_API_TOKEN_DEV` (a new
+# dev-scoped analytics token) and `GF_SECRET_KEY_DEV` (a new random Grafana key); the dev block reads
+# those names because a non-production block of a config that binds STS may not read a
+# production-named store secret. Never copy the production values.
 workload: kilo-ops
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - O11Y_CF_AE_API_TOKEN
+  - GF_SECRET_KEY

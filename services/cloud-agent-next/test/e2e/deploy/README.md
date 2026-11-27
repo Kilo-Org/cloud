@@ -188,11 +188,14 @@ Prerequisites, in order:
     production binding remains (bindings equal the deployed configs),
     schedules are `[]`, `workers.dev` and previews are off, one version at
     100%, exactly the configured domain. The Access secrets are no finding here.
-12. One-time upload of the two Worker secrets (route set by the operator
-    ruling), only after step 11 passed, with an allowlist preflight: script
-    `cloud-agent-e2e-test`, names `E2E_ACCESS_CLIENT_ID` and
-    `E2E_ACCESS_CLIENT_SECRET` only, values from Infisical production
-    `/ci/ci-cloud-agent-e2e`, never printed. CI never uploads them.
+12. One-time operator upload, after step 11's readback shows no production
+    bindings: from a disposable VM, using the approved Wrangler login route
+    (token piped over ssh into a 0600 file, deleted with the VM), run a
+    preflight that refuses any script other than `cloud-agent-e2e-test` and
+    any secret name other than `E2E_ACCESS_CLIENT_ID` /
+    `E2E_ACCESS_CLIENT_SECRET`, then `wrangler secret put` both, piped from
+    Infisical production `/ci/ci-cloud-agent-e2e`, never printed. Rotation
+    repeats this step. CI never uploads them.
 13. Tests: dispatch again (the `deploy` input may be off). The `tests` job, the
     only STS bundle reader, first checks names only that both Access secrets
     exist on the Worker and stops with a pointer to step 12 otherwise, then

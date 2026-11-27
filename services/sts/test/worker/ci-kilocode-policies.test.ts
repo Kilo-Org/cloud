@@ -290,11 +290,12 @@ describe('shipped Kilo-Org/kilocode policies', () => {
     it('refuses it with another repository id or owner id', async () => {
       const { verify } = await fixture('production');
       const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
-      for (const ids of [
+      const changes: Record<string, string>[] = [
         { repository_id: '1395255492' },
         { repository_owner_id: '1' },
         { repository_id: '1395255492', repository_owner_id: '1' },
-      ]) {
+      ];
+      for (const ids of changes) {
         const outcome = await verify({ ...base, ...ids });
         expect(outcome, JSON.stringify(ids)).toMatchObject({ status: 'denied' });
         expect(outcome).not.toMatchObject({ workload: 'ci-kilocode-release' });
@@ -304,12 +305,13 @@ describe('shipped Kilo-Org/kilocode policies', () => {
     it('keeps every other binding', async () => {
       const { verify } = await fixture('production');
       const base = { ...claims('release', 'publish.yml', 'workflow_dispatch'), sub: LEGACY };
-      for (const change of [
+      const changes: Record<string, string>[] = [
         { ref: 'refs/heads/v2', job_workflow_ref: pinned('publish.yml', 'refs/heads/v2') },
         { event_name: 'push' },
         { job_workflow_ref: pinned('ci.yml') },
         { environment: 'automation' },
-      ]) {
+      ];
+      for (const change of changes) {
         expect(await verify({ ...base, ...change }), JSON.stringify(change)).toMatchObject({
           status: 'denied',
           reason: 'identity_rejected',

@@ -9,7 +9,7 @@ import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
  * the web writes each pin into the pool's JSONB entries. Internal secret only, never a user call.
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request, 'auto_routing_pool_pins');
   if (unauthorized) return unauthorized;
 
   let body: unknown;

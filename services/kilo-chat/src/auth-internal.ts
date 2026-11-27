@@ -1,5 +1,10 @@
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { logger } from './util/logger';
 import { readKiloChatSecret } from './secrets';
 import { requestContext } from './util/request-context';
@@ -37,6 +42,13 @@ export const internalApiMiddleware = createMiddleware<{
 
   if (!timingSafeEqual(apiKey, secret)) return c.json({ error: 'Forbidden' }, 403);
 
+  // Design section 9.4, item 9: an accepted shared secret is counted here.
+  observeInternalAuth(
+    'kilo-chat',
+    'internal',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
   logger.setTags({ source: 'internal-api' });
   return next();
 });

@@ -2,7 +2,8 @@ name: Notify Main Workflow Failure
 
 on:
   workflow_run:
-    # E2E retains its existing notification with per-scenario failure details.
+    # Cloud Agent E2E is deliberately not covered: it runs only on manual
+    # dispatch, so its failure is in front of the person who started it.
     workflows:
       - Auto-docs intake
       - Chromatic

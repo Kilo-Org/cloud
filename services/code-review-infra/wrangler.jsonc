@@ -5,20 +5,27 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-01-20",
   "compatibility_flags": ["nodejs_compat"],
-  // Production features
+  // Production features. Traces stay off, as a config that binds STS requires (services/sts README,
+  // "Policy"), since a trace records outbound URLs.
   "upload_source_maps": true,
   "observability": {
     "enabled": true,
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "version_metadata": {
     "binding": "CF_VERSION_METADATA",
   },
+  // No STS binding here yet: batch B (#13047) adds this Worker's STS binding and its worker-binding
+  // policy, and the registry PR adds the status-write grant. Until then
+  // CODE_REVIEW_STATUS_CALLBACK_AUTH=sts fails closed (sts_binding_missing, src/status-callback-auth.ts).
   // Public environment variables
   "vars": {
     "ENVIRONMENT": "production",
     "API_URL": "https://app.kilo.ai",
     "CLOUD_AGENT_NEXT_URL": "https://cloud-agent-next.kilosessions.ai",
+    // CODE_REVIEW_STATUS_CALLBACK_AUTH is unset (legacy): set `sts` only once the web route accepts
+    // the status-write token (README, "Status writes").
   },
   // Durable Objects configuration
   "durable_objects": {

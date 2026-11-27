@@ -219,7 +219,8 @@ export async function hydrateSessionHistory(input: {
   kiloSessionId: string;
   rootKiloSessionId?: string;
   userId: string;
-  internalSecret?: string;
+  /** Credential headers of the export call (`SESSION_INGEST_CALLER_AUTH`); none under `binding`. */
+  ingestCredential?: Readonly<Record<string, string>>;
   isCurrent: () => boolean;
   broadcast: (event: StoredEvent) => void;
 }): Promise<void> {
@@ -312,7 +313,7 @@ export async function hydrateSessionHistory(input: {
         `https://session-ingest/internal/session/${encodeURIComponent(input.kiloSessionId)}/export`,
         {
           headers: {
-            'X-Internal-Secret': input.internalSecret ?? '',
+            ...input.ingestCredential,
             'X-Kilo-User-Id': input.userId,
           },
           signal: AbortSignal.timeout(CHILD_EXPORT_MS),

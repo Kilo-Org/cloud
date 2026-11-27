@@ -38,7 +38,7 @@ type RouteParams = { params: Promise<{ externalId: string }> };
  * single membership DELETE does, so a replay is a no-op.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request, 'scim_user_memberships');
   if (unauthorized) return unauthorized;
 
   const { externalId } = await params;

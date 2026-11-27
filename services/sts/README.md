@@ -453,10 +453,12 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
+| `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
@@ -490,6 +492,12 @@ Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every sc
 holds on development STS, the same as `web`'s development grants. If fork or outside pull-request
 previews are ever enabled on that project, these grants need a review first.
 
+`web` and `ai-gateway` read `INTERNAL_API_SECRET` from their bundle only when the deployment's
+`SECRETS_SOURCE` is `sts` (`packages/web-shared/src/lib/sts-secret-reader.ts`), from
+`/workloads/web` or `/workloads/ai-gateway` if the name is there, else from `/shared`. The grant is
+in staging and production only: previews read development STS and keep `env`, so no preview build
+can read the key; a preview flip adds a `development` key.
+
 Workloads with a policy, all over `worker-binding`:
 
 | Workload | Environments | Worker config |
@@ -504,6 +512,7 @@ Workloads with a policy, all over `worker-binding`:
 | `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-webhook-agent-ingest` | production | `services/webhook-agent-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `security-auto-analysis` | production | `services/security-auto-analysis/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `session-ingest` | production | `services/session-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `kilo-chat` | production | `services/kilo-chat/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
@@ -559,7 +568,7 @@ review covers its STS binding; this repository refuses any config that deploys u
 
 `test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
 `wrangler*.toml` the checkout tracks, or holds untracked and not ignored, test fixtures included
-(`cloud-agent-e2e-deploy.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
+(`cloud-agent-e2e.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
 Ignored configs stay out: `wrangler.runtime-generated.json` and
 `.wrangler/wrangler.e2e-test.jsonc` are rendered at deploy time from a tracked `wrangler.jsonc` this
 check already reads. Each file is parsed with Wrangler's own parser, every env block and every

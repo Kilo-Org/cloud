@@ -277,8 +277,26 @@ function decideRequest(payload: unknown) {
   });
 }
 
+/** The counter's test seam; the Worker test pool shares `globalThis` with the module under test. */
+const OBSERVATION_SEAM = '__KILO_INTERNAL_AUTH_OBSERVATION__';
+const testGlobals = globalThis as unknown as Record<string, unknown>;
+
+/**
+ * The decision log lines of a spy, without the item-9 `kilo_internal_auth` line that the same
+ * accepted request also writes. Asserting on this keeps the suite independent of minute boundaries.
+ */
+function decisionLogs(log: { mock: { calls: unknown[][] } }): Record<string, unknown>[] {
+  return log.mock.calls
+    .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+    .filter(line => line.event !== 'kilo_internal_auth');
+}
+
 describe('auto routing worker', () => {
   beforeEach(async () => {
+    // This suite asserts the exact decision log lines; the item-9 counter has its own suite
+    // (packages/worker-utils/src/backend-auth-middleware.test.ts).
+    process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
+    testGlobals[OBSERVATION_SEAM] = false;
     clearClassifierConfigCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
@@ -362,6 +380,8 @@ describe('auto routing worker', () => {
   afterEach(async () => {
     await drainBackgroundTasks();
     globalThis.fetch = originalFetch;
+    delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
+    delete testGlobals[OBSERVATION_SEAM];
     vi.restoreAllMocks();
   });
 
@@ -430,8 +450,8 @@ describe('auto routing worker', () => {
         expect(benchmarkFetch).toHaveBeenCalledTimes(baselineCalls.origin);
         expect(writeDataPoint).toHaveBeenCalledTimes(baselineCalls.metrics);
         expect(configPut).not.toHaveBeenCalled();
-        expect(log).toHaveBeenCalledTimes(1);
-        expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+        expect(decisionLogs(log)).toHaveLength(1);
+        expect(decisionLogs(log)[0]).toMatchObject({
           event: 'auto_routing_decision',
           decidedModel: 'google/gemini-2.5-flash-lite',
           shadowModel: change === 'no_route' ? null : model,
@@ -473,8 +493,8 @@ describe('auto routing worker', () => {
       expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
       expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
       expect(configPut).not.toHaveBeenCalled();
-      expect(log).toHaveBeenCalledTimes(1);
-      expect(JSON.parse(String(log.mock.calls[0]?.[0]))).not.toHaveProperty('shadowDiffers');
+      expect(decisionLogs(log)).toHaveLength(1);
+      expect(decisionLogs(log)[0]).not.toHaveProperty('shadowDiffers');
     });
 
     it.each(['absent', 'invalid', 'read_error'])(

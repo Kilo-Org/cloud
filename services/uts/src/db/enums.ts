@@ -53,6 +53,8 @@ export const REVOKE_REASONS = [
   'scim_mailbox_move',
   'apple_consent_revoked',
   'staff_api_reset',
+  // Added by 0024_home_widget_grants.sql: a widget grant that a newer exchange replaced.
+  'replaced',
 ] as const;
 export const SESSION_STATUSES = ['active', 'revoked'] as const;
 export const GRANT_STATUSES = ['active', 'revoked'] as const;

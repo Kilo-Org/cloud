@@ -14,7 +14,7 @@ import { waitUntil } from '@vercel/functions';
  *
  * `apps/web` and `apps/ai-gateway` install one `BouncerAuth` from `instrumentation.ts`, with the
  * Bouncer scopes their STS policy grants (`BOUNCER_APP_SCOPES`). Every call names its caller in
- * `x-kilo-caller`, whatever the flag says. With `BOUNCER_STS_TOKENS=on` a call to
+ * `x-kilo-caller`, whatever the flag says. With `BOUNCER_CLIENT_AUTH=dual` a call to
  * `BOUNCER_STS_ORIGIN` also carries `Authorization: Bearer <STS token>` for the route's scope, next
  * to the unchanged `x-internal-api-key`: Bouncer's `legacy` mode ignores the bearer and its `dual`
  * mode verifies it. Scripts and tests install nothing, so they send neither.
@@ -111,13 +111,14 @@ export type BouncerTokenMissReason =
   | 'config';
 
 /**
- * `BOUNCER_STS_TOKENS`: `on` sends STS tokens; unset, empty or `off` sends the legacy key alone.
- * Any other value also sends the legacy key alone and counts as a `config` miss, so a typo can
- * never stop Bouncer calls.
+ * `BOUNCER_CLIENT_AUTH`, the repository's caller-auth mode convention: `legacy` (unset or empty
+ * too) sends the legacy key alone; `dual` also sends an STS token. `sts` (token only) comes with
+ * the change that removes the legacy key. Any other value sends the legacy key alone and counts as
+ * a `config` miss, so a typo can never stop Bouncer calls.
  */
-export function bouncerStsTokensEnabled(value: string | undefined): boolean | 'invalid' {
-  if (value === undefined || value === '' || value === 'off') return false;
-  if (value === 'on') return true;
+export function bouncerClientAuthMode(value: string | undefined): 'legacy' | 'dual' | 'invalid' {
+  if (value === undefined || value === '' || value === 'legacy') return 'legacy';
+  if (value === 'dual') return 'dual';
   return 'invalid';
 }
 
@@ -307,9 +308,9 @@ export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
     },
 
     async headers({ scope, wait, origin, signal }) {
-      const enabled = bouncerStsTokensEnabled(options.flag());
-      if (enabled === 'invalid') return miss('config', scope);
-      if (enabled !== true) return callerHeaders;
+      const mode = bouncerClientAuthMode(options.flag());
+      if (mode === 'invalid') return miss('config', scope);
+      if (mode === 'legacy') return callerHeaders;
       if (!options.scopes.includes(scope) || origin !== BOUNCER_STS_ORIGIN) {
         return miss('config', scope);
       }
@@ -374,7 +375,7 @@ export function installBouncerAuth(caller: BouncerCaller): void {
   globalThis.__kilocodeBouncerAuth = createBouncerAuth({
     caller,
     scopes: BOUNCER_APP_SCOPES[caller],
-    flag: () => process.env.BOUNCER_STS_TOKENS,
+    flag: () => process.env.BOUNCER_CLIENT_AUTH,
     loadTransport: async hooks => {
       // Lazy on purpose, as `sts-secret-reader.ts` does: a deployment with the flag off never loads
       // the token client, the Vercel OIDC exchange or the Runtime Cache.
@@ -383,7 +384,7 @@ export function installBouncerAuth(caller: BouncerCaller): void {
       return createBouncerTransport(hooks);
     },
     waitUntil,
-    preload: process.env.BOUNCER_STS_TOKENS === 'on',
+    preload: process.env.BOUNCER_CLIENT_AUTH === 'dual',
   });
 }
 

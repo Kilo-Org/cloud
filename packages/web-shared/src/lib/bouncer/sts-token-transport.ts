@@ -19,7 +19,7 @@ import { getVercelOidcToken } from '@vercel/functions/oidc';
 
 /**
  * The token client of the shared Bouncer client, loaded by `sts-auth.ts` on the first call with
- * `BOUNCER_STS_TOKENS=on` (or at install with the flag on). One client per process: it holds the
+ * `BOUNCER_CLIENT_AUTH=dual` (or at install with the flag on). One client per process: it holds the
  * Bouncer tokens in memory, starts a token's renewal on a read after 80 % of its lifetime, and
  * batches concurrent reads into one attempt (one STS call per scope: the client sends one token per
  * audience per call).

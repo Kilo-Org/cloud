@@ -50,7 +50,7 @@ jest.mock('@vercel/functions/oidc', () => ({
 
 const mockFetch = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
 const realFetch = global.fetch;
-const runtimeNames = ['VERCEL_ENV', 'VERCEL_TARGET_ENV', 'BOUNCER_STS_TOKENS'] as const;
+const runtimeNames = ['VERCEL_ENV', 'VERCEL_TARGET_ENV', 'BOUNCER_CLIENT_AUTH'] as const;
 const savedRuntime = Object.fromEntries(runtimeNames.map(name => [name, process.env[name]]));
 
 function setRuntime(values: Partial<Record<(typeof runtimeNames)[number], string>>): void {
@@ -83,7 +83,7 @@ beforeEach(() => {
   setRuntime({
     VERCEL_ENV: 'production',
     VERCEL_TARGET_ENV: 'production',
-    BOUNCER_STS_TOKENS: 'on',
+    BOUNCER_CLIENT_AUTH: 'dual',
   });
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(async (input, init) => {
@@ -202,7 +202,7 @@ describe('the installed Bouncer auth with the real transport', () => {
   ])(
     'makes no STS call from %s deployment, even with its own STS_URL',
     async (_name, runtime, issuer) => {
-      setRuntime({ ...runtime, BOUNCER_STS_TOKENS: 'on' });
+      setRuntime({ ...runtime, BOUNCER_CLIENT_AUTH: 'dual' });
       mockStsUrl = issuer;
       installBouncerAuth('kilocode-ai-gateway');
       await decide(

@@ -12,7 +12,7 @@ import {
   BOUNCER_STS_ORIGIN,
   BOUNCER_TOKEN_WAIT_MS,
   bouncerAuthHeaders,
-  bouncerStsTokensEnabled,
+  bouncerClientAuthMode,
   createBouncerAuth,
   installBouncerAuth,
   type BouncerAuth,
@@ -62,7 +62,7 @@ function harness(
   });
   const waitUntil = jest.fn<BouncerAuthOptions['waitUntil']>();
   const logged: Line[] = [];
-  const flag = { value: 'on' as string | undefined };
+  const flag = { value: 'dual' as string | undefined };
   const clock = { offset: 0 };
   const auth = createBouncerAuth({
     caller,
@@ -145,24 +145,25 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-describe('bouncerStsTokensEnabled', () => {
+describe('bouncerClientAuthMode', () => {
   it.each([
-    [undefined, false],
-    ['', false],
-    ['off', false],
-    ['on', true],
-    ['ON', 'invalid'],
+    [undefined, 'legacy'],
+    ['', 'legacy'],
+    ['legacy', 'legacy'],
+    ['dual', 'dual'],
+    ['sts', 'invalid'],
+    ['DUAL', 'invalid'],
+    ['on', 'invalid'],
     ['true', 'invalid'],
-    ['1', 'invalid'],
   ] as const)('maps %j to %j', (value, expected) => {
-    expect(bouncerStsTokensEnabled(value)).toBe(expected);
+    expect(bouncerClientAuthMode(value)).toBe(expected);
   });
 });
 
 describe('createBouncerAuth', () => {
   it('names the caller and loads nothing while the flag is off', async () => {
     const h = harness('kilocode-ai-gateway');
-    for (const value of [undefined, '', 'off']) {
+    for (const value of [undefined, '', 'legacy']) {
       h.flag.value = value;
       await expect(h.auth.headers(decideCall)).resolves.toEqual({
         'x-kilo-caller': 'kilocode-ai-gateway',
@@ -690,7 +691,7 @@ describe('createBouncerAuth', () => {
 describe('installBouncerAuth', () => {
   afterEach(() => {
     globalThis.__kilocodeBouncerAuth = undefined;
-    delete process.env.BOUNCER_STS_TOKENS;
+    delete process.env.BOUNCER_CLIENT_AUTH;
   });
 
   it('sends nothing extra in a process that installed nothing', async () => {

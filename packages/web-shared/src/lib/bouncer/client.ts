@@ -33,7 +33,7 @@ import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-
  * with a retryable error before creating a Stripe customer or account.
  *
  * Every call sends `x-internal-api-key`; an app that installed `BouncerAuth` (`sts-auth.ts`) also
- * names itself in `x-kilo-caller` and, with `BOUNCER_STS_TOKENS=on`, sends the route's STS token
+ * names itself in `x-kilo-caller` and, with `BOUNCER_CLIENT_AUTH=dual`, sends the route's STS token
  * as `Authorization: Bearer`. A missing token never stops a call.
  */
 

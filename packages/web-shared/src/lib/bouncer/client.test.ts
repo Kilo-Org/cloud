@@ -951,7 +951,7 @@ describe('a decide whose STS mint hangs', () => {
     globalThis.__kilocodeBouncerAuth = createBouncerAuth({
       caller: 'kilocode-ai-gateway',
       scopes: ['bouncer:decide', 'bouncer:usage.write'],
-      flag: () => 'on',
+      flag: () => 'dual',
       // The exchanged Vercel token is held, but the mint never answers.
       loadTransport: async () => ({
         read: async () => await Promise.withResolvers<string>().promise,

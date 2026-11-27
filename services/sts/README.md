@@ -462,7 +462,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
 are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only and accepts only
 production STS tokens; the shared Bouncer client of both apps mints them behind
-`BOUNCER_STS_TOKENS` (`ENVIRONMENT.md`). `bouncer:signup.history` is registered for the
+`BOUNCER_CLIENT_AUTH=dual` (`ENVIRONMENT.md`). `bouncer:signup.history` is registered for the
 signup-history import job, and no policy grants it yet. The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the

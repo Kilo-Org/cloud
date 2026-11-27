@@ -47,6 +47,10 @@ const BINDINGS_MAPS = [
  * prefix, which would let a row copy another app's key of the same name.
  */
 const STORE_SUFFIX_EXCEPTIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  // The admin secret predates the shared NEXTAUTH name: its store entry carries the app prefix.
+  'kilo-ai-attribution': {
+    ADMIN_SECRET: 'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
+  },
   // kilo-chat reads the media bucket's dedicated R2 token, not the account-wide one.
   'kilo-chat': {
     R2_ACCESS_KEY_ID: 'R2_ACCESS_KEY_ID_KILOCHAT_MEDIA',

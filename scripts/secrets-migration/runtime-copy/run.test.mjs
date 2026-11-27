@@ -1885,3 +1885,138 @@ test('STS token: past expiry - 7 min no phase starts; the armed copier is delete
   assert.deepEqual([world.readLog.length, world.infisical.calls.length], [0, 0]);
   assert.equal(exitCode(report), 1);
 });
+
+test('plan: the cleanup deadline is the earlier of the step limit and the token expiry, minus slack', () => {
+  const operator = operatorMeta();
+  const slack = TIMING.cleanupSlackMs;
+  assert.equal(
+    planRun(baseEnv(), operator, T0).cleanupDeadline,
+    T0 + TIMING.stepLimitMs.secret - slack
+  );
+  assert.equal(
+    planRun(baseEnv(stsEnv(T0 + 60 * 60_000)), operator, T0).cleanupDeadline,
+    T0 + TIMING.stepLimitMs.sts - slack,
+    'the 58-minute step ends before a 60-minute token'
+  );
+  assert.equal(
+    planRun(baseEnv(stsEnv(T0 + 50 * 60_000)), operator, T0).cleanupDeadline,
+    T0 + 50 * 60_000 - slack,
+    'a token that ends first bounds cleanup'
+  );
+});
+
+test('cleanup deadline: the snapshot stops reading, drift is not_read_by_deadline, the gate fails', async () => {
+  const id = randomUUID();
+  const names = Array.from({ length: 30 }, (_, i) => `w-${String(i).padStart(2, '0')}`);
+  const world = (startMs, deadlineMs) => {
+    const clock = { t: startMs, now: () => clock.t };
+    const reads = [];
+    let present = true;
+    const cf = {
+      async deploymentVersions(name, opts) {
+        reads.push([name, opts?.timeoutMs]);
+        if (name === COPIER) return present ? [{ version_id: id, percentage: 100 }] : null;
+        clock.t += 10_000;
+        return [{ version_id: randomUUID(), percentage: 100 }];
+      },
+      async deleteScript(_name, opts) {
+        reads.push(['delete', opts?.timeoutMs]);
+        present = false;
+      },
+      async scriptStatus() {
+        return present ? 200 : 404;
+      },
+      async doNamespaces() {
+        return [];
+      },
+      async scriptNames() {
+        return names;
+      },
+    };
+    const state = {
+      created: true,
+      recorded: new Set([id]),
+      before: {},
+      plan: { notBefore: T0 - 1, cleanupDeadline: deadlineMs },
+      since: T0,
+      copier: COPIER,
+      source: 'notifications',
+    };
+    return { io: { cf, gh: {}, clock, sleep: async () => {} }, state, reads };
+  };
+
+  // The deadline falls inside the snapshot: the copier is deleted, the snapshot stops reading.
+  const mid = world(T0, T0 + 60_000);
+  const cut = await cleanup(mid.io, mid.state);
+  assert.deepEqual(
+    [cut.deleted, cut.scriptStatus, cut.drift, cut.deadlineReached, cut.gate.ok],
+    [true, 404, 'not_read_by_deadline', true, false]
+  );
+  assert.deepEqual(cut.errors, ['snapshot:deadline']);
+  const scanned = mid.reads.filter(([n]) => n.startsWith('w-'));
+  assert.ok(scanned.length > 0 && scanned.length < names.length, `${scanned.length} reads`);
+  assert.ok(
+    mid.reads.every(([, t]) => t <= 60_000),
+    'every read capped at the time left'
+  );
+
+  // Already past the deadline: one read and one delete with the short timeout, nothing else.
+  const late = world(T0 + 2 * 60_000, T0 + 60_000);
+  const after = await cleanup(late.io, late.state);
+  const q = TIMING.abortCallTimeoutMs;
+  assert.deepEqual(late.reads, [
+    [COPIER, q],
+    ['delete', q],
+  ]);
+  assert.deepEqual(
+    [after.deleted, after.drift, after.deadlineReached, after.errors, after.gate.ok],
+    [true, 'not_read_by_deadline', true, ['status:deadline', 'snapshot:deadline'], false]
+  );
+});
+
+test('cleanup deadline in a run: the report is still complete and the entry fails as token_expiry_abort', async () => {
+  // The STS step's limit ends cleanup at T0 + 57 min; the cleanup snapshot (the third) starts at
+  // T0 + 58 min, so its reads are cut off.
+  const { world, report } = await drive(
+    {
+      onSnapshot: (w, n) => {
+        if (n === 3) w.clock.t = T0 + 58 * 60_000;
+      },
+    },
+    stsEnv(T0 + 60 * 60_000)
+  );
+  assert.ok(report.finalReceipt, 'the copy itself completed');
+  assert.deepEqual(
+    [report.status, report.stopReason, report.firstStopReason],
+    ['stopped', 'token_expiry_abort', undefined]
+  );
+  assert.deepEqual(
+    [report.cleanup.scriptStatus, report.cleanup.drift, report.cleanup.gate.ok],
+    [404, 'not_read_by_deadline', false]
+  );
+  assert.deepEqual(wranglerVerbs(world), ['deploy', 'secret', 'delete']);
+  assert.equal(JSON.parse(JSON.stringify(report)).stopReason, 'token_expiry_abort');
+  assert.equal(exitCode(report), 1);
+});
+
+test('the in-run snapshots (before, and the pre-arm drift check) read one transient error again', async () => {
+  // Scan 1 is the before snapshot and 2 the pre-arm one; a failing scan's retry takes the next
+  // number, so either way the run makes four scans (cleanup included).
+  for (const failing of [1, 2]) {
+    const { world, report } = await drive({
+      onSnapshot: (_w, n) => {
+        if (n === failing) throw new StopError('cloudflare_transport');
+      },
+    });
+    assert.equal(report.status, 'cloudflare_complete', `${failing}: ${report.stopReason}`);
+    assert.equal(exitCode(report), 0);
+    assert.equal(world.calls.filter(c => c[1] === 'scriptNames').length, 4, `${failing}`);
+  }
+  // A second failure of the same scan is not retried again.
+  const { report } = await drive({
+    onSnapshot: (_w, n) => {
+      if (n === 1 || n === 2) throw new StopError('cloudflare_transport');
+    },
+  });
+  assert.deepEqual([report.status, report.stopReason], ['stopped', 'cloudflare_transport']);
+});

@@ -29,7 +29,9 @@ import {
   checkSource,
   evaluatePreflight,
   moduleHashes,
+  parsePolicy,
   readerKeysOf,
+  sharedBinders,
   sharedTargetProblems,
   validatedNameTable,
 } from './checks.mjs';
@@ -488,11 +490,11 @@ test('one Worker batch with several rows: one read and one create per row, rows 
   assert.equal(unrevoked.receipt.outcome, 'copied_revoke_unproven');
 });
 
-// A passing preflight input for `batch` of a synthetic Worker whose reviewed names are `names`,
-// with the writer configured exactly (one create per row, rows + 1 uses).
-function writerScope(batch, names) {
+// A passing preflight input for `batch` of a Worker whose reviewed names are `names` (by default a
+// synthetic Worker reviewed only by `names`), with the writer configured exactly (one create per
+// row, rows + 1 uses).
+function writerScope(batch, names, sources = { [batch.sourceScript]: { names } }) {
   const worker = batch.sourceScript;
-  const sources = { [worker]: { names } };
   const pins = {
     M65_RUN_ID: RUN_ID,
     M65_BATCH: worker,
@@ -797,5 +799,106 @@ test('M142 writer scope with shared keys: exact path and key creates, never a br
       failures(withWriter({ permissions })).includes('writer_permissions_not_exact'),
       JSON.stringify(permissions)
     );
+  }
+});
+
+test('M142 live parity: the creating entry reads every other binder of its shared key first', () => {
+  const batch = TABLE.batches['auto-routing'];
+  const src = WORKER_SOURCES['auto-routing'];
+  // kilo-ops binds the O11Y entry; nothing else in the table binds either auto-routing key.
+  assert.deepEqual(sharedBinders(batch), [
+    {
+      worker: 'kilo-ops',
+      key: 'O11Y_CF_AE_API_TOKEN',
+      binding: 'CF_ANALYTICS_API_KEY',
+      storeId: STORE,
+      secretName: 'O11Y_CF_AE_API_TOKEN',
+    },
+  ]);
+  assert.deepEqual(sharedBinders(TABLE.batches['kilo-ops']), [], 'kilo-ops creates nothing shared');
+  const { failures } = writerScope(batch, src.names, WORKER_SOURCES);
+  const VERSION = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const kiloOps = bindings => ({
+    sharedBinders: {
+      'kilo-ops': {
+        deployments: [{ version_id: VERSION, percentage: 100 }],
+        version: { id: VERSION, bindings },
+      },
+    },
+  });
+  const binding = (secretName, name = 'CF_ANALYTICS_API_KEY') => ({
+    name,
+    type: 'secrets_store_secret',
+    store_id: STORE,
+    secret_name: secretName,
+  });
+  const code = 'shared_parity_live_differs_O11Y_CF_AE_API_TOKEN';
+  assert.deepEqual(
+    failures(kiloOps([binding('O11Y_CF_AE_API_TOKEN'), binding('GF_SECRET_KEY', 'GF_SECRET_KEY')])),
+    []
+  );
+  for (const [patch, why] of [
+    [{}, 'not read'],
+    [kiloOps([binding('O11Y_CF_AE_API_TOKEN_OTHER')]), 'another store entry'],
+    [kiloOps([]), 'binding gone'],
+    [kiloOps([binding('O11Y_CF_AE_API_TOKEN'), binding('O11Y_CF_AE_API_TOKEN')]), 'bound twice'],
+    [
+      {
+        sharedBinders: {
+          'kilo-ops': {
+            deployments: [
+              { version_id: VERSION, percentage: 50 },
+              { version_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', percentage: 50 },
+            ],
+            version: { id: VERSION, bindings: [binding('O11Y_CF_AE_API_TOKEN')] },
+          },
+        },
+      },
+      'split deployment',
+    ],
+  ]) {
+    assert.deepEqual(failures(patch), [code], why);
+  }
+});
+
+test('policy: a flow list is read, an unreadable policy refuses by name, never as empty', () => {
+  assert.deepEqual(parsePolicy('workload: w\nsecrets: [A_ONE, B_TWO]\n').lists.secrets, [
+    'A_ONE',
+    'B_TWO',
+  ]);
+  assert.deepEqual(parsePolicy('secrets: []\n').lists.secrets, []);
+  for (const text of ['secrets: [A, "B"]\n', 'secrets: [A, B\n', 'secrets: [A B]\n', '  ???\n']) {
+    assert.throws(() => parsePolicy(text), JSON.stringify(text));
+  }
+  const notifications = WORKER_SOURCES.notifications;
+  const batch = FIXTURE.batches.notifications;
+  const rootWith = policyText => {
+    const root = scratch();
+    for (const f of [notifications.wrangler, notifications.reader, notifications.policy]) {
+      mkdirSync(dirname(join(root, f)), { recursive: true });
+      cpSync(join(REPO_ROOT, f), join(root, f));
+    }
+    writeFileSync(join(root, notifications.policy), policyText);
+    return root;
+  };
+  const head =
+    'workload: notifications\nenvironments:\n  - production\nidentity:\n  kind: worker-binding\n';
+  // The same grants as a flow list pass the full check.
+  const keys = notifications.names.map(n => n.secretKey).join(', ');
+  assert.equal(
+    validatedNameTable(batch, rootWith(`${head}secrets: [${keys}]\n`), FIXTURE).ok,
+    true
+  );
+  // An unreadable policy: a names-only refusal, no rows.
+  for (const bad of [
+    `${head}secrets: [${keys}\n`,
+    `${head}secrets: ${notifications.names[0].secretKey}\n`,
+  ]) {
+    const v = validatedNameTable(batch, rootWith(bad), FIXTURE);
+    assert.deepEqual(
+      [v.gate, v.ok, v.failures, v.rows],
+      ['table', false, ['policy_unreadable: notifications'], []]
+    );
+    assert.doesNotThrow(() => JSON.stringify(v));
   }
 });

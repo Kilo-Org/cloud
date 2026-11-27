@@ -67,8 +67,13 @@
 // `expires_at` output. The run refuses at start unless the token outlives the result deadline by
 // 8 minutes, and 7 minutes before it expires it stops admitting phases, caps every wait and child
 // there and goes to the normal cleanup (`token_expiry_abort`) while the token can still delete.
-// The token lives at most 60 minutes from the mint, so the abort lands by minute 53 and cleanup
-// keeps 5 minutes before the step's 58-minute limit.
+// The token lives at most 60 minutes from the mint, so cleanup starts by minute 53.
+//
+// Cleanup has its own deadline: the earlier of the step limit (`stepLimitMs`, from driver start)
+// and the token expiry, minus `cleanupSlackMs`. Every cleanup read is capped there; past it only
+// the copier read and delete run, once each with the short timeout. A deployment snapshot that the
+// deadline cuts off records `drift: 'not_read_by_deadline'`, the report is still printed, and the
+// entry fails as `token_expiry_abort`.
 //
 // CI proves only the Cloudflare half. The operator completes the Infisical post-run and cleanup
 // gates privately with this report's `preflightPins` and `finalReceipt` and its own readback.
@@ -85,12 +90,14 @@ import { fileURLToPath } from 'node:url';
 
 import {
   MODULES,
+  WORKER_SOURCES,
   bindArmedPreflight,
   evaluateCleanupCloudflare,
   evaluatePostRunCloudflare,
   evaluatePreflight,
   moduleHashes,
   parseReceipt,
+  sharedBinders,
   validatedNameTable,
 } from './runtime-copy/checks.mjs';
 import {
@@ -147,10 +154,15 @@ export const TIMING = Object.freeze({
   // After a stop signal each Cloudflare read or delete gets this long, once, with no retry.
   abortCallTimeoutMs: 2_500,
   // STS path: refuse to start unless the token outlives the result deadline by this much, and
-  // stop admitting phases this long before it expires, so cleanup still holds a live token and
-  // finishes inside the workflow step's 58-minute limit (60-minute token minus 7 = minute 53).
+  // stop admitting phases this long before it expires, so cleanup starts while the token is still
+  // live: by minute 53 of a 60-minute token.
   tokenStartMarginMs: 8 * 60_000,
   tokenAbortMarginMs: 7 * 60_000,
+  // The driver step's limit, from driver start: the STS step's `timeout-minutes: 58`; on the
+  // stored-token path the job's 80 minutes minus up to 5 for the steps before the driver.
+  stepLimitMs: Object.freeze({ sts: 58 * 60_000, secret: 75 * 60_000 }),
+  // Cleanup stops reading this long before the step limit or the token expiry.
+  cleanupSlackMs: 60_000,
   rolloutRunsPerWorkflow: 20,
 });
 
@@ -334,6 +346,11 @@ export function planRun(env, operator, nowMs) {
     armedReadyDeadline: notBefore - TIMING.readyMarginMs,
     resultDeadline,
     tokenAbortAt: tokenExpiresAt - TIMING.tokenAbortMarginMs,
+    cleanupDeadline:
+      Math.min(
+        nowMs + TIMING.stepLimitMs[env.CLOUDFLARE_TOKEN_SOURCE === 'sts' ? 'sts' : 'secret'],
+        tokenExpiresAt
+      ) - TIMING.cleanupSlackMs,
     out: join(
       env.RUNNER_TEMP,
       `m65-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}-${env.COPY_INDEX}.wrangler.json`
@@ -433,8 +450,8 @@ export function cloudflare({
   }
   const script = name => `/workers/scripts/${encodeURIComponent(name)}`;
   return {
-    async scriptNames() {
-      const ids = records(await get('/workers/scripts')).map(s => s.id);
+    async scriptNames({ timeoutMs: t } = {}) {
+      const ids = records(await get('/workers/scripts', { timeoutMs: t })).map(s => s.id);
       if (!ids.every(id => typeof id === 'string' && id !== '')) {
         throw new StopError('cloudflare_unreadable');
       }
@@ -684,15 +701,33 @@ export async function rolloutRunsDuring(gh, startMs, endMs) {
   }
 }
 
-/** Every existing script's current deployment, by name. */
-export async function snapshot(cf, concurrency = 8) {
-  const names = await cf.scriptNames();
+/**
+ * Every existing script's current deployment, by name. `deadlineMs` is the total budget: each read
+ * is capped at the time left, and once none is left the snapshot stops reading and throws
+ * `deadline` (never retried by `readBack`).
+ */
+export async function snapshot(
+  cf,
+  { deadlineMs = Infinity, now = Date.now, concurrency = 8 } = {}
+) {
+  const budget = () => {
+    const left = deadlineMs - now();
+    if (left <= 0) throw new StopError('deadline');
+    return { timeoutMs: Math.min(TIMING.cfTimeoutMs, left) };
+  };
+  const names = await cf.scriptNames(budget());
   const scripts = {};
   let next = 0;
+  let failed = false;
   async function worker() {
-    while (next < names.length) {
+    while (!failed && next < names.length) {
       const name = names[next++];
-      scripts[name] = await cf.deploymentVersions(name);
+      try {
+        scripts[name] = await cf.deploymentVersions(name, budget());
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, names.length) }, worker));
@@ -732,14 +767,23 @@ const storeMeta = async (cf, batch) => ({
   secrets: await cf.storeSecrets(batch.rows[0].storeId),
 });
 
-/** Copier, source and store metadata in the shape the core preflight reads. */
-export async function cloudflareMeta(cf, target) {
+/**
+ * Copier, source and store metadata in the shape the core preflight reads, plus the serving
+ * version of every other table Worker that binds one of this batch's shared targets (M142 live
+ * parity).
+ */
+export async function cloudflareMeta(cf, target, table = TABLE) {
   const { copier: name } = target;
   const source = await servingVersion(cf, target.source);
   const copier = await servingVersion(cf, name);
+  const binders = {};
+  for (const { worker } of sharedBinders(target.batch, table)) {
+    binders[worker] ??= await servingVersion(cf, worker);
+  }
   return {
     source,
     store: await storeMeta(cf, target.batch),
+    sharedBinders: binders,
     copier: {
       doNamespaces: await cf.doNamespaces(name),
       deployments: copier.deployments,
@@ -762,12 +806,17 @@ const TRANSIENT = new Set([
   'cloudflare_unreadable',
 ]);
 
-/** A read that hits a transient failure is read once more. Never used for a mutation. */
-export async function readBack(io, read) {
+/**
+ * A read that hits a transient failure is read once more, unless the retry would start at or
+ * after `deadlineMs`. Never used for a mutation.
+ */
+export async function readBack(io, read, deadlineMs = Infinity) {
   try {
     return await read();
   } catch (err) {
     if (!(err instanceof StopError) || !TRANSIENT.has(err.reason)) throw err;
+    const now = () => io.clock?.now() ?? Date.now();
+    if (now() + TIMING.readRetryMs >= deadlineMs) throw err;
     await (io.sleep ?? (ms => new Promise(r => setTimeout(r, ms))))(TIMING.readRetryMs);
     return read();
   }
@@ -1125,6 +1174,22 @@ export async function run(io) {
     if (!hit && pastTokenAbort()) throw new StopError('token_expiry_abort');
     return hit;
   };
+  // The in-run deployment snapshots: a transient read is read once more, and neither runs past
+  // the token abort time.
+  const snapshotInRun = async () => {
+    try {
+      return await readBack(
+        io,
+        () => snapshot(cf, { deadlineMs: tokenAbortAt, now: () => clock.now() }),
+        tokenAbortAt
+      );
+    } catch (err) {
+      if (err instanceof StopError && err.reason === 'deadline') {
+        throw new StopError('token_expiry_abort');
+      }
+      throw err;
+    }
+  };
 
   const problems = contextProblems(env, io.headSha, table);
   if (problems.length) return { ...report, status: 'refused', problems };
@@ -1180,7 +1245,7 @@ export async function run(io) {
 
     phase('snapshot_before');
     since = clock.now();
-    before = await snapshot(cf);
+    before = await snapshotInRun();
     if (copier in before || (await cf.scriptStatus(copier)) !== 404) {
       throw new StopError('copier_exists');
     }
@@ -1244,14 +1309,19 @@ export async function run(io) {
     phase('preflight_gate');
     const preflight = evaluatePreflight(
       {
-        meta: { ...(await cloudflareMeta(cf, target)), ...operatorPreflightMeta(operator) },
+        meta: {
+          ...(await cloudflareMeta(cf, target, table)),
+          ...operatorPreflightMeta(operator),
+        },
         pins,
         deployedVersionId: unarmedVersion,
         allowedReaders: operator.allowedReaders,
         readinessReceipt: unarmed,
         nowMs: clock.now(),
       },
-      batch
+      batch,
+      WORKER_SOURCES,
+      table
     );
     report.gates.push(verdictOf(preflight));
     if (!preflight.ok) throw new StopError('preflight_gate_failed');
@@ -1262,7 +1332,7 @@ export async function run(io) {
       report.activeRollouts = rolloutsBeforeArm;
       throw new StopError('rollout_active_before_arm');
     }
-    const preArm = drift(before, await snapshot(cf), [copier]);
+    const preArm = drift(before, await snapshotInRun(), [copier]);
     if (preArm.length) {
       report.drift = preArm;
       throw new StopError('drift_before_arm');
@@ -1355,6 +1425,14 @@ export async function run(io) {
       report.tail = { ...stats, stop: tail ? ((await tail.stop()) ?? 'stopped') : 'not_started' };
     }
   }
+  // The cleanup deadline cut a read off: the entry fails as a token-expiry abort, report printed.
+  if (report.cleanup?.deadlineReached) {
+    if (report.stopReason && report.stopReason !== 'token_expiry_abort') {
+      report.firstStopReason = report.stopReason;
+    }
+    report.status = 'stopped';
+    report.stopReason = 'token_expiry_abort';
+  }
   const unresolved = [];
   if (report.armWrite === 'unproved') unresolved.push('secret_put_unproved');
   if (created && report.cleanup.scriptStatus !== 404) unresolved.push('copier_not_proved_deleted');
@@ -1398,6 +1476,10 @@ export function operatorPreflightMeta(operator) {
  * once with the short abort timeout (no retry, status, namespace read, snapshot or rollout
  * listing), so the cleanup gate stays failed and the job's last seconds go to the delete; a
  * SIGKILL can still land first.
+ * `plan.cleanupDeadline` bounds the rest: every read and retry is capped there. Past it the copier
+ * read and delete still run once each with the short timeout, every later read is skipped
+ * (`<step>:deadline`), an unread snapshot is `drift: 'not_read_by_deadline'`, and
+ * `deadlineReached` fails the entry.
  */
 export async function cleanup(
   io,
@@ -1418,6 +1500,8 @@ export async function cleanup(
       beforeNotBefore: beforeNotBefore(),
     };
   }
+  const deadline = Number.isFinite(plan?.cleanupDeadline) ? plan.cleanupDeadline : Infinity;
+  const pastDeadline = () => clock.now() >= deadline;
   const step = async (name, fn) => {
     try {
       return { value: await fn() };
@@ -1426,23 +1510,39 @@ export async function cleanup(
       return null;
     }
   };
-  // After a stop signal: one read and one delete, each with the short timeout and no retry, and
-  // no status read (the operator reads the copier back).
+  // A later read that the deadline leaves no time for is skipped and recorded.
+  const bounded = (name, fn) => {
+    if (!pastDeadline()) return step(name, () => readBack(io, fn, deadline));
+    result.errors.push(`${name}:deadline`);
+    result.deadlineReached = true;
+    return null;
+  };
+  // After a stop signal or past the deadline: one read and one delete, each with the short timeout
+  // and no retry; after a stop signal also no status read (the operator reads the copier back).
   const quick = { timeoutMs: TIMING.abortCallTimeoutMs };
+  const hurry = aborted || pastDeadline();
+  const capped = () =>
+    hurry
+      ? quick
+      : {
+          timeoutMs: Math.max(
+            TIMING.abortCallTimeoutMs,
+            Math.min(TIMING.cfTimeoutMs, deadline - clock.now())
+          ),
+        };
   const read = await step('read', () =>
-    aborted
+    hurry
       ? cf.deploymentVersions(copier, quick)
-      : readBack(io, () => cf.deploymentVersions(copier))
+      : readBack(io, () => cf.deploymentVersions(copier, capped()), deadline)
   );
   const versions = read?.value;
   if (read && versions === null) {
     result.scriptStatus = 404;
   } else if (read && versions.length > 0 && versions.every(v => recorded.has(v.version_id))) {
     result.attempted = true;
-    result.deleted =
-      (await step('delete', () => cf.deleteScript(copier, aborted ? quick : undefined))) !== null;
+    result.deleted = (await step('delete', () => cf.deleteScript(copier, capped()))) !== null;
     if (!aborted) {
-      const status = await step('status', () => readBack(io, () => cf.scriptStatus(copier)));
+      const status = await bounded('status', () => cf.scriptStatus(copier));
       if (status) result.scriptStatus = status.value;
     }
   } else if (read) {
@@ -1453,16 +1553,21 @@ export async function cleanup(
     result.aborted = true;
   } else {
     if (result.scriptStatus === 404) {
-      const ns = await step('namespaces', () => readBack(io, () => cf.doNamespaces(copier)));
+      const ns = await bounded('namespaces', () => cf.doNamespaces(copier));
       if (ns) result.gateNamespacePresent = ns.value.length > 0;
     }
   }
   let after = null;
   if (before && !aborted) {
-    const snap = await step('snapshot', () => readBack(io, () => snapshot(cf)));
+    const snap = await bounded('snapshot', () =>
+      snapshot(cf, { deadlineMs: deadline, now: () => clock.now() })
+    );
     if (snap) {
       after = snap.value;
       result.drift = drift(before, after, [copier]);
+    } else if (result.errors.includes('snapshot:deadline')) {
+      result.drift = 'not_read_by_deadline';
+      result.deadlineReached = true;
     }
   }
   const verdict = evaluateCleanupCloudflare({
@@ -1477,7 +1582,7 @@ export async function cleanup(
     },
   });
   result.gate = verdictOf(verdict);
-  if (result.drift?.length && since !== null) {
+  if (Array.isArray(result.drift) && result.drift.length && since !== null && !pastDeadline()) {
     result.rolloutRuns = await rolloutRunsDuring(io.gh, since, clock.now());
   }
   if (result.errors.length === 0) delete result.errors;

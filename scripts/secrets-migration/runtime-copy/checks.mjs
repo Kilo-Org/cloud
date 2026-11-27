@@ -83,7 +83,11 @@ export const SHARED_KEYS = Object.freeze([
   'AUTO_ROUTING_DECISION_SECRET',
 ]);
 
-// Minimal reader for the policy file's flat shape (scalars, lists of scalars, identity.kind).
+// Minimal reader for the policy file's flat shape: scalars, block lists of scalars, flow lists of
+// plain names (`secrets: [A, B]`, `secrets: []`) and identity.kind. Anything else throws, and so
+// does a scalar under a list key, so a list it cannot read is never taken as empty.
+const FLOW_ITEM = /^[A-Za-z0-9_.-]+$/;
+const LIST_KEYS = new Set(['secrets', 'environments']);
 export function parsePolicy(text) {
   const p = { lists: {} };
   let list = null;
@@ -93,11 +97,19 @@ export function parsePolicy(text) {
     let m;
     if ((m = /^([a-z_]+):\s*(\S.*)?$/.exec(line))) {
       list = block = null;
-      if (m[2] !== undefined) p[m[1]] = m[2].trim();
-      else {
+      const value = m[2]?.trim();
+      if (value === undefined) {
         list = block = m[1];
         p.lists[list] = [];
-      }
+      } else if (value.startsWith('[')) {
+        const flow = /^\[(.*)\]$/.exec(value);
+        if (!flow) throw new Error('policy flow list not recognized');
+        const items = flow[1].trim() === '' ? [] : flow[1].split(',').map(s => s.trim());
+        if (!items.every(s => FLOW_ITEM.test(s)))
+          throw new Error('policy flow list not recognized');
+        p.lists[m[1]] = items;
+      } else if (LIST_KEYS.has(m[1])) throw new Error('policy list not recognized');
+      else p[m[1]] = value;
     } else if ((m = /^\s+-\s+(\S+)\s*$/.exec(line)) && list) p.lists[list].push(m[1]);
     else if ((m = /^\s+([a-z_]+):\s*(\S+)\s*$/.exec(line)) && block) {
       p[`${block}.${m[1]}`] = m[2];
@@ -459,6 +471,37 @@ export function parseReaderBindings(readerText, readerMap = 'SECRETS_STORE_BINDI
   return map;
 }
 
+const sharedBindingOf = (sources, w, key) =>
+  (Object.hasOwn(sources, w) ? sources[w].names : []).find(
+    n => n.secretPath === '/shared' && n.secretKey === key
+  );
+
+/**
+ * The other table Workers that bind one of `batch`'s shared targets, each with the binding it reads
+ * it through and the creator's store entry it must equal. The creating entry's preflight reads
+ * each one's serving version (`shared_parity_live_differs_<KEY>`).
+ */
+export function sharedBinders(batch, table = TABLE, sources = WORKER_SOURCES) {
+  const out = [];
+  for (const r of Array.isArray(batch?.rows) ? batch.rows : []) {
+    if (!SHARED_TARGETS.includes(`${r.secretPath}/${r.secretKey}`)) continue;
+    for (const worker of table.workers) {
+      if (worker === batch.sourceScript) continue;
+      const n = sharedBindingOf(sources, worker, r.secretKey);
+      if (n) {
+        out.push({
+          worker,
+          key: r.secretKey,
+          binding: n.binding,
+          storeId: r.storeId,
+          secretName: r.secretName,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * M142, for one Worker of `table`: a shared target's creating row must belong to the first table
  * Worker whose reviewed source binds that /shared key, and every table Worker that binds it must
@@ -467,10 +510,7 @@ export function parseReaderBindings(readerText, readerMap = 'SECRETS_STORE_BINDI
  */
 export function sharedTargetProblems(worker, table = TABLE, sources = WORKER_SOURCES) {
   const f = [];
-  const bindingOf = (w, key) =>
-    (Object.hasOwn(sources, w) ? sources[w].names : []).find(
-      n => n.secretPath === '/shared' && n.secretKey === key
-    );
+  const bindingOf = (w, key) => sharedBindingOf(sources, w, key);
   for (const r of table.rows) {
     if (!SHARED_TARGETS.includes(r.target)) continue;
     const key = r.target.slice('/shared/'.length);
@@ -564,7 +604,12 @@ export function checkSource(
     const aliases = Object.fromEntries(Object.entries(reader).filter(([k, b]) => k !== b));
     if (!same(aliases, src.aliases)) f.push('reader_aliases_differ');
   }
-  const pol = parsePolicy(policyText);
+  let pol;
+  try {
+    pol = parsePolicy(policyText);
+  } catch {
+    return [...f, 'policy_unreadable'];
+  }
   if (
     pol.workload !== src.workload ||
     !same(pol.lists.environments, ['production']) ||
@@ -656,7 +701,13 @@ export function validatedNameTable(batch, root = REPO_ROOT, table = TABLE) {
     return refused([`source_not_on_main: ${worker}`]);
   }
   const sources = readTrackedSource(src, root);
-  if ((parsePolicy(sources.policyText).lists.secrets ?? []).length === 0) {
+  let granted;
+  try {
+    granted = parsePolicy(sources.policyText).lists.secrets ?? [];
+  } catch {
+    return refused([`policy_unreadable: ${worker}`]);
+  }
+  if (granted.length === 0) {
     return refused([`source_not_on_main: ${worker}`]);
   }
   const failures = checkSource(
@@ -1002,9 +1053,9 @@ const NO_PINS = Object.freeze({
  * storeIds, sourceDeployments}}: names and ids only, never a value or a principal. versionId is the
  * unarmed version; `bindArmedPreflight` moves it to the armed version after the put.
  */
-export function evaluatePreflight(input, batch, sources = WORKER_SOURCES) {
+export function evaluatePreflight(input, batch, sources = WORKER_SOURCES, table = TABLE) {
   try {
-    return preflightOf(input, batch, sources);
+    return preflightOf(input, batch, sources, table);
   } catch {
     return {
       gate: 'preflight',
@@ -1015,7 +1066,7 @@ export function evaluatePreflight(input, batch, sources = WORKER_SOURCES) {
   }
 }
 
-function preflightOf(input, batch, sources) {
+function preflightOf(input, batch, sources, table) {
   const meta = isRecord(input?.meta) ? input.meta : {};
   const pins = isRecord(input?.pins) ? input.pins : {};
   const { deployedVersionId, allowedReaders, readinessReceipt } = isRecord(input) ? input : {};
@@ -1041,6 +1092,16 @@ function preflightOf(input, batch, sources) {
   if (!source) f.push('source_serving_version_not_single');
   else if (!sameStoreRows(storeRows(source.bindings), sourceStoreRows(src))) {
     f.push('source_live_bindings_differ');
+  }
+  // M142 live parity: every other table Worker that binds one of this batch's shared targets must
+  // serve exactly one version whose binding reads the creator's very store entry.
+  const binders = isRecord(meta.sharedBinders) ? meta.sharedBinders : {};
+  for (const b of sharedBinders(batch, table, sources)) {
+    const live = servingVersion(Object.hasOwn(binders, b.worker) ? binders[b.worker] : null);
+    const hits = live ? storeRows(live.bindings).filter(x => x.binding === b.binding) : [];
+    if (hits.length !== 1 || hits[0].storeId !== b.storeId || hits[0].secretName !== b.secretName) {
+      f.push(`shared_parity_live_differs_${b.key}`);
+    }
   }
   const store = isRecord(meta.store) ? meta.store : {};
   const storeIds = {};

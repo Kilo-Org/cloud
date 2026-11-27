@@ -107,7 +107,9 @@
      * only X-O11Y-ADMIN-TOKEN, exactly as before (src/admin-middleware.ts). Accepting STS service
      * tokens needs the `o11y` scopes registered and granted, then a separate change that sets it
      * and STS_ENVIRONMENT. Rollback is a redeploy with it unset or `legacy-only`; it does not
-     * touch SECRETS_SOURCE.
+     * touch SECRETS_SOURCE. API_METRICS_CREDENTIAL_ACCEPT, also unset, takes the same values for
+     * POST /ingest/api-metrics alone and otherwise follows ADMIN_CREDENTIAL_ACCEPT; the alerting
+     * routes never read it. Any STS mode on either needs STS_ENVIRONMENT `production` here.
      */
   },
   /**

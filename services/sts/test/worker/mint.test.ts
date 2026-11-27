@@ -1,5 +1,9 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import {
+  STS_BOUNCER_DECIDE,
+  STS_BOUNCER_SIGNUP_DECIDE,
+  STS_BOUNCER_SIGNUP_HISTORY,
+  STS_BOUNCER_USAGE_WRITE,
   STS_DENIED_PROBE,
   STS_DENIED_PROBE_REASON,
   STS_DENIED_PROBE_WORKLOAD,
@@ -735,6 +739,87 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
       workload: `vercel:team_ItxRShuUkJaEd9GmXMEEgunb/${otherProjectId}`,
     });
   });
+});
+
+describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
+  const WEB_SCOPES = [STS_BOUNCER_DECIDE, STS_BOUNCER_USAGE_WRITE, STS_BOUNCER_SIGNUP_DECIDE];
+  const GATEWAY_SCOPES = [STS_BOUNCER_DECIDE, STS_BOUNCER_USAGE_WRITE];
+  const BOUNCER_SCOPES = [...WEB_SCOPES, STS_BOUNCER_SIGNUP_HISTORY];
+
+  function caller(workload: 'web' | 'ai-gateway'): MintCaller {
+    return {
+      channel: 'http',
+      workload,
+      identity: 'vercel',
+      attestationExp: null,
+      claims: { provider: 'vercel' },
+    };
+  }
+
+  async function mintIn(
+    environment: (typeof STS_ENVIRONMENTS)[number],
+    workload: 'web' | 'ai-gateway',
+    entry: { audience: string; scope: string }
+  ) {
+    return await serveMint(
+      env,
+      { ...config, environment },
+      {
+        caller: caller(workload),
+        request: { tokens: [entry] },
+        waitUntil,
+        authority: defaultMintAuthority,
+      }
+    );
+  }
+
+  it.each([
+    ...WEB_SCOPES.map(entry => ['web', entry] as const),
+    ...GATEWAY_SCOPES.map(entry => ['ai-gateway', entry] as const),
+  ])('lets %s mint a %o token in production', async (workload, entry) => {
+    // The policy admits the token, so the mint reaches the token signer. The test Worker's signers
+    // belong to development and refuse a production request, so the answer is `unavailable`, never
+    // a denial; the denials below show the same call refused by policy.
+    expect(await mintIn('production', workload, entry)).toEqual({
+      status: 'unavailable',
+      retryAfterSeconds: TOKEN_SIGNER_RETRY_AFTER_SECONDS,
+    });
+    expect(await issuedRows()).toEqual([]);
+    expect(await flushedDenials()).toEqual([]);
+  });
+
+  it.each([STS_BOUNCER_SIGNUP_DECIDE, STS_BOUNCER_SIGNUP_HISTORY])(
+    'refuses ai-gateway %o in production, since the gateway sends no signup call',
+    async entry => {
+      expect(await mintIn('production', 'ai-gateway', entry)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...entry, reason: 'scope_not_allowed' }],
+      });
+    }
+  );
+
+  it('refuses web bouncer:signup.history in production, since the web app sends no signup-history call', async () => {
+    expect(await mintIn('production', 'web', STS_BOUNCER_SIGNUP_HISTORY)).toEqual({
+      status: 'ok',
+      tokens: [{ status: 'denied', ...STS_BOUNCER_SIGNUP_HISTORY, reason: 'scope_not_allowed' }],
+    });
+    expect(await issuedRows()).toEqual([]);
+  });
+
+  it.each(BOUNCER_SCOPES)(
+    'refuses web and ai-gateway %o outside production, where no Bouncer accepts it',
+    async entry => {
+      for (const environment of ['development', 'staging'] as const) {
+        for (const workload of ['web', 'ai-gateway'] as const) {
+          expect(await mintIn(environment, workload, entry)).toEqual({
+            status: 'ok',
+            tokens: [{ status: 'denied', ...entry, reason: 'audience_not_allowed' }],
+          });
+        }
+      }
+      expect(await issuedRows()).toEqual([]);
+    }
+  );
 });
 
 describe('phase 4 service scopes and CI scopes under the shipped policies', () => {

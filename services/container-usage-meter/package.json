@@ -15,6 +15,7 @@
     "@kilocode/container-usage": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "drizzle-orm": "catalog:",
     "@kilocode/worker-utils": "workspace:*"
   },

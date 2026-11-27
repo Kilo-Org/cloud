@@ -72,6 +72,31 @@ export const STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH = {
 } as const;
 
 /**
+ * The web app and the AI gateway call Bouncer (repo Kilo-Org/bouncer) for verdicts: `decide`,
+ * `charge-decide` and `release`. Bouncer's `ROUTE_SCOPES` (`src/api-auth.ts`) names the scope of
+ * each route; the four Bouncer pairs here match it.
+ */
+export const STS_BOUNCER_DECIDE = { audience: 'bouncer', scope: 'bouncer:decide' } as const;
+
+/** The web app and the AI gateway report usage and credit events to Bouncer. */
+export const STS_BOUNCER_USAGE_WRITE = {
+  audience: 'bouncer',
+  scope: 'bouncer:usage.write',
+} as const;
+
+/** The web app asks Bouncer whether a signup may proceed. */
+export const STS_BOUNCER_SIGNUP_DECIDE = {
+  audience: 'bouncer',
+  scope: 'bouncer:signup.decide',
+} as const;
+
+/** The signup-history import job writes signup history to Bouncer; no app holds this scope. */
+export const STS_BOUNCER_SIGNUP_HISTORY = {
+  audience: 'bouncer',
+  scope: 'bouncer:signup.history',
+} as const;
+
+/**
  * A GitHub Actions job asks the web app to mint the one-hour catalog API token
  * (`POST /api/internal/mcp-catalog/token`): the MCP catalog dump and the kilo-app changelog jobs.
  */
@@ -98,9 +123,10 @@ export const STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC = {
  * phase 4 are the Secure Proxy forward (`STS_SECURE_PROXY_FORWARD`), the usage publish to Usage
  * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
  * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
- * finding dismissal (`STS_SECURITY_SYNC_*`), and the web app's security notification dispatch
- * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`). The CI scopes are the web app's catalog token mint
- * (`STS_WEB_MCP_CATALOG_TOKEN_MINT`) and the community contributions dashboard's opencode sync
+ * finding dismissal (`STS_SECURITY_SYNC_*`), the web app's security notification dispatch
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), and the Bouncer scopes (`STS_BOUNCER_*`). The CI
+ * scopes are the web app's catalog token mint (`STS_WEB_MCP_CATALOG_TOKEN_MINT`) and the
+ * community contributions dashboard's opencode sync
  * (`STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC`). STS mints each one only where a policy
  * grants it (default deny).
  */
@@ -134,6 +160,14 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   'security-sync': {
     scopes: [STS_SECURITY_SYNC_MANUAL_SYNC.scope, STS_SECURITY_SYNC_DISMISS_FINDING.scope],
+  },
+  [STS_BOUNCER_DECIDE.audience]: {
+    scopes: [
+      STS_BOUNCER_DECIDE.scope,
+      STS_BOUNCER_USAGE_WRITE.scope,
+      STS_BOUNCER_SIGNUP_DECIDE.scope,
+      STS_BOUNCER_SIGNUP_HISTORY.scope,
+    ],
   },
   'community-contributions-dashboard': {
     scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],

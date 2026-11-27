@@ -23,7 +23,7 @@ import {
 } from './models-dev';
 import { parseAwsBedrockModelsDevModels } from './bedrock-models';
 import { parseGcpVertexModelsDevModels } from './vertex-models';
-import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { recordSyncCompleted } from '@/lib/providers/sync-state';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;

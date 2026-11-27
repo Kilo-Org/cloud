@@ -38,7 +38,7 @@ function expectThrow(sources: Record<string, string>, fragment: string): void {
 }
 
 describe('migration-run policies', () => {
-  it('ships ci-db-migrate and ci-db-migrate-staging, and reserves migration-proxy', () => {
+  it('ships ci-db-migrate, ci-db-migrate-staging and the migration-proxy Worker policy', () => {
     expect(policyIndex.get('production', 'ci-db-migrate')).toMatchObject({
       environments: ['production'],
       secrets: [],
@@ -59,8 +59,15 @@ describe('migration-run policies', () => {
         jobWorkflowRefs: ['Kilo-Org/cloud/.github/workflows/deploy-staging.yml@refs/heads/main'],
       },
     });
-    expect(policyIndex.registered()).toContain('migration-proxy');
-    expect(policyIndex.has('migration-proxy')).toBe(false);
+    for (const environment of ['staging', 'production'] as const) {
+      expect(policyIndex.get(environment, 'migration-proxy')).toMatchObject({
+        environments: ['staging', 'production'],
+        identity: { kind: 'worker-binding' },
+        secrets: ['MIGRATION_PROXY_DB_PASSWORD', 'MIGRATION_PROXY_GITHUB_APP_KEY'],
+      });
+    }
+    expect(policyIndex.registered()).not.toContain('migration-proxy');
+    expect(policyIndex.get('development', 'migration-proxy')).toBeNull();
   });
 
   it('accepts the trigger-only policy with workflow_run and production (Q71 carve-out)', () => {

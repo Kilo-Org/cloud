@@ -931,21 +931,33 @@ describe('dual-accept grants of the shipped policies', () => {
   );
 
   it.each(['staging', 'production'] as const)(
-    'grants the callers only these scopes and audiences in %s',
+    'grants the callers only these scopes and audiences in %s, beside the production Bouncer grants',
     environment => {
+      const bouncer = environment === 'production';
       expect(policyFor(environment, 'usage-ingest')).toMatchObject({
         audiences: ['web'],
         scopes: ['web:sts.canary', 'web:usage.record'],
         secrets: [],
       });
       expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y'],
-        scopes: WEB_BASE_SCOPES,
+        audiences: ['usage-ingest', 'o11y', ...(bouncer ? ['bouncer'] : [])],
+        scopes: [
+          ...WEB_BASE_SCOPES,
+          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] : []),
+        ],
         secrets: [],
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
-        scopes: GATEWAY_BASE_SCOPES,
+        audiences: [
+          'usage-ingest',
+          'o11y',
+          'ai-gateway-secure-proxy',
+          ...(bouncer ? ['bouncer'] : []),
+        ],
+        scopes: [
+          ...GATEWAY_BASE_SCOPES,
+          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
+        ],
         secrets: [],
       });
     }

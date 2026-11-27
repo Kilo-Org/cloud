@@ -1,4 +1,5 @@
-// Fences every direct services/*/wrangler.{jsonc,toml}: no nonproduction
+// Fences every direct services/*/wrangler.{json,jsonc,toml}, each file on its
+// own even when several coexist (Wrangler picks one by precedence): no nonproduction
 // environment may publish to a production host, run an inherited schedule, or
 // bind a production or hosted database. Configs render through the pinned
 // Wrangler in the usage-ingest closure, so inheritance matches `wrangler deploy
@@ -84,7 +85,7 @@ function render(service, path, env) {
 const services = readdirSync(servicesDir, { withFileTypes: true })
   .filter(entry => entry.isDirectory())
   .flatMap(entry =>
-    ['wrangler.jsonc', 'wrangler.toml']
+    ['wrangler.json', 'wrangler.jsonc', 'wrangler.toml']
       .map(file => join(servicesDir, entry.name, file))
       .filter(path => existsSync(path))
       .map(path => {

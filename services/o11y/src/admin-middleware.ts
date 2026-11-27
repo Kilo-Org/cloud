@@ -16,7 +16,7 @@ import { SecretNotConfiguredError, readO11ySecret } from './secrets';
  * `O11Y_KILO_GATEWAY_CLIENT_SECRET` in `X-O11Y-ADMIN-TOKEN` moves to an STS service token with the
  * `o11y` audience). The set is closed: a value outside it refuses every request, never a default.
  * Unset means `legacy-only`, the behaviour before phase 4. Rollback is a redeploy with the value
- * set back to `legacy-only`, independent of `SECRETS_SOURCE` and of the callers' own switches.
+ * set back to `legacy-only`, independent of the callers' own switches.
  * `API_METRICS_CREDENTIAL_ACCEPT` takes the same values for `POST /ingest/api-metrics` alone.
  */
 export const ADMIN_CREDENTIAL_ACCEPT_MODES = [

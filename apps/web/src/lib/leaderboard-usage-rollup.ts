@@ -9,6 +9,16 @@ export const LEADERBOARD_USAGE_LOOKBACK_DAYS = 7;
 /** Runs before this UTC hour rebuild yesterday even when it is already built. */
 export const YESTERDAY_SETTLING_HOURS = 6;
 
+/**
+ * How long after a day ends before it is first built. Usage-ingest queue
+ * retries can write a row ~20 minutes after its `created_at`, so building
+ * earlier would publish a day that is visibly short.
+ */
+export const DAY_SETTLE_MS = 60 * 60 * 1000;
+
+/** Days built per run, bounding replica load and the work a killed run loses. */
+export const MAX_DAYS_PER_RUN = 2;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSERT_BATCH_SIZE = 1_000;
 
@@ -114,12 +124,13 @@ function keyOf(row: LeaderboardUsageKey): string {
 
 /**
  * Aggregates one UTC day of usage from `readDb` 15 minutes at a time, then replaces
- * that day's rollup rows on `db` in one transaction. Returns the rows written.
+ * that day's rollup rows on `db` in one transaction. Returns the rows written, or
+ * `null` without writing anything when `deadline` passes before the last slice.
  */
 export async function rebuildLeaderboardUsageDay(
   usageDate: string,
-  { readDb, db }: { readDb: DrizzleDatabase; db: DrizzleDatabase }
-): Promise<number> {
+  { readDb, db, deadline }: { readDb: DrizzleDatabase; db: DrizzleDatabase; deadline?: number }
+): Promise<number | null> {
   const dayStartMs = Date.parse(`${usageDate}T00:00:00.000Z`);
   const rows = new Map<string, LeaderboardUsageRow>();
 
@@ -128,6 +139,7 @@ export async function rebuildLeaderboardUsageDay(
     sliceStartMs < dayStartMs + DAY_MS;
     sliceStartMs += SLICE_MS
   ) {
+    if (deadline !== undefined && Date.now() >= deadline) return null;
     const start = new Date(sliceStartMs).toISOString();
     const end = new Date(sliceStartMs + SLICE_MS).toISOString();
     for (const aggregate of await aggregateSlice(readDb, start, end)) {
@@ -182,15 +194,33 @@ export async function rebuildLeaderboardUsageDay(
 }
 
 /**
- * Builds every day in the leaderboard window that has no rollup rows yet, and
- * rebuilds yesterday during its settling period, newest first, until `deadline`.
+ * The days in `window` that may be built: their settle period has passed, and
+ * `readDb` has replayed past it. `replayedAtMs` is null on a primary.
+ */
+export function settledLeaderboardUsageDays(
+  window: string[],
+  now: Date,
+  replayedAtMs: number | null
+): string[] {
+  return window.filter(usageDate => {
+    const settledAtMs = Date.parse(`${usageDate}T00:00:00.000Z`) + DAY_MS + DAY_SETTLE_MS;
+    return now.getTime() >= settledAtMs && (replayedAtMs === null || replayedAtMs >= settledAtMs);
+  });
+}
+
+/**
+ * Builds the days in the leaderboard window that have no rollup rows yet,
+ * newest first, then rebuilds yesterday during its settling period. A run
+ * builds at most `MAX_DAYS_PER_RUN` days and stops at `deadline`, even partway
+ * through a day; whatever is left is reported as `remaining` for the next run.
  *
- * A usage row's `created_at` is stamped when the gateway sends it, before it
- * passes through the usage-ingest queue, whose retries can land it 20+ minutes
- * later. A replica can also lag at build time. So a day built just after
- * midnight can miss its last rows, and yesterday is rebuilt on every run until
- * `YESTERDAY_SETTLING_HOURS` UTC to pick them up. Rows landing later than that,
- * such as dead-letter replays, are not reflected.
+ * Each day is written whole, so the routes never see a partly built day. A day
+ * is first built `DAY_SETTLE_MS` after it ends, and only once `readDb` has
+ * replayed past that point, because a usage row's `created_at` is stamped when
+ * the gateway sends it, before usage-ingest queue retries can delay its write.
+ * Stragglers after that are picked up by rebuilding yesterday on every run until
+ * `YESTERDAY_SETTLING_HOURS` UTC. Rows landing later, such as dead-letter
+ * replays, are not reflected.
  */
 export async function buildLeaderboardUsageDays({
   readDb,
@@ -210,15 +240,27 @@ export async function buildLeaderboardUsageDays({
     WHERE usage_date >= ${window[window.length - 1]} AND usage_date <= ${window[0]}
   `);
   const builtDates = new Set(existing.rows.map(row => row.usage_date));
-  const settling = now.getUTCHours() < YESTERDAY_SETTLING_HOURS;
-  const toBuild = window.filter(
-    (usageDate, index) => !builtDates.has(usageDate) || (settling && index === 0)
-  );
+  // One request keeps one replica, so this is the replica the slices read.
+  const replay = await readDb.execute<{ replayed_at_ms: number | null }>(sql`
+    SELECT (extract(epoch FROM pg_last_xact_replay_timestamp()) * 1000)::float8 AS replayed_at_ms
+  `);
+  const settled = settledLeaderboardUsageDays(window, now, replay.rows[0]?.replayed_at_ms ?? null);
+  const yesterday = window[0];
+  const rebuildYesterday =
+    now.getUTCHours() < YESTERDAY_SETTLING_HOURS &&
+    builtDates.has(yesterday) &&
+    settled.includes(yesterday);
+  const toBuild = [
+    ...settled.filter(usageDate => !builtDates.has(usageDate)),
+    ...(rebuildYesterday ? [yesterday] : []),
+  ];
 
   const built: { usageDate: string; rows: number }[] = [];
-  for (const usageDate of toBuild) {
+  for (const usageDate of toBuild.slice(0, MAX_DAYS_PER_RUN)) {
     if (Date.now() >= deadline) break;
-    built.push({ usageDate, rows: await rebuildLeaderboardUsageDay(usageDate, { readDb, db }) });
+    const rows = await rebuildLeaderboardUsageDay(usageDate, { readDb, db, deadline });
+    if (rows === null) break;
+    built.push({ usageDate, rows });
   }
 
   return {

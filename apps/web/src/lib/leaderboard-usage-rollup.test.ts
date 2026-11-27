@@ -13,6 +13,7 @@ import {
   buildLeaderboardUsageDays,
   leaderboardUsageWindow,
   rebuildLeaderboardUsageDay,
+  settledLeaderboardUsageDays,
 } from '@/lib/leaderboard-usage-rollup';
 
 type UsageInput = {
@@ -199,13 +200,59 @@ describe('leaderboard usage rollup', () => {
     ]);
   });
 
-  test('builds only the days in the window that have no rollup yet', async () => {
-    const now = new Date('2026-11-10T00:20:00.000Z');
-    for (const day of ['02', '03', '08', '09', '10']) {
-      await insertUsage({ created_at: `2026-11-${day}T12:00:00.000Z` });
+  test('first builds a day an hour after it ends, once the replica has replayed that far', () => {
+    const window = ['2026-11-09', '2026-11-08'];
+
+    expect(settledLeaderboardUsageDays(window, new Date('2026-11-10T00:59:00.000Z'), null)).toEqual(
+      ['2026-11-08']
+    );
+    expect(settledLeaderboardUsageDays(window, new Date('2026-11-10T01:00:00.000Z'), null)).toEqual(
+      window
+    );
+    expect(
+      settledLeaderboardUsageDays(
+        window,
+        new Date('2026-11-10T01:20:00.000Z'),
+        Date.parse('2026-11-10T00:50:00.000Z')
+      )
+    ).toEqual(['2026-11-08']);
+  });
+
+  test('builds missing days newest first, at most two per run', async () => {
+    const now = new Date('2026-11-10T01:20:00.000Z');
+    for (const day of leaderboardUsageWindow(now)) {
+      await insertUsage({ created_at: `${day}T12:00:00.000Z` });
     }
     await rebuildLeaderboardUsageDay('2026-11-08', { readDb: db, db });
     await insertUsage({ created_at: '2026-11-08T13:00:00.000Z' });
+
+    const first = await buildLeaderboardUsageDays({
+      readDb: db,
+      db,
+      now,
+      deadline: Date.now() + 60_000,
+    });
+    const second = await buildLeaderboardUsageDays({
+      readDb: db,
+      db,
+      now,
+      deadline: Date.now() + 60_000,
+    });
+
+    expect(first.built.map(day => day.usageDate)).toEqual(['2026-11-09', '2026-11-07']);
+    expect(first.remaining).toEqual(['2026-11-06', '2026-11-05', '2026-11-04', '2026-11-03']);
+    expect(second.built.map(day => day.usageDate)).toEqual(['2026-11-06', '2026-11-05']);
+    // A built day is not rebuilt for the second row added after it was built.
+    expect(
+      (await rollupRows())
+        .filter(row => row.usage_date === '2026-11-08')
+        .map(row => row.request_count)
+    ).toEqual([1]);
+  });
+
+  test('does not build yesterday within an hour of midnight', async () => {
+    const now = new Date('2026-11-10T00:20:00.000Z');
+    await insertUsage({ created_at: '2026-11-09T12:00:00.000Z' });
 
     const result = await buildLeaderboardUsageDays({
       readDb: db,
@@ -214,22 +261,9 @@ describe('leaderboard usage rollup', () => {
       deadline: Date.now() + 60_000,
     });
 
-    expect(result.built.map(day => day.usageDate)).toEqual([
-      '2026-11-09',
-      '2026-11-07',
-      '2026-11-06',
-      '2026-11-05',
-      '2026-11-04',
-      '2026-11-03',
-    ]);
-    expect(result.remaining).toEqual([]);
-    expect(
-      (await rollupRows()).map(row => ({ date: row.usage_date, requests: row.request_count }))
-    ).toEqual([
-      { date: '2026-11-03', requests: 1 },
-      { date: '2026-11-08', requests: 1 },
-      { date: '2026-11-09', requests: 1 },
-    ]);
+    expect(result.built.map(day => day.usageDate)).not.toContain('2026-11-09');
+    expect(result.remaining).not.toContain('2026-11-09');
+    expect(await rollupRows()).toEqual([]);
   });
 
   test.each([
@@ -238,8 +272,9 @@ describe('leaderboard usage rollup', () => {
   ])(
     'rebuilds yesterday for late usage rows only before 06:00 UTC ($now)',
     async ({ now, requests, rebuilt }) => {
-      await insertUsage({ created_at: '2026-11-09T12:00:00.000Z' });
-      for (const day of leaderboardUsageWindow(new Date(now))) {
+      const window = leaderboardUsageWindow(new Date(now));
+      for (const day of window) {
+        await insertUsage({ created_at: `${day}T12:00:00.000Z` });
         await rebuildLeaderboardUsageDay(day, { readDb: db, db });
       }
       await insertUsage({ created_at: '2026-11-09T23:59:59.000Z' });
@@ -251,13 +286,12 @@ describe('leaderboard usage rollup', () => {
         deadline: Date.now() + 60_000,
       });
 
-      // The empty days stay unbuilt and are retried; only yesterday matters here.
-      expect(result.built.map(day => day.usageDate).filter(day => day === '2026-11-09')).toEqual(
-        rebuilt
-      );
+      expect(result.built.map(day => day.usageDate)).toEqual(rebuilt);
       expect(
-        (await rollupRows()).map(row => ({ date: row.usage_date, requests: row.request_count }))
-      ).toEqual([{ date: '2026-11-09', requests }]);
+        (await rollupRows())
+          .filter(row => row.usage_date === '2026-11-09')
+          .map(row => row.request_count)
+      ).toEqual([requests]);
     }
   );
 
@@ -265,11 +299,26 @@ describe('leaderboard usage rollup', () => {
     const result = await buildLeaderboardUsageDays({
       readDb: db,
       db,
-      now: new Date('2026-11-10T00:20:00.000Z'),
+      now: new Date('2026-11-10T01:20:00.000Z'),
       deadline: Date.now(),
     });
 
     expect(result.built).toEqual([]);
     expect(result.remaining).toHaveLength(7);
+  });
+
+  test('a day whose deadline passes before its last slice writes nothing', async () => {
+    await insertUsage({ created_at: '2026-11-10T12:00:00.000Z' });
+    await rebuildLeaderboardUsageDay('2026-11-10', { readDb: db, db });
+    await insertUsage({ created_at: '2026-11-10T13:00:00.000Z' });
+
+    const rows = await rebuildLeaderboardUsageDay('2026-11-10', {
+      readDb: db,
+      db,
+      deadline: Date.now(),
+    });
+
+    expect(rows).toBeNull();
+    expect((await rollupRows()).map(row => row.request_count)).toEqual([1]);
   });
 });

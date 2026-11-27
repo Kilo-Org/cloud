@@ -132,8 +132,7 @@
         "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
       },
       // No schedule outside production: a config that binds STS runs none
-      // (services/sts/test/repo/worker-configs.ts), and a deploy of this block
-      // would reach the production database through its Hyperdrive id.
+      // (services/sts/test/repo/worker-configs.ts).
       // `wrangler dev` never runs crons by itself and uses the local
       // connection string; trigger a handler by hand, for example
       // `curl "http://127.0.0.1:8812/cdn-cgi/local/scheduled?cron=15+*+*+*+*"`

@@ -23,11 +23,7 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
 import { computeContentHashes } from './conversation-identity';
-import {
-  toUsageRecordWireBody,
-  UsageRecordRequestSchema,
-  type UsageRecordRequest,
-} from '@kilocode/usage-contracts';
+import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import {
   buildClassifierUsage,
   writeClassifierUsage,
@@ -1258,11 +1254,11 @@ describe('auto routing worker', () => {
         new Date(generation).toISOString()
       );
       expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(1);
-      expect(cacheRecordClassifierUsage).toHaveBeenCalledWith(toUsageRecordWireBody(expected));
+      expect(cacheRecordClassifierUsage).toHaveBeenCalledWith(expected);
       expect(mockedFetch).toHaveBeenCalledTimes(1);
       const body = mockedFetch.mock.calls[0]?.[1]?.body;
       expect(typeof body).toBe('string');
-      expect(JSON.parse(body as string)).toEqual(toUsageRecordWireBody(expected));
+      expect(JSON.parse(body as string)).toEqual(expected);
     }
 
     describe.each([1, 2, null])('messageCount=%s', messageCount => {
@@ -1749,9 +1745,7 @@ describe('auto routing worker', () => {
       });
       const body = mockedFetch.mock.calls[0]?.[1]?.body;
       if (typeof body !== 'string') throw new Error('Expected serialized usage body');
-      expect(JSON.parse(body)).toEqual(
-        toUsageRecordWireBody(UsageRecordRequestSchema.parse(usage))
-      );
+      expect(JSON.parse(body)).toEqual(usage);
       expect(mockedFetch.mock.calls[0]?.[1]?.headers).toMatchObject({
         'x-internal-api-key': 'classifier-token',
       });

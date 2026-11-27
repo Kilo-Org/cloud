@@ -5,11 +5,10 @@ import {
   USAGE_INGEST_URL,
   USAGE_INGEST_PUBLISH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
-import {
-  toUsageRecordWireBody,
-  type EnkryptUsageWriteInput,
-  type ExaUsageRecord,
-  type LlmUsageQueueMessage,
+import type {
+  EnkryptUsageWriteInput,
+  ExaUsageRecord,
+  LlmUsageQueueMessage,
 } from '@kilocode/usage-contracts';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
@@ -141,14 +140,9 @@ export async function enqueueUsage(
   payload: LlmUsageQueueMessage,
   { retryTransientFailures = false }: { retryTransientFailures?: boolean } = {}
 ): Promise<UsageEnqueueOutcome> {
-  return publishToUsageIngest(
-    { usageId: payload.core.id },
-    USAGE_INGEST_URL,
-    toUsageRecordWireBody(payload),
-    {
-      retryTransientFailures,
-    }
-  );
+  return publishToUsageIngest({ usageId: payload.core.id }, USAGE_INGEST_URL, payload, {
+    retryTransientFailures,
+  });
 }
 
 const USAGE_INGEST_PATH = '/usage';

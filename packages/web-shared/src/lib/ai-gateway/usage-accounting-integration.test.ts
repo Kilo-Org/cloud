@@ -11,7 +11,7 @@ import { createServer } from 'node:http';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
-import { toUsageRecordWireBody, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 
 const nativeFetch = globalThis.fetch;
@@ -1299,8 +1299,8 @@ describe('queued usage accounting', () => {
         expect(result).toMatchObject({ status: 'queued' });
         const payload = jest.mocked(publisher.enqueueUsage).mock.calls[0][0];
         expect(jest.mocked(fetch).mock.calls.map(([, init]) => init?.body)).toEqual([
-          JSON.stringify(toUsageRecordWireBody(payload)),
-          JSON.stringify(toUsageRecordWireBody(payload)),
+          JSON.stringify(payload),
+          JSON.stringify(payload),
         ]);
         expect(writer).not.toHaveBeenCalled();
         expect(db.transaction).not.toHaveBeenCalled();
@@ -1412,9 +1412,7 @@ describe('queued usage accounting', () => {
           : 0;
         expect(fetch).toHaveBeenCalledTimes(attempts);
         expect(sent).toEqual(
-          Array.from({ length: attempts }, () =>
-            JSON.parse(JSON.stringify(toUsageRecordWireBody(payload)))
-          )
+          Array.from({ length: attempts }, () => JSON.parse(JSON.stringify(payload)))
         );
         // Every completed HTTP attempt, and only those, writes one attempt diagnostic.
         expect(

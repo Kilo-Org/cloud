@@ -3,7 +3,6 @@ import { setTimeout } from 'node:timers/promises';
 import { createTestHarness } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { stsStandIn } from './sts-stand-in.test-fixture';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import { usage } from './usage.test-fixture';
 
 it.each([undefined, 'staging'])(
@@ -103,7 +102,7 @@ it.each([undefined, 'staging'])(
       expect(calls).toEqual(
         Array.from({ length: 2 }, () => ({
           path: '/api/internal/usage/record',
-          body: toUsageRecordWireBody(event),
+          body: event,
           secret: 'local-writer',
           bypass: 'local-bypass',
           source: 'queue',

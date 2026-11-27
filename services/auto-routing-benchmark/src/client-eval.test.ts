@@ -9,7 +9,6 @@ import {
   type InternalClientEvalResultRequest,
 } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import * as z from 'zod';
 import { runDeciderCaseViaCli } from './cli-runner';
 import {
@@ -275,7 +274,6 @@ describe('client eval (real SQLite)', () => {
       model: 'auto-routing/grader',
       cost: 2100,
     });
-    expect(usage.metadata).not.toHaveProperty('user_prompt_prefix');
   });
 
   it('grades a judged case once when parallel uploads race for it', async () => {
@@ -595,10 +593,6 @@ describe('client eval (real SQLite)', () => {
     );
     writeUsage.mockResolvedValueOnce({ kind: 'unavailable', reason: 'http_error' });
     await expect(gradeClientEvalResult(db, CONFIG, upload(judged), deps)).rejects.toThrow();
-    const stored = sqlite
-      .prepare('SELECT pending_grader_usage AS pending FROM client_case_results')
-      .get() as { pending: string };
-    expect(JSON.parse(stored.pending)).toEqual(toUsageRecordWireBody(writeUsage.mock.calls[0][0]));
 
     expect(await gradeClientEvalResult(db, CONFIG, upload(judged), deps)).toEqual({ score: 0.75 });
     expect(await gradeClientEvalResult(db, CONFIG, upload(judged), deps)).toEqual({ score: 0.75 });

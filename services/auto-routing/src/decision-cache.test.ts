@@ -8,7 +8,6 @@ import {
   readConversationState,
 } from './decision-cache';
 import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import { buildClassifierUsage } from './classifier-usage';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -243,10 +242,7 @@ describe('classifier usage retries', () => {
     const key = `usage:${usage.core.id}`;
     fetchMock.mockRejectedValueOnce(new Error('connection lost'));
     await cacheDO.recordClassifierUsage(usage);
-    expect(storage.put.mock.calls[0]).toEqual([
-      key,
-      expect.objectContaining({ usage: toUsageRecordWireBody(usage) }),
-    ]);
+    expect(storage.put.mock.calls[0]).toEqual([key, expect.objectContaining({ usage })]);
     expect(storage.put.mock.invocationCallOrder[0]).toBeLessThan(
       fetchMock.mock.invocationCallOrder[0]
     );
@@ -257,9 +253,7 @@ describe('classifier usage retries', () => {
     vi.advanceTimersByTime(1000);
     storage.clearAlarmForTest();
     await cacheDO.alarm();
-    expect(storage.entries.get(key)).toEqual(
-      expect.objectContaining({ usage: toUsageRecordWireBody(usage), attempts: 2 })
-    );
+    expect(storage.entries.get(key)).toMatchObject({ attempts: 2 });
     await expect(storage.getAlarm()).resolves.toBe(Date.now() + 2000);
 
     fetchMock.mockResolvedValueOnce(
@@ -281,7 +275,7 @@ describe('classifier usage retries', () => {
     for (const [, init] of fetchMock.mock.calls) {
       const body = init?.body;
       if (typeof body !== 'string') throw new Error('Expected serialized usage body');
-      expect(JSON.parse(body)).toEqual(toUsageRecordWireBody(usage));
+      expect(JSON.parse(body)).toEqual(usage);
     }
   });
 

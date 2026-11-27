@@ -1,12 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { z } from 'zod';
 
 import type { KiloOrganizationId } from './schema-types';
-import {
-  UsageRecordRequestSchema,
-  UsageRecordResponseSchema,
-  toUsageRecordWireBody,
-} from './index';
+import { UsageRecordRequestSchema, UsageRecordResponseSchema } from './index';
 
 const RETIRED_METADATA_KEYS = [
   'user_prompt_prefix',
@@ -168,36 +163,6 @@ describe('UsageRecordRequestSchema', () => {
       for (const key of RETIRED_METADATA_KEYS) expect(parsed.metadata).not.toHaveProperty(key);
     }
   );
-
-  describe('toUsageRecordWireBody', () => {
-    // The schema before the retirement: older receivers still require these keys.
-    const PreRetirementRequestSchema = UsageRecordRequestSchema.extend({
-      metadata: UsageRecordRequestSchema.shape.metadata.extend({
-        user_prompt_prefix: z.string().nullable(),
-        system_prompt_prefix: z.string().nullable(),
-        abuse_delay: z.number().nullable(),
-        abuse_downgraded_from: z.string().nullable(),
-      }),
-    });
-
-    test('satisfies a receiver that still requires the retired keys', () => {
-      const body = toUsageRecordWireBody(UsageRecordRequestSchema.parse(validRequest()));
-      expect(PreRetirementRequestSchema.safeParse(JSON.parse(JSON.stringify(body))).success).toBe(
-        true
-      );
-      for (const key of RETIRED_METADATA_KEYS) expect(body.metadata[key]).toBeNull();
-    });
-
-    test('is still accepted by the current schema, without the retired keys', () => {
-      const body = toUsageRecordWireBody(UsageRecordRequestSchema.parse(validRequest()));
-      const parsed = UsageRecordRequestSchema.parse(body);
-      for (const key of RETIRED_METADATA_KEYS) expect(parsed.metadata).not.toHaveProperty(key);
-    });
-
-    test('a body without the helper fails the pre-retirement schema', () => {
-      expect(PreRetirementRequestSchema.safeParse(validRequest()).success).toBe(false);
-    });
-  });
 
   test('rejects a non-integer cost', () => {
     const request = validRequest();

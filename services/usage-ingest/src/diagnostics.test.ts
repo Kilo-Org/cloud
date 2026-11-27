@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import worker from './index';
 import type { Env } from './publish-usage';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -104,7 +104,7 @@ it('captures explicit enqueue boundaries and returned metrics without another qu
     queue_backlog_bytes: 120,
     queue_oldest_message_at_ms: 500,
   });
-  expect(send).toHaveBeenCalledExactlyOnceWith(wireUsage, { contentType: 'json' });
+  expect(send).toHaveBeenCalledExactlyOnceWith(usage, { contentType: 'json' });
   expect(metrics).not.toHaveBeenCalled();
 });
 

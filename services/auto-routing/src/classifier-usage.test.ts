@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MirrorPayloadSchema, type MirrorPayload } from '@kilocode/auto-routing-contracts';
-import { toUsageRecordWireBody, UsageRecordRequestSchema } from '@kilocode/usage-contracts';
+import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import {
   buildClassifierUsage,
   recordClassifierUsage,
@@ -197,7 +197,7 @@ describe('classifier usage delivery', () => {
         costUsd,
         createdAt
       );
-      expect(record).toHaveBeenCalledExactlyOnceWith(toUsageRecordWireBody(expected));
+      expect(record).toHaveBeenCalledExactlyOnceWith(expected);
       expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
     }
   );
@@ -276,7 +276,7 @@ describe('classifier usage delivery', () => {
           'content-type': 'application/json',
           'x-internal-api-key': 'test-internal-secret',
         },
-        body: JSON.stringify(toUsageRecordWireBody(usage)),
+        body: JSON.stringify(usage),
       })
     );
   });

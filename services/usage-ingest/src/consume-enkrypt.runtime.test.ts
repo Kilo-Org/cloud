@@ -2,7 +2,7 @@ import type { RequestListener } from 'node:http';
 import { expect, it } from 'vitest';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { withTaggedConsumerRuntime } from './tagged-consumer.test-fixture';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 
 type EnkryptReply = 'recorded' | 'duplicate' | 'admission' | 'wrong_echo' | 'missing_echo';
 
@@ -98,10 +98,7 @@ it('routes tagged Enkrypt messages through workerd and keeps untagged LLM dispos
     expect(mixed.retryMessages).toEqual([]);
     expect(
       calls.slice(-2).toSorted((a, b) => String(a.path).localeCompare(String(b.path)))
-    ).toEqual([
-      enkryptCall,
-      { path: '/api/internal/usage/record', body: wireUsage, source: 'queue' },
-    ]);
+    ).toEqual([enkryptCall, { path: '/api/internal/usage/record', body: usage, source: 'queue' }]);
 
     const processing = logs
       .map(log => JSON.stringify(log))

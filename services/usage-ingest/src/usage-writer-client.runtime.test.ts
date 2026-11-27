@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createTestHarness } from 'wrangler';
 import { expect, it } from 'vitest';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 
 it('calls a local HTTP writer from workerd and checks the acknowledgement', async () => {
   const received: { path: string; secret: string | string[] | undefined; body: unknown }[] = [];
@@ -84,7 +84,7 @@ it('calls a local HTTP writer from workerd and checks the acknowledgement', asyn
       Array.from({ length: 3 }, () => ({
         path: '/api/internal/usage/record',
         secret: 'synthetic-writer-secret',
-        body: wireUsage,
+        body: usage,
       }))
     );
     expect(JSON.stringify(server.getLogs())).not.toContain('synthetic-writer-secret');

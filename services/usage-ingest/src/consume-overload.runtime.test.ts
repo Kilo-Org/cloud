@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it, vi } from 'vitest';
 import { unstable_readConfig, unstable_startWorker } from 'wrangler';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
 import { usage } from './usage.test-fixture';
 
 // The worker consumes messages in parallel, so compare recorded writes as a set keyed by usage id.
@@ -13,7 +12,7 @@ const sortById = (list: { core: { id: string } }[]) =>
   list.toSorted((a, b) => a.core.id.localeCompare(b.core.id));
 
 async function testQueueRetryDelay(randomValue: number) {
-  const calls: ReturnType<typeof toUsageRecordWireBody>[] = [];
+  const calls: (typeof usage)[] = [];
   let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
   let statusById: Map<string, number | 'recorded' | 'duplicate' | 'admission'> | undefined;
   let mixedStatus: number | 'admission' | undefined;
@@ -146,7 +145,7 @@ async function testQueueRetryDelay(randomValue: number) {
       'queue-5',
     ]);
     expect(successfulResult.retryMessages).toEqual([]);
-    expect(sortById(calls)).toEqual(sortById(events.map(toUsageRecordWireBody)));
+    expect(sortById(calls)).toEqual(sortById(events));
     expect(peak).toBe(2);
     expect(statuses).toEqual([]);
     for (const status of [400, 429, 503, 'admission'] as const) {
@@ -171,9 +170,7 @@ async function testQueueRetryDelay(randomValue: number) {
       const delay = result.retryMessages[0].delaySeconds;
       expect(delay).toBeGreaterThanOrEqual(status === 'admission' ? 2 : 60);
       expect(delay).toBeLessThanOrEqual(status === 'admission' ? 4 : 120);
-      expect(sortById(calls.slice(-2))).toEqual(
-        sortById(events.slice(0, 2).map(toUsageRecordWireBody))
-      );
+      expect(sortById(calls.slice(-2))).toEqual(sortById(events.slice(0, 2)));
     }
     mixedStatus = undefined;
     for (const status of [429, 503, 'admission'] as const) {
@@ -197,7 +194,7 @@ async function testQueueRetryDelay(randomValue: number) {
       expect(result.ackAll).toBe(false);
       expect(result.explicitAcks.toSorted()).toEqual(['queue-0', 'queue-3', 'queue-4', 'queue-5']);
       expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1', 'queue-2']);
-      expect(sortById(calls.slice(-6))).toEqual(sortById(events.map(toUsageRecordWireBody)));
+      expect(sortById(calls.slice(-6))).toEqual(sortById(events));
       // A later delivery retains the usage identity and can settle as a duplicate.
       statusById = undefined;
       statuses = ['duplicate'];
@@ -205,7 +202,7 @@ async function testQueueRetryDelay(randomValue: number) {
       expect(replay.outcome).toBe('ok');
       expect(replay.explicitAcks).toEqual(['queue-1']);
       expect(replay.retryMessages).toEqual([]);
-      expect(calls.at(-1)).toEqual(toUsageRecordWireBody(events[1]));
+      expect(calls.at(-1)).toEqual(events[1]);
     }
     for (const status of [400, 401, 403, 500, 502, 504]) {
       statuses = [status];

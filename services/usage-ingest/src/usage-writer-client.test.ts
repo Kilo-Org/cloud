@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { toUsageRecordWireBody } from '@kilocode/usage-contracts';
-import { usage, wireUsage } from './usage.test-fixture';
+import { usage } from './usage.test-fixture';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaRecord } from './exa-usage.test-fixture';
 import {
@@ -229,15 +228,8 @@ describe('usage writer client', () => {
         'x-internal-api-key': config.secret,
         'x-vercel-protection-bypass': config.protectionBypass,
       },
-      body: JSON.stringify(toUsageRecordWireBody(event)),
+      body: JSON.stringify(event),
       signal: expect.any(AbortSignal),
-    });
-    const sent = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-    expect(sent.metadata).toMatchObject({
-      user_prompt_prefix: null,
-      system_prompt_prefix: null,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
     });
     pending.resolve(Response.json({ status: 'recorded', result }));
     expect(await outcome).toEqual({ kind: 'recorded', result });
@@ -259,7 +251,7 @@ describe('usage writer client', () => {
         authorization: `Bearer ${serviceToken}`,
         'x-vercel-protection-bypass': config.protectionBypass,
       },
-      body: JSON.stringify(wireUsage),
+      body: JSON.stringify(usage),
       signal: expect.any(AbortSignal),
     });
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;
@@ -289,7 +281,7 @@ describe('usage writer client', () => {
         'x-usage-write-source': 'queue',
         'x-vercel-protection-bypass': config.protectionBypass,
       },
-      body: JSON.stringify(wireUsage),
+      body: JSON.stringify(usage),
       signal: expect.any(AbortSignal),
     });
   });

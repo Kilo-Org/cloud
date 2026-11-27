@@ -128,7 +128,12 @@ export async function run(since?: string): Promise<void> {
     try {
       response = await fetch(target, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-internal-api-key': key },
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': key,
+          // Bouncer counts legacy calls per caller; this is the name its KNOWN_CALLERS gives the job.
+          'x-kilo-caller': 'ci-bouncer-signup-import',
+        },
         body: JSON.stringify({ entries }),
         redirect: 'error',
         signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS),

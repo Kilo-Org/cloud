@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
-jest.mock('@/lib/leaderboard-usage-rollup', () => ({
-  buildLeaderboardUsageDays: jest.fn(),
+jest.mock('@/lib/leaderboard-usage-hourly-rollup', () => ({
+  buildLeaderboardUsageHours: jest.fn(),
 }));
 const mockSentryLog = jest.fn();
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -11,15 +11,16 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
 }));
 
-import type { LeaderboardUsageBuildSummary } from '@/lib/leaderboard-usage-rollup';
-import { buildLeaderboardUsageDays } from '@/lib/leaderboard-usage-rollup';
+import type { LeaderboardUsageBuildSummary } from '@/lib/leaderboard-usage-hourly-rollup';
+import { buildLeaderboardUsageHours } from '@/lib/leaderboard-usage-hourly-rollup';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { GET, maxDuration } from './route';
 
-const mockBuild = jest.mocked(buildLeaderboardUsageDays);
+const mockBuild = jest.mocked(buildLeaderboardUsageHours);
 
 function request(secret: string): NextRequest {
-  return new NextRequest('http://localhost:3000/api/cron/leaderboard-usage-rollup', {
+  return new NextRequest('http://localhost:3000/api/cron/leaderboard-usage-hourly-rollup', {
     headers: { authorization: `Bearer ${secret}` },
   });
 }
@@ -27,15 +28,19 @@ function request(secret: string): NextRequest {
 function summary(overrides: Partial<LeaderboardUsageBuildSummary> = {}) {
   return {
     built: [
-      { usageDate: '2026-11-09', rows: 42, durationMs: 9_000, slices: 96, slowestSliceMs: 300 },
+      {
+        hourStart: '2026-11-10T08:00:00.000Z',
+        rows: 42,
+        durationMs: 2_500,
+        slices: 12,
+        slowestSliceMs: 300,
+      },
     ],
+    failed: [],
+    overBudget: [],
     remaining: [],
-    unsettled: [],
-    emptyDays: [],
     stoppedBy: null,
-    yesterdayBuilt: true,
-    replicaLagMs: 120,
-    durationMs: 9_500,
+    durationMs: 2_600,
     ...overrides,
   } satisfies LeaderboardUsageBuildSummary;
 }
@@ -45,10 +50,9 @@ function loggedLine(logger: jest.Mock): unknown {
   return JSON.parse(line);
 }
 
-describe('GET /api/cron/leaderboard-usage-rollup', () => {
+describe('GET /api/cron/leaderboard-usage-hourly-rollup', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useRealTimers();
     mockBuild.mockResolvedValue(summary());
   });
 
@@ -59,48 +63,50 @@ describe('GET /api/cron/leaderboard-usage-rollup', () => {
     expect(mockBuild).not.toHaveBeenCalled();
   });
 
-  test('builds within a deadline inside the function duration and logs the summary', async () => {
+  test('builds on the primary within a deadline inside the function duration', async () => {
     const before = Date.now();
     const response = await GET(request('cron-secret'));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
-      summary: { built: [{ usageDate: '2026-11-09', rows: 42 }], remaining: [] },
+      summary: { built: [{ hourStart: '2026-11-10T08:00:00.000Z', rows: 42 }], remaining: [] },
     });
     const [options] = mockBuild.mock.calls[0];
+    expect(options.db).toBe(db);
     expect(options.deadline).toBeGreaterThan(before);
-    expect(options.deadline).toBeLessThan(before + maxDuration * 1000);
+    expect(options.deadline).toBeLessThan(before + maxDuration * 1000 - 60_000);
     expect(loggedLine(jest.mocked(logExceptInTest))).toEqual({
       type: 'leaderboard_usage_rollup',
       ...summary(),
-      yesterdayMissing: false,
     });
     expect(warnExceptInTest).not.toHaveBeenCalled();
     expect(mockSentryLog).not.toHaveBeenCalled();
   });
 
-  test('logs a warning when a built day was empty', async () => {
-    mockBuild.mockResolvedValue(summary({ emptyDays: ['2026-11-09'] }));
+  test('logs a warning when the run stopped at its deadline', async () => {
+    mockBuild.mockResolvedValue(
+      summary({ remaining: ['2026-11-10T09:00:00.000Z'], stoppedBy: 'deadline' })
+    );
 
     await GET(request('cron-secret'));
 
     expect(loggedLine(jest.mocked(warnExceptInTest))).toMatchObject({
-      emptyDays: ['2026-11-09'],
+      remaining: ['2026-11-10T09:00:00.000Z'],
+      stoppedBy: 'deadline',
     });
     expect(logExceptInTest).not.toHaveBeenCalled();
   });
 
-  test.each([
-    { now: '2026-11-10T02:20:00.000Z', warned: false },
-    { now: '2026-11-10T03:20:00.000Z', warned: true },
-  ])('warns when yesterday is still missing at 03:00 UTC ($now)', async ({ now, warned }) => {
-    jest.useFakeTimers({ now: new Date(now), doNotFake: ['nextTick', 'setImmediate'] });
-    mockBuild.mockResolvedValue(summary({ built: [], yesterdayBuilt: false }));
+  test('logs a warning when an hour failed', async () => {
+    mockBuild.mockResolvedValue(summary({ failed: ['2026-11-10T07:00:00.000Z'] }));
 
-    await GET(request('cron-secret'));
+    const response = await GET(request('cron-secret'));
 
-    const logger = jest.mocked(warned ? warnExceptInTest : logExceptInTest);
-    expect(loggedLine(logger)).toMatchObject({ yesterdayMissing: warned });
+    expect(response.status).toBe(200);
+    expect(loggedLine(jest.mocked(warnExceptInTest))).toMatchObject({
+      failed: ['2026-11-10T07:00:00.000Z'],
+    });
+    expect(mockSentryLog).not.toHaveBeenCalled();
   });
 });

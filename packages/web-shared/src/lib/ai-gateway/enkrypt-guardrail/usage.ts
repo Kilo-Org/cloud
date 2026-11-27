@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { randomUUID } from 'crypto';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { after } from 'next/server';
 import { eq, inArray } from 'drizzle-orm';
 import {
@@ -80,11 +80,12 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
  * written directly only when nothing was sent, and is dropped after a failed send because the
  * queue may already hold it.
  *
- * When nothing was sent — a missing/unparseable publisher configuration or a failed request-
- * lifetime registration — the write takes the direct path: in a US region it is handed to
- * Frankfurt, next to the primary, so its transaction neither pays cross-region round trips nor
- * holds a primary pool connection for them. A failed handoff falls back to a local write; the
- * usage id makes a repeated delivery a no-op. Gateway callers must defer it with `after()`.
+ * When nothing was sent — a missing/unparseable publisher configuration, a failed request-
+ * lifetime registration, or `not_sent` (no STS token before any request) — the write takes the
+ * direct path: in a US region it is handed to Frankfurt, next to the primary, so its transaction
+ * neither pays cross-region round trips nor holds a primary pool connection for them. A failed
+ * handoff falls back to a local write; the usage id makes a repeated delivery a no-op. Gateway
+ * callers must defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
   const { guardrail = 'input', detectorsFired = [], ...call } = usageRecord;
@@ -95,12 +96,12 @@ export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promi
     // them still accepts the write.
     ...(guardrail === 'output' ? { guardrail } : {}),
     ...(firstDetector ? { detectorsFired: [firstDetector, ...otherDetectors] } : {}),
-    id: randomUUID(),
+    id: createUsageId(),
     occurredAt: new Date().toISOString(),
   };
   const outcome = await enqueueWithinRequestLifetime(usageWrite);
   if (outcome.kind === 'accepted') return;
-  if (!NOTHING_SENT_REASONS.has(outcome.reason)) {
+  if (outcome.kind !== 'not_sent' && !NOTHING_SENT_REASONS.has(outcome.reason)) {
     console.error('[enkrypt-guardrail] usage queue publication failed; record dropped', {
       usage_id: usageWrite.id,
       reason: outcome.reason,

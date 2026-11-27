@@ -15,6 +15,7 @@ export const POLICY_FILES = [
   'ci-kilocode-release.yaml',
   'ci-kilocode-release-jetbrains.yaml',
   'ci-kilocode-app-key.yaml',
+  'ci-kilocode-app-key-v2.yaml',
   'ci-kilocode-scan-notify.yaml',
   'ci-kilocode-community.yaml',
   'ci-kilocode-notify.yaml',

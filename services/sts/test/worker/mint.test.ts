@@ -1,5 +1,9 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import {
+  STS_BOUNCER_DECIDE,
+  STS_BOUNCER_SIGNUP_DECIDE,
+  STS_BOUNCER_SIGNUP_HISTORY,
+  STS_BOUNCER_USAGE_WRITE,
   STS_DENIED_PROBE,
   STS_DENIED_PROBE_REASON,
   STS_DENIED_PROBE_WORKLOAD,
@@ -666,7 +670,7 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
         {
           audience: 'usage-ingest',
           scope: 'usage-ingest:sts.canary',
-          reason: 'audience_not_allowed',
+          reason: 'scope_not_allowed',
         },
         { audience: 'web', scope: 'web:sts.canary', reason: 'audience_not_allowed' },
         { ...STS_DENIED_PROBE, reason: 'audience_not_allowed' },
@@ -690,7 +694,7 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
     expect(await issuedRows()).toEqual([]);
   });
 
-  it('denies an ai-gateway caller at the staging and production mint as unknown_workload', async () => {
+  it('denies an ai-gateway caller the UTS feed at the staging and production mint', async () => {
     const gateway: MintCaller = {
       channel: 'http',
       workload: 'ai-gateway',
@@ -712,7 +716,7 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
         )
       ).toEqual({
         status: 'ok',
-        tokens: [{ status: 'denied', ...FEED, reason: 'unknown_workload' }],
+        tokens: [{ status: 'denied', ...FEED, reason: 'audience_not_allowed' }],
       });
     }
     expect(await issuedRows()).toEqual([]);
@@ -735,7 +739,88 @@ describe('UTS feed grant of the shipped ai-gateway policy', () => {
   });
 });
 
-describe('phase 4 service scopes under the shipped policies (default deny)', () => {
+describe('Bouncer grants of the shipped web and ai-gateway policies', () => {
+  const WEB_SCOPES = [STS_BOUNCER_DECIDE, STS_BOUNCER_USAGE_WRITE, STS_BOUNCER_SIGNUP_DECIDE];
+  const GATEWAY_SCOPES = [STS_BOUNCER_DECIDE, STS_BOUNCER_USAGE_WRITE];
+  const BOUNCER_SCOPES = [...WEB_SCOPES, STS_BOUNCER_SIGNUP_HISTORY];
+
+  function caller(workload: 'web' | 'ai-gateway'): MintCaller {
+    return {
+      channel: 'http',
+      workload,
+      identity: 'vercel',
+      attestationExp: null,
+      claims: { provider: 'vercel' },
+    };
+  }
+
+  async function mintIn(
+    environment: (typeof STS_ENVIRONMENTS)[number],
+    workload: 'web' | 'ai-gateway',
+    entry: { audience: string; scope: string }
+  ) {
+    return await serveMint(
+      env,
+      { ...config, environment },
+      {
+        caller: caller(workload),
+        request: { tokens: [entry] },
+        waitUntil,
+        authority: defaultMintAuthority,
+      }
+    );
+  }
+
+  it.each([
+    ...WEB_SCOPES.map(entry => ['web', entry] as const),
+    ...GATEWAY_SCOPES.map(entry => ['ai-gateway', entry] as const),
+  ])('lets %s mint a %o token in production', async (workload, entry) => {
+    // The policy admits the token, so the mint reaches the token signer. The test Worker's signers
+    // belong to development and refuse a production request, so the answer is `unavailable`, never
+    // a denial; the denials below show the same call refused by policy.
+    expect(await mintIn('production', workload, entry)).toEqual({
+      status: 'unavailable',
+      retryAfterSeconds: TOKEN_SIGNER_RETRY_AFTER_SECONDS,
+    });
+    expect(await issuedRows()).toEqual([]);
+    expect(await flushedDenials()).toEqual([]);
+  });
+
+  it.each([STS_BOUNCER_SIGNUP_DECIDE, STS_BOUNCER_SIGNUP_HISTORY])(
+    'refuses ai-gateway %o in production, since the gateway sends no signup call',
+    async entry => {
+      expect(await mintIn('production', 'ai-gateway', entry)).toEqual({
+        status: 'ok',
+        tokens: [{ status: 'denied', ...entry, reason: 'scope_not_allowed' }],
+      });
+    }
+  );
+
+  it('refuses web bouncer:signup.history in production, since the web app sends no signup-history call', async () => {
+    expect(await mintIn('production', 'web', STS_BOUNCER_SIGNUP_HISTORY)).toEqual({
+      status: 'ok',
+      tokens: [{ status: 'denied', ...STS_BOUNCER_SIGNUP_HISTORY, reason: 'scope_not_allowed' }],
+    });
+    expect(await issuedRows()).toEqual([]);
+  });
+
+  it.each(BOUNCER_SCOPES)(
+    'refuses web and ai-gateway %o outside production, where no Bouncer accepts it',
+    async entry => {
+      for (const environment of ['development', 'staging'] as const) {
+        for (const workload of ['web', 'ai-gateway'] as const) {
+          expect(await mintIn(environment, workload, entry)).toEqual({
+            status: 'ok',
+            tokens: [{ status: 'denied', ...entry, reason: 'audience_not_allowed' }],
+          });
+        }
+      }
+      expect(await issuedRows()).toEqual([]);
+    }
+  );
+});
+
+describe('phase 4 service scopes under the shipped policies', () => {
   // The O11y scopes, the Security Sync scopes and the web scopes each share one audience, and a
   // mint holds one token per audience, so each scope is asked for in a request of its own.
   const SERVICE_SCOPES = [
@@ -749,12 +834,22 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
     STS_SECURITY_SYNC_DISMISS_FINDING,
     STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   ];
-  // The scopes under an audience the canary pair holds (`web`, `usage-ingest`).
-  const CANARY_PAIR_AUDIENCE_SCOPES: readonly { audience: string; scope: string }[] = [
-    STS_USAGE_PUBLISH,
-    STS_USAGE_RECORD,
-    STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
-  ];
+  /**
+   * The dual-accept grants, each the caller its receiver admits: usage-ingest's queue consumer
+   * records usage at the web app; the AI gateway publishes LLM and Enkrypt usage and the web app
+   * Exa usage to usage-ingest; both write O11y API metrics and only the web app reads and changes
+   * O11y alerting; only the AI gateway forwards to the Secure Proxy. Every environment.
+   */
+  const GRANTED: Readonly<Record<string, readonly { audience: string; scope: string }[]>> = {
+    'usage-ingest': [STS_USAGE_RECORD],
+    'ai-gateway': [STS_USAGE_PUBLISH, STS_O11Y_API_METRICS_WRITE, STS_SECURE_PROXY_FORWARD],
+    web: [
+      STS_USAGE_PUBLISH,
+      STS_O11Y_API_METRICS_WRITE,
+      STS_O11Y_ALERTING_READ,
+      STS_O11Y_ALERTING_WRITE,
+    ],
+  };
   const shipped = STS_ENVIRONMENTS.flatMap(environment =>
     defaultMintAuthority.policies
       .forEnvironment(environment)
@@ -780,25 +875,82 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
     return result;
   }
 
-  it('covers the web, usage-ingest and o11y policies in every environment', () => {
+  it('covers the web, usage-ingest, ai-gateway and o11y policies in every environment', () => {
     for (const environment of STS_ENVIRONMENTS) {
       const workloads = shipped
         .filter(entry => entry.environment === environment)
         .map(entry => entry.workload);
-      expect(workloads).toEqual(expect.arrayContaining(['web', 'usage-ingest', 'o11y']));
+      expect(workloads).toEqual(
+        expect.arrayContaining(['web', 'usage-ingest', 'ai-gateway', 'o11y'])
+      );
     }
   });
 
+  it('issues each dual-accept scope to exactly its caller in development', async () => {
+    for (const [workload, granted] of Object.entries(GRANTED)) {
+      for (const entry of granted) {
+        const result = await mintAsShipped('development', workload, entry);
+        if (result.status !== 'ok' || result.tokens[0]?.status !== 'issued') {
+          throw new Error(
+            `expected ${workload} to get ${entry.scope}, got ${JSON.stringify(result)}`
+          );
+        }
+        expect(decodeJwt(result.tokens[0].token)).toMatchObject({
+          sub: `service:${workload}`,
+          env: 'development',
+          aud: entry.audience,
+          scope: entry.scope,
+        });
+      }
+    }
+  });
+
+  it.each(['staging', 'production'] as const)(
+    'hands each dual-accept scope of exactly its caller to the %s token signer',
+    async environment => {
+      // The test Worker's signer objects run as development and refuse a request for another
+      // environment, so this records what the policy decision hands the signer instead of signing.
+      const signed: Array<Parameters<TokenSignerDO['mint']>[0]> = [];
+      const namespace = env.STS_TOKEN_SIGNER_DO;
+      const spy = vi.spyOn(namespace, 'get').mockImplementation(
+        id =>
+          ({
+            id,
+            mint: async (request: Parameters<TokenSignerDO['mint']>[0]) => {
+              signed.push(request);
+              return { status: 'unavailable' };
+            },
+          }) as unknown as DurableObjectStub<TokenSignerDO>
+      );
+      try {
+        for (const [workload, granted] of Object.entries(GRANTED)) {
+          for (const entry of granted) {
+            signed.length = 0;
+            await mintAsShipped(environment, workload, entry);
+            expect(signed).toEqual([
+              expect.objectContaining({
+                environment,
+                workload,
+                request: { tokens: [{ audience: entry.audience, scope: entry.scope }] },
+              }),
+            ]);
+          }
+        }
+      } finally {
+        spy.mockRestore();
+      }
+    }
+  );
+
   it.each(shipped)(
-    'refuses $workload in $environment every phase 4 service scope, never as unknown_scope',
+    'refuses $workload in $environment every phase 4 service scope it is not granted, never as unknown_scope',
     async ({ environment, workload, policy }) => {
-      for (const entry of SERVICE_SCOPES) {
-        // No shipped policy lists the Secure Proxy, O11y or Security Sync audience. A policy
-        // holding a `web` or `usage-ingest` audience (the canary pair) is refused the scope instead.
-        const reason =
-          CANARY_PAIR_AUDIENCE_SCOPES.includes(entry) && policy.audiences.includes(entry.audience)
-            ? 'scope_not_allowed'
-            : 'audience_not_allowed';
+      const granted = GRANTED[workload] ?? [];
+      for (const entry of SERVICE_SCOPES.filter(scope => !granted.includes(scope))) {
+        // A policy holding the audience for another scope is refused the scope; otherwise the audience.
+        const reason = policy.audiences.includes(entry.audience)
+          ? 'scope_not_allowed'
+          : 'audience_not_allowed';
         expect(await mintAsShipped(environment, workload, entry)).toEqual({
           status: 'ok',
           tokens: [{ status: 'denied', ...entry, reason }],
@@ -808,28 +960,33 @@ describe('phase 4 service scopes under the shipped policies (default deny)', () 
   );
 
   it.each(STS_ENVIRONMENTS)(
-    'refuses the canary pair, which holds the audiences, the usage scopes and the web dispatch as not granted in %s',
+    'refuses each dual-accept scope to the other receivers and callers in %s',
     async environment => {
-      expect(await mintAsShipped(environment, 'web', STS_USAGE_PUBLISH)).toEqual({
-        status: 'ok',
-        tokens: [{ status: 'denied', ...STS_USAGE_PUBLISH, reason: 'scope_not_allowed' }],
-      });
-      expect(await mintAsShipped(environment, 'usage-ingest', STS_USAGE_RECORD)).toEqual({
-        status: 'ok',
-        tokens: [{ status: 'denied', ...STS_USAGE_RECORD, reason: 'scope_not_allowed' }],
-      });
-      expect(
-        await mintAsShipped(environment, 'usage-ingest', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH)
-      ).toEqual({
-        status: 'ok',
-        tokens: [
-          {
-            status: 'denied',
-            ...STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
-            reason: 'scope_not_allowed',
-          },
-        ],
-      });
+      const refusals = [
+        { workload: 'usage-ingest', entry: STS_USAGE_PUBLISH, reason: 'audience_not_allowed' },
+        {
+          workload: 'usage-ingest',
+          entry: STS_O11Y_API_METRICS_WRITE,
+          reason: 'audience_not_allowed',
+        },
+        { workload: 'web', entry: STS_USAGE_RECORD, reason: 'audience_not_allowed' },
+        { workload: 'web', entry: STS_SECURE_PROXY_FORWARD, reason: 'audience_not_allowed' },
+        { workload: 'ai-gateway', entry: STS_O11Y_ALERTING_READ, reason: 'scope_not_allowed' },
+        { workload: 'ai-gateway', entry: STS_O11Y_ALERTING_WRITE, reason: 'scope_not_allowed' },
+        { workload: 'ai-gateway', entry: STS_USAGE_RECORD, reason: 'audience_not_allowed' },
+        { workload: 'o11y', entry: STS_O11Y_API_METRICS_WRITE, reason: 'audience_not_allowed' },
+        {
+          workload: 'usage-ingest',
+          entry: STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+          reason: 'scope_not_allowed',
+        },
+      ];
+      for (const { workload, entry, reason } of refusals) {
+        expect(await mintAsShipped(environment, workload, entry)).toEqual({
+          status: 'ok',
+          tokens: [{ status: 'denied', ...entry, reason }],
+        });
+      }
     }
   );
 

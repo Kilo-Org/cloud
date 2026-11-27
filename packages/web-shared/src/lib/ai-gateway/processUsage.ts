@@ -3,7 +3,6 @@ import {
   isDelegatedBillingProvider,
   isPromotionalModelProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
-import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
@@ -18,6 +17,7 @@ import {
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import { z } from 'zod';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -174,7 +174,7 @@ export type UsageContextInfo = ReturnType<typeof extractUsageContextInfo>;
 
 export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   return {
-    id: usageContext.usageId ?? randomUUID(),
+    id: usageContext.usageId ?? createUsageId(),
     kilo_user_id: usageContext.kiloUserId,
     organization_id: usageContext.organizationId ?? null,
     ...usageContext.fraudHeaders,
@@ -493,6 +493,16 @@ async function logMicrodollarUsageWithTransport(
       });
       return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
     }
+    if (outcome.kind === 'not_sent') {
+      // STS gave no token before any request was launched, so the direct write cannot duplicate it.
+      console.warn('usage accounting queue sent nothing without an STS token', {
+        usageId: core.id,
+        execution_region: getVercelExecutionRegion(),
+        reason: outcome.reason,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
     console.error('usage accounting publication failed', {
       usageId: core.id,
       execution_region: getVercelExecutionRegion(),
@@ -535,10 +545,10 @@ async function recordUsageDirectly(
  * Selected usage normally goes through `enqueueUsage` and the configured queue
  * transport; the production Cloudflare consumer then calls the existing
  * Frankfurt `/api/internal/usage/record` writer. This path is for unselected
- * accounting, plus the two pre-publication fallbacks where nothing was sent:
- * missing/unparseable publisher configuration and failed lifetime registration.
- * It is not used after any publication attempt, because the event may already
- * be queued.
+ * accounting, plus the pre-publication fallbacks where nothing was sent:
+ * missing/unparseable publisher configuration, failed lifetime registration,
+ * and `not_sent` (no STS token before any request was launched). It is not
+ * used after any publication attempt, because the event may already be queued.
  *
  * SFO instances hand this write to Frankfurt through
  * `recordUsageInPrimaryRegion`; Frankfurt instances write locally.

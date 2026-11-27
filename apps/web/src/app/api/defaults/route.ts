@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
-  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 
@@ -11,7 +11,7 @@ type DefaultsResponse = {
 
 export async function GET(): Promise<NextResponse<DefaultsResponse>> {
   return NextResponse.json({
-    defaultModel: KILO_AUTO_BALANCED_MODEL.id,
+    defaultModel: KILO_AUTO_EFFICIENT_MODEL.id,
     defaultFreeModel: KILO_AUTO_FREE_MODEL.id,
   });
 }

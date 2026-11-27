@@ -74,7 +74,7 @@ import {
   ImpactReferralRewardStatus,
 } from '@kilocode/db/schema-types';
 import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
 import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { computeKiloPassBonusCreditsUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
@@ -368,6 +368,12 @@ function getUsageStartInclusiveIso(params: {
   return usageStartInclusiveIso;
 }
 
+function isAtOrAfterIso(timestampIso: string, boundaryIso: string): boolean {
+  const timestamp = dayjs(timestampIso).utc();
+  const boundary = dayjs(boundaryIso).utc();
+  return timestamp.isValid() && boundary.isValid() && !timestamp.isBefore(boundary);
+}
+
 function getStripePeriodEndSeconds(subscription: Stripe.Subscription): number | null {
   return subscription.items.data[0]?.current_period_end ?? null;
 }
@@ -408,14 +414,17 @@ function assertStripeManagedSubscription(
   }
 }
 
-async function getLatestBonusLikeItemForSubscriptionId(subscriptionId: string): Promise<{
+async function getLatestBonusLikeItemForSubscriptionId(params: {
+  subscriptionId: string;
+  periodStartIso: string;
+}): Promise<{
   kind: KiloPassBonusKind;
   amountUsd: number;
 } | null> {
   const lastIssuance = await db
     .select({ id: kilo_pass_issuances.id })
     .from(kilo_pass_issuances)
-    .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId))
+    .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, params.subscriptionId))
     // Keep the existing latest-issuance interpretation; the id tie-breaker
     // makes duplicate issue months deterministic.
     .orderBy(desc(kilo_pass_issuances.issue_month), desc(kilo_pass_issuances.id))
@@ -433,7 +442,8 @@ async function getLatestBonusLikeItemForSubscriptionId(subscriptionId: string): 
     .where(
       and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-        inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
+        inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS),
+        gte(kilo_pass_issuance_items.created_at, params.periodStartIso)
       )
     )
     .orderBy(asc(kilo_pass_issuance_items.kind))
@@ -495,7 +505,11 @@ async function getLatestBaseCreditsForSubscription(subscriptionId: string): Prom
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
       )
     )
-    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .orderBy(
+      desc(kilo_pass_issuances.issue_month),
+      desc(credit_transactions.created_at),
+      desc(kilo_pass_issuances.id)
+    )
     .limit(1);
 
   const row = rows[0];
@@ -744,6 +758,12 @@ async function buildActiveKiloPassSubscriptionState(params: {
   nowUtc: ReturnType<typeof dayjs>;
 }): Promise<KiloPassSubscriptionStateResponse> {
   const baseAmountUsd = getMonthlyPriceUsd(params.subscription.tier);
+  const currentPeriodUsageStartIso = getUsageStartInclusiveIso({
+    subscription: params.subscription,
+    baseCreditsIssuedAtIso: null,
+    periodStartIso: params.periodStartIso,
+    nowUtc: params.nowUtc,
+  });
   const [
     isFirstTimeSubscriberEver,
     latestBonusLikeItem,
@@ -755,13 +775,21 @@ async function buildActiveKiloPassSubscriptionState(params: {
       kiloUserId: params.kiloUserId,
       subscriptionId: params.subscription.subscriptionId,
     }),
-    getLatestBonusLikeItemForSubscriptionId(params.subscription.subscriptionId),
+    getLatestBonusLikeItemForSubscriptionId({
+      subscriptionId: params.subscription.subscriptionId,
+      periodStartIso: currentPeriodUsageStartIso,
+    }),
     getHasKiloPassThreshold(params.kiloUserId),
     getLatestBaseCreditsForSubscription(params.subscription.subscriptionId),
     getInitialWelcomePromoContextForSubscription(db, {
       subscriptionId: params.subscription.subscriptionId,
     }),
   ]);
+  const currentPeriodBaseCredits =
+    latestBaseCredits !== null &&
+    isAtOrAfterIso(latestBaseCredits.issuedAtIso, currentPeriodUsageStartIso)
+      ? latestBaseCredits
+      : null;
   const isBonusUnlocked = latestBonusLikeItem !== null;
   const isBonusAvailableToUnlock = hasKiloPassThreshold && !isBonusUnlocked;
   const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
@@ -771,7 +799,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
   const welcomePromoEligibilityReason = initialWelcomePromoContext?.eligibilityReason ?? null;
   const usageStartInclusiveIso = getUsageStartInclusiveIso({
     subscription: params.subscription,
-    baseCreditsIssuedAtIso: latestBaseCredits?.issuedAtIso ?? null,
+    baseCreditsIssuedAtIso: currentPeriodBaseCredits?.issuedAtIso ?? null,
     periodStartIso: params.periodStartIso,
     nowUtc: params.nowUtc,
   });
@@ -779,7 +807,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     startInclusiveIso: usageStartInclusiveIso,
     endExclusiveIso: params.spendEndExclusiveIso,
-    usageBaselineMicrodollars: latestBaseCredits?.usageBaselineMicrodollars ?? null,
+    usageBaselineMicrodollars: currentPeriodBaseCredits?.usageBaselineMicrodollars ?? null,
   });
 
   const projectedAmountUsd =

@@ -1435,11 +1435,14 @@ loader refuses the grant on any identity but a `github-oidc` one with an `enviro
 accepts a ref other than `refs/heads/main` (in every environment while the account is shared; a
 production policy also accepts only `refs/heads/main`, as every GitHub policy does), a second
 `cloudflare-deploy` entry, a `ttlSeconds` above 3600 or below 300, a `maxActive` above 3, a
-`maxPerHour` above 12 or below `maxActive`, a group listed twice, a `zone` group without zones or
+`maxPerHour` above 12 or below `maxActive`, a `maxPerRun` above 64, a `maxActive` times
+`maxPerRun` above 100 (the environment's token share), more than 64 `intendedScripts`, a group
+listed twice, a `zone` group without zones or
 zones without a `zone` group, a group whose name matches `API Token` or `member`, and any group or
 zone outside the pins in `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`). Those pins hold three
 lists, filled in at setup step 3 and empty until then: `allowedGroups`, the only groups a grant may
-list, each with its scope (the three deploy groups); `allowedZones`, per STS environment, the only
+list, each with its scope (the three deploy groups, and for Kilo-Org/cloud's own deploys Queues,
+D1, R2 Storage and Vectorize Write and Workers AI Read on the account); `allowedZones`, per STS environment, the only
 zones a grant of that environment may list (`kiloapps.io` serves staging and production alike, so
 it is in both lists and this check cannot separate them; it keeps every other zone out); and
 `forbiddenGroupIds`, the token, member, role and account-settings groups, which a deploy token
@@ -1454,6 +1457,58 @@ https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tok
 for members). So the pins and the runtime check of the returned token are what keep token
 provisioning, and any group beyond the deploy groups, out of a minted token; setup check 6
 confirms the minting token's fixed policy bounds it too.
+
+**Per-run limits (`maxPerRun`).** A grant that sets `maxPerRun` counts `maxActive` and
+`maxPerHour` in GitHub run attempts (run id and attempt) instead of tokens, and allows each run
+attempt `maxPerRun` mint requests per hour, whatever their outcome (`run_limit` beyond). It is for
+a workflow whose parallel jobs each deploy with their own token: Kilo-Org/cloud's
+`deploy-workers.yml` ran 449 Worker deploy jobs in 39 runs on 2026-11-26, up to 31 at once in one
+run and about 5 runs in its busiest hour, which a per-token `maxActive` of 3 and `maxPerHour` of
+12 cannot carry, and GitHub drops a job output that holds a masked value, so jobs cannot share one
+token. Each job still gets, and revokes, its own token, and each token is audited and
+window-checked. The caller's own run attempt never counts against `maxActive` or `maxPerHour`.
+PENDING IGOR: this reads the design's §3 limits per run for these policies.
+
+**Kilo-Org/cloud's own deploys** (repository id `1145038391`, owner id `201822503`, each workflow
+pinned to `@refs/heads/main`; the repository variable `DEPLOY_TOKEN_SOURCE` set to `sts` runs each
+deploy job's `-sts` twin, which reads no stored Cloudflare or R2 secret; unset or `secret` keeps
+the stored-secret jobs as the rollback):
+
+| Workload | STS environment | GitHub environment | Workflow file | Events | Permission groups | Limits |
+|---|---|---|---|---|---|---|
+| `ci-deploy-cloud` | production | `production` | `deploy-workers.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | Workers Scripts, Containers, Routes (`kiloapps.io`), Queues, D1, R2 Storage Write | 1 h, 2 runs, 12 runs/h, 40 per run |
+| `ci-deploy-cloud-staging` | staging | `staging` | `deploy-workers.yml` | same | Workers Scripts, Queues Write | 1 h, 2 runs, 12 runs/h, 16 per run |
+| `ci-deploy-cloud-runtime` | production | `cloud-agent-runtime-publication` | `cloud-agent-runtime-publish.yml` | `workflow_run`, `workflow_dispatch` | Containers, R2 Storage Write | 1 h, 1 active, 12/h |
+| `ci-deploy-cloud-mcp-catalog` | production | `production` | `kilo-mcp-catalog.yml` | `push` | Vectorize Write, Workers AI Read | 15 min, 1 active, 12/h |
+
+- **`workflow_run` (PENDING IGOR, Q71 carve-out).** Q71 keeps `workflow_run` out of production and
+  alone in its list, because STS cannot see the upstream run. `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT`
+  (`src/policy/schema.ts`) lets the deploy-only policies of `deploy-workers.yml` and
+  `cloud-agent-runtime-publish.yml` list it with `schedule` and `workflow_dispatch` and grant
+  production: their jobs receive the stored `CLOUDFLARE_API_TOKEN` on the same trigger today, run
+  main's workflow code, and deploy a commit that `check-deployment-changes.yml` (or the publisher's
+  admission) picked from main, so a 1-hour token is no stronger than the stored token (Q65). It
+  holds only for a Kilo-Org/cloud policy, by ids, bound to a GitHub environment, naming only those
+  files and holding nothing but its `cloudflare-deploy` grant.
+- **Secrets Store bindings.** A minted token holds no Secrets Store permission (Edit would write
+  every secret of the shared store). Each Worker deploy job runs
+  `scripts/ci/inherit-secret-bindings.mjs` first: with the token it reads the Worker's latest
+  uploaded version and fails unless every committed `secrets_store_secrets` binding is there
+  unchanged, then rewrites them as `{ type: inherit }` `unsafe.bindings`, which Cloudflare copies
+  from that version. A new or changed Secrets Store binding, or a new Worker with one, therefore
+  deploys with `DEPLOY_TOKEN_SOURCE` `secret`.
+- **R2.** The Cloud Agent runtime jobs take temporary S3 credentials for the runtime bucket from
+  the token (`scripts/ci/r2-temp-credentials.sh`, `POST /accounts/<account>/r2/temp-access-credentials`,
+  prefix `runtime-artifacts/v1/`, 1 hour), derived from the R2 API token whose access key id is
+  the repository variable `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID`. R2 Storage Write reaches
+  every bucket for the token's hour, as a Worker binding deployed with Workers Scripts Write already
+  does (Q65).
+- **Before `DEPLOY_TOKEN_SOURCE` becomes `sts`:** the `kiloapps.ai` zone id joins `allowedZones`
+  and `ci-deploy-cloud` (cloud-agent-next's zone routes); setup step 3 confirms the five new group
+  ids; a Super Administrator adds the new groups and zone to `sts-minting-<env>` (setup step 2
+  lists only the bouncer groups); the repository variable `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID`
+  is set; and the `cloud-agent-runtime-publication` GitHub environment admits `main` only. A STS
+  deploy rides the sts path too: if a broken STS cannot mint, set the variable to `secret`.
 
 **Calling it.** The job asks with no body and revokes in an `always()` step:
 
@@ -1474,7 +1529,7 @@ curl -sS -X POST https://sts.kiloapps.io/v1/ci/cloudflare-deploy-token/revoke \
 |---|---|---|
 | `ok` | 200 | `token` (`cfat_...`), `tokenId`, `expiresAt`, `ttlSeconds`, `permissionSet` |
 | `denied` | 401 or 403 | `identity_rejected` (401: another workflow, event, ref or GitHub environment, a fork's event, or a token without a run id), `unknown_workload`, `environment_mismatch`, `grant_not_allowed`, `not_configured` (STS's setup step 3 has not pinned the forbidden and allowed groups; no retry helps) |
-| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included), `rate_limited` (`maxPerHour` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, possibly left by a creation whose outcome is unknown (not one Cloudflare refused or that was never sent), or found by the sweep and not yet deleted; two environments then hold at most 200 of the account's 500, 5 minutes) |
+| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included; run attempts holding one under `maxPerRun`), `rate_limited` (`maxPerHour` mint requests in the last hour; run attempts under `maxPerRun`), `run_limit` (this run attempt made `maxPerRun` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, possibly left by a creation whose outcome is unknown (not one Cloudflare refused or that was never sent), or found by the sweep and not yet deleted; two environments then hold at most 200 of the account's 500, 5 minutes) |
 | `invalid_request` | 400 (413 above 1 KB) | A body other than empty or `{}` |
 | `unavailable` | 503, `Retry-After` | No minting credential, Cloudflare refused or failed (a 429's `Retry-After` is passed on), the object did not answer in 35 seconds, or the environment has no `CF_DEPLOY_ACCOUNT_ID` |
 

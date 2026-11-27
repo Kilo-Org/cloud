@@ -35,9 +35,10 @@ export type PolicySnapshotEntry = {
   /**
    * One `<grant>:<maxTtlSeconds>:<defaultTtlSeconds>:<maxActive>` per lease grant, and one
    * `cloudflare-deploy:<permissionSet>:<ttlSeconds>:<maxActive>:<maxPerHour>:<groups>:<zones>` with
-   * the first 8 characters of each sorted id, so a changed group or zone shows. Absent when the
-   * policy has none, so the snapshot and its hash stay what a reader without leases expects (a
-   * rollback to it then parses the stored snapshot).
+   * the first 8 characters of each sorted id, so a changed group or zone shows, followed by
+   * `:run<maxPerRun>` when the grant sets it. Absent when the policy has none, so the snapshot and
+   * its hash stay what a reader without leases expects (a rollback to it then parses the stored
+   * snapshot).
    */
   dynamic?: string[];
 };
@@ -53,7 +54,8 @@ function dynamicKey(entry: DynamicGrant): string {
       .map(id => id.slice(0, 8))
       .join('+');
   const groups = short(entry.permissionGroups.map(group => group.id));
-  return `${entry.grant}:${entry.permissionSet}:${entry.ttlSeconds}:${entry.maxActive}:${entry.maxPerHour}:${groups}:${short(entry.zones)}`;
+  const perRun = entry.maxPerRun === undefined ? '' : `:run${entry.maxPerRun}`;
+  return `${entry.grant}:${entry.permissionSet}:${entry.ttlSeconds}:${entry.maxActive}:${entry.maxPerHour}:${groups}:${short(entry.zones)}${perRun}`;
 }
 
 /**

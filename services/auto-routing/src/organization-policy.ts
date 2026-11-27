@@ -16,9 +16,7 @@ type GatewayPolicyEnv = Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_AI_GATEWAY_
 type PolicyCacheEntry = {
   expiresAt: number;
   value: string[];
-  /** When the lookup that produced this answer started; its TTL runs from here. */
-  startedAt: number;
-  /** Start order of that lookup, so an older answer never replaces a newer one. */
+  /** Start order of the lookup that produced this answer, so an older answer never replaces it. */
   sequence: number;
 };
 
@@ -113,7 +111,6 @@ export async function deniedOrganizationModelIds(
   deniedModelsCache.set(key, {
     expiresAt: now + POLICY_CACHE_TTL_MS,
     value: deniedModelIds,
-    startedAt: now,
     sequence,
   });
   if (deniedModelsCache.size > POLICY_CACHE_LIMIT) {

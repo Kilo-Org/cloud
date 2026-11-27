@@ -106,15 +106,12 @@ function storeCached(key: string, entry: CacheEntry): void {
 }
 
 /**
- * A read that started before the cached answer must never replace it, and neither may a read that
- * started before an observation landed: a slower answer never becomes the current one.
+ * A read that started before the cached answer must never replace it. An observation stored while a
+ * read was in flight takes its sequence when it is stored, so it wins for the same reason.
  */
 function storeRead(key: string, entry: CacheEntry, started: CacheEntry | undefined): void {
   const existing = cache.get(key);
-  if (existing !== undefined && existing !== started) {
-    if (existing.sequence > entry.sequence) return;
-    if (existing.observedAtMs !== null) return;
-  }
+  if (existing !== undefined && existing !== started && existing.sequence > entry.sequence) return;
   storeCached(key, entry);
 }
 
@@ -201,13 +198,15 @@ async function findAuthoritativeCustomRouter(
 function rememberObservation(
   key: string,
   router: CustomRouterDefinition | null,
-  observedAtMs: number
+  observedAtMs: number,
+  startedAt: number
 ): void {
   const hit = cache.get(key);
   if (hit && hit.observedAtMs !== null && hit.observedAtMs > observedAtMs) return;
   readSequence += 1;
   storeCached(key, {
-    expiresAt: Date.now() + CUSTOM_ROUTER_CACHE_TTL_MS,
+    // The TTL runs from the start of the freshness read, not from when the database answered.
+    expiresAt: startedAt + CUSTOM_ROUTER_CACHE_TTL_MS,
     value: router,
     observedAtMs,
     sequence: readSequence,
@@ -242,9 +241,15 @@ export async function findServingCustomRouter(
   if (!router || !hasGatewayAlias(router)) {
     return router ? { router, aliasTargets: new Map() } : null;
   }
+  const freshnessStartedAt = Date.now();
   const observed = await findAuthoritativeCustomRouter(env, owner, slug);
   if (!observed) return null;
-  rememberObservation(`${owner.type}:${owner.id}:${slug}`, observed.router, observed.observedAtMs);
+  rememberObservation(
+    `${owner.type}:${owner.id}:${slug}`,
+    observed.router,
+    observed.observedAtMs,
+    freshnessStartedAt
+  );
   return { router: observed.router, aliasTargets: observed.aliasTargets };
 }
 

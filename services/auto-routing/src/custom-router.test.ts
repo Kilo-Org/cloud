@@ -28,8 +28,13 @@ import type * as CustomRouterStoreModule from './custom-router-store';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import type * as ModelClassifierModule from './model-classifier';
 import { clearEmailDomainBlacklistCache } from './caller-auth';
-import { clearCustomRouterTableCache } from './custom-router-decision';
+import {
+  clearCustomRouterTableCache,
+  customRouterTarget,
+  customRouting,
+} from './custom-router-decision';
 import { clearClassificationHotCache } from './decision-cache';
+import type { DecisionTimings } from './decide';
 import { clearOrganizationPolicyCache } from './organization-policy';
 import { app } from './index';
 
@@ -245,6 +250,8 @@ const env = {
 };
 
 const backgroundTasks: Promise<unknown>[] = [];
+// The stub omits bindings a direct `customRouterTarget` call never touches.
+const customRouterEnv = env as unknown as Env;
 const executionCtx = {
   waitUntil: (promise: Promise<unknown>) => {
     backgroundTasks.push(promise);
@@ -349,6 +356,17 @@ function memberBalanceRow(overrides: Partial<OrganizationMemberBalanceRow> = {})
 async function decisionOf(res: Response) {
   expect(res.status).toBe(200);
   return CustomRouterDecideResponseSchema.parse(await res.json());
+}
+
+function decisionTimings(): DecisionTimings {
+  return {
+    capabilitiesMs: null,
+    tableMs: null,
+    prepMs: 0,
+    cacheReadMs: 0,
+    classifierMs: null,
+    totalMs: 0,
+  };
 }
 
 // A user whose credited balance is fully spent.
@@ -1059,8 +1077,8 @@ describe('public custom router decide', () => {
     expect(tableReads).toBe(2);
   });
 
-  it('keeps a table build alive through waitUntil so an abandoned request still caches it', async () => {
-    const waitUntil = vi.spyOn(executionCtx, 'waitUntil');
+  it('hands the table build to waitUntil and caches it after the request stops waiting', async () => {
+    const handed: Promise<unknown>[] = [];
     const tableRead = Promise.withResolvers<void>();
     const releaseTable = Promise.withResolvers<void>();
     benchmarkFetch.mockImplementation(async url => {
@@ -1081,22 +1099,38 @@ describe('public custom router decide', () => {
         ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
       ).length;
 
+    const routing = customRouting(
+      customRouter(),
+      [{ provider: 'ollama', model: 'qwen3:32b' }],
+      new Set()
+    );
     // Nobody is waiting for this response any more: the gateway gave up on it. The build the worker
     // handed to `waitUntil` still finishes and writes the cache for the next request.
-    const abandoned = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    const loading = customRouterTarget(
+      customRouterEnv,
+      promise => handed.push(promise),
+      routing
+    ).loadRouting(decisionTimings());
     await tableRead.promise;
-    expect(waitUntil).toHaveBeenCalled();
+    expect(handed).toHaveLength(1);
+
     releaseTable.resolve();
-    await Promise.all(waitUntil.mock.calls.map(([promise]) => promise));
+    await expect(handed[0]).resolves.toMatchObject({ table: rankedTable });
+    await loading;
     expect(tableFetches()).toBe(1);
 
-    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const nextHanded: Promise<unknown>[] = [];
+    await customRouterTarget(
+      customRouterEnv,
+      promise => nextHanded.push(promise),
+      routing
+    ).loadRouting(decisionTimings());
     expect(tableFetches()).toBe(1);
-    await decisionOf(await abandoned);
+    expect(nextHanded).toHaveLength(0);
   });
 
-  it('never rejects the build it hands to waitUntil', async () => {
-    const waitUntil = vi.spyOn(executionCtx, 'waitUntil');
+  it('hands a failed table build to waitUntil as a promise that resolves', async () => {
+    const handed: Promise<unknown>[] = [];
     benchmarkFetch.mockImplementation(async url => {
       const path = new URL(String(url)).pathname;
       if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 1 });
@@ -1109,10 +1143,15 @@ describe('public custom router decide', () => {
       return Response.json({ error: 'unexpected path' }, { status: 500 });
     });
 
-    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(500);
+    const routing = customRouting(customRouter(), [], new Set());
+    await expect(
+      customRouterTarget(customRouterEnv, promise => handed.push(promise), routing).loadRouting(
+        decisionTimings()
+      )
+    ).rejects.toThrow('Custom router table is temporarily unavailable');
     // A failed build must not surface as an unhandled rejection held open by the runtime.
-    const kept = await Promise.allSettled(waitUntil.mock.calls.map(([promise]) => promise));
-    expect(kept.filter(result => result.status === 'rejected')).toHaveLength(0);
+    expect(handed).toHaveLength(1);
+    await expect(handed[0]).resolves.toBeUndefined();
   });
 
   it('never answers a post-settlement request from a build started before it', async () => {

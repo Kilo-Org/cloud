@@ -11,6 +11,10 @@ import {
   OPENAI_CHATGPT_PROVIDER_ID,
   OPENAI_CHATGPT_PROVIDER_NAME,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
+import {
+  BYOK_PRIVATE_PROVIDER_ID_PREFIX,
+  isByokPrivateProviderId,
+} from '@kilocode/db/schema-types';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
 // clause forces new entries here whenever a provider is added to
@@ -113,10 +117,17 @@ const STORED_ONLY_BYOK_PROVIDER_NAMES = new Map<string, string>([
   [OPENAI_CHATGPT_PROVIDER_ID, OPENAI_CHATGPT_PROVIDER_NAME],
 ]);
 
+/**
+ * The display name of a provider. Private providers are named by their organization, which only the key
+ * row knows, so callers that have the row should prefer its name.
+ */
 export function getByokProviderDisplayName(providerId: string): string {
   const storedOnlyName = STORED_ONLY_BYOK_PROVIDER_NAMES.get(providerId);
   if (storedOnlyName !== undefined) {
     return storedOnlyName;
+  }
+  if (isByokPrivateProviderId(providerId)) {
+    return `Private provider ${providerId.slice(BYOK_PRIVATE_PROVIDER_ID_PREFIX.length)}`;
   }
   const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
   return provider?.name || providerId;

@@ -461,6 +461,46 @@ describe('production queued accounting eligibility', () => {
     }
   );
 
+  test.each([
+    ['fra1', 'sts_token_denied'],
+    ['sfo1', 'sts_token_unavailable'],
+  ] as const)(
+    'accounts directly from %s when STS launched no request (%s)',
+    async (region, reason) => {
+      configureQueueEnvironment({ VERCEL_REGION: region });
+      jest.mocked(publisher.enqueueUsage).mockResolvedValue({ kind: 'not_sent', reason });
+      const lifecycle = requestLifetime();
+      const result = await lifecycle.run(() =>
+        logMicrodollarUsage({ ...stats }, { ...personalContext })
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(result?.status).toBe('recorded');
+      expect(fetch).not.toHaveBeenCalled();
+      expect(writer).toHaveBeenCalledTimes(region === 'sfo1' ? 1 : 0);
+      expect(db.transaction).toHaveBeenCalledTimes(region === 'sfo1' ? 0 : 1);
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test.each(['sts_token_denied', 'sts_token_unavailable'])(
+    'does not account directly when a later STS token failed after a launched send (%s)',
+    async reason => {
+      configureQueueEnvironment();
+      // What the publisher answers once a request was launched (usage-publisher-sts.test.ts).
+      jest.mocked(publisher.enqueueUsage).mockResolvedValue({ kind: 'unavailable', reason });
+      const lifecycle = requestLifetime();
+      const result = await lifecycle.run(() =>
+        logMicrodollarUsage({ ...stats }, { ...personalContext })
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(result).toBeNull();
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(writer).not.toHaveBeenCalled();
+    }
+  );
+
   test('internal writer does not enqueue even when queue transport is selected', async () => {
     configureQueueEnvironment();
     const lifecycle = requestLifetime();

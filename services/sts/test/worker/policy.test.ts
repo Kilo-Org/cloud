@@ -339,6 +339,90 @@ ${options.extra ?? ''}`;
       );
     });
 
+    describe('the production exception for kilocode v2 (M76)', () => {
+      const V2_WORKFLOW = 'Kilo-Org/kilocode/.github/workflows/kilo-v2.yml@refs/heads/v2';
+      const exact = `
+workload: ci-kilocode-app-key-v2
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/kilocode
+  repositoryId: '946087422'
+  repositoryOwnerId: '201822503'
+  legacySubject: true
+  environment: automation
+  refs: [refs/heads/v2]
+  jobWorkflowRefs: [${V2_WORKFLOW}]
+  events: [push]
+secrets: [KILOCODE_MAINTAINER_APP_KEY]
+`;
+      const REFUSED = 'a github-oidc policy that grants production accepts only refs/heads/main';
+
+      it('loads the exact entry on refs/heads/v2', () => {
+        const loaded = loadPolicies({ 'ci-kilocode-app-key-v2.yaml': exact });
+        expect(loaded.get('production', 'ci-kilocode-app-key-v2')?.identity).toMatchObject({
+          refs: ['refs/heads/v2'],
+          jobWorkflowRefs: [V2_WORKFLOW],
+        });
+      });
+
+      // Each change keeps refs/heads/v2 and alters one pinned field, so the policy is a production
+      // policy off main that no longer equals the entry.
+      it.each([
+        [
+          'another workload',
+          'workload: ci-kilocode-app-key-v2',
+          'workload: ci-kilocode-app-key-v3',
+        ],
+        ['another repository id', "repositoryId: '946087422'", "repositoryId: '999999999'"],
+        ['another owner id', "repositoryOwnerId: '201822503'", "repositoryOwnerId: '1'"],
+        ['another repository', 'repository: Kilo-Org/kilocode', 'repository: Kilo-Org/bouncer'],
+        ['another environment', 'environment: automation', 'environment: release'],
+        ['another ref', 'refs: [refs/heads/v2]', 'refs: [refs/heads/v3]'],
+        ['main as well', 'refs: [refs/heads/v2]', 'refs: [refs/heads/v2, refs/heads/main]'],
+        [
+          'another workflow file',
+          `jobWorkflowRefs: [${V2_WORKFLOW}]`,
+          'jobWorkflowRefs: [Kilo-Org/kilocode/.github/workflows/ci.yml@refs/heads/v2]',
+        ],
+        [
+          'a second workflow file',
+          `jobWorkflowRefs: [${V2_WORKFLOW}]`,
+          `jobWorkflowRefs: [${V2_WORKFLOW}, Kilo-Org/kilocode/.github/workflows/nix-hashes.yml@refs/heads/v2]`,
+        ],
+        ['another event', 'events: [push]', 'events: [workflow_dispatch]'],
+        ['a second event', 'events: [push]', 'events: [push, workflow_dispatch]'],
+        [
+          'a second secret',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY]',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY, KILOCODE_AUR_KEY]',
+        ],
+        ['another secret', 'secrets: [KILOCODE_MAINTAINER_APP_KEY]', 'secrets: [KILOCODE_AUR_KEY]'],
+        ['staging as well', 'environments: [production]', 'environments: [production, staging]'],
+        [
+          'an environment grant',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY]',
+          'secrets: [KILOCODE_MAINTAINER_APP_KEY]\nenvironmentGrants:\n  production:\n    secrets: [KILOCODE_AUR_KEY]',
+        ],
+      ])('refuses it with %s', (_label, from, to) => {
+        expect(exact).toContain(from);
+        const source = exact.replace(from, to);
+        const workload = /^workload: (\S+)$/m.exec(source)?.[1];
+        expectThrow({ [`${workload}.yaml`]: source }, REFUSED);
+      });
+
+      it('refuses it with a token grant', () => {
+        expect(() =>
+          loadPolicies(
+            {
+              'ci-kilocode-app-key-v2.yaml': `${exact}audiences: [gateway]\nscopes: ['gateway:models.read']\n`,
+            },
+            { scopeRegistry: REGISTRY }
+          )
+        ).toThrow(REFUSED);
+      });
+    });
+
     it('allows identity.legacySubject only for Kilo-Org/kilocode with its ids', () => {
       const kilocode = (repository: string, repositoryId: string, ownerId: string) =>
         github({

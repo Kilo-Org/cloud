@@ -73,7 +73,7 @@ const surfaces: Record<string, Surface> = {
   },
   LeaseDO: {
     prototype: LeaseDO.prototype,
-    rpc: ['alarm', 'create', 'revoke'],
+    rpc: ['alarm', 'create', 'ensureSweeping', 'revoke'],
     stub: () => getLeaseStub(env, config),
     internal: [['revokeOnce', ['another-workloads-lease']]],
   },

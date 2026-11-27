@@ -38,6 +38,7 @@
     "TOKEN_SIGNING_KIDS_REVOKED": "",
     "LEASE_CI_MIGRATION_TARGET": "",
     "CF_DEPLOY_ACCOUNT_ID": "",
+    "LEASE_REPLICA_SWEEP_BINDINGS": "",
   },
   "services": [
     {

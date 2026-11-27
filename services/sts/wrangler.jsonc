@@ -60,6 +60,9 @@
     "LEASE_CI_MIGRATION_TARGET": "",
     // Cloudflare account STS mints CI deploy tokens in; empty mints none (README "Cloudflare deploy tokens").
     "CF_DEPLOY_ACCOUNT_ID": "",
+    // Hyperdrive bindings of the read replicas the lease object sweeps (README "Replica sessions");
+    // empty sweeps none. Production grants no `replica-read` until this names its replica.
+    "LEASE_REPLICA_SWEEP_BINDINGS": "",
   },
   "queues": {
     "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit" }],
@@ -106,6 +109,7 @@
         "TOKEN_SIGNING_KIDS_REVOKED": "",
         "LEASE_CI_MIGRATION_TARGET": "",
         "CF_DEPLOY_ACCOUNT_ID": "",
+        "LEASE_REPLICA_SWEEP_BINDINGS": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-staging" }],
@@ -141,6 +145,7 @@
         "TOKEN_SIGNING_KIDS_REVOKED": "",
         "LEASE_CI_MIGRATION_TARGET": "",
         "CF_DEPLOY_ACCOUNT_ID": "",
+        "LEASE_REPLICA_SWEEP_BINDINGS": "",
       },
       "queues": {
         "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-local" }],

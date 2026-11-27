@@ -7,11 +7,10 @@ export async function resolveGitHubPrepareParams(input: {
   githubRepo: string | undefined;
   githubIntegrationId?: string;
 }): Promise<{ githubRepo: string | undefined; githubIntegrationId?: string; platform: 'github' }> {
-  // The runtime's repository preflight runs only when the request names the
-  // integration that owns the repository, so resolve it for the caller here.
-  // An explicitly supplied id wins, and an unresolvable repository stays
-  // unqualified (the previous behaviour) rather than refusing a request the
-  // runtime can still serve.
+  // Pin the integration that owns the repository, so the runtime's repository
+  // preflight checks that exact integration. An explicitly supplied id wins.
+  // An unresolvable repository stays unpinned, and the preflight then checks it
+  // across the caller's connections.
   const resolvedIntegrationId =
     input.githubIntegrationId ??
     (input.githubRepo === undefined

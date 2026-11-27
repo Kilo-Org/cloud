@@ -392,6 +392,85 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
   });
 });
 
+describe('Cloud Agent create authorization parity with capability issuance', () => {
+  const service = () =>
+    new GitTokenRPCEntrypoint(
+      {} as ExecutionContext,
+      {
+        GITHUB_APP_SLUG: 'example-app',
+        GITHUB_APP_BOT_USER_ID: '123',
+        SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      } as unknown as CloudflareEnv
+    );
+  // Session create sends these fields for an unpinned repository; the grant adds the
+  // allocation and, for interactive origins, personal authorization.
+  const createCheck = {
+    githubRepo: 'acme/repo',
+    userId: 'user_1',
+    accessPurpose: 'workflow',
+  } as const;
+  const grant = {
+    ...createCheck,
+    outboundContainerId: 'allocation-1',
+    allowUserAuthorization: true,
+  } as const;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    serviceMocks.findRefreshCandidates.mockResolvedValue({ success: true, candidates: [] });
+    serviceMocks.selectUserAuthorization.mockResolvedValue({
+      selected: true,
+      token: 'user-token',
+      gitAuthor: { name: 'Example User', email: 'user-1@example.com' },
+    });
+  });
+
+  it('accepts a repository with an installation at create and at a personally authorized grant', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'standard',
+      repoName: 'repo',
+      permissions: { contents: 'write', pull_requests: 'write' },
+    });
+    const rpc = service();
+
+    await expect(rpc.authorizeCloudAgentGitHubRepo(createCheck)).resolves.toEqual({
+      success: true,
+    });
+    await expect(rpc.issueGitHubSessionCapability(grant)).resolves.toMatchObject({
+      success: true,
+      source: 'user',
+    });
+  });
+
+  it.each([
+    ['no_installation_found', 'no_installation_found'],
+    ['ambiguous_installation', 'no_installation_found'],
+    ['repository_not_installed', 'repository_not_installed'],
+  ] as const)(
+    'rejects a lookup that reports %s at create and at a personally authorized grant',
+    async (lookupReason, reason) => {
+      serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+        success: false,
+        reason: lookupReason,
+      });
+      const rpc = service();
+
+      await expect(rpc.authorizeCloudAgentGitHubRepo(createCheck)).resolves.toEqual({
+        success: false,
+        reason,
+      });
+      await expect(rpc.issueGitHubSessionCapability(grant)).resolves.toMatchObject({
+        success: false,
+        reason,
+      });
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+});
+
 describe('fetch disconnect endpoint', () => {
   const jwtSecret = 'test-secret-that-is-at-least-32-characters';
   const env = {

@@ -3,7 +3,6 @@ import {
   bitbucketCloneUrl,
   sameRepositoryIdentity,
   type EnvironmentReferenceRepository,
-  type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
 import { parseGitLabCloneUrl } from '@kilocode/worker-utils/gitlab-url';
 import type { PersistenceEnv } from '../persistence/types.js';
@@ -23,10 +22,12 @@ type AccessContext = { env: PersistenceEnv; userId: string; orgId?: string };
 export async function assertRepositoryAccessBeforeSessionCreation(
   input: AccessContext & { createdOnPlatform?: string; repository: SessionRepositoryRequest }
 ): Promise<void> {
-  if (input.repository.type === 'github' && input.repository.githubIntegrationId) {
+  if (input.repository.type === 'github') {
     await assertGitHubAccess(input, {
       repo: input.repository.repo,
-      expectedIntegrationId: input.repository.githubIntegrationId,
+      ...(input.repository.githubIntegrationId
+        ? { expectedIntegrationId: input.repository.githubIntegrationId }
+        : {}),
       accessPurpose: input.repository.githubAccessPurpose ?? 'workflow',
     });
     return;
@@ -166,23 +167,6 @@ async function assertMemberAccess(
 }
 
 /**
- * The repository the launch check above authorizes: a pinned GitHub repository,
- * a GitLab repository and a Bitbucket repository. Every other launch repository
- * is checked as a member, so that every member of a V2 environment is
- * authorized. An unpinned GitHub launch is not checked again with its pin; that
- * check is the pinned one.
- */
-function launchIdentityAuthorizedByLaunchCheck(
-  repository: SessionRepositoryRequest
-): EnvironmentRepositoryIdentity | undefined {
-  const covered =
-    (repository.type === 'github' && repository.githubIntegrationId !== undefined) ||
-    repository.type === 'gitlab' ||
-    repository.type === 'bitbucket';
-  return covered ? launchRepositoryIdentity(repository) : undefined;
-}
-
-/**
  * Authorizes every repository of a V2 environment before the session registers.
  * The first failure in environment order fails the start, and the error names
  * that repository. A V1 environment has no members to check.
@@ -197,7 +181,9 @@ export async function assertEnvironmentRepositoriesAccess(
       | undefined;
   }
 ): Promise<void> {
-  const authorized = launchIdentityAuthorizedByLaunchCheck(input.repository);
+  // Session create authorizes a GitHub, GitLab or Bitbucket launch repository
+  // before this check, so the member with the launch identity is not checked again.
+  const authorized = launchRepositoryIdentity(input.repository);
   const members = (
     isMultiRepositoryEnvironment(input.environment) ? input.environment.repositories : []
   ).filter(

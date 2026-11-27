@@ -47,8 +47,10 @@ import {
   type SecurityRemediationOrigin,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { webInternalCredential } from '@kilocode/worker-utils/web-internal-credential';
-import { STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH } from '@kilocode/sts-contracts';
+import {
+  STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
+  webInternalCredential,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { and, asc, desc, eq, inArray, isNull, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -2286,7 +2288,7 @@ export async function dispatchSecurityLifecycleEventForFinding(params: {
     // A push is best effort; without a credential it is dropped like any other failed push.
     const credential = await webInternalCredential(
       params.env,
-      STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+      STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
       { header: 'X-Internal-Secret', secret: () => params.env.INTERNAL_API_SECRET.get() }
     );
     if (credential.kind === 'unavailable') return;

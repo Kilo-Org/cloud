@@ -328,7 +328,6 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
       env: {
         KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-        WEB_INTERNAL_AUTH: 'legacy',
       } as never,
       db: {} as never,
       findingId,
@@ -350,7 +349,7 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
     });
   });
 
-  it('presents a web:security-notifications.dispatch STS token by default', async () => {
+  it('presents a web:security-notifications.lifecycle STS token under sts', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue({
       id: findingId,
       owned_by_user_id: 'user-1',
@@ -365,6 +364,7 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
       env: {
         KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: { get: secret },
+        WEB_INTERNAL_AUTH: 'sts',
         STS: {
           async mintTokens(request: { tokens: { audience: string; scope: string }[] }) {
             minted.push(request);
@@ -393,7 +393,7 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
     expect(headers['X-Internal-Secret']).toBeUndefined();
     expect(secret).not.toHaveBeenCalled();
     expect(minted).toEqual([
-      { tokens: [{ audience: 'web', scope: 'web:security-notifications.dispatch' }] },
+      { tokens: [{ audience: 'web', scope: 'web:security-notifications.lifecycle' }] },
     ]);
   });
 
@@ -412,6 +412,7 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
         env: {
           KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
           INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
+          WEB_INTERNAL_AUTH: 'sts',
         } as never,
         db: {} as never,
         findingId,
@@ -442,7 +443,6 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
       env: {
         KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-        WEB_INTERNAL_AUTH: 'legacy',
       } as never,
       db: db as never,
       findingId,
@@ -476,7 +476,6 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
         env: {
           KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
           INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-          WEB_INTERNAL_AUTH: 'legacy',
         } as never,
         db: {} as never,
         findingId,
@@ -499,7 +498,6 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
         env: {
           KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
           INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-          WEB_INTERNAL_AUTH: 'legacy',
         } as never,
         db: {} as never,
         findingId,
@@ -524,7 +522,6 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
         env: {
           KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
           INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-          WEB_INTERNAL_AUTH: 'legacy',
         } as never,
         db: {} as never,
         findingId,
@@ -556,7 +553,6 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
         env: {
           KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
           INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-          WEB_INTERNAL_AUTH: 'legacy',
         } as never,
         db: db as never,
         findingId,
@@ -577,7 +573,6 @@ describe('finalizeRemediationCallbackFromEnv lifecycle emit sites', () => {
   const env = {
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-    WEB_INTERNAL_AUTH: 'legacy',
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
   } as unknown as CloudflareEnv;
 
@@ -833,7 +828,6 @@ describe('remediation queued lifecycle emit sites', () => {
     REMEDIATION_ATTEMPT_QUEUE: { sendBatch: vi.fn().mockResolvedValue(undefined) },
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-    WEB_INTERNAL_AUTH: 'legacy',
   } as unknown as CloudflareEnv;
 
   const actor = {
@@ -1150,7 +1144,6 @@ describe('cancelRemediation queued-cancel lifecycle emit', () => {
     HYPERDRIVE: { connectionString: 'postgres://worker' },
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
     INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
-    WEB_INTERNAL_AUTH: 'legacy',
   } as unknown as CloudflareEnv;
 
   const personalFinding = {

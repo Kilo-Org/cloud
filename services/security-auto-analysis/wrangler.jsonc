@@ -35,11 +35,11 @@
   "vars": {
     "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
-    // The credential of the lifecycle push to `/api/internal/security-agent/notifications`
-    // (decision D59): `sts` sends a `web:security-notifications.dispatch` STS service token over
-    // the `STS` binding, `legacy` the `INTERNAL_API_SECRET` as `X-Internal-Secret`. Rollback is
-    // `legacy`.
-    "WEB_INTERNAL_AUTH": "sts",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the lifecycle push to
+    // `/api/internal/security-agent/notifications` sends `INTERNAL_API_SECRET` as
+    // `X-Internal-Secret`. `"sts"` sends a `web:security-notifications.lifecycle` STS service token
+    // over the `STS` binding instead; set it only once the Worker has that binding, STS grants the
+    // scope and the route accepts STS. Removing it is the rollback.
     "SESSION_INGEST_WORKER_URL": "https://ingest.kilosessions.ai",
     "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
     "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "https://app.kilo.ai",

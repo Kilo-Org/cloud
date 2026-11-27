@@ -57,8 +57,8 @@ export type SecurityNotificationSweepEnv = WebInternalAuthEnv & {
   SECURITY_NOTIFICATION_DISPATCH_ENABLED?: string;
 };
 
-/** The credential of one dispatch; a held STS token is a memory read. */
-type DispatchCredentials = () => Promise<WebInternalCredential>;
+/** The app credential the sweep read once for the tick, before claiming any row. */
+type DispatchCredential = Extract<WebInternalCredential, { kind: 'ready' }>;
 
 type OwnerKey = `org:${string}` | `user:${string}`;
 
@@ -877,15 +877,9 @@ async function claimNotification(db: WorkerDb, notificationId: string): Promise<
 
 export async function dispatchNotification(
   backendUrl: string,
-  credentials: DispatchCredentials,
+  credential: DispatchCredential,
   notificationId: string
 ): Promise<EndpointResponse> {
-  // The sweep checked for a credential before claiming anything; losing it mid-tick (STS stopped
-  // answering) is a transient failure of the dispatch path, retried like an unreachable app.
-  const credential = await credentials();
-  if (credential.kind === 'unavailable') {
-    return { outcome: 'retryable_failure', reason: 'provider_unavailable' };
-  }
   try {
     const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
       method: 'POST',
@@ -1016,7 +1010,7 @@ async function dispatchPendingRows(
   states: Map<OwnerKey, OwnerConfigState>,
   recipients: Map<OwnerKey, Set<string>>,
   backendUrl: string,
-  credentials: DispatchCredentials,
+  credential: DispatchCredential,
   now: Date
 ): Promise<
   Pick<
@@ -1059,7 +1053,7 @@ async function dispatchPendingRows(
       batch.map(async row => {
         const claimed = await claimNotification(db, row.notificationId);
         if (!claimed) return 'skipped' as const;
-        const outcome = await dispatchNotification(backendUrl, credentials, row.notificationId);
+        const outcome = await dispatchNotification(backendUrl, credential, row.notificationId);
         switch (outcome.outcome) {
           case 'sent':
             await markSent(db, row.notificationId);
@@ -1196,13 +1190,17 @@ export async function runSecurityNotificationSweep(
 
   if (dispatchEnabled) {
     const backendUrl = env.BACKEND_API_URL;
-    const credentials: DispatchCredentials = () =>
-      webInternalCredential(env, STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH, {
-        header: 'X-Internal-Secret',
-        secret: () => readInternalSecret(env),
-      });
-    // Checked before any row is claimed, so an STS outage or a missing secret costs no attempt.
-    if (!backendUrl || (await credentials()).kind === 'unavailable') {
+    // Read once per tick, before any row is claimed: an STS outage or refusal, or a missing
+    // secret, skips the dispatch phase and spends no attempt. A tick's requests are bounded
+    // (MAX_DISPATCH_PER_TICK in batches, each within DISPATCH_TIMEOUT_MS); a token that expires in
+    // a pathologically slow tick is refused by the app and retried like any unexpected answer.
+    const credential = backendUrl
+      ? await webInternalCredential(env, STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH, {
+          header: 'X-Internal-Secret',
+          secret: () => readInternalSecret(env),
+        })
+      : undefined;
+    if (!backendUrl || credential?.kind !== 'ready') {
       console.warn(
         '[security-notifications] BACKEND_API_URL or app credential missing; skipping dispatch'
       );
@@ -1212,7 +1210,7 @@ export async function runSecurityNotificationSweep(
         states,
         recipients,
         backendUrl,
-        credentials,
+        credential,
         now
       );
       processed = dispatchResult.processed;

@@ -1148,7 +1148,6 @@ describe('processRemediationAttempt pre-initiation cancellation settle', () => {
         HYPERDRIVE: { connectionString: 'postgres://worker' },
         NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
         INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
-        WEB_INTERNAL_AUTH: 'legacy',
         CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
         ENVIRONMENT: 'development',
         SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE: 'web',
@@ -1173,7 +1172,6 @@ const lifecycleEnv = {
   HYPERDRIVE: { connectionString: 'postgres://worker' },
   KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
   INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
-  WEB_INTERNAL_AUTH: 'legacy',
 } as unknown as CloudflareEnv;
 
 function postedLifecycleEvents(fetchMock: ReturnType<typeof vi.fn>): string[] {

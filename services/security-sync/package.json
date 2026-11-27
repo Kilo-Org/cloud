@@ -21,6 +21,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@kilocode/service-token-client": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "jsonc-parser": "3.3.1",

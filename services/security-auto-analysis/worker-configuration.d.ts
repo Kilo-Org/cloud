@@ -87,7 +87,7 @@ declare type CloudflareEnv = {
   NEXTAUTH_SECRET: SecretBinding;
   INTERNAL_API_SECRET: SecretBinding;
   CALLBACK_TOKEN_SECRET: SecretBinding;
-  /** `sts` (absent: `sts`) or `legacy`: `@kilocode/worker-utils/web-internal-credential`. */
+  /** `legacy` (absent: `legacy`) or `sts`: `@kilocode/worker-utils/web-internal-credential`. */
   WEB_INTERNAL_AUTH?: string;
   KILOCODE_BACKEND_BASE_URL: string;
   SESSION_INGEST_WORKER_URL: string;

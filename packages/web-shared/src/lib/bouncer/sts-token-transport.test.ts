@@ -3,7 +3,12 @@ import { waitUntil } from '@vercel/functions';
 import { decide, deliverUsageEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import { installBouncerAuth } from '@kilocode/web-shared/lib/bouncer/sts-auth';
 import { BouncerStsConfigError } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
-import { createBouncerTransportFor } from './sts-token-transport';
+import {
+  BOUNCER_FIRST_MINT_JITTER_MS,
+  BOUNCER_NOT_HELD_MEMORY_MS,
+  connectBouncerSts,
+  createBouncerTransportFor,
+} from './sts-token-transport';
 
 // The shipped wiring end to end in one process: `installBouncerAuth` loads the real transport on
 // the first call with the flag on, which mints through the real `createHttpServiceTokens` against
@@ -15,7 +20,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get STS_URL() {
     return mockStsUrl;
   },
-  BOUNCER_URL: 'https://bouncer.example.com',
+  BOUNCER_URL: 'https://bouncer.kiloapps.io',
   INTERNAL_API_SECRET: 'env-only-secret',
 }));
 
@@ -62,7 +67,7 @@ function urlOf(input: Parameters<typeof fetch>[0]): string {
 
 function bouncerCalls(): Headers[] {
   return mockFetch.mock.calls
-    .filter(([input]) => urlOf(input).startsWith('https://bouncer.example.com/'))
+    .filter(([input]) => urlOf(input).startsWith('https://bouncer.kiloapps.io/'))
     .map(([, init]) => new Headers(init?.headers));
 }
 
@@ -99,7 +104,7 @@ beforeEach(() => {
     }
     return Response.json({ enforced: false, spendWatch: false, flags: [] });
   });
-  installBouncerAuth('kilocode-ai-gateway', ['bouncer:decide', 'bouncer:usage.write']);
+  installBouncerAuth('kilocode-ai-gateway');
 });
 
 afterEach(async () => {
@@ -126,7 +131,8 @@ describe('the installed Bouncer auth with the real transport', () => {
       ([input]) => urlOf(input) === `${STS_ISSUERS.production}/v1/token`
     )?.[1];
     expect(new Headers(stsInit?.headers).get('authorization')).toBe(`Bearer ${IDENTITY_TOKEN}`);
-    expect(mockReadinessGet).toHaveBeenCalledTimes(1);
+    // Held before the mint, so the mint went out without the first-exchange jitter.
+    expect(mockReadinessGet).toHaveBeenCalled();
 
     const [headers] = bouncerCalls();
     expect(headers.get('authorization')).toBe('Bearer sts-decide-token');
@@ -146,14 +152,26 @@ describe('the installed Bouncer auth with the real transport', () => {
 
   it('does not wait for a decide token while the exchanged Vercel token is not held', async () => {
     mockExchangeHeld = false;
-    await decide({ requestId: 'r-7', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
-    const [headers] = bouncerCalls();
-    expect(headers.get('authorization')).toBeNull();
-    expect(headers.get('x-internal-api-key')).toBe('env-only-secret');
-    // The mint still runs in the background, so the next call finds its token.
-    await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
-    await decide({ requestId: 'r-8', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
-    expect(bouncerCalls()[1].get('authorization')).toBe('Bearer sts-decide-token');
+    // No first-exchange jitter here; `connectBouncerSts` below tests it with fake timers.
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      await decide(
+        { requestId: 'r-7', tier: 'anonymous', ip: '203.0.113.7' },
+        { timeoutMs: 1_000 }
+      );
+      const [headers] = bouncerCalls();
+      expect(headers.get('authorization')).toBeNull();
+      expect(headers.get('x-internal-api-key')).toBe('env-only-secret');
+      // The mint still runs in the background, so the next call finds its token.
+      await Promise.allSettled(jest.mocked(waitUntil).mock.calls.map(([promise]) => promise));
+      await decide(
+        { requestId: 'r-8', tier: 'anonymous', ip: '203.0.113.7' },
+        { timeoutMs: 1_000 }
+      );
+      expect(bouncerCalls()[1].get('authorization')).toBe('Bearer sts-decide-token');
+    } finally {
+      random.mockRestore();
+    }
   });
 
   it('delivers a usage event with the legacy key alone while its token is not held yet', async () => {
@@ -168,6 +186,8 @@ describe('the installed Bouncer auth with the real transport', () => {
 
   it('never presents its identity to the STS of another environment', async () => {
     mockStsUrl = STS_ISSUERS.staging;
+    // The deployment starts with these settings: install again, as instrumentation would.
+    installBouncerAuth('kilocode-ai-gateway');
     await decide({ requestId: 'r-4', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
     expect(stsCalls()).toEqual([]);
     expect(mockIdentity).not.toHaveBeenCalled();
@@ -184,6 +204,7 @@ describe('the installed Bouncer auth with the real transport', () => {
     async (_name, runtime, issuer) => {
       setRuntime({ ...runtime, BOUNCER_STS_TOKENS: 'on' });
       mockStsUrl = issuer;
+      installBouncerAuth('kilocode-ai-gateway');
       await decide(
         { requestId: 'r-6', tier: 'anonymous', ip: '203.0.113.7' },
         { timeoutMs: 1_000 }
@@ -198,7 +219,7 @@ describe('the installed Bouncer auth with the real transport', () => {
     }
   );
 
-  it('sends no token and loads no transport with the flag off', async () => {
+  it('sends no token with the flag off', async () => {
     setRuntime({ VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' });
     await decide({ requestId: 'r-5', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1_000 });
     expect(stsCalls()).toEqual([]);
@@ -244,5 +265,104 @@ describe('createBouncerTransportFor', () => {
         connect,
       })
     ).toThrow(BouncerStsConfigError);
+  });
+});
+
+describe('connectBouncerSts', () => {
+  const DECIDE = { audience: 'bouncer', scope: 'bouncer:decide' } as const;
+  const ctx = { waitUntil: () => undefined };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function connection(options: { held: { value: boolean }; status?: number }) {
+    const mint = jest.fn<void, [boolean]>();
+    const exchangeHeld = jest.fn(async () => options.held.value);
+    const identity = jest.fn(async () => IDENTITY_TOKEN);
+    const stsFetch = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const request = JSON.parse(init?.body as string) as MintRequest;
+      if (options.status === 503) {
+        return Response.json({ status: 'unavailable', retryAfterSeconds: 1 }, { status: 503 });
+      }
+      return Response.json({
+        status: 'ok',
+        tokens: request.tokens.map(({ audience, scope }) => ({
+          status: 'issued',
+          audience,
+          scope,
+          token: 'sts-token',
+          jti: 'jti',
+          expiresAt: Math.floor(Date.now() / 1000) + 300,
+        })),
+      });
+    });
+    const connected = connectBouncerSts({
+      stsIssuer: STS_ISSUERS.production,
+      hooks: { mint },
+      identity,
+      exchangeHeld,
+      fetch: stsFetch as unknown as typeof fetch,
+      random: () => 0.5,
+    });
+    return { connected, mint, exchangeHeld, identity, stsFetch };
+  }
+
+  it('delays a first-exchange mint by the jitter and reports not ready meanwhile', async () => {
+    jest.useFakeTimers();
+    const held = { value: false };
+    const { connected, mint, stsFetch } = connection({ held });
+    const token = connected.tokens.get(DECIDE, ctx);
+    // The identity step found no exchanged token, so this mint waits half the jitter range.
+    await jest.advanceTimersByTimeAsync(20);
+    held.value = true;
+    await jest.advanceTimersByTimeAsync(BOUNCER_NOT_HELD_MEMORY_MS);
+    await expect(connected.exchangeReady()).resolves.toBe(false);
+    await jest.advanceTimersByTimeAsync(BOUNCER_FIRST_MINT_JITTER_MS / 2 - 300);
+    expect(stsFetch).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(50);
+    await expect(token).resolves.toBe('sts-token');
+    expect(stsFetch).toHaveBeenCalledTimes(1);
+    expect(mint).toHaveBeenCalledWith(true);
+    await expect(connected.exchangeReady()).resolves.toBe(true);
+  });
+
+  it('mints at once when the exchanged token was already held', async () => {
+    jest.useFakeTimers();
+    const { connected, stsFetch } = connection({ held: { value: true } });
+    const token = connected.tokens.get(DECIDE, ctx);
+    await jest.advanceTimersByTimeAsync(20);
+    await expect(token).resolves.toBe('sts-token');
+    expect(stsFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs one readiness check at a time and remembers a miss for the memory window', async () => {
+    jest.useFakeTimers();
+    const { connected, exchangeHeld } = connection({ held: { value: false } });
+    const check = Promise.withResolvers<boolean>();
+    exchangeHeld.mockReturnValueOnce(check.promise);
+    const first = connected.exchangeReady();
+    const second = connected.exchangeReady();
+    expect(exchangeHeld).toHaveBeenCalledTimes(1);
+    check.resolve(false);
+    await expect(first).resolves.toBe(false);
+    await expect(second).resolves.toBe(false);
+    await jest.advanceTimersByTimeAsync(BOUNCER_NOT_HELD_MEMORY_MS - 1);
+    await expect(connected.exchangeReady()).resolves.toBe(false);
+    expect(exchangeHeld).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    await connected.exchangeReady();
+    expect(exchangeHeld).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a refused or failed STS answer to the mint hook', async () => {
+    jest.useFakeTimers();
+    const { connected, mint } = connection({ held: { value: true }, status: 503 });
+    const token = connected.tokens.get(DECIDE, ctx);
+    void token.catch(() => undefined);
+    await jest.advanceTimersByTimeAsync(20);
+    await expect(token).rejects.toThrow();
+    expect(mint).toHaveBeenCalledWith(false);
+    expect(mint).not.toHaveBeenCalledWith(true);
   });
 });

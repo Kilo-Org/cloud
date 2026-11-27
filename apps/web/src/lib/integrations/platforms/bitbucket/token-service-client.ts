@@ -132,6 +132,7 @@ export const BitbucketPullRequestProjectionSchema = z
       })
       .strict(),
     source: BitbucketPullRequestSideSchema,
+    sourceCommitMessage: z.string().optional(),
     destination: BitbucketPullRequestSideSchema,
     url: z.string().url().max(2048),
   })
@@ -307,12 +308,15 @@ export async function fetchBitbucketPullRequestFromTokenService(params: {
   workspace: BitbucketCodeReviewWorkspaceIdentity;
   repository: BitbucketCodeReviewRepositoryIdentity;
   pullRequestId: number;
+  includeSourceCommitMessage?: boolean;
 }): Promise<BitbucketPullRequestResult> {
   return callBitbucketCodeReviewTokenService({
     actorUserId: params.botUserId,
     organizationId: params.organizationId,
     audience: BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
-    path: '/internal/bitbucket/code-review/pull-request',
+    path: params.includeSourceCommitMessage
+      ? '/internal/bitbucket/code-review/pull-request?includeSourceCommitMessage=true'
+      : '/internal/bitbucket/code-review/pull-request',
     requestBody: { ...params.workspace, ...params.repository, pullRequestId: params.pullRequestId },
     resultSchema: BitbucketPullRequestResultSchema,
     fallback: { success: false, reason: 'temporarily_unavailable' },

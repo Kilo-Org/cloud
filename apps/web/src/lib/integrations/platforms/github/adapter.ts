@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/rest';
+import { hasReviewSkipDirective } from '@/lib/code-reviews/triggers/commit-message';
 import { createAppAuth } from '@octokit/auth-app';
 import { z } from 'zod';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -2130,7 +2131,8 @@ export async function checkExistingFork(
 // How many merges a head may stack before its branch content is treated as unknown.
 const mergeHeadWalkLimit = 10;
 
-export type MergeHeadContent =
+export type ReviewHeadContent =
+  | Readonly<{ kind: 'skip_directive' }>
   | Readonly<{ kind: 'not_merge' }>
   // The heads a review of the merge head can cover: every merge head on its first-parent chain, then
   // the branch commit the chain ends on, which all of them carry.
@@ -2139,21 +2141,23 @@ export type MergeHeadContent =
   | Readonly<{ kind: 'unreviewed_content' }>;
 
 /**
- * Resolves what a synchronize head carries. A head that stacks merges of the
+ * Checks the head message for a skip directive. With a base SHA, also resolves
+ * what a synchronize head carries. A head that stacks merges of the
  * base branch carries the branch commit its first-parent chain ends on, and each
  * merge head on that chain carries the same content, so the chain names the
  * heads a review of any of them covers. A merge whose second parent is not base
  * content brings in code no branch review covers, and an unreadable chain is
  * treated the same way, so both fall through to a review instead of a skip.
  */
-export async function resolveMergeHeadContent(args: {
+export async function inspectReviewHead(args: {
   appType: GitHubAppType;
-  baseSha: string;
+  baseSha?: string;
+  pullRequestRepository?: { owner: string; repo: string };
   headSha: string;
   installationId: string;
   owner: string;
   repo: string;
-}): Promise<MergeHeadContent> {
+}): Promise<ReviewHeadContent> {
   try {
     const tokenData = await generateGitHubInstallationToken(args.installationId, args.appType);
     const octokit = new Octokit({ auth: tokenData.token });
@@ -2161,12 +2165,20 @@ export async function resolveMergeHeadContent(args: {
     let current = args.headSha;
 
     for (let depth = 0; depth <= mergeHeadWalkLimit; depth += 1) {
+      // The installation may only have access to the base repository of a fork PR.
+      const commitRepository = depth === 0 ? (args.pullRequestRepository ?? args) : args;
       // oxlint-disable-next-line no-await-in-loop -- Each parent names the next commit to read.
       const { data } = await octokit.git.getCommit({
-        owner: args.owner,
-        repo: args.repo,
+        owner: commitRepository.owner,
+        repo: commitRepository.repo,
         commit_sha: current,
       });
+      if (depth === 0 && hasReviewSkipDirective(data.message)) {
+        return { kind: 'skip_directive' };
+      }
+      if (args.baseSha === undefined) {
+        return { kind: 'not_merge' };
+      }
       const [firstParent, secondParent] = data.parents;
       if (data.parents.length < 2) {
         if (depth === 0) {
@@ -2185,30 +2197,27 @@ export async function resolveMergeHeadContent(args: {
         head: secondParent.sha,
       });
       if (comparison.data.status !== 'behind' && comparison.data.status !== 'identical') {
-        logExceptInTest(
-          '[resolveMergeHeadContent] Merge takes content from outside the base branch',
-          {
-            owner: args.owner,
-            repo: args.repo,
-            sha: current.substring(0, 8),
-            secondParent: secondParent.sha.substring(0, 8),
-            status: comparison.data.status,
-          }
-        );
+        logExceptInTest('[inspectReviewHead] Merge takes content from outside the base branch', {
+          owner: args.owner,
+          repo: args.repo,
+          sha: current.substring(0, 8),
+          secondParent: secondParent.sha.substring(0, 8),
+          status: comparison.data.status,
+        });
         return { kind: 'unreviewed_content' };
       }
       shas.push(current);
       current = firstParent.sha;
     }
 
-    logExceptInTest('[resolveMergeHeadContent] Merge chain exceeds the walk limit', {
+    logExceptInTest('[inspectReviewHead] Merge chain exceeds the walk limit', {
       owner: args.owner,
       repo: args.repo,
       sha: args.headSha.substring(0, 8),
     });
     return { kind: 'unreviewed_content' };
   } catch (error) {
-    logExceptInTest('[resolveMergeHeadContent] Failed to walk the merge chain:', error);
+    logExceptInTest('[inspectReviewHead] Failed to inspect review head:', error);
     return { kind: 'unreviewed_content' };
   }
 }

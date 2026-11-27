@@ -11,7 +11,7 @@ const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
-const mockResolveMergeHeadContent = jest.fn();
+const mockInspectReviewHead = jest.fn();
 const mockFindReviewCoveringHeads = jest.fn();
 const mockGetCheckRunConclusion = jest.fn();
 const mockFindLatestCheckRunId = jest.fn();
@@ -57,7 +57,7 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   createCheckRun: (...args: unknown[]) => mockCreateCheckRun(...args),
   findLatestCheckRunId: (...args: unknown[]) => mockFindLatestCheckRunId(...args),
   getCheckRunConclusion: (...args: unknown[]) => mockGetCheckRunConclusion(...args),
-  resolveMergeHeadContent: (...args: unknown[]) => mockResolveMergeHeadContent(...args),
+  inspectReviewHead: (...args: unknown[]) => mockInspectReviewHead(...args),
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
 
@@ -124,7 +124,7 @@ beforeEach(() => {
   });
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToPR.mockResolvedValue(undefined);
-  mockResolveMergeHeadContent.mockResolvedValue({ kind: 'not_merge' });
+  mockInspectReviewHead.mockResolvedValue({ kind: 'not_merge' });
   mockFindReviewCoveringHeads.mockResolvedValue(null);
   mockGetCheckRunConclusion.mockResolvedValue(undefined);
   mockFindLatestCheckRunId.mockResolvedValue(undefined);
@@ -458,7 +458,7 @@ describe('handlePullRequest', () => {
       // new SHA with a fresh check run by migrateInFlightReviewsToMergeCommitHead).
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });
-      expect(mockResolveMergeHeadContent).not.toHaveBeenCalled();
+      expect(mockInspectReviewHead).not.toHaveBeenCalled();
       expect(mockCreateCodeReview).not.toHaveBeenCalled();
     });
 
@@ -606,7 +606,7 @@ describe('handlePullRequest', () => {
       config: {},
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
@@ -638,7 +638,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
@@ -677,7 +677,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
@@ -713,7 +713,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
@@ -741,7 +741,7 @@ describe('handlePullRequest', () => {
 
     await handlePullRequest(pullRequestPayload(), platformIntegration());
 
-    expect(mockResolveMergeHeadContent).toHaveBeenCalledWith({
+    expect(mockInspectReviewHead).toHaveBeenCalledWith({
       appType: 'standard',
       baseSha: 'def456',
       headSha: 'abc123',
@@ -751,17 +751,23 @@ describe('handlePullRequest', () => {
     });
   });
 
-  it('does not look for merge content on a non-synchronize event', async () => {
+  it('inspects the head message without comparing merge parents on open', async () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
-    mockGetAgentConfigForOwner.mockResolvedValue({
-      is_enabled: true,
-      config: {},
-    });
+    mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+    mockInspectReviewHead.mockResolvedValue({ kind: 'skip_directive' });
 
-    await handlePullRequest(pullRequestPayload({ action: 'opened' }), platformIntegration());
+    const response = await handlePullRequest(
+      pullRequestPayload({ action: 'opened' }),
+      platformIntegration()
+    );
 
-    expect(mockResolveMergeHeadContent).not.toHaveBeenCalled();
-    expect(mockCreateCodeReview).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockInspectReviewHead).toHaveBeenCalledWith(
+      expect.objectContaining({ baseSha: undefined, headSha: 'abc123' })
+    );
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockCreateCheckRun).not.toHaveBeenCalled();
   });
 
   it('reviews a merge-commit head whose content no review covers', async () => {
@@ -770,7 +776,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
@@ -790,7 +796,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockResolveMergeHeadContent.mockResolvedValue({ kind: 'unreviewed_content' });
+    mockInspectReviewHead.mockResolvedValue({ kind: 'unreviewed_content' });
 
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
@@ -805,7 +811,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });
@@ -824,7 +830,7 @@ describe('handlePullRequest', () => {
       config: {},
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
-    mockResolveMergeHeadContent.mockResolvedValue({
+    mockInspectReviewHead.mockResolvedValue({
       kind: 'review_content',
       shas: ['merge-sha', 'content-sha'],
     });

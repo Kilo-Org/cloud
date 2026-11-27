@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hasReviewSkipDirective } from '@/lib/code-reviews/triggers/commit-message';
 import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { MergeRequestPayload } from '../webhook-schemas';
 import { GITLAB_ACTION, PLATFORM } from '@/lib/integrations/core/constants';
@@ -158,11 +159,14 @@ export async function handleMergeRequestCodeReview(
       platformIntegrationId: integration.id,
     } satisfies ReviewScope;
 
+    const skipDirective = hasReviewSkipDirective(mr.last_commit?.message);
+
     // Skip merge commits on update (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
     if (
-      await shouldSkipUpdateForMergeCommit({
+      !skipDirective &&
+      (await shouldSkipUpdateForMergeCommit({
         action: mr.action,
         check: async () => {
           const integrationForCheck = await getIntegrationById(integration.id);
@@ -174,7 +178,7 @@ export async function handleMergeRequestCodeReview(
           const accessToken = await getValidGitLabToken(integrationForCheck, credentialActor);
           return isMergeCommit(accessToken, mr.source_project_id, headSha, checkInstanceUrl);
         },
-      })
+      }))
     ) {
       logExceptInTest('Skipping merge commit:', {
         mr_iid: mr.iid,
@@ -238,6 +242,10 @@ export async function handleMergeRequestCodeReview(
         description: SUPERSEDED_BY_NEW_PUSH_REASON,
         credentialActor,
       });
+    }
+
+    if (skipDirective) {
+      return NextResponse.json({ message: 'Skipped review by commit message' }, { status: 200 });
     }
 
     const existingReview = await findExistingReview(reviewScope, headSha);

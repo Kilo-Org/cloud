@@ -98,6 +98,7 @@ type ProviderStateOptions = {
   draft?: boolean;
   updatedOn?: string;
   headSha?: string;
+  sourceCommitMessage?: string;
 };
 
 let ownerUser: User;
@@ -126,6 +127,7 @@ function providerPullRequest(options: ProviderStateOptions = {}) {
       draft,
       updatedOn,
       title: 'Keep admission ordered',
+      sourceCommitMessage: options.sourceCommitMessage,
       author: {
         uuid: '44444444-4444-4444-8444-444444444444',
         displayName: 'Ada Reviewer',
@@ -459,6 +461,32 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
       expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('records a marked head without queuing it and reviews the next unmarked head', async () => {
+    const integration = await insertIntegrationAndConfig();
+    const nextHead = 'c'.repeat(40);
+    mockFetchBitbucketPullRequest
+      .mockResolvedValueOnce(providerPullRequest({ sourceCommitMessage: 'Update docs [ci-skip]' }))
+      .mockResolvedValueOnce(
+        providerPullRequest({ headSha: nextHead, updatedOn: '2026-06-24T14:00:00.000Z' })
+      );
+
+    const skipped = await callWebhook(integration, webhookRequest(integration));
+
+    expect(skipped.status).toBe(200);
+    await expect(organizationReviews()).resolves.toHaveLength(0);
+    await expect(organizationWebhookEvents()).resolves.toMatchObject([{ processed: true }]);
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+
+    const queued = await callWebhook(
+      integration,
+      webhookRequest(integration, { eventKey: 'pullrequest:updated' })
+    );
+
+    expect(queued.status).toBe(202);
+    await expect(organizationReviews()).resolves.toMatchObject([{ head_sha: nextHead }]);
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
+  });
 
   it('acknowledges an unselected repository without persistence or provider access', async () => {
     const integration = await insertIntegrationAndConfig([OTHER_REPOSITORY_UUID]);

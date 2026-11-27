@@ -21,6 +21,7 @@ import {
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { hasReviewSkipDirective } from '@/lib/code-reviews/triggers/commit-message';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { fetchBitbucketPullRequestFromTokenService } from '@/lib/integrations/platforms/bitbucket/token-service-client';
 import {
@@ -379,6 +380,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         repositoryFullName: selectedRepository.fullName,
       },
       pullRequestId: payload.pullrequest.id,
+      includeSourceCommitMessage: !BITBUCKET_TERMINAL_DELIVERY_EVENTS.has(eventKey),
     });
   } catch {
     await safelyRecordFailure(event, 'temporarily_unavailable');
@@ -496,6 +498,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         reviewScope,
         pullRequest.source.sha
       );
+      if (hasReviewSkipDirective(pullRequest.sourceCommitMessage)) {
+        await completeBitbucketWebhookEventInTransaction(tx, event, observation);
+        return { cancelledReviews, created: false };
+      }
+
       const createdReview = await createCodeReviewIfAbsentInTransaction(tx, reviewScope, {
         owner: ownerWithBot,
         platformIntegrationId: integration.id,

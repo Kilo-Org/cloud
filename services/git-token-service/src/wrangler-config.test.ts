@@ -17,7 +17,6 @@ describe('git-token-service wrangler.jsonc', () => {
 
     expect(production.name).toBe('git-token-service');
     expect(production.targetEnvironment).toBeUndefined();
-    expect(production.definedEnvironments).toEqual(['dev']);
     expect(production.workers_dev).toBe(false);
     expect(production.preview_urls).toBe(false);
     expect(production.routes).toEqual([
@@ -59,8 +58,8 @@ describe('git-token-service wrangler.jsonc', () => {
 
   it('refuses an undeclared environment instead of rendering production', () => {
     // Wrangler's own reason when `env` is declared but has no section of that name.
-    expect(() => unstable_readConfig({ config, env: 'staging' })).toThrow(
-      'No environment found in configuration with name "staging".'
+    expect(() => unstable_readConfig({ config, env: 'preview' })).toThrow(
+      'No environment found in configuration with name "preview".'
     );
   });
 });

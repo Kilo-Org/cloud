@@ -7,11 +7,12 @@ import type { Env } from '../../src/env';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const INVALID_TOKEN = 'not-a-jwt';
+const CLI_URL = 'http://local/api/user/cli';
 
-// Only the bindings the auth middleware reads. Signature checks reject these
-// tokens before the pepper lookup, and the connection string points at a local
-// port nothing listens on so an unexpected lookup fails loudly. The fixture
-// stands in for the Worker's full binding set, which this test never reaches.
+// Only the bindings the auth middleware reads. Signature and audience checks
+// reject most tokens before the pepper lookup. The connection string points at
+// a local port nothing listens on, so a token that reaches the lookup meets a
+// database outage. The fixture stands in for the Worker's full binding set.
 const env = {
   NEXTAUTH_SECRET_PROD: { get: async () => TEST_JWT_SECRET },
   HYPERDRIVE: { connectionString: 'postgres://postgres:postgres@127.0.0.1:1/postgres' },
@@ -40,7 +41,7 @@ function signAudienceToken(aud: unknown): Promise<string> {
 }
 
 function cliUpgradeRequest(query = ''): Request {
-  return new Request(`http://local/api/user/cli${query}`, {
+  return new Request(`${CLI_URL}${query}`, {
     headers: { Upgrade: 'websocket' },
   });
 }
@@ -142,5 +143,32 @@ describe('CLI websocket authentication rejection', () => {
       success: false,
       error: 'Invalid or expired token',
     });
+  });
+
+  it('keeps a retryable 503 for a CLI websocket whose user lookup fails', async () => {
+    // A correctly signed token reaches the pepper lookup, and the fixture's
+    // database refuses connections.
+    const response = await app.fetch(
+      cliUpgradeRequest(`?token=${await signAudienceToken(SESSION_INGEST_AUDIENCE)}`),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.webSocket).toBeNull();
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Service temporarily unavailable',
+    });
+  });
+
+  it.each([
+    ['a POST', new Request(CLI_URL, { method: 'POST', headers: { Upgrade: 'websocket' } })],
+    ['a mixed-case Upgrade value', new Request(CLI_URL, { headers: { Upgrade: 'WebSocket' } })],
+    ['a trailing-slash path', new Request(`${CLI_URL}/`, { headers: { Upgrade: 'websocket' } })],
+  ])('keeps the HTTP 401 without a socket for %s', async (_name, request) => {
+    const response = await app.fetch(request, env);
+
+    expect(response.status).toBe(401);
+    expect(response.webSocket).toBeNull();
   });
 });

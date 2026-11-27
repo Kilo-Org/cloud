@@ -443,16 +443,27 @@ export async function startExistingMachine(
       }
     }
 
-    // failed machines are restartable via updateMachine (Fly re-launches on the next available host)
     if (machine.state === 'stopped' || machine.state === 'created' || machine.state === 'failed') {
-      await fly.updateMachine(flyConfig, providerState.machineId, machineConfig, {
+      const updated = await fly.updateMachine(flyConfig, providerState.machineId, machineConfig, {
         minSecretsVersion,
       });
+      // Fly leaves a machine in a non-started state stopped after an update, so
+      // the update alone does not launch it. Start it explicitly, then wait on
+      // the version the update created. Mirrors restartRuntime().
+      const afterUpdate = await fly.getMachine(flyConfig, providerState.machineId);
+      if (
+        afterUpdate.state === 'stopped' ||
+        afterUpdate.state === 'created' ||
+        afterUpdate.state === 'failed'
+      ) {
+        await fly.startMachine(flyConfig, providerState.machineId);
+      }
       await fly.waitForState(
         flyConfig,
         providerState.machineId,
         'started',
-        STARTUP_TIMEOUT_SECONDS
+        STARTUP_TIMEOUT_SECONDS,
+        updated.instance_id
       );
       console.log('[DO] Machine updated and started:', providerState.machineId);
     } else if (machine.state === 'started') {

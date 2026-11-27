@@ -14,6 +14,7 @@
 //
 // With COPY_POLICY_DIR set, every snapshot policy must be present.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -178,7 +179,6 @@ test('runs only on a dispatch by iscekic on main, in the copy-secrets environmen
   assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
   assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), [
     'mode',
-    'identity_id',
     'expected_commit',
     'only',
   ]);
@@ -225,18 +225,86 @@ test('no job calls the environments API with the job token', () => {
   for (const [name, job] of Object.entries(workflow.jobs)) {
     assert.equal(job.permissions.actions, undefined, name);
     assert.equal(job.permissions.administration, undefined, name);
-    const step = JSON.stringify(job.steps[0]);
-    assert.doesNotMatch(step, /GH_TOKEN|GITHUB_TOKEN|GITHUB_API_URL|api\.github\.com/, name);
-    assert.doesNotMatch(step, /\/environments\b|deployment-branch-policies/, name);
+    for (const [index, step] of job.steps.entries()) {
+      const text = JSON.stringify(step);
+      const where = `${name} step ${index}`;
+      assert.doesNotMatch(text, /GH_TOKEN|GITHUB_TOKEN|GITHUB_API_URL|api\.github\.com/, where);
+      assert.doesNotMatch(text, /\/environments\b|deployment-branch-policies/, where);
+    }
   }
 });
 
-test('the probe job holds no secret', () => {
+const IDENTITY_ENV = '${{ secrets.COPY_IDENTITY_ID }}';
+const IDENTITY_EMPTY_ERROR =
+  '::error::secret COPY_IDENTITY_ID of the copy-secrets environment is missing or empty';
+
+// The script of a job up to its first request (the OIDC token request).
+function beforeFirstRequest(run, name) {
+  const end = run.indexOf('aud=$(');
+  assert.ok(end >= 0 && end < run.indexOf('jwt=$(curl '), `${name}: aud precedes the OIDC request`);
+  assert.equal(run.indexOf('aud=$(', end + 1), -1, `${name}: one aud`);
+  return run.slice(0, end);
+}
+
+function runPrefix(prefix, identityId) {
+  const sha = 'a'.repeat(40);
+  return spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c', prefix], {
+    encoding: 'utf8',
+    env: {
+      PATH: process.env.PATH,
+      EXPECTED_COMMIT: sha,
+      GITHUB_SHA: sha,
+      IDENTITY_ID: identityId,
+      ONLY: '',
+    },
+  });
+}
+
+// The identity id exists only as a secret of the copy-secrets environment. A dispatch that
+// auto-creates a deleted environment gets no secrets, so both jobs stop before any request.
+test('both jobs take the identity id from the environment secret and refuse an empty one', () => {
+  assert.doesNotMatch(workflowText, /inputs\.identity_id/);
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    const step = job.steps[0];
+    assert.equal(step.env.IDENTITY_ID, IDENTITY_ENV, name);
+    assert.ok(step.run.includes(`fail "${IDENTITY_EMPTY_ERROR.slice('::error::'.length)}"`), name);
+    // The id reaches jq through $ENV and is never printed, only a hash prefix of it.
+    assert.match(step.run, /jq -Rc '\{identityId: \$ENV\.IDENTITY_ID, jwt: \.\}'/, name);
+    assert.doesNotMatch(step.run, /--arg id|echo "[^"\n]*\$IDENTITY_ID/, name);
+    const prefix = beforeFirstRequest(step.run, name);
+    const empty = runPrefix(prefix, '');
+    assert.equal(empty.status, 1, `${name}: empty id refused`);
+    assert.ok(
+      empty.stdout.includes(IDENTITY_EMPTY_ERROR),
+      `${name}: ${empty.stdout}${empty.stderr}`
+    );
+    const upper = runPrefix(prefix, '0000000A-0000-4000-8000-000000000000');
+    assert.equal(upper.status, 1, `${name}: uppercase id refused`);
+    assert.ok(
+      upper.stdout.includes('::error::secret COPY_IDENTITY_ID is not a lowercase UUID'),
+      name
+    );
+    const id = '0000000a-0000-4000-8000-000000000000';
+    const valid = runPrefix(prefix, id);
+    assert.ok(
+      valid.stdout.includes('identity_id_sha256='),
+      `${name}: ${valid.stdout}${valid.stderr}`
+    );
+    assert.ok(!valid.stdout.includes('COPY_IDENTITY_ID'), `${name}: a valid id passes the checks`);
+    assert.ok(!valid.stdout.includes(id), `${name}: the id is not printed`);
+  }
+});
+
+test('the probe job holds only the identity id secret', () => {
   assert.deepEqual(probeStep.env, {
     EXPECTED_COMMIT: EXPECTED_COMMIT_ENV,
-    IDENTITY_ID: '${{ inputs.identity_id }}',
+    IDENTITY_ID: IDENTITY_ENV,
   });
-  assert.doesNotMatch(JSON.stringify(workflow.jobs['probe-login']), /secrets\./);
+  const secrets = [...JSON.stringify(workflow.jobs['probe-login']).matchAll(/secrets\.(\w+)/g)];
+  assert.deepEqual(
+    secrets.map(match => match[1]),
+    ['COPY_IDENTITY_ID']
+  );
 });
 
 test('the copy step binds only the copied secrets and creates only', () => {
@@ -248,6 +316,11 @@ test('the copy step binds only the copied secrets and creates only', () => {
   assert.deepEqual(
     Object.keys(copyStep.env).filter(key => !key.startsWith('V_')),
     ['EXPECTED_COMMIT', 'IDENTITY_ID', 'ONLY']
+  );
+  assert.equal(copyStep.env.IDENTITY_ID, IDENTITY_ENV);
+  assert.equal(
+    Object.values(copyStep.env).filter(binding => binding.includes('secrets.')).length,
+    used.length + 1
   );
   const run = copyStep.run;
   // One POST per target to the v4 create endpoint; no update, delete or retry flag.

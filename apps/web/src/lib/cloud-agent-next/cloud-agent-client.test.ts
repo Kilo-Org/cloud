@@ -889,6 +889,30 @@ describe('CloudAgentNextClient sandbox selection', () => {
     ).rejects.toThrow();
   });
 
+  it('sends workspace continuation without the legacy autoInitiate field', async () => {
+    const mutate = jest
+      .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+      .mockResolvedValue({
+        kiloSessionId: 'ses_abcdefghijklmnopqrstuvwx01',
+        cloudAgentSessionId: 'workspace_test',
+      });
+    mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+
+    await new CloudAgentNextClient('auth-token').prepareSession({
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      cloneFromKiloSessionId: 'ses_12345678901234567890123456',
+      workspaceContinuation: true,
+      operationKey: '12345678-1234-4234-9234-123456789abc',
+      autoInitiate: true,
+    });
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceContinuation: true, autoInitiate: undefined })
+    );
+  });
+
   it.each([
     undefined,
     'isolated-standard',

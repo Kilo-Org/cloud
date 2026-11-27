@@ -6559,6 +6559,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
     // The clone resume now sends the worktree id and location it previously
@@ -6601,6 +6602,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
     // A clone-only continuation never re-clones and never admits an initial turn.
@@ -7471,6 +7473,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         operationKey: OPERATION_KEY,
         createdOnPlatform: 'cloud-agent-web',
         clientProvenance: 'browser',
+        workspaceContinuation: true,
       },
     });
   }
@@ -7555,12 +7558,14 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     await expect(runCreate(ctx, cloneWebRequest())).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
     });
     expect(generateSessionIdMock).toHaveBeenCalledWith();
 
     expect(sandboxSessionIdFromName).toHaveBeenCalledWith(`${USER_ID}:${WORKSPACE_SESSION_ID}`);
     expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
     expect(doStub.registerSessionFromMetadata.mock.calls.length).toBe(1);
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(createdMetadata(doStub)?.clone).toEqual({
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
     });

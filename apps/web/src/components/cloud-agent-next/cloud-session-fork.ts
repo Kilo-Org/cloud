@@ -1,17 +1,20 @@
 /**
  * Pure decision logic for "continue this session in a new Cloud Agent
- * session" (a cloud-to-cloud fork). The web UI mirrors the mobile Continue
- * flow: the source session's own runtime configuration (repository, model,
- * mode) is copied into a `prepareSession` clone request instead of asking the
- * user to re-pick a destination.
+ * session". Both Cloud Agent and read-only CLI sources use a `prepareSession`
+ * clone request.
  *
  * This module stays free of tRPC, React, and server-only imports so the
  * derivation rules can be unit tested in isolation.
  */
 
-import type { SessionConfig } from '@kilocode/cloud-agent-sdk';
+import type { ModelSelection, SessionConfig, StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { parseGitLabBaseUrl, parseGitLabCloneUrl } from '@kilocode/worker-utils/gitlab-url';
 
-import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
+import {
+  agentVariantSchema,
+  basePrepareSessionNextSchema,
+} from '@/routers/cloud-agent-next-schemas';
+import { isBuiltinAgentMode, normalizeAlias } from './session-config';
 
 /** The subset of a cloud session's runtime state this feature reads. */
 export type CloudRuntimeConfig = {
@@ -51,7 +54,7 @@ export type CloudForkRejectionReason =
 
 export type CloudForkRepository =
   | { kind: 'github'; fullName: string }
-  | { kind: 'gitlab'; projectPath: string };
+  | { kind: 'gitlab'; projectPath: string; instanceUrl?: string };
 
 export type CloudForkFields = {
   mode: string;
@@ -66,19 +69,49 @@ export type DeriveCloudSessionForkResult =
   | { ok: true; fields: CloudForkFields }
   | { ok: false; reason: CloudForkRejectionReason };
 
+export type ReadOnlyForkSettings = Pick<CloudRuntimeConfig, 'mode' | 'model' | 'variant'>;
+type ReadOnlyForkDestination = ReadOnlyForkSettings & {
+  gitLabInstanceUrl?: string;
+};
+
+export function getReadOnlyForkSettings(
+  composerSettings: Pick<SessionConfig, 'mode' | 'model' | 'variant'> | null,
+  observedModel: ModelSelection | null,
+  messages: readonly StoredMessage['info'][]
+): ReadOnlyForkSettings {
+  const lastAssistant = messages.findLast(message => message.role === 'assistant');
+  const mode = [normalizeAlias(composerSettings?.mode), normalizeAlias(lastAssistant?.mode)].find(
+    isBuiltinAgentMode
+  );
+  const gatewayModel = observedModel?.model.providerID === 'kilo' ? observedModel : null;
+  return {
+    mode: mode ?? 'code',
+    model: gatewayModel?.model.modelID ?? composerSettings?.model,
+    variant: (gatewayModel ? gatewayModel.variant : composerSettings?.variant) ?? undefined,
+  };
+}
+
 const MODE_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 const MAX_MODE_SLUG_LENGTH = 50;
 const GITHUB_REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const GITLAB_PROJECT_PATTERN = /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/;
 
 export function deriveCloudSessionForkFields(input: {
-  session: { cloud_agent_session_id: string | null };
+  session: { cloud_agent_session_id: string | null; git_url?: string | null };
   runtime: CloudRuntimeConfig | null;
+  readOnlySettings?: ReadOnlyForkDestination;
 }): DeriveCloudSessionForkResult {
-  const { session, runtime } = input;
+  const { session, readOnlySettings } = input;
+  let runtime = input.runtime;
 
   if (!session.cloud_agent_session_id) {
-    return { ok: false, reason: 'not-a-cloud-session' };
+    if (!readOnlySettings) {
+      return { ok: false, reason: 'not-a-cloud-session' };
+    }
+    if (!session.git_url) {
+      return { ok: false, reason: 'missing-repository' };
+    }
+    runtime = { ...readOnlySettings, gitUrl: session.git_url };
   }
 
   if (!runtime) {
@@ -97,7 +130,9 @@ export function deriveCloudSessionForkFields(input: {
     return { ok: false, reason: 'invalid-mode' };
   }
 
-  const repository = deriveRepository(runtime);
+  const repository = !session.cloud_agent_session_id
+    ? deriveReadOnlyRepository(runtime, readOnlySettings?.gitLabInstanceUrl)
+    : deriveRepository(runtime);
   if (!repository.ok) {
     return repository;
   }
@@ -152,9 +187,46 @@ function isValidVariant(variant: string | undefined): variant is string {
   return typeof variant === 'string' && agentVariantSchema.safeParse(variant).success;
 }
 
-function deriveRepository(
-  runtime: CloudRuntimeConfig
-): { ok: true; fields: CloudForkRepository } | { ok: false; reason: CloudForkRejectionReason } {
+type RepositoryResult =
+  | { ok: true; fields: CloudForkRepository }
+  | { ok: false; reason: CloudForkRejectionReason };
+
+function deriveReadOnlyRepository(
+  runtime: CloudRuntimeConfig,
+  gitLabInstanceUrl: string | undefined
+): RepositoryResult {
+  if (!runtime.gitUrl) return { ok: false, reason: 'missing-repository' };
+  if (isGitHubForkUrl(runtime.gitUrl)) return deriveRepository(runtime);
+
+  if (!gitLabInstanceUrl) return { ok: false, reason: 'unsupported-platform' };
+  const source = runtime.gitUrl.trim().replace(/^git@([^:/]+):\/?/, 'ssh://git@$1/');
+  let cloneUrl = source;
+  if (source.startsWith('ssh://')) {
+    const ssh = URL.parse(source);
+    const instance = parseGitLabBaseUrl(gitLabInstanceUrl);
+    if (!ssh || !instance || ssh.hostname.toLowerCase() !== new URL(instance.origin).hostname) {
+      return { ok: false, reason: 'unparseable-repository' };
+    }
+    // GitLab can use different HTTPS and SSH ports for the same instance.
+    cloneUrl = `${instance.origin}${ssh.pathname}`;
+  }
+  const repository = parseGitLabCloneUrl(cloneUrl, gitLabInstanceUrl);
+  if (!repository.success) return { ok: false, reason: 'unparseable-repository' };
+  return {
+    ok: true,
+    fields: {
+      kind: 'gitlab',
+      projectPath: repository.projectPath,
+      instanceUrl: repository.instanceOrigin,
+    },
+  };
+}
+
+export function isGitHubForkUrl(gitUrl: string): boolean {
+  return gitHostOf(gitUrl) === 'github.com';
+}
+
+function deriveRepository(runtime: CloudRuntimeConfig): RepositoryResult {
   const platform = resolvePlatform(runtime);
 
   switch (platform) {
@@ -316,6 +388,7 @@ export type CloudSessionForkRuntimeStateResult = {
     session_id: string;
     cloud_agent_session_id: string | null;
     organization_id: string | null;
+    git_url?: string | null;
   };
   runtimeState: CloudRuntimeConfig | null;
 };
@@ -327,17 +400,57 @@ export type CloudSessionForkCreateInput = {
   variant?: string;
   autoCommit: boolean;
   cloneFromKiloSessionId: string;
+  workspaceContinuation?: true;
   autoInitiate: true;
   operationKey: string;
   organizationId?: string;
   githubRepo?: string;
   gitlabProject?: string;
+  expectedGitLabInstanceUrl?: string;
   runtimeAgents?: CloudRuntimeAgentInput[];
 };
 
+export function parsePendingCloudClone(
+  stored: string,
+  sessionId: string
+): CloudSessionForkCreateInput | undefined {
+  const parsed = basePrepareSessionNextSchema.safeParse(JSON.parse(stored));
+  if (
+    !parsed.success ||
+    !parsed.data.workspaceContinuation ||
+    parsed.data.cloneFromKiloSessionId !== sessionId
+  ) {
+    return undefined;
+  }
+  const {
+    mode,
+    model,
+    variant,
+    githubRepo,
+    gitlabProject,
+    expectedGitLabInstanceUrl,
+    operationKey,
+  } = parsed.data;
+  return {
+    mode,
+    model,
+    variant,
+    githubRepo,
+    gitlabProject,
+    expectedGitLabInstanceUrl,
+    operationKey,
+    autoCommit: false,
+    autoInitiate: true,
+    workspaceContinuation: true,
+    cloneFromKiloSessionId: sessionId,
+  };
+}
+
 export type CloudSessionForkDeps = {
   getRuntimeState: (sessionId: string) => Promise<CloudSessionForkRuntimeStateResult>;
-  createSession: (input: CloudSessionForkCreateInput) => Promise<{ kiloSessionId: string }>;
+  createSession: (
+    input: CloudSessionForkCreateInput
+  ) => Promise<{ kiloSessionId: string; worktreeId?: string }>;
 };
 
 /** UI glue around `continueInNewCloudSession`: invalidation, navigation, errors. */
@@ -345,6 +458,14 @@ export type CloudForkFlowDeps = CloudSessionForkDeps & {
   invalidateSessionQueries: () => Promise<unknown> | unknown;
   navigateToSession: (kiloSessionId: string) => void;
   notifyError: (message: string) => void;
+};
+
+type CloudForkRequest = {
+  sessionId: string;
+  organizationId?: string;
+  operationKey: string;
+  getReadOnlySettings?: (gitUrl: string) => Promise<ReadOnlyForkDestination>;
+  pendingInput?: CloudSessionForkCreateInput;
 };
 
 export type ContinueInNewCloudSessionResult =
@@ -357,17 +478,18 @@ export type ContinueInNewCloudSessionResult =
  * cannot be forked (after notifying the user why). Cache invalidation is
  * best-effort — a failure must not block navigation to the new session.
  */
-export async function runCloudForkFlow(params: {
-  sessionId: string;
-  organizationId?: string;
-  operationKey: string;
-  deps: CloudForkFlowDeps;
-}): Promise<boolean> {
+export async function runCloudForkFlow(
+  params: CloudForkRequest & { deps: CloudForkFlowDeps }
+): Promise<boolean> {
   const { deps } = params;
   const result = await continueInNewCloudSession(params);
 
   if (!result.ok) {
-    deps.notifyError(cloudForkRejectionMessage(result.reason));
+    deps.notifyError(
+      params.getReadOnlySettings && result.reason === 'missing-model'
+        ? 'No model is available to continue in Cloud Agent.'
+        : cloudForkRejectionMessage(result.reason)
+    );
     return false;
   }
 
@@ -394,20 +516,34 @@ export async function runCloudForkFlow(params: {
  * A fork must stay inside the source session's own organization, so a context
  * mismatch is rejected before any create call.
  */
-export async function continueInNewCloudSession(params: {
-  sessionId: string;
-  organizationId?: string;
-  operationKey: string;
-  deps: CloudSessionForkDeps;
-}): Promise<ContinueInNewCloudSessionResult> {
-  const { sessionId, organizationId, operationKey, deps } = params;
+export async function continueInNewCloudSession(
+  params: CloudForkRequest & { deps: CloudSessionForkDeps }
+): Promise<ContinueInNewCloudSessionResult> {
+  const { sessionId, organizationId, operationKey, getReadOnlySettings, pendingInput, deps } =
+    params;
   const { session, runtimeState } = await deps.getRuntimeState(sessionId);
 
   if (session.organization_id !== (organizationId ?? null)) {
     return { ok: false, reason: 'organization-mismatch' };
   }
 
-  const derived = deriveCloudSessionForkFields({ session, runtime: runtimeState });
+  if (pendingInput) {
+    const { kiloSessionId } = await deps.createSession(pendingInput);
+    return { ok: true, kiloSessionId };
+  }
+
+  let readOnlySettings: ReadOnlyForkDestination | undefined;
+  if (getReadOnlySettings && !session.cloud_agent_session_id) {
+    if (!session.git_url) {
+      return { ok: false, reason: 'missing-repository' };
+    }
+    readOnlySettings = await getReadOnlySettings(session.git_url);
+  }
+  const derived = deriveCloudSessionForkFields({
+    session,
+    runtime: runtimeState,
+    readOnlySettings,
+  });
   if (!derived.ok) {
     return derived;
   }
@@ -416,7 +552,12 @@ export async function continueInNewCloudSession(params: {
   const repositoryField =
     fields.repository.kind === 'github'
       ? { githubRepo: fields.repository.fullName }
-      : { gitlabProject: fields.repository.projectPath };
+      : {
+          gitlabProject: fields.repository.projectPath,
+          ...(fields.repository.instanceUrl
+            ? { expectedGitLabInstanceUrl: fields.repository.instanceUrl }
+            : {}),
+        };
 
   const { kiloSessionId } = await deps.createSession({
     mode: fields.mode,
@@ -425,6 +566,7 @@ export async function continueInNewCloudSession(params: {
     autoCommit: fields.autoCommit,
     ...(fields.runtimeAgents ? { runtimeAgents: fields.runtimeAgents } : {}),
     cloneFromKiloSessionId: sessionId,
+    ...(readOnlySettings ? { workspaceContinuation: true } : {}),
     autoInitiate: true,
     operationKey,
     ...(organizationId ? { organizationId } : {}),

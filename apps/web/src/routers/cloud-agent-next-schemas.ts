@@ -398,6 +398,7 @@ const PrepareSessionSharedFields = {
     )
     .optional()
     .describe('GitLab project path (e.g., group/project or group/subgroup/project)'),
+  expectedGitLabInstanceUrl: z.url().max(2048).optional(),
   bitbucketRepo: z
     .object({
       fullName: z
@@ -483,6 +484,7 @@ const PrepareSessionNonCloneVariant = z.object({
    */
   cloneFromKiloSessionId: z.undefined().optional(),
   cloneUpToMessageId: z.undefined().optional(),
+  workspaceContinuation: z.undefined().optional(),
   ...PrepareSessionSharedFields,
 });
 
@@ -496,6 +498,7 @@ const PrepareSessionCloneVariant = z.object({
    * including this message. Omitted copies the whole session.
    */
   cloneUpToMessageId: messageIdNextSchema.optional(),
+  workspaceContinuation: z.literal(true).optional(),
   autoInitiate: z.literal(true),
   operationKey: z.string().uuid(),
   ...PrepareSessionSharedFields,
@@ -530,6 +533,22 @@ export const basePrepareSessionNextSchema = z
     {
       message: 'GitHub integration requires a GitHub repository',
       path: ['githubIntegrationId'],
+    }
+  )
+  .refine(
+    data =>
+      !data.expectedGitLabInstanceUrl ||
+      (data.cloneFromKiloSessionId && data.gitlabProject && !data.stackOnWorktreeId),
+    {
+      message: 'A GitLab instance check requires a GitLab clone request',
+      path: ['expectedGitLabInstanceUrl'],
+    }
+  )
+  .refine(
+    data => !data.workspaceContinuation || (!data.stackOnWorktreeId && !data.cloneUpToMessageId),
+    {
+      message: 'Workspace continuation requires a full clone into a new workspace',
+      path: ['workspaceContinuation'],
     }
   )
   .refine(data => data.baseBranch === undefined || data.upstreamBranch === undefined, {

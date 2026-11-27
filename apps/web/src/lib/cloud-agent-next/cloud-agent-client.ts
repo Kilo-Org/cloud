@@ -239,11 +239,13 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   kiloSessionId?: string;
   cloneFromKiloSessionId?: undefined;
   cloneUpToMessageId?: undefined;
+  workspaceContinuation?: undefined;
 };
 
 /** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
 export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
   cloneFromKiloSessionId: string;
+  workspaceContinuation?: true;
   /** Inclusive cut: copy source messages up to and including this ID. */
   cloneUpToMessageId?: string;
   autoInitiate: true;
@@ -252,6 +254,13 @@ export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
 
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCloneInput;
+
+type PrepareSessionWorkerInput =
+  | PrepareSessionInput
+  | (Omit<PrepareSessionCloneInput, 'autoInitiate'> & {
+      workspaceContinuation: true;
+      autoInitiate?: undefined;
+    });
 
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
@@ -756,7 +765,7 @@ type CloudAgentNextTRPCClient = {
     query: (input: GetPreviewOptionsInput) => Promise<unknown>;
   };
   prepareSession: {
-    mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
+    mutate: (input: PrepareSessionWorkerInput) => Promise<PrepareSessionOutput>;
   };
   createWorktreeChat: {
     mutate: (input: CreateWorktreeChatInput) => Promise<CreateWorktreeChatOutput>;
@@ -1273,7 +1282,13 @@ export class CloudAgentNextClient {
     });
     const startTime = Date.now();
     try {
-      const result = await this.client.prepareSession.mutate(input);
+      // Older Workers require autoInitiate on clones. Omit it for workspace
+      // continuation so they reject the request before creating a session.
+      const result = await this.client.prepareSession.mutate(
+        input.workspaceContinuation
+          ? { ...input, workspaceContinuation: true, autoInitiate: undefined }
+          : input
+      );
       console.log('[CloudAgentNextClient.prepareSession] Request completed', {
         elapsed: Date.now() - startTime,
         kiloSessionId: result.kiloSessionId,

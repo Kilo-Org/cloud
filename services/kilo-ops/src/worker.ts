@@ -2,7 +2,7 @@ import { Container, ContainerProxy } from '@cloudflare/containers';
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { Hono } from 'hono';
 import { withCloudflareAccess } from './cf-access.middleware';
-import { readKiloOpsSecret, type KiloOpsSecretName } from './secrets';
+import { readKiloOpsSecret, secretConfigured, type KiloOpsSecretName } from './secrets';
 
 export { ContainerProxy };
 
@@ -60,6 +60,15 @@ GrafanaContainer.outboundByHost = {
     // locked to a single upstream regardless of what the container requests.
     if (request.method !== 'GET' && request.method !== 'POST') {
       return new Response('method not allowed', { status: 405 });
+    }
+
+    // The `dev` block binds no Analytics Engine token — no dev-scoped Cloudflare API token can be
+    // minted, and a production-named store secret may not be read from a non-production block — so
+    // that deployment runs this proxy off. Answer that as a missing feature, not as a broken read.
+    if (!secretConfigured(env, 'O11Y_CF_AE_API_TOKEN')) {
+      return new Response('Analytics Engine proxy is not configured for this deployment', {
+        status: 503,
+      });
     }
 
     // Interception runs in the containers package's `ContainerProxy` WorkerEntrypoint, whose

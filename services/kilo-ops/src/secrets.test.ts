@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
-import { readKiloOpsSecret, secretsSource, type KiloOpsSecretName } from './secrets';
+import {
+  readKiloOpsSecret,
+  secretConfigured,
+  secretsSource,
+  type KiloOpsSecretName,
+} from './secrets';
 
 const NAMES: KiloOpsSecretName[] = ['O11Y_CF_AE_API_TOKEN', 'GF_SECRET_KEY'];
 const ETAG = '"0123456789abcdef"';
@@ -42,6 +47,48 @@ describe('secretsSource', () => {
 
   it('fails closed on an unknown source', () => {
     expect(() => secretsSource({ SECRETS_SOURCE: 'infisical' })).toThrow(/SECRETS_SOURCE/);
+  });
+});
+
+describe('secretConfigured', () => {
+  it('is false where the deployment binds nothing for the name', () => {
+    expect(secretConfigured({}, 'O11Y_CF_AE_API_TOKEN')).toBe(false);
+    expect(
+      secretConfigured({ GF_SECRET_KEY: storeSecret('grafana').secret }, 'O11Y_CF_AE_API_TOKEN')
+    ).toBe(false);
+  });
+
+  it('is true for a store binding, a plain secret, and under sts', () => {
+    // The env holds the *binding* that serves the name, not the name itself.
+    expect(secretConfigured({ CF_ANALYTICS_API_KEY: 'plain' }, 'O11Y_CF_AE_API_TOKEN')).toBe(true);
+    expect(
+      secretConfigured(
+        { CF_ANALYTICS_API_KEY: storeSecret('token').secret },
+        'O11Y_CF_AE_API_TOKEN'
+      )
+    ).toBe(true);
+    const sts = stsBinding();
+    expect(
+      secretConfigured({ STS: sts.binding, SECRETS_SOURCE: 'sts' }, 'O11Y_CF_AE_API_TOKEN')
+    ).toBe(true);
+    expect(sts.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on an unknown source', () => {
+    expect(() => secretConfigured({ SECRETS_SOURCE: 'infisical' }, 'GF_SECRET_KEY')).toThrow(
+      /SECRETS_SOURCE/
+    );
+  });
+
+  it('says unconfigured exactly where the read says unconfigured', async () => {
+    // The shape the `dev` block deploys: the Grafana key only, no Analytics Engine token.
+    const dev = { GF_SECRET_KEY: storeSecret('grafana').secret };
+
+    expect(secretConfigured(dev, 'O11Y_CF_AE_API_TOKEN')).toBe(false);
+    await expect(readKiloOpsSecret(dev, 'O11Y_CF_AE_API_TOKEN')).rejects.toThrow(
+      /CF_ANALYTICS_API_KEY is not configured/
+    );
+    expect(secretConfigured(dev, 'GF_SECRET_KEY')).toBe(true);
   });
 });
 

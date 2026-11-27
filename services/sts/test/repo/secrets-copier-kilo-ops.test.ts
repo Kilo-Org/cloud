@@ -66,13 +66,13 @@ const EXPECTED_ROWS: readonly CopierRow[] = [
 ];
 
 /**
- * The two entries the `dev` block reads, by binding. Both have to exist in the account's Secrets
- * Store before `wrangler deploy --env dev` works, and neither may hold a production value: a config
- * that binds STS may not read a production-named store secret from a non-production block
- * (worker-configs.ts).
+ * The entry the `dev` block reads, by binding. It has to exist in the account's Secrets Store
+ * before `wrangler deploy --env dev` works, and it may not hold a production value: a config that
+ * binds STS may not read a production-named store secret from a non-production block
+ * (worker-configs.ts). Nothing else is bound there: no dev-scoped Analytics Engine token can be
+ * minted, so dev runs that proxy off (src/worker.ts, `secretConfigured`).
  */
 const EXPECTED_DEV_ENTRIES: readonly { binding: string; secret_name: string }[] = [
-  { binding: 'CF_ANALYTICS_API_KEY', secret_name: 'O11Y_CF_AE_API_TOKEN_DEV' },
   { binding: 'GF_SECRET_KEY', secret_name: 'GF_SECRET_KEY_DEV' },
 ];
 
@@ -198,7 +198,8 @@ describe('the secrets copier table for kilo-ops', () => {
     // changed store name or a repointed binding fails here rather than at cutover.
     expect(rows, WORKLOAD).toEqual(EXPECTED_ROWS);
 
-    // The `dev` block reads the two new dev-only store entries, by binding, never a production one.
+    // The `dev` block binds exactly one dev-only store entry, for the Grafana key — nothing for the
+    // Analytics Engine proxy, whose dev deployment runs off, and never a production name.
     const devEntries = config.env?.['dev']?.secrets_store_secrets ?? [];
     expect(
       devEntries

@@ -50,6 +50,17 @@ export function secretsSource(env: Pick<KiloOpsSecretsEnv, 'SECRETS_SOURCE'>): S
 const stsClients = new WeakMap<BundleBinding, Secrets>();
 
 /**
+ * Whether this deployment has a source for `name` at all: `secrets-store` needs the binding it
+ * reads, while `sts` has one by definition and is checked on the read itself. A caller that offers
+ * a feature gated on a secret uses this to tell "this deployment runs that feature off" from "a
+ * read failed", which are different answers to its caller.
+ */
+export function secretConfigured(env: KiloOpsSecretsEnv, name: KiloOpsSecretName): boolean {
+  if (secretsSource(env) === 'sts') return true;
+  return env[BINDINGS[name]] !== undefined;
+}
+
+/**
  * Reads one secret from the selected source and returns it as stored, empty included, so every
  * caller keeps its own empty-value handling. `ctx` belongs to the invocation doing the read (the
  * Durable Object request): a bundle revalidation it starts runs under that invocation's

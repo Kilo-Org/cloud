@@ -13,7 +13,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 # Optional repo/org variables for runner migration:
 # - RUNNER_DEFAULT_LABEL=blacksmith-2vcpu-ubuntu-2404
@@ -23,6 +22,10 @@ jobs:
   changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
+    # dorny/paths-filter lists the pull request's changed files through the API.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       # Fall back to the retry attempt when the first Detect changes step died
       # on a transient GitHub API failure (it sets no outputs when it fails).
@@ -76,8 +79,9 @@ jobs:
       lint_groups_non_trpc: ${{ steps.affected.outputs.lint_groups_non_trpc }}
       cloud_agent_next_parts: ${{ steps.affected.outputs.cloud_agent_next_parts }}
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup pnpm
@@ -147,7 +151,7 @@ jobs:
       # that run: every detection step would otherwise read the repository,
       # not node_modules.
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -648,15 +652,16 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -731,7 +736,9 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -762,13 +769,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -784,7 +793,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
 
       - name: Restore or build tRPC declarations
-        uses: ./.github/actions/trpc-declarations
+        uses: $/.github/actions/trpc-declarations
 
       - name: Upload tRPC declarations
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -810,13 +819,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -829,12 +840,13 @@ jobs:
       # The harness-sdk row of workspace-tests saves the compiled plugin; this
       # group only reads it, so a skipped saver costs a compile, never a failure.
       - name: Restore compiler plugins
-        uses: ./.github/actions/ttsc-plugin-cache
+        uses: $/.github/actions/ttsc-plugin-cache
 
       - name: Typecheck
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
-        run: scripts/typecheck-all.sh --group ${{ matrix.group }}
+          GROUP: ${{ matrix.group }}
+        run: scripts/typecheck-all.sh --group "$GROUP"
 
   # The trpc typecheck row: the extension group, the only typecheck row that
   # reads the trpc-declarations artifact. `always()` makes a failed producer
@@ -851,13 +863,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -870,7 +884,7 @@ jobs:
       # The harness-sdk row of workspace-tests saves the compiled plugin; this
       # group only reads it, so a skipped saver costs a compile, never a failure.
       - name: Restore compiler plugins
-        uses: ./.github/actions/ttsc-plugin-cache
+        uses: $/.github/actions/ttsc-plugin-cache
 
       - name: Download tRPC declarations
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -916,13 +930,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -935,7 +951,8 @@ jobs:
       - name: Lint
         env:
           KILO_AFFECTED: ${{ needs.changes.outputs.affected }}
-        run: scripts/lint-all.sh --group ${{ matrix.group }}
+          GROUP: ${{ matrix.group }}
+        run: scripts/lint-all.sh --group "$GROUP"
 
   # The trpc lint row: the extension sources lint against the built tRPC types,
   # and the only lint row that reads the trpc-declarations artifact. `always()`
@@ -951,13 +968,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -976,7 +995,7 @@ jobs:
       # A full lint also covers apps/mobile, which needs the harness SDK build.
       - name: Restore or build the harness SDK
         if: contains(fromJSON(needs.changes.outputs.affected).full_checks, 'lint')
-        uses: ./.github/actions/harness-sdk-build
+        uses: $/.github/actions/harness-sdk-build
 
       - name: Lint
         env:
@@ -1008,13 +1027,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1038,13 +1059,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1117,13 +1140,15 @@ jobs:
       JEST_MAX_WORKERS: 4
 
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1139,7 +1164,9 @@ jobs:
         run: pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter kilocode-monorepo
 
       - name: Run web tests
-        run: pnpm --filter web test --shard=${{ matrix.shard }}/4
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: pnpm --filter web test --shard="$SHARD/4"
 
   test-scripts:
     needs: changes
@@ -1206,13 +1233,15 @@ jobs:
       TERM: xterm-256color
 
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1260,13 +1289,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1323,17 +1354,18 @@ jobs:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         # next.config.mjs fails the build unless public/kilo-anim.mp4 is the
         # real LFS object, so this job keeps LFS.
         with:
+          persist-credentials: false
           lfs: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1394,13 +1426,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1455,13 +1489,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1517,13 +1553,15 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1619,13 +1657,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1644,7 +1684,7 @@ jobs:
       # The check below builds the SDK, so this job stores the plugin cache.
       - name: Restore compiler plugins
         id: plugins
-        uses: ./.github/actions/ttsc-plugin-cache
+        uses: $/.github/actions/ttsc-plugin-cache
 
       # Everything but the timing gate, which needs a machine nobody else is
       # using. The migration check is why this job exists: the store's SQL is
@@ -1668,13 +1708,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1734,13 +1776,15 @@ jobs:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1800,13 +1844,15 @@ jobs:
       UTS_TEST_ADMIN_URL: postgres://uts_admin:uts-local-admin@127.0.0.1:5432/uts
 
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1841,13 +1887,15 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
+        uses: $/.github/actions/pnpm-store
 
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -1875,11 +1923,13 @@ jobs:
       - name: Restore compiler plugins
         id: plugins
         if: matrix.workspace.name == '@kilocode/harness-sdk'
-        uses: ./.github/actions/ttsc-plugin-cache
+        uses: $/.github/actions/ttsc-plugin-cache
 
       - name: Run tests
         if: matrix.workspace.name != 'kilo-extension' || github.event_name == 'merge_group'
-        run: pnpm --filter ${{ matrix.workspace.name }} test
+        env:
+          WORKSPACE: ${{ matrix.workspace.name }}
+        run: pnpm --filter "$WORKSPACE" test
 
       # Stores what the run compiled, unless this run selected the harness-sdk
       # job, which stores it then.

@@ -49,10 +49,10 @@ export type AppCallContext = {
   /** `BACKEND_API_URL`. */
   origin: string;
   /**
-   * The credential header for one call (`webInternalCredential`): an STS
-   * `web:scim.sync` bearer, or under `WEB_INTERNAL_AUTH=legacy` the
-   * `INTERNAL_API_SECRET` as `x-internal-api-key`. Resolved per call, so a
-   * drain that outlives one token presents a fresh one.
+   * The credential header for one call (`webInternalCredential`): the
+   * `INTERNAL_API_SECRET` as `x-internal-api-key`, or under
+   * `WEB_INTERNAL_AUTH=sts` an STS `web:scim.sync` bearer. Resolved per call,
+   * so a drain that outlives one token presents a fresh one.
    */
   credential: () => Promise<WebInternalCredential>;
   /**

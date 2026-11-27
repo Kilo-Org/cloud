@@ -44,11 +44,11 @@ afterEach(() => {
 });
 
 describe('webInternalAuthMode', () => {
-  it('defaults to sts and accepts legacy as the rollback', () => {
-    expect(webInternalAuthMode(undefined)).toBe('sts');
-    expect(webInternalAuthMode('')).toBe('sts');
-    expect(webInternalAuthMode('sts')).toBe('sts');
+  it('defaults to legacy and accepts sts once switched on', () => {
+    expect(webInternalAuthMode(undefined)).toBe('legacy');
+    expect(webInternalAuthMode('')).toBe('legacy');
     expect(webInternalAuthMode('legacy')).toBe('legacy');
+    expect(webInternalAuthMode('sts')).toBe('sts');
   });
 
   it('refuses every other value', () => {
@@ -59,11 +59,15 @@ describe('webInternalAuthMode', () => {
 });
 
 describe('webInternalCredential', () => {
-  it('sends an STS bearer for the route scope and never reads the secret by default', async () => {
+  it('sends an STS bearer for the route scope under sts, never reading the secret', async () => {
     const binding = issuing();
     const legacy = legacySecret('shared-secret');
 
-    const credential = await webInternalCredential({ STS: binding }, STS_WEB_SCIM_SYNC, legacy);
+    const credential = await webInternalCredential(
+      { WEB_INTERNAL_AUTH: 'sts', STS: binding },
+      STS_WEB_SCIM_SYNC,
+      legacy
+    );
 
     expect(credential).toEqual({
       kind: 'ready',
@@ -77,11 +81,26 @@ describe('webInternalCredential', () => {
   it('serves a held token from memory on the next request', async () => {
     const binding = issuing();
     const legacy = legacySecret('shared-secret');
+    const env = { WEB_INTERNAL_AUTH: 'sts', STS: binding };
 
-    await webInternalCredential({ STS: binding }, STS_WEB_USER_DATA_EXPORT_READY, legacy);
-    await webInternalCredential({ STS: binding }, STS_WEB_USER_DATA_EXPORT_READY, legacy);
+    await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, legacy);
+    await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, legacy);
 
     expect(binding.requests).toHaveLength(1);
+  });
+
+  it('sends the legacy header, and no STS call, when the switch is absent', async () => {
+    const binding = issuing();
+    const legacy = legacySecret('shared-secret');
+
+    const credential = await webInternalCredential({ STS: binding }, STS_WEB_SCIM_SYNC, legacy);
+
+    expect(credential).toEqual({
+      kind: 'ready',
+      header: 'x-internal-api-key',
+      value: 'shared-secret',
+    });
+    expect(binding.requests).toHaveLength(0);
   });
 
   it('sends the legacy header, and no STS call, when switched back to legacy', async () => {
@@ -138,7 +157,11 @@ describe('webInternalCredential', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const legacy = legacySecret('shared-secret');
 
-    const credential = await webInternalCredential({}, STS_WEB_SCIM_SYNC, legacy);
+    const credential = await webInternalCredential(
+      { WEB_INTERNAL_AUTH: 'sts' },
+      STS_WEB_SCIM_SYNC,
+      legacy
+    );
 
     expect(credential).toEqual({ kind: 'unavailable', reason: 'sts_binding_missing' });
     expect(legacy.secret).not.toHaveBeenCalled();
@@ -150,9 +173,12 @@ describe('webInternalCredential', () => {
 
     const credential = await webInternalCredential(
       {
+        WEB_INTERNAL_AUTH: 'sts',
         STS: answering({
           status: 'ok',
-          tokens: [{ status: 'denied', audience: 'web', scope: scope.scope, reason: 'unknown_scope' }],
+          tokens: [
+            { status: 'denied', audience: 'web', scope: scope.scope, reason: 'unknown_scope' },
+          ],
         }),
       },
       scope,
@@ -171,7 +197,7 @@ describe('webInternalCredential', () => {
     const scope = { audience: 'web', scope: 'web:outage-test' };
 
     const credential = await webInternalCredential(
-      { STS: answering({ status: 'unavailable', retryAfterSeconds: 7 }) },
+      { WEB_INTERNAL_AUTH: 'sts', STS: answering({ status: 'unavailable', retryAfterSeconds: 7 }) },
       scope,
       legacySecret('shared-secret')
     );
@@ -185,11 +211,7 @@ describe('webInternalCredential', () => {
   it('refuses an empty legacy secret', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const credential = await webInternalCredential(
-      { WEB_INTERNAL_AUTH: 'legacy' },
-      STS_WEB_SCIM_SYNC,
-      legacySecret('')
-    );
+    const credential = await webInternalCredential({}, STS_WEB_SCIM_SYNC, legacySecret(''));
 
     expect(credential).toEqual({ kind: 'unavailable', reason: 'secret_missing' });
   });

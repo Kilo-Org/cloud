@@ -712,6 +712,7 @@ describe('native organization compute accounting', () => {
         HYPERDRIVE: { connectionString },
         KILOCODE_BACKEND_BASE_URL: 'https://local-web.invalid',
         INTERNAL_API_SECRET_PROD: { get: async () => 'fixture-secret' },
+        WEB_INTERNAL_AUTH: 'sts',
         STS: {
           mintTokens: async (request: { tokens: { audience: string; scope: string }[] }) => ({
             status: 'ok',

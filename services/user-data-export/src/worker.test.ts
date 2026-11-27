@@ -885,7 +885,7 @@ describe('dispatchReadyNotifications', () => {
     },
   });
 
-  it('sends each ready callback with a web:user-data-exports.ready STS token by default', async () => {
+  it('sends each ready callback with a web:user-data-exports.ready STS token under sts', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const minted: unknown[] = [];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
@@ -894,6 +894,7 @@ describe('dispatchReadyNotifications', () => {
       {
         USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'sts',
         STS: sts(minted),
       },
       pending
@@ -901,7 +902,9 @@ describe('dispatchReadyNotifications', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     for (const [url, init] of fetchMock.mock.calls) {
-      expect(String(url)).toBe('https://api.kilo.ai/api/internal/user-data-exports/ready');
+      expect(url instanceof URL ? url.href : url).toBe(
+        'https://api.kilo.ai/api/internal/user-data-exports/ready'
+      );
       const headers = new Headers(init?.headers);
       expect(headers.get('authorization')).toBe('Bearer sts-ready-token');
       expect(headers.has('x-internal-api-key')).toBe(false);
@@ -912,7 +915,7 @@ describe('dispatchReadyNotifications', () => {
     ]);
   });
 
-  it('sends the internal secret under WEB_INTERNAL_AUTH=legacy', async () => {
+  it('sends the internal secret, and mints nothing, while WEB_INTERNAL_AUTH is unset', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const minted: unknown[] = [];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
@@ -921,7 +924,6 @@ describe('dispatchReadyNotifications', () => {
       {
         USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
         INTERNAL_API_SECRET: 'shared-secret',
-        WEB_INTERNAL_AUTH: 'legacy',
         STS: sts(minted),
       },
       pending
@@ -938,7 +940,11 @@ describe('dispatchReadyNotifications', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
 
     await dispatchReadyNotifications(
-      { USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai', INTERNAL_API_SECRET: 'shared-secret' },
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'sts',
+      },
       pending
     );
 

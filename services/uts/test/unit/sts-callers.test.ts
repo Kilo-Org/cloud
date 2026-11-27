@@ -139,7 +139,8 @@ describe('deployed STS callers', () => {
     const stsCallers = exchangeOf(callers('staging', unreachable));
     const web = await stsToken('web', UTS_AUTHORITY_SCOPE);
     const check = await serviceTokens(`Bearer ${web}`, UTS_AUTHORITY_SCOPE);
-    if (check.status !== 'unavailable') throw new Error(`expected unavailable, got ${check.status}`);
+    if (check.status !== 'unavailable')
+      throw new Error(`expected unavailable, got ${check.status}`);
     // verify names what is left of its wait (at most JWKS_RETRY_MS plus JWKS_JITTER), never the
     // fixed default.
     expect(check.retryAfterSeconds).toBeGreaterThanOrEqual(1);

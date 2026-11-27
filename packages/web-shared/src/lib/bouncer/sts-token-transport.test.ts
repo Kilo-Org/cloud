@@ -1,6 +1,10 @@
 import { STS_ISSUERS, type MintRequest } from '@kilocode/sts-contracts';
 import { waitUntil } from '@vercel/functions';
-import { decide, deliverUsageEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  decide,
+  deliverUsageEventWireBody,
+  signupDecide,
+} from '@kilocode/web-shared/lib/bouncer/client';
 import { installBouncerAuth } from '@kilocode/web-shared/lib/bouncer/sts-auth';
 import { BouncerStsConfigError } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import {
@@ -512,10 +516,7 @@ describe('connectBouncerSts', () => {
         return await first;
       })()
     ).resolves.toBe('sts-token');
-    const second = connected.tokens.get(
-      { audience: 'bouncer', scope: 'bouncer:usage.write' },
-      ctx
-    );
+    const second = connected.tokens.get({ audience: 'bouncer', scope: 'bouncer:usage.write' }, ctx);
     await jest.advanceTimersByTimeAsync(BOUNCER_NOT_HELD_MEMORY_MS + 20);
     // Half the jitter range (random 0.5) has not passed: the second mint still waits.
     expect(stsFetch).toHaveBeenCalledTimes(1);

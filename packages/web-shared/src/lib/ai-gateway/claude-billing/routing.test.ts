@@ -22,11 +22,13 @@ import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 import {
   buildClaudeBillingProvider,
   checkClaudeBilling,
+  claudeBillingLinkTakesRequests,
   CLAUDE_BILLING_OPERATOR_UNAVAILABLE_MESSAGE,
   CLAUDE_BILLING_REQUIRED_MESSAGE,
 } from './routing';
 import { ClaudeBillingPayerStateParseError } from './payer-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const row: ClaudeBillingConnectionRow = {
@@ -499,5 +501,75 @@ describe('Claude customer-billed routing', () => {
     const operatorGap = await checkClaudeBilling(input());
     if (operatorGap?.kind !== 'unavailable') throw new Error('Expected unavailable');
     expect(operatorGap.message).not.toContain(pointer);
+  });
+});
+
+describe('claudeBillingLinkTakesRequests', () => {
+  it.each(['connected', 'billing_unavailable'] as const)(
+    'is true for a personal link whose status is %s',
+    async status => {
+      jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted({ ...row, status }));
+
+      await expect(
+        claudeBillingLinkTakesRequests({ userId: 'user', organizationId: undefined })
+      ).resolves.toBe(true);
+      expect(jest.mocked(getGrantedClaudeBillingConnection).mock.calls).toEqual([
+        [{ kind: 'personal', kiloUserId: 'user' }, readDb],
+      ]);
+    }
+  );
+
+  it.each(['pending', 'removed'] as const)(
+    'is false for a link whose status is %s',
+    async status => {
+      jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted({ ...row, status }));
+
+      await expect(
+        claudeBillingLinkTakesRequests({ userId: 'user', organizationId: undefined })
+      ).resolves.toBe(false);
+    }
+  );
+
+  it('is false without a link', async () => {
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(null);
+
+    await expect(
+      claudeBillingLinkTakesRequests({ userId: 'user', organizationId: undefined })
+    ).resolves.toBe(false);
+  });
+
+  it('reads the organization’s link, never the personal one, for an organization request', async () => {
+    organizationOnly();
+
+    await expect(
+      claudeBillingLinkTakesRequests({ userId: 'user', organizationId: ORGANIZATION_ID })
+    ).resolves.toBe(true);
+    expect(jest.mocked(getGrantedClaudeBillingConnection).mock.calls).toEqual([
+      [organizationOwner(), readDb],
+    ]);
+  });
+
+  it('is false for an organization without a link even if the member has a personal one', async () => {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockImplementation(async owner => (owner.kind === 'personal' ? granted(row) : null));
+
+    await expect(
+      claudeBillingLinkTakesRequests({ userId: 'user', organizationId: ORGANIZATION_ID })
+    ).resolves.toBe(false);
+  });
+
+  it('is false without a user, and reads nothing', async () => {
+    await expect(
+      claudeBillingLinkTakesRequests({ userId: null, organizationId: undefined })
+    ).resolves.toBe(false);
+    expect(getGrantedClaudeBillingConnection).not.toHaveBeenCalled();
+  });
+
+  it('reads the replica only, never the operator', async () => {
+    await claudeBillingLinkTakesRequests({ userId: 'user', organizationId: undefined });
+
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+    expect(findUserById).not.toHaveBeenCalled();
   });
 });

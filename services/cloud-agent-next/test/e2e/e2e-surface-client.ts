@@ -27,6 +27,7 @@ import {
   sandboxProviderConfigurationSchema,
   type SandboxProviderConfiguration,
 } from '../../src/sandbox-control/provider.js';
+import { workerAccessHeaders } from './worker-access.js';
 
 export type AllocationInspection = {
   logicalSandboxId: string;
@@ -61,6 +62,7 @@ export type SurfaceRequestOptions = {
 
 function surfaceHeaders(options: SurfaceRequestOptions): Record<string, string> {
   return {
+    ...workerAccessHeaders(),
     ...(options.bearerToken === undefined
       ? {}
       : { Authorization: `Bearer ${options.bearerToken}` }),
@@ -245,8 +247,10 @@ export function createHttpSessionSandbox(
  * `POST /__e2e/callbacks`, register the returned URL as the session's
  * callback target, then poll `GET /__e2e/callbacks/:token` for deliveries and
  * release the token with `DELETE`. The Worker's callback delivery sends no
- * credential, so the token ingest route authorizes by its own unguessable path
- * token while mint/read/delete carry the driver bearer.
+ * Worker credential, so the token ingest route authorizes by its own unguessable
+ * path token while mint/read/delete carry the driver bearer. On an
+ * Access-protected hostname the target also carries the Access service-token
+ * headers, which Access consumes before the request reaches the Worker.
  */
 export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObservation {
   const base = options.surfaceUrl.replace(/\/+$/, '');
@@ -288,6 +292,8 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
       const minted = await mint(signal);
       return {
         callbackUrl: minted.callbackUrl,
+        // Delivery to the Worker's own origin passes the same Access application.
+        callbackHeaders: workerAccessHeaders(),
         records: recordsSignal => records(minted.token, recordsSignal ?? signal),
         waitFor: async (predicate, timeoutMs, waitSignal) => {
           const effective = waitSignal ?? signal ?? options.signal;

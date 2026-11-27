@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       worker_url:
-        description: 'HTTPS URL of the deployed cloud-agent-next Worker'
-        required: true
+        description: 'HTTPS URL of the Access-protected e2e Worker hostname; empty uses vars.CLOUD_AGENT_E2E_WORKER_URL'
+        required: false
         type: string
-        default: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev'
+        default: ''
       fake_llm_url:
         description: 'HTTPS URL of the deployed fake-LLM Worker'
         required: true
@@ -32,10 +32,10 @@ on:
   workflow_call:
     inputs:
       worker_url:
-        description: 'HTTPS URL of the deployed cloud-agent-next Worker'
+        description: 'HTTPS URL of the Access-protected e2e Worker hostname; empty uses vars.CLOUD_AGENT_E2E_WORKER_URL'
         required: false
         type: string
-        default: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev'
+        default: ''
       fake_llm_url:
         description: 'HTTPS URL of the deployed fake-LLM Worker'
         required: false
@@ -81,21 +81,54 @@ jobs:
       failed: ${{ steps.summarize.outputs.failed }}
       summary: ${{ steps.summarize.outputs.summary }}
     runs-on: ubuntu-latest
+    # The Access service token lives only in this environment. Its deployment
+    # branch policy keeps it to main.
+    environment: cloud-agent-e2e
     # Operational ceiling for one whole run, not a registry-derived bound.
     timeout-minutes: 180
     env:
-      # Dispatch input overrides; defaults point at the deployed e2e Worker.
-      WORKER_URL: ${{ inputs.worker_url || 'https://cloud-agent-e2e-test.engineering-e11.workers.dev' }}
+      # The Worker has no public address: workers.dev and preview URLs are off.
+      # Its only hostname sits behind a Cloudflare Access application whose
+      # policy admits one service token, which the driver sends on every
+      # request to the Worker and registers on callback targets.
+      WORKER_URL: ${{ inputs.worker_url || vars.CLOUD_AGENT_E2E_WORKER_URL }}
       FAKE_LLM_URL: ${{ inputs.fake_llm_url || 'https://fake-llm.engineering-e11.workers.dev' }}
       E2E_BACKEND_URL: ${{ inputs.backend_url || 'https://api.kilo.ai' }}
       # Secrets are exposed as environment variables only; never echoed.
       E2E_USER_TOKEN: ${{ secrets.E2E_USER_TOKEN }}
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
+      E2E_ACCESS_CLIENT_ID: ${{ secrets.E2E_ACCESS_CLIENT_ID }}
+      E2E_ACCESS_CLIENT_SECRET: ${{ secrets.E2E_ACCESS_CLIENT_SECRET }}
       # The harness's existing DEFAULT_PARALLEL; the runner owns concurrency.
       E2E_PARALLEL: ${{ inputs.parallel || '4' }}
       E2E_ONLY: ${{ inputs.only }}
     steps:
+      # Inert until the Access hostname and its service token exist: refuse a
+      # missing or public Worker address and missing credentials before any
+      # request leaves the runner.
+      - name: Check the closed Worker path
+        run: |
+          set -euo pipefail
+          if [ -z "$WORKER_URL" ]; then
+            echo "::error::Set vars.CLOUD_AGENT_E2E_WORKER_URL (or the worker_url input) to the Access-protected hostname"
+            exit 1
+          fi
+          host="$(node -e 'const u = new URL(process.env.WORKER_URL); if (u.protocol !== "https:" || u.pathname !== "/" || u.search || u.username || u.password) process.exit(1); process.stdout.write(u.hostname)')" || {
+            echo "::error::WORKER_URL must be a bare https:// origin"
+            exit 1
+          }
+          case "$host" in
+            *.workers.dev)
+              echo "::error::WORKER_URL must be the Access-protected hostname, not workers.dev"
+              exit 1
+              ;;
+          esac
+          if [ -z "$E2E_ACCESS_CLIENT_ID" ] || [ -z "$E2E_ACCESS_CLIENT_SECRET" ]; then
+            echo "::error::Set E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET in the cloud-agent-e2e environment"
+            exit 1
+          fi
+
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true

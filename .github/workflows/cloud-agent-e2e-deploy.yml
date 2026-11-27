@@ -28,10 +28,12 @@ concurrency:
 jobs:
   deploy:
     # Guard: this workflow_dispatch is reachable from a fork, and the job
-    # deploys Workers with admin secrets against production Postgres and R2.
-    # Only the canonical repo may run it.
+    # deploys Workers with admin secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
+    # The Access service token lives only in this environment. Its deployment
+    # branch policy keeps it to main.
+    environment: cloud-agent-e2e
     # Runtime preparation may wait up to 45 minutes for the exact-SHA handoff.
     timeout-minutes: 75
     env:
@@ -39,12 +41,25 @@ jobs:
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
+      # The renderer gives the Worker this one custom domain and nothing public;
+      # the deploy uploads the Access service token as Worker secrets so sandbox
+      # requests to the Worker's own origin pass the Access application.
+      E2E_WORKER_HOSTNAME: ${{ vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME }}
+      E2E_ACCESS_CLIENT_ID: ${{ secrets.E2E_ACCESS_CLIENT_ID }}
+      E2E_ACCESS_CLIENT_SECRET: ${{ secrets.E2E_ACCESS_CLIENT_SECRET }}
       # Runtime publication runs only for main SHAs. A branch run can borrow the
       # runtime of a main SHA; the Worker and fake LLM still deploy from the run SHA.
       RUNTIME_SOURCE_SHA: ${{ inputs.runtime_source_sha || github.sha }}
-      # The e2e Worker writes to production Postgres and R2, so this deployed
-      # stack is a deliberate opt-in, not an isolation boundary.
     steps:
+      # Inert until the Access hostname and its service token exist.
+      - name: Check the closed Worker path
+        run: |
+          set -euo pipefail
+          if [ -z "$E2E_WORKER_HOSTNAME" ] || [ -z "$E2E_ACCESS_CLIENT_ID" ] || [ -z "$E2E_ACCESS_CLIENT_SECRET" ]; then
+            echo "::error::Set vars.CLOUD_AGENT_E2E_WORKER_HOSTNAME and the E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET secrets in the cloud-agent-e2e environment"
+            exit 1
+          fi
+
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           ref: ${{ env.RUNTIME_SOURCE_SHA }}

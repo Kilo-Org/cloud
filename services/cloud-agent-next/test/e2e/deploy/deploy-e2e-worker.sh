@@ -57,7 +57,13 @@ Optional environment:
                           the script cannot prove: it cannot read production's value.
   E2E_AUTH_FILE        Deployed-run JSON file. Its e2eInternalApiSecret field is used when
                        E2E_INTERNAL_API_SECRET is unset or empty.
-  WORKER_URL           Defaults to https://cloud-agent-e2e-test.engineering-e11.workers.dev
+  E2E_WORKER_HOSTNAME  Private hostname of the Worker: one custom domain that a Cloudflare Access
+                       application must already protect (Service Auth only). Unset renders a
+                       Worker with no address at all: workers.dev and preview URLs are always off.
+  E2E_ACCESS_CLIENT_ID, E2E_ACCESS_CLIENT_SECRET
+                       The Access service token. Required with E2E_WORKER_HOSTNAME on deploy:
+                       uploaded as the Worker's secrets of the same names, so sandbox requests
+                       to the Worker's own origin pass the Access application.
 USAGE
 }
 
@@ -170,6 +176,32 @@ upload_internal_secret() {
   (cd "$SERVICE_DIR" && printf '%s' "$INTERNAL_SECRET" | pnpm exec wrangler secret put "$INTERNAL_SECRET_VAR" --name "$WORKER_NAME")
 }
 
+# The Access service token travels as two Worker secrets of the same names. A
+# hostname without them would leave every sandbox request to the Worker's own
+# origin challenged by Access, so deploy refuses that combination.
+prepare_access_credentials() {
+  local have_id="${E2E_ACCESS_CLIENT_ID:+1}"
+  local have_secret="${E2E_ACCESS_CLIENT_SECRET:+1}"
+  if [[ "$have_id" != "$have_secret" ]]; then
+    printf 'Set both E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET, or neither.\n' >&2
+    exit 1
+  fi
+  if [[ -n "${E2E_WORKER_HOSTNAME:-}" && -z "$have_id" ]]; then
+    printf 'E2E_WORKER_HOSTNAME requires E2E_ACCESS_CLIENT_ID and E2E_ACCESS_CLIENT_SECRET.\n' >&2
+    exit 1
+  fi
+}
+
+# Never print either value: the redacted lines name the variables instead.
+upload_access_credentials() {
+  local name
+  for name in E2E_ACCESS_CLIENT_ID E2E_ACCESS_CLIENT_SECRET; do
+    printf '+ printf %%s "[redacted]" | pnpm exec wrangler secret put %s --name %s\n' \
+      "$name" "$WORKER_NAME" >&2
+    (cd "$SERVICE_DIR" && printf '%s' "${!name}" | pnpm exec wrangler secret put "$name" --name "$WORKER_NAME")
+  done
+}
+
 render_config() {
   run_service_command node "$RENDER_SCRIPT"
 }
@@ -205,12 +237,16 @@ main() {
       ;;
     deploy)
       prepare_internal_secret
+      prepare_access_credentials
       render_config
       run_service_command pnpm run build:wrapper
       ensure_callback_queue
       run_service_command pnpm exec wrangler deploy --config "$CONFIG_PATH"
       if [[ -n "$INTERNAL_SECRET" ]]; then
         upload_internal_secret
+      fi
+      if [[ -n "${E2E_ACCESS_CLIENT_ID:-}" ]]; then
+        upload_access_credentials
       fi
       run_service_command pnpm exec wrangler deployments list --name "$WORKER_NAME"
       ;;

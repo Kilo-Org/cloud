@@ -104,13 +104,28 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
 
    ```sh
    FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
-   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
+   FAKE_LLM_BASE_URL=<base> E2E_WORKER_HOSTNAME=<host> \
+     E2E_ACCESS_CLIENT_ID=<id> E2E_ACCESS_CLIENT_SECRET=<secret> \
+     test/e2e/deploy/deploy-e2e-worker.sh deploy
    # add E2E_INTERNAL_API_SECRET=<secret> on the first deploy, or to rotate it
    ```
 
-   The deployed test Worker writes to production Postgres and R2. Every
-   authenticated Kilo user can start control-plane sessions and create worktrees
-   on it.
+   The rendered Worker binds no production resource and has no public address
+   (see [What the render changes](#what-the-render-changes-and-why)). Its only
+   possible hostname is `E2E_WORKER_HOSTNAME`, one custom domain that a
+   Cloudflare Access application must protect with a Service Auth policy
+   **before** the deploy, because the custom domain answers as soon as it is
+   attached. Without `E2E_WORKER_HOSTNAME` the Worker has no address at all.
+   With it, `deploy` requires `E2E_ACCESS_CLIENT_ID` and
+   `E2E_ACCESS_CLIENT_SECRET` and uploads them as Worker secrets of the same
+   names: sandbox requests to the Worker's own origin leave through
+   `ContainersOutbound`, re-enter Cloudflare's front door under
+   `global_fetch_strictly_public`, and pass Access only with the token
+   (`src/e2e-surface/access-credentials.ts`).
+
+   Without the production Hyperdrive, Session Ingest, usage meter and runtime
+   bucket the Worker cannot start a session; each needs a verified staging
+   replacement before the deployed profile runs again.
 
    The renderer points `E2E_MODEL_VALIDATION_BASE_URL` at the fake Worker origin,
    so model validation with a runtime-authorized token uses the fake catalogue.
@@ -142,8 +157,7 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    the exception: it deletes session resources without the
    `requireCurrentSessionAccess` check the public `deleteSession` applies, so the
    secret plus any valid JWT can trigger cleanup of an **unowned** session id;
-   seed remains the only no-JWT path. The deployed e2e Worker writes to
-   production Postgres and R2, so "separate deployment" is not a data boundary.
+   seed remains the only no-JWT path.
 
    The deployed driver resolves the e2e secret with the same order as the
    fake-LLM admin token (`E2E_INTERNAL_API_SECRET` → auth-file
@@ -199,7 +213,9 @@ script never falls back to another token and never prints the token value.
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value uploaded as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
 | `FAKE_LLM_BASE_URL` | yes | Must be `https://<fake-host>/api/openrouter`. |
 | `FAKE_LLM_ADMIN_TOKEN` | yes | Bearer for the fake's `/test/*` routes. Uploaded as the Worker secret by `deploy-fake-llm.sh` and exported for the driver. When unset or empty, the script resolves it from `E2E_AUTH_FILE`. Never the development default. |
-| `WORKER_URL` | no | Default `https://cloud-agent-e2e-test.engineering-e11.workers.dev`. |
+| `WORKER_URL` | yes, for the driver | The Access-protected hostname as `https://<host>`. The Worker has no `workers.dev` or preview address. |
+| `E2E_WORKER_HOSTNAME` | no | Deploy only: the one custom domain of the Worker. Unset renders a Worker with no address. |
+| `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` | with a hostname | The Access service token. The driver sends it on every Worker request and registers it on callback targets; `deploy` uploads it as Worker secrets. Set both or neither. |
 | `FAKE_LLM_WORKER_URL` | no | Default `https://fake-llm.engineering-e11.workers.dev`. |
 
 ## Authentication model
@@ -236,17 +252,31 @@ development key (see
 
 ## What the render changes, and why
 
+The renderer builds the config from an allowlist: it copies only runtime
+settings (`account_id`, compatibility date and flags, source maps, version
+metadata, rules, observability, placement) and adds the e2e Worker's own
+resources. Any other key of `wrangler.jsonc`, including a binding added later,
+stays out until it is reviewed. `scripts/e2e-worker-fence.test.ts` renders the
+config and fails on any production resource or public address, where production
+is every resource a `services/*/wrangler.json{,c}` top level binds.
+
 | Change | Reason |
 |---|---|
 | Separate Worker `name` | The e2e Worker is distinct from production. |
 | Written to `.wrangler/wrangler.e2e-test.jsonc` | Private, gitignored render. |
 | `main` and container `image` paths rebased (`../src/index.ts`, `../Dockerfile*`) | The rendered config lives one directory deeper, in `.wrangler/`. |
+| `workers_dev: false`, `preview_urls: false`; no routes, or only the `E2E_WORKER_HOSTNAME` custom domain | No public address; the hostname is reachable only through its Access application. |
+| `vars.WORKER_URL` is `https://<E2E_WORKER_HOSTNAME>`, or absent | The Worker never advertises production's hostname. |
+| `triggers.crons: []` | The scheduled handlers read and delete report data over Hyperdrive; an empty list also removes schedules left on the script. |
+| Every service binding dropped (`SESSION_SYNC`, `SESSION_INGEST`, `GIT_TOKEN_SERVICE`, `NOTIFICATIONS`, `CONTAINER_USAGE_METER`) | Each targets a production Worker. No closed staging target exists for any of them in this repository. |
+| `HYPERDRIVE`, `R2_BUCKET`, `WORKSPACE_ARTIFACTS_BUCKET`, `RUNTIME_RELEASE_BUCKET` and `AI` dropped; `logpush` off | Production database, buckets, runtime publication and account AI. |
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
 | Only the native `SandboxContainers` container kept | Native Cloudflare Containers is the only runtime; the E2E Worker exercises the same provider as production. |
+| Durable Object bindings: only this script's own classes | A binding with `script_name` would reach another Worker's objects. |
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
-| `NEXTAUTH_SECRET` Secrets Store binding added, pointing at `NEXTAUTH_SECRET_DEV` | Verifies the ticket and API token, and seals runtime authorization, with the non-production signing key. |
-| Not changed: `INTERNAL_API_SECRET_PROD` Secrets Store binding | The e2e Worker still binds the production internal API key, inherited from `wrangler.jsonc`. |
+| Secrets Store: only `NEXTAUTH_SECRET` → `NEXTAUTH_SECRET_DEV`; `INTERNAL_API_SECRET_PROD` dropped | Verifies the ticket and API token, and seals runtime authorization, with the non-production signing key. |
+| Not changed: `KILOCODE_BACKEND_BASE_URL=https://api.kilo.ai`, `KILO_SESSION_INGEST_URL` and the other production URL vars | Outbound addresses only, with no production credential bound; a staging backend replaces them. |
 
 ### Container classes and migrations
 

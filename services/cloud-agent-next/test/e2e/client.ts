@@ -29,6 +29,7 @@ import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
 import type { FakeScenarioStatus } from './fake-llm-server.js';
+import { workerAccessHeaders } from './worker-access.js';
 
 /**
  * Which tRPC surface the driver exercises.
@@ -199,6 +200,7 @@ export async function trpcCall<T>(
     : (config.bearerToken ??
       mintApiToken(config.user, config.nextAuthSecret, 60 * 60, config.kilocodeOrganizationId));
   const headers: Record<string, string> = {
+    ...workerAccessHeaders(),
     'Content-Type': 'application/json',
     Authorization: `Bearer ${bearer}`,
   };
@@ -1362,7 +1364,7 @@ export function openStream(
 
   function openSocket(ticket: string): void {
     const generation = ++currentGeneration;
-    const ws = new WebSocket(buildUrl(ticket));
+    const ws = new WebSocket(buildUrl(ticket), { headers: workerAccessHeaders() });
     currentWs = ws;
     let opened = false;
 

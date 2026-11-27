@@ -770,7 +770,11 @@ Two different fake URL bases — do not conflate them:
   `/test/requests` (and the other `/test/*` side channels) on it. Do not reuse
   the `/api/openrouter` provider base as `FAKE_LLM_URL`.
 
-Driver env: `E2E_PROFILE=deployed`, `WORKER_URL`, `E2E_BACKEND_URL` (a backend
+Driver env: `E2E_PROFILE=deployed`, `WORKER_URL` (the Access-protected
+hostname; the Worker has no `workers.dev` or preview address),
+`E2E_ACCESS_CLIENT_ID` and `E2E_ACCESS_CLIENT_SECRET` (the Access service token,
+sent on every request to the Worker and registered on callback targets; set both
+or neither), `E2E_BACKEND_URL` (a backend
 that signs control tokens and stream tickets with `NEXTAUTH_SECRET_DEV`, not
 `https://api.kilo.ai`), `FAKE_LLM_URL`, and a user token from
 either `E2E_USER_TOKEN` or `E2E_AUTH_FILE`; optional `E2E_MODEL` (default
@@ -827,7 +831,8 @@ Exact run command, from `services/cloud-agent-next`:
 
 ```bash
 E2E_PROFILE=deployed \
-WORKER_URL=https://cloud-agent-e2e-test.engineering-e11.workers.dev \
+WORKER_URL=https://<access-protected-e2e-hostname> \
+E2E_ACCESS_CLIENT_ID=<client-id> E2E_ACCESS_CLIENT_SECRET=<client-secret> \
 FAKE_LLM_URL=https://fake-llm.engineering-e11.workers.dev \
 E2E_BACKEND_URL=https://<backend-signing-with-NEXTAUTH_SECRET_DEV> \
 pnpm exec tsx test/e2e/run.ts cold-hot echo:hi

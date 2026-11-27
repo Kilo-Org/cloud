@@ -246,6 +246,8 @@ development key (see
 | Only the native `SandboxContainers` container kept | Native Cloudflare Containers is the only runtime; the E2E Worker exercises the same provider as production. |
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
 | `NEXTAUTH_SECRET` Secrets Store binding added, pointing at `NEXTAUTH_SECRET_DEV` | Verifies the ticket and API token, and seals runtime authorization, with the non-production signing key. |
+| `STS` service binding removed | The broker authorizes on `props.caller`, which must equal the Worker's own name, and the e2e Worker is named `cloud-agent-e2e-test`. |
+| `SECRETS_SOURCE` pinned to `secrets-store` | The e2e Worker keeps reading the legacy bindings it deploys, even after the production manifest flips to `sts`. |
 | Not changed: `INTERNAL_API_SECRET_PROD` Secrets Store binding | The e2e Worker still binds the production internal API key, inherited from `wrangler.jsonc`. |
 
 ### Container classes and migrations

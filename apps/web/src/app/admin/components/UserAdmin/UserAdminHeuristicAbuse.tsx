@@ -91,7 +91,7 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
   },
   {
     key: 'system_prompt_kind',
-    title: 'Guessed Client',
+    title: 'System Prompt',
     render: row => row.system_prompt_kind ?? 'N/A',
     visible: true,
   },

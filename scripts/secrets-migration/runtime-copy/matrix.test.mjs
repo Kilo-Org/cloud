@@ -274,7 +274,7 @@ test('a target may equal its own store name, never another row’s store name', 
   );
 });
 
-test('source_not_on_main: a Worker whose reader is absent or whose policy grants nothing refuses by name', async () => {
+test('source_not_on_main: a Worker whose reader is absent or whose policy grants nothing refuses by name', () => {
   const notifications = WORKER_SOURCES.notifications;
   const batch = FIXTURE.batches.notifications;
   const all = [notifications.wrangler, notifications.reader, notifications.policy];
@@ -308,9 +308,9 @@ test('source_not_on_main: a Worker whose reader is absent or whose policy grants
   assert.deepEqual([emptyPolicy.ok, emptyPolicy.failures], [false, refused]);
 
   // The plan refuses the whole checked-in table on a checkout without the batch files, naming
-  // each Worker, and reads no environment.
+  // each Worker.
   const sha = 'a'.repeat(40);
-  const plan = await planMatrix({
+  const plan = planMatrix({
     env: {
       GITHUB_REPOSITORY: 'Kilo-Org/cloud',
       GITHUB_REF: 'refs/heads/main',
@@ -319,10 +319,8 @@ test('source_not_on_main: a Worker whose reader is absent or whose policy grants
       EXPECTED_COMMIT: sha,
       GITHUB_RUN_ID: '1',
       GITHUB_RUN_ATTEMPT: '1',
-      GITHUB_TOKEN: 'synthetic',
     },
     headSha: sha,
-    ghFor: () => assert.fail('no environment read before every source is on main'),
     root: scratch(),
   });
   assert.deepEqual(
@@ -861,7 +859,7 @@ test('M142 live parity: the creating entry reads every other binder of its share
   }
 });
 
-test('policy: a flow list is read, an unreadable policy refuses by name, never as empty', async () => {
+test('policy: a flow list is read, an unreadable policy refuses by name, never as empty', () => {
   assert.deepEqual(parsePolicy('workload: w\nsecrets: [A_ONE, B_TWO]\n').lists.secrets, [
     'A_ONE',
     'B_TWO',
@@ -901,9 +899,9 @@ test('policy: a flow list is read, an unreadable policy refuses by name, never a
     );
     assert.doesNotThrow(() => JSON.stringify(v));
   }
-  // The plan passes the refusal through by name, unprefixed, and reads no environment.
+  // The plan passes the refusal through by name, unprefixed.
   const sha = 'b'.repeat(40);
-  const plan = await planMatrix({
+  const plan = planMatrix({
     env: {
       GITHUB_REPOSITORY: 'Kilo-Org/cloud',
       GITHUB_REF: 'refs/heads/main',
@@ -912,10 +910,8 @@ test('policy: a flow list is read, an unreadable policy refuses by name, never a
       EXPECTED_COMMIT: sha,
       GITHUB_RUN_ID: '1',
       GITHUB_RUN_ATTEMPT: '1',
-      GITHUB_TOKEN: 'synthetic',
     },
     headSha: sha,
-    ghFor: () => assert.fail('no environment read with an unreadable policy'),
     table: FIXTURE,
     root: rootWith(`${head}secrets: [${keys}\n`),
   });

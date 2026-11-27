@@ -264,31 +264,6 @@ function makeWorld(o = {}) {
   };
 
   world.gh = {
-    async environment() {
-      calls.push(['gh', 'environment']);
-      if (o.environment === null) return null;
-      return {
-        name: ENVIRONMENT,
-        can_admins_bypass: false,
-        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-        protection_rules: [
-          { id: 1, type: 'branch_policy' },
-          {
-            id: 2,
-            type: 'required_reviewers',
-            prevent_self_review: true,
-            reviewers: [
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-a' } },
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-b' } },
-            ],
-          },
-        ],
-        ...o.environment,
-      };
-    },
-    async branchPolicies() {
-      return { branch_policies: o.branches ?? [{ name: 'main', type: 'branch' }] };
-    },
     async activeRuns(workflow) {
       calls.push(['gh', 'activeRuns', workflow]);
       return o.activeRuns?.(workflow, world) ?? 0;
@@ -583,6 +558,7 @@ test('context and operator refusals make no provider, GitHub or process call', a
     [{ [WRITER_SECRET]: '' }, 'writer_secret'],
     [{ [OPERATOR_META]: '' }, 'operator_meta'],
     [{ M65_INFISICAL_CLIENT_ID: 'not-a-uuid' }, 'client_id'],
+    [{ GITHUB_TOKEN: '' }, 'github_token'],
     [{ [OPERATOR_META]: JSON.stringify(operatorMeta(), null, 2) }, 'operator_meta_not_compact'],
     [
       { [OPERATOR_META]: JSON.stringify(operatorMeta({ commit: 'e'.repeat(40) })) },
@@ -647,85 +623,6 @@ test('context and operator refusals make no provider, GitHub or process call', a
     assert.deepEqual(world.calls, []);
   });
 });
-test('missing or loosened protected environment stops before any Cloudflare call', async t => {
-  for (const [o, reason] of [
-    [{ environment: null }, 'environment_absent'],
-    [{ environment: { can_admins_bypass: true } }, 'environment_admin_bypass'],
-    [
-      {
-        environment: {
-          deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
-        },
-      },
-      'environment_branch_policy',
-    ],
-    [
-      {
-        branches: [
-          { name: 'main', type: 'branch' },
-          { name: 'release/*', type: 'branch' },
-        ],
-      },
-      'environment_branches',
-    ],
-    [{ branches: [{ name: 'main', type: 'tag' }] }, 'environment_branches'],
-    [{ branches: [{ name: 'main' }] }, 'environment_branches'],
-    [{ environment: { can_admins_bypass: undefined } }, 'environment_admin_bypass'],
-    [{ environment: { protection_rules: undefined } }, 'environment_required_reviewers'],
-    [
-      { environment: { protection_rules: [{ id: 1, type: 'branch_policy' }] } },
-      'environment_required_reviewers',
-    ],
-    [
-      {
-        environment: {
-          protection_rules: [
-            {
-              type: 'required_reviewers',
-              prevent_self_review: false,
-              reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
-            },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-    [
-      {
-        environment: {
-          protection_rules: [
-            { type: 'required_reviewers', prevent_self_review: true, reviewers: [] },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-    // The run sequence names two reviewers (iscekic plus one other); one is refused.
-    [
-      {
-        environment: {
-          protection_rules: [
-            {
-              type: 'required_reviewers',
-              prevent_self_review: true,
-              reviewers: [{ type: 'User', reviewer: { login: 'synthetic-reviewer-a' } }],
-            },
-          ],
-        },
-      },
-      'environment_required_reviewers',
-    ],
-  ]) {
-    await t.test(reason, async () => {
-      const { world, report } = await drive(o);
-      assert.equal(report.stopReason, 'environment_not_protected');
-      assert.deepEqual(report.environment, [reason]);
-      assert.equal(world.calls.filter(c => c[0] === 'cf' || c[0] === 'wrangler').length, 0);
-      assert.equal(report.cleanup.note, 'not_created');
-    });
-  }
-});
-
 test('an active rollout at start stops before deploy; one before arming deletes the unarmed copier', async () => {
   const atStart = await drive({ activeRuns: w => (w === 'deploy-production.yml' ? 1 : 0) });
   assert.equal(atStart.report.stopReason, 'rollout_active');
@@ -1661,13 +1558,13 @@ test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets
   const plan = wf.jobs.plan;
   assert.equal(plan.if, guardIf);
   assert.equal(plan.environment, undefined);
-  assert.deepEqual(plan.permissions, { contents: 'read', actions: 'read' });
+  assert.deepEqual(plan.permissions, { contents: 'read' });
   assert.ok(!JSON.stringify(plan).includes('secrets.'));
   assert.deepEqual(plan.outputs, { workers: '${{ steps.plan.outputs.workers }}' });
   const planStep = plan.steps.at(-1);
   assert.equal(planStep.id, 'plan');
   assert.equal(planStep.run, 'node scripts/secrets-migration/runtime-copy-run.mjs --plan');
-  assert.deepEqual(Object.keys(planStep.env).sort(), ['EXPECTED_COMMIT', 'GITHUB_TOKEN']);
+  assert.deepEqual(Object.keys(planStep.env), ['EXPECTED_COMMIT']);
 
   const job = wf.jobs.copy;
   assert.equal(job.needs, 'plan');
@@ -1773,65 +1670,86 @@ test('workflow: dispatch-only plan job, serial per-Worker matrix, twins, secrets
   assert.ok(!text.includes('upload-artifact'));
 });
 
-test('plan job: the valid table and every protected environment, else no matrix', async () => {
+test('no environment readback: the workflow and the driver never call the environments API', async () => {
+  const text = readFileSync(
+    new URL('../../../.github/workflows/runtime-copy.yml', import.meta.url),
+    'utf8'
+  );
+  const driver = readFileSync(new URL('../runtime-copy-run.mjs', import.meta.url), 'utf8');
+  for (const source of [text, driver]) {
+    assert.ok(!/\/environments\b/.test(source), 'no environments API path');
+    assert.ok(!source.includes('deployment-branch-policies'));
+  }
+  // The plan job holds no token at all; only the copy drivers hold the job token, for the
+  // rollout guard.
+  const { load } = createRequire(import.meta.url)('js-yaml');
+  const wf = load(text);
+  assert.ok(!JSON.stringify(wf.jobs.plan).includes('github.token'));
+  assert.deepEqual(
+    wf.jobs.copy.steps.filter(s => JSON.stringify(s).includes('github.token')).map(s => s.name),
+    ['Run the copier (stored token)', 'Run the copier (STS token)']
+  );
+
+  // The run path, with the real GitHub client on a recording fetch: the plan makes no request at
+  // all, and a whole copy driver run asks GitHub only for rollout workflow runs.
+  const seen = [];
+  const recordingFetch = async url => {
+    seen.push(new URL(url).pathname);
+    return new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), { status: 200 });
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = recordingFetch;
+  try {
+    const plan = planMatrix({ env: baseEnv(), headSha: SHA, table: FIXTURE });
+    assert.equal(plan.ok, true, JSON.stringify(plan.failures));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(seen, [], 'the plan makes no request');
+
+  const gh = github({ token: 'synthetic-github-token', fetchImpl: recordingFetch });
+  assert.deepEqual(Object.keys(gh).sort(), ['activeRuns', 'runsCreated']);
+  const world = makeWorld();
+  const report = await run({ ...ioOf(world), gh, log: () => {} });
+  assert.equal(report.status, 'cloudflare_complete', JSON.stringify(report.gates));
+  assert.deepEqual(
+    await rolloutRunsDuring(gh, T0, T0 + 60_000),
+    ROLLOUT_WORKFLOWS.map(workflow => ({ workflow, total: 0, runs: [] }))
+  );
+  assert.ok(seen.length > 0);
+  for (const path of seen) {
+    assert.ok(!/\/environments\b|deployment-branch-policies/.test(path), path);
+    assert.match(path, /^\/repos\/Kilo-Org\/cloud\/actions\/workflows\/[\w.-]+\.yml\/runs$/);
+  }
+});
+
+test('plan job: the valid table and the dispatch identity, offline, else no matrix', async t => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = () => assert.fail('the plan makes no network call');
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  // The plan job holds no token.
   const env = baseEnv();
-  const protectedEnv = name => ({
-    async environment() {
-      return {
-        name,
-        can_admins_bypass: false,
-        deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
-        protection_rules: [
-          {
-            type: 'required_reviewers',
-            prevent_self_review: true,
-            reviewers: [
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-a' } },
-              { type: 'User', reviewer: { login: 'synthetic-reviewer-b' } },
-            ],
-          },
-        ],
-      };
-    },
-    async branchPolicies() {
-      return { branch_policies: [{ name: 'main', type: 'branch' }] };
-    },
-  });
-  const asked = [];
-  const ok = await planMatrix({
-    env,
-    headSha: SHA,
-    table: FIXTURE,
-    ghFor: name => {
-      asked.push(name);
-      return protectedEnv(name);
-    },
-  });
-  assert.deepEqual(ok, { gate: 'plan', ok: true, failures: [], workers: ['notifications'] });
-  assert.deepEqual(asked, ['runtime-copy-notifications']);
-
-  const missing = await planMatrix({
-    env,
-    headSha: SHA,
-    table: FIXTURE,
-    ghFor: () => ({ environment: async () => null }),
-  });
-  assert.deepEqual(missing, {
+  delete env.GITHUB_TOKEN;
+  assert.deepEqual(planMatrix({ env, headSha: SHA, table: FIXTURE }), {
     gate: 'plan',
-    ok: false,
-    failures: ['notifications:environment_absent'],
-    workers: [],
+    ok: true,
+    failures: [],
+    workers: ['notifications'],
   });
-
-  const offline = await planMatrix({
+  const offline = planMatrix({
     env: { ...env, GITHUB_REF: 'refs/heads/feature' },
     headSha: SHA,
     table: FIXTURE,
-    ghFor: () => {
-      throw new Error('no GitHub call before the offline checks pass');
-    },
   });
   assert.deepEqual([offline.ok, offline.failures, offline.workers], [false, ['ref'], []]);
+  const commit = planMatrix({
+    env: { ...env, EXPECTED_COMMIT: 'd'.repeat(40) },
+    headSha: SHA,
+    table: FIXTURE,
+  });
+  assert.deepEqual([commit.ok, commit.failures, commit.workers], [false, ['expected_commit'], []]);
 });
 
 // The operator readback's writer expires at T0 + 41.5 min: not-before T0 + 24, not-after T0 + 39,

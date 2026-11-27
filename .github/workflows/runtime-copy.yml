@@ -10,10 +10,13 @@ name: Runtime copy (temporary)
 # It takes no input except the exact commit the dispatcher approved, and runs only from
 # Kilo-Org/cloud main. Each Worker's entry runs in its own protected environment
 # `runtime-copy-<worker>`, which must already exist with main as its only deployment branch, no
-# admin bypass, and required reviewers with self-review prevented. The first job (no secret, no
-# environment) validates the table offline and reads every environment back; only then does the
-# matrix reference them, so a dispatch never auto-creates one. The driver reads its environment
-# back again. This workflow never creates or configures an environment.
+# admin bypass, and required reviewers with self-review prevented. GitHub enforces that protection
+# when each entry starts. The job token cannot read an environment's settings, so no job here reads
+# them: before dispatch the operator reads every environment back with admin rights (the run
+# notes record the result per environment). This workflow never configures an environment, and a
+# dispatch that referenced a missing one would create it unprotected, so that readback is a
+# dispatch precondition. The first job (no secret, no environment, no GitHub API call) validates
+# the table and every Worker's sources offline and outputs the matrix.
 #
 # Serial: max-parallel 1 and fail-fast, so one copier exists at a time, the rollout guard and the
 # zero-drift snapshots hold per entry, and the first failure stops the rest. Concurrency: its own
@@ -51,7 +54,6 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      actions: read
     outputs:
       workers: ${{ steps.plan.outputs.workers }}
     steps:
@@ -66,11 +68,10 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Validate the table and read back every environment
+      - name: Validate the table and the sources
         id: plan
         env:
           EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/secrets-migration/runtime-copy-run.mjs --plan
 
   copy:

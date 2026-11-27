@@ -3,9 +3,9 @@
 // It runs only inside .github/workflows/runtime-copy.yml, one source Worker per job, the jobs one
 // at a time. The workflow passes only the Worker name (a Worker of the reviewed row table,
 // src/table.mjs) and its matrix index; everything else is fixed here or in the core
-// (scripts/secrets-migration/runtime-copy/). `--plan` (the workflow's first job, no secrets)
-// validates the whole table offline, reads back every Worker's protected environment and prints
-// the matrix.
+// (scripts/secrets-migration/runtime-copy/). `--plan` (the workflow's first job, no secrets, no
+// GitHub API call) validates the whole table and every Worker's sources offline and prints the
+// matrix.
 //
 // Order. Each step stops on its first failure; cleanup always runs for the attributable new script.
 //   1. Context guards: repository, ref, event, exact commit, credentials present. The writer secret
@@ -17,10 +17,11 @@
 //      <= notAfter + 15 min, with one minute of margin). The earliest tick keeps the run short.
 //      A writer secret that expires more than 60 minutes after start is refused.
 //      Then the core's validated name table, printed once; a refusal stops before any network call.
-//   3. GitHub guards: the protected environment reads back main-only with no admin bypass and a
-//      required-reviewers rule (at least one reviewer, self-review prevented), and no Worker
-//      rollout workflow is queued or running. A rollout workflow that cannot be read stops
-//      the run. The copy uses its own concurrency group, so it never displaces a pending rollout.
+//   3. GitHub guard: no Worker rollout workflow is queued or running. A rollout workflow that
+//      cannot be read stops the run. The copy uses its own concurrency group, so it never displaces
+//      a pending rollout. The protected environment is not read here: the job token cannot read it.
+//      GitHub enforces its required reviewers, self-review prevention and branch policy before this
+//      job starts, and the operator reads every environment back with admin rights before dispatch.
 //   4. Names-only snapshot of every existing Worker's current deployment (versions and percentages).
 //      The copier script must be absent.
 //   5. Render (core render-config.mjs), then `wrangler deploy` UNARMED: no writer secret. The
@@ -213,13 +214,14 @@ export function dispatchProblems(env, headSha) {
   else if (headSha !== env.GITHUB_SHA) p.push('checkout_head');
   if (!/^[0-9]{1,20}$/.test(env.GITHUB_RUN_ID ?? '')) p.push('run_id');
   if (!/^[0-9]{1,4}$/.test(env.GITHUB_RUN_ATTEMPT ?? '')) p.push('run_attempt');
-  if (!env.GITHUB_TOKEN) p.push('github_token');
   return p;
 }
 
 /** Names-only context problems for the copy job. Empty means the run may start. */
 export function contextProblems(env, headSha, table = TABLE) {
   const p = dispatchProblems(env, headSha);
+  // The rollout guard reads workflow runs with the job token.
+  if (!env.GITHUB_TOKEN) p.push('github_token');
   if (!targetOf(env.COPY_WORKER, table)) p.push('worker');
   if (!/^[0-9]{1,3}$/.test(env.COPY_INDEX ?? '')) p.push('matrix_index');
   if (!['secret', 'sts'].includes(env.CLOUDFLARE_TOKEN_SOURCE)) p.push('token_source');
@@ -569,10 +571,10 @@ export function cloudflare({
 }
 
 /**
- * Read-only GitHub client for the environment readback and the rollout guard. `environment` is the
- * protected environment it reads back (one source Worker's).
+ * Read-only GitHub client for the rollout guard: workflow runs only (`actions: read`). It never
+ * reads an environment; the job token cannot.
  */
-export function github({ token, repository = REPOSITORY, apiUrl, environment, fetchImpl = fetch }) {
+export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fetch }) {
   apiUrl ||= 'https://api.github.com';
   async function get(path) {
     let res;
@@ -606,11 +608,6 @@ export function github({ token, repository = REPOSITORY, apiUrl, environment, fe
     return body;
   }
   return {
-    environment: () => get(`/environments/${encodeURIComponent(environment)}`),
-    branchPolicies: () =>
-      get(
-        `/environments/${encodeURIComponent(environment)}/deployment-branch-policies?per_page=100`
-      ),
     async activeRuns(workflow) {
       let count = 0;
       for (const status of ACTIVE_RUN_STATUSES) {
@@ -640,38 +637,6 @@ export function github({ token, repository = REPOSITORY, apiUrl, environment, fe
       };
     },
   };
-}
-
-/**
- * The protected environment must exist, allow only `main`, give admins no bypass, and require a
- * reviewer other than the dispatcher (a required_reviewers rule with at least one reviewer and
- * prevent_self_review on).
- */
-export async function environmentProblems(gh) {
-  const env = await gh.environment();
-  if (env === null) return ['environment_absent'];
-  const p = [];
-  if (env.can_admins_bypass !== false) p.push('environment_admin_bypass');
-  const reviewers = (Array.isArray(env.protection_rules) ? env.protection_rules : []).filter(
-    r => isRecord(r) && r.type === 'required_reviewers'
-  );
-  if (
-    reviewers.length !== 1 ||
-    reviewers[0].prevent_self_review !== true ||
-    !Array.isArray(reviewers[0].reviewers) ||
-    reviewers[0].reviewers.length < 2
-  ) {
-    p.push('environment_required_reviewers');
-  }
-  const policy = env.deployment_branch_policy;
-  if (policy?.custom_branch_policies !== true || policy?.protected_branches !== false) {
-    p.push('environment_branch_policy');
-  } else {
-    const list = await gh.branchPolicies();
-    const names = (list?.branch_policies ?? []).map(b => `${b.type}:${b.name}`);
-    if (JSON.stringify(names) !== JSON.stringify(['branch:main'])) p.push('environment_branches');
-  }
-  return p;
 }
 
 /** Rollout workflows with a queued or running run; the copy never joins their concurrency group. */
@@ -1232,11 +1197,6 @@ export async function run(io) {
     io.printTable(names.table);
 
     phase('github_guards');
-    const envProblems = await environmentProblems(io.gh);
-    if (envProblems.length) {
-      report.environment = envProblems;
-      throw new StopError('environment_not_protected');
-    }
     const rolloutsAtStart = await activeRollouts(io.gh);
     if (rolloutsAtStart.length) {
       report.activeRollouts = rolloutsAtStart;
@@ -1621,7 +1581,6 @@ async function main() {
   const clock = { now: () => Date.now() };
   const log = line => process.stdout.write(`${JSON.stringify(line)}\n`);
   const printTable = text => process.stdout.write(`${text}\n`);
-  const target = targetOf(env.COPY_WORKER);
   const report = await run({
     ...processIo(env, controller.signal),
     env,
@@ -1631,11 +1590,7 @@ async function main() {
     signal: controller.signal,
     headSha: await gitHead(),
     cf: cloudflare({ token: env.CLOUDFLARE_API_TOKEN, accountId: ACCOUNT_ID }),
-    gh: github({
-      token: env.GITHUB_TOKEN,
-      apiUrl: env.GITHUB_API_URL,
-      environment: target?.environment ?? '',
-    }),
+    gh: github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL }),
   });
   log(report);
   if (report.operatorAction) {
@@ -1651,16 +1606,16 @@ async function main() {
 }
 
 /**
- * The workflow's credential-free first job. Offline first: the dispatch identity and the whole row
- * table (`validateTable`), then every table Worker's name check (`validatedNameTable`; a Worker whose
- * reader or policy is not on main yet refuses as `source_not_on_main: <worker>`). Then each
- * Worker's protected environment is read back before any copy job can reference it, so a dispatch
- * never auto-creates one. Any failure refuses the whole dispatch: no subset of the table runs.
- * `ghFor(environment)` returns a read-only GitHub client; `table` is the checked-in table and `root`
- * the checkout (tests pass a fixture). Returns {gate:"plan", ok, failures, workers}; `workers` is
- * the matrix, in table order.
+ * The workflow's first job: no secret, no environment, no GitHub API call. The dispatch identity
+ * and the whole row table (`validateTable`), then every table Worker's name check
+ * (`validatedNameTable`; a Worker whose reader or policy is not on main yet refuses as
+ * `source_not_on_main: <worker>`). Any failure refuses the whole dispatch: no subset of the table
+ * runs. The workflow never reads the protected environments: the operator reads each one back
+ * with admin rights before dispatch, and GitHub enforces its protection when the copy job starts.
+ * `table` is the checked-in table and `root` the checkout (tests pass a fixture). Returns
+ * {gate:"plan", ok, failures, workers}; `workers` is the matrix, in table order.
  */
-export async function planMatrix({ env, headSha, ghFor, table = TABLE, root = REPO_ROOT }) {
+export function planMatrix({ env, headSha, table = TABLE, root = REPO_ROOT }) {
   const failures = [
     ...dispatchProblems(env, headSha),
     ...table.problems.map(p => `table_${p}`),
@@ -1670,30 +1625,13 @@ export async function planMatrix({ env, headSha, ghFor, table = TABLE, root = RE
       )
     ),
   ];
-  if (failures.length === 0) {
-    for (const w of table.workers) {
-      try {
-        failures.push(
-          ...(await environmentProblems(ghFor(environmentName(w)))).map(f => `${w}:${f}`)
-        );
-      } catch (err) {
-        if (!(err instanceof StopError)) throw err;
-        failures.push(`${w}:${err.reason}`);
-      }
-    }
-  }
   const ok = failures.length === 0 && table.workers.length > 0;
   return { gate: 'plan', ok, failures, workers: ok ? [...table.workers] : [] };
 }
 
 async function planMain() {
   const env = process.env;
-  const verdict = await planMatrix({
-    env,
-    headSha: await gitHead(),
-    ghFor: environment =>
-      github({ token: env.GITHUB_TOKEN, apiUrl: env.GITHUB_API_URL, environment }),
-  });
+  const verdict = planMatrix({ env, headSha: await gitHead() });
   process.stdout.write(`${JSON.stringify(verdict)}\n`);
   if (verdict.ok && env.GITHUB_OUTPUT) {
     appendFileSync(env.GITHUB_OUTPUT, `workers=${JSON.stringify(verdict.workers)}\n`);

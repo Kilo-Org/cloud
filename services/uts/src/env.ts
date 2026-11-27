@@ -184,6 +184,12 @@ export type Env = {
    * JWKs as JSON. `kilo-web` is served only where it is set (src/bff/client-auth.ts).
    */
   KILO_WEB_CLIENT_JWKS?: string;
+  /**
+   * The public keys of the legacy bridge's subject tokens (`KiloBridgeJwksSchema`): one or two
+   * Ed25519 JWKs as JSON, never a `KILO_WEB_CLIENT_JWKS` key. The bridge serves only where both
+   * this and `LEGACY_BRIDGE_ENABLED` are set (src/bff/client-auth.ts).
+   */
+  KILO_WEB_BRIDGE_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
 } & SignInEnv &

@@ -96,10 +96,12 @@ function logRefusal(kind: UtsNoticeKind, reason: 'threw' | 'invalid_answer', err
 }
 
 /**
- * Push through the `notifications` Worker's service binding. The receiver refuses a wrong caller
- * or an invalid payload by throwing, or by an answer outside its outcome union; either is a
- * permanent failure of push for that notice, which is logged and not retried, and email still
- * goes out. Only a timeout and a `failed` answer are retried.
+ * Push through the `notifications` Worker's service binding. An answer outside its outcome union
+ * is a permanent failure of push for that notice, which is logged and not retried, and email still
+ * goes out. A call that throws is retried like a timeout: a binding call throws for a network or
+ * deploy fault as well as for a refusal, and the two cannot be told apart, so a push-only notice
+ * (`sign_in_code_stopped`) is not given up after one fault; a refusal that throws every time fails
+ * after the notice's 3 rounds.
  */
 export function notificationsServicePush(service: SecurityPushService): PushTransport {
   return async message => {
@@ -116,7 +118,7 @@ export function notificationsServicePush(service: SecurityPushService): PushTran
       );
     } catch (error) {
       logRefusal(message.kind, 'threw', error);
-      return 'permanent_failure';
+      return 'retryable_failure';
     }
     if (answer.status === 'timed_out') return 'retryable_failure';
     const outcome = DispatchOutcomeSchema.safeParse(answer.value);

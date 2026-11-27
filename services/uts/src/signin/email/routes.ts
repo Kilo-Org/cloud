@@ -237,9 +237,9 @@ export async function handleEmailRequest(
     } catch (error) {
       return unavailablePage(classifyFailure(error, 'email_start') === 'retryable');
     }
-    if (stored.outcome === 'sso_required') {
+    if (stored.outcome !== 'stored') {
       logSignInOutcome('email', null, stored.outcome);
-      return refusalPage('sso_required', returnTo);
+      return refusalPage(stored.outcome, returnTo);
     }
     const sent = await delivery.mailer({
       to: email,

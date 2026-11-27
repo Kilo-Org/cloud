@@ -78,12 +78,16 @@ const metadataDocument = {
   redirect_uris: [REDIRECT],
 };
 
+/** The connecting address of every resolver request here. */
+const ADDRESS = '198.51.100.20';
+
 function resolverDeps(
   store: ThirdPartyAccess,
   fetcher: MetadataFetcher,
-  now = () => 1_000_000
+  now = () => 1_000_000,
+  fetchRetryAfter: ThirdPartyClientsDeps['fetchRetryAfter'] = () => null
 ): ThirdPartyClientsDeps {
-  return { store, fetcher, now, failures: new Map(), inFlight: new Map() };
+  return { store, fetcher, now, failures: new Map(), inFlight: new Map(), fetchRetryAfter };
 }
 
 describe('the third-party client resolver', () => {
@@ -93,12 +97,16 @@ describe('the third-party client resolver', () => {
 
   it('serves a fresh cached client without a fetch, and refuses a blocked one', async () => {
     const fresh = fakeStore({ readClient: async () => activeClient(true) });
-    expect(await thirdPartyClients(resolverDeps(fresh.access, unusedFetch))(CLIENT_ID)).toEqual({
+    expect(
+      await thirdPartyClients(resolverDeps(fresh.access, unusedFetch))(CLIENT_ID, ADDRESS)
+    ).toEqual({
       kind: 'client',
       client: { clientId: CLIENT_ID, name: 'Example', redirectUris: [REDIRECT] },
     });
     const blocked = fakeStore({ readClient: async () => ({ status: 'blocked' }) });
-    expect(await thirdPartyClients(resolverDeps(blocked.access, unusedFetch))(CLIENT_ID)).toEqual({
+    expect(
+      await thirdPartyClients(resolverDeps(blocked.access, unusedFetch))(CLIENT_ID, ADDRESS)
+    ).toEqual({
       kind: 'refused',
       reason: 'blocked',
     });
@@ -107,7 +115,7 @@ describe('the third-party client resolver', () => {
   it('refuses a client id the URL guard refuses, with no statement and no fetch', async () => {
     const store = fakeStore();
     const resolve = thirdPartyClients(resolverDeps(store.access, unusedFetch));
-    expect(await resolve('https://127.0.0.1/client.json')).toEqual({
+    expect(await resolve('https://127.0.0.1/client.json', ADDRESS)).toEqual({
       kind: 'refused',
       reason: 'client id names an IP address',
     });
@@ -127,7 +135,7 @@ describe('the third-party client resolver', () => {
       resolverDeps(store.access, async () =>
         Response.json(metadataDocument, { headers: { 'Cache-Control': 'max-age=600' } })
       )
-    )(CLIENT_ID);
+    )(CLIENT_ID, ADDRESS);
     expect(fetched.kind).toBe('client');
     expect(saved).toEqual([
       expect.objectContaining({ clientId: CLIENT_ID, cacheSeconds: 600, etag: null }),
@@ -144,9 +152,9 @@ describe('the third-party client resolver', () => {
       revalidated.push(new Headers(init.headers).get('If-None-Match') ?? 'none');
       return new Response(null, { status: 304 });
     };
-    expect((await thirdPartyClients(resolverDeps(stale.access, fetcher))(CLIENT_ID)).kind).toBe(
-      'client'
-    );
+    expect(
+      (await thirdPartyClients(resolverDeps(stale.access, fetcher))(CLIENT_ID, ADDRESS)).kind
+    ).toBe('client');
     expect(revalidated).toEqual(['"v1"', '3600']);
   });
 
@@ -158,7 +166,7 @@ describe('the third-party client resolver', () => {
     expect(
       await thirdPartyClients(
         resolverDeps(store.access, async () => Response.json(metadataDocument))
-      )(CLIENT_ID)
+      )(CLIENT_ID, ADDRESS)
     ).toEqual({ kind: 'refused', reason: 'blocked' });
   });
 
@@ -176,12 +184,12 @@ describe('the third-party client resolver', () => {
         () => now
       )
     );
-    expect(await resolve(CLIENT_ID)).toEqual({ kind: 'unavailable' });
+    expect(await resolve(CLIENT_ID, ADDRESS)).toEqual({ kind: 'unavailable' });
     now += 59_000;
-    expect(await resolve(CLIENT_ID)).toEqual({ kind: 'unavailable' });
+    expect(await resolve(CLIENT_ID, ADDRESS)).toEqual({ kind: 'unavailable' });
     expect(fetches).toBe(1);
     now += 1_000;
-    await resolve(CLIENT_ID);
+    await resolve(CLIENT_ID, ADDRESS);
     expect(fetches).toBe(2);
   });
 
@@ -199,7 +207,7 @@ describe('the third-party client resolver', () => {
         return Response.json(metadataDocument);
       })
     );
-    const results = Promise.all([resolve(CLIENT_ID), resolve(CLIENT_ID)]);
+    const results = Promise.all([resolve(CLIENT_ID, ADDRESS), resolve(CLIENT_ID, ADDRESS)]);
     await Promise.resolve();
     release();
     const outcomes: ClientResolution[] = await results;
@@ -213,9 +221,40 @@ describe('the third-party client resolver', () => {
         throw storeFailure('retryable');
       },
     });
-    expect(await thirdPartyClients(resolverDeps(store.access, unusedFetch))(CLIENT_ID)).toEqual({
+    expect(
+      await thirdPartyClients(resolverDeps(store.access, unusedFetch))(CLIENT_ID, ADDRESS)
+    ).toEqual({
       kind: 'unavailable',
     });
+  });
+
+  it("counts each fetch against the requesting network's allowance, and fetches nothing past it", async () => {
+    const asked: (string | null)[] = [];
+    const limited = (retryAfter: number | null) => (address: string | null) => {
+      asked.push(address);
+      return retryAfter;
+    };
+    const missing = fakeStore({ readClient: async () => null });
+    expect(
+      await thirdPartyClients(resolverDeps(missing.access, unusedFetch, undefined, limited(42)))(
+        CLIENT_ID,
+        ADDRESS
+      )
+    ).toEqual({ kind: 'rate_limited', retryAfterSeconds: 42 });
+    expect(missing.calls.map(call => call.method)).toEqual(['readClient']);
+    expect(asked).toEqual([ADDRESS]);
+
+    // A cached client is served without counting.
+    const fresh = fakeStore({ readClient: async () => activeClient(true) });
+    expect(
+      (
+        await thirdPartyClients(resolverDeps(fresh.access, unusedFetch, undefined, limited(42)))(
+          CLIENT_ID,
+          ADDRESS
+        )
+      ).kind
+    ).toBe('client');
+    expect(asked).toEqual([ADDRESS]);
   });
 });
 
@@ -264,13 +303,16 @@ describe('the consent screen', () => {
         name: pending.client.name,
         redirectKind: 'private_use_scheme',
       },
-      redirectUri: 'com.example.app:/oauth/callback',
+      redirectUri: 'cursor://anysphere.cursor-retrieval/oauth/callback',
     };
     const shown = await step(store.access)(new Request(authorizeUrl), nativeApp, session);
     if (shown.status !== 'interaction') throw new Error('expected the confirm page, not a code');
-    expect(await shown.response.text()).toContain('id="confirm-app"');
+    const shownHtml = await shown.response.text();
+    expect(shownHtml).toContain('id="confirm-app"');
+    // The user sees where the code goes, short scheme included.
+    expect(shownHtml).toContain('cursor://anysphere.cursor-retrieval/oauth/callback');
     expect(shown.response.headers.get('Content-Security-Policy')).toContain(
-      "form-action 'self' com.example.app:;"
+      "form-action 'self' cursor:;"
     );
     expect(
       (await step(store.access)(consentPost({}, 'https://evil.example'), nativeApp, session)).status

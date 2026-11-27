@@ -231,6 +231,17 @@ describe('SignerKeysAnswerSchema', () => {
     // An answer from a mint Worker of the previous release has no `feeds`; it is accepted for one
     // release.
     expect(SignerKeysAnswerSchema.safeParse({ signers: signers() }).success).toBe(true);
+    // A field a later mint Worker adds is dropped, so a feed Worker that does not know it yet keeps
+    // serving keys during a deploy or after its own rollback.
+    const later = SignerKeysReadSchema.safeParse({
+      status: 'answered',
+      answer: { signers: signers(), feeds: feeds(), later: true },
+      later: true,
+    });
+    expect(later.success && later.data).toEqual({
+      status: 'answered',
+      answer: { signers: signers(), feeds: feeds() },
+    });
   });
 
   it('names the signer-keys entrypoint, holds keys 24 hours, and reads an answer, a refusal or a misconfigured shard', () => {

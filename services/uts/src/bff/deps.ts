@@ -31,8 +31,15 @@ export type LegacySsoAuthority = (claim: LegacySsoClaim) => Promise<'verified' |
  */
 export const noSsoAuthority: LegacySsoAuthority = async () => 'unverified';
 
-/** The legacy bridge runs only where `LEGACY_BRIDGE_ENABLED` is `true`. */
-export type LegacyBridge = { status: 'off' } | { status: 'on'; authority: LegacySsoAuthority };
+/**
+ * The legacy bridge runs only where `LEGACY_BRIDGE_ENABLED` is `true`, and verifies its subject
+ * tokens only under its own key set (`KILO_WEB_BRIDGE_JWKS`, `legacyBridgeKeys`): while that set
+ * is unset, invalid or shares a key with the client set, the bridge answers 503, so removing the
+ * bridge key turns the bridge off.
+ */
+export type LegacyBridge =
+  | { status: 'off' }
+  | { status: 'on'; authority: LegacySsoAuthority; keys: () => Promise<WebClientKeys> };
 
 /** What the `kilo-web` token grants and the browser-session API need. */
 export type WebClientDeps = {

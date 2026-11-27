@@ -6,6 +6,7 @@ import {
   type SignerKeysAnswer,
   type SignerKeysBinding,
   type SignerKeysRead,
+  type SignerKeysRequest,
   type UtsJwks,
 } from '@kilocode/uts-contracts';
 import { getKeySetShardStub, getSignerStub, KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
@@ -64,9 +65,10 @@ export async function resetKeySetShards(): Promise<void> {
 
 /** One `signerKeys()` call through `binding`, validated and then disposed as the feed Worker does. */
 export async function readSignerKeys(
-  binding: SignerKeysBinding = env.FEED_MINT
+  binding: SignerKeysBinding = env.FEED_MINT,
+  request: SignerKeysRequest = { feeds: true }
 ): Promise<SignerKeysRead> {
-  const result = await binding.signerKeys();
+  const result = await binding.signerKeys(request);
   const read = SignerKeysReadSchema.parse(result);
   if (typeof result === 'object' && result !== null && Symbol.dispose in result) {
     const dispose = result[Symbol.dispose];

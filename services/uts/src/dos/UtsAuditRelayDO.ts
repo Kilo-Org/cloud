@@ -63,8 +63,9 @@ function logOutcome(stream: string, outcome: RelayRunOutcome, next: NextRelayRun
  * again after a run that stopped at its read budget, and with backoff after a failure
  * (`src/audit/relay-schedule.ts`). One object owns each shard; the watermark's compare-and-set
  * keeps a shard correct even if two runs overlap across a deploy. It stores only its count of
- * failed runs in a row; the watermark lives in the identity store. The cron (`src/scheduled.ts`)
- * calls `ensureStarted` every minute, which arms a missing alarm.
+ * failed runs in a row; the watermark lives in the identity store. It finds its shard by its id,
+ * not its name, so an alarm that starts it without a name keeps the loop going. The cron
+ * (`src/scheduled.ts`) calls `ensureStarted` every minute, which arms a missing alarm.
  */
 export class UtsAuditRelayDO extends DurableObject<Env> {
   readonly #config: UtsConfig;
@@ -73,7 +74,7 @@ export class UtsAuditRelayDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.#config = readConfig(env);
-    const id = auditShardOfObjectId(this.#config, ctx.id);
+    const id = auditShardOfObjectId(env, this.#config, ctx.id);
     if (id.status === 'refused') {
       console.error(JSON.stringify({ event: 'uts.audit_relay.refused', reason: id.reason }));
       this.#phase = id;

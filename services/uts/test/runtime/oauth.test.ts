@@ -9,7 +9,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { createLocalJWKSet, decodeJwt, jwtVerify } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../src/env';
 import type {
   ExchangeCodeInput,
@@ -584,6 +584,7 @@ describe('token endpoint: request shape', () => {
       formRequest('/token', { grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
       oauthDeps(fakeGrants().access, {
         device: {
+          status: 'served',
           grant: async () => new Response('hook', { status: 418 }),
           pages: {
             config,
@@ -885,6 +886,116 @@ describe('authorization endpoint', () => {
   });
 
   it.each([
+    ['an unsupported response type', { response_type: 'token' }, 'unsupported_response_type'],
+    ['no PKCE', { code_challenge_method: 'plain' }, 'invalid_request'],
+    ['a repeated state', { state: ['one', 'two'] }, 'invalid_request'],
+    ['an unknown scope', { scope: 'gateway:unknown.read' }, 'invalid_scope'],
+    ['a DPoP key', { dpop_jkt: jkt }, 'invalid_request'],
+  ])(
+    'shows a third-party error before the hand-off for %s, never a redirect to the URI its own document lists',
+    async (_name, change, error) => {
+      let handedOff = false;
+      const response = await call(
+        authorizeUrl({
+          ...base,
+          client_id: THIRD_PARTY,
+          redirect_uri: 'https://client.example.com/callback',
+          dpop_jkt: '',
+          ...change,
+        }),
+        oauthDeps(fakeGrants().access, {
+          clients: knownClient,
+          handoff: async () => {
+            handedOff = true;
+            return { status: 'denied' };
+          },
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe(error);
+      expect(handedOff).toBe(false);
+    }
+  );
+
+  it('redirects a third-party denial once the user acted in the hand-off', async () => {
+    const response = await call(
+      authorizeUrl({
+        ...base,
+        client_id: THIRD_PARTY,
+        redirect_uri: 'https://client.example.com/callback',
+        dpop_jkt: '',
+      }),
+      oauthDeps(fakeGrants().access, {
+        clients: knownClient,
+        handoff: async () => ({ status: 'denied' }),
+      })
+    );
+    expect(response.status).toBe(302);
+    expect(redirectOf(response).origin).toBe('https://client.example.com');
+    expect(redirectOf(response).searchParams.get('error')).toBe('access_denied');
+  });
+
+  it.each(['data:text/html,hi', 'javascript:alert(1)'])(
+    'refuses a cached redirect URI %s the blocklist refuses',
+    async uri => {
+      const response = await call(
+        authorizeUrl({ ...base, client_id: THIRD_PARTY, redirect_uri: uri, dpop_jkt: '' }),
+        oauthDeps(fakeGrants().access, {
+          clients: async clientId => ({
+            kind: 'client',
+            client: { clientId, name: 'Example', redirectUris: [uri] },
+          }),
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe('invalid_request');
+    }
+  );
+
+  it.each([
+    'cursor://anysphere.cursor-retrieval/oauth/callback',
+    'vscode://vscode.github-authentication/did-authenticate',
+  ])('accepts the private-use redirect %s of a real MCP client', async uri => {
+    const response = await call(
+      authorizeUrl({ ...base, client_id: THIRD_PARTY, redirect_uri: uri, dpop_jkt: '' }),
+      oauthDeps(fakeGrants().access, {
+        clients: async clientId => ({
+          kind: 'client',
+          client: { clientId, name: 'Example', redirectUris: [uri] },
+        }),
+        handoff: async () => ({ status: 'denied' }),
+      })
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')?.startsWith(uri)).toBe(true);
+  });
+
+  it('answers 429 with Retry-After when the network used its metadata fetch allowance', async () => {
+    let address: string | null = 'unset';
+    const request = authorizeUrl({
+      ...base,
+      client_id: THIRD_PARTY,
+      redirect_uri: 'https://client.example.com/callback',
+    });
+    const response = await call(
+      new Request(request, { headers: { 'CF-Connecting-IP': '203.0.113.9' } }),
+      oauthDeps(fakeGrants().access, {
+        clients: async (_clientId, from) => {
+          address = from;
+          return { kind: 'rate_limited', retryAfterSeconds: 17 };
+        },
+      })
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('17');
+    expect(response.headers.get('Location')).toBeNull();
+    expect(await errorOf(response)).toBe('temporarily_unavailable');
+    expect(address).toBe('203.0.113.9');
+  });
+
+  it.each([
     ['an unregistered scope', 'kilo-cli', 'gateway:unknown.read'],
     ['a scope of another first-party client', 'kilo-cli', 'user-data-export:exports.dispatch'],
     ['a scope for the web app only', 'kilo-cli', 'uts:security.read'],
@@ -915,8 +1026,14 @@ describe('authorization endpoint', () => {
         },
       })
     );
-    expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
-    expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    if (thirdParty) {
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(await errorOf(response)).toBe('invalid_scope');
+    } else {
+      expect(redirectOf(response).searchParams.get('error')).toBe('invalid_scope');
+      expect(redirectOf(response).searchParams.get('code')).toBeNull();
+    }
     expect(handedOff).toBe(false);
     expect(grants.calls.filter(item => item.method === 'issueCode')).toEqual([]);
   });
@@ -1196,5 +1313,31 @@ describe('mint Worker wiring', () => {
         'urn:ietf:params:oauth:grant-type:token-exchange',
       ],
     });
+  });
+
+  it('serves every other route, without the device grant, while the user-code secret is malformed', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const malformed: Env = { ...env, DEVICE_USER_CODE_KEY: 'not a key' };
+      const response = await fetchMint(metadataRequest(), malformed);
+      expect(response.status).toBe(200);
+      const document = await metadata(response);
+      expect(document.device_authorization_endpoint).toBeUndefined();
+      expect(document.grant_types_supported).toEqual(['authorization_code', 'refresh_token']);
+      expect(errors.mock.calls).toEqual([]);
+      expect(
+        (
+          await fetchMint(
+            formRequest('/device_authorization', { client_id: 'kilo-cli' }),
+            malformed
+          )
+        ).status
+      ).toBe(404);
+      expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+        { event: 'uts.signin.misconfigured', method: 'device', missing: ['DEVICE_USER_CODE_KEY'] },
+      ]);
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

@@ -1,8 +1,8 @@
 /**
- * At most 20 uncached PAT lookups per second per client address per isolate (design 3, 7), as the
- * verifier library counts them. The probe route caches nothing, so every request it lets through
- * is one lookup. The bookkeeping holds at most 10,000 addresses; the oldest window goes first.
- * Plain data only, per isolate.
+ * At most 20 uncached PAT lookups per second per client per isolate (design 3, 7), as the verifier
+ * library counts them. A client is an IPv4 address or an IPv6 /64 (`clientLimitKey`). The probe
+ * route caches nothing, so every request it lets through is one lookup. The bookkeeping holds at
+ * most 10,000 clients; the oldest window goes first. Plain data only, per isolate.
  */
 
 export const LOOKUPS_PER_SECOND_PER_ADDRESS = 20;

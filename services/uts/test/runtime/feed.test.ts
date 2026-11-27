@@ -6,7 +6,12 @@ import {
 import { FeedReadsHeadSchema, FeedReadsListSchema, feedOfFeedKid } from '@kilocode/uts-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { feedOfObjectName, getFeedStub } from '../../src/dos/stubs';
-import { FEED_ALARM_INTERVAL_MS, type UtsFeedDO } from '../../src/feed/UtsFeedDO';
+import {
+  FEED_ALARM_INTERVAL_MS,
+  FEED_UNBOUND_ALARM_INTERVAL_MS,
+  feedAlarmIntervalMs,
+  type UtsFeedDO,
+} from '../../src/feed/UtsFeedDO';
 import { feedPublisher } from '../../src/revocation/publish';
 import { feedAnswer, resetKeySetShards } from './support';
 import { grantEntry } from './oauth-support';
@@ -48,6 +53,29 @@ describe('feed objects', () => {
     );
     expect(alarm).not.toBeNull();
     expect(alarm ?? 0).toBeLessThanOrEqual(Date.now() + FEED_ALARM_INTERVAL_MS);
+  });
+
+  it('tick hourly while the identity store is unbound, and every 5 seconds once it is bound', async () => {
+    expect(feedAlarmIntervalMs({ kind: 'unprovisioned' })).toBe(FEED_UNBOUND_ALARM_INTERVAL_MS);
+    expect(feedAlarmIntervalMs({ kind: 'ready', connectionString: 'postgres://unused' })).toBe(
+      FEED_ALARM_INTERVAL_MS
+    );
+    // An object that ticked hourly while unbound backfills at once after the deploy that binds the
+    // store, rather than an hour later.
+    await feedStub(0).publicKeys();
+    await runInDurableObject(feedStub(0), (_instance, state) =>
+      state.storage.setAlarm(Date.now() + FEED_UNBOUND_ALARM_INTERVAL_MS)
+    );
+    await runInDurableObject(feedStub(0), (_instance, state) => state.abort('test restart')).catch(
+      () => undefined
+    );
+    await feedStub(0).publicKeys();
+    const alarm = await runInDurableObject(feedStub(0), (_instance, state) =>
+      state.storage.getAlarm()
+    );
+    expect(alarm ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+      Date.now() + FEED_ALARM_INTERVAL_MS
+    );
   });
 
   it('take a valid batch, refuse anything else, and sign no head without a good backfill', async () => {

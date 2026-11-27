@@ -30,8 +30,29 @@ import {
 
 let db: TestDatabase;
 
+/**
+ * The statements below need a table the app login writes directly. Since migration 0019 the app
+ * login writes none of the account tables, so this file's database gets one probe table, shaped
+ * like `uts.accounts` where the checks need it: a primary key, a status-shape CHECK that quotes the
+ * row in its detail, and an int8 column.
+ */
+const PROBE_TABLE = `CREATE TABLE uts.client_probe (
+  id text PRIMARY KEY,
+  primary_email text NOT NULL,
+  status text NOT NULL DEFAULT 'active',
+  blocked_at timestamptz,
+  event_version bigint NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT client_probe_status_shape CHECK ((status = 'blocked') = (blocked_at IS NOT NULL))
+)`;
+
+const ProbeRowSchema = z.object({ id: z.string(), status: z.string(), event_version: z.bigint() });
+
 beforeAll(async () => {
   db = await TestDatabase.create();
+  const owner = await db.connectAsOwner();
+  await owner.query(PROBE_TABLE);
+  await owner.query('GRANT SELECT, INSERT, UPDATE ON uts.client_probe TO uts_app');
 });
 afterAll(() => db.drop());
 
@@ -58,8 +79,8 @@ describe('identity-store client', () => {
   it('returns no row for an unknown key', async () => {
     const row = await run('uts_app_a', store =>
       store.maybeOne(
-        { text: 'SELECT * FROM uts.accounts WHERE id = $1', values: ['oauth/unknown'] },
-        AccountRowSchema
+        { text: 'SELECT * FROM uts.client_probe WHERE id = $1', values: ['oauth/unknown'] },
+        ProbeRowSchema
       )
     );
     expect(row).toBeNull();
@@ -69,10 +90,10 @@ describe('identity-store client', () => {
     const account = await run('uts_app_a', store =>
       store.maybeOne(
         {
-          text: `INSERT INTO uts.accounts (id, primary_email) VALUES ($1, $2) RETURNING *`,
+          text: `INSERT INTO uts.client_probe (id, primary_email) VALUES ($1, $2) RETURNING *`,
           values: ['oauth/client-test', 'client@example.com'],
         },
-        AccountRowSchema
+        ProbeRowSchema
       )
     );
     expect(account).toMatchObject({ id: 'oauth/client-test', status: 'active', event_version: 0n });
@@ -98,7 +119,7 @@ describe('identity-store client', () => {
     const insert = (store: IdentityStore) =>
       store.rows(
         {
-          text: 'INSERT INTO uts.accounts (id, primary_email) VALUES ($1, $2)',
+          text: 'INSERT INTO uts.client_probe (id, primary_email) VALUES ($1, $2)',
           values: ['oauth/duplicate', 'duplicate@example.com'],
         },
         z.unknown()
@@ -107,15 +128,15 @@ describe('identity-store client', () => {
     const failure = await failureOf(() => run('uts_app_a', insert));
     expect(failure.failure).toBe('permanent');
     expect(failure.sqlState).toBe('23505');
-    expect(failure.constraint).toBe('accounts_pkey');
-    expect(failure.table).toBe('accounts');
+    expect(failure.constraint).toBe('client_probe_pkey');
+    expect(failure.table).toBe('client_probe');
   });
 
   it('keeps no row value of a refused statement in the error', async () => {
     const marker = 'failing-row-marker@example.com';
-    // A blocked account without `blocked_at`: the server's detail quotes the whole row.
+    // A blocked row without `blocked_at`: the server's detail quotes the whole row.
     const statement = {
-      text: `INSERT INTO uts.accounts (id, primary_email, status) VALUES ($1, $2, 'blocked')`,
+      text: `INSERT INTO uts.client_probe (id, primary_email, status) VALUES ($1, $2, 'blocked')`,
       values: ['oauth/failing-row', marker],
     };
     const raw = await db.connect('uts_app_a');
@@ -131,8 +152,8 @@ describe('identity-store client', () => {
     expect(failure).toMatchObject({
       failure: 'permanent',
       sqlState: '23514',
-      constraint: 'accounts_status_shape',
-      table: 'accounts',
+      constraint: 'client_probe_status_shape',
+      table: 'client_probe',
     });
     expect(failure.cause).toBeUndefined();
     for (const text of [inspect(failure, { depth: 10 }), JSON.stringify(failure), failure.stack]) {
@@ -143,9 +164,13 @@ describe('identity-store client', () => {
 
   it('reports a lock timeout as retryable', async () => {
     const holder = await db.connect('uts_app_b');
-    const accountId = await insertAccount(holder);
+    const accountId = 'oauth/locked-row';
+    await holder.query(
+      `INSERT INTO uts.client_probe (id, primary_email) VALUES ($1, 'locked@example.com')`,
+      [accountId]
+    );
     await holder.query('BEGIN');
-    await holder.query('SELECT 1 FROM uts.accounts WHERE id = $1 FOR UPDATE', [accountId]);
+    await holder.query('SELECT 1 FROM uts.client_probe WHERE id = $1 FOR UPDATE', [accountId]);
     try {
       const failure = await failureOf(() =>
         run('uts_app_a', async store => {
@@ -155,7 +180,7 @@ describe('identity-store client', () => {
           );
           return store.rows(
             {
-              text: `UPDATE uts.accounts SET updated_at = now() WHERE id = $1`,
+              text: `UPDATE uts.client_probe SET updated_at = now() WHERE id = $1`,
               values: [accountId],
             },
             z.unknown()
@@ -226,6 +251,11 @@ describe('identity-store client', () => {
         text: `SELECT * FROM uts.${table} WHERE account_id = $1`,
         values: [accountId],
       });
+      const [account] = await store.rows(
+        { text: 'SELECT * FROM uts.accounts WHERE id = $1', values: [accountId] },
+        AccountRowSchema
+      );
+      expect(account).toMatchObject({ id: accountId, status: 'active', event_version: 0n });
       const [code] = await store.rows(select('authorization_codes'), AuthorizationCodeRowSchema);
       expect(code.resources).toEqual(['gateway', 'kilo-chat']);
       expect(code.amr).toEqual(['oauth', 'passkey']);

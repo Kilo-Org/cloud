@@ -24,7 +24,6 @@ import {
 } from '../token/credentials';
 import { tokenResponseBody } from '../token/mint';
 import {
-  type ClientKeys,
   type JtiUse,
   type LegacySessionClaims,
   authenticateWebClient,
@@ -43,9 +42,10 @@ import type { WebSession } from './store';
  *   verifier and no DPoP proof (browser grants are not DPoP-bound). The answer names the browser
  *   session and its handle, derived from the code and the verifier, so a retry inside the code's
  *   lifetime gets the same session and handle with new access tokens.
- * * the RFC 8693 legacy bridge (`LEGACY_BRIDGE_ENABLED`): a web-signed subject token for an
- *   existing web session becomes a browser session with `amr` `legacy_session` and the legacy
- *   sign-in time, never a fresh sign-in or a step-up.
+ * * the RFC 8693 legacy bridge (`LEGACY_BRIDGE_ENABLED`): a subject token for an existing web
+ *   session, signed under the bridge's own key set (`KILO_WEB_BRIDGE_JWKS`, never a client key),
+ *   becomes a browser session with `amr` `legacy_session` and the legacy sign-in time, never a
+ *   fresh sign-in or a step-up.
  *
  * Every other grant is `unauthorized_client`: the BFF holds no refresh token.
  */
@@ -153,8 +153,7 @@ async function bridgeLegacySession(
   request: Request,
   params: Params,
   deps: WebClientDeps,
-  assertion: JtiUse,
-  keys: ClientKeys
+  assertion: JtiUse
 ): Promise<Response> {
   if (deps.bridge.status === 'off') return oauthError('unsupported_grant_type', 400);
   const typesError = bridgeTypesError(params);
@@ -177,10 +176,12 @@ async function bridgeLegacySession(
     return oauthError('invalid_scope', 400, 'a requested scope needs an organization');
   }
 
+  const bridgeKeys = await deps.bridge.keys();
+  if (bridgeKeys.status !== 'ready') return webClientUnavailable();
   const nowSeconds = Math.floor(deps.now() / 1000);
   const legacy = await verifyLegacySessionToken(
     subjectToken,
-    keys,
+    bridgeKeys.keys,
     tokenEndpointUrl(deps.config),
     nowSeconds
   );
@@ -249,7 +250,7 @@ export async function handleWebClientToken(
       case UTS_GRANT_TYPES.authorizationCode:
         return await exchangeWebCode(request, params, deps, auth.assertion);
       case UTS_GRANT_TYPES.tokenExchange:
-        return await bridgeLegacySession(request, params, deps, auth.assertion, keys.keys);
+        return await bridgeLegacySession(request, params, deps, auth.assertion);
       default:
         return oauthError(
           'unauthorized_client',

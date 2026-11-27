@@ -56,14 +56,10 @@ import {
 } from 'jose';
 import pg from 'pg';
 import { z } from 'zod';
-import { isLoopbackHost } from './connection';
+import { localDatabaseUrl } from './e2e-store';
 
-const adminUrl = z.url().parse(process.env.UTS_E2E_ADMIN_URL);
-const appUrl = z.url().parse(process.env.UTS_E2E_APP_URL);
-for (const url of [adminUrl, appUrl]) {
-  if (!isLoopbackHost(new URL(url)))
-    throw new Error('the end-to-end run uses a local database only');
-}
+const adminUrl = localDatabaseUrl('UTS_E2E_ADMIN_URL').toString();
+const appUrl = localDatabaseUrl('UTS_E2E_APP_URL').toString();
 const PORT = z.coerce
   .number()
   .int()
@@ -158,11 +154,11 @@ async function emailSignIn(email: string): Promise<void> {
 
 type WebKey = { privateKey: CryptoKey; kid: string; jwks: string };
 
-async function webKey(): Promise<WebKey> {
+async function webKey(kidPrefix = 'kilo-web-'): Promise<WebKey> {
   const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
   const { x } = await exportJWK(publicKey);
   if (x === undefined) throw new Error('no public key');
-  const kid = `kilo-web-${await calculateJwkThumbprint({ kty: 'OKP', crv: 'Ed25519', x })}`;
+  const kid = `${kidPrefix}${await calculateJwkThumbprint({ kty: 'OKP', crv: 'Ed25519', x })}`;
   return {
     privateKey,
     kid,
@@ -173,12 +169,14 @@ async function webKey(): Promise<WebKey> {
 }
 
 let KEY: WebKey;
+/** The legacy bridge's own key (`KILO_WEB_BRIDGE_JWKS`), never a client assertion key. */
+let BRIDGE_KEY: WebKey;
 
-async function signJwt(claims: JWTPayload, typ?: string): Promise<string> {
+async function signJwt(claims: JWTPayload, typ?: string, key = KEY): Promise<string> {
   return keep(
     await new SignJWT(claims)
-      .setProtectedHeader({ alg: 'EdDSA', kid: KEY.kid, ...(typ === undefined ? {} : { typ }) })
-      .sign(KEY.privateKey)
+      .setProtectedHeader({ alg: 'EdDSA', kid: key.kid, ...(typ === undefined ? {} : { typ }) })
+      .sign(key.privateKey)
   );
 }
 
@@ -690,7 +688,8 @@ async function run(admin: pg.Client) {
         auth_time: legacyAuthTime,
         ...claims,
       },
-      'kilo-legacy-session+jwt'
+      'kilo-legacy-session+jwt',
+      BRIDGE_KEY
     );
   const bridgeFields = async (token: string) => ({
     grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
@@ -810,9 +809,11 @@ async function run(admin: pg.Client) {
 
 async function main() {
   KEY = await webKey();
+  BRIDGE_KEY = await webKey('kilo-bridge-');
   const vars = {
     SIGNIN_EMAIL_HASH_KEY: keep(randomBytes(32).toString('base64url')),
     KILO_WEB_CLIENT_JWKS: KEY.jwks,
+    KILO_WEB_BRIDGE_JWKS: BRIDGE_KEY.jwks,
   };
   writeFileSync(
     '.dev.vars.bff-e2e',

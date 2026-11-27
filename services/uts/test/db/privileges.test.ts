@@ -19,7 +19,8 @@ const INSUFFICIENT_PRIVILEGE = '42501';
 /**
  * Tables the app login writes only through security-definer functions: the OAuth grant functions
  * (migration 0004), the account functions (migration 0005), the sign-in functions (migration
- * 0008) and the notice and sign-in functions and triggers (migration 0010).
+ * 0008), the notice and sign-in functions and triggers (migration 0010) and the third-party
+ * client functions (migration 0021).
  */
 const FUNCTION_WRITTEN_TABLES = [
   'authorization_codes',
@@ -48,6 +49,14 @@ const FUNCTION_WRITTEN_TABLES = [
   'known_devices',
   'known_networks',
   'sign_ins',
+  'third_party_clients',
+  'third_party_consents',
+  'notices',
+  'accounts',
+  'sso_connections',
+  'sso_domains',
+  'org_sso_policies',
+  'org_memberships',
 ];
 
 /**
@@ -82,6 +91,8 @@ const UPDATE_COLUMN: Partial<Record<string, string>> = {
   known_devices: 'last_seen_at',
   known_networks: 'last_seen_at',
   sign_ins: 'new_device',
+  notices: 'delivery',
+  org_sso_policies: 'enforcement',
 };
 
 let db: TestDatabase;
@@ -241,18 +252,6 @@ describe('role attributes', () => {
 });
 
 describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
-  it('reads and writes the ungated credential tables', async () => {
-    const app = await db.connect(login);
-    const accountId = await insertAccount(app);
-    // Browser sessions, PATs and gate passes change only through the sign-in and account
-    // functions (migrations 0005 and 0008); a notice is a table the app login still writes.
-    const result = await app.query(
-      `INSERT INTO uts.notices (account_id, kind) VALUES ($1, 'sessions_revoked') RETURNING id`,
-      [accountId]
-    );
-    expect(result.rowCount).toBe(1);
-  });
-
   it('reads a PAT but cannot write it, and a revoked PAT stays revoked', async () => {
     const owner = await db.connectAsOwner();
     const accountId = await insertAccount(owner);
@@ -412,14 +411,19 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     'cannot insert, update or delete uts.%s directly, only read it',
     async table => {
       const app = await db.connect(login);
-      await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
-      const column = UPDATE_COLUMN[table] ?? 'status';
-      for (const statement of [
-        `INSERT INTO uts.${table} DEFAULT VALUES`,
-        `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
-        `DELETE FROM uts.${table} WHERE false`,
-      ]) {
-        expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+      // Closed here: this file opens a connection per test, and these cases alone are dozens.
+      try {
+        await app.query(`SELECT 1 FROM uts.${table} LIMIT 1`);
+        const column = UPDATE_COLUMN[table] ?? 'status';
+        for (const statement of [
+          `INSERT INTO uts.${table} DEFAULT VALUES`,
+          `UPDATE uts.${table} SET ${column} = ${column} WHERE false`,
+          `DELETE FROM uts.${table} WHERE false`,
+        ]) {
+          expect(await sqlStateOf(() => app.query(statement))).toBe(INSUFFICIENT_PRIVILEGE);
+        }
+      } finally {
+        await app.end();
       }
     }
   );
@@ -515,8 +519,7 @@ describe.each(['uts_pat_a', 'uts_pat_b'] as const)('PAT login %s', login => {
 
 describe.each(['uts_reader_a', 'uts_reader_b'] as const)('reader login %s', login => {
   it('reads the account views', async () => {
-    const app = await db.connect('uts_app_a');
-    const accountId = await insertAccount(app);
+    const accountId = await insertAccount(await db.connectAsOwner());
     const reader = await db.connect(login);
     const result = await reader.query('SELECT id, status FROM uts_read.accounts WHERE id = $1', [
       accountId,
@@ -615,11 +618,10 @@ describe('table privileges', () => {
     );
 
     // Gated tables (0003_access.sql): no INSERT, and UPDATE only on lifecycle columns. PATs and org
-    // bot keys lose even those in 0005, like gate passes, and device codes in 0008: only the
-    // account and sign-in functions write them.
+    // bot keys lose even those in 0005, like gate passes, device codes in 0008 and third-party
+    // consents in 0021: only the account, sign-in and consent functions write them.
     const gatedUpdates: Record<string, string[]> = {
       ci_trust_policies: ['revoked_at', 'status', 'updated_at'],
-      third_party_consents: ['revoked_at', 'status'],
     };
     const credentialTables = Object.keys(IDENTITY_STORE_TABLES).filter(
       table =>
@@ -704,6 +706,7 @@ describe('functions', () => {
       { routine: 'exchange_device_code', grantee: 'uts_app' },
       { routine: 'exchange_web_code', grantee: 'uts_app' },
       { routine: 'exempt_code_attestation', grantee: 'uts_app' },
+      { routine: 'extend_third_party_client', grantee: 'uts_app' },
       { routine: 'feed_entries_of_statement', grantee: 'uts_app' },
       { routine: 'finish_notice', grantee: 'uts_app' },
       { routine: 'grant_third_party_consent', grantee: 'uts_app' },
@@ -718,6 +721,8 @@ describe('functions', () => {
       { routine: 'list_bot_keys', grantee: 'uts_app' },
       { routine: 'list_pats', grantee: 'uts_app' },
       { routine: 'list_third_party_consents', grantee: 'uts_app' },
+      { routine: 'live_feed_entries', grantee: 'uts_app' },
+      { routine: 'live_feed_entries_of_refresh_token', grantee: 'uts_app' },
       { routine: 'lookup_bot_key', grantee: 'uts_pat' },
       { routine: 'lookup_pat', grantee: 'uts_pat' },
       { routine: 'maintain_attestation_rows', grantee: 'uts_app' },
@@ -727,7 +732,9 @@ describe('functions', () => {
       { routine: 'maintain_provider_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_subject_operation_rows', grantee: 'uts_app' },
+      { routine: 'maintain_third_party_client_rows', grantee: 'uts_app' },
       { routine: 'mint_web_session_token', grantee: 'uts_app' },
+      { routine: 'open_browser_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'read_app_account_events', grantee: 'uts_app' },
       { routine: 'read_browser_session', grantee: 'uts_app' },
@@ -744,6 +751,7 @@ describe('functions', () => {
       { routine: 'revoke_pat', grantee: 'uts_app' },
       { routine: 'revoke_refresh_token', grantee: 'uts_app' },
       { routine: 'revoke_web_device', grantee: 'uts_app' },
+      { routine: 'save_third_party_client', grantee: 'uts_app' },
       { routine: 'settle_code_attestation', grantee: 'uts_app' },
       { routine: 'sso_app_organization', grantee: 'uts_app' },
       { routine: 'start_email_sign_in', grantee: 'uts_app' },

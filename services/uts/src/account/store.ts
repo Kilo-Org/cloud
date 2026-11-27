@@ -32,10 +32,18 @@ export type CreatedCredential = { id: string; createdAt: Date; expiresAt: Date }
 /**
  * `gate_required`: no sign-in and no passkey step-up within 10 minutes (design 5.11).
  * `org_denied`: the PAT names an organization the caller cannot act in.
+ * `rate_limited`: the account created 20 PATs in the last hour (migration 0019).
  */
 export type CreatePatResult =
   | ({ outcome: 'created' } & CreatedCredential)
-  | { outcome: 'invalid_session' | 'gate_required' | 'org_denied' | 'limit_reached' };
+  | {
+      outcome:
+        | 'invalid_session'
+        | 'gate_required'
+        | 'org_denied'
+        | 'limit_reached'
+        | 'rate_limited';
+    };
 
 export type ListPatsResult =
   | { outcome: 'listed'; pats: PatSummary[] }
@@ -61,7 +69,14 @@ export type CreateBotKeyInput = OrgSession & {
 };
 export type CreateBotKeyResult =
   | ({ outcome: 'created' } & CreatedCredential)
-  | { outcome: 'invalid_session' | 'gate_required' | 'not_org_admin' | 'limit_reached' };
+  | {
+      outcome:
+        | 'invalid_session'
+        | 'gate_required'
+        | 'not_org_admin'
+        | 'limit_reached'
+        | 'rate_limited';
+    };
 
 export type ListBotKeysResult =
   | { outcome: 'listed'; botKeys: BotKeySummary[] }
@@ -138,7 +153,7 @@ const CreatePatRowSchema = z.discriminatedUnion('outcome', [
     pat_created_at: z.date(),
     pat_expires_at: z.date(),
   }),
-  failure(['invalid_session', 'gate_required', 'org_denied', 'limit_reached']),
+  failure(['invalid_session', 'gate_required', 'org_denied', 'limit_reached', 'rate_limited']),
 ]);
 
 const ListPatsRowSchema = z.discriminatedUnion('outcome', [
@@ -157,11 +172,18 @@ const RevokeBotKeyRowSchema = z.object({
 });
 
 /**
- * The select list of a revoke function: its outcome, and for `revoked` the feed entries the
- * statement wrote (`uts.feed_entries_of_statement()`, migration 0006), read in the same statement.
+ * The select list of a revoke function whose credential has revocation kind `kind` and id in
+ * parameter `$idParameter`: its outcome, and the feed entries to publish, read in the same
+ * statement. For `revoked` they are the entries the statement wrote
+ * (`uts.feed_entries_of_statement()`, migration 0006); for `already_revoked` the credential's
+ * entry while it still lives (`uts.live_feed_entries`, migration 0019), so a retry after a revoke
+ * that no feed object confirmed publishes it again.
  */
-const WITH_FEED_ENTRIES = `result.outcome, CASE WHEN result.outcome = 'revoked'
-  THEN uts.feed_entries_of_statement() ELSE '[]'::jsonb END AS feed_entries`;
+const withFeedEntries = (kind: 'pat' | 'bot_key', idParameter: number) =>
+  `result.outcome, CASE result.outcome
+    WHEN 'revoked' THEN uts.feed_entries_of_statement()
+    WHEN 'already_revoked' THEN uts.live_feed_entries('${kind}', $${idParameter}::text)
+    ELSE '[]'::jsonb END AS feed_entries`;
 
 const CreateBotKeyRowSchema = z.discriminatedUnion('outcome', [
   z.object({
@@ -170,7 +192,7 @@ const CreateBotKeyRowSchema = z.discriminatedUnion('outcome', [
     key_created_at: z.date(),
     key_expires_at: z.date(),
   }),
-  failure(['invalid_session', 'gate_required', 'not_org_admin', 'limit_reached']),
+  failure(['invalid_session', 'gate_required', 'not_org_admin', 'limit_reached', 'rate_limited']),
 ]);
 
 const ListBotKeysRowSchema = z.discriminatedUnion('outcome', [
@@ -239,7 +261,7 @@ export function identityStoreAccount(store: IdentityStore): AccountStore {
 
     async revokePat(input) {
       const row = await one(
-        `SELECT ${WITH_FEED_ENTRIES} FROM uts.revoke_pat($1, $2, $3, $4) AS result`,
+        `SELECT ${withFeedEntries('pat', 4)} FROM uts.revoke_pat($1, $2, $3, $4) AS result`,
         [input.environment, input.accountId, input.grantId, input.patId],
         RevokePatRowSchema
       );
@@ -282,7 +304,7 @@ export function identityStoreAccount(store: IdentityStore): AccountStore {
 
     async revokeBotKey(input) {
       const row = await one(
-        `SELECT ${WITH_FEED_ENTRIES} FROM uts.revoke_bot_key($1, $2, $3, $4, $5) AS result`,
+        `SELECT ${withFeedEntries('bot_key', 5)} FROM uts.revoke_bot_key($1, $2, $3, $4, $5) AS result`,
         [input.environment, input.accountId, input.grantId, input.orgId, input.keyId],
         RevokeBotKeyRowSchema
       );

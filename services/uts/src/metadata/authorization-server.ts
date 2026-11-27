@@ -32,7 +32,7 @@ export function authorizationServerMetadata(
     return { ...base, response_types_supported: [], grant_types_supported: [] };
   }
   const { issuer } = config.endpoints;
-  const device = oauth.deps.device !== null;
+  const device = oauth.deps.device.status === 'served';
   // `kilo-web` answers only where its key set is valid; its legacy bridge only where it is on too.
   const bridge = webClientReady && oauth.deps.web.bridge.status === 'on';
   return {

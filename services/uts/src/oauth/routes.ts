@@ -16,7 +16,7 @@ import {
 } from '@kilocode/uts-contracts';
 import { type AttestationService, attestationService } from '../attest/gate';
 import { attestationAccess } from '../attest/store';
-import { webClientKeys } from '../bff/client-auth';
+import { legacyBridgeKeys, webClientKeys } from '../bff/client-auth';
 import { type WebClientDeps, noSsoAuthority } from '../bff/deps';
 import type { HandleWindows } from '../bff/limits';
 import { handleBrowserSessionRequest } from '../bff/routes';
@@ -40,9 +40,10 @@ import { emailSignIn, platformFetch } from '../signin/email/delivery';
 import { handleEmailRequest } from '../signin/email/routes';
 import { signInChoices } from '../signin/flows';
 import { requestSession, signInHandoff } from '../signin/handoff';
+import { anonymousWriteRetryAfter } from '../signin/limits';
 import { messagePage, passkeysPage, signInPage, unavailablePage } from '../signin/pages';
 import { handlePasskeyOptions, handlePasskeyVerify } from '../signin/passkey/ceremonies';
-import { signInConfigFor } from '../signin/providers/config';
+import { logMisconfigured, signInConfigFor } from '../signin/providers/config';
 import { handleProviderRequest } from '../signin/providers/routes';
 import { providerSignInAccess } from '../signin/providers/store';
 import { signInScript } from '../signin/script';
@@ -65,10 +66,15 @@ import { handleRevoke } from './revoke';
 import { type DeviceCodeGrant, handleToken } from './token-endpoint';
 
 /**
- * The RFC 8628 device grant: its token-endpoint hook and its pages. Served only where the
- * user-code secret is set.
+ * The RFC 8628 device grant: its token-endpoint hook and its pages where the user-code secret is
+ * set (`served`). Where the secret is unset (`off`) or malformed (`misconfigured`) the grant is not
+ * served and every other route works as before.
  */
-export type DeviceService = { grant: DeviceCodeGrant; pages: DeviceDeps };
+export type DeviceService =
+  | { status: 'served'; grant: DeviceCodeGrant; pages: DeviceDeps }
+  | { status: 'off' | 'misconfigured' };
+
+type ServedDevice = Extract<DeviceService, { status: 'served' }>;
 
 /**
  * What an OAuth or sign-in request needs; the runtime tests pass their own stores, `scopes` and
@@ -83,7 +89,7 @@ export type OAuthDeps = {
   /** Writes a committed statement's feed entries to the feed objects (src/revocation/publish.ts). */
   publish: FeedPublish;
   handoff: AuthorizationHandoff;
-  device: DeviceService | null;
+  device: DeviceService;
   signIn: SignInDeps;
   tickets: TicketDeps;
   /** The web BFF `kilo-web`: its token grants and the browser-session API (src/bff/). */
@@ -169,12 +175,13 @@ export function oauthService(
       publish,
       handoff: handoff === null ? signInPages : handoff(signInPages),
       device:
-        secret === null
-          ? null
-          : {
+        secret.status === 'on'
+          ? {
+              status: 'served',
               grant: deviceCodeGrant({ config, sign: signer, scopes }, signIn.signIn),
-              pages: { ...signIn, userCodeSecret: secret },
-            },
+              pages: { ...signIn, userCodeSecret: secret.secret },
+            }
+          : { status: secret.status },
       signIn,
       tickets: { config, tickets: ticketAccess(binding.connectionString, ctx) },
       web: {
@@ -184,10 +191,11 @@ export function oauthService(
         sign: signer,
         scopes,
         publish,
-        // The authority check stays closed until the identity store holds SSO authority data.
+        // The authority check stays closed until the identity store holds SSO authority data. The
+        // bridge verifies only under its own key set, so it also needs `KILO_WEB_BRIDGE_JWKS`.
         bridge:
           env.LEGACY_BRIDGE_ENABLED === 'true'
-            ? { status: 'on', authority: noSsoAuthority }
+            ? { status: 'on', authority: noSsoAuthority, keys: () => legacyBridgeKeys(env) }
             : { status: 'off' },
         windows: handleWindows,
         now: Date.now,
@@ -198,6 +206,7 @@ export function oauthService(
         now: Date.now,
         failures: metadataFailures,
         inFlight: metadataFetches,
+        fetchRetryAfter: address => anonymousWriteRetryAfter(address, 'client_metadata_fetch'),
       }),
       thirdParty,
       exchange:
@@ -240,6 +249,15 @@ async function handleSignedInPage(request: Request, deps: SignInDeps): Promise<R
   }
 }
 
+/**
+ * The device grant for a device page, or null (the page is not served). A malformed secret is
+ * logged once per request that reaches a device page, by name only.
+ */
+function servedDevice(device: DeviceService): ServedDevice | null {
+  if (device.status === 'misconfigured') logMisconfigured('device', ['DEVICE_USER_CODE_KEY']);
+  return device.status === 'served' ? device : null;
+}
+
 /** The response for an endpoint, or null when `pathname` names none that is served. */
 export async function handleOAuthRequest(
   request: Request,
@@ -260,7 +278,7 @@ export async function handleOAuthRequest(
     case UTS_TOKEN_PATH:
       return await handleToken(request, {
         ...deps,
-        deviceCodeGrant: deps.device?.grant ?? null,
+        deviceCodeGrant: deps.device.status === 'served' ? deps.device.grant : null,
         webClient: (tokenRequest, grantType, params) =>
           handleWebClientToken(tokenRequest, grantType, params, deps.web),
       });
@@ -286,14 +304,18 @@ export async function handleOAuthRequest(
       return signInScript();
     case UTS_TICKETS_PATH:
       return await handleTicketIssue(request, deps.tickets);
-    case UTS_DEVICE_AUTHORIZATION_PATH:
-      return deps.device === null
-        ? null
-        : await handleDeviceAuthorization(request, deps.device.pages);
-    case UTS_DEVICE_VERIFICATION_PATH:
-      return deps.device === null ? null : await handleDevicePage(request, deps.device.pages);
-    case UTS_DEVICE_DECISION_PATH:
-      return deps.device === null ? null : await handleDeviceDecision(request, deps.device.pages);
+    case UTS_DEVICE_AUTHORIZATION_PATH: {
+      const device = servedDevice(deps.device);
+      return device === null ? null : await handleDeviceAuthorization(request, device.pages);
+    }
+    case UTS_DEVICE_VERIFICATION_PATH: {
+      const device = servedDevice(deps.device);
+      return device === null ? null : await handleDevicePage(request, device.pages);
+    }
+    case UTS_DEVICE_DECISION_PATH: {
+      const device = servedDevice(deps.device);
+      return device === null ? null : await handleDeviceDecision(request, device.pages);
+    }
     default:
       return await handleBrowserSessionRequest(request, pathname, deps.web);
   }

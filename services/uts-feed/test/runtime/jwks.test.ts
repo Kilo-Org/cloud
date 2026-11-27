@@ -96,11 +96,15 @@ const failedAnswer = (status: 'misconfigured' | 'unavailable') =>
   answered(Array.from({ length: UTS_SIGNER_COUNT }, (_, signer) => ({ signer, status })));
 
 /** A mint Worker binding whose `signerKeys()` answers `answer`, counting its calls. */
-function mintBinding(answer: () => Promise<MintResult>): SignerKeysBinding & { calls: number } {
+function mintBinding(
+  answer: () => Promise<MintResult>
+): SignerKeysBinding & { calls: number; requests: unknown[] } {
   const fake = {
     calls: 0,
-    signerKeys: async (): Promise<MintResult> => {
+    requests: [] as unknown[],
+    signerKeys: async (request?: unknown): Promise<MintResult> => {
       fake.calls += 1;
+      fake.requests.push(request);
       return await answer();
     },
   };
@@ -197,6 +201,12 @@ describe('key set endpoint', () => {
       ...feedEntry(0).keys.map(key => key.kid),
       ...feedEntry(1).keys.map(key => key.kid),
     ]);
+  });
+
+  it("asks the mint Worker for the feed objects' keys, which a mint Worker of the previous release leaves out", async () => {
+    const mint = mintBinding(async () => okAnswer());
+    expect((await get(mint, T0)).status).toBe(200);
+    expect(mint.requests).toEqual([{ feeds: true }]);
   });
 
   it('answers 404 to other paths and 405 to other methods without a read', async () => {

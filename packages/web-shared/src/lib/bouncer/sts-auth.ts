@@ -2,72 +2,93 @@ import 'server-only';
 import {
   BouncerStsConfigError,
   type BouncerScope,
-  type BouncerTokenRead,
+  type BouncerTransport,
 } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { waitUntil } from '@vercel/functions';
 
 /**
  * The STS service tokens the shared Bouncer client sends (Bouncer STS integration design 3.1).
  *
- * `apps/web` and `apps/ai-gateway` install one `BouncerAuth` from `instrumentation.ts`. Every call
- * then names its caller in `x-kilo-caller` (`kilocode-app` or `kilocode-ai-gateway`, the names
- * Bouncer counts legacy calls by). With `BOUNCER_STS_TOKENS=on` the call also carries
- * `Authorization: Bearer <STS token>` for the route's scope, next to the unchanged
- * `x-internal-api-key`: Bouncer's `legacy` mode ignores the bearer and its `dual` mode verifies it.
- * Scripts and tests install nothing, so they send neither header.
+ * `apps/web` and `apps/ai-gateway` install one `BouncerAuth` from `instrumentation.ts`, each with
+ * the Bouncer scopes its STS policy grants. Every call then names its caller in `x-kilo-caller`.
+ * With `BOUNCER_STS_TOKENS=on` the call also carries `Authorization: Bearer <STS token>` for the
+ * route's scope, next to the unchanged `x-internal-api-key`: Bouncer's `legacy` mode ignores the
+ * bearer and its `dual` mode verifies it. Scripts and tests install nothing, so they send neither.
  *
- * Budgets: the token client keeps each token in memory and renews it in the background at 80 % of
- * its lifetime, so a warm instance reads it with no network call. An admission call
- * (`bouncer:decide`, `bouncer:signup.decide`) waits at most `BOUNCER_TOKEN_WAIT_MS` for a token it
- * does not hold, and never past the call's own deadline (`signal`), which also bounds the request
- * that follows, so the wait never lengthens the call. A write (`bouncer:usage.write`), whose
- * durable outbox retries it, never waits. A call without a token proceeds with the legacy key
- * alone and is counted, and so is a call that sends one. After `BOUNCER_BREAKER_THRESHOLD`
- * consecutive admission waits that ran out, the wait drops to 0 until a mint succeeds. The mint
- * keeps running under the request's `waitUntil` after a call stops waiting for it.
+ * Tokens: the token client keeps each token in memory; a read after 80 % of a token's lifetime
+ * starts its renewal in the background. Every call reads all of the app's granted scopes (the
+ * route's own, plus the others in the background), so a rarely used scope is renewed by the
+ * traffic of the others and only an instance without any Bouncer call for most of a token's
+ * lifetime has to mint again.
+ *
+ * Budgets: a call whose route waits (decide, charge-decide, signup-decide) waits at most
+ * `BOUNCER_TOKEN_WAIT_MS` for a token it does not hold, out of the call's own deadline, and only
+ * when the deployment's exchanged Vercel token is already held, so the mint is one STS call. A
+ * deployment's first calls, before that exchange, wait 0 (`exchange_pending`). Every other route
+ * never waits. A call without a token proceeds with the legacy key alone. Each mint that does not
+ * answer within a wait counts once toward the breaker; after `BOUNCER_BREAKER_THRESHOLD` such
+ * mints in a row the wait drops to 0 until a read that waited for a mint gets its token. After
+ * Bouncer answers 401 to a call that carried a scope's token, that scope's token is held back for
+ * `BOUNCER_REJECTED_HOLD_MS`.
  *
  * This module stays light: the token client, the Vercel OIDC exchange and the Runtime Cache load
  * on the first call with the flag on (`sts-token-transport.ts`).
  */
 
-/** The `x-kilo-caller` names, the STS workload names of design 5 that Bouncer counts. */
+/**
+ * The `x-kilo-caller` values: the labels Bouncer's legacy-call counters accept (`KNOWN_CALLERS` in
+ * Kilo-Org/bouncer `src/api-auth.ts`). They are counting labels, not STS workload names: Bouncer
+ * attributes a call that carries a token by the token's `sub` (`service:web`, `service:ai-gateway`).
+ */
 export type BouncerCaller = 'kilocode-app' | 'kilocode-ai-gateway';
 
 /** The headers one Bouncer call adds besides `content-type` and `x-internal-api-key`. */
 export type BouncerAuthHeaders = Readonly<Record<string, string>>;
 
-/** The headers for one call; `signal` is the call's deadline, which ends the token wait too. */
-export type BouncerAuth = (
-  scope: BouncerScope,
-  signal?: AbortSignal
-) => Promise<BouncerAuthHeaders>;
+/**
+ * One call: its scope, whether its route waits for a token it does not hold, and the call's
+ * deadline, which also ends the wait.
+ */
+export type BouncerAuthCall = { scope: BouncerScope; wait: boolean; signal?: AbortSignal };
+
+export type BouncerAuth = {
+  headers(call: BouncerAuthCall): Promise<BouncerAuthHeaders>;
+  /** Bouncer answered 401 to a call that carried this scope's token. */
+  rejected(scope: BouncerScope): void;
+};
 
 /** Design 3.1: a caller reads its token within 250 ms of its own. */
 export const BOUNCER_TOKEN_WAIT_MS = 250;
-/** Design 3.1: consecutive admission waits that ran out before the breaker sets the wait to 0. */
+/** Design 3.1: mints in a row that did not answer within a wait before the breaker opens. */
 export const BOUNCER_BREAKER_THRESHOLD = 10;
+/** How long a scope's token is held back after Bouncer refused it. */
+export const BOUNCER_REJECTED_HOLD_MS = 60_000;
 /**
- * One `bouncer_sts_token_missed` line per reason and scope, and one `bouncer_sts_token_attached`
- * line per scope, per this interval and instance, each with the count since the previous line.
+ * One `bouncer_sts_tokens` line per instance per this interval, with every count since the
+ * previous line. It is written by the first call after the interval ends, so an idle instance
+ * writes nothing.
  */
 export const BOUNCER_COUNT_LOG_INTERVAL_MS = 60_000;
 
-const ADMISSION_SCOPES: Readonly<Record<BouncerScope, boolean>> = {
-  'bouncer:decide': true,
-  'bouncer:signup.decide': true,
-  'bouncer:usage.write': false,
-};
-
 /**
- * Why a call went without a token. `timeout`: an admission wait ran out; `breaker_open`: the
- * breaker skipped the wait; `not_held`: a write found no fresh token and never waits; `denied` and
- * `unavailable`: the token client's answer; `load`: the transport did not load; `config`: the flag
- * or the deployment's STS settings are invalid.
+ * Why a call went without a token.
+ * - `timeout`: a wait ran out while a mint was running.
+ * - `breaker_open`: the breaker skipped the wait.
+ * - `exchange_pending`: the deployment's exchanged Vercel token is not held yet, so no wait.
+ * - `not_held`: the route never waits and no fresh token was held.
+ * - `aborted`: the call's own deadline or its caller ended the wait.
+ * - `rejected`: Bouncer refused this scope's token within the hold.
+ * - `denied`, `unavailable`: the token client's answer.
+ * - `load`: the transport did not load.
+ * - `config`: the flag, the deployment's STS settings, or a scope the app is not granted.
  */
 export type BouncerTokenMissReason =
   | 'timeout'
   | 'breaker_open'
+  | 'exchange_pending'
   | 'not_held'
+  | 'aborted'
+  | 'rejected'
   | 'denied'
   | 'unavailable'
   | 'load'
@@ -84,31 +105,29 @@ export function bouncerStsTokensEnabled(value: string | undefined): boolean | 'i
   return 'invalid';
 }
 
-const SETTLED = Symbol('settled');
-
-type Raced = { token: string } | { error: unknown } | typeof SETTLED;
+type Raced<T> = { value: T } | { error: unknown } | 'waited' | 'aborted';
 
 /**
- * `promise`, or `SETTLED` once `ms` passes or `signal` aborts first; a held token wins a 0 ms
- * race.
+ * `promise`, or `waited` once `ms` passes, or `aborted` once `signal` aborts, whichever is first. A
+ * value already settled wins a 0 ms race.
  */
-async function within(promise: Promise<string>, ms: number, signal?: AbortSignal): Promise<Raced> {
-  const timer = Promise.withResolvers<typeof SETTLED>();
-  const settle = () => timer.resolve(SETTLED);
-  const handle = setTimeout(settle, ms);
-  if (signal?.aborted) settle();
-  signal?.addEventListener('abort', settle, { once: true });
+async function race<T>(promise: Promise<T>, ms: number, signal?: AbortSignal): Promise<Raced<T>> {
+  const timer = Promise.withResolvers<'waited' | 'aborted'>();
+  const abort = () => timer.resolve('aborted');
+  const handle = setTimeout(() => timer.resolve('waited'), Math.max(0, ms));
+  if (signal?.aborted) abort();
+  signal?.addEventListener('abort', abort, { once: true });
   try {
     return await Promise.race([
       promise.then(
-        token => ({ token }),
+        value => ({ value }),
         (error: unknown) => ({ error })
       ),
       timer.promise,
     ]);
   } finally {
     clearTimeout(handle);
-    signal?.removeEventListener('abort', settle);
+    signal?.removeEventListener('abort', abort);
   }
 }
 
@@ -130,92 +149,172 @@ function missReasonOf(error: unknown): BouncerTokenMissReason {
 
 export type BouncerAuthOptions = {
   caller: BouncerCaller;
+  /** The Bouncer scopes the app's STS policy grants; no other scope is ever read. */
+  scopes: readonly BouncerScope[];
   /** The flag's current value; read on every call. */
   flag: () => string | undefined;
-  /** Loads the token client once; a rejection marks a `load` (or `config`) miss and is retried. */
-  loadTokens: () => Promise<BouncerTokenRead>;
+  /** Loads the transport once; a rejection marks a `load` (or `config`) miss and is retried. */
+  loadTransport: () => Promise<BouncerTransport>;
   waitUntil: (promise: Promise<unknown>) => void;
   now?: () => number;
-  log?: (line: string) => void;
+  log?: (line: string, level: 'info' | 'warn') => void;
 };
 
 export function createBouncerAuth(options: BouncerAuthOptions): BouncerAuth {
   const now = options.now ?? Date.now;
-  const log = options.log ?? (line => console.warn(line));
+  const log =
+    options.log ?? ((line, level) => (level === 'warn' ? console.warn(line) : console.info(line)));
   const callerHeaders: BouncerAuthHeaders = { 'x-kilo-caller': options.caller };
-  let loading: Promise<BouncerTokenRead> | null = null;
+  const ctx = { waitUntil: options.waitUntil };
+  let loading: Promise<BouncerTransport> | null = null;
+  /** Mints in a row that did not answer within a wait. */
   let timeouts = 0;
-  const counts = new Map<string, { count: number; loggedAt: number | null }>();
+  /** The read whose running mint already counted toward the breaker. */
+  let countedMint: Promise<string> | null = null;
+  /** The read handed to `waitUntil` to keep the running mint alive past the response. */
+  let heldMint: Promise<string> | null = null;
+  const rejectedUntil = new Map<BouncerScope, number>();
+  let attached: Record<string, number> = {};
+  let missed: Record<string, Record<string, number>> = {};
+  let flushedAt: number | null = null;
 
-  function load(): Promise<BouncerTokenRead> {
-    loading ??= options.loadTokens().catch((error: unknown) => {
+  function load(): Promise<BouncerTransport> {
+    loading ??= options.loadTransport().catch((error: unknown) => {
       loading = null;
       throw error instanceof BouncerStsConfigError ? error : new BouncerTransportLoadError(error);
     });
     return loading;
   }
 
-  /**
-   * Counts one call under `event` and `fields`; logs it with the count since the last line, once
-   * per interval per event and fields. The fields are fixed names, never a token or error text.
-   */
-  function count(event: string, fields: Readonly<Record<string, string>>): void {
-    const key = JSON.stringify([event, fields]);
-    const entry = counts.get(key) ?? { count: 0, loggedAt: null };
-    entry.count += 1;
+  /** Writes the counts when the interval has ended; the first count of the instance writes too. */
+  function flushIfDue(): void {
     const at = now();
-    if (entry.loggedAt === null || at - entry.loggedAt >= BOUNCER_COUNT_LOG_INTERVAL_MS) {
-      log(JSON.stringify({ event, caller: options.caller, ...fields, count: entry.count }));
-      entry.count = 0;
-      entry.loggedAt = at;
+    if (flushedAt !== null && at - flushedAt < BOUNCER_COUNT_LOG_INTERVAL_MS) return;
+    log(
+      JSON.stringify({ event: 'bouncer_sts_tokens', caller: options.caller, attached, missed }),
+      'info'
+    );
+    attached = {};
+    missed = {};
+    flushedAt = at;
+  }
+
+  function attach(scope: BouncerScope, token: string): BouncerAuthHeaders {
+    attached[scope] = (attached[scope] ?? 0) + 1;
+    flushIfDue();
+    return { ...callerHeaders, authorization: `Bearer ${token}` };
+  }
+
+  function miss(reason: BouncerTokenMissReason, scope: BouncerScope): BouncerAuthHeaders {
+    const byReason = (missed[scope] ??= {});
+    byReason[reason] = (byReason[reason] ?? 0) + 1;
+    flushIfDue();
+    return callerHeaders;
+  }
+
+  /** Keeps a running mint alive past the response: one read per mint, not one per waiting call. */
+  function holdMint(reading: Promise<string>): void {
+    if (heldMint !== null) return;
+    heldMint = reading;
+    const release = () => {
+      if (heldMint === reading) heldMint = null;
+    };
+    options.waitUntil(reading.then(release, release));
+  }
+
+  /** Counts a wait that ran out toward the breaker, once per running mint. */
+  function timedOut(reading: Promise<string>): void {
+    if (countedMint !== null) return;
+    countedMint = reading;
+    const release = () => {
+      if (countedMint === reading) countedMint = null;
+    };
+    void reading.then(release, release);
+    timeouts += 1;
+    if (timeouts === BOUNCER_BREAKER_THRESHOLD) {
+      log(JSON.stringify({ event: 'bouncer_sts_breaker_open', caller: options.caller }), 'warn');
     }
-    counts.set(key, entry);
   }
 
-  function miss(reason: BouncerTokenMissReason, scope: BouncerScope): void {
-    count('bouncer_sts_token_missed', { reason, scope });
-  }
-
-  function succeeded(): void {
+  /** A read that waited for a mint got its token: the mint path works again. */
+  function mintSucceeded(): void {
     if (timeouts >= BOUNCER_BREAKER_THRESHOLD) {
-      log(JSON.stringify({ event: 'bouncer_sts_breaker_closed', caller: options.caller }));
+      log(JSON.stringify({ event: 'bouncer_sts_breaker_closed', caller: options.caller }), 'warn');
     }
     timeouts = 0;
   }
 
-  return async (scope, signal) => {
-    const enabled = bouncerStsTokensEnabled(options.flag());
-    if (enabled === 'invalid') miss('config', scope);
-    if (enabled !== true) return callerHeaders;
-
-    const admission = ADMISSION_SCOPES[scope];
-    const breakerOpen = timeouts >= BOUNCER_BREAKER_THRESHOLD;
-    const waitMs = admission && !breakerOpen ? BOUNCER_TOKEN_WAIT_MS : 0;
-    const ctx = { waitUntil: options.waitUntil };
-    const reading = load().then(read => read({ audience: 'bouncer', scope }, ctx));
-    void reading.then(succeeded, () => undefined);
-
-    const raced = await within(reading, waitMs, signal);
-    if (raced === SETTLED) {
-      // The mint runs on past the response; the next call finds its token.
+  /** Reads the app's other granted scopes in the background, so their renewals start too. */
+  function warmSiblings(transport: Promise<BouncerTransport>, scope: BouncerScope): void {
+    for (const other of options.scopes) {
+      if (other === scope) continue;
+      const reading = transport.then(t => t.read({ audience: 'bouncer', scope: other }, ctx));
       options.waitUntil(reading.catch(() => undefined));
-      if (waitMs > 0) {
-        timeouts += 1;
-        if (timeouts === BOUNCER_BREAKER_THRESHOLD) {
-          log(JSON.stringify({ event: 'bouncer_sts_breaker_open', caller: options.caller }));
-        }
-        miss('timeout', scope);
-      } else {
-        miss(admission ? 'breaker_open' : 'not_held', scope);
+    }
+  }
+
+  return {
+    rejected(scope) {
+      if (!options.scopes.includes(scope)) return;
+      const held = (rejectedUntil.get(scope) ?? 0) > now();
+      rejectedUntil.set(scope, now() + BOUNCER_REJECTED_HOLD_MS);
+      if (!held) {
+        log(
+          JSON.stringify({ event: 'bouncer_sts_token_rejected', caller: options.caller, scope }),
+          'warn'
+        );
       }
-      return callerHeaders;
-    }
-    if ('error' in raced) {
-      miss(missReasonOf(raced.error), scope);
-      return callerHeaders;
-    }
-    count('bouncer_sts_token_attached', { scope });
-    return { ...callerHeaders, authorization: `Bearer ${raced.token}` };
+    },
+
+    async headers({ scope, wait, signal }) {
+      const enabled = bouncerStsTokensEnabled(options.flag());
+      if (enabled === 'invalid') return miss('config', scope);
+      if (enabled !== true) return callerHeaders;
+      if (!options.scopes.includes(scope)) return miss('config', scope);
+      // The whole wait, the held check and the readiness check included, counts from here.
+      const started = now();
+      const transport = load();
+      // Settled by the read below or by `warmSiblings`; the rejection reaches the caller there.
+      void transport.catch(() => undefined);
+      const reading = transport.then(t => t.read({ audience: 'bouncer', scope }, ctx));
+      warmSiblings(transport, scope);
+      if ((rejectedUntil.get(scope) ?? 0) > now()) {
+        void reading.catch(() => undefined);
+        return miss('rejected', scope);
+      }
+
+      const held = await race(reading, 0, signal);
+      if (held === 'aborted') return miss('aborted', scope);
+      if (held !== 'waited') {
+        return 'value' in held ? attach(scope, held.value) : miss(missReasonOf(held.error), scope);
+      }
+
+      // No fresh token: a mint is running. Keep it alive, and let its success close the breaker.
+      holdMint(reading);
+      void reading.then(mintSucceeded, () => undefined);
+      if (!wait) return miss('not_held', scope);
+      if (timeouts >= BOUNCER_BREAKER_THRESHOLD) return miss('breaker_open', scope);
+
+      const ready = await race(
+        transport.then(t => t.exchangeReady()),
+        BOUNCER_TOKEN_WAIT_MS - (now() - started),
+        signal
+      );
+      if (ready === 'aborted') return miss('aborted', scope);
+      if (ready === 'waited' || !('value' in ready) || !ready.value) {
+        return miss('exchange_pending', scope);
+      }
+
+      const minted = await race(reading, BOUNCER_TOKEN_WAIT_MS - (now() - started), signal);
+      if (minted === 'aborted') return miss('aborted', scope);
+      if (minted === 'waited') {
+        timedOut(reading);
+        return miss('timeout', scope);
+      }
+      return 'value' in minted
+        ? attach(scope, minted.value)
+        : miss(missReasonOf(minted.error), scope);
+    },
   };
 }
 
@@ -226,30 +325,33 @@ declare global {
 }
 
 /**
- * Installs the auth for `caller`; called once from the `instrumentation.ts` of `apps/web` and
- * `apps/ai-gateway`. Installing builds and loads nothing: the flag is read on every call, and the
- * transport loads on the first call with the flag on.
+ * Installs the auth for `caller` and the Bouncer scopes its STS policy grants; called once from
+ * the `instrumentation.ts` of `apps/web` and `apps/ai-gateway`. Installing builds and loads
+ * nothing: the flag is read on every call, and the transport loads on the first call with it on.
  */
-export function installBouncerAuth(caller: BouncerCaller): void {
+export function installBouncerAuth(caller: BouncerCaller, scopes: readonly BouncerScope[]): void {
   globalThis.__kilocodeBouncerAuth = createBouncerAuth({
     caller,
+    scopes,
     flag: () => process.env.BOUNCER_STS_TOKENS,
-    loadTokens: async () => {
+    loadTransport: async () => {
       // Lazy on purpose, as `sts-secret-reader.ts` does: a deployment with the flag off never loads
       // the token client, the Vercel OIDC exchange or the Runtime Cache.
-      const { createBouncerTokenRead } =
+      const { createBouncerTransport } =
         await import('@kilocode/web-shared/lib/bouncer/sts-token-transport');
-      return createBouncerTokenRead();
+      return createBouncerTransport();
     },
     waitUntil,
   });
 }
 
 /** The installed auth's headers for one call; none in a process that installed nothing. */
-export async function bouncerAuthHeaders(
-  scope: BouncerScope,
-  signal?: AbortSignal
-): Promise<BouncerAuthHeaders> {
+export async function bouncerAuthHeaders(call: BouncerAuthCall): Promise<BouncerAuthHeaders> {
   const auth = globalThis.__kilocodeBouncerAuth;
-  return auth === undefined ? {} : auth(scope, signal);
+  return auth === undefined ? {} : auth.headers(call);
+}
+
+/** Reports Bouncer's 401 to a call that carried this scope's token; a no-op without an auth. */
+export function bouncerAuthRejected(scope: BouncerScope): void {
+  globalThis.__kilocodeBouncerAuth?.rejected(scope);
 }

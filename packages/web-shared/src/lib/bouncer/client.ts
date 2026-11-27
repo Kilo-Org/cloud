@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 
 import * as z from 'zod';
 
-import { bouncerAuthHeaders } from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import { bouncerAuthHeaders, bouncerAuthRejected } from '@kilocode/web-shared/lib/bouncer/sts-auth';
 import type { BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
@@ -468,8 +468,10 @@ type PostResult =
  * rule accepted instead of from concatenation. A configured endpoint that carries a trailing
  * separator therefore still reaches the worker's own path, and a value outside the rule, or a
  * missing key, is `unconfigured` and sends nothing. The STS headers are read within the call's
- * own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`, `sts-auth.ts`)
- * and the request, so the call never takes longer than `timeoutMs`; that read never fails.
+ * own deadline: one signal bounds the token wait (at most `BOUNCER_TOKEN_WAIT_MS`, `sts-auth.ts`,
+ * and only on a route that waits) and the request, so the call never takes longer than
+ * `timeoutMs`; that read never fails. A 401 to a call that carried a token is reported, so the
+ * auth holds that scope's token back for a while.
  */
 async function postWithResult(
   path: BouncerApiPath,
@@ -488,7 +490,8 @@ async function postWithResult(
   if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
   const timeout = AbortSignal.timeout(timeoutMs);
   const deadline = signal ? AbortSignal.any([timeout, signal]) : timeout;
-  const auth = await bouncerAuthHeaders(BOUNCER_PATH_SCOPES[path], deadline);
+  const { scope, wait } = BOUNCER_ROUTES[path];
+  const auth = await bouncerAuthHeaders({ scope, wait, signal: deadline });
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -505,6 +508,7 @@ async function postWithResult(
       redirect: 'manual',
     });
     if (!response.ok) {
+      if (response.status === 401 && auth.authorization !== undefined) bouncerAuthRejected(scope);
       return {
         ok: false,
         kind: 'failed',
@@ -578,14 +582,18 @@ type BouncerApiPath =
   | typeof SIGNUP_DECIDE_PATH
   | typeof RELEASE_PATH;
 
-/** The STS scope Bouncer requires on each route (`ROUTE_SCOPES` in bouncer's `src/api-auth.ts`). */
-const BOUNCER_PATH_SCOPES: Readonly<Record<BouncerApiPath, BouncerScope>> = {
-  [CREDIT_EVENT_PATH]: 'bouncer:usage.write',
-  [USAGE_EVENT_PATH]: 'bouncer:usage.write',
-  [DECIDE_PATH]: 'bouncer:decide',
-  [CHARGE_DECIDE_PATH]: 'bouncer:decide',
-  [SIGNUP_DECIDE_PATH]: 'bouncer:signup.decide',
-  [RELEASE_PATH]: 'bouncer:decide',
+/**
+ * The STS scope Bouncer requires on each route (`ROUTE_SCOPES` in bouncer's `src/api-auth.ts`),
+ * and whether the route waits for a token it does not hold: the admission calls do, while release
+ * (after the response) and the usage and credit events (whose outboxes retry) never wait.
+ */
+const BOUNCER_ROUTES: Readonly<Record<BouncerApiPath, { scope: BouncerScope; wait: boolean }>> = {
+  [CREDIT_EVENT_PATH]: { scope: 'bouncer:usage.write', wait: false },
+  [USAGE_EVENT_PATH]: { scope: 'bouncer:usage.write', wait: false },
+  [DECIDE_PATH]: { scope: 'bouncer:decide', wait: true },
+  [CHARGE_DECIDE_PATH]: { scope: 'bouncer:decide', wait: true },
+  [SIGNUP_DECIDE_PATH]: { scope: 'bouncer:signup.decide', wait: true },
+  [RELEASE_PATH]: { scope: 'bouncer:decide', wait: false },
 };
 
 const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {

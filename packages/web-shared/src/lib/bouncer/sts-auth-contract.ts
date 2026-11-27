@@ -13,6 +13,16 @@ export type BouncerTokenRead = (
   ctx: { waitUntil(promise: Promise<unknown>): void }
 ) => Promise<string>;
 
+/**
+ * What the lazily loaded transport gives the auth: the token read, and whether the deployment's
+ * exchanged Vercel token is already held (instance memory or the shared Runtime Cache), so a mint
+ * now takes one STS call and no Vercel exchange. Readiness never exchanges or writes anything.
+ */
+export type BouncerTransport = {
+  read: BouncerTokenRead;
+  exchangeReady(): Promise<boolean>;
+};
+
 /** A deployment whose STS settings cannot mint Bouncer tokens: no STS environment, a wrong issuer. */
 export class BouncerStsConfigError extends Error {
   constructor(message: string) {

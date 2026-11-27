@@ -13,7 +13,7 @@ import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
 import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { BOUNCER_TOKEN_WAIT_MS, createBouncerAuth } from './sts-auth';
+import { BOUNCER_TOKEN_WAIT_MS, createBouncerAuth, type BouncerAuth } from './sts-auth';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id, so the client
 // is loaded after the config mock is registered (same convention as the store-completion tests).
@@ -758,21 +758,22 @@ describe('parseBouncerCreditEventBody ja4', () => {
 });
 
 describe('STS headers from the installed Bouncer auth', () => {
-  const installedAuth =
-    jest.fn<(scope: string, signal?: AbortSignal) => Promise<Record<string, string>>>();
+  const headersOf = jest.fn<BouncerAuth['headers']>();
+  const rejected = jest.fn<BouncerAuth['rejected']>();
 
   beforeEach(() => {
-    installedAuth.mockImplementation(async scope => ({
+    headersOf.mockImplementation(async ({ scope }) => ({
       'x-kilo-caller': 'kilocode-app',
       authorization: `Bearer token-for-${scope}`,
     }));
-    globalThis.__kilocodeBouncerAuth = installedAuth;
+    globalThis.__kilocodeBouncerAuth = { headers: headersOf, rejected };
     mockFetch.mockResolvedValue(Response.json({ enforced: false, spendWatch: false, flags: [] }));
   });
 
   afterEach(() => {
     globalThis.__kilocodeBouncerAuth = undefined;
-    installedAuth.mockReset();
+    headersOf.mockReset();
+    rejected.mockReset();
   });
 
   function sent(): { path: string; headers: Headers } {
@@ -786,6 +787,7 @@ describe('STS headers from the installed Bouncer auth', () => {
       () => decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 }),
       '/api/v1/decide',
       'bouncer:decide',
+      true,
     ],
     [
       'charge-decide',
@@ -799,12 +801,14 @@ describe('STS headers from the installed Bouncer auth', () => {
         }),
       '/api/v1/charge-decide',
       'bouncer:decide',
+      true,
     ],
     [
       'release',
       () => releaseDecideLease({ requestId: 'r', accountId: 'user:u' }),
       '/api/v1/release',
       'bouncer:decide',
+      false,
     ],
     [
       'usage-event',
@@ -821,24 +825,27 @@ describe('STS headers from the installed Bouncer auth', () => {
         }),
       '/api/v1/usage-event',
       'bouncer:usage.write',
+      false,
     ],
     [
       'credit-event',
       () => deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-sts', userId: 'user-1' }),
       '/api/v2/credit-event',
       'bouncer:usage.write',
+      false,
     ],
     [
       'signup-decide',
       () => signupDecide({ operationId: 'signup:operation-1', ip: '203.0.113.7' }),
       '/api/v1/signup-decide',
       'bouncer:signup.decide',
+      true,
     ],
   ] as const)(
-    '%s asks for %s and sends it with the legacy key',
-    async (_name, call, path, scope) => {
+    '%s asks for %s (waits: %s) and sends it with the legacy key',
+    async (_name, call, path, scope, wait) => {
       await call();
-      expect(installedAuth).toHaveBeenCalledWith(scope, expect.any(AbortSignal));
+      expect(headersOf).toHaveBeenCalledWith({ scope, wait, signal: expect.any(AbortSignal) });
       const { path: sentPath, headers } = sent();
       expect(sentPath).toBe(path);
       expect(headers.get('authorization')).toBe(`Bearer token-for-${scope}`);
@@ -857,10 +864,29 @@ describe('STS headers from the installed Bouncer auth', () => {
     expect(headers.get('x-internal-api-key')).toBe('test-internal-secret');
   });
 
+  it('reports a 401 to a call that carried a token, and only then', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+    await expect(
+      decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 })
+    ).resolves.toBeNull();
+    expect(rejected).toHaveBeenCalledWith('bouncer:decide');
+
+    rejected.mockClear();
+    headersOf.mockResolvedValue({ 'x-kilo-caller': 'kilocode-app' });
+    mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+    await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
+    expect(rejected).not.toHaveBeenCalled();
+
+    mockFetch.mockResolvedValue(new Response(null, { status: 403 }));
+    headersOf.mockResolvedValue({ authorization: 'Bearer t' });
+    await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
+    expect(rejected).not.toHaveBeenCalled();
+  });
+
   it('asks for no token when the endpoint is unconfigured', async () => {
     mockConfigState.bouncerUrl = null;
     await decide({ requestId: 'r', tier: 'anonymous', ip: '203.0.113.7' }, { timeoutMs: 1000 });
-    expect(installedAuth).not.toHaveBeenCalled();
+    expect(headersOf).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
@@ -877,9 +903,13 @@ describe('a decide whose STS mint hangs', () => {
     });
     globalThis.__kilocodeBouncerAuth = createBouncerAuth({
       caller: 'kilocode-ai-gateway',
+      scopes: ['bouncer:decide', 'bouncer:usage.write'],
       flag: () => 'on',
-      // The mint never answers.
-      loadTokens: async () => async () => await Promise.withResolvers<string>().promise,
+      // The exchanged Vercel token is held, but the mint never answers.
+      loadTransport: async () => ({
+        read: async () => await Promise.withResolvers<string>().promise,
+        exchangeReady: async () => true,
+      }),
       waitUntil: () => undefined,
       log: () => undefined,
     });

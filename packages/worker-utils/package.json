@@ -77,6 +77,7 @@
     "./github-authorization": "./src/github-authorization.ts",
     "./pr-observations": "./src/pr-observations.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
+    "./usage-id": "./src/usage-id.ts",
     "./usage-writer-client": "./src/usage-writer-client.ts",
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
@@ -104,6 +105,7 @@
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
+    "uuid": "11.1.1",
     "zod": "catalog:",
     "@cfworker/json-schema": "catalog:"
   },

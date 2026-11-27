@@ -17,7 +17,12 @@ function headersOfCall(index: number): Headers {
 }
 
 async function graderUsage(): Promise<UsageRecordRequest> {
-  return buildGraderUsage({ userId: 'user-1', organizationId: null }, ['case-a', 1], 0.002, createdAt);
+  return buildGraderUsage(
+    { userId: 'user-1', organizationId: null },
+    ['case-a', 1],
+    0.002,
+    createdAt
+  );
 }
 
 beforeEach(() => {

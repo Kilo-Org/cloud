@@ -73,9 +73,7 @@ export async function webInternalSenderCredential(
   target: ServiceTokenRequest,
   options: WebInternalSenderOptions
 ): Promise<WebInternalSenderCredential> {
-  const mode = webInternalSenderMode(
-    'auth' in options ? options.auth : WEB_INTERNAL_SENDER_AUTH
-  );
+  const mode = webInternalSenderMode('auth' in options ? options.auth : WEB_INTERNAL_SENDER_AUTH);
   if (mode === null) return unavailable(target, 'auth_misconfigured');
   if (mode === 'legacy') {
     const secret = await options.legacySecret();

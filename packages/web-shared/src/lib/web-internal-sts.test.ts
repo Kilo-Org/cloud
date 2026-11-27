@@ -113,7 +113,10 @@ describe('webInternalSenderCredential', () => {
       })
     ).resolves.toEqual({ kind: 'ready', header: 'authorization', value: 'Bearer sts-token' });
     // Outside Vercel the deployment's STS environment is development.
-    expect(mintedToken).toHaveBeenCalledWith('development', STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ);
+    expect(mintedToken).toHaveBeenCalledWith(
+      'development',
+      STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ
+    );
     expect(secretRead).not.toHaveBeenCalled();
   });
 
@@ -283,7 +286,10 @@ describe('the US-region senders under WEB_INTERNAL_SENDER_AUTH=sts', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://app.example.com/api/internal/claude-billing/payer-state'
     );
-    expect(mintedToken).toHaveBeenCalledWith('development', STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ);
+    expect(mintedToken).toHaveBeenCalledWith(
+      'development',
+      STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ
+    );
     expect(sentHeaders().get('authorization')).toBe('Bearer sts-payer-state-token');
     expect(sentHeaders().has('x-internal-api-key')).toBe(false);
     expect(secretRead).not.toHaveBeenCalled();

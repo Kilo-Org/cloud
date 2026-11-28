@@ -1,3 +1,4 @@
+import { PAID_BENCHMARK_ADMIN_ROUTING_TABLE_PATH } from '@kilocode/auto-routing-contracts';
 import { STS_ISSUERS, STS_SCOPE_REGISTRY, type StsScopeRegistry } from '@kilocode/sts-contracts';
 import { resetInternalAuthObservation } from '@kilocode/worker-utils/internal-auth-observation';
 import { Hono } from 'hono';
@@ -366,6 +367,27 @@ describe('STS token checks', () => {
     const response = await call(testApp(null), 'adminRead', env, bearer(await token('adminRead')));
     expect(response.status).toBe(403);
   });
+
+  it.each(['web', 'ai-gateway', 'auto-routing'])(
+    'refuses a routing-tables.read token from %s on the paid request routing table',
+    async workload => {
+      const paidTable = { method: 'POST', path: PAID_BENCHMARK_ADMIN_ROUTING_TABLE_PATH };
+      expect(routeFamily(paidTable.method, paidTable.path)).toBe('adminRead');
+      const { env, secretReads } = makeEnv(DUAL);
+      const sts = await token('routingTablesRead', {}, workload);
+      const response = await call(testApp(), paidTable, env, bearer(sts));
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'insufficient_scope',
+        scope: ROUTE_CONTRACTS.adminRead.scope,
+      });
+      expect(secretReads()).toBe(0);
+      expect(counterLines()).toEqual([]);
+      // The route itself admits its own scope from web.
+      const admitted = await call(testApp(), paidTable, env, bearer(await token('adminRead')));
+      expect(admitted.status).toBe(200);
+    }
+  );
 });
 
 describe('route table', () => {

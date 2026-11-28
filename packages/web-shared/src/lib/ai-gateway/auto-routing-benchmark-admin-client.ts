@@ -53,16 +53,23 @@ import {
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
 import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
-import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import * as z from 'zod';
 import {
   createWorkerAdminFetch,
   ErrorBodySchema,
   WORKER_ADMIN_TIMEOUT_MS,
+  WORKER_TOKEN_UNAVAILABLE_ERROR,
+  workerAdminCredential,
   type ErrorBody,
 } from './worker-admin-fetch';
 
+/**
+ * Each call names its route family, as the Worker's `GOVERNED_ROUTES` map it; the app's installed
+ * sender (`auto-routing-sender.ts`) picks the credential: the internal secret, or an STS token of
+ * `auto-routing-benchmark:routing-tables.read` (the routing table reads, from the web app or the
+ * gateway), `auto-routing-benchmark:admin.read` or `admin.write` (the web app's other calls).
+ */
 const fetchBenchmarkAdmin = createWorkerAdminFetch({
   workerUrl: AUTO_ROUTING_BENCHMARK_WORKER_URL,
   unconfiguredError: 'Auto routing benchmark worker is not configured',
@@ -70,6 +77,7 @@ const fetchBenchmarkAdmin = createWorkerAdminFetch({
 
 export function getBenchmarkConfig(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `/admin/config?router=${router}`,
     { method: 'GET' },
     BenchmarkConfigResponseSchema
@@ -78,6 +86,7 @@ export function getBenchmarkConfig(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
 
 export function updateBenchmarkConfig(config: BenchmarkConfig, updatedByEmail: string) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     `/admin/config?router=${config.router}`,
     {
       method: 'PUT',
@@ -93,6 +102,7 @@ export function updateBenchmarkConfig(config: BenchmarkConfig, updatedByEmail: s
 
 export function getBenchmarkSchedulerConfig() {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     '/admin/scheduler-config',
     { method: 'GET' },
     BenchmarkSchedulerConfigResponseSchema
@@ -104,6 +114,7 @@ export function updateBenchmarkSchedulerConfig(
   updatedByEmail: string
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     '/admin/scheduler-config',
     {
       method: 'PUT',
@@ -125,6 +136,7 @@ export function listBenchmarkRuns(
   if (filter.purpose) query.set('purpose', filter.purpose);
   const suffix = query.size > 0 ? `?${query.toString()}` : '';
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `/admin/runs${suffix}`,
     { method: 'GET' },
     BenchmarkRunsResponseSchema
@@ -133,6 +145,7 @@ export function listBenchmarkRuns(
 
 export function getBenchmarkRunSummaries(runId: string, router: AutoRouter = DEFAULT_AUTO_ROUTER) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `/admin/runs/${encodeURIComponent(runId)}/summaries?router=${router}`,
     { method: 'GET' },
     BenchmarkRunSummariesResponseSchema
@@ -146,6 +159,7 @@ export function startBenchmarkRun(
   router: AutoRouter = DEFAULT_AUTO_ROUTER
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     `/admin/runs?router=${router}`,
     {
       method: 'POST',
@@ -158,6 +172,7 @@ export function startBenchmarkRun(
 
 export function getBenchmarkRegistry(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `/admin/registry?router=${router}`,
     { method: 'GET' },
     BenchmarkRegistryResponseSchema
@@ -169,6 +184,7 @@ export function requeueBenchmarkRegistry(
   router: AutoRouter = DEFAULT_AUTO_ROUTER
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     `/admin/registry/requeue?router=${router}`,
     {
       method: 'POST',
@@ -188,6 +204,7 @@ export function readmitBenchmarkProfile(
   router: AutoRouter = DEFAULT_AUTO_ROUTER
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     `/admin/registry/refresh?router=${router}`,
     {
       method: 'POST',
@@ -203,6 +220,7 @@ export function getBenchmarkRoutingTable(
   signal?: AbortSignal
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkRoutingTablesRead',
     `/admin/routing-table?router=${router}`,
     { method: 'GET', signal },
     BenchmarkRoutingTableResponseSchema
@@ -227,23 +245,30 @@ export async function registerOwnerBenchmarkProfiles(
     AUTO_ROUTING_BENCHMARK_WORKER_URL,
     `/admin/profiles/register?router=${request.router}`
   );
-  // A secret that cannot be read sends nothing and answers like a missing one, without its reason.
-  const internalApiSecret = endpoint ? await readInternalApiSecret().catch(() => '') : '';
-  if (!endpoint || !internalApiSecret) {
+  const credential = endpoint
+    ? await workerAdminCredential(endpoint, 'benchmarkAdminWrite', signal)
+    : null;
+  if (!endpoint || credential?.kind === 'unconfigured') {
     return {
       ok: false,
       status: 500,
       error: { error: 'Auto routing benchmark worker is not configured' },
     };
   }
+  if (credential?.kind !== 'ready') {
+    // A spent deadline answers as the request would have: an abort.
+    signal.throwIfAborted();
+    return { ok: false, status: 503, error: { error: WORKER_TOKEN_UNAVAILABLE_ERROR } };
+  }
   const response = await fetch(endpoint.toString(), {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${internalApiSecret}`,
+      authorization: credential.authorization,
       'content-type': 'application/json',
     },
     body: JSON.stringify(request),
     signal,
+    ...(credential.redirect ? { redirect: credential.redirect } : {}),
   });
   const body: unknown = await response.json().catch(() => null);
   if (response.ok && BenchmarkProfileStatusesResponseSchema.safeParse(body).success) {
@@ -263,6 +288,7 @@ export async function registerOwnerBenchmarkProfiles(
 
 export function getCustomRouterStatus(request: CustomRouterBenchmarkContext) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     CUSTOM_ROUTER_STATUS_PATH,
     {
       method: 'POST',
@@ -276,6 +302,7 @@ export function getCustomRouterStatus(request: CustomRouterBenchmarkContext) {
 /** The table the Worker serves for this pool, from its current measurements. */
 export function getCustomRouterTable(context: CustomRouterBenchmarkContext) {
   return fetchBenchmarkAdmin(
+    'benchmarkRoutingTablesRead',
     CUSTOM_ROUTER_TABLE_PATH,
     {
       method: 'POST',
@@ -297,6 +324,7 @@ export async function lookupCustomRouterBlockedModels(
   options: { signal?: AbortSignal } = {}
 ): Promise<CustomRouterBlockedModelsResponse> {
   const result = await fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     CUSTOM_ROUTER_BLOCKED_MODELS_PATH,
     {
       method: 'POST',
@@ -351,9 +379,12 @@ async function postPaidBenchmark<T>(
     AUTO_ROUTING_BENCHMARK_WORKER_URL,
     PAID_BENCHMARK_PATH
   );
-  // A secret that cannot be read sends nothing and answers like a missing one, without its reason.
-  const internalApiSecret = endpoint ? await readInternalApiSecret().catch(() => '') : '';
-  if (!endpoint || !internalApiSecret) {
+  // One deadline covers the credential read (a cold STS mint included) and the request.
+  const signal = AbortSignal.timeout(timeoutMs);
+  const credential = endpoint
+    ? await workerAdminCredential(endpoint, 'benchmarkAdminWrite', signal)
+    : null;
+  if (!endpoint || credential?.kind === 'unconfigured') {
     return {
       ok: false,
       status: 500,
@@ -363,16 +394,30 @@ async function postPaidBenchmark<T>(
       },
     };
   }
+  if (credential?.kind !== 'ready') {
+    return signal.aborted
+      ? {
+          ok: false,
+          status: 504,
+          error: { code: 'timeout', message: 'The benchmark worker did not answer in time' },
+        }
+      : {
+          ok: false,
+          status: 503,
+          error: { code: 'token_unavailable', message: WORKER_TOKEN_UNAVAILABLE_ERROR },
+        };
+  }
   let response: Response;
   try {
     response = await fetch(endpoint.toString(), {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${internalApiSecret}`,
+        authorization: credential.authorization,
         'content-type': 'application/json',
       },
       body: JSON.stringify(request),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
+      ...(credential.redirect ? { redirect: credential.redirect } : {}),
     });
   } catch (error) {
     const timedOut = error instanceof Error && error.name === 'TimeoutError';
@@ -454,6 +499,7 @@ export function pausePoolBenchmark(ref: {
 
 export function getPlatformMeasurements(baseRouter: AutoRouter) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `${PLATFORM_MEASUREMENTS_PATH}?router=${baseRouter}`,
     { method: 'GET', signal: AbortSignal.timeout(10_000) },
     PlatformMeasurementsResponseSchema
@@ -463,6 +509,7 @@ export function getPlatformMeasurements(baseRouter: AutoRouter) {
 /** Operator cancel of one platform run; `already_finished` means it ended first. */
 export function cancelBenchmarkRun(runId: string, router: AutoRouter = DEFAULT_AUTO_ROUTER) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     `/admin/runs/${encodeURIComponent(runId)}/cancel?router=${router}`,
     { method: 'POST' },
     BenchmarkRunCancelResponseSchema
@@ -484,6 +531,7 @@ export function listPaidBenchmarkAdminRequests(filter: {
   if (filter.cursor) query.set('cursor', filter.cursor);
   if (filter.limit !== undefined) query.set('limit', String(filter.limit));
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `${PAID_BENCHMARK_ADMIN_PATH}?${query.toString()}`,
     { method: 'GET' },
     PaidBenchmarkAdminListResponseSchema
@@ -494,6 +542,7 @@ export function getPaidBenchmarkAdminProgress(requestId: string, cursor?: string
   const query = new URLSearchParams({ requestId });
   if (cursor) query.set('cursor', cursor);
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     `${PAID_BENCHMARK_ADMIN_PROGRESS_PATH}?${query.toString()}`,
     { method: 'GET' },
     PaidBenchmarkAdminProgressResponseSchema
@@ -502,6 +551,7 @@ export function getPaidBenchmarkAdminProgress(requestId: string, cursor?: string
 
 export function pausePaidBenchmarkAdminRequest(requestId: string) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     PAID_BENCHMARK_ADMIN_PAUSE_PATH,
     {
       method: 'POST',
@@ -515,6 +565,7 @@ export function pausePaidBenchmarkAdminRequest(requestId: string) {
 /** The pool routing result the request's quote was bound to. */
 export function getPaidBenchmarkAdminRoutingTable(requestId: string) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminRead',
     PAID_BENCHMARK_ADMIN_ROUTING_TABLE_PATH,
     {
       method: 'POST',
@@ -534,6 +585,7 @@ export function acquireAliasPromotion(
   request: Extract<AliasPromotionRequest, { action: 'acquire' }>
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     BENCHMARK_ALIAS_PROMOTION_PATH,
     {
       method: 'POST',
@@ -549,6 +601,7 @@ export function releaseAliasPromotion(
   request: Extract<AliasPromotionRequest, { action: 'release' }>
 ) {
   return fetchBenchmarkAdmin(
+    'benchmarkAdminWrite',
     BENCHMARK_ALIAS_PROMOTION_PATH,
     {
       method: 'POST',

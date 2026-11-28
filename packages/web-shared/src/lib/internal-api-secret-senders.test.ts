@@ -102,7 +102,7 @@ describe.each([
       workerUrl: 'https://worker.example.com',
       unconfiguredError: 'Worker is not configured',
     });
-    await fetchAdmin('/admin/x', { method: 'GET' }, z.object({ ok: z.literal(true) }));
+    await fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, z.object({ ok: z.literal(true) }));
     expect(sentHeader('authorization')).toBe(`Bearer ${expected}`);
   });
 });
@@ -143,7 +143,7 @@ describe('when STS cannot deliver the secret', () => {
       unconfiguredError: 'Worker is not configured',
     });
     await expect(
-      fetchAdmin('/admin/x', { method: 'GET' }, z.object({ ok: z.literal(true) }))
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, z.object({ ok: z.literal(true) }))
     ).resolves.toEqual({ status: 500, body: { error: 'Worker is not configured' } });
     expect(fetchMock).not.toHaveBeenCalled();
   });

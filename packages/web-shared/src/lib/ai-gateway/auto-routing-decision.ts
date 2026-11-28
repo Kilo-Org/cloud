@@ -17,6 +17,7 @@ import { AUTO_ROUTING_WORKER_URL } from '@kilocode/web-shared/lib/config.server'
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { autoRoutingCredential } from './auto-routing-sender';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
 
@@ -109,8 +110,8 @@ function buildDecidePayload(params: EfficientDecisionParams): DecidePayload | nu
 }
 
 /**
- * The decide call's bearer: the caller's token, else the internal API secret. A secret that cannot
- * be read is reported through `onError` and leaves the worker uncalled, like an unset one.
+ * The legacy bearer: the caller's token, else the internal API secret. A secret that cannot be
+ * read is reported through `onError` and leaves the worker uncalled, like an unset one.
  */
 async function workerAuthToken(options: FetchEfficientDecisionOptions): Promise<string> {
   if (options.authToken !== undefined) return options.authToken;
@@ -124,6 +125,40 @@ async function workerAuthToken(options: FetchEfficientDecisionOptions): Promise<
   }
 }
 
+type DecideCredential = {
+  authorization: string;
+  /** An STS token is for the Worker's origin only: a redirect fails rather than carry it on. */
+  redirect?: 'error';
+};
+
+/**
+ * The decide call's credential (`auto-routing-sender.ts`): the legacy bearer while the gateway's
+ * `AUTO_ROUTING_DECIDE_SENDER_AUTH` is `legacy`, or an `auto-routing:decide` STS token under `sts`.
+ * A held token is a memory read; a cold instance waits for one mint within the decide deadline
+ * (`signal`). Without a credential the worker is left uncalled, and `sts` never falls back to the
+ * secret.
+ */
+async function decideCredential(
+  workerUrl: URL,
+  options: FetchEfficientDecisionOptions,
+  signal: AbortSignal
+): Promise<DecideCredential | null> {
+  const sender = await autoRoutingCredential('decide', { url: workerUrl, signal });
+  switch (sender.kind) {
+    case 'legacy': {
+      const authToken = await workerAuthToken(options);
+      return authToken ? { authorization: `Bearer ${authToken}` } : null;
+    }
+    case 'sts':
+      return { authorization: sender.authorization, redirect: 'error' };
+    case 'unavailable':
+      (options.onError ?? warnExceptInTest)('Efficient auto decision credential unavailable', {
+        error: sender.reason,
+      });
+      return null;
+  }
+}
+
 type DecideOutcome =
   | { kind: 'ok'; response: AutoRoutingDecisionResponse }
   | { kind: 'rejected'; error: CustomRouterErrorResponse['error'] }
@@ -132,24 +167,24 @@ type DecideOutcome =
 async function postDecision(
   payload: DecidePayload,
   workerUrl: URL,
-  authToken: string,
+  credential: DecideCredential,
+  signal: AbortSignal,
   options: FetchEfficientDecisionOptions
 ): Promise<DecideOutcome> {
   const onError = options.onError ?? warnExceptInTest;
   const startedAt = performance.now();
   let status: number | null = null;
   let outcome: 'ok' | 'timeout' | 'error' | 'http_error' | 'invalid_response' = 'error';
-  let signal: AbortSignal | undefined;
   try {
-    signal = AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS);
     const response = await fetch(new URL('/decide', workerUrl).toString(), {
       method: 'POST',
       headers: new Headers({
-        authorization: `Bearer ${authToken}`,
+        authorization: credential.authorization,
         'content-type': 'application/json',
       }),
       body: JSON.stringify(payload),
       signal,
+      ...(credential.redirect ? { redirect: credential.redirect } : {}),
     });
     status = response.status;
     if (!response.ok) {
@@ -173,7 +208,7 @@ async function postDecision(
     outcome = 'ok';
     return { kind: 'ok', response: parsed.data };
   } catch (error) {
-    outcome = signal?.aborted ? 'timeout' : 'error';
+    outcome = signal.aborted ? 'timeout' : 'error';
     onError('Efficient auto decision request failed', {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -204,13 +239,15 @@ export async function fetchEfficientAutoDecision(
 ): Promise<{ decision: AutoRoutingDecision | null; costUsd: number } | null> {
   const workerUrl = parseInternalServiceUrl(options.workerUrl ?? AUTO_ROUTING_WORKER_URL);
   if (!workerUrl) return null;
-  const authToken = await workerAuthToken(options);
-  if (!authToken) return null;
+  // One deadline, started before the credential read so a cold mint counts inside it.
+  const signal = AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS);
+  const credential = await decideCredential(workerUrl, options, signal);
+  if (!credential) return null;
 
   const payload = buildDecidePayload(params);
   if (!payload) return null;
 
-  const outcome = await postDecision(payload, workerUrl, authToken, options);
+  const outcome = await postDecision(payload, workerUrl, credential, signal, options);
   return outcome.kind === 'ok'
     ? { decision: outcome.response.decision, costUsd: outcome.response.cost }
     : null;
@@ -236,8 +273,10 @@ export async function fetchCustomRouterDecision(
   options: FetchEfficientDecisionOptions = {}
 ): Promise<CustomRouterDecisionOutcome> {
   const workerUrl = parseInternalServiceUrl(options.workerUrl ?? AUTO_ROUTING_WORKER_URL);
-  const authToken = workerUrl ? await workerAuthToken(options) : '';
-  if (!workerUrl || !authToken) {
+  // One deadline, started before the credential read so a cold mint counts inside it.
+  const signal = AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS);
+  const credential = workerUrl ? await decideCredential(workerUrl, options, signal) : null;
+  if (!workerUrl || !credential) {
     return { kind: 'unavailable' };
   }
 
@@ -246,7 +285,7 @@ export async function fetchCustomRouterDecision(
     return { kind: 'rejected', code: 'invalid_request', message: 'Messages cannot be classified' };
   }
 
-  const outcome = await postDecision(payload, workerUrl, authToken, options);
+  const outcome = await postDecision(payload, workerUrl, credential, signal, options);
   if (outcome.kind === 'ok') {
     return { kind: 'ok', decision: outcome.response.decision, costUsd: outcome.response.cost };
   }

@@ -41,6 +41,11 @@
     // `"sts"` sends a `web:usage.classifier.record` STS service token over the `STS` binding
     // instead; set it only once the Worker has that binding, STS grants the scope and the route
     // accepts STS. Removing it is the rollback.
+    // `BENCHMARK_ROUTING_TABLES_SENDER_AUTH` (decision D59) is unset, so the routing-table reads
+    // over `BENCHMARK_SERVICE` (src/benchmark-origin.ts) send `INTERNAL_API_SECRET` as the bearer.
+    // `"sts"` sends only an `auto-routing-benchmark:routing-tables.read` STS service token over
+    // the `STS` binding instead; set it only once STS grants that scope to `auto-routing` and the
+    // benchmark Worker's ADMIN_CREDENTIAL_ACCEPT admits STS. Removing it is the rollback.
     "KILO_AI_GATEWAY_BASE_URL": "https://ai-gateway.kilo.ai",
     // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
     // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other

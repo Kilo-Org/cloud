@@ -16,6 +16,8 @@
     "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",

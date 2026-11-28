@@ -10,6 +10,13 @@ export async function register() {
     const { installSelectedInternalApiSecretRead } =
       await import('@kilocode/web-shared/lib/sts-secret-reader');
     installSelectedInternalApiSecretRead();
+    // The credential of the shared auto-routing clients: only this app's switches
+    // (`auto-routing-gateway-sender.ts`). Installing resolves nothing; each switch is read per call.
+    const [{ installAutoRoutingSender }, { createGatewayAutoRoutingSender }] = await Promise.all([
+      import('@kilocode/web-shared/lib/ai-gateway/auto-routing-sender'),
+      import('@kilocode/web-shared/lib/ai-gateway/auto-routing-gateway-sender'),
+    ]);
+    installAutoRoutingSender(createGatewayAutoRoutingSender());
   }
 }
 

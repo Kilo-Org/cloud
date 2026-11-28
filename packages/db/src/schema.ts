@@ -2904,35 +2904,6 @@ export const microdollar_usage_daily_repairs = pgTable(
 
 export type MicrodollarUsageDailyRepair = typeof microdollar_usage_daily_repairs.$inferSelect;
 
-// Obsolete: replaced by `leaderboard_usage_hourly`. Nothing reads or writes this
-// table any more; drop it in a later migration.
-export const leaderboard_usage_daily = pgTable(
-  'leaderboard_usage_daily',
-  {
-    id: uuid()
-      .notNull()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey(),
-    usage_date: date({ mode: 'string' }).notNull(),
-    provider: text(),
-    requested_model: text(),
-    model: text(),
-    inference_provider: text(),
-    mode: text(),
-    // Usage without a metadata row, or with a NULL flag, counts as not BYOK.
-    is_user_byok: boolean().notNull(),
-    input_tokens: bigint({ mode: 'number' }).notNull(),
-    output_tokens: bigint({ mode: 'number' }).notNull(),
-    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
-    cost_microdollars: bigint({ mode: 'number' }).notNull(),
-    request_count: bigint({ mode: 'number' }).notNull(),
-    error_count: bigint({ mode: 'number' }).notNull(),
-  },
-  table => [index('IDX_leaderboard_usage_daily_usage_date').on(table.usage_date)]
-);
-
-export type LeaderboardUsageDaily = typeof leaderboard_usage_daily.$inferSelect;
-
 // Global per-hour usage rollup behind the public leaderboard routes, with no
 // user or organization dimension. Each UTC hour is built whole from recent
 // usage by the `leaderboard-usage-hourly-rollup` cron. Leaderboard filters are

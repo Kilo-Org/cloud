@@ -1,0 +1,1 @@
+DROP TABLE "leaderboard_usage_daily" CASCADE;

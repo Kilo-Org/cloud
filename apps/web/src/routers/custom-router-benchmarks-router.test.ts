@@ -620,4 +620,18 @@ describe('customRouterBenchmarks', () => {
       code: 'TIMEOUT',
     });
   });
+
+  test('maps a missing STS service token to the retryable unavailable state', async () => {
+    await createRouter({ userId: user.id });
+    mockedQuote.mockResolvedValue({
+      ok: false,
+      status: 503,
+      error: { code: 'token_unavailable', message: 'No service token for the worker; try again' },
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.customRouterBenchmarks.quote({ slug: 'coding' })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+    });
+  });
 });

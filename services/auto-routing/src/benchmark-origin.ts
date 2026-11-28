@@ -46,12 +46,27 @@ export type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_
   STS?: MintBinding;
 };
 
-/** One token client per isolate, keyed by the binding object; it holds and renews the token. */
-let tokens: { binding: MintBinding; client: ServiceTokens } | null = null;
+/**
+ * The longest a routing-table read waits for a cold mint. The reads sit on the `/decide` path,
+ * inside the gateway's 5 s decide deadline (`EFFICIENT_DECISION_TIMEOUT_MS`), so the wait ends well
+ * before it; the mint runs on under the invocation's `waitUntil`, and a later read finds the token.
+ */
+export const ROUTING_TABLES_TOKEN_WAIT_MS = 2_000;
+
+/**
+ * One token client per isolate, built once: it holds and renews the token for every request. Its
+ * transport calls the binding of the latest read, so a request whose `env` carries another `STS`
+ * object still shares the held token.
+ */
+let tokens: ServiceTokens | null = null;
+let latestBinding: MintBinding | null = null;
 
 function tokensFor(binding: MintBinding): ServiceTokens {
-  if (tokens?.binding !== binding) tokens = { binding, client: createWorkerServiceTokens(binding) };
-  return tokens.client;
+  latestBinding = binding;
+  tokens ??= createWorkerServiceTokens({
+    mintTokens: request => (latestBinding ?? binding).mintTokens(request),
+  });
+  return tokens;
 }
 
 function routingTablesRefused(reason: string, detail: Record<string, string> = {}): Error {
@@ -63,9 +78,10 @@ function routingTablesRefused(reason: string, detail: Record<string, string> = {
 }
 
 /**
- * The `Authorization` value of one routing-table read. A held token is a memory read; a cold one
- * waits for one mint over the binding (at most the client's attempt timeout). Throws, sending
- * nothing, without a credential.
+ * The `Authorization` value of one routing-table read. A held token is a memory read, and with
+ * `ctx` its renewal runs under the invocation's `waitUntil` rather than inside the read. A cold
+ * read waits for one mint at most `ROUTING_TABLES_TOKEN_WAIT_MS`. Throws, sending nothing, without
+ * a credential.
  */
 async function routingTablesAuthorization(
   env: BenchmarkEnv,
@@ -77,12 +93,22 @@ async function routingTablesAuthorization(
   }
   if (auth !== 'sts') throw routingTablesRefused('auth_misconfigured');
   if (env.STS === undefined) throw routingTablesRefused('sts_binding_missing');
+  const attempt = tokensFor(env.STS).get(STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ, ctx);
+  const expired = Promise.withResolvers<'deadline'>();
+  const timer = setTimeout(() => expired.resolve('deadline'), ROUTING_TABLES_TOKEN_WAIT_MS);
   try {
-    return `Bearer ${await tokensFor(env.STS).get(STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ, ctx)}`;
+    const outcome = await Promise.race([attempt, expired.promise]);
+    if (outcome !== 'deadline') return `Bearer ${outcome}`;
+    // Still the client's one in-flight mint; keeping it alive serves the next read.
+    ctx?.waitUntil(attempt.catch(() => {}));
+    throw routingTablesRefused('token_deadline');
   } catch (error) {
-    throw error instanceof ServiceTokenError && error.reason === 'denied'
+    if (!(error instanceof ServiceTokenError)) throw error;
+    throw error.reason === 'denied'
       ? routingTablesRefused('token_denied', { denied_reason: error.deniedReason ?? 'unknown' })
       : routingTablesRefused('token_unavailable');
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -126,17 +152,18 @@ async function fetchBenchmarkJson(
 }
 
 // The two cached origin reads below are loaded through `ttlCached` (routing-table.ts,
-// classifier-config.ts), whose loaders receive only the env. They therefore pass no invocation
-// context: each caller already authenticated through a ctx-bearing read in the same invocation.
+// classifier-config.ts) on the `/decide` path. Their caches hand the loader the invocation's
+// `ctx`, so a token renewal or a bundle revalidation runs under its `waitUntil`.
 export async function fetchRoutingTableFromOrigin(
   env: BenchmarkEnv,
-  router: AutoRouter = DEFAULT_AUTO_ROUTER
+  router: AutoRouter = DEFAULT_AUTO_ROUTER,
+  ctx?: SecretsExecutionContext
 ): Promise<RoutingTable | null> {
   const path =
     router === DEFAULT_AUTO_ROUTER
       ? '/admin/routing-table'
       : `/admin/routing-table?router=${router}`;
-  const body = await fetchBenchmarkJson(env, path);
+  const body = await fetchBenchmarkJson(env, path, undefined, ctx);
   const parsed = BenchmarkRoutingTableResponseSchema.safeParse(body);
   if (!parsed.success) {
     throw new Error(
@@ -147,9 +174,10 @@ export async function fetchRoutingTableFromOrigin(
 }
 
 export async function fetchClassifierWinnerFromOrigin(
-  env: BenchmarkEnv
+  env: BenchmarkEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<ClassifierWinner | null> {
-  const body = await fetchBenchmarkJson(env, '/admin/classifier-winner');
+  const body = await fetchBenchmarkJson(env, '/admin/classifier-winner', undefined, ctx);
   const parsed = ClassifierWinnerResponseSchema.safeParse(body);
   if (!parsed.success) {
     throw new Error(

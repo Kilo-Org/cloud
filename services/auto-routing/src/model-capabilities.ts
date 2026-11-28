@@ -333,7 +333,8 @@ export async function getModelCapabilities(
     // lookups. `routing-table.ts`'s `ttlCached` serves a table that an earlier
     // request resolved; a concurrent request still reads its own, because a
     // pending load belongs to the request that started it.
-    const routingTable = await getRoutingTable(env, router);
+    const { waitUntil } = options;
+    const routingTable = await getRoutingTable(env, router, waitUntil ? { waitUntil } : undefined);
     const ids = new Set<string>();
     if (routingTable) {
       for (const route of Object.values(routingTable.routes)) {

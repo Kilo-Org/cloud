@@ -380,7 +380,7 @@ function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTa
         (async () => {
           const startedAt = performance.now();
           const tables = await Promise.all([
-            getRoutingTable(c.env, router),
+            getRoutingTable(c.env, router, requestContext(c)),
             router === 'efficient' ? getShadowRoutingTable(c.env) : null,
           ]);
           timings.tableMs = performance.now() - startedAt;
@@ -477,7 +477,7 @@ export async function runDecision(
     const [hashes, userIdHash, classifierModel, successSampleRate] = await Promise.all([
       computeContentHashes(payload.input),
       hashIdentifierForTelemetry(payload.userId),
-      getClassifierModel(c.env),
+      getClassifierModel(c.env, requestContext(c)),
       getDecisionLogSampleRate(c.env),
     ]);
     timings.prepMs = performance.now() - prepStartedAt;

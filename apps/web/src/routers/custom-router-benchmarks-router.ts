@@ -139,6 +139,11 @@ function paidBenchmarkError(result: {
       message: 'The benchmark worker did not answer. Try again.',
     });
   }
+  // No STS service token yet (`AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH=sts`): nothing was sent,
+  // and a later attempt may hold one.
+  if (error.code === 'token_unavailable') {
+    return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: error.message });
+  }
   if (status === 404) return new TRPCError({ code: 'NOT_FOUND', message: error.message });
   if (status === 429) {
     return new TRPCError({ code: 'TOO_MANY_REQUESTS', message: error.message });

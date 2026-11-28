@@ -7,8 +7,9 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/classifier';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { kvReadThrough } from './kv-read-through';
-import { fetchClassifierWinnerFromOrigin } from './benchmark-origin';
+import { fetchClassifierWinnerFromOrigin, type BenchmarkEnv } from './benchmark-origin';
 
 export const CLASSIFIER_MODEL_CONFIG_KEY = 'classifier_model';
 export const DECISION_LOG_SAMPLE_RATE_CONFIG_KEY = 'decision_log_sample_rate';
@@ -25,10 +26,7 @@ export const DEFAULT_DECISION_LOG_SAMPLE_RATE = 0.01;
 // read from every classification.
 const CONFIG_CACHE_TTL_MS = 60_000;
 
-type ClassifierConfigEnv = Pick<
-  Env,
-  'AUTO_ROUTING_CONFIG' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
->;
+type ClassifierConfigEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'> & BenchmarkEnv;
 
 export type ClassifierModelInfo = {
   // Effective model used by /decide: override ?? benchmark winner ?? default.
@@ -46,14 +44,22 @@ function parseClassifierWinner(raw: string): ClassifierWinner | null {
   }
 }
 
-const classifierModelCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: ClassifierConfigEnv) => {
+/**
+ * The loader's input: the env and the invocation that triggered the load, so a benchmark-origin
+ * read it makes runs its token renewal under that invocation's `waitUntil`.
+ */
+type ClassifierModelLoad = { env: ClassifierConfigEnv; ctx?: SecretsExecutionContext };
+
+const classifierModelCache = ttlCached(
+  CONFIG_CACHE_TTL_MS,
+  async ({ env, ctx }: ClassifierModelLoad) => {
   const [configuredModel, winner] = await Promise.all([
     env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY),
     kvReadThrough<ClassifierWinner>({
       kv: env.AUTO_ROUTING_CONFIG,
       key: CLASSIFIER_WINNER_KV_KEY,
       ttlSeconds: 3600,
-      fetchOrigin: () => fetchClassifierWinnerFromOrigin(env),
+      fetchOrigin: () => fetchClassifierWinnerFromOrigin(env, ctx),
       parse: parseClassifierWinner,
     }).catch((error: unknown) => {
       // A benchmark-origin failure must not reject the whole load: that would
@@ -75,7 +81,8 @@ const classifierModelCache = ttlCached(CONFIG_CACHE_TTL_MS, async (env: Classifi
     override,
     benchmarkWinner,
   } satisfies ClassifierModelInfo;
-});
+  }
+);
 
 const decisionLogSampleRateCache = ttlCached(
   CONFIG_CACHE_TTL_MS,
@@ -137,14 +144,21 @@ const DEFAULT_CLASSIFIER_MODEL_INFO: ClassifierModelInfo = {
   benchmarkWinner: null,
 };
 
-export function getClassifierModelInfo(env: ClassifierConfigEnv): Promise<ClassifierModelInfo> {
+/** `ctx` is the invocation reading the model; see `ClassifierModelLoad`. */
+export function getClassifierModelInfo(
+  env: ClassifierConfigEnv,
+  ctx?: SecretsExecutionContext
+): Promise<ClassifierModelInfo> {
   return classifierModelCache
-    .get(env)
+    .get({ env, ctx })
     .catch(failClosed(CLASSIFIER_MODEL_CONFIG_KEY, DEFAULT_CLASSIFIER_MODEL_INFO));
 }
 
-export async function getClassifierModel(env: ClassifierConfigEnv): Promise<string> {
-  return (await getClassifierModelInfo(env)).model;
+export async function getClassifierModel(
+  env: ClassifierConfigEnv,
+  ctx?: SecretsExecutionContext
+): Promise<string> {
+  return (await getClassifierModelInfo(env, ctx)).model;
 }
 
 export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<number> {
@@ -157,12 +171,13 @@ export function getDecisionLogSampleRate(env: ClassifierConfigEnv): Promise<numb
 // built-in default) takes effect.
 export async function setClassifierModel(
   env: ClassifierConfigEnv,
-  model: string | null
+  model: string | null,
+  ctx?: SecretsExecutionContext
 ): Promise<ClassifierModelInfo | null> {
   if (model === null) {
     await env.AUTO_ROUTING_CONFIG.delete(CLASSIFIER_MODEL_CONFIG_KEY);
     classifierModelCache.clear();
-    return getClassifierModelInfo(env);
+    return getClassifierModelInfo(env, ctx);
   }
   const trimmedModel = model.trim();
   if (trimmedModel.length === 0) {
@@ -170,5 +185,5 @@ export async function setClassifierModel(
   }
   await env.AUTO_ROUTING_CONFIG.put(CLASSIFIER_MODEL_CONFIG_KEY, trimmedModel);
   classifierModelCache.clear();
-  return getClassifierModelInfo(env);
+  return getClassifierModelInfo(env, ctx);
 }

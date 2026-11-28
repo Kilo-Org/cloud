@@ -131,6 +131,9 @@ type DecideCredential = {
   redirect?: 'error';
 };
 
+/** Credential failure reasons already reported: decide runs on every auto-routed LLM request. */
+const reportedCredentialFailures = new Set<string>();
+
 /**
  * The decide call's credential (`auto-routing-sender.ts`): the legacy bearer while the gateway's
  * `AUTO_ROUTING_DECIDE_SENDER_AUTH` is `legacy`, or an `auto-routing:decide` STS token under `sts`.
@@ -152,9 +155,13 @@ async function decideCredential(
     case 'sts':
       return { authorization: sender.authorization, redirect: 'error' };
     case 'unavailable':
-      (options.onError ?? warnExceptInTest)('Efficient auto decision credential unavailable', {
-        error: sender.reason,
-      });
+      // Once per reason and process: a misconfigured switch would otherwise warn on every request.
+      if (!reportedCredentialFailures.has(sender.reason)) {
+        reportedCredentialFailures.add(sender.reason);
+        (options.onError ?? warnExceptInTest)('Efficient auto decision credential unavailable', {
+          error: sender.reason,
+        });
+      }
       return null;
   }
 }

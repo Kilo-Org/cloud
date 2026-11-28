@@ -3,10 +3,13 @@
 // identity are faked. Do not import `jest` from '@jest/globals': the SWC transform hoists these
 // `jest.mock` calls only with the global `jest`.
 const mockSwitches: Record<string, string | undefined> = {};
+const mockWorkerUrl = { value: 'https://auto-routing.kiloapps.io' };
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'legacy-internal-secret',
-  AUTO_ROUTING_WORKER_URL: 'https://auto-routing.kiloapps.io',
+  get AUTO_ROUTING_WORKER_URL() {
+    return mockWorkerUrl.value;
+  },
   AUTO_ROUTING_BENCHMARK_WORKER_URL: 'https://auto-routing-benchmark.kiloapps.io',
   // Read at each call, so a test sets a switch through `mockSwitches`.
   get AUTO_ROUTING_ADMIN_SENDER_AUTH() {
@@ -257,5 +260,18 @@ describe('the web sender', () => {
 
     await expect(admin.getAutoRoutingClassifierModel()).resolves.toMatchObject({ status: 500 });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses sts to any https host other than the receiver origin', async () => {
+    mockSwitches.AUTO_ROUTING_ADMIN_SENDER_AUTH = 'sts';
+    mockWorkerUrl.value = 'https://auto-routing.example.com';
+    try {
+      const clients = await loadWeb();
+
+      await expect(clients.autoRoutingRead()).resolves.toMatchObject({ status: 500 });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      mockWorkerUrl.value = 'https://auto-routing.kiloapps.io';
+    }
   });
 });

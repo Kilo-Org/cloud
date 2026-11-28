@@ -261,4 +261,18 @@ describe('the gateway sender', () => {
     await expect(fetchEfficientAutoDecision(params, { onError: () => {} })).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('refuses sts to any https host other than the receiver origin', async () => {
+    mockSwitches.AUTO_ROUTING_DECIDE_SENDER_AUTH = 'sts';
+    await loadGateway();
+    const { fetchEfficientAutoDecision } = await import('./auto-routing-decision');
+
+    await expect(
+      fetchEfficientAutoDecision(params, {
+        workerUrl: 'https://auto-routing.example.com',
+        onError: () => {},
+      })
+    ).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

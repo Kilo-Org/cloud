@@ -1,16 +1,20 @@
 import {
   AUTO_ROUTING_ADMIN_SENDER_AUTH,
   AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH,
+  AUTO_ROUTING_BENCHMARK_WORKER_URL,
+  AUTO_ROUTING_WORKER_URL,
   WEB_ROUTING_TABLES_SENDER_AUTH,
 } from '@kilocode/web-shared/lib/config.server';
-import type {
-  AutoRoutingSender,
-  AutoRoutingSenderRoute,
+import {
+  isAutoRoutingReceiverOrigin,
+  type AutoRoutingSender,
+  type AutoRoutingSenderRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-sender';
 import { AUTO_ROUTING_SENDER_SCOPES } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-sender-scopes';
 import {
   resolveServiceSenderAuth,
   serviceSenderHeaders,
+  type ServiceSenderAuth,
   type VercelRuntime,
 } from '@/lib/service-sender-auth';
 
@@ -26,32 +30,22 @@ import {
  *   `auto-routing-benchmark:routing-tables.read`.
  * `legacy` (also when unset) sends the internal secret as before; explicit `sts` sends only an STS
  * token of the route's scope, for Vercel production and local development only (neither Worker
- * has a staging deployment). Any other value sends nothing. The web app sends no `POST /decide`,
+ * has a staging deployment), and only to the receiver's own origin: `https://auto-routing.kiloapps.io`
+ * or `https://auto-routing-benchmark.kiloapps.io` in production, the local Worker on loopback in
+ * development. Any other value or destination sends nothing. The web app sends no `POST /decide`,
  * so that route keeps the secret.
  */
-const WEB_SWITCHES: Partial<
-  Record<AutoRoutingSenderRoute, { variable: string; auth: () => string | undefined }>
-> = {
-  adminRead: {
-    variable: 'AUTO_ROUTING_ADMIN_SENDER_AUTH',
-    auth: () => AUTO_ROUTING_ADMIN_SENDER_AUTH,
-  },
-  adminWrite: {
-    variable: 'AUTO_ROUTING_ADMIN_SENDER_AUTH',
-    auth: () => AUTO_ROUTING_ADMIN_SENDER_AUTH,
-  },
-  benchmarkAdminRead: {
-    variable: 'AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH',
-    auth: () => AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH,
-  },
-  benchmarkAdminWrite: {
-    variable: 'AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH',
-    auth: () => AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH,
-  },
-  benchmarkRoutingTablesRead: {
-    variable: 'WEB_ROUTING_TABLES_SENDER_AUTH',
-    auth: () => WEB_ROUTING_TABLES_SENDER_AUTH,
-  },
+type WebVariable =
+  | 'AUTO_ROUTING_ADMIN_SENDER_AUTH'
+  | 'AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH'
+  | 'WEB_ROUTING_TABLES_SENDER_AUTH';
+
+const WEB_SWITCHES: Partial<Record<AutoRoutingSenderRoute, WebVariable>> = {
+  adminRead: 'AUTO_ROUTING_ADMIN_SENDER_AUTH',
+  adminWrite: 'AUTO_ROUTING_ADMIN_SENDER_AUTH',
+  benchmarkAdminRead: 'AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH',
+  benchmarkAdminWrite: 'AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH',
+  benchmarkRoutingTablesRead: 'WEB_ROUTING_TABLES_SENDER_AUTH',
 };
 
 /** Resolves when `signal` aborts; never when there is none. */
@@ -63,22 +57,41 @@ function aborted(signal: AbortSignal | undefined): Promise<'aborted'> {
 }
 
 /**
- * Under `sts` a request waits for one mint at most until its own deadline (`signal`), as the code
- * review and session ingest senders do; without a token it is not sent.
+ * The web app's sender. Each switch is resolved once, here, against its configured Worker URL; a
+ * request then checks its own destination against the receiver's origin. Under `sts` a request
+ * waits for one mint at most until its own deadline (`signal`), as the code review and session
+ * ingest senders do; without a token it is not sent.
  */
-export function createWebAutoRoutingSender(
-  runtime: VercelRuntime = process.env
-): AutoRoutingSender {
+export function createWebAutoRoutingSender(runtime: VercelRuntime = process.env): AutoRoutingSender {
+  const resolve = (auth: string | undefined, url: string) =>
+    resolveServiceSenderAuth({ auth, url, runtime });
+  const senders: Record<WebVariable, ServiceSenderAuth> = {
+    AUTO_ROUTING_ADMIN_SENDER_AUTH: resolve(AUTO_ROUTING_ADMIN_SENDER_AUTH, AUTO_ROUTING_WORKER_URL),
+    AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH: resolve(
+      AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH,
+      AUTO_ROUTING_BENCHMARK_WORKER_URL
+    ),
+    WEB_ROUTING_TABLES_SENDER_AUTH: resolve(
+      WEB_ROUTING_TABLES_SENDER_AUTH,
+      AUTO_ROUTING_BENCHMARK_WORKER_URL
+    ),
+  };
   return async (route, { url, signal }) => {
-    const edge = WEB_SWITCHES[route];
-    if (edge === undefined) return { kind: 'legacy' };
-    const sender = resolveServiceSenderAuth({ auth: edge.auth(), url: url.href, runtime });
+    const variable = WEB_SWITCHES[route];
+    if (variable === undefined) return { kind: 'legacy' };
+    const sender = senders[variable];
     if (sender.kind === 'legacy') return { kind: 'legacy' };
+    if (sender.kind === 'sts' && !isAutoRoutingReceiverOrigin(route, url, sender.environment)) {
+      console.error('auto-routing sender: destination is not the receiver origin; request refused', {
+        variable,
+      });
+      return { kind: 'unavailable', reason: 'misconfigured' };
+    }
     try {
       const headers = await Promise.race([
         serviceSenderHeaders({
           sender,
-          variable: edge.variable,
+          variable,
           label: 'auto-routing sender',
           request: AUTO_ROUTING_SENDER_SCOPES[route],
           // Unreachable: a `legacy` switch returned above.

@@ -23,9 +23,8 @@ import {
   BUNDLE_REQUEST_MAX_BODY_BYTES,
   DEPLOY_TOKEN_REQUEST_MAX_BODY_BYTES,
   TOKEN_JWKS_CACHE_MS,
+  TOKEN_KEY_SET_DEADLINE_MS,
   TOKEN_REQUEST_MAX_BODY_BYTES,
-  TOKEN_SIGNER_DEADLINE_MS,
-  TOKEN_SIGNER_SHARDS,
   VERIFIER_RETRY_AFTER_SECONDS,
   WEBHOOK_MAX_BODY_BYTES,
 } from './constants';
@@ -34,9 +33,9 @@ import {
   serveDeployToken,
   serveDeployTokenRevoke,
 } from './deploy-tokens/serve';
-import { getRefresherStub, getSignerStub, getTokenSignerStub } from './dos/stubs';
+import { getRefresherStub, getSignerStub, getTokenKeySetStub } from './dos/stubs';
 import type { ManagerJwks } from './dos/SignerDO';
-import type { TokenJwks } from './dos/TokenSignerDO';
+import type { TokenKeySetRead } from './dos/TokenKeySetDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env, type StsConfig } from './env';
 import {
   IdentityVerifier,
@@ -78,7 +77,7 @@ let jwksCache: { environment: string; jwks: ManagerJwks; expiresAt: number } | n
 let tokenJwksCache: {
   environment: string;
   revokedKids: string;
-  jwks: TokenJwks;
+  keys: TokenJwk[];
   expiresAt: number;
 } | null = null;
 
@@ -228,68 +227,67 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
 
 /**
  * The service-token key set (design 5.7): the next, current and retired-in-grace keys of every
- * token signer shard. Each isolate serves it from memory for `TOKEN_JWKS_CACHE_MS`; a request
- * that finds no fresh copy calls each shard itself, in parallel and bounded like a mint, and
- * stores the plain result only when every shard answered. Requests that find the copy stale at
- * the same moment each load it (no promise is shared across requests): a few extra shard calls
- * per isolate per 5 minutes, accepted. A kid listed in `TOKEN_SIGNING_KIDS_REVOKED` is left out
- * here as well as in the signer, so an emergency removal never waits on the object, and a change
- * of that list rebuilds the copy. The answer is `no-store`: a key-set removal is the only recall
- * of an STS token (design Q50), so no HTTP cache may hold the set, nor serve it stale while STS
- * answers 503; only the verifier's own 5-minute copy counts. A scheduled removal (a retired key
- * leaving the ring) can therefore reach verifiers up to 10 minutes later: up to 5 minutes in this
- * isolate copy, then up to 5 in the verifier's. An emergency removal is filtered from every
- * answer, so it reaches them within the verifier's 5 minutes.
+ * token signer shard. A request that finds no fresh isolate copy makes ONE call, to the key-set
+ * object (`TokenKeySetDO`), which holds the shards' keys as one document; the copy then serves
+ * until `TOKEN_JWKS_CACHE_MS` after the shard reads that built that document, not after this
+ * call, so the object's document and this copy together are never older than one period.
+ * Requests that find the copy stale at the same moment each make the call (no promise is shared
+ * across requests). A kid listed in `TOKEN_SIGNING_KIDS_REVOKED` is left out here as well as in
+ * the signer, so an emergency removal never waits on an object, and a change of that list
+ * rebuilds the copy and the object's document. The answer is `no-store`: a key-set removal is the
+ * only recall of an STS token (design Q50), so no HTTP cache may hold the set, nor serve it stale
+ * while STS answers 503; only the verifier's own 5-minute copy counts. A scheduled removal (a
+ * retired key leaving the ring) can therefore reach verifiers up to 10 minutes later: up to 5
+ * minutes from the shard read in the object's document and this copy, then up to 5 in the
+ * verifier's. An emergency removal is filtered from every answer, so it reaches them within the
+ * verifier's 5 minutes.
  */
 async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
   const cached = tokenJwksCache;
   const revokedKids = config.revokedTokenKids.join(',');
-  let jwks: TokenJwks;
+  let keys: TokenJwk[];
   if (
     cached !== null &&
     cached.environment === config.environment &&
     cached.revokedKids === revokedKids &&
     cached.expiresAt > Date.now()
   ) {
-    jwks = cached.jwks;
+    keys = cached.keys;
   } else {
-    const outcomes = await Promise.all(
-      Array.from({ length: TOKEN_SIGNER_SHARDS }, (_, shard) =>
-        callWithDeadline(
-          async (): Promise<TokenJwks> =>
-            await withDORetry(
-              () => getTokenSignerStub(env, config, shard),
-              stub => stub.getJwks(),
-              'sts.getTokenJwks'
-            ),
-          TOKEN_SIGNER_DEADLINE_MS
-        )
-      )
+    const outcome = await callWithDeadline(
+      async (): Promise<TokenKeySetRead> =>
+        await withDORetry(
+          () => getTokenKeySetStub(env, config),
+          async (stub): Promise<TokenKeySetRead> => await stub.read(config.revokedTokenKids),
+          'sts.readTokenKeySet'
+        ),
+      TOKEN_KEY_SET_DEADLINE_MS
     );
-    const keys: TokenJwk[] = [];
-    for (const outcome of outcomes) {
-      if (outcome.status !== 'answered') {
-        console.warn('sts: token key set could not be loaded', {
-          outcome: outcome.status,
-          reason:
-            outcome.status === 'failed' && outcome.error instanceof Error
-              ? outcome.error.name
-              : 'none',
-        });
-        return unavailableResponse();
-      }
-      keys.push(...outcome.value.keys.map(key => ({ ...key })));
+    if (outcome.status !== 'answered' || outcome.value.status !== 'ok') {
+      console.warn('sts: token key set could not be loaded', {
+        outcome: outcome.status === 'answered' ? outcome.value.status : outcome.status,
+        reason:
+          outcome.status === 'failed' && outcome.error instanceof Error
+            ? outcome.error.name
+            : 'none',
+      });
+      return unavailableResponse();
     }
-    jwks = { keys };
+    const { builtAt } = outcome.value;
+    keys = outcome.value.keys.map(key => ({ ...key }));
     tokenJwksCache = {
       environment: config.environment,
       revokedKids,
-      jwks,
-      expiresAt: Date.now() + TOKEN_JWKS_CACHE_MS,
+      keys,
+      // On a clock behind the object's, the copy still expires one period after this call at most.
+      expiresAt: Math.min(builtAt, Date.now()) + TOKEN_JWKS_CACHE_MS,
     };
   }
-  const keys = jwks.keys.filter(key => !config.revokedTokenKids.includes(key.kid));
-  return jsonResponse({ keys }, 200, 'no-store');
+  return jsonResponse(
+    { keys: keys.filter(key => !config.revokedTokenKids.includes(key.kid)) },
+    200,
+    'no-store'
+  );
 }
 
 /**

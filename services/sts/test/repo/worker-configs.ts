@@ -167,6 +167,7 @@ export const STS_CLASS_NAMES: readonly string[] = [
   'RefresherDO',
   'DenialDO',
   'TokenSignerDO',
+  'TokenKeySetDO',
   'LeaseDO',
   'DeployTokenDO',
 ];

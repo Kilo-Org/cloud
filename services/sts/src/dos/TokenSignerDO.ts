@@ -24,10 +24,12 @@ import {
   RELAY_RETRY_MS,
   TOKEN_AUDIT_PRUNE_INTERVAL_MS,
   TOKEN_AUDIT_RETENTION_MS,
+  TOKEN_KEY_SET_NOTIFY_DEADLINE_MS,
   TOKEN_SIGNER_SHARDS,
 } from '../constants';
 import * as schema from '../db/token-signer-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
+import { callWithDeadline } from '../rpc';
 import {
   advanceKeyRing,
   keyRingDueAt,
@@ -40,7 +42,7 @@ import {
   type TokenJwk,
   type TokenKey,
 } from '../tokens/key-ring';
-import { getTokenSignerStub } from './stubs';
+import { getTokenKeySetStub, getTokenSignerStub } from './stubs';
 
 /** KV storage key of the key ring (see `crypto/key-store.ts`). */
 const KEY_RING_NAME = 'token-key-ring';
@@ -117,11 +119,17 @@ export class TokenSignerDO extends DurableObject<Env> {
   readonly #config: StsConfig;
   readonly #audit: AuditLog;
   readonly #stream: string;
+  readonly #shard: number;
   #ring: KeyRing = { keys: [] };
   /** Non-extractable signing keys by kid, imported once per instance. */
   readonly #signingKeys = new Map<string, CryptoKey>();
   /** The alarm time this instance last read or set (null: none); undefined until first read. */
   #alarmAt: number | null | undefined = undefined;
+  /**
+   * The ring changed since the key-set object was last told; the next call (or alarm) tells it
+   * before it answers.
+   */
+  #keySetChanged = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -137,6 +145,7 @@ export class TokenSignerDO extends DurableObject<Env> {
       pruneIntervalMs: TOKEN_AUDIT_PRUNE_INTERVAL_MS,
     });
     this.#stream = `sts:${config.environment}:tokens:${shard}`;
+    this.#shard = shard;
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(drizzle(ctx.storage, { schema }), migrations);
       const stored: unknown = await ctx.storage.get(KEY_RING_NAME);
@@ -262,10 +271,40 @@ export class TokenSignerDO extends DurableObject<Env> {
     return imported;
   }
 
-  /** Rotation and emergency removal run one at a time, and only when something is due. */
+  /**
+   * Rotation and emergency removal run one at a time, and only when something is due. A change
+   * (here or at start) is told to the key-set object after the block, before the call answers: a
+   * `getJwks` from the key-set object's own rebuild then answers only after the note arrived, so
+   * that rebuild counts as current.
+   */
   async #advanceIfDue(now: number): Promise<void> {
-    if (keyRingDueAt(this.#ring, this.#config.revokedTokenKids, now) > now) return;
-    await this.ctx.blockConcurrencyWhile(() => this.#advance(Date.now()));
+    if (keyRingDueAt(this.#ring, this.#config.revokedTokenKids, now) <= now) {
+      await this.ctx.blockConcurrencyWhile(() => this.#advance(Date.now()));
+    }
+    await this.#notifyKeySet();
+  }
+
+  /**
+   * Tells the key-set object the published keys changed, so it rebuilds its document before the
+   * next read instead of serving it to its expiry. A call that fails or runs past its deadline is
+   * only logged: the document then expires on its own, `TOKEN_JWKS_CACHE_MS` after its build.
+   */
+  async #notifyKeySet(): Promise<void> {
+    if (!this.#keySetChanged) return;
+    this.#keySetChanged = false;
+    const outcome = await callWithDeadline(async () => {
+      await getTokenKeySetStub(this.env, this.#config).invalidate(this.#shard);
+      return {};
+    }, TOKEN_KEY_SET_NOTIFY_DEADLINE_MS);
+    if (outcome.status !== 'answered') {
+      console.warn(
+        'sts: token key set not told of a ring change; its document expires on its own',
+        {
+          outcome: outcome.status,
+          reason: outcome.status === 'failed' ? errorName(outcome.error) : 'none',
+        }
+      );
+    }
   }
 
   /**
@@ -292,6 +331,7 @@ export class TokenSignerDO extends DurableObject<Env> {
       keepLatestSignedExp(result.ring, this.#ring);
       await this.ctx.storage.put(KEY_RING_NAME, result.ring);
       this.#ring = result.ring;
+      this.#keySetChanged = true;
       // A retired key keeps no private key, so its imported signing key goes too.
       for (const kid of this.#signingKeys.keys()) {
         if (!result.ring.keys.some(key => key.kid === kid && key.pkcs8 !== null)) {

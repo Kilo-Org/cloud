@@ -6,6 +6,7 @@ import type { DeployTokenDO } from './DeployTokenDO';
 import type { LeaseDO } from './LeaseDO';
 import type { RefresherDO } from './RefresherDO';
 import type { SignerDO } from './SignerDO';
+import type { TokenKeySetDO } from './TokenKeySetDO';
 import type { TokenSignerDO } from './TokenSignerDO';
 
 /** Durable Object names carry the environment so a staging object can never serve production. */
@@ -84,4 +85,10 @@ export function getTokenSignerStub(
 ): DurableObjectStub<TokenSignerDO> {
   const namespace = scoped(config, env.STS_TOKEN_SIGNER_DO);
   return namespace.get(namespace.idFromName(`${config.environment}:${shard}`));
+}
+
+/** The environment's service-token key set: one document of every shard's public keys. */
+export function getTokenKeySetStub(env: Env, config: StsConfig): DurableObjectStub<TokenKeySetDO> {
+  const namespace = scoped(config, env.STS_TOKEN_KEY_SET_DO);
+  return namespace.get(namespace.idFromName(config.environment));
 }

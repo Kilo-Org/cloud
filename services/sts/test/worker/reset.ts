@@ -48,6 +48,17 @@ export async function resetTokenSignerObject(stub: DurableObjectStub): Promise<v
   await resetObject(stub, [], ['token-key-ring']);
 }
 
+/** The key-set object has no tables: its document and alarm go, then the instance. */
+export async function resetTokenKeySetObject(stub: DurableObjectStub): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    await state.storage.delete('token-key-set');
+    await state.storage.deleteAlarm();
+  });
+  await runInDurableObject(stub, (_instance, state) => state.abort('test reset')).catch(
+    () => undefined
+  );
+}
+
 /** The aborted instance also forgets its manager access token. */
 export async function resetLeaseObject(stub: DurableObjectStub): Promise<void> {
   await resetObject(stub, ['lease', 'lease_replica_sweep']);

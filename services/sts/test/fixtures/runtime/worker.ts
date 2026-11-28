@@ -9,6 +9,11 @@ import { serveBundle, SecretsBroker } from '../../../src/broker';
 import { RefresherDO as StsRefresherDO } from '../../../src/dos/RefresherDO';
 import { SignerDO as StsSignerDO, type ManagerJwks } from '../../../src/dos/SignerDO';
 import { getBundleStub } from '../../../src/dos/stubs';
+import {
+  TokenKeySetDO as StsTokenKeySetDO,
+  type TokenKeySetRead,
+} from '../../../src/dos/TokenKeySetDO';
+import { TokenSignerDO as StsTokenSignerDO, type TokenJwks } from '../../../src/dos/TokenSignerDO';
 import { MANAGER_JWKS_PATH, readConfig, type Env } from '../../../src/env';
 import { handleRequest, MANAGER_WEBHOOK_PATH } from '../../../src/http';
 import { IdentityVerifier } from '../../../src/identity/verify';
@@ -18,7 +23,24 @@ import type { MintAuthority } from '../../../src/tokens/mint';
 import type { FillResult } from '../../../src/types';
 import { createProvider, providerFetch, signToken } from '../../worker/support';
 
-export { BundleDO, DenialDO, DeployTokenDO, LeaseDO, TokenSignerDO } from '../../../src/index';
+export { BundleDO, DenialDO, DeployTokenDO, LeaseDO } from '../../../src/index';
+
+/** Calls into the key-set object and into the token signer shards' `getJwks`, in this runtime. */
+const keySetCalls = { keySetRead: 0, shardGetJwks: 0 };
+
+export class TokenKeySetDO extends StsTokenKeySetDO {
+  override async read(revokedKids: readonly string[]): Promise<TokenKeySetRead> {
+    keySetCalls.keySetRead += 1;
+    return await super.read(revokedKids);
+  }
+}
+
+export class TokenSignerDO extends StsTokenSignerDO {
+  override async getJwks(): Promise<TokenJwks> {
+    keySetCalls.shardGetJwks += 1;
+    return await super.getJwks();
+  }
+}
 
 /**
  * Test-only Worker for test/runtime; never deployed. `BROKER` binds its own `ProbeBroker`
@@ -353,6 +375,8 @@ export default {
         return new Response(String(fillsBuilt));
       case '/token-kid':
         return Response.json({ kid: await servedKid(env) });
+      case '/key-set-calls':
+        return Response.json(keySetCalls);
       case '/cold-tokens':
         return await coldTokens(env);
       case '/mint-authority':

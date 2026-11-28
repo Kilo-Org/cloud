@@ -6,6 +6,7 @@ import type { DeployTokenDO } from './dos/DeployTokenDO';
 import type { LeaseDO } from './dos/LeaseDO';
 import type { RefresherDO } from './dos/RefresherDO';
 import type { SignerDO } from './dos/SignerDO';
+import type { TokenKeySetDO } from './dos/TokenKeySetDO';
 import type { TokenSignerDO } from './dos/TokenSignerDO';
 
 function withoutTrailingSlash(value: string): string {
@@ -13,7 +14,7 @@ function withoutTrailingSlash(value: string): string {
 }
 
 /** An Ed25519 key's RFC 7638 thumbprint: SHA-256, base64url without padding. */
-const KidSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+export const KidSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 
 /** A comma list of token-signing key ids pulled out of service; empty by default (README). */
 const RevokedKidsSchema = z
@@ -129,6 +130,7 @@ export type Env = {
   STS_SIGNER_DO: DurableObjectNamespace<SignerDO>;
   STS_DENIAL_DO: DurableObjectNamespace<DenialDO>;
   STS_TOKEN_SIGNER_DO: DurableObjectNamespace<TokenSignerDO>;
+  STS_TOKEN_KEY_SET_DO: DurableObjectNamespace<TokenKeySetDO>;
   STS_LEASE_DO: DurableObjectNamespace<LeaseDO>;
   STS_DEPLOY_TOKEN_DO: DurableObjectNamespace<DeployTokenDO>;
   AUDIT_QUEUE: Queue;

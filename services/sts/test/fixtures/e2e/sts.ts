@@ -11,7 +11,7 @@ import { loadPolicies } from '../../../src/policy/load';
 import type { MintAuthority } from '../../../src/tokens/mint';
 import { E2E_SCOPES } from './scopes';
 
-export { DenialDO, LeaseDO, SignerDO, TokenSignerDO } from '../../../src/index';
+export { DenialDO, LeaseDO, SignerDO, TokenKeySetDO, TokenSignerDO } from '../../../src/index';
 
 /**
  * Test-only build of STS for the local end-to-end checks (README "Tests"); never deployed. It runs

@@ -63,6 +63,31 @@ it('keeps the signing key across a restart of the runtime with persisted storage
   expect(after).toEqual(before);
 }, 60_000);
 
+it('reads the key set on a cold isolate with one Durable Object call', async () => {
+  const persist = mkdtempSync(join(tmpdir(), 'sts-token-key-set-'));
+  directories.push(persist);
+
+  // The first runtime builds the key-set document from the four shards and stores it.
+  const first = await start(persist);
+  const before = await (await first.fetch('http://probe.test/token-kid')).json();
+  expect(await (await first.fetch('http://probe.test/key-set-calls')).json()).toEqual({
+    keySetRead: 1,
+    shardGetJwks: 4,
+  });
+  await first.dispose();
+  workers = [];
+
+  // A new runtime: a cold isolate and cold objects. Its read is one call to the key-set object,
+  // which answers from its stored document without calling a shard.
+  const second = await start(persist);
+  const after = await (await second.fetch('http://probe.test/token-kid')).json();
+  expect(after).toEqual(before);
+  expect(await (await second.fetch('http://probe.test/key-set-calls')).json()).toEqual({
+    keySetRead: 1,
+    shardGetJwks: 0,
+  });
+}, 60_000);
+
 it('answers two cold key-set requests and two cold mint calls each from work of its own', async () => {
   const logs: string[] = [];
   const worker = await start(false, logs);

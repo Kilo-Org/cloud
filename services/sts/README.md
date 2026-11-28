@@ -184,16 +184,35 @@ Each change appends one `ai.kilo.sts.token_key.rotated` event (`change`: `create
 `activated`, `removed`). `GET /.well-known/jwks.json` serves the next, current and retired keys
 with `Cache-Control: no-store`: removing a kid from this set is the only recall of an STS token
 (design 6.1), so no HTTP cache may hold it or serve it stale while STS answers 503; a verifier
-keeps its own copy for 5 minutes and never serves it longer. Each isolate serves it from memory
-for 5 minutes, together with the `TOKEN_SIGNING_KIDS_REVOKED` list it was built under; a request
-that finds no fresh copy, or a copy built under another list, calls the four shards itself, in
-parallel (each bounded at 5 s and retried like the manager key set), and stores the plain result
-only when all four answered; otherwise it answers 503 with `Retry-After: 30`. Requests that find the
-copy stale at the same moment each load it, because no promise is shared across requests: a few
-extra shard calls per isolate per 5 minutes, accepted. So a scheduled removal (a retired key
-leaving its ring) reaches verifiers up to 10 minutes later: up to 5 minutes in an isolate copy,
-then up to 5 in the verifier's. An emergency removal is filtered from every answer, so it reaches
-them within 5 minutes (see the runbook below for the rollout of the list itself).
+keeps its own copy for 5 minutes and never serves it longer.
+
+The set is one document, held by the environment's `TokenKeySetDO` (`eu` jurisdiction in
+production and staging), so a cold isolate reads it with one object call instead of one per shard.
+The object builds the document by reading the four shards in parallel (each bounded at 5 s and
+retried like the manager key set; each shard first applies its due ring changes), copies only the
+six public JWK fields of each key, stores it, and answers from it while all of these hold:
+
+- it was built under the `TOKEN_SIGNING_KIDS_REVOKED` list the reading isolate passes, so the
+  first read under a new list rebuilds it;
+- it is younger than 5 minutes, counted from the shard reads that built it;
+- no shard changed its ring since it answered: after every change (publication, activation,
+  removal, emergency removal) and before it answers its next call, a shard tells the object
+  (`invalidate`, bounded at 2 s), which marks the document stale and rebuilds it in its alarm at
+  once.
+
+A read that finds no such document rebuilds it and waits; when that rebuild fails, a stale
+document still inside its 5 minutes answers (an isolate copy would have served it as long), and
+otherwise STS answers 503 with `Retry-After: 30`. While reads arrive, the object's alarm rebuilds
+the document 1 minute before it expires, so reads do not wait for the shards; an idle document is
+left to expire. Concurrent reads share one rebuild. Each isolate keeps the answer in memory,
+together with the list it was read under, until 5 minutes after the shard reads that built the
+document, not after its own call, so the object's document and the isolate copy together are
+never older than 5 minutes. Requests of one isolate that find the copy stale at the same moment
+each make the object call, because no promise is shared across requests. So a scheduled removal
+(a retired key leaving its ring) reaches verifiers up to 10 minutes later: up to 5 minutes from the
+shard read in the object's document and an isolate copy, then up to 5 in the verifier's. An
+emergency removal is filtered from every answer, so it reaches them within 5 minutes (see the
+runbook below for the rollout of the list itself).
 
 ### Cost per request
 
@@ -221,8 +240,11 @@ them within 5 minutes (see the runbook below for the rollout of the list itself)
   compression; the relay refuses to send a message over `AUDIT_BATCH_MAX_COMPRESSED_BYTES` (60 KB,
   under the 128 KB queue message limit) or 1 MB decompressed and splits that batch in two, so at
   worst the message counts above double (288 a minute in total at 200,000).
-- **Key set:** one request per isolate per 5 minutes reaches the four shards (four object calls,
-  no row written); every other request is served from isolate memory.
+- **Key set:** a cold isolate, or one whose copy expired, makes one call to the key-set object
+  (no row written); every other request is served from isolate memory. The object reads the four
+  shards when it rebuilds its document: about once per 4 minutes while reads arrive, plus once
+  after each ring change (about 4 times per shard per 30 days), plus once per new revoked-kid
+  list. Each rebuild writes the document (one KV row) and at most one `setAlarm`.
 - **Rotation alarm:** each shard wakes for the next ring change (about 4 times per 30 days:
   publish, activate, remove) and for relays and prunes it already runs for its audit rows; each
   change writes the ring (one KV row), one audit row and one `setAlarm`.
@@ -239,8 +261,9 @@ key out of service:
    again and leaves it out of the key set. If it was the current key, the shard's `next` key goes
    too, because a leak of the shard's storage exposes both: a freshly generated key becomes current
    at once and a fresh next key is published. If it was a next key, a fresh next key is published.
-   The Worker also filters the listed kids out of every key-set answer and rebuilds its isolate
-   copy when the list changes. One `ai.kilo.sts.token_key.revoked` event per dropped key records
+   The Worker also filters the listed kids out of every key-set answer, and both its isolate copy
+   and the key-set object's document are rebuilt for the new list. One
+   `ai.kilo.sts.token_key.revoked` event per dropped key records
    the kid, its state, the cause (`listed`, or `same_ring` for the next key dropped with its
    current key) and the replacement kid.
 4. Remove the policy grant too if the workload itself is the problem (design 6.1).
@@ -306,16 +329,16 @@ revalidates each folder with its ETag, so an unchanged folder costs a 304.
 
 ### Internal Durable Objects
 
-`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`, `TokenSignerDO`, `LeaseDO` and `DeployTokenDO`
-are internal. Their methods skip the policy check and the audit row that `SecretsBroker` performs
+`BundleDO`, `RefresherDO`, `SignerDO`, `DenialDO`, `TokenSignerDO`, `TokenKeySetDO`, `LeaseDO` and
+`DeployTokenDO` are internal. Their methods skip the policy check and the audit row that `SecretsBroker` performs
 (the token signer signs what STS's policy check allowed, the lease and deploy-token objects lease
 and mint what it allowed), so no other Worker may reach them: a
 `durable_objects.bindings[].script_name`, workflow `script_name`, migration `from_script` or export
 `transfer_from` naming `sts`, `sts-staging` or `sts-local`, an `unsafe` binding, or an STS service
 binding at any entrypoint other than `SecretsBroker` fails `test/repo/worker-configs.test.ts`. A
 config outside `services/sts/` that binds a class named `BundleDO`, `RefresherDO`, `DenialDO`,
-`TokenSignerDO`, `LeaseDO` or `DeployTokenDO` fails too (`SignerDO` is also the audit relay's own
-class name).
+`TokenSignerDO`, `TokenKeySetDO`, `LeaseDO` or `DeployTokenDO` fails too (`SignerDO` is also the
+audit relay's own class name).
 
 ## Configuration
 
@@ -343,8 +366,8 @@ uses and that its `STS_ISSUER` equals `STS_ISSUERS` in `@kilocode/sts-contracts`
 
 Bindings: `AUDIT_QUEUE` (queue producer), the Hyperdrive bindings `LEASE_REPLICA_SWEEP_BINDINGS` names, `STS_BUNDLE_DO`, `STS_REFRESHER_DO`, `STS_SIGNER_DO`,
 `STS_DENIAL_DO`, `STS_TOKEN_SIGNER_DO` (migration `v3`), `STS_LEASE_DO` (migration `v4`),
-`STS_DEPLOY_TOKEN_DO` (migration `v5`). Trigger: cron `*/5 * * * *` in production and staging, `[]`
-in the local block.
+`STS_DEPLOY_TOKEN_DO` (migration `v5`), `STS_TOKEN_KEY_SET_DO` (migration `v6`). Trigger: cron
+`*/5 * * * *` in production and staging, `[]` in the local block.
 
 ## Policy
 

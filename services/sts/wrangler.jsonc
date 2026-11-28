@@ -75,6 +75,7 @@
       { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
       { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
       { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+      { "name": "STS_TOKEN_KEY_SET_DO", "class_name": "TokenKeySetDO" },
       { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
       { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
     ],
@@ -85,6 +86,7 @@
     { "tag": "v3", "new_sqlite_classes": ["TokenSignerDO"] },
     { "tag": "v4", "new_sqlite_classes": ["LeaseDO"] },
     { "tag": "v5", "new_sqlite_classes": ["DeployTokenDO"] },
+    { "tag": "v6", "new_sqlite_classes": ["TokenKeySetDO"] },
   ],
   "env": {
     "staging": {
@@ -122,6 +124,7 @@
           { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
           { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+          { "name": "STS_TOKEN_KEY_SET_DO", "class_name": "TokenKeySetDO" },
           { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
           { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
         ],
@@ -158,6 +161,7 @@
           { "name": "STS_SIGNER_DO", "class_name": "SignerDO" },
           { "name": "STS_DENIAL_DO", "class_name": "DenialDO" },
           { "name": "STS_TOKEN_SIGNER_DO", "class_name": "TokenSignerDO" },
+          { "name": "STS_TOKEN_KEY_SET_DO", "class_name": "TokenKeySetDO" },
           { "name": "STS_LEASE_DO", "class_name": "LeaseDO" },
           { "name": "STS_DEPLOY_TOKEN_DO", "class_name": "DeployTokenDO" },
         ],

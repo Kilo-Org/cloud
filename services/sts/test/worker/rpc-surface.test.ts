@@ -7,6 +7,7 @@ import { DeployTokenDO } from '../../src/dos/DeployTokenDO';
 import { LeaseDO } from '../../src/dos/LeaseDO';
 import { RefresherDO } from '../../src/dos/RefresherDO';
 import { SignerDO } from '../../src/dos/SignerDO';
+import { TokenKeySetDO } from '../../src/dos/TokenKeySetDO';
 import { TokenSignerDO } from '../../src/dos/TokenSignerDO';
 import {
   getBundleStub,
@@ -15,6 +16,7 @@ import {
   getLeaseStub,
   getRefresherStub,
   getSignerStub,
+  getTokenKeySetStub,
   getTokenSignerStub,
 } from '../../src/dos/stubs';
 import { stubOfflineNetwork } from './manager';
@@ -88,6 +90,15 @@ const surfaces: Record<string, Surface> = {
     rpc: ['alarm', 'getJwks', 'mint'],
     stub: () => getTokenSignerStub(env, config, 0),
     internal: [['currentKey', []]],
+  },
+  TokenKeySetDO: {
+    prototype: TokenKeySetDO.prototype,
+    rpc: ['alarm', 'invalidate', 'read'],
+    stub: () => getTokenKeySetStub(env, config),
+    internal: [
+      ['build', ['']],
+      ['rebuildOnce', ['']],
+    ],
   },
   // No binding to it in this pool; test/runtime calls its former `mintAuthority` over one.
   SecretsBroker: {

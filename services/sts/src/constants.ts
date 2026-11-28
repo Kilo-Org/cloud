@@ -122,8 +122,30 @@ export const TOKEN_KEY_PUBLISH_AHEAD_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export const TOKEN_KEY_RETIRED_GRACE_MS = TOKEN_CLOCK_SKEW_SECONDS * 1000;
 
-/** Each isolate serves the token key set from memory this long; the response itself is no-store. */
+/**
+ * The token key set is at most this old when STS serves it, counted from the shard reads that
+ * built it: the key-set object's document and each isolate's copy of it both expire this long after
+ * those reads, so the two layers never add up. The response itself is no-store.
+ */
 export const TOKEN_JWKS_CACHE_MS = 5 * 60 * 1000;
+
+/** While reads arrive, the key-set object rebuilds its document this long before it expires. */
+export const TOKEN_KEY_SET_REFRESH_AHEAD_MS = 60 * 1000;
+
+/** After a failed background rebuild, the key-set object tries again after this long. */
+export const TOKEN_KEY_SET_RETRY_MS = 5_000;
+
+/**
+ * STS stops waiting for the key-set object after this long: past the object's own bound on a
+ * rebuild (`TOKEN_SIGNER_DEADLINE_MS` per shard, in parallel).
+ */
+export const TOKEN_KEY_SET_DEADLINE_MS = TOKEN_SIGNER_DEADLINE_MS + 1_000;
+
+/**
+ * A token signer waits this long for the key-set object to take note of a ring change before it
+ * goes on; a missed note leaves the document to expire on its own (`TOKEN_JWKS_CACHE_MS`).
+ */
+export const TOKEN_KEY_SET_NOTIFY_DEADLINE_MS = 2_000;
 
 /**
  * Token signer objects per environment. STS picks one at random per mint call, so the instances

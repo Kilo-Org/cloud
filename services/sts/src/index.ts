@@ -5,6 +5,7 @@ export { DeployTokenDO } from './dos/DeployTokenDO';
 export { LeaseDO } from './dos/LeaseDO';
 export { RefresherDO } from './dos/RefresherDO';
 export { SignerDO } from './dos/SignerDO';
+export { TokenKeySetDO } from './dos/TokenKeySetDO';
 export { TokenSignerDO } from './dos/TokenSignerDO';
 
 import { withDORetry } from '@kilocode/worker-utils';

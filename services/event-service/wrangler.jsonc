@@ -17,6 +17,12 @@
     // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
     // value refuses every read. The `sts` source never falls back to the Secrets Store.
     "SECRETS_SOURCE": "secrets-store",
+    // Background check that the STS bundle and the Secrets Store hold the same NEXTAUTH_SECRET
+    // bytes, under either source (src/secrets-compare.ts): once per isolate, on the first accepted
+    // `/connect-ticket` bearer whose own read supplied the verified value. Only `true`
+    // turns it on, and only when WORKER_ENV is `production` (local dev sets `development`); it
+    // never changes the source, a response or the verifier's cache.
+    "SECRETS_COMPARE_ENABLED": "true",
   },
   "routes": [
     {
@@ -49,7 +55,8 @@
 
   // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
   // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
-  // event-service.yaml grants NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+  // event-service.yaml grants NEXTAUTH_SECRET. While SECRETS_SOURCE is `secrets-store`, the only
+  // reader is the background comparison that SECRETS_COMPARE_ENABLED turns on.
   "services": [
     {
       "binding": "STS",

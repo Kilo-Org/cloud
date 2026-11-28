@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BundleBinding } from '@kilocode/secrets-client';
 import {
   clearSecretCacheForTest,
   EVENT_SERVICE_AUDIENCE,
@@ -6,6 +7,7 @@ import {
 } from '@kilocode/worker-utils';
 import { type KiloUserPepperResult } from '@kilocode/worker-utils/kilo-token-auth';
 import { type AuthEnv, authenticateToken } from '../auth';
+import { SECRET_UNAVAILABLE_EVENT } from '../secrets';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const currentPepperByUserId = new Map<string, KiloUserPepperResult>();
@@ -246,5 +248,107 @@ describe('authenticateToken', () => {
         getUserPepper: async () => Promise.reject(new Error('lookup unavailable')),
       })
     ).rejects.toThrow('lookup unavailable');
+  });
+});
+
+describe('authenticateToken signer-read labels', () => {
+  const labels = {
+    route: 'connect_ticket',
+    secret: 'NEXTAUTH_SECRET',
+    source: 'secrets-store',
+  } as const;
+
+  function captureLabels() {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    return {
+      unavailable: () =>
+        error.mock.calls.filter(call => call[0] === SECRET_UNAVAILABLE_EVENT).map(call => call[1]),
+      count: () => log.mock.calls.length + warn.mock.calls.length + error.mock.calls.length,
+      text: () => JSON.stringify([log.mock.calls, warn.mock.calls, error.mock.calls]),
+    };
+  }
+
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    currentPepperByUserId.clear();
+    currentPepperByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('logs nothing for a missing, refused or accepted bearer', async () => {
+    const logs = captureLabels();
+    const [stale, current] = await Promise.all([
+      signEventServiceToken({ pepper: 'pepper-stale', env: 'production' }),
+      signEventServiceToken({ pepper: 'pepper-current', env: 'production' }),
+    ]);
+
+    await expect(authenticateTestToken(null)).resolves.toBeNull();
+    await expect(authenticateTestToken(stale.token)).resolves.toBeNull();
+    await expect(authenticateTestToken(current.token)).resolves.toEqual({
+      userId: 'user-xyz-789',
+    });
+
+    expect(logs.count()).toBe(0);
+  });
+
+  it.each<[string, Partial<AuthEnv>, string | RegExp]>([
+    [
+      'read_failed',
+      { NEXTAUTH_SECRET: { get: async () => Promise.reject(new Error('store down')) } },
+      'store down',
+    ],
+    ['binding_missing', { NEXTAUTH_SECRET: undefined }, /NEXTAUTH_SECRET is not configured/],
+    ['empty', { NEXTAUTH_SECRET: { get: async () => '' } }, /not configured/],
+  ])('labels a %s signer read and keeps its error', async (reason, override, error) => {
+    const logs = captureLabels();
+    const { token } = await signEventServiceToken({ pepper: 'pepper-current', env: 'production' });
+
+    await expect(
+      authenticateToken(token, { ...makeEnv(), ...override }, { getUserPepper })
+    ).rejects.toThrow(error);
+
+    expect(logs.unavailable()).toEqual([{ ...labels, reason }]);
+    expect(logs.count()).toBe(1);
+    expect(logs.text()).not.toContain(TEST_JWT_SECRET);
+    expect(logs.text()).not.toContain(token);
+  });
+
+  it('labels an unknown source as invalid without echoing its value', async () => {
+    const logs = captureLabels();
+    const { token } = await signEventServiceToken({ pepper: 'pepper-current', env: 'production' });
+
+    await expect(
+      authenticateToken(token, { ...makeEnv(), SECRETS_SOURCE: 'infisical' }, { getUserPepper })
+    ).rejects.toThrow(/SECRETS_SOURCE/);
+
+    expect(logs.unavailable()).toEqual([
+      { ...labels, source: 'invalid', reason: 'invalid_source' },
+    ]);
+    expect(logs.text()).not.toContain('infisical');
+  });
+
+  it('labels an STS denial with the client reason and never reads the legacy binding', async () => {
+    const logs = captureLabels();
+    const get = vi.fn(async () => TEST_JWT_SECRET);
+    const sts = {
+      getBundle: async () => ({ status: 'denied', reason: 'unknown_workload' }) as const,
+    } satisfies BundleBinding;
+    const { token } = await signEventServiceToken({ pepper: 'pepper-current', env: 'production' });
+
+    await expect(
+      authenticateToken(
+        token,
+        { ...makeEnv(), SECRETS_SOURCE: 'sts', STS: sts, NEXTAUTH_SECRET: { get } },
+        { getUserPepper }
+      )
+    ).rejects.toThrow();
+
+    expect(get).not.toHaveBeenCalled();
+    expect(logs.unavailable()).toEqual([{ ...labels, source: 'sts', reason: 'denied' }]);
   });
 });

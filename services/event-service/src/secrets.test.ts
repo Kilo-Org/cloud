@@ -1,6 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SecretUnavailableError, type BundleBinding } from '@kilocode/secrets-client';
-import { readEventServiceSecret, secretsSource, type EventServiceSecretName } from './secrets';
+import {
+  readBundleSecret,
+  readEventServiceSecret,
+  resetStsReadMarkerForTest,
+  secretRefusal,
+  secretsSource,
+  secretsSourceLabel,
+  STS_SOURCE_READ_EVENT,
+  type EventServiceSecretName,
+  type EventServiceSecretsEnv,
+} from './secrets';
 
 const NAMES: EventServiceSecretName[] = ['NEXTAUTH_SECRET'];
 const ETAG = '"0123456789abcdef"';
@@ -42,6 +52,12 @@ describe('secretsSource', () => {
 
   it('fails closed on an unknown source', () => {
     expect(() => secretsSource({ SECRETS_SOURCE: 'infisical' })).toThrow(/SECRETS_SOURCE/);
+  });
+
+  it('labels an unknown source as invalid instead of echoing it', () => {
+    expect(secretsSourceLabel({})).toBe('secrets-store');
+    expect(secretsSourceLabel({ SECRETS_SOURCE: 'sts' })).toBe('sts');
+    expect(secretsSourceLabel({ SECRETS_SOURCE: 'infisical' })).toBe('invalid');
   });
 });
 
@@ -114,5 +130,67 @@ describe('readEventServiceSecret', () => {
     expect(await readEventServiceSecret(env, 'NEXTAUTH_SECRET')).toBe('bundle-nextauth');
     expect(await readEventServiceSecret(env, 'NEXTAUTH_SECRET')).toBe('bundle-nextauth');
     expect(sts.getBundle).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the selected STS read marker', () => {
+  beforeEach(() => {
+    resetStsReadMarkerForTest();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function markerLines(log: { mock: { calls: unknown[][] } }) {
+    return log.mock.calls.filter(call => call[0] === STS_SOURCE_READ_EVENT);
+  }
+
+  it('logs once, on the first non-empty value the sts source serves', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const empty = stsBinding(okBundle({ NEXTAUTH_SECRET: '' }));
+    const served = stsBinding(okBundle({ NEXTAUTH_SECRET: 'bundle-nextauth' }));
+
+    await readEventServiceSecret({ STS: empty.binding, SECRETS_SOURCE: 'sts' }, 'NEXTAUTH_SECRET');
+    expect(markerLines(log)).toEqual([]);
+
+    const env = { STS: served.binding, SECRETS_SOURCE: 'sts' };
+    await readEventServiceSecret(env, 'NEXTAUTH_SECRET');
+    await readEventServiceSecret(env, 'NEXTAUTH_SECRET');
+
+    expect(markerLines(log)).toEqual([[STS_SOURCE_READ_EVENT, { source: 'sts' }]]);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('bundle-nextauth');
+  });
+
+  it('is never logged by the legacy source or a raw bundle read', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const sts = stsBinding(okBundle({ NEXTAUTH_SECRET: 'bundle-nextauth' }));
+
+    await readEventServiceSecret(
+      { NEXTAUTH_SECRET: 'legacy-value', STS: sts.binding },
+      'NEXTAUTH_SECRET'
+    );
+    expect(await readBundleSecret(sts.binding, 'NEXTAUTH_SECRET')).toBe('bundle-nextauth');
+
+    expect(markerLines(log)).toEqual([]);
+  });
+});
+
+describe('secretRefusal', () => {
+  const store = { get: async () => 'legacy-value' };
+  const sts = stsBinding().binding;
+
+  it.each<[string, EventServiceSecretsEnv, unknown]>([
+    ['invalid_source', { SECRETS_SOURCE: 'infisical', NEXTAUTH_SECRET: store }, new Error('x')],
+    ['binding_missing', {}, new Error('x')],
+    ['binding_missing', { SECRETS_SOURCE: 'sts' }, new Error('x')],
+    ['read_failed', { NEXTAUTH_SECRET: store }, new Error('x')],
+    ['missing', { SECRETS_SOURCE: 'sts', STS: sts }, new SecretUnavailableError('missing')],
+    ['not_granted', { SECRETS_SOURCE: 'sts', STS: sts }, new SecretUnavailableError('not_granted')],
+    ['denied', { SECRETS_SOURCE: 'sts', STS: sts }, new SecretUnavailableError('denied')],
+    ['unavailable', { SECRETS_SOURCE: 'sts', STS: sts }, new SecretUnavailableError('unavailable')],
+    ['read_failed', { SECRETS_SOURCE: 'sts', STS: sts }, new Error('x')],
+  ])('names %s from fixed values only', (reason, env, error) => {
+    expect(secretRefusal(env, 'NEXTAUTH_SECRET', error)).toBe(reason);
   });
 });

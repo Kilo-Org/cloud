@@ -1,14 +1,4 @@
-# The cloudflare-security-sync Worker (services/security-sync/wrangler.jsonc). Production only: the
-# config has no staging block, and its `dev` block binds no STS. It asks the web app to dispatch
-# security notifications with a web:security-notifications.dispatch token over its `STS`
-# SecretsBroker binding (WEB_INTERNAL_AUTH=sts).
+# Registration only: services/security-sync/wrangler.jsonc. No environment, identity or grant.
 workload: cloudflare-security-sync
-environments:
-  - production
-identity:
-  kind: worker-binding
+registered: true
 secrets: []
-audiences:
-  - web
-scopes:
-  - web:security-notifications.dispatch

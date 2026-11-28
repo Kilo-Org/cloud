@@ -473,7 +473,6 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `container-usage-meter` | `web`: `web:compute-balance-alert.send` | in its file | production |
 | `cloudflare-scim-sync` | `web`: `web:scim.sync` | none | production |
 | `user-data-export` | `web`: `web:user-data-exports.ready` | none | production |
-| `cloudflare-security-sync` | `web`: `web:security-notifications.dispatch` | none | production |
 | `security-auto-analysis` | `web`: `web:security-notifications.lifecycle` | none | production |
 | `auto-routing-benchmark` | `web`: `web:auto-routing.pool-pins.write`, `web:usage.receipts.read`, `web:auto-routing.production-profile.read`, `web:usage.benchmark-grader.record` | none | production |
 | `auto-routing` | `web`: `web:usage.classifier.record`; `auto-routing-benchmark`: `auto-routing-benchmark:routing-tables.read` | none | production |
@@ -555,11 +554,6 @@ Workloads with a policy, all over `worker-binding`:
 | `user-data-export` | production | `services/user-data-export/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
 | `kilo-ops` | production | `services/kilo-ops/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc`; reads stay on the Worker secret and Secrets Store bindings until `SECRETS_SOURCE` is `sts` |
-| `cloudflare-security-sync` | production | `services/security-sync/wrangler.jsonc` |
-
-The phase 2 C1 grants make policies of several of these Workers. Each config's production STS
-binding arrives with that Worker's own change; until then the repository check in
-`test/repo/worker-configs.test.ts` fails for it.
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.

@@ -925,15 +925,12 @@ describe('phase 4 service scopes and CI scopes under the shipped policies', () =
     ],
   };
   /**
-   * The phase 2 C1 grants of phase 4 scopes, production only: Security Sync's dispatch, and the web
-   * app's manual sync and finding dismissal enqueues at Security Sync.
+   * The phase 2 C1 grants of phase 4 scopes, production only: the web app's manual sync and finding
+   * dismissal enqueues at Security Sync.
    */
   const PRODUCTION_GRANTED: Readonly<
     Record<string, readonly { audience: string; scope: string }[]>
-  > = {
-    'cloudflare-security-sync': [STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
-    web: [STS_SECURITY_SYNC_MANUAL_SYNC, STS_SECURITY_SYNC_DISMISS_FINDING],
-  };
+  > = { web: [STS_SECURITY_SYNC_MANUAL_SYNC, STS_SECURITY_SYNC_DISMISS_FINDING] };
   const shipped = STS_ENVIRONMENTS.flatMap(environment =>
     defaultMintAuthority.policies
       .forEnvironment(environment)
@@ -1073,19 +1070,17 @@ describe('phase 4 service scopes and CI scopes under the shipped policies', () =
   );
 
   it.each(STS_ENVIRONMENTS)(
-    'refuses the Security Sync workload its own scopes in %s, and serves it in production only',
+    'refuses the registered-only Security Sync workload its own scopes and the web dispatch in %s',
     async environment => {
-      // cloudflare-security-sync.yaml is a production policy whose one audience is web.
-      for (const entry of [STS_SECURITY_SYNC_MANUAL_SYNC, STS_SECURITY_SYNC_DISMISS_FINDING]) {
+      // cloudflare-security-sync.yaml is a registration: STS answers for it as for a name with no file.
+      for (const entry of [
+        STS_SECURITY_SYNC_MANUAL_SYNC,
+        STS_SECURITY_SYNC_DISMISS_FINDING,
+        STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+      ]) {
         expect(await mintAsShipped(environment, 'cloudflare-security-sync', entry)).toEqual({
           status: 'ok',
-          tokens: [
-            {
-              status: 'denied',
-              ...entry,
-              reason: environment === 'production' ? 'audience_not_allowed' : 'unknown_workload',
-            },
-          ],
+          tokens: [{ status: 'denied', ...entry, reason: 'unknown_workload' }],
         });
       }
     }
@@ -1101,7 +1096,6 @@ describe('phase 2 C1 grants under the shipped policies', () => {
     [STS_WEB_COMPUTE_BALANCE_ALERT, 'container-usage-meter'],
     [STS_WEB_SCIM_SYNC, 'cloudflare-scim-sync'],
     [STS_WEB_USER_DATA_EXPORT_READY, 'user-data-export'],
-    [STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH, 'cloudflare-security-sync'],
     [STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE, 'security-auto-analysis'],
     [STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE, 'auto-routing-benchmark'],
     [STS_WEB_USAGE_RECEIPTS_READ, 'auto-routing-benchmark'],

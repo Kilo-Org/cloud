@@ -62,9 +62,15 @@ import {
   DIRECT_BYOK_PROVIDERS_LIST,
   getByokProviderDisplayName,
 } from '@/lib/byok/provider-names';
+import type { BYOKApiKeyResponse } from '@/lib/byok/types';
 import { cn } from '@/lib/utils';
 import type { BYOKKeyTestResult } from '@/lib/byok/types';
 import * as z from 'zod';
+import {
+  usePrivateProviderCatalogModelIds,
+  type PrivateProviderCatalogModelIds,
+} from './usePrivateProviderCatalogModelIds';
+import { ByokPrivateProviderDialog } from './ByokPrivateProviderDialog';
 
 export {
   getStructuredCredentialKind,
@@ -78,6 +84,49 @@ export {
  */
 function apiKeyObjectLabel(providerName: string): string {
   return providerName.endsWith('API key') ? providerName : `${providerName} API key`;
+}
+
+type NamedKey = Pick<BYOKApiKeyResponse, 'provider_id' | 'provider_name' | 'is_private_provider'>;
+
+/** A private provider is named by the organization; every other key by its provider. */
+function keyDisplayName(key: NamedKey): string {
+  return key.is_private_provider ? key.provider_name : getByokProviderDisplayName(key.provider_id);
+}
+
+function keyObjectLabel(key: NamedKey): string {
+  return key.is_private_provider
+    ? `${key.provider_name} private provider`
+    : apiKeyObjectLabel(keyDisplayName(key));
+}
+
+function privateModelLabels(key: BYOKApiKeyResponse): string[] {
+  return (key.private_provider?.models ?? []).map(model => {
+    const id = key.serve_catalog_models ? model.id : `${key.provider_id}/${model.id}`;
+    return model.name ? `${model.name} (${id})` : id;
+  });
+}
+
+/** Warns about the models of a catalog-mode private provider that no catalog id names, which it does not serve. */
+function PrivateProviderCatalogModelWarning({
+  models,
+  catalogModelIds,
+}: {
+  models: string[];
+  catalogModelIds: PrivateProviderCatalogModelIds | null;
+}) {
+  if (!catalogModelIds) return null;
+  const unserved = models.filter(
+    id => catalogModelIds.checked.has(id) && !catalogModelIds.served.has(id)
+  );
+  if (unserved.length === 0) return null;
+  const all = unserved.length === models.length;
+  return (
+    <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+      {all
+        ? 'None of this private provider’s model IDs is a Kilo catalog model ID, so it serves no requests in catalog mode.'
+        : `${unserved.length} of this private provider’s model IDs ${unserved.length === 1 ? 'is' : 'are'} not Kilo catalog model IDs and ${unserved.length === 1 ? 'is' : 'are'} not served in catalog mode: ${unserved.slice(0, 3).join(', ')}${unserved.length > 3 ? ', …' : ''}.`}
+    </p>
+  );
 }
 
 function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
@@ -134,14 +183,14 @@ function SupportedModelsList({ models }: { models: string[] }) {
 }
 
 function CatalogModeSetting({
-  providerName,
+  keyLabel,
   enabled,
   canChange,
   isOrganizationKey,
   isPending,
   onChange,
 }: {
-  providerName: string;
+  keyLabel: string;
   enabled: boolean;
   canChange: boolean;
   isOrganizationKey: boolean;
@@ -155,7 +204,7 @@ function CatalogModeSetting({
           checked={enabled}
           onCheckedChange={onChange}
           disabled={!canChange || isPending}
-          aria-label={`Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}`}
+          aria-label={`Use Kilo catalog model IDs for the ${keyLabel}`}
         />
         <span className="text-muted-foreground text-xs">Use Kilo catalog model IDs</span>
       </div>
@@ -195,21 +244,21 @@ function reorderButtonId(keyId: string, direction: ReorderDirection) {
 
 function KeyPriorityControls({
   keyId,
-  providerName,
+  keyLabel,
   position,
   count,
   saving,
   onMove,
 }: {
   keyId: string;
-  providerName: string;
+  keyLabel: string;
   position: number;
   count: number;
   /** Moves wait for the previous save. The buttons stay focusable so keyboard focus survives. */
   saving: boolean;
   onMove: (direction: ReorderDirection) => void;
 }) {
-  const label = apiKeyObjectLabel(providerName);
+  const label = keyLabel;
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm tabular-nums">
@@ -340,6 +389,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [reorderAnnouncement, setReorderAnnouncement] = useState('');
+  const [privateProviderDialog, setPrivateProviderDialog] = useState<{
+    open: boolean;
+    editingKeyId: string | null;
+  }>({ open: false, editingKeyId: null });
   const [pendingFocus, setPendingFocus] = useState<{
     keyId: string;
     index: number;
@@ -359,6 +412,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
   const { data: experimentalByokEnabled = false } = useQuery(
     trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
+  );
+  const { data: privateProvidersEnabled = false } = useQuery(
+    trpc.byok.privateProvidersEnabled.queryOptions(listQueryInput)
   );
   const addableProviders = ADD_BYOK_PROVIDERS.filter(
     provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
@@ -553,18 +609,22 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
 
   const handleEdit = (keyId: string) => {
+    const key = keys?.find(k => k.id === keyId);
+    if (key?.is_private_provider) {
+      setPrivateProviderDialog({ open: true, editingKeyId: keyId });
+      return;
+    }
     setEditingKeyId(keyId);
-    const key = keys?.find((k: { id: string; provider_id: string }) => k.id === keyId);
     if (key) {
       setSelectedProvider(key.provider_id);
     }
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (keyId: string, providerName: string) => {
+  const handleDelete = async (keyId: string, keyLabel: string) => {
     if (
       await confirm({
-        title: `Delete the ${apiKeyObjectLabel(providerName)}?`,
+        title: `Delete the ${keyLabel}?`,
         description: 'This key will be removed and can no longer be used for requests.',
         confirmLabel: 'Delete key',
         destructive: true,
@@ -575,20 +635,20 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
 
   const handleToggleCatalogMode = async (
-    key: { id: string; provider_id: string },
+    key: NamedKey & { id: string },
     serve_catalog_models: boolean
   ) => {
-    const providerName = getByokProviderDisplayName(key.provider_id);
+    const label = keyObjectLabel(key);
     const prefix = `${key.provider_id}/`;
     const confirmed = await confirm(
       serve_catalog_models
         ? {
-            title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
+            title: `Use Kilo catalog model IDs for the ${label}?`,
             description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For eligible OpenAI requests, linked ChatGPT billing takes precedence; BYOK fallback follows the ordinary key priority order.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {
-            title: `Use provider model IDs for the ${apiKeyObjectLabel(providerName)}?`,
+            title: `Use provider model IDs for the ${label}?`,
             description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model and provider restrictions no longer apply to requests through this key.' : ''}`,
             confirmLabel: 'Use provider model IDs',
             destructive: !!organizationId,
@@ -611,7 +671,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     const reordered = keyIds.with(index, swappedId).with(target, movedId);
     const movedKey = keys?.find(key => key.id === movedId);
     setReorderAnnouncement(
-      `${apiKeyObjectLabel(getByokProviderDisplayName(movedKey?.provider_id ?? ''))} moved to priority ${target + 1} of ${keyIds.length}.`
+      `${movedKey ? keyObjectLabel(movedKey) : 'Key'} moved to priority ${target + 1} of ${keyIds.length}.`
     );
     setPendingFocus({ keyId: movedId, index: target, direction });
     reorderMutation.mutate(
@@ -659,6 +719,21 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setPendingFocus(null);
   }, [pendingFocus, listedKeyOrder]);
 
+  // The "Sign in with ChatGPT" connection is stored in this table under its own
+  // provider id, but it is not a pasted key: the card above the list owns it, so
+  // it never appears here with edit, toggle, test or delete controls.
+  const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
+  const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
+  const catalogModePrivateModelIds =
+    listedKeys
+      ?.filter(key => key.is_private_provider && key.serve_catalog_models)
+      .flatMap(key => key.private_provider?.models.map(model => model.id) ?? []) ?? [];
+  const privateProviderCatalogModelIds = usePrivateProviderCatalogModelIds(
+    organizationId ?? '',
+    catalogModePrivateModelIds,
+    !!organizationId && catalogModePrivateModelIds.length > 0
+  );
+
   if (keysLoading) {
     return (
       <div className="space-y-4">
@@ -680,11 +755,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     );
   }
 
-  // The "Sign in with ChatGPT" connection is stored in this table under its own
-  // provider id, but it is not a pasted key: the card above the list owns it, so
-  // it never appears here with edit, toggle, test or delete controls.
-  const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
-  const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
   const canReorder = listedKeyIds.length > 1;
 
   // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.
@@ -708,10 +778,22 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           <div className="flex flex-col gap-2">
             <CardTitle>BYOK API Keys</CardTitle>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)} size="sm">
-            <Plus className="mr-2 size-4" />
-            Add Key
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {organizationId && privateProvidersEnabled ? (
+              <Button
+                onClick={() => setPrivateProviderDialog({ open: true, editingKeyId: null })}
+                size="sm"
+                variant="outline"
+              >
+                <Plus className="mr-2 size-4" />
+                Add private provider
+              </Button>
+            ) : null}
+            <Button onClick={() => setIsDialogOpen(true)} size="sm">
+              <Plus className="mr-2 size-4" />
+              Add Key
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {canReorder ? (
@@ -754,155 +836,154 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </tr>
                 </thead>
                 <tbody role="rowgroup" className="block @2xl:table-row-group">
-                  {listedKeys.map(
-                    (
-                      key: {
-                        id: string;
-                        provider_id: string;
-                        created_at: string;
-                        management_source: 'user' | 'coding_plan';
-                        is_enabled: boolean;
-                        serve_catalog_models: boolean;
-                        supports_catalog_mode: boolean;
-                        can_change_catalog_mode: boolean;
-                      },
-                      index: number
-                    ) => {
-                      const isManaged = !organizationId && key.management_source === 'coding_plan';
-                      return (
-                        <tr
-                          key={key.id}
-                          role="row"
+                  {listedKeys.map((key, index) => {
+                    const isManaged = !organizationId && key.management_source === 'coding_plan';
+                    const displayName = keyDisplayName(key);
+                    const objectLabel = keyObjectLabel(key);
+                    return (
+                      <tr
+                        key={key.id}
+                        role="row"
+                        className={cn(
+                          'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b p-4 last:border-0 @2xl:table-row @2xl:p-0',
+                          !key.is_enabled && 'bg-muted/20'
+                        )}
+                      >
+                        {canReorder ? (
+                          <td role="cell" className="col-span-2 @2xl:table-cell @2xl:p-4">
+                            <KeyPriorityControls
+                              keyId={key.id}
+                              keyLabel={objectLabel}
+                              position={index + 1}
+                              count={listedKeyIds.length}
+                              saving={reorderMutation.isPending}
+                              onMove={direction => handleMove(listedKeyIds, index, direction)}
+                            />
+                          </td>
+                        ) : null}
+                        <td
+                          role="cell"
                           className={cn(
-                            'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b p-4 last:border-0 @2xl:table-row @2xl:p-0',
-                            !key.is_enabled && 'bg-muted/20'
+                            'col-span-2 min-w-0 @2xl:table-cell @2xl:p-4',
+                            !key.is_enabled && 'text-muted-foreground'
                           )}
                         >
-                          {canReorder ? (
-                            <td role="cell" className="col-span-2 @2xl:table-cell @2xl:p-4">
-                              <KeyPriorityControls
-                                keyId={key.id}
-                                providerName={getByokProviderDisplayName(key.provider_id)}
-                                position={index + 1}
-                                count={listedKeyIds.length}
-                                saving={reorderMutation.isPending}
-                                onMove={direction => handleMove(listedKeyIds, index, direction)}
-                              />
-                            </td>
+                          <div className="break-words">{displayName}</div>
+                          {key.is_private_provider ? (
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              Private provider
+                              {key.private_provider
+                                ? ` · ${key.private_provider.models.length} model${key.private_provider.models.length === 1 ? '' : 's'}`
+                                : ''}
+                            </p>
                           ) : null}
-                          <td
-                            role="cell"
-                            className={cn(
-                              'col-span-2 min-w-0 @2xl:table-cell @2xl:p-4',
-                              !key.is_enabled && 'text-muted-foreground'
-                            )}
-                          >
-                            <div className="break-words">
-                              {getByokProviderDisplayName(key.provider_id)}
-                            </div>
-                            {isManaged ? (
-                              <p className="text-muted-foreground mt-1 text-xs">
-                                {getCodingPlanManagedKeyLabel(
-                                  getByokProviderDisplayName(key.provider_id)
-                                )}
-                              </p>
-                            ) : null}
-                            <SupportedModelsList
-                              models={getProviderModels(key.provider_id, key.serve_catalog_models)}
+                          {isManaged ? (
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              {getCodingPlanManagedKeyLabel(displayName)}
+                            </p>
+                          ) : null}
+                          <SupportedModelsList
+                            models={
+                              key.is_private_provider
+                                ? privateModelLabels(key)
+                                : getProviderModels(key.provider_id, key.serve_catalog_models)
+                            }
+                          />
+                          {key.is_private_provider &&
+                          key.serve_catalog_models &&
+                          key.private_provider ? (
+                            <PrivateProviderCatalogModelWarning
+                              models={key.private_provider.models.map(model => model.id)}
+                              catalogModelIds={privateProviderCatalogModelIds}
                             />
-                            {/* Shown while enabled so a key can leave catalog mode after its
+                          ) : null}
+                          {/* Shown while enabled so a key can leave catalog mode after its
                                 provider loses every catalog mapping. */}
-                            {key.supports_catalog_mode || key.serve_catalog_models ? (
-                              <CatalogModeSetting
-                                providerName={getByokProviderDisplayName(key.provider_id)}
-                                enabled={key.serve_catalog_models}
-                                canChange={key.can_change_catalog_mode}
-                                isOrganizationKey={!!organizationId}
-                                isPending={setCatalogModeMutation.isPending}
-                                onChange={serveCatalogModels =>
-                                  handleToggleCatalogMode(key, serveCatalogModels)
+                          {key.supports_catalog_mode || key.serve_catalog_models ? (
+                            <CatalogModeSetting
+                              keyLabel={objectLabel}
+                              enabled={key.serve_catalog_models}
+                              canChange={key.can_change_catalog_mode}
+                              isOrganizationKey={!!organizationId}
+                              isPending={setCatalogModeMutation.isPending}
+                              onChange={serveCatalogModels =>
+                                handleToggleCatalogMode(key, serveCatalogModels)
+                              }
+                            />
+                          ) : null}
+                        </td>
+                        <td
+                          role="cell"
+                          className="text-muted-foreground col-span-2 text-sm @2xl:table-cell @2xl:p-4 @2xl:text-base"
+                        >
+                          <span className="@2xl:hidden" aria-hidden="true">
+                            Created{' '}
+                          </span>
+                          {new Date(key.created_at).toLocaleDateString()}
+                        </td>
+                        <td role="cell" className="@2xl:table-cell @2xl:p-4">
+                          <div className="flex items-center gap-3">
+                            {!isManaged ? (
+                              <Switch
+                                checked={key.is_enabled}
+                                onCheckedChange={isEnabled =>
+                                  handleToggleEnabled(key.id, isEnabled)
                                 }
+                                disabled={setEnabledMutation.isPending}
+                                aria-label={`Toggle ${objectLabel}`}
                               />
                             ) : null}
-                          </td>
-                          <td
-                            role="cell"
-                            className="text-muted-foreground col-span-2 text-sm @2xl:table-cell @2xl:p-4 @2xl:text-base"
-                          >
-                            <span className="@2xl:hidden" aria-hidden="true">
-                              Created{' '}
+                            <span
+                              className={cn('text-sm', !isManaged && 'sr-only @sm:not-sr-only')}
+                            >
+                              {key.is_enabled ? 'Enabled' : 'Disabled'}
                             </span>
-                            {new Date(key.created_at).toLocaleDateString()}
-                          </td>
-                          <td role="cell" className="@2xl:table-cell @2xl:p-4">
-                            <div className="flex items-center gap-3">
-                              {!isManaged ? (
-                                <Switch
-                                  checked={key.is_enabled}
-                                  onCheckedChange={isEnabled =>
-                                    handleToggleEnabled(key.id, isEnabled)
-                                  }
-                                  disabled={setEnabledMutation.isPending}
-                                  aria-label={`Toggle ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
-                                />
-                              ) : null}
-                              <span
-                                className={cn('text-sm', !isManaged && 'sr-only @sm:not-sr-only')}
-                              >
-                                {key.is_enabled ? 'Enabled' : 'Disabled'}
-                              </span>
-                            </div>
-                          </td>
-                          <td role="cell" className="@2xl:table-cell @2xl:p-4">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() =>
-                                  testMutation.mutate({
-                                    ...(organizationId && { organizationId }),
-                                    id: key.id,
-                                  })
-                                }
-                                disabled={testMutation.isPending}
-                                title="Test API key"
-                                aria-label={`Test ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
-                              >
-                                <FlaskConical className="size-4" />
-                              </Button>
-                              {!isManaged ? (
-                                <>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => handleEdit(key.id)}
-                                    disabled={updateMutation.isPending}
-                                    aria-label={`Update ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
-                                  >
-                                    <Edit className="size-4" />
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleDelete(
-                                        key.id,
-                                        getByokProviderDisplayName(key.provider_id)
-                                      )
-                                    }
-                                    disabled={deleteMutation.isPending}
-                                    aria-label={`Delete ${apiKeyObjectLabel(getByokProviderDisplayName(key.provider_id))}`}
-                                  >
-                                    <Trash2 className="size-4" />
-                                  </Button>
-                                </>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
+                          </div>
+                        </td>
+                        <td role="cell" className="@2xl:table-cell @2xl:p-4">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                testMutation.mutate({
+                                  ...(organizationId && { organizationId }),
+                                  id: key.id,
+                                })
+                              }
+                              disabled={testMutation.isPending}
+                              title="Test API key"
+                              aria-label={`Test ${objectLabel}`}
+                            >
+                              <FlaskConical className="size-4" />
+                            </Button>
+                            {!isManaged ? (
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleEdit(key.id)}
+                                  disabled={updateMutation.isPending}
+                                  aria-label={`Update ${objectLabel}`}
+                                >
+                                  <Edit className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleDelete(key.id, objectLabel)}
+                                  disabled={deleteMutation.isPending}
+                                  aria-label={`Delete ${objectLabel}`}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1327,6 +1408,22 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {organizationId ? (
+          <ByokPrivateProviderDialog
+            organizationId={organizationId}
+            open={privateProviderDialog.open}
+            editingKey={
+              listedKeys?.find(
+                key => key.id === privateProviderDialog.editingKeyId && key.is_private_provider
+              ) ?? null
+            }
+            onOpenChange={open => setPrivateProviderDialog(current => ({ ...current, open }))}
+            onSaved={() => {
+              invalidateKeys();
+              setPrivateProviderDialog({ open: false, editingKeyId: null });
+            }}
+          />
+        ) : null}
         <CardFooter>
           <BYOKSetupGuideLink />
         </CardFooter>
@@ -1334,7 +1431,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       {listedKeys && listedKeys.length > 0 ? (
         <BYOKRoutingPreview
           organizationId={organizationId}
-          getProviderName={getByokProviderDisplayName}
+          getProviderName={providerId => {
+            const key = listedKeys.find(k => k.provider_id === providerId);
+            return key ? keyDisplayName(key) : getByokProviderDisplayName(providerId);
+          }}
         />
       ) : null}
     </div>

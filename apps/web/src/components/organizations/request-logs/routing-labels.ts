@@ -1,5 +1,6 @@
 import { apiKindLabel } from '@/lib/api-kind-labels';
 import { byokKeyLabel, getByokProviderDisplayName } from '@/lib/byok/provider-names';
+import { isByokPrivateProviderId } from '@kilocode/db/schema-types';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import type {
   RequestLogNotSentReason,
@@ -37,6 +38,12 @@ const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
   'model-unavailable': 'Model not offered through this gateway',
   'provider-settings': 'Excluded by provider settings',
   'ignored-by-request': 'Provider ignored by the request',
+  'unusable-credential': 'Credential unusable',
+};
+
+const PRIVATE_PROVIDER_SKIP_REASON_LABELS: Record<string, string> = {
+  disabled: 'Private provider disabled',
+  'not-catalog-mode': 'Private provider uses its own model IDs',
 };
 
 const BYOK_OUTCOME_LABELS: Record<string, string> = {
@@ -71,7 +78,9 @@ const REJECTED_RESULT_LABELS: Record<string, string> = {
   'claude-billing-unavailable': 'Rejected: Claude organization billing is unavailable',
   'claude-billing-reconnect': 'Rejected: the Claude organization must be linked again',
   'custom-llm-unavailable': 'Rejected: the promotional model is unavailable',
-  'direct-byok-catalog-only': 'Rejected: the key only serves Kilo catalog model IDs',
+  'byok-private-provider-unavailable': 'Rejected: the private provider is unavailable',
+  'direct-byok-catalog-only':
+    'Rejected: the key or private provider only serves Kilo catalog model IDs',
 };
 
 const NOT_SENT_LABELS: Record<RequestLogNotSentReason, string> = {
@@ -95,15 +104,26 @@ export function gatewayName(provider: string): string | null {
   return Object.hasOwn(GATEWAY_NAMES, provider) ? GATEWAY_NAMES[provider] : null;
 }
 
+/** A private provider is named by its provider id alone; every other BYOK provider is a key. */
 function keyLabel(providerIds: string[]): string {
-  return byokKeyLabel(providerIds.map(getByokProviderDisplayName));
+  const privateProviders = providerIds.filter(isByokPrivateProviderId);
+  const keys = providerIds.filter(providerId => !isByokPrivateProviderId(providerId));
+  const labels = privateProviders.map(getByokProviderDisplayName);
+  if (keys.length > 0) labels.push(byokKeyLabel(keys.map(getByokProviderDisplayName)));
+  return listOf(labels);
 }
 
 function listOf(names: string[]): string {
   return names.join(', ');
 }
 
-export function byokSkipReasonLabel(reason: string): string {
+export function byokSkipReasonLabel(reason: string, providerId: string): string {
+  if (
+    isByokPrivateProviderId(providerId) &&
+    Object.hasOwn(PRIVATE_PROVIDER_SKIP_REASON_LABELS, reason)
+  ) {
+    return PRIVATE_PROVIDER_SKIP_REASON_LABELS[reason];
+  }
   return lookup(BYOK_SKIP_REASON_LABELS, reason);
 }
 
@@ -211,10 +231,27 @@ function describePromotionalModel(step: RequestLogRoutingStep): string {
   return 'The requested model is not a promotional model.';
 }
 
+/** Why an organization private provider could not serve its own model id, which no other route serves. */
+const PRIVATE_PROVIDER_REJECTION_LABELS: Record<string, (privateProvider: string) => string> = {
+  'no-organization': () => 'Private providers are only available to organizations.',
+  'no-key': privateProvider => `This organization has no ${privateProvider}.`,
+  disabled: privateProvider => `The ${privateProvider} is disabled.`,
+  'unknown-model': privateProvider => `The ${privateProvider} does not offer the requested model.`,
+  'invalid-credentials': privateProvider =>
+    `The ${privateProvider}'s credentials could not be used.`,
+};
+
+function isPrivateProviderStep(step: RequestLogRoutingStep): boolean {
+  return step.provider_id !== undefined && isByokPrivateProviderId(step.provider_id);
+}
+
 function describeProviderModelId(step: RequestLogRoutingStep): string {
   const key = step.provider_id ? keyLabel([step.provider_id]) : 'BYOK key';
   if (step.outcome === 'selected') return `Served with the ${key}.`;
   if (step.outcome === 'rejected') {
+    if (step.reason && Object.hasOwn(PRIVATE_PROVIDER_REJECTION_LABELS, step.reason)) {
+      return PRIVATE_PROVIDER_REJECTION_LABELS[step.reason](key);
+    }
     return step.catalog_model_id
       ? `The ${key} only serves Kilo catalog model IDs; request ${step.catalog_model_id} instead.`
       : `The ${key} only serves Kilo catalog model IDs.`;
@@ -298,7 +335,11 @@ export function describeStep(
     case 'custom-llm':
       return { title: 'Promotional model', detail: describePromotionalModel(step), tone };
     case 'direct-byok-model':
-      return { title: 'Provider model ID', detail: describeProviderModelId(step), tone };
+      return {
+        title: isPrivateProviderStep(step) ? 'Private provider model ID' : 'Provider model ID',
+        detail: describeProviderModelId(step),
+        tone,
+      };
     case 'organization-policy': {
       const excluded = step.excluded_provider_ids ?? [];
       return {

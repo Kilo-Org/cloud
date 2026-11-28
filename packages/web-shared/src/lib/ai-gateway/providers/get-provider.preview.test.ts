@@ -7,7 +7,10 @@ import {
   type GetProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
-import { firstRoute } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
+import {
+  expectProviderResult,
+  firstRoute,
+} from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   findDirectByokCatalogModels,
@@ -182,6 +185,9 @@ async function routeOf(
   result: GetProviderResult,
   apiKind: GatewayChatApiKind
 ): Promise<RouteSignature> {
+  if (result.kind === 'direct-byok-unsupported-api-kind') {
+    return { route: 'unsupported-api-kind', providerId: result.providerId };
+  }
   const { provider, userByok } = await firstRoute(result);
   if (provider.type === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
@@ -561,19 +567,24 @@ describe('previewByokRouting', () => {
 
   test.each([
     { catalogPriority: 0, expected: 'serves' },
-    { catalogPriority: 2, expected: 'fails closed' },
+    { catalogPriority: 2, expected: 'fails over to it' },
+    { catalogPriority: null, expected: 'fails closed without it' },
   ])(
     'decrypts only the key it uses: catalog key at priority $catalogPriority $expected',
     async ({ catalogPriority, expected }) => {
       const user = await insertTestUser();
       await db.insert(byok_api_keys).values([
-        {
-          kilo_user_id: user.id,
-          provider_id: 'zai-coding',
-          encrypted_api_key_envelope: testByokEnvelope('zai-coding-secret'),
-          created_by: user.id,
-          settings: { serve_catalog_models: true, priority: catalogPriority },
-        },
+        ...(catalogPriority === null
+          ? []
+          : [
+              {
+                kilo_user_id: user.id,
+                provider_id: 'zai-coding',
+                encrypted_api_key_envelope: testByokEnvelope('zai-coding-secret'),
+                created_by: user.id,
+                settings: { serve_catalog_models: true, priority: catalogPriority },
+              },
+            ]),
         {
           kilo_user_id: user.id,
           provider_id: 'moonshotai',
@@ -588,6 +599,7 @@ describe('previewByokRouting', () => {
       jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
       jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
       jest.mocked(decryptApiKey).mockClear();
+      const error = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const routed = getProvider(
         getProviderInput({
@@ -604,9 +616,19 @@ describe('previewByokRouting', () => {
           providerId: 'zai-coding',
         });
         expect(decryptApiKey).toHaveBeenCalledTimes(1);
+      } else if (expected === 'fails over to it') {
+        // An undecryptable key yields to the owner's next key, never to Kilo's route.
+        const result = await routed;
+        expectProviderResult(result);
+        expect(result.routes).toHaveLength(1);
+        expect(await routeOf(result, 'chat_completions')).toEqual({
+          route: 'direct-byok',
+          providerId: 'zai-coding',
+        });
       } else {
         await expect(routed).rejects.toThrow();
       }
+      error.mockRestore();
     }
   );
 

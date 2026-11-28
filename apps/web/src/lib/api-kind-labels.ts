@@ -1,8 +1,10 @@
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+
 export const API_KIND_LABELS = {
   chat_completions: 'Chat Completions',
   responses: 'Responses',
   messages: 'Anthropic Messages',
-} as const;
+} as const satisfies Record<GatewayChatApiKind, string>;
 
 export type ApiKind = keyof typeof API_KIND_LABELS;
 

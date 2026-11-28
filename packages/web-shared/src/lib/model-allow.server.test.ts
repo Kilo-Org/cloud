@@ -8,8 +8,15 @@ import {
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
+  type CustomLlmGrantee,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
+import type { ByokPrivateProviderDefinition } from '@kilocode/db/schema-types';
+import { byok_api_keys } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { testByokEnvelope } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 
 const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
@@ -194,6 +201,102 @@ describe('model access predicates', () => {
 
     await expect(deniedByModelPolicy(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
+  });
+
+  describe('private provider models', () => {
+    const PRIVATE_PROVIDER_ID = 'private-a1b2c3d4e5';
+    const CATALOG_PRIVATE_PROVIDER_ID = 'private-b1c2d3e4f5';
+    const DISABLED_PRIVATE_PROVIDER_ID = 'private-c1d2e3f4g5';
+    let organizationId: string;
+    let otherOrganizationId: string;
+
+    function privateProviderDefinition(): ByokPrivateProviderDefinition {
+      return {
+        name: 'Acme',
+        base_url: 'https://llm.acme.example/v1',
+        api_kinds: ['chat_completions'],
+        client_provider: 'openrouter',
+        reasoning_format: 'reasoning-details',
+        models: [
+          {
+            id: 'acme/coder',
+            internal_id: 'coder-v2',
+            context_length: 1000,
+            max_completion_tokens: 10,
+          },
+        ],
+      };
+    }
+
+    beforeAll(async () => {
+      const user = await insertTestUser();
+      organizationId = (
+        await createTestOrganization(`Private provider ${crypto.randomUUID()}`, user.id, 0)
+      ).id;
+      otherOrganizationId = (
+        await createTestOrganization(`Private provider ${crypto.randomUUID()}`, user.id, 0)
+      ).id;
+      await db.insert(byok_api_keys).values(
+        [
+          { providerId: PRIVATE_PROVIDER_ID, catalogMode: false, isEnabled: true },
+          { providerId: CATALOG_PRIVATE_PROVIDER_ID, catalogMode: true, isEnabled: true },
+          { providerId: DISABLED_PRIVATE_PROVIDER_ID, catalogMode: false, isEnabled: false },
+        ].map(key => ({
+          organization_id: organizationId,
+          provider_id: key.providerId,
+          encrypted_api_key_envelope: testByokEnvelope('{"type":"api_key","api_key":"secret"}'),
+          created_by: user.id,
+          is_enabled: key.isEnabled,
+          settings: {
+            serve_catalog_models: key.catalogMode,
+            private_provider: privateProviderDefinition(),
+          },
+        }))
+      );
+    });
+
+    function isAllowed(modelId: string, grantee: CustomLlmGrantee | undefined) {
+      return createAllowPredicateFromRestrictions(
+        {
+          requireModelInCurrentSnapshot: true,
+          providerAllowList: [],
+          modelDenyList: [modelId],
+          customLlmGrantee: grantee,
+        },
+        lookup({})
+      )(modelId);
+    }
+
+    test('exempts a model the grantee organization private provider lists', async () => {
+      await expect(
+        isAllowed(`${PRIVATE_PROVIDER_ID}/acme/coder`, { organizationId, groupIds: [] })
+      ).resolves.toBe(true);
+    });
+
+    test.each([
+      ['an unlisted model', `${PRIVATE_PROVIDER_ID}/acme/other`, () => organizationId],
+      [
+        'a catalog-mode private provider',
+        `${CATALOG_PRIVATE_PROVIDER_ID}/acme/coder`,
+        () => organizationId,
+      ],
+      [
+        'a disabled private provider',
+        `${DISABLED_PRIVATE_PROVIDER_ID}/acme/coder`,
+        () => organizationId,
+      ],
+      ['an unknown private provider', 'private-zzzzzzzzzz/acme/coder', () => organizationId],
+      ['another organization', `${PRIVATE_PROVIDER_ID}/acme/coder`, () => otherOrganizationId],
+    ])('does not exempt %s', async (_case, modelId, grantee) => {
+      await expect(isAllowed(modelId, { organizationId: grantee(), groupIds: [] })).resolves.toBe(
+        false
+      );
+    });
+
+    test('does not exempt a private provider model without a grantee', async () => {
+      await expect(isAllowed(`${PRIVATE_PROVIDER_ID}/acme/coder`, undefined)).resolves.toBe(false);
+      await expect(isAllowed('private-provider-short/acme/coder', undefined)).resolves.toBe(false);
+    });
   });
 
   describe('custom LLMs', () => {

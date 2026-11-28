@@ -13,6 +13,7 @@ type ReorderInput = ListInput & { keyIds: string[] };
 
 const listKey = (input: ListInput) => ['byok', 'list', input];
 let mockKeys: BYOKApiKeyResponse[] = [];
+let mockByokPrivateProvidersEnabled = false;
 /** The options the screen registered for the stored-key test, so a test can run its handlers. */
 let mockTestApiKeyOptions:
   | { onSuccess?: (result: unknown, variables: { id: string }) => void }
@@ -46,8 +47,20 @@ jest.mock('@/lib/trpc/utils', () => ({
         listCatalogModeSupportedModels: {
           queryOptions: () => ({ queryKey: ['byok', 'catalog-models'], queryFn: async () => ({}) }),
         },
+        listPrivateProviderCatalogModelIds: {
+          queryOptions: (input: object) => ({
+            queryKey: ['byok', 'private-provider-catalog-models', input],
+            queryFn: async () => [],
+          }),
+        },
         experimentalByokEnabled: {
           queryOptions: () => ({ queryKey: ['byok', 'experimental'], queryFn: async () => false }),
+        },
+        privateProvidersEnabled: {
+          queryOptions: (input: ListInput) => ({
+            queryKey: ['byok', 'private providers-enabled', input],
+            queryFn: async () => mockByokPrivateProvidersEnabled,
+          }),
         },
         previewRouting: { pathFilter: () => ({ queryKey: ['byok', 'previewRouting'] }) },
         create: mutation,
@@ -64,6 +77,9 @@ jest.mock('@/lib/trpc/utils', () => ({
             return { ...options, mutationFn: jest.fn() };
           },
         },
+        createPrivateProvider: mutation,
+        updatePrivateProvider: mutation,
+        listModelsFromPrivateProvider: mutation,
       },
     };
   },
@@ -166,12 +182,14 @@ describe('BYOK key priorities', () => {
   let queryClient: QueryClient | undefined;
 
   afterEach(async () => {
+    await act(async () => new Promise(resolve => setTimeout(resolve)));
     await act(async () => root?.unmount());
     root = undefined;
     queryClient?.clear();
     queryClient = undefined;
     mockReorder.mockClear();
     jest.mocked(toast.error).mockClear();
+    mockByokPrivateProvidersEnabled = false;
   });
 
   async function mount(organizationId?: string, providers = ['anthropic', 'openrouter']) {
@@ -187,10 +205,16 @@ describe('BYOK key priorities', () => {
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
       created_by: 'test-user',
+      is_private_provider: false,
+      private_provider: null,
     }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient = client;
     client.setQueryData(listKey(organizationId ? { organizationId } : {}), mockKeys);
+    client.setQueryData(
+      ['byok', 'private providers-enabled', organizationId ? { organizationId } : {}],
+      mockByokPrivateProvidersEnabled
+    );
     const dom = installDom();
     root = createRoot(dom.container);
     await act(async () => {
@@ -266,6 +290,21 @@ describe('BYOK key priorities', () => {
     );
     expect(toast.error).toHaveBeenCalledWith('Failed to save key priority: Permission denied');
   });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'with BYOK private providers enabled %s, shows the Add private provider button: %s',
+    async (enabled, shown) => {
+      mockByokPrivateProvidersEnabled = enabled;
+      const container = await mount('test-org');
+      const buttons = [...container.querySelectorAll('button')];
+      expect(buttons.some(button => button.textContent?.includes('Add private provider'))).toBe(
+        shown
+      );
+    }
+  );
 });
 
 describe('BYOK stored-key test toasts', () => {
@@ -296,6 +335,8 @@ describe('BYOK stored-key test toasts', () => {
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-01T00:00:00.000Z',
         created_by: 'test-user',
+        is_private_provider: false,
+        private_provider: null,
       },
     ];
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

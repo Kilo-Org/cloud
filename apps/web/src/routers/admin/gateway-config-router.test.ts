@@ -87,6 +87,7 @@ describe('adminGatewayConfigRouter', () => {
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [organizationId.toUpperCase()],
+      byok_private_providers: [organizationId.toUpperCase()],
       enkrypt_output_guardrail: [organizationId.toUpperCase()],
       gateway_settings: [organizationId],
       org_permission_policy: [organizationId.toUpperCase()],
@@ -95,6 +96,7 @@ describe('adminGatewayConfigRouter', () => {
 
     await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual({
       experimental_byok: [organizationId],
+      byok_private_providers: [organizationId],
       enkrypt_output_guardrail: [organizationId],
       gateway_settings: [organizationId],
       org_permission_policy: [organizationId],
@@ -110,18 +112,21 @@ describe('adminGatewayConfigRouter', () => {
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
       org_permission_policy: [organizationId],
     });
     const saved = await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [organizationId],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
     });
 
     expect(saved).toEqual({
       experimental_byok: [organizationId],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: [],
       org_permission_policy: [organizationId],
@@ -135,6 +140,7 @@ describe('adminGatewayConfigRouter', () => {
     await caller.admin.gatewayConfig.set(input);
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [],
       gateway_settings: ['00000000-0000-4000-8000-000000000001'],
       org_permission_policy: [],
@@ -152,6 +158,7 @@ describe('adminGatewayConfigRouter', () => {
     await expect(
       caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: ['not-an-id'],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
         org_permission_policy: [],
@@ -168,6 +175,7 @@ describe('adminGatewayConfigRouter', () => {
 
       const preview = await caller.admin.gatewayConfig.previewOrganizationFeatures({
         experimental_byok: [first.id.toUpperCase(), first.id],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [first.id, second.id],
         gateway_settings: [first.id.toUpperCase(), second.id.toUpperCase(), second.id],
         org_permission_policy: [second.id],
@@ -191,6 +199,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [crypto.randomUUID()],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [organization.id, crypto.randomUUID()],
           org_permission_policy: [],
@@ -209,6 +218,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           org_permission_policy: [],
@@ -222,6 +232,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           org_permission_policy: [],
@@ -232,6 +243,7 @@ describe('adminGatewayConfigRouter', () => {
 
     it.each([
       'experimental_byok',
+      'byok_private_providers',
       'enkrypt_output_guardrail',
       'gateway_settings',
       'org_permission_policy',
@@ -241,6 +253,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           org_permission_policy: [],
@@ -252,6 +265,7 @@ describe('adminGatewayConfigRouter', () => {
 
     it.each([
       'experimental_byok',
+      'byok_private_providers',
       'enkrypt_output_guardrail',
       'gateway_settings',
       'org_permission_policy',
@@ -261,6 +275,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           org_permission_policy: [],
@@ -279,6 +294,7 @@ describe('adminGatewayConfigRouter', () => {
       await caller.admin.gatewayConfig.set(input);
       await caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
         org_permission_policy: [],
@@ -288,6 +304,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           org_permission_policy: [],
@@ -305,6 +322,7 @@ describe('adminGatewayConfigRouter', () => {
       await expect(
         caller.admin.gatewayConfig.previewOrganizationFeatures({
           experimental_byok: [organization.id],
+          byok_private_providers: [],
           enkrypt_output_guardrail: [],
           gateway_settings: [],
           org_permission_policy: [],
@@ -478,6 +496,7 @@ describe('adminGatewayConfigRouter', () => {
       await caller.admin.gatewayConfig.set(input);
       await caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [organizationId],
         org_permission_policy: [],

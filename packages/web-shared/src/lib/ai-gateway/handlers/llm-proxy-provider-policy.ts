@@ -17,7 +17,10 @@ import {
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokModel,
+  type DirectByokPolicyTarget,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -190,6 +193,16 @@ export async function resolveProviderAndPolicy(
       !groupPolicy || (await isModelAllowedForProviderKey(groupPolicy, model, policyProviderId))
     );
   };
+  /**
+   * Whether the organization policy admits the model served by a catalog-mode direct BYOK key. The
+   * organization configured its own private providers, so its provider allow-lists do not restrict them.
+   */
+  const isDirectByokServingAllowed = async (target: DirectByokPolicyTarget) =>
+    target.kind === 'provider'
+      ? isModelAllowedForPolicyProvider(target.providerSlug)
+      : !isAnonymous &&
+        !!input.organizationId &&
+        (await getAccessCheck()).groupModelAllowedForInferenceProviderUserByok;
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise(input);
   const organizationAccount = input.organizationId
@@ -214,7 +227,7 @@ export async function resolveProviderAndPolicy(
       request.body.provider,
     getAllowedProviders: async () =>
       isAnonymous ? undefined : (await getAccessCheck()).allowedProviders,
-    isDirectByokProviderAllowed: isModelAllowedForPolicyProvider,
+    isDirectByokProviderAllowed: isDirectByokServingAllowed,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
     managedRoutesOnly: input.managedRoutesOnly,
@@ -237,15 +250,26 @@ export async function resolveProviderAndPolicy(
       claudeBillingUnavailableResponse(getProviderResult.message, getProviderResult.retryable)
     );
   }
-  if (getProviderResult.kind === 'custom-llm-unavailable') {
-    // Same response as an unknown model id, so callers cannot probe for custom LLMs.
+  if (getProviderResult.kind === 'byok-private-provider-unavailable' && orgAutoRouteTarget) {
+    // The organization chose the target itself, so it may learn why its private provider cannot serve it.
+    return reject(
+      organizationAutoConfigurationResponse(
+        `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because no enabled private provider of this organization serves it.`
+      )
+    );
+  }
+  if (
+    getProviderResult.kind === 'custom-llm-unavailable' ||
+    getProviderResult.kind === 'byok-private-provider-unavailable'
+  ) {
+    // Same response as an unknown model id, so callers cannot probe for custom LLMs or private providers.
     return reject(unknownModelResponse(model));
   }
   if (getProviderResult.kind === 'direct-byok-catalog-only') {
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.
     const message = directByokCatalogOnlyMessage({
       model,
-      providerId: getProviderResult.providerId,
+      keyLabel: getProviderResult.keyLabel,
       catalogModelId: getProviderResult.catalogModelId,
     });
     return reject(
@@ -254,6 +278,15 @@ export async function resolveProviderAndPolicy(
             `Organization Auto route target '${orgAutoRouteTarget}' is unavailable: ${message}`
           )
         : directByokCatalogOnlyResponse(message)
+    );
+  }
+  if (getProviderResult.kind === 'direct-byok-unsupported-api-kind') {
+    return reject(
+      apiKindNotSupportedResponse(
+        request.kind,
+        getProviderResult.supportedApiKinds,
+        getProviderResult.keyLabel
+      )
     );
   }
   /** Why the policy refuses the route, or null when it may serve the request. */
@@ -295,7 +328,7 @@ export async function resolveProviderAndPolicy(
       return apiKindNotSupportedResponse(
         request.kind,
         route.provider.supportedChatApis,
-        route.provider.type === 'direct-byok' ? route.userByok?.[0]?.providerId : undefined
+        route.provider.directByokKeyLabel
       );
     }
 
@@ -335,10 +368,11 @@ export async function resolveProviderAndPolicy(
 
     if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
-      // against the key's provider alone. Routing already skips keys it rejects.
+      // against its target alone: the key's provider, or for the organization's own private provider, only
+      // the model policy. Routing already skips keys it rejects.
       if (
-        !route.directByokPolicyProviderId ||
-        !(await isModelAllowedForPolicyProvider(route.directByokPolicyProviderId))
+        !route.directByokPolicyTarget ||
+        !(await isDirectByokServingAllowed(route.directByokPolicyTarget))
       ) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
@@ -377,6 +411,9 @@ export async function resolveProviderAndPolicy(
   }
 
   // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  // Direct BYOK routes drop the provider object before the request leaves, so Kilo neither
+  // verifies nor enforces `zdr` or prompt retention at an organization's private provider, even
+  // when it serves a catalog id.
   const dataCollectionModel = await resolveOpenRouterModelAlias(model);
   const dataCollectionRejected = await dataCollectionPolicyRejection(
     dataCollectionModel,

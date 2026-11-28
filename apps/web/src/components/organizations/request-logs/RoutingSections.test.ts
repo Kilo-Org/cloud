@@ -168,6 +168,141 @@ describe('RoutingSections BYOK failover', () => {
   });
 });
 
+describe('RoutingSections private providers', () => {
+  const privateProviderId = 'private-a1b2c3d4e5';
+
+  function privateProviderRouting(
+    overrides: Partial<RequestLogRoutingDetails>,
+    attempts: RequestLogByokFailoverAttempt[] = []
+  ): RequestLogRoutingDetails {
+    return {
+      ...routing(attempts),
+      requested_model: `${privateProviderId}/my-model`,
+      steps: [{ step: 'direct-byok-model', outcome: 'selected', provider_id: privateProviderId }],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'direct-byok-model',
+        provider_type: 'direct-byok',
+        byok_provider_ids: [privateProviderId],
+        payer: 'owner-byok-key',
+        is_free: false,
+      },
+      ...overrides,
+    };
+  }
+
+  it('shows the private provider that served a private provider model ID', () => {
+    const text = render(privateProviderRouting({})).body.textContent ?? '';
+
+    expect(text).toContain('Private provider model ID');
+    expect(text).toContain('Served with the Private provider a1b2c3d4e5.');
+    expect(text).toContain('Sent to Private provider a1b2c3d4e5');
+    expect(text).toContain('Paid by: Private provider a1b2c3d4e5');
+    expect(text).not.toMatch(/custom/i);
+  });
+
+  it('shows why a private provider model ID was rejected', () => {
+    const text =
+      render(
+        privateProviderRouting({
+          steps: [
+            {
+              step: 'direct-byok-model',
+              outcome: 'rejected',
+              provider_id: privateProviderId,
+              reason: 'disabled',
+            },
+          ],
+          result: { kind: 'byok-private-provider-unavailable' },
+        })
+      ).body.textContent ?? '';
+
+    expect(text).toContain('The Private provider a1b2c3d4e5 is disabled.');
+    expect(text).toContain('Rejected: the private provider is unavailable');
+  });
+
+  it('names private provider candidates and their skip reason', () => {
+    const document = render(
+      privateProviderRouting({
+        steps: [
+          { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'openai' },
+        ],
+        byok_candidates: [
+          {
+            route: 'direct-byok',
+            provider_id: privateProviderId,
+            route_order: 0,
+            outcome: 'skipped',
+            reason: 'disabled',
+          },
+          { route: 'vercel-byok', provider_id: 'openai', route_order: 1, outcome: 'selected' },
+        ],
+        result: {
+          kind: 'provider',
+          route: 'vercel-byok',
+          provider_type: 'vercel',
+          byok_provider_ids: ['openai'],
+          payer: 'owner-byok-key',
+          is_free: false,
+        },
+      })
+    );
+
+    expect(candidateRows(document)).toEqual([
+      expect.stringContaining('Private provider a1b2c3d4e5Skipped'),
+      expect.stringContaining('OpenAI API keyvia Vercel AI GatewaySelected'),
+    ]);
+    expect(candidateRows(document)[0]).toContain('Private provider disabled');
+  });
+
+  it('labels a candidate skipped for an unusable credential', () => {
+    const document = render(
+      privateProviderRouting({
+        byok_candidates: [
+          {
+            route: 'direct-byok',
+            provider_id: privateProviderId,
+            route_order: 0,
+            outcome: 'skipped',
+            reason: 'unusable-credential',
+          },
+        ],
+      })
+    );
+
+    expect(candidateRows(document)[0]).toContain('Credential unusable');
+  });
+
+  it('names a private provider that failed over to the next key', () => {
+    const document = render(
+      privateProviderRouting({}, [
+        {
+          provider_type: 'direct-byok',
+          byok_provider_ids: [privateProviderId],
+          status: 502,
+          duration_ms: 300,
+          outcome: 'failed-over',
+        },
+        {
+          provider_type: 'openrouter',
+          byok_provider_ids: ['openrouter'],
+          status: 200,
+          duration_ms: 900,
+          outcome: 'served',
+        },
+      ])
+    );
+
+    const attempts = [...document.querySelectorAll('[aria-label="BYOK failover attempts"] li')].map(
+      row => row.textContent ?? ''
+    );
+    expect(attempts[0]).toContain('Private provider a1b2c3d4e5');
+    expect(attempts[0]).not.toContain('via Vercel AI Gateway');
+    expect(document.body.textContent).toContain('Sent to OpenRouter');
+  });
+});
+
 function partnerRouting(attempts: RequestLogByokFailoverAttempt[]): RequestLogRoutingDetails {
   return {
     ...routing(attempts),

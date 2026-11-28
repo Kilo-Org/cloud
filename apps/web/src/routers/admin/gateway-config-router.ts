@@ -104,6 +104,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
         input.org_permission_policy ?? (await readOrganizationFeatures(db)).org_permission_policy;
       const organization_features: OrganizationFeatures = {
         experimental_byok: input.experimental_byok,
+        byok_private_providers: input.byok_private_providers,
         enkrypt_output_guardrail: input.enkrypt_output_guardrail,
         gateway_settings: input.gateway_settings,
         org_permission_policy: orgPermissionPolicy,

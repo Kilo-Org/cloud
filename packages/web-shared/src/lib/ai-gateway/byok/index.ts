@@ -1,9 +1,16 @@
 import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
-import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
+import {
+  ByokApiKeySettingsSchema,
+  ByokPrivateProviderDefinitionSchema,
+  getCustomLlmClientApiKind,
+  isByokPrivateProviderId,
+  type ByokPrivateProviderDefinition,
+} from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
-import type { BYOKApiKeyEnvelope, ByokApiKeySettings } from '@kilocode/db/schema-types';
+import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
 import { decryptByokEnvelope } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
@@ -18,7 +25,12 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  AI_SDK_PROVIDER_FOR_CHAT_API,
+  type BYOKResult,
+  type GatewayChatApiKind,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
   getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -165,6 +177,16 @@ function ownerColumn(owner: ByokOwner): ByokOwnerColumn {
   return owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id;
 }
 
+const PrivateProviderSettingsSchema = z.object({ private_provider: z.unknown() });
+
+/**
+ * The stored settings other than the private provider definition, which
+ * `readByokPrivateProviderDefinition` parses on its own so that an invalid one cannot hide the rest.
+ */
+const StoredByokSettingsSchema = ByokApiKeySettingsSchema.omit({ private_provider: true });
+
+export type StoredByokSettings = z.infer<typeof StoredByokSettingsSchema>;
+
 /** The owner scoping every read of that owner's keys shares; `enabledOnly` and `providerIds` narrow it. */
 function byokOwnerWhere(
   owner: ByokOwner,
@@ -181,18 +203,42 @@ function byokOwnerWhere(
 }
 
 /** Stored per-key settings, with invalid or missing settings read as empty. */
-export function parseByokSettings(settings: unknown): ByokApiKeySettings {
-  return ByokApiKeySettingsSchema.safeParse(settings).data ?? {};
+export function parseByokSettings(settings: unknown): StoredByokSettings {
+  return StoredByokSettingsSchema.safeParse(settings).data ?? {};
 }
 
 /** Whether stored key settings put the key in catalog mode. */
-export function servesCatalogModels(settings: ByokApiKeySettings): boolean {
+export function servesCatalogModels(settings: StoredByokSettings): boolean {
   return settings.serve_catalog_models === true;
 }
 
 /** The owner's chosen priority of a key, or undefined when the key keeps its default order. */
-export function getByokKeyPriority(settings: ByokApiKeySettings): number | undefined {
+export function getByokKeyPriority(settings: StoredByokSettings): number | undefined {
   return settings.priority;
+}
+
+/**
+ * The definition of an organization's private provider key, stored in its settings. Null for every other
+ * key, so a definition in the settings of a personal or provider key is never honoured, and for a
+ * definition that no longer parses, which is logged.
+ */
+export function readByokPrivateProviderDefinition(row: {
+  provider_id: string;
+  organization_id: string | null;
+  settings: unknown;
+}): ByokPrivateProviderDefinition | null {
+  if (!isByokPrivateProviderId(row.provider_id) || !row.organization_id) return null;
+  const parsed = ByokPrivateProviderDefinitionSchema.safeParse(
+    PrivateProviderSettingsSchema.safeParse(row.settings).data?.private_provider
+  );
+  if (!parsed.success) {
+    console.error('[byok] Ignoring a private provider key with an invalid definition', {
+      providerId: row.provider_id,
+      issues: parsed.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
 }
 
 const byokKeyPriority = sql`case when jsonb_typeof(${byok_api_keys.settings}->'priority') = 'number' then (${byok_api_keys.settings}->>'priority')::numeric end`;
@@ -209,6 +255,8 @@ export type EnabledByokProvider = {
   providerId: UserByokProviderId;
   /** Catalog mode as stored; only providers that support it can store true. */
   serveCatalogModels: boolean;
+  /** The definition of an organization's private provider key; set exactly for private provider ids. */
+  privateProvider?: ByokPrivateProviderDefinition;
 };
 
 export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean; priority?: number };
@@ -241,24 +289,29 @@ function reportByokDecryptFailure(keyId: string, error: unknown): void {
 
 const byokKeyStateColumns = {
   provider_id: byok_api_keys.provider_id,
+  organization_id: byok_api_keys.organization_id,
   settings: byok_api_keys.settings,
   is_enabled: byok_api_keys.is_enabled,
 };
 
 function toByokKeyState(row: {
   provider_id: string;
+  organization_id: string | null;
   settings: unknown;
   is_enabled: boolean;
 }): ByokKeyState | null {
   const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
   if (!providerId.success) return null;
   const settings = parseByokSettings(row.settings);
-  return {
+  const state: ByokKeyState = {
     providerId: providerId.data,
     serveCatalogModels: servesCatalogModels(settings),
     isEnabled: row.is_enabled,
     priority: getByokKeyPriority(settings),
   };
+  if (!isByokPrivateProviderId(providerId.data)) return state;
+  const privateProvider = readByokPrivateProviderDefinition(row);
+  return privateProvider ? { ...state, privateProvider } : null;
 }
 
 async function selectByokKeyStates(
@@ -280,7 +333,11 @@ export async function getEnabledByokProviders(
   owner: ByokOwner
 ): Promise<EnabledByokProvider[]> {
   const keys = await selectByokKeyStates(fromDb, owner, { enabledOnly: true });
-  return keys.map(({ providerId, serveCatalogModels }) => ({ providerId, serveCatalogModels }));
+  return keys.map(({ providerId, serveCatalogModels, privateProvider }) => ({
+    providerId,
+    serveCatalogModels,
+    ...(privateProvider && { privateProvider }),
+  }));
 }
 
 /**
@@ -456,18 +513,57 @@ export function isInferenceProviderUserByok(userByok: readonly BYOKResult[] | nu
   );
 }
 
+/** A catalog-mode direct BYOK key that serves a catalog id: its APIs, and the one clients use. */
+export type DirectByokCatalogServingKey = {
+  chatApis: readonly GatewayChatApiKind[];
+  clientApi: GatewayChatApiKind;
+};
+
+/** The keys that serve each catalog id, by catalog id (see `getDirectByokCatalogServing`). */
+export type DirectByokCatalogServing = ReadonlyMap<string, readonly DirectByokCatalogServingKey[]>;
+
+/**
+ * The client API metadata of a catalog model only catalog-mode keys serve. When none of them
+ * serves the API the catalog tells clients to use, routing would refuse those requests instead of
+ * billing Kilo, so clients are told to use the client API of the first key instead.
+ */
+function withServedClientApi(
+  model: OpenRouterCatalogModel,
+  keys: readonly DirectByokCatalogServingKey[]
+): OpenRouterCatalogModel {
+  const catalogApi = getCustomLlmClientApiKind(model.opencode?.ai_sdk_provider);
+  if (keys.length === 0 || keys.some(key => key.chatApis.includes(catalogApi))) return model;
+  const ai_sdk_provider = AI_SDK_PROVIDER_FOR_CHAT_API[keys[0].clientApi];
+  const { ai_sdk_provider: _catalogProvider, ...opencode } = model.opencode ?? {};
+  return {
+    ...model,
+    opencode: {
+      ...opencode,
+      ...(ai_sdk_provider && { ai_sdk_provider }),
+      variants: opencode.reasoning_options
+        ? toLegacyVariants(opencode.reasoning_options, ai_sdk_provider)
+        : opencode.variants,
+    },
+  };
+}
+
 /**
  * Marks catalog models the caller's direct BYOK keys in catalog mode serve
- * (`getDirectByokCatalogModelIds`), alongside the gateway and Vercel BYOK availability.
+ * (`getDirectByokCatalogServing`), alongside the gateway and Vercel BYOK availability, which must
+ * already be marked.
  */
 export function addDirectByokCatalogAvailability(
   models: OpenRouterCatalogModel[],
-  directByokCatalogModelIds: ReadonlySet<string>
+  serving: DirectByokCatalogServing
 ): OpenRouterCatalogModel[] {
-  if (directByokCatalogModelIds.size === 0) return models;
-  return models.map(model =>
-    directByokCatalogModelIds.has(model.id) ? markByokAvailable(model) : model
-  );
+  if (serving.size === 0) return models;
+  return models.map(model => {
+    const keys = serving.get(model.id);
+    if (!keys) return model;
+    // A request over the catalog's API still reaches another BYOK key that serves the model.
+    const served = model.hasUserByokAvailable ? model : withServedClientApi(model, keys);
+    return markByokAvailable(served);
+  });
 }
 
 export function getByokKmsContext(row: ByokKmsContextRow): ByokKmsContext {
@@ -510,7 +606,7 @@ export type ByokCredential = BYOKResult & { serveCatalogModels: boolean };
  * The one construction of a decrypted credential: the routing and list paths differ only in the
  * settings they add, so a new credential field needs one edit. An undefined priority is omitted.
  */
-async function toByokResult(row: ByokKeyRow, settings: ByokApiKeySettings): Promise<BYOKResult> {
+async function toByokResult(row: ByokKeyRow, settings: StoredByokSettings): Promise<BYOKResult> {
   const priority = getByokKeyPriority(settings);
   return { ...(await decryptByokRow(row)), ...(priority !== undefined && { priority }) };
 }

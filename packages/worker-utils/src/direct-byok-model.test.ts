@@ -24,4 +24,11 @@ describe('isDirectByokModelId', () => {
     expect(isDirectByokModelId('synthetic/hf:zai-org/GLM-5.1')).toBe(true);
     expect(isDirectByokModelId('synthetic-new/whatever')).toBe(false);
   });
+
+  it("matches organization private provider model ids, which only the private provider's key serves", () => {
+    expect(isDirectByokModelId('private-a1b2c3d4e5/acme/coder')).toBe(true);
+    expect(isDirectByokModelId('Private-A1B2C3D4E5/Acme/Coder')).toBe(true);
+    expect(isDirectByokModelId('private-provider-short/acme/coder')).toBe(false);
+    expect(isDirectByokModelId('private provider/acme/coder')).toBe(false);
+  });
 });

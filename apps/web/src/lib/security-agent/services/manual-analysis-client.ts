@@ -1,8 +1,9 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
+import { STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL } from '@kilocode/sts-contracts';
 import { SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
-import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import {
+  SECURITY_AUTO_ANALYSIS_WORKER_SENDER,
   isDefinitiveSecurityWorkerRejection,
   postSecurityWorkerJson,
 } from './security-worker-request';
@@ -87,8 +88,7 @@ function definitiveRejectionError(status: number): TRPCError {
 export async function submitManualAnalysisStart(
   params: ManualAnalysisStartParams
 ): Promise<{ queued: true; commandId: string }> {
-  const internalApiSecret = SECURITY_AUTO_ANALYSIS_WORKER_URL ? await readInternalApiSecret() : '';
-  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !internalApiSecret) {
+  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL) {
     // Mirrored by the mobile security mutation classifier: a stable
     // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
     // classifier treats as retryable transport. The sentence is the shared
@@ -103,11 +103,13 @@ export async function submitManualAnalysisStart(
 
   // Bounded, and `BAD_GATEWAY` on a stalled or non-JSON response (see
   // `postSecurityWorkerJson`): both leave the command's acceptance unknown, so
-  // the caller must not record one either.
+  // the caller must not record one either. The credential (the internal API
+  // secret, or an STS token) is checked there, inside the same budget.
   const { response, body } = await postSecurityWorkerJson({
     url: `${SECURITY_AUTO_ANALYSIS_WORKER_URL}/internal/manual-analysis-start`,
     service: 'analysis',
-    internalApiSecret,
+    worker: SECURITY_AUTO_ANALYSIS_WORKER_SENDER,
+    scope: STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
     body: {
       schemaVersion: 1,
       findingId: params.findingId,

@@ -12,9 +12,18 @@ import {
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications/schemas';
-import { NOTIFICATIONS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { STS_NOTIFICATIONS_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  NOTIFICATIONS_SENDER_AUTH,
+  NOTIFICATIONS_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+  type ServiceSenderAuth,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 
 type InternalWorkerEndpointSpec = {
   /** Absolute path of the route on the notifications worker. */
@@ -25,6 +34,8 @@ type InternalWorkerEndpointSpec = {
   failureLabel: string;
   /** The Sentry `endpoint` tag value. */
   tag: string;
+  /** One attempt's timeout; the first attempt shares it with the credential read. */
+  timeoutMs: number;
 };
 
 const DISPATCH_ENDPOINT: InternalWorkerEndpointSpec = {
@@ -32,16 +43,47 @@ const DISPATCH_ENDPOINT: InternalWorkerEndpointSpec = {
   skipSubject: 'push dispatch',
   failureLabel: 'Notifications worker dispatch failed',
   tag: 'dispatch',
+  timeoutMs: 30_000,
 };
 
+// The registration mutation awaits a refresh. The worker's refresh is one
+// snapshot fetch plus parallel APNs sends, so 10s is generous; past it the
+// retired row is still superseded and the next refresh ends the card, and the
+// shorter bound keeps a hung worker from holding the caller's token-mutation
+// queue.
 const GLANCEABLE_REFRESH_ENDPOINT: InternalWorkerEndpointSpec = {
   path: '/internal/v1/glanceable-refresh',
   skipSubject: 'glanceable refresh',
   failureLabel: 'Notifications worker glanceable refresh failed',
   tag: 'glanceable-refresh',
+  timeoutMs: 10_000,
 };
 
-type InternalWorkerEndpoint = { url: URL; secret: string; failureLabel: string };
+type InternalWorkerEndpoint = {
+  url: URL;
+  credential: Record<string, string>;
+  failureLabel: string;
+  /** What the credential read left of the spec's timeout, for the first attempt. */
+  firstAttemptTimeoutMs: number;
+};
+
+const resolvedNotificationsSender = resolveServiceSenderAuth({
+  auth: NOTIFICATIONS_SENDER_AUTH,
+  url: NOTIFICATIONS_WORKER_URL,
+  runtime: process.env,
+});
+
+/**
+ * `NOTIFICATIONS_SENDER_AUTH` (`service-sender-auth.ts`), the credential of both internal routes:
+ * `legacy` sends the internal API secret in `X-Internal-Secret`, as before (also when unset);
+ * explicit `sts` sends only a `notifications:internal.call` STS token, never following a redirect.
+ * The Worker admits only the `web` workload, so an ai-gateway build (its low-balance pushes come
+ * through here; `next.config.mjs` inlines `KILO_STS_WORKLOAD`) refuses `sts` and sends nothing.
+ */
+const notificationsSender: ServiceSenderAuth =
+  resolvedNotificationsSender.kind === 'sts' && process.env.KILO_STS_WORKLOAD !== undefined
+    ? { kind: 'refused', reason: 'not_web_workload' }
+    : resolvedNotificationsSender;
 
 type InternalPostResult =
   | { ok: true; response: Response }
@@ -50,10 +92,10 @@ type InternalPostResult =
 /**
  * Resolves one worker endpoint behind its three configuration gates, in the
  * order the worker's logs and tests expect: a configured base URL, a base URL
- * that parses as https or loopback http, then an internal API secret. Returns
- * `null` after logging which gate skipped the call, or after capturing a secret
- * that could not be read, so the caller only has to return its never-rejects
- * value.
+ * that parses as https or loopback http, then its credential. Returns `null`
+ * after logging which gate skipped the call, or after capturing a credential
+ * that could not be read (a rejected secret read, a refused switch, no STS
+ * token), so the caller only has to return its never-rejects value.
  */
 async function resolveInternalWorkerEndpoint(
   spec: InternalWorkerEndpointSpec
@@ -71,22 +113,47 @@ async function resolveInternalWorkerEndpoint(
     );
     return null;
   }
-  let secret: string;
+  // The credential read counts against the first attempt's timeout, so a cold STS mint cannot
+  // add to it. A read past it ends the call like any other credential failure.
+  const startedAt = Date.now();
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(
+    () => expired.reject(new Error(`No credential within ${spec.timeoutMs}ms`)),
+    spec.timeoutMs
+  );
+  let credential: Record<string, string>;
   try {
-    secret = await readInternalApiSecret();
+    credential = await Promise.race([
+      serviceSenderHeaders({
+        sender: notificationsSender,
+        variable: 'NOTIFICATIONS_SENDER_AUTH',
+        label: 'notifications worker client',
+        request: STS_NOTIFICATIONS_INTERNAL_CALL,
+        legacyHeaders: async () => ({ 'X-Internal-Secret': await readInternalApiSecret() }),
+      }),
+      expired.promise,
+    ]);
   } catch (error) {
     captureException(error, {
       tags: { source: 'notifications-worker-client', endpoint: spec.tag },
     });
     return null;
+  } finally {
+    clearTimeout(timer);
   }
-  if (!secret) {
+  // Only the legacy credential carries the header; an empty secret skips the call, as before.
+  if (credential['X-Internal-Secret'] === '') {
     console.error(
       `[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping ${spec.skipSubject}`
     );
     return null;
   }
-  return { url, secret, failureLabel: spec.failureLabel };
+  return {
+    url,
+    credential,
+    failureLabel: spec.failureLabel,
+    firstAttemptTimeoutMs: Math.max(1, spec.timeoutMs - (Date.now() - startedAt)),
+  };
 }
 
 /**
@@ -99,16 +166,19 @@ async function postInternal(
   body: InternalDispatchRequest | GlanceableScopeRefreshRequest,
   { timeoutMs, headers = {} }: { timeoutMs: number; headers?: Record<string, string> }
 ): Promise<InternalPostResult> {
-  const response = await fetch(endpoint.url.toString(), {
+  const init: RequestInit = {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'X-Internal-Secret': endpoint.secret,
+      ...endpoint.credential,
       ...headers,
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
-  });
+  };
+  // An STS token is for this origin only; a redirect never carries it on.
+  if (notificationsSender.kind === 'sts') init.redirect = 'error';
+  const response = await fetch(endpoint.url.toString(), init);
 
   if (response.ok) {
     return { ok: true, response };
@@ -178,7 +248,7 @@ async function dispatchInternal(body: InternalDispatchRequest): Promise<boolean>
   try {
     for (let attempt = 0; ; attempt++) {
       const result = await postInternal(endpoint, body, {
-        timeoutMs: 30_000,
+        timeoutMs: attempt === 0 ? endpoint.firstAttemptTimeoutMs : DISPATCH_ENDPOINT.timeoutMs,
         headers: { 'X-Dispatch-Id': dispatchId },
       });
 
@@ -354,12 +424,9 @@ export async function refreshGlanceableScope(input: GlanceableScopeRefreshReques
     endpoint: GLANCEABLE_REFRESH_ENDPOINT.tag,
   };
   try {
-    // The registration mutation awaits this. The worker's refresh is one
-    // snapshot fetch plus parallel APNs sends, so 10s is generous; past it
-    // the retired row is still superseded and the next refresh ends the card,
-    // and the shorter bound keeps a hung worker from holding the caller's
-    // token-mutation queue.
-    const result = await postInternal(endpoint, input, { timeoutMs: 10_000 });
+    const result = await postInternal(endpoint, input, {
+      timeoutMs: endpoint.firstAttemptTimeoutMs,
+    });
     if (!result.ok) {
       captureException(result.error, {
         tags,

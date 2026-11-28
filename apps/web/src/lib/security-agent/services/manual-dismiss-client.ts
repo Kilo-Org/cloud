@@ -1,4 +1,5 @@
 import 'server-only';
+import { STS_SECURITY_SYNC_DISMISS_FINDING } from '@kilocode/sts-contracts';
 import {
   postSecurityWorkerCommand,
   type AcceptedSecurityWorkerCommand,
@@ -22,6 +23,7 @@ export async function submitManualFindingDismissal(
 ): Promise<AcceptedSecurityWorkerCommand> {
   return postSecurityWorkerCommand({
     path: '/internal/dismiss-finding',
+    scope: STS_SECURITY_SYNC_DISMISS_FINDING,
     service: 'dismissal',
     disabledRoutingError: 'Finding dismissal Worker routing is disabled',
     body: {

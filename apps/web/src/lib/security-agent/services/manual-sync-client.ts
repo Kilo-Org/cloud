@@ -1,4 +1,5 @@
 import 'server-only';
+import { STS_SECURITY_SYNC_MANUAL_SYNC } from '@kilocode/sts-contracts';
 import {
   postSecurityWorkerCommand,
   type AcceptedSecurityWorkerCommand,
@@ -25,6 +26,7 @@ export async function submitManualSecuritySync(
 ): Promise<AcceptedSecurityWorkerCommand> {
   return postSecurityWorkerCommand({
     path: '/internal/manual-sync',
+    scope: STS_SECURITY_SYNC_MANUAL_SYNC,
     service: 'sync',
     disabledRoutingError: 'Manual sync Worker routing is disabled',
     body: {

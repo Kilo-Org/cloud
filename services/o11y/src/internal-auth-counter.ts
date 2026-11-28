@@ -4,7 +4,7 @@ import {
 } from '@kilocode/worker-utils/internal-auth-observation';
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
-import { readO11ySecret } from './secrets';
+import { readO11ySecret, type O11ySecretsEnv } from './secrets';
 
 /**
  * Item 9 of the secrets design (section 9.4), read side. `notifications` and `usage-ingest` have no
@@ -22,9 +22,8 @@ import { readO11ySecret } from './secrets';
  * `(window, minute, receiver, route, auth, caller)` row with a count that can only grow, so the
  * gate takes `max(count)` per that key and then sums over windows, which stays exact either way.
  */
-export type InternalAuthCounterEnv = {
+export type InternalAuthCounterEnv = O11ySecretsEnv & {
   O11Y_CF_ACCOUNT_ID: string;
-  O11Y_CF_AE_API_TOKEN: SecretsStoreSecret;
 };
 
 /** The shared dataset both writers use; the reader never names a second one. */

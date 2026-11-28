@@ -3,17 +3,15 @@ import { queryDeadLetterQueue } from './dead-letter-queue-query';
 import { recordAlertFired, shouldSuppress } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 import type { QueueBacklogMetrics } from './queue-backlog';
+import type { O11ySecretsEnv } from '../secrets';
 
-type DeadLetterQueueEnv = {
+type DeadLetterQueueEnv = O11ySecretsEnv & {
   O11Y_ALERT_STATE: KVNamespace;
   O11Y_CF_ACCOUNT_ID: string;
-  O11Y_CF_CONTAINERS_API_TOKEN: SecretsStoreSecret;
-  O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
-  O11Y_SLACK_WEBHOOK_TICKET: SecretsStoreSecret;
 };
 
 type QueryFn = (
-  env: Pick<DeadLetterQueueEnv, 'O11Y_CF_ACCOUNT_ID' | 'O11Y_CF_CONTAINERS_API_TOKEN'>,
+  env: Pick<DeadLetterQueueEnv, 'O11Y_CF_ACCOUNT_ID' | 'STS'>,
   queueName: string
 ) => Promise<QueueBacklogMetrics>;
 

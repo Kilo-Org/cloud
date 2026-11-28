@@ -461,6 +461,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 | `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `ai-gateway` | | `POSTGRES_URL`, `POSTGRES_REPLICA_US_URL`, `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` | staging and production only (`environmentGrants`) |
+| `ai-gateway` | | `BYOK_KMS_SERVICE_TOKEN`, `CREDIT_CATEGORIES_ENCRYPTION_KEY`, `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2`, `ENKRYPT_API_KEY`, `MAILGUN_API_KEY`, `MISTRAL_API_KEY`, `O11Y_KILO_GATEWAY_CLIENT_SECRET`, `OPENAI_CHATGPT_API_KEY`, `OPENAI_CLIENT_SECRET`, `OPENROUTER_API_KEY`, `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID`, `R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY`, `R2_API_REQUEST_LOG_ACCESS_KEY_ID`, `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY`, `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL`, `STRIPE_SECRET_KEY`, `VERCEL_AI_GATEWAY_API_KEY` (resolved from `/shared`) | production only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
@@ -510,6 +511,12 @@ secrets-cutover PR, and previews keep `env`. A granted name that comes back `mis
 configuration error for the reader to report: a missing EU replica keeps today's behaviour and
 never routes EU reads to the primary. No other workload holds them: Workers reach the database
 through their Hyperdrive bindings.
+
+`ai-gateway` also holds seventeen web values in production (ruling M142b), listed in the table
+above and read by gateway code under `packages/web-shared/src/lib` for the read under
+`SECRETS_SOURCE=sts` in the secrets-cutover PR. Each is copied Create-only into production
+`/shared`, which is authoritative, and none into `/workloads/ai-gateway`, so the bundle resolves it
+from `/shared` with no STS code change. Staging and previews keep `env`.
 
 Workloads with a policy, all over `worker-binding`:
 

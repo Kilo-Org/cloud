@@ -239,18 +239,18 @@ describe('leaderboard usage hourly rollup', () => {
     ]);
   });
 
-  test('eligible hours settled for an hour and ended within the last four hours, oldest first', () => {
-    expect(eligibleLeaderboardUsageHours(new Date('2026-11-10T10:15:00.000Z'))).toEqual([
+  test('eligible hours settled for three hours and ended within the last six hours, oldest first', () => {
+    expect(eligibleLeaderboardUsageHours(new Date('2026-11-10T12:15:00.000Z'))).toEqual([
       '2026-11-10T06:00:00.000Z',
       '2026-11-10T07:00:00.000Z',
       '2026-11-10T08:00:00.000Z',
     ]);
-    expect(eligibleLeaderboardUsageHours(new Date('2026-11-10T09:59:59.999Z'))).toEqual([
+    expect(eligibleLeaderboardUsageHours(new Date('2026-11-10T11:59:59.999Z'))).toEqual([
       '2026-11-10T05:00:00.000Z',
       '2026-11-10T06:00:00.000Z',
       '2026-11-10T07:00:00.000Z',
     ]);
-    expect(eligibleLeaderboardUsageHours(new Date('2026-11-10T10:00:00.000Z'))).toEqual([
+    expect(eligibleLeaderboardUsageHours(new Date('2026-11-10T12:00:00.000Z'))).toEqual([
       '2026-11-10T05:00:00.000Z',
       '2026-11-10T06:00:00.000Z',
       '2026-11-10T07:00:00.000Z',
@@ -259,7 +259,7 @@ describe('leaderboard usage hourly rollup', () => {
   });
 
   test('builds unrecorded eligible hours oldest first, recording empty hours and reading nothing older', async () => {
-    const now = new Date('2026-11-10T10:15:00.000Z');
+    const now = new Date('2026-11-10T12:15:00.000Z');
     await insertUsage({ created_at: '2026-11-10T05:30:00.000Z', requested_model: 'too/old' });
     await insertUsage({ created_at: '2026-11-10T06:30:00.000Z' });
     await insertUsage({ created_at: '2026-11-10T07:30:00.000Z' });
@@ -301,7 +301,7 @@ describe('leaderboard usage hourly rollup', () => {
   test('stops starting new hours once the deadline has passed', async () => {
     const summary = await buildLeaderboardUsageHours({
       db,
-      now: new Date('2026-11-10T10:15:00.000Z'),
+      now: new Date('2026-11-10T12:15:00.000Z'),
       deadline: Date.now(),
     });
 
@@ -359,7 +359,7 @@ describe('leaderboard usage hourly rollup', () => {
 
     const summary = await buildLeaderboardUsageHours({
       db: slowDb,
-      now: new Date('2026-11-10T10:15:00.000Z'),
+      now: new Date('2026-11-10T12:15:00.000Z'),
       deadline: Date.now() + 60_000,
     });
 
@@ -416,7 +416,7 @@ describe('leaderboard usage hourly rollup', () => {
 
     const summary = await buildLeaderboardUsageHours({
       db: slowDb,
-      now: new Date('2026-11-10T10:15:00.000Z'),
+      now: new Date('2026-11-10T12:15:00.000Z'),
       deadline: Date.now() + 2 * HOUR_BUDGET_MS + 60_000,
     });
 
@@ -447,7 +447,7 @@ describe('leaderboard usage hourly rollup', () => {
 
     const summary = await buildLeaderboardUsageHours({
       db: flakyDb,
-      now: new Date('2026-11-10T10:15:00.000Z'),
+      now: new Date('2026-11-10T12:15:00.000Z'),
       deadline: Date.now() + 60_000,
     });
 

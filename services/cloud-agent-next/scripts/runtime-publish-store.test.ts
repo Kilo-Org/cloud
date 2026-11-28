@@ -115,21 +115,3 @@ it('does not retry a permanent HEAD failure', async () => {
   await expect(put()).rejects.toThrow('runtime store HEAD failed (403)');
   expect(request).toHaveBeenCalledTimes(1);
 });
-it('signs every request with the session token of temporary credentials, and only then', async () => {
-  const signed = async (sessionToken?: string) => {
-    const request = vi.fn(async (_input: Request) => new Response(new Uint8Array([1])));
-    await remoteArtifactStore({
-      accountId: 'a'.repeat(32),
-      bucket: 'runtime-test',
-      accessKeyId: 'fixture-key',
-      secretAccessKey: 'fixture-secret',
-      sessionToken,
-      request: request as unknown as typeof fetch,
-    }).getBytes(payloadKey);
-    return request.mock.calls[0][0];
-  };
-  expect((await signed('fixture-session')).headers.get('x-amz-security-token')).toBe(
-    'fixture-session'
-  );
-  expect((await signed()).headers.get('x-amz-security-token')).toBeNull();
-});

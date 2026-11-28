@@ -447,9 +447,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    # The index jobs below upsert Vectorize only after this job proved the committed catalog fresh.
-    outputs:
-      catalog: ${{ steps.merge_changes.outputs.catalog }}
     steps:
       # Full history so the change-detection step can diff the pushed commit
       # against `github.event.before`.
@@ -670,31 +667,6 @@ jobs:
             exit 1
           fi
 
-  # The Vectorize upsert of a verified main catalog, in one of two twins that the repository
-  # variable DEPLOY_TOKEN_SOURCE picks (services/sts/README.md, "Cloudflare deploy tokens"): unset
-  # or `secret` runs catalog-index with the stored CLOUDFLARE_API_TOKEN; `sts` runs
-  # catalog-index-sts with a token STS mints for the job over GitHub OIDC (policy
-  # ci-deploy-cloud-mcp-catalog: Vectorize Write and Workers AI Read only). Both run after
-  # catalog-merge passed on the same commit, so the index never takes a stale catalog.
-  catalog-index:
-    name: catalog Vectorize index (main)
-    needs: catalog-merge
-    if: needs.catalog-merge.outputs.catalog == 'true' && vars.DEPLOY_TOKEN_SOURCE != 'sts'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      # Full history: the id collection walks every version of the catalog.
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
       # The ids to delete are the procedures the index was ever built from that
       # the current catalog no longer has. That union comes from git history, not
       # from listing the index: a full list of the production index through the
@@ -703,6 +675,7 @@ jobs:
       # Deleting an id the index never had is a no-op.
       - name: Collect every id the index was ever built from
         id: prune_ids
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/catalog-ever-ids.txt"
@@ -714,84 +687,10 @@ jobs:
           echo "file=$out" >> "$GITHUB_OUTPUT"
 
       - name: Upsert Vectorize index and prune removed procedures
+        if: steps.merge_changes.outputs.catalog == 'true'
         run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
           VECTORIZE_INDEX_NAME: kilo-mcp-catalog
           MCP_CATALOG_PRUNE_IDS: ${{ steps.prune_ids.outputs.file }}
-
-  catalog-index-sts:
-    name: catalog Vectorize index (main)
-    needs: catalog-merge
-    if: needs.catalog-merge.outputs.catalog == 'true' && vars.DEPLOY_TOKEN_SOURCE == 'sts'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    # The policy binds this GitHub environment, which admits main only.
-    environment: production
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      # Exactly `sts`: job conditions compare without case, so `STS` passes them and stops here.
-      - name: Check DEPLOY_TOKEN_SOURCE
-        env:
-          DEPLOY_TOKEN_SOURCE: ${{ vars.DEPLOY_TOKEN_SOURCE }}
-        run: |
-          if [[ $DEPLOY_TOKEN_SOURCE != sts ]]; then
-            echo "::error::DEPLOY_TOKEN_SOURCE must be unset, secret or sts"
-            exit 1
-          fi
-
-      # Full history: the id collection walks every version of the catalog.
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      # The ids to delete are the procedures the index was ever built from that
-      # the current catalog no longer has. That union comes from git history, not
-      # from listing the index: a full list of the production index through the
-      # REST API times out, and a single-step diff would strand the ids of a run
-      # whose prune failed (the next run no longer sees them in its base).
-      # Deleting an id the index never had is a no-op.
-      - name: Collect every id the index was ever built from
-        id: prune_ids
-        run: |
-          set -euo pipefail
-          out="$RUNNER_TEMP/catalog-ever-ids.txt"
-          : > "$out"
-          for sha in $(git log --format=%H -- services/kilo-mcp/catalog.json); do
-            git show "${sha}:services/kilo-mcp/catalog.json" 2>/dev/null | jq -r 'keys[]' >> "$out" || true
-          done
-          sort -u "$out" -o "$out"
-          echo "file=$out" >> "$GITHUB_OUTPUT"
-
-      # Masks the token and hands it on only as a step output. A refusal fails the job: it never
-      # falls back to the secret; rolling back means setting DEPLOY_TOKEN_SOURCE to `secret`.
-      - name: Get a deploy token from STS
-        id: sts
-        env:
-          STS_ENVIRONMENT: production
-        run: bash scripts/ci/sts-deploy-token.sh mint
-
-      - name: Upsert Vectorize index and prune removed procedures
-        run: node services/kilo-mcp/scripts/embed-catalog.ts upsert
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
-          CLOUDFLARE_ACCOUNT_ID: e115e769bcdd4c3d66af59d3332cb394
-          VECTORIZE_INDEX_NAME: kilo-mcp-catalog
-          MCP_CATALOG_PRUNE_IDS: ${{ steps.prune_ids.outputs.file }}
-
-      # Also after a failed or cancelled upsert, with a fresh OIDC token. A token that is not
-      # revoked stays valid until STS deletes it at its expiry.
-      - name: Revoke the deploy token
-        if: always() && steps.sts.outputs.token_id != ''
-        env:
-          STS_ENVIRONMENT: production
-          TOKEN_ID: ${{ steps.sts.outputs.token_id }}
-        run: bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"

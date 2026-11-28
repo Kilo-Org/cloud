@@ -178,13 +178,6 @@ jobs:
         needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success'
       }}
-    # The ceiling of the called jobs: only its `-sts` deploy jobs request id-token, and their
-    # tokens name deploy-workers.yml, so they match the ci-deploy-cloud policy and never this
-    # workflow's trigger-only ci-db-migrate.
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
     uses: ./.github/workflows/deploy-workers.yml
     with:
       worker_matrix: ${{ needs.detect-workers.outputs.matrix }}

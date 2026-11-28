@@ -144,8 +144,6 @@ export async function main(
     bucket,
     accessKeyId: z.string().parse(process.env.RUNTIME_R2_ACCESS_KEY_ID),
     secretAccessKey: z.string().parse(process.env.RUNTIME_R2_SECRET_ACCESS_KEY),
-    // Present with R2 temporary credentials (the STS deploy path), absent with the stored keys.
-    sessionToken: process.env.RUNTIME_R2_SESSION_TOKEN || undefined,
   });
   const token = process.env.GITHUB_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;

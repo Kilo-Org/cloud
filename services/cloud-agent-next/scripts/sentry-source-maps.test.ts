@@ -372,23 +372,16 @@ console.log(JSON.stringify(events));
       expect(dockerfile).toContain(`ARG BUN_VERSION="${RUNTIME_DISTRIBUTION.bun}"`);
     }
     const workflow = await readFile(resolve('../../.github/workflows/deploy-workers.yml'), 'utf8');
-    // Every deploy job above has an `-sts` twin (`DEPLOY_TOKEN_SOURCE=sts`), so
-    // both paths carry the same Cloud Agent wiring and are checked separately.
-    const twinMarker = '# The STS twins of the deploy jobs above';
-    const twinStart = workflow.indexOf(twinMarker);
-    expect(twinStart).toBeGreaterThan(0);
-    for (const jobs of [workflow.slice(0, twinStart), workflow.slice(twinStart)]) {
-      expect(jobs.match(/name: Upload Cloud Agent Sentry source maps/g)).toHaveLength(3);
-      expect(jobs.match(/SENTRY_AUTH_TOKEN: \$\{\{ secrets\.SENTRY_AUTH_TOKEN \}\}/g)).toHaveLength(
-        3
-      );
-      expect(jobs).not.toContain('CLOUD_AGENT_SENTRY_ORG');
-      expect(jobs).not.toContain('CLOUD_AGENT_SENTRY_PROJECT');
-      expect(jobs.match(/steps\.runtime\.outputs\.command/g)).toHaveLength(10);
-      expect(jobs.match(/dist\/worker\/index\.js --no-bundle --upload-source-maps/g)).toHaveLength(
-        6
-      );
-      expect(jobs.match(/name: Deploy to Cloudflare Workers \(retry\)/g)).toHaveLength(3);
-    }
+    expect(workflow.match(/name: Upload Cloud Agent Sentry source maps/g)).toHaveLength(3);
+    expect(
+      workflow.match(/SENTRY_AUTH_TOKEN: \$\{\{ secrets\.SENTRY_AUTH_TOKEN \}\}/g)
+    ).toHaveLength(3);
+    expect(workflow).not.toContain('CLOUD_AGENT_SENTRY_ORG');
+    expect(workflow).not.toContain('CLOUD_AGENT_SENTRY_PROJECT');
+    expect(workflow.match(/steps\.runtime\.outputs\.command/g)).toHaveLength(10);
+    expect(
+      workflow.match(/dist\/worker\/index\.js --no-bundle --upload-source-maps/g)
+    ).toHaveLength(6);
+    expect(workflow.match(/name: Deploy to Cloudflare Workers \(retry\)/g)).toHaveLength(3);
   });
 });

@@ -330,8 +330,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     RUNTIME_R2_ACCOUNT_ID: accountId,
     RUNTIME_R2_ACCESS_KEY_ID: accessKeyId,
     RUNTIME_R2_SECRET_ACCESS_KEY: secretAccessKey,
-    // Present with R2 temporary credentials (the STS publish path), absent with the stored keys.
-    RUNTIME_R2_SESSION_TOKEN: sessionToken,
   } = process.env;
   if (bucket && (!accountId || !accessKeyId || !secretAccessKey))
     throw new Error('Runtime publisher credentials are missing');
@@ -341,13 +339,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     (out !== undefined
       ? localDirectoryArtifactStore(out)
       : bucket && accountId && accessKeyId && secretAccessKey
-        ? remoteArtifactStore({
-            accountId,
-            bucket,
-            accessKeyId,
-            secretAccessKey,
-            sessionToken: sessionToken || undefined,
-          })
+        ? remoteArtifactStore({ accountId, bucket, accessKeyId, secretAccessKey })
         : null);
   if (!store) throw new Error('Runtime publisher target is invalid');
   try {

@@ -7,10 +7,6 @@ import bouncerWatchPolicy from '../../policy/bouncer-watch.yaml';
 import ciDbMigrateStagingPolicy from '../../policy/ci-db-migrate-staging.yaml';
 import ciDbMigratePolicy from '../../policy/ci-db-migrate.yaml';
 import ciDeployBouncerPolicy from '../../policy/ci-deploy-bouncer.yaml';
-import ciDeployCloudMcpCatalogPolicy from '../../policy/ci-deploy-cloud-mcp-catalog.yaml';
-import ciDeployCloudRuntimePolicy from '../../policy/ci-deploy-cloud-runtime.yaml';
-import ciDeployCloudStagingPolicy from '../../policy/ci-deploy-cloud-staging.yaml';
-import ciDeployCloudPolicy from '../../policy/ci-deploy-cloud.yaml';
 import ciKilocodeAppKeyPolicy from '../../policy/ci-kilocode-app-key.yaml';
 import ciKilocodeAppKeyV2Policy from '../../policy/ci-kilocode-app-key-v2.yaml';
 import ciKilocodeCommunityPolicy from '../../policy/ci-kilocode-community.yaml';
@@ -61,10 +57,6 @@ const sources: Record<PolicyFile, string> = {
   'ci-db-migrate.yaml': ciDbMigratePolicy,
   'ci-db-migrate-staging.yaml': ciDbMigrateStagingPolicy,
   'ci-deploy-bouncer.yaml': ciDeployBouncerPolicy,
-  'ci-deploy-cloud.yaml': ciDeployCloudPolicy,
-  'ci-deploy-cloud-staging.yaml': ciDeployCloudStagingPolicy,
-  'ci-deploy-cloud-runtime.yaml': ciDeployCloudRuntimePolicy,
-  'ci-deploy-cloud-mcp-catalog.yaml': ciDeployCloudMcpCatalogPolicy,
   'ci-kilocode-app-key.yaml': ciKilocodeAppKeyPolicy,
   'ci-kilocode-app-key-v2.yaml': ciKilocodeAppKeyV2Policy,
   'ci-kilocode-community.yaml': ciKilocodeCommunityPolicy,

@@ -371,7 +371,7 @@ export class SessionRelayDO extends DurableObject<Env> {
 
   private async authorize(token: string): Promise<Attachment['ticket'] | undefined> {
     if (this.purged) return undefined;
-    const ticket = await verifyTicket(token, this.env, 'session-relay');
+    const ticket = await verifyTicket(token, this.env, 'session-relay', this.ctx);
     if (this.purged || !ticket?.sessionID) return undefined;
     const name = JSON.stringify([ticket.tenant.type, ticket.tenant.id, ticket.sessionID]);
     if (!this.env.SESSION_RELAY_DO.idFromName(name).equals(this.ctx.id)) return undefined;

@@ -1,7 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import { WorkOS } from '@workos-inc/node';
+import { getCachedSecret } from '@kilocode/worker-utils';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
+import {
+  STS_WEB_SCIM_SYNC,
+  webInternalCredential,
+} from '@kilocode/worker-utils/web-internal-credential';
 
 import migrations from '../../drizzle/migrations';
 import * as state from '../db/state';
@@ -20,7 +25,7 @@ import {
 } from '../util/constants';
 import { clampPollIntervalSeconds } from '../util/interval';
 import { logger } from '../util/logger';
-import { resolveSecret } from '../util/secret';
+import { readScimSyncSecret, type ScimSyncSecretName } from '../secrets';
 
 /**
  * A failure the loop steps over, and what it records for it.
@@ -43,6 +48,17 @@ export class ScimSyncDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
     });
+  }
+
+  /**
+   * Reads one of this Worker's secrets through the STS-flagged reader.
+   *
+   * The lazy binding keeps `getCachedSecret`'s isolate cache: these values are
+   * read on every poll, so re-fetching them each time would add three round
+   * trips per alarm, whichever source `SECRETS_SOURCE` selects.
+   */
+  private secret(name: ScimSyncSecretName): Promise<string> {
+    return getCachedSecret({ get: () => readScimSyncSecret(this.env, name, this.ctx) }, name);
   }
 
   /**
@@ -139,8 +155,8 @@ export class ScimSyncDO extends DurableObject<Env> {
       cursor = resolved.cursor;
       cursorSource = resolved.source;
 
-      const workos = new WorkOS(await resolveSecret(this.env.WORKOS_API_KEY, 'WORKOS_API_KEY'), {
-        clientId: await resolveSecret(this.env.WORKOS_CLIENT_ID, 'WORKOS_CLIENT_ID'),
+      const workos = new WorkOS(await this.secret('WORKOS_API_KEY'), {
+        clientId: await this.secret('WORKOS_CLIENT_ID'),
         // The SDK retries 4xx-adjacent and 5xx responses internally. Leaving
         // that on would stretch a single alarm across several attempts and hide
         // the failure; the alarm interval is the retry.
@@ -148,7 +164,11 @@ export class ScimSyncDO extends DurableObject<Env> {
       });
       const app: AppCallContext = {
         origin: this.env.BACKEND_API_URL,
-        apiKey: await resolveSecret(this.env.INTERNAL_API_SECRET, 'INTERNAL_API_SECRET'),
+        credential: () =>
+          webInternalCredential(this.env, STS_WEB_SCIM_SYNC, {
+            header: 'x-internal-api-key',
+            secret: () => this.secret('INTERNAL_API_SECRET'),
+          }),
         // A plain Worker secret rather than a Secrets Store binding, because
         // only the protected origin needs one: a `secrets_store_secrets` entry
         // for a secret that does not exist fails the deploy, so production

@@ -2,6 +2,7 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { AUTH_CLOCK_SKEW_SECONDS, syncSigningKey, verifyGrant, type Principal } from '../auth';
 import type { Env } from '../env';
 import { principalSchema, sessionIDSchema, tenantSchema, userIDSchema } from '../protocol';
@@ -52,14 +53,15 @@ export async function mintTicket(
   principal: Principal,
   audience: LiveAudience,
   role: LiveRole,
-  sessionID?: string
+  sessionID?: string,
+  ctx?: SecretsExecutionContext
 ): Promise<{ ticket: string; expiresAt: string }> {
   const token = extractBearerToken(request.headers.get('Authorization'));
   if (!token) throw new LiveTicketError(401, 'unauthenticated', 'A sync grant is required');
   if (!env.ENVIRONMENT) {
     throw new LiveTicketError(503, 'auth_unavailable', 'Authentication is temporarily unavailable');
   }
-  const grant = await verifyGrant(token, env).catch(() => {
+  const grant = await verifyGrant(token, env, ctx).catch(() => {
     throw new LiveTicketError(503, 'auth_unavailable', 'Authentication is temporarily unavailable');
   });
   const bound = principalSchema.safeParse(principal);
@@ -93,7 +95,7 @@ export async function mintTicket(
   }
   const ticket = await new SignJWT(claims.data)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .sign(await syncSigningKey(env));
+    .sign(await syncSigningKey(env, ctx));
   return { ticket, expiresAt: new Date(exp * 1000).toISOString() };
 }
 
@@ -101,10 +103,11 @@ export async function mintTicket(
 export async function verifyTicket(
   token: string,
   env: Env,
-  audience: LiveAudience
+  audience: LiveAudience,
+  ctx?: SecretsExecutionContext
 ): Promise<LiveTicket | undefined> {
   if (!env.ENVIRONMENT) return undefined;
-  const key = await syncSigningKey(env);
+  const key = await syncSigningKey(env, ctx);
   let payload: unknown;
   try {
     ({ payload } = await jwtVerify(token, key, {

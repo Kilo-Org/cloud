@@ -1,5 +1,10 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { TRPCContext } from '../types.js';
 import { projectTrpcErrorData } from '../trpc-error.js';
 import { validateScopedWorkerPreparation } from '../cloud-agent-authority.js';
@@ -114,7 +119,6 @@ export const internalApiProtectedProcedure = t.procedure.use(
         message: 'Invalid or missing internal API key',
       });
     }
-
     if (!ctx.userId || !ctx.authToken) {
       throw new TRPCError({
         code: 'UNAUTHORIZED',
@@ -135,6 +139,14 @@ export const internalApiProtectedProcedure = t.procedure.use(
       }
     }
 
+    // Every credential passed. The procedure name is a registered literal; `caller` is the
+    // unauthenticated header label.
+    observeInternalAuth(
+      'cloud-agent-next',
+      path,
+      'legacy_shared_secret',
+      callerLabel(ctx.request.headers.get(INTERNAL_CALLER_HEADER) ?? null)
+    );
     return next({ ctx });
   }
 );

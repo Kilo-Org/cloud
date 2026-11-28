@@ -12,6 +12,11 @@ const workflowPath = '.github/workflows/kilo-mcp-catalog.yml';
 const testPath = 'scripts/kilo-mcp-catalog.test.mjs';
 const prJobName = 'catalog-pr';
 const mergeJobName = 'catalog-merge';
+// The Vectorize upsert's two twins, picked by the repository variable DEPLOY_TOKEN_SOURCE: the
+// stored CLOUDFLARE_API_TOKEN, or a token STS mints for the job (services/sts/README.md,
+// "Cloudflare deploy tokens").
+const indexJobName = 'catalog-index';
+const stsIndexJobName = 'catalog-index-sts';
 const dumpCommand = 'pnpm --filter web script src/scripts/mcp-catalog/dump.ts';
 const skillCommand = 'pnpm --filter web script src/scripts/mcp-catalog/skill.ts';
 const wiringCommand = 'node --test scripts/kilo-mcp-catalog.test.mjs';
@@ -416,7 +421,11 @@ function webTestFilterPaths() {
 }
 
 function validate(workflow) {
-  assert.deepEqual(Object.keys(workflow.jobs), [prJobName, mergeJobName], 'exactly two jobs');
+  assert.deepEqual(
+    Object.keys(workflow.jobs),
+    [prJobName, mergeJobName, indexJobName, stsIndexJobName],
+    'exactly the PR job, the merge job and the two index twins'
+  );
   const pr = workflow.jobs[prJobName];
   const merge = workflow.jobs[mergeJobName];
 
@@ -666,16 +675,19 @@ function validate(workflow) {
     mergeChangeGate,
     'merge skill regeneration is gated on catalog-relevant changes'
   );
-  const upsert = findStep(merge, step => step.run === embedCommand, 'merge job upserts Vectorize');
+  assert.ok(
+    merge.steps.every(step => step.run !== embedCommand),
+    'the merge job verifies the catalog; only the index jobs upsert it'
+  );
+  assert.equal(
+    merge.outputs?.catalog,
+    '${{ steps.merge_changes.outputs.catalog }}',
+    'the merge job publishes its change gate for the index jobs'
+  );
   const mergeDrift = findStep(
     merge,
     step => /git diff --exit-code[\s\S]*services\/kilo-mcp\/catalog\.json/.test(step.run ?? ''),
     'merge job fails when the regenerated catalog is not the committed one'
-  );
-  assert.ok(
-    merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeDrift) &&
-      merge.steps.indexOf(mergeDrift) < merge.steps.indexOf(upsert),
-    'the merge drift check must run between the dump and the Vectorize upsert'
   );
   assert.ok(
     merge.steps.indexOf(mergeDump) < merge.steps.indexOf(mergeSkill) &&
@@ -692,60 +704,95 @@ function validate(workflow) {
     /exit 1/,
     'a catalog changed on main must fail the merge job, not index the stale bundled catalog'
   );
+  for (const [jobName, token, operator] of [
+    [indexJobName, '${{ secrets.CLOUDFLARE_API_TOKEN }}', '!='],
+    [stsIndexJobName, '${{ steps.sts.outputs.token }}', '=='],
+  ]) {
+    const job = workflow.jobs[jobName];
+    // Needing the merge job means a failed drift check (or dump) skips the upsert, so the index
+    // never takes a catalog the Worker bundle does not carry.
+    assert.equal(job.needs, mergeJobName, `${jobName} runs only after the merge job passed`);
+    assert.equal(
+      job.if,
+      `needs.catalog-merge.outputs.catalog == 'true' && vars.DEPLOY_TOKEN_SOURCE ${operator} 'sts'`,
+      `${jobName} runs on catalog-relevant main pushes for its token source`
+    );
+    const upsert = findStep(job, step => step.run === embedCommand, `${jobName} upserts Vectorize`);
+    assert.equal(upsert.env?.CLOUDFLARE_API_TOKEN, token, `${jobName} upsert token`);
+    assert.ok(upsert.env?.CLOUDFLARE_ACCOUNT_ID, 'upsert gets the Cloudflare account id');
+    assert.equal(
+      upsert.env.VECTORIZE_INDEX_NAME,
+      'kilo-mcp-catalog',
+      'upsert targets the prod index'
+    );
+    // The prune's ids come from git history, never from listing the index: a full list of the
+    // production index times out, and a single-step diff would strand the ids of a run whose
+    // prune failed.
+    const ids = findStep(
+      job,
+      step => step.id === 'prune_ids',
+      `${jobName} collects every id the index was ever built from`
+    );
+    assert.match(
+      ids.run ?? '',
+      /git log --format=%H -- services\/kilo-mcp\/catalog\.json/,
+      'the ids come from every version of the committed catalog'
+    );
+    assert.match(ids.run ?? '', /keys\[\]/, 'each version contributes its procedure paths');
+    assert.match(ids.run ?? '', /sort -u/, 'the union is deduped');
+    // `git log` and `git show` walk every commit, so the walk's prerequisite is a full clone:
+    // without it the union silently covers only the pushed range.
+    const checkout = job.steps.find(step =>
+      (step.uses ?? '').startsWith('useblacksmith/checkout@')
+    );
+    assert.equal(checkout?.with?.['fetch-depth'], 0, 'the history walk needs the full clone');
+    assert.match(
+      ids.run ?? '',
+      /out="\$RUNNER_TEMP\/catalog-ever-ids\.txt"/,
+      'the collection writes the id list to a file'
+    );
+    assert.match(
+      ids.run ?? '',
+      /echo "file=\$out" >> "\$GITHUB_OUTPUT"/,
+      'the collection publishes its file as the step output'
+    );
+    assert.ok(
+      job.steps.indexOf(ids) < job.steps.indexOf(upsert),
+      'the id list is collected before the upsert reads it'
+    );
+    assert.equal(
+      upsert.env?.MCP_CATALOG_PRUNE_IDS,
+      '${{ steps.prune_ids.outputs.file }}',
+      'the upsert prunes from the collected id list'
+    );
+  }
+  const legacyIndex = workflow.jobs[indexJobName];
+  assert.deepEqual(legacyIndex.permissions, { contents: 'read' }, 'the secret twin mints nothing');
+  const stsIndex = workflow.jobs[stsIndexJobName];
+  assert.deepEqual(stsIndex.permissions, { contents: 'read', 'id-token': 'write' });
   assert.equal(
-    upsert.env?.CLOUDFLARE_API_TOKEN,
-    '${{ secrets.CLOUDFLARE_API_TOKEN }}',
-    'upsert uses the Cloudflare API token secret'
+    stsIndex.environment,
+    'production',
+    'the STS policy binds the production environment'
   );
-  assert.ok(upsert.env?.CLOUDFLARE_ACCOUNT_ID, 'upsert gets the Cloudflare account id');
-  assert.equal(
-    upsert.env.VECTORIZE_INDEX_NAME,
-    'kilo-mcp-catalog',
-    'upsert targets the prod index'
+  assert.doesNotMatch(
+    JSON.stringify(stsIndex),
+    /secrets\./,
+    `${stsIndexJobName} reads no repository secret`
   );
-  // The prune's ids come from git history, never from listing the index: a
-  // full list of the production index times out, and a single-step diff would
-  // strand the ids of a run whose prune failed.
-  const ids = findStep(
-    merge,
-    step => step.id === 'prune_ids',
-    'merge job collects every id the index was ever built from'
+  const mint = findStep(stsIndex, step => step.id === 'sts', 'the STS twin mints a deploy token');
+  assert.equal(mint.run, 'bash scripts/ci/sts-deploy-token.sh mint');
+  assert.equal(mint.env?.STS_ENVIRONMENT, 'production');
+  const revoke = findStep(
+    stsIndex,
+    step => step.run === 'bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"',
+    'the STS twin revokes its token'
   );
-  assert.equal(ids.if, mergeChangeGate, 'the id collection is gated with the upsert');
-  assert.match(
-    ids.run ?? '',
-    /git log --format=%H -- services\/kilo-mcp\/catalog\.json/,
-    'the ids come from every version of the committed catalog'
-  );
-  assert.match(ids.run ?? '', /keys\[\]/, 'each version contributes its procedure paths');
-  assert.match(ids.run ?? '', /sort -u/, 'the union is deduped');
-  // `git log` and `git show` walk every commit, so the walk's prerequisite is a
-  // full clone: without it the union silently covers only the pushed range.
-  const mergeCheckout = merge.steps.find(step =>
-    (step.uses ?? '').startsWith('useblacksmith/checkout@')
-  );
-  assert.equal(mergeCheckout?.with?.['fetch-depth'], 0, 'the history walk needs the full clone');
-  assert.match(
-    ids.run ?? '',
-    /out="\$RUNNER_TEMP\/catalog-ever-ids\.txt"/,
-    'the collection writes the id list to a file'
-  );
-  assert.match(
-    ids.run ?? '',
-    /echo "file=\$out" >> "\$GITHUB_OUTPUT"/,
-    'the collection publishes its file as the step output'
-  );
-  assert.ok(
-    merge.steps.indexOf(ids) < merge.steps.indexOf(upsert),
-    'the id list is collected before the upsert reads it'
-  );
-  assert.equal(
-    upsert.env?.MCP_CATALOG_PRUNE_IDS,
-    '${{ steps.prune_ids.outputs.file }}',
-    'the upsert prunes from the collected id list'
-  );
-  const afterIds = merge.steps.slice(merge.steps.indexOf(ids) + 1);
-  assert.equal(afterIds[0] === upsert, true, 'the upsert runs immediately after the id collection');
+  assert.equal(revoke.if, "always() && steps.sts.outputs.token_id != ''");
+  assert.equal(stsIndex.steps.at(-1), revoke, 'the revoke is the last step');
+  for (const job of [prJobName, mergeJobName, indexJobName]) {
+    assert.equal(workflow.jobs[job].permissions?.['id-token'], undefined, `${job} mints nothing`);
+  }
 }
 
 /**
@@ -973,8 +1020,25 @@ for (const [name, defect] of [
     },
   ],
   [
-    'merge upsert removed',
-    workflow => dropStep(workflow, mergeJobName, step => step.run === embedCommand),
+    'index upsert removed',
+    workflow => dropStep(workflow, indexJobName, step => step.run === embedCommand),
+  ],
+  [
+    'STS index upsert removed',
+    workflow => dropStep(workflow, stsIndexJobName, step => step.run === embedCommand),
+  ],
+  [
+    'index upsert ahead of the merge job',
+    workflow => {
+      delete workflow.jobs[indexJobName].needs;
+    },
+  ],
+  [
+    'STS index reading the stored token',
+    workflow => {
+      const step = workflow.jobs[stsIndexJobName].steps.find(item => item.run === embedCommand);
+      step.env.CLOUDFLARE_API_TOKEN = '${{ secrets.CLOUDFLARE_API_TOKEN }}';
+    },
   ],
   [
     'merge drift check removed',

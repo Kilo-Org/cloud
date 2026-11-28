@@ -32,7 +32,7 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import {
-  KILOCLAW_API_URL,
+  KILOCLAW_LEGACY_WORKER_URL,
   KILOCLAW_INSTANCE_URL_TEMPLATE,
 } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -78,7 +78,10 @@ import {
 } from '@kilocode/db/schema';
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
+import {
+  deleteWorkerTrigger,
+  isWebhookAgentConfigured,
+} from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
@@ -1099,7 +1102,7 @@ async function getUpcomingScheduledActionForInstance(
   };
 }
 
-function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
+function createNoInstanceStatus(userId: string, workerUrl: string | null): KiloClawDashboardStatus {
   return {
     userId,
     sandboxId: null,
@@ -1155,7 +1158,7 @@ function isFakeSeedInstance(instance: ActiveKiloClawInstance): boolean {
 
 function createFakeSeedInstanceStatus(
   instance: ActiveKiloClawInstance,
-  workerUrl: string
+  workerUrl: string | null
 ): KiloClawDashboardStatus {
   return {
     ...createNoInstanceStatus(instance.userId, workerUrl),
@@ -3171,7 +3174,8 @@ export const kiloclawRouter = createTRPCRouter({
 
   getStatus: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
-    const legacyWorkerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+    // Null outside production unless a non-production legacy host is configured.
+    const legacyWorkerUrl = KILOCLAW_LEGACY_WORKER_URL || null;
 
     if (!instance) {
       // No instance yet → no sandboxId yet → per-instance URL can't be
@@ -3521,8 +3525,9 @@ export const kiloclawRouter = createTRPCRouter({
         );
 
       // Clean up webhook/scheduled triggers for the destroyed instance.
-      // Delete from worker DOs first (best-effort), then from PostgreSQL.
-      if (destroyedRow) {
+      // Delete from worker DOs first (best-effort), then from PostgreSQL. Without a configured
+      // worker nothing is deleted, so no row is dropped while its DO may still exist.
+      if (destroyedRow && isWebhookAgentConfigured()) {
         const orphanedTriggers = await db
           .select({
             triggerId: cloud_agent_webhook_triggers.trigger_id,

@@ -11,10 +11,26 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
-import { readCloudAgentNextStoreSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readCloudAgentNextStoreSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
+import { sessionIngestCallerAuth } from './session-ingest-caller-auth.js';
 
 type ScopeProxyEnv = Pick<Cloudflare.Env, 'SESSION_INGEST'> & CloudAgentNextSecretsEnv;
+
+/**
+ * The facade's credential toward Session Ingest (`SESSION_INGEST_CALLER_AUTH`): the internal
+ * secret under `legacy`, nothing under `binding`, where the binding's `props.caller` identifies
+ * this Worker. Throws rather than forward without a credential.
+ */
+async function sessionIngestCredential(
+  env: ScopeProxyEnv,
+  ctx?: SecretsExecutionContext
+): Promise<Record<string, string>> {
+  if (sessionIngestCallerAuth(env) === 'binding') return {};
+  const internalSecret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET', ctx);
+  if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
+  return { 'X-Internal-Secret': internalSecret };
+}
 
 function getCloudAgentSessionScopeInternalUrl(requestUrl: string): URL | null {
   const url = new URL(requestUrl);
@@ -106,12 +122,11 @@ export async function forwardCloudAgentSessionScopeRequest(
   if (!url || request.method !== 'POST')
     throw new Error('Unsupported Cloud Agent session scope route');
 
-  const internalSecret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET', ctx);
-  if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
+  const credential = await sessionIngestCredential(env, ctx);
 
   const headers = stripCallerScopeHeaders(request);
   headers.set('Authorization', result.authorization);
-  headers.set('X-Internal-Secret', internalSecret);
+  for (const [name, value] of Object.entries(credential)) headers.set(name, value);
   headers.set(
     cloudAgentSessionScopeHeaders.cloudAgentSessionId,
     result.sessionIngestScope.cloudAgentSessionId
@@ -147,12 +162,11 @@ export async function forwardCloudAgentSessionScopeV2Request(
   const url = getCloudAgentSessionScopeV2InternalUrl(request.url);
   if (!url) throw new Error('Unsupported Cloud Agent session scope v2 route');
 
-  const internalSecret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET', ctx);
-  if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
+  const credential = await sessionIngestCredential(env, ctx);
 
   const headers = stripCallerScopeHeaders(request);
   headers.set('Authorization', result.authorization);
-  headers.set('X-Internal-Secret', internalSecret);
+  for (const [name, value] of Object.entries(credential)) headers.set(name, value);
   for (const [name, value] of Object.entries(result.scopeHeaders)) headers.set(name, value);
   if (result.runtimeProxyAttestation) {
     headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, result.runtimeProxyAttestation);

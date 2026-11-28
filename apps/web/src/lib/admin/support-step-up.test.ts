@@ -10,14 +10,19 @@ jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
 
 import type {
   requireSupportWriteUseStepUp as RequireSupportWriteUseStepUpValue,
+  supportStepUpCredential as SupportStepUpCredentialValue,
   supportStepUpPort as SupportStepUpPortValue,
 } from '@kilocode/web-shared/lib/admin/support-step-up';
+import type { staffRefusalKind as StaffRefusalKindValue } from '@kilocode/web-shared/lib/admin/admin-guard';
 
 let supportStepUpPort: typeof SupportStepUpPortValue;
 let requireSupportWriteUseStepUp: typeof RequireSupportWriteUseStepUpValue;
+let supportStepUpCredential: typeof SupportStepUpCredentialValue;
+let staffRefusalKind: typeof StaffRefusalKindValue;
 beforeAll(async () => {
-  ({ requireSupportWriteUseStepUp, supportStepUpPort } =
+  ({ requireSupportWriteUseStepUp, supportStepUpCredential, supportStepUpPort } =
     await import('@kilocode/web-shared/lib/admin/support-step-up'));
+  ({ staffRefusalKind } = await import('@kilocode/web-shared/lib/admin/admin-guard'));
 });
 
 const mockedEvaluate = (
@@ -185,5 +190,36 @@ describe('support write use', () => {
     ).resolves.toBe(true);
 
     expect(requireFreshSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('support step-up credential', () => {
+  afterEach(() => {
+    if (originalAdminStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+    else process.env.ADMIN_STEP_UP_ENABLED = originalAdminStepUp;
+  });
+
+  test.each(['true', 'false'])(
+    'a UTS browser session is refused by name with step-up %s',
+    enabled => {
+      process.env.ADMIN_STEP_UP_ENABLED = enabled;
+      let refusal: unknown;
+      try {
+        supportStepUpCredential('uts_session');
+      } catch (error) {
+        refusal = error;
+      }
+      expect(refusal).toBeInstanceOf(TRPCError);
+      expect((refusal as TRPCError).code).toBe('FORBIDDEN');
+      expect(staffRefusalKind(refusal)).toBe('uts_session');
+    }
+  );
+
+  test('every other credential passes unchanged', () => {
+    expect(supportStepUpCredential('session')).toBe('session');
+    expect(supportStepUpCredential('human_bearer')).toBe('human_bearer');
+    expect(supportStepUpCredential('delegated_workload')).toBe('delegated_workload');
+    expect(supportStepUpCredential('service_assertion')).toBe('service_assertion');
+    expect(supportStepUpCredential(undefined)).toBeUndefined();
   });
 });

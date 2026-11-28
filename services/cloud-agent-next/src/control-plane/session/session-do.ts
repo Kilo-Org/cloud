@@ -52,6 +52,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import { readCloudAgentNextSecret, readCloudAgentNextStoreSecret } from '../../secrets.js';
+import { sessionIngestExportCredential } from '../../session-ingest-caller-auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
 import { getSandboxProviderBinding } from '../../persistence/session-metadata.js';
@@ -3171,11 +3172,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     let hydration = this.historyHydrations.get(kiloSessionId);
     if (hydration === undefined) {
       hydration = (async () => {
-        const internalSecret = await readCloudAgentNextStoreSecret(
-          this.env,
-          'INTERNAL_API_SECRET',
-          this.ctx
-        ).catch(() => null);
+        // SESSION_INGEST_CALLER_AUTH; an unknown value throws here, before any export call.
+        const ingestCredential = await sessionIngestExportCredential(this.env, this.ctx);
         if (this.registration !== registration) return;
         await hydrateSessionHistory({
           db: this.db,
@@ -3187,7 +3185,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kiloSessionId,
           rootKiloSessionId: registration.spec.kiloSessionId,
           userId: metadata.identity.userId,
-          internalSecret: internalSecret ?? '',
+          ingestCredential,
           isCurrent: () => this.registration === registration,
           broadcast: event => this.broadcast(event),
         });

@@ -19,6 +19,7 @@ interface __BaseEnv_Env {
 	APNS_KEY_ID?: "KRYMZL626P";
 	EVENT_SERVICE?: Fetcher /* event-service */;
 	STS?: Service /* entrypoint SecretsBroker from sts */;
+	INTERNAL_AUTH_COUNTER?: AnalyticsEngineDataset;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -33,6 +34,7 @@ declare namespace Cloudflare {
 		PUSH_SINK_MODE: string;
 		KILO_WEB_API_BASE_URL: string;
 		NOTIFICATION_CHANNEL_DO: DurableObjectNamespace<import("./src/index").NotificationChannelDO>;
+		INTERNAL_AUTH_COUNTER?: AnalyticsEngineDataset;
 	}
 	interface Env extends __BaseEnv_Env {}
 }

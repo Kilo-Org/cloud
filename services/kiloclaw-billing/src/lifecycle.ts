@@ -85,6 +85,8 @@ import type {
   TrialInactivityStopCandidateQueueMessage,
 } from './types.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readKiloclawBillingSecret } from './secrets.js';
 import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowflake.js';
 
 const MS_PER_DAY = 86_400_000;
@@ -329,6 +331,13 @@ type SweepExecutionContext = BillingCorrelationContext & {
   billingRunId: string;
   billingSweep: BillingMessageSweep;
   billingAttempt: number;
+  /**
+   * The invocation that owns this sweep (a queue batch, a cron tick or an HTTP request), so a
+   * bundle revalidation started by a secret read is handed to its `waitUntil` instead of dying
+   * with the read. It is an invocation handle, not sweep data: `sweepLogTags` keeps it out of
+   * every log line, and it never reaches the database or an outbound payload.
+   */
+  ctx?: SecretsExecutionContext;
 };
 
 type SideEffectRequest =
@@ -997,15 +1006,23 @@ function organizationTrialLifecycleEmailLogTypesCondition(instanceId: string) {
   );
 }
 
+/** The loggable fields of a sweep context: the invocation handle never reaches a log line. */
+function sweepLogTags(context: SweepExecutionContext): Omit<SweepExecutionContext, 'ctx'> {
+  const { ctx: _invocation, ...tags } = context;
+  return tags;
+}
+
 function createSweepContext(
   message: { runId: string; sweep: BillingMessageSweep },
-  attempt: number
+  attempt: number,
+  ctx?: SecretsExecutionContext
 ): SweepExecutionContext {
   return {
     billingFlow: BILLING_FLOW,
     billingRunId: message.runId,
     billingSweep: message.sweep,
     billingAttempt: attempt,
+    ...(ctx === undefined ? {} : { ctx }),
   };
 }
 
@@ -1015,15 +1032,19 @@ async function callBillingSideEffect<T extends SideEffectRequest>(
   request: T,
   entityFields: BillingEntityFields = {}
 ): Promise<SideEffectResponse<T>> {
-  if (!env.INTERNAL_API_SECRET) {
+  const internalApiSecret = await readKiloclawBillingSecret(
+    env,
+    'INTERNAL_API_SECRET',
+    context.ctx
+  );
+  if (!internalApiSecret) {
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
-  const internalApiSecret = env.INTERNAL_API_SECRET;
 
   const billingCallId = crypto.randomUUID();
   const startedAt = performance.now();
   const callContext = {
-    ...context,
+    ...sweepLogTags(context),
     billingCallId,
   };
 
@@ -1083,15 +1104,19 @@ async function requestKiloClaw<T>(
   entityFields: BillingEntityFields = {},
   options: { handledErrorStatuses?: readonly number[] } = {}
 ): Promise<T> {
-  if (!env.INTERNAL_API_SECRET) {
+  const internalApiSecret = await readKiloclawBillingSecret(
+    env,
+    'INTERNAL_API_SECRET',
+    context.ctx
+  );
+  if (!internalApiSecret) {
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
-  const internalApiSecret = env.INTERNAL_API_SECRET;
 
   const billingCallId = crypto.randomUUID();
   const startedAt = performance.now();
   const callContext = {
-    ...context,
+    ...sweepLogTags(context),
     billingCallId,
   };
 
@@ -1183,7 +1208,7 @@ function snowflakeLog(
     {
       source: 'snowflake',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'snowflake_sql_api',
       },
     },
@@ -2564,15 +2589,16 @@ async function fetchCreditRenewalItemRow(
 export async function processCreditRenewalDiscovery(
   env: BillingWorkerEnv,
   message: CreditRenewalDiscoveryQueueMessage | CreditRenewalDiscoveryContinuationQueueMessage,
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<BillingSummary> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
 
   return await withLogTags(
     {
       source: 'processCreditRenewalDiscovery',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'worker',
       },
     },
@@ -2662,15 +2688,16 @@ export async function processCreditRenewalDiscovery(
 export async function processCreditRenewalItem(
   env: BillingWorkerEnv,
   message: CreditRenewalItemQueueMessage,
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<BillingSummary> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
 
   return await withLogTags(
     {
       source: 'processCreditRenewalItem',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'worker',
         kiloclawSubscriptionId: message.subscriptionId,
       },
@@ -2923,13 +2950,14 @@ export async function runCommitRetirementGuardSweep(
 export async function processCommitRetirementGuardPage(
   env: BillingWorkerEnv,
   message: CommitRetirementGuardMessage,
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<{ summary: BillingSummary; continuationEnqueued: boolean }> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
   return await withLogTags(
     {
       source: 'processCommitRetirementGuardPage',
-      tags: { ...context, billingComponent: 'worker' },
+      tags: { ...sweepLogTags(context), billingComponent: 'worker' },
     },
     async () => {
       const summary = createSummary();
@@ -3253,15 +3281,16 @@ async function processTrialExpiryRow(
 export async function processTrialExpiryPage(
   env: BillingWorkerEnv,
   message: TrialExpiryPageQueueMessage | TrialExpiryContinuationQueueMessage,
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<{ summary: BillingSummary; continuationEnqueued: boolean }> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
 
   return await withLogTags(
     {
       source: 'processTrialExpiryPage',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'worker',
       },
     },
@@ -3896,15 +3925,16 @@ export async function processOrganizationTrialExpiryPage(
   message:
     | OrganizationTrialExpiryPageQueueMessage
     | OrganizationTrialExpiryContinuationQueueMessage,
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<{ summary: BillingSummary; continuationEnqueued: boolean }> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
 
   return await withLogTags(
     {
       source: 'processOrganizationTrialExpiryPage',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'worker',
       },
     },
@@ -5357,7 +5387,7 @@ async function runTrialInactivityStopSweep(
     return;
   }
 
-  const missingSnowflakeConfig = getMissingSnowflakeConfig(env);
+  const missingSnowflakeConfig = await getMissingSnowflakeConfig(env, context.ctx);
   if (missingSnowflakeConfig.length > 0) {
     summary.errors++;
     log('error', 'Skipping trial inactivity stop due to missing Snowflake config', {
@@ -5414,11 +5444,12 @@ async function runTrialInactivityStopSweep(
 
     try {
       const snowflakeContext = {
-        ...context,
+        ...sweepLogTags(context),
         billingCallId: crypto.randomUUID(),
       } satisfies SweepExecutionContext;
       const activeUserIds = await queryKiloclawActiveUserIds({
         env,
+        ctx: context.ctx,
         userIds: batch.map(candidate => candidate.user_id),
         log: (level, message, fields) => {
           void snowflakeLog(snowflakeContext, level, message, fields);
@@ -5477,11 +5508,12 @@ async function runTrialInactivityStopSweep(
       for (const row of batch) {
         try {
           const snowflakeContext = {
-            ...context,
+            ...sweepLogTags(context),
             billingCallId: crypto.randomUUID(),
           } satisfies SweepExecutionContext;
           const activeUserIds = await queryKiloclawActiveUserIds({
             env,
+            ctx: context.ctx,
             userIds: [row.user_id],
             log: (level, message, fields) => {
               void snowflakeLog(snowflakeContext, level, message, {
@@ -5545,15 +5577,16 @@ async function runTrialInactivityStopSweep(
 export async function processTrialInactivityStopCandidate(
   env: BillingWorkerEnv,
   message: TrialInactivityStopCandidateQueueMessage,
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<BillingSummary> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
 
   return await withLogTags(
     {
       source: 'runSweep',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'worker',
         userId: message.userId,
         instanceId: message.instanceId,
@@ -5624,15 +5657,16 @@ export async function processTrialInactivityStopCandidate(
 export async function runSweep(
   env: BillingWorkerEnv,
   message: { runId: string; sweep: BillingMessageSweep },
-  attempt = 1
+  attempt = 1,
+  ctx?: SecretsExecutionContext
 ): Promise<BillingSummary> {
-  const context = createSweepContext(message, attempt);
+  const context = createSweepContext(message, attempt, ctx);
 
   return await withLogTags(
     {
       source: 'runSweep',
       tags: {
-        ...context,
+        ...sweepLogTags(context),
         billingComponent: 'worker',
       },
     },

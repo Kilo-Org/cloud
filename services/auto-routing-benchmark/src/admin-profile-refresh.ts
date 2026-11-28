@@ -11,6 +11,7 @@ import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
 import type { HonoEnv } from './hono-env';
 import { ProfileRefreshConflictError, refreshCurrentProfiles } from './profile-refresh';
 import { computeEngineIdentity } from './run';
+import { requestContext } from './secrets';
 
 export function registerProfileRefreshRoute(app: Hono<HonoEnv>): void {
   app.post(
@@ -26,7 +27,10 @@ export function registerProfileRefreshRoute(app: Hono<HonoEnv>): void {
         return c.json({ error: 'Save the benchmark config before refreshing profiles.' }, 400);
       const catalog = await fetchExecutableBenchmarkModelCatalog(
         c.env,
-        resolveBenchmarkIdentity(config)
+        resolveBenchmarkIdentity(config),
+        fetch,
+        undefined,
+        requestContext(c)
       );
       try {
         return c.json(

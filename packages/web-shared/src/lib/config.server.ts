@@ -121,6 +121,7 @@ export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
+export const CODE_REVIEW_WORKER_SENDER_AUTH = getEnvVariable('CODE_REVIEW_WORKER_SENDER_AUTH');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
 export const IMPACT_CAMPAIGN_ID = getEnvVariable('IMPACT_CAMPAIGN_ID') || '';
@@ -312,12 +313,60 @@ export const COMPOSIO_AGENTS_API_BASE_URL =
 export const COMPOSIO_API_BASE_URL =
   getEnvVariable('COMPOSIO_API_BASE_URL') || 'https://backend.composio.dev';
 
+export type DeploymentEnvironment = { VERCEL_ENV?: string; VERCEL_TARGET_ENV?: string };
+
+const deploymentEnvironment: DeploymentEnvironment = {
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV,
+};
+
+// Vercel sets both values to `production` only on a production deployment of the production
+// target; a staging, preview or local runtime never has both, whatever its NODE_ENV.
+function isConfirmedVercelProduction(env: DeploymentEnvironment): boolean {
+  return env.VERCEL_ENV === 'production' && env.VERCEL_TARGET_ENV === 'production';
+}
+
+// A fully qualified name (trailing dots) and any scheme or port still reach the same host.
+function urlHost(value: string): string | null {
+  try {
+    return new URL(value).hostname.replace(/\.+$/, '');
+  } catch {
+    return null;
+  }
+}
+
+// Cloudflare serves a Worker with `workers_dev` enabled at `<name>.<account>.workers.dev`, and a
+// version preview at `<version>-<name>.<account>.workers.dev`.
+function isWorkersDevHost(host: string, workerName: string): boolean {
+  const firstLabel = host.split('.')[0] ?? '';
+  return (
+    host.endsWith('.workers.dev') &&
+    (firstLabel === workerName || firstLabel.endsWith(`-${workerName}`))
+  );
+}
+
+/**
+ * A Worker URL whose production deployment has a built-in default. Production keeps its explicit
+ * value or that default. Any other runtime uses only an explicit value off the production Worker:
+ * unset, the production host, or (given `workersDevName`) that Worker's workers.dev host resolves
+ * to '' (unconfigured), and the callers send nothing.
+ */
+export function resolveProductionDefaultedUrl(
+  explicit: string | undefined,
+  productionOrigin: string,
+  env: DeploymentEnvironment,
+  workersDevName?: string
+): string {
+  if (isConfirmedVercelProduction(env)) return explicit || productionOrigin;
+  if (!explicit) return '';
+  const host = urlHost(explicit);
+  if (host === urlHost(productionOrigin)) return '';
+  if (host !== null && workersDevName && isWorkersDevHost(host, workersDevName)) return '';
+  return explicit;
+}
+
 /**
  * Per-instance worker URL template.
- *
- * Per-instance URLs are the default in BOTH production and dev/test so a
- * merge of the name-based routing feature flips them on automatically,
- * without forcing anyone to edit env files.
  *
  * Resolution rules (checked in order):
  *   1. `KILOCLAW_INSTANCE_URL_TEMPLATE=legacy` (case-insensitive) is the
@@ -327,31 +376,25 @@ export const COMPOSIO_API_BASE_URL =
  *      A non-empty sentinel is used (rather than empty string) because
  *      Vercel / Node env pipelines often coerce empty env entries into
  *      "unset", making an empty-string rollback unreliable.
- *   2. A non-empty `KILOCLAW_INSTANCE_URL_TEMPLATE` is used verbatim.
- *      Must contain `{label}`; missing placeholder is a misconfiguration
- *      warned about at render time (see `workerUrlForInstance`).
- *   3. Otherwise in `NODE_ENV=production`, default to the canonical
+ *   2. In the confirmed Vercel production deployment, a non-empty value is
+ *      used verbatim, and unset defaults to the canonical
  *      `https://{label}.kiloclaw.ai` template.
- *   4. Otherwise (dev/test) derive a template from `KILOCLAW_API_URL`:
- *      if `KILOCLAW_API_URL` looks like a loopback URL (`http://localhost:<port>`
- *      / `http://127.0.0.1:<port>`), emit
- *      `http://{label}.kiloclaw.localhost:<port>` so the browser
- *      auto-resolves `*.kiloclaw.localhost` to `127.0.0.1` per RFC 6761.
- *      If `KILOCLAW_API_URL` is missing or unparsable, fall back to the
- *      same template with the wrangler dev port (`8795`) — matches
- *      `.dev.vars.example`.
+ *   3. Anywhere else, only an explicit `http(s)` template is used, and never
+ *      one on a host the production KiloClaw Worker serves (`kiloclaw.ai`,
+ *      any `*.kiloclaw.ai`, `claw.kilosessions.ai`, `claw.kilo.ai`). Unset or
+ *      refused means unconfigured (''), which keeps every instance on the
+ *      legacy host (`KILOCLAW_LEGACY_WORKER_URL`).
+ *      Local development sets `http://{label}.kiloclaw.localhost:8795`
+ *      (`apps/web/.env.development.local.example`).
  *
- * When the template ends up set and contains `{label}`, `getStatus`
- * emits a `workerUrl` pointing at the instance's own virtual host
+ * A template missing `{label}` is a misconfiguration warned about at render
+ * time (see `workerUrlForInstance`). When the template contains `{label}`,
+ * `getStatus` emits a `workerUrl` pointing at the instance's own virtual host
  * (derived from its sandboxId) for instances whose
- * `controllerCapabilitiesVersion >= 2`. Pre-v2 instances keep falling
- * back to `KILOCLAW_API_URL`.
- *
- * Exported as a plain function so it's testable without forcing a
- * re-import of this entire module (which triggers production-only
- * validation of unrelated secrets).
+ * `controllerCapabilitiesVersion >= 2`. Pre-v2 instances keep falling back to
+ * the legacy host (`KILOCLAW_LEGACY_WORKER_URL`).
  */
-const DEFAULT_DEV_WRANGLER_PORT = '8795';
+const PRODUCTION_INSTANCE_URL_TEMPLATE = 'https://{label}.kiloclaw.ai';
 
 /**
  * Sentinel value for `KILOCLAW_INSTANCE_URL_TEMPLATE` that disables the
@@ -362,44 +405,58 @@ const DEFAULT_DEV_WRANGLER_PORT = '8795';
  */
 const KILL_SWITCH_SENTINEL = 'legacy';
 
-function deriveDevTemplateFromWorkerUrl(workerUrl: string | undefined): string {
-  const fallback = `http://{label}.kiloclaw.localhost:${DEFAULT_DEV_WRANGLER_PORT}`;
-  if (!workerUrl) return fallback;
-  try {
-    const parsed = new URL(workerUrl);
-    // Only derive when we're pointed at a loopback dev worker. Anything
-    // else (remote staging, preview domains, etc.) uses the same
-    // fallback — operators can still override explicitly.
-    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
-      return fallback;
-    }
-    const port = parsed.port || DEFAULT_DEV_WRANGLER_PORT;
-    return `${parsed.protocol}//{label}.kiloclaw.localhost:${port}`;
-  } catch {
-    return fallback;
-  }
+// Refuses the hosts routed to the production KiloClaw Worker (services/kiloclaw/wrangler.jsonc)
+// and its documented browser host `claw.kilo.ai` (services/kiloclaw/README.md). Accepts a
+// per-instance template (`{label}`) or a plain URL.
+function isNonProductionKiloClawUrl(value: string): boolean {
+  const url = value.replaceAll('{label}', 'label');
+  const host = urlHost(url);
+  return (
+    host !== null &&
+    /^https?:\/\//i.test(url) &&
+    host !== 'kiloclaw.ai' &&
+    !host.endsWith('.kiloclaw.ai') &&
+    host !== 'claw.kilosessions.ai' &&
+    host !== 'claw.kilo.ai'
+  );
 }
 
 export function resolveInstanceUrlTemplate(
   envVar: string | undefined,
-  nodeEnv: string | undefined,
-  workerUrl: string | undefined
+  env: DeploymentEnvironment
 ): string {
-  // Explicit kill switch. Empty string falls through to the production
-  // / dev defaults — operators must set `legacy` to disable, not "".
+  // Explicit kill switch. Empty string counts as unset — operators must set
+  // `legacy` to disable, not "".
   if (envVar !== undefined && envVar.toLowerCase() === KILL_SWITCH_SENTINEL) {
     return '';
   }
-  // Non-empty explicit override wins.
-  if (envVar !== undefined && envVar !== '') return envVar;
-  if (nodeEnv === 'production') return 'https://{label}.kiloclaw.ai';
-  return deriveDevTemplateFromWorkerUrl(workerUrl);
+  if (isConfirmedVercelProduction(env)) return envVar || PRODUCTION_INSTANCE_URL_TEMPLATE;
+  return envVar && isNonProductionKiloClawUrl(envVar) ? envVar : '';
 }
 
 export const KILOCLAW_INSTANCE_URL_TEMPLATE = resolveInstanceUrlTemplate(
   process.env.KILOCLAW_INSTANCE_URL_TEMPLATE,
-  process.env.NODE_ENV,
-  KILOCLAW_API_URL
+  deploymentEnvironment
+);
+
+/**
+ * The single-host KiloClaw URL the browser uses when no per-instance host applies. Production
+ * keeps `KILOCLAW_API_URL` or `https://claw.kilo.ai`. Anywhere else only an explicit `http(s)`
+ * `KILOCLAW_API_URL` off the production KiloClaw hosts is used; otherwise '' (no usable URL).
+ * This is the browser-facing value only: the server-side KiloClaw clients keep reading
+ * `KILOCLAW_API_URL`.
+ */
+export function resolveLegacyWorkerUrl(
+  apiUrl: string | undefined,
+  env: DeploymentEnvironment
+): string {
+  if (isConfirmedVercelProduction(env)) return apiUrl || 'https://claw.kilo.ai';
+  return apiUrl && isNonProductionKiloClawUrl(apiUrl) ? apiUrl : '';
+}
+
+export const KILOCLAW_LEGACY_WORKER_URL = resolveLegacyWorkerUrl(
+  KILOCLAW_API_URL,
+  deploymentEnvironment
 );
 
 // KiloClaw Early Bird Checkout
@@ -409,15 +466,20 @@ export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
 );
-// Webhook Agent Ingest Worker
-export const WEBHOOK_AGENT_URL =
-  getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';
+// Webhook Agent Ingest Worker (services/webhook-agent-ingest/wrangler.jsonc enables workers.dev)
+export const WEBHOOK_AGENT_URL = resolveProductionDefaultedUrl(
+  getEnvVariable('WEBHOOK_AGENT_URL'),
+  'https://hooks.kilosessions.ai',
+  deploymentEnvironment,
+  'cloudflare-webhook-agent-ingest'
+);
 
 // Model eval ingest Worker
 export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || '';
 
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
+export const SESSION_INGEST_SENDER_AUTH = getEnvVariable('SESSION_INGEST_SENDER_AUTH');
 
 // Push-notifications worker (internal dispatch)
 export const NOTIFICATIONS_WORKER_URL = getEnvVariable('NOTIFICATIONS_WORKER_URL') || '';
@@ -427,9 +489,11 @@ export const AUTO_ROUTING_WORKER_URL = getEnvVariable('AUTO_ROUTING_WORKER_URL')
 export const AUTO_ROUTING_DECISION_SECRET = getEnvVariable('AUTO_ROUTING_DECISION_SECRET') || '';
 
 // Auto routing benchmark worker
-export const AUTO_ROUTING_BENCHMARK_WORKER_URL =
-  getEnvVariable('AUTO_ROUTING_BENCHMARK_WORKER_URL') ||
-  'https://auto-routing-benchmark.kiloapps.io';
+export const AUTO_ROUTING_BENCHMARK_WORKER_URL = resolveProductionDefaultedUrl(
+  getEnvVariable('AUTO_ROUTING_BENCHMARK_WORKER_URL'),
+  'https://auto-routing-benchmark.kiloapps.io',
+  deploymentEnvironment
+);
 
 // Security Agent sync Worker command ingress
 export const SECURITY_SYNC_WORKER_URL = getEnvVariable('SECURITY_SYNC_WORKER_URL') || '';
@@ -450,6 +514,10 @@ export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
 export const O11Y_API_METRICS_SENDER_AUTH = getEnvVariable('O11Y_API_METRICS_SENDER_AUTH');
 export const O11Y_ALERTING_SENDER_AUTH = getEnvVariable('O11Y_ALERTING_SENDER_AUTH');
+// The credential the AI Gateway's US-region senders present to the web app's own /api/internal/*
+// routes (web-internal-sts.ts): absent, empty or `legacy` sends the internal secret; `sts` an STS
+// service token.
+export const WEB_INTERNAL_SENDER_AUTH = getEnvVariable('WEB_INTERNAL_SENDER_AUTH');
 
 // Pylon chat widget (support chat on Code Reviewer pages).
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign

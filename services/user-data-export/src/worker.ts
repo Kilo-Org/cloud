@@ -11,8 +11,14 @@ import {
   type ExportJob,
   type HyperdriveBinding,
   type ReplicaDatabase,
+  type StateDb,
 } from './databases';
 import { SourceReadError, TerminalExportError } from './errors';
+import {
+  STS_WEB_USER_DATA_EXPORT_READY,
+  webInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import {
   createSourceAdapters,
   findPresentWarehouseTables,
@@ -25,6 +31,8 @@ import {
 import type { SourceAdapter } from './source-adapters';
 import { uploadGzipStream } from './gzip';
 import { classifyFetchFailure, logExportEvent, safeError, withSpan } from './observability';
+import { readUserDataExportSecret, type UserDataExportSecretsEnv } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 /**
  * The wall-clock deadlines, and the reason tuning past this point does not help.
@@ -141,20 +149,16 @@ export async function handleGenerationFailure(input: {
   return 'retry';
 }
 
-export type ExportEnv = {
+export type ExportEnv = UserDataExportSecretsEnv & {
   PRIMARY_STATE_DB: HyperdriveBinding;
   /** Export warehouse. Read only, frozen at its load cutoff. */
   EXPORT_WAREHOUSE_DB: HyperdriveBinding;
   EXPORT_BUCKET: R2Bucket;
   EXPORT_QUEUE: Queue<ExportQueueMessage>;
-  INTERNAL_API_SECRET: string;
-  NEXTAUTH_SECRET: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
   R2_ACCOUNT_ID: string;
   R2_BUCKET_NAME: string;
   USER_DATA_EXPORT_WEB_URL?: string;
-};
+} & WebInternalAuthEnv;
 
 function objectKey(exportId: string): string {
   return `exports/${exportId}/kilo-data-export.jsonl.gz`;
@@ -862,14 +866,14 @@ export async function consumeDeadLetterBatch(
  * The cron runs every five minutes and its four stages are sequential, so without spans
  * per stage a slow sweep is indistinguishable from a slow lease expiry query.
  */
-export async function reconcile(env: ExportEnv): Promise<void> {
+export async function reconcile(env: ExportEnv, ctx?: SecretsExecutionContext): Promise<void> {
   const state = createStateDb(env.PRIMARY_STATE_DB);
   await withSpan('reconcile_leases', {}, () => state.reconcile());
   await withSpan('reconcile_object_deletions', {}, () =>
     deletePendingObjects(env.EXPORT_BUCKET, state)
   );
   await withSpan('reconcile_scheduled_work', {}, () => processScheduledExportWork(env, state));
-  await withSpan('reconcile_notifications', {}, () => dispatchReadyNotifications(env, state));
+  await withSpan('reconcile_notifications', {}, () => dispatchReadyNotifications(env, state, ctx));
 }
 
 export async function processScheduledExportWork(
@@ -994,9 +998,14 @@ export function redirectTargetHost(response: Response, requestUrl: URL): string 
   }
 }
 
-async function dispatchReadyNotifications(
-  env: ExportEnv,
-  state: ReturnType<typeof createStateDb>
+export async function dispatchReadyNotifications(
+  env: Pick<
+    ExportEnv,
+    'USER_DATA_EXPORT_WEB_URL' | 'INTERNAL_API_SECRET' | 'SECRETS_SOURCE' | 'STS'
+  > &
+    WebInternalAuthEnv,
+  state: Pick<StateDb, 'pendingNotifications'>,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (!env.USER_DATA_EXPORT_WEB_URL) return;
   if (!isAllowedWebCallbackUrl(env.USER_DATA_EXPORT_WEB_URL)) {
@@ -1005,10 +1014,42 @@ async function dispatchReadyNotifications(
   }
   const baseUrl = new URL(env.USER_DATA_EXPORT_WEB_URL);
   const callbackUrl = new URL('/api/internal/user-data-exports/ready', baseUrl);
-  for (const item of await state.pendingNotifications()) {
+  const pending = await state.pendingNotifications();
+  // Nothing to send is the common cron run, and it must not fail on a secret read.
+  if (pending.length === 0) return;
+  // The shared key is read only when a send actually falls back to it: under WEB_INTERNAL_AUTH=sts
+  // every item carries a minted token, so a missing INTERNAL_API_SECRET must not fail the sweep.
+  // One read per sweep.
+  let sharedKey: Promise<string> | undefined;
+  for (const item of pending) {
+    // Per item: a held STS token is a memory read, and a long sweep presents a fresh one.
+    let credential: Awaited<ReturnType<typeof webInternalCredential>>;
+    try {
+      credential = await webInternalCredential(env, STS_WEB_USER_DATA_EXPORT_READY, {
+        header: 'x-internal-api-key',
+        secret: () => (sharedKey ??= readUserDataExportSecret(env, 'INTERNAL_API_SECRET', ctx)),
+      });
+    } catch (error) {
+      // An unreadable shared key is a credential problem, not a failed sweep: report it the way the
+      // unavailable path does and leave every item for the next run.
+      logExportEvent('warn', 'export_notification_callback_failed', {
+        exportId: item.id,
+        reason: 'credential_unavailable',
+        ...safeError(error),
+      });
+      return;
+    }
+    if (credential.kind === 'unavailable') {
+      // The rest of the sweep would fail the same way; the lease keeps every item for the next.
+      logExportEvent('warn', 'export_notification_callback_failed', {
+        exportId: item.id,
+        reason: 'credential_unavailable',
+      });
+      return;
+    }
     try {
       // redirect: 'manual' is fail-closed — we never follow a redirect and therefore
-      // never re-send x-internal-api-key to the redirect target. We still capture the
+      // never re-send the credential to the redirect target. We still capture the
       // redirect's target host (no path/query, so no secrets) to diagnose an
       // unexpected 3xx on the api.kilo.ai callback path.
       const response = await fetch(callbackUrl, {
@@ -1016,7 +1057,7 @@ async function dispatchReadyNotifications(
         redirect: 'manual',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': env.INTERNAL_API_SECRET,
+          [credential.header]: credential.value,
         },
         body: JSON.stringify({ exportId: item.id }),
         signal: AbortSignal.timeout(10_000),

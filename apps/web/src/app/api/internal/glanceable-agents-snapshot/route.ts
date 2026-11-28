@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import { callerLabel, observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
 import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
   if (!expected || !secretMatches(secret, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'web',
+    'glanceable_agents_snapshot',
+    'legacy_shared_secret',
+    callerLabel(req.headers.get('x-kilo-caller'))
+  );
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsedBody = BodySchema.safeParse(rawBody);

@@ -40,7 +40,7 @@ async function writePat(
 ): Promise<PatWrite> {
   const result = await owner.query<PatWrite>(
     `SELECT outcome, new_pat_id, new_gate_pass_id, gate_checks::text
-     FROM uts.write_gated_pat($1, $2, 'ci', $3, 'abcd', 'gateway:models.read', $4, $5)`,
+     FROM uts.write_gated_pat($1, NULL, $2, 'ci', $3, 'abcd', 'gateway:models.read', $4, $5)`,
     [accountId, deviceSessionId, randomHash(), options.orgId ?? null, options.lifetimeDays ?? 90]
   );
   return result.rows[0];
@@ -49,7 +49,7 @@ async function writePat(
 async function writeBotKey(accountId: string, deviceSessionId: string, orgId: string) {
   const result = await owner.query<PatWrite & { new_key_id: string | null }>(
     `SELECT outcome, new_key_id, new_gate_pass_id, gate_checks::text
-     FROM uts.write_gated_bot_key($1, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
+     FROM uts.write_gated_bot_key($1, NULL, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
     [accountId, deviceSessionId, orgId, randomHash()]
   );
   return result.rows[0];
@@ -274,7 +274,7 @@ describe('uts.write_gated_bot_key', () => {
     await creator.query('BEGIN');
     const key = await creator.query<{ new_key_id: string }>(
       `SELECT new_key_id
-       FROM uts.write_gated_bot_key($1, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
+       FROM uts.write_gated_bot_key($1, NULL, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
       [adminId, sessionId, orgId, randomHash()]
     );
     const deleted = deleter.query('DELETE FROM uts.accounts WHERE id = $1', [adminId]);
@@ -369,12 +369,12 @@ describe('a member removal that races a create', () => {
     await creator.query('BEGIN');
     const key = await creator.query<{ outcome: string; new_key_id: string }>(
       `SELECT outcome, new_key_id
-       FROM uts.write_gated_bot_key($1, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
+       FROM uts.write_gated_bot_key($1, NULL, $2, $3, 'bot', $4, 'wxyz', 'gateway:models.read', 90)`,
       [adminId, sessionId, orgId, randomHash()]
     );
     const pat = await creator.query<{ outcome: string; new_pat_id: string }>(
       `SELECT outcome, new_pat_id
-       FROM uts.write_gated_pat($1, $2, 'ci', $3, 'abcd', 'gateway:models.read', $4, 90)`,
+       FROM uts.write_gated_pat($1, NULL, $2, 'ci', $3, 'abcd', 'gateway:models.read', $4, 90)`,
       [adminId, sessionId, randomHash(), orgId]
     );
     expect([key.rows[0].outcome, pat.rows[0].outcome]).toEqual(['created', 'created']);

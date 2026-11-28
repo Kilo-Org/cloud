@@ -33,12 +33,31 @@
     },
   ],
   "logpush": true,
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": true,
+    "traces": { "enabled": false },
   },
   "vars": {
     "ENVIRONMENT": "production",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
+  "services": [
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // kilo-ai-attribution.yaml grants NEXTAUTH_SECRET and ADMIN_SECRET. Nothing reads it while
+    // SECRETS_SOURCE is `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "kilo-ai-attribution" },
+    },
+  ],
   "routes": [
     {
       "pattern": "ai-attribution.kiloapps.io/*",

@@ -393,7 +393,7 @@ export function emitPrivilegedAccessEvent(params: PrivilegedAccessEventInput): v
   emitAdminAccessEvent({
     ...params,
     kind: 'privileged_access',
-    authViaToken: params.credential !== 'session',
+    authViaToken: params.credential !== 'session' && params.credential !== 'uts_session',
   });
 }
 

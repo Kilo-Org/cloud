@@ -1,6 +1,6 @@
-import { createWorkerSecrets, type BundleBinding } from '@kilocode/secrets-client';
 import { z } from 'zod';
 import type { Env, UtsConfig } from '../env';
+import { stsSecrets } from '../secrets';
 
 /**
  * The rotation job's one secret in the UTS STS bundle (manager folder `/workloads/uts`):
@@ -13,19 +13,14 @@ export const SWITCH_TOKEN_NAME = 'UTS_HYPERDRIVE_SWITCH_TOKEN';
 /** Development: the token as JSON in `UTS_LOCAL_SECRETS`. */
 const LocalSecretsSchema = z.strictObject({ [SWITCH_TOKEN_NAME]: z.string().min(1) });
 
-/** One bundle client per STS binding, so each run revalidates with its ETag. */
-const readers = new WeakMap<BundleBinding, { get(name: string): Promise<string> }>();
-
-/** The switch token; throws when the bundle or the local value cannot serve it. */
+/**
+ * The switch token; throws when the bundle or the local value cannot serve it. The bundle client is
+ * the isolate's one client for the binding, which the runtime secrets share (src/secrets.ts).
+ */
 export async function switchToken(env: Env, config: UtsConfig): Promise<string> {
   if (config.environment === 'development') {
     return LocalSecretsSchema.parse(JSON.parse(env.UTS_LOCAL_SECRETS ?? 'null'))[SWITCH_TOKEN_NAME];
   }
   if (env.STS === undefined) throw new Error('STS is not bound');
-  let reader = readers.get(env.STS);
-  if (reader === undefined) {
-    reader = createWorkerSecrets(env.STS);
-    readers.set(env.STS, reader);
-  }
-  return await reader.get(SWITCH_TOKEN_NAME);
+  return await stsSecrets(env.STS).get(SWITCH_TOKEN_NAME);
 }

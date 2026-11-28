@@ -365,7 +365,7 @@ describe('the UTS configs themselves', () => {
     const problems = utsConfigProblems(
       mintWith(raw => ({
         ...raw,
-        vars: { UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'none' },
+        vars: { UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'none', SECRETS_SOURCE: 'worker' },
         placement: { mode: 'smart' },
       }))
     );
@@ -385,9 +385,56 @@ describe('the UTS configs themselves', () => {
 
   it('fail a mint config whose deployments drift from the deployment list', () => {
     const problems = utsConfigProblems(
-      mintWith(raw => ({ ...raw, vars: { UTS_ENVIRONMENT: 'staging', DO_JURISDICTION: 'eu' } }))
+      mintWith(raw => ({
+        ...raw,
+        vars: { UTS_ENVIRONMENT: 'staging', DO_JURISDICTION: 'eu', SECRETS_SOURCE: 'worker' },
+      }))
     );
     expect(problems).toEqual([expect.stringContaining('deploys uts-staging=staging, uts=staging')]);
+  });
+
+  it('fail a deployed mint block without a secrets source or with another STS binding', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => {
+        const { SECRETS_SOURCE: _source, ...vars } = z
+          .record(z.string(), z.unknown())
+          .parse(raw.vars);
+        return {
+          ...raw,
+          vars,
+          services: [
+            {
+              binding: 'STS',
+              service: 'sts-staging',
+              entrypoint: 'SecretsBroker',
+              props: { caller: 'uts' },
+            },
+          ],
+        };
+      })
+    );
+    expect(problems).toEqual([
+      expect.stringContaining('(top level): SECRETS_SOURCE resolves to undefined'),
+      expect.stringContaining(
+        '(top level): binds STS as sts-staging/SecretsBroker/uts; expected sts/SecretsBroker/uts'
+      ),
+    ]);
+  });
+
+  it('accept secrets-store, the shared rollback value, and fail an unknown source', () => {
+    const withSource = (source: string) =>
+      utsConfigProblems(
+        mintWith(raw => ({
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), SECRETS_SOURCE: source },
+        }))
+      );
+    expect(withSource('secrets-store')).toEqual([]);
+    expect(withSource('foo')).toEqual([
+      expect.stringContaining(
+        '(top level): SECRETS_SOURCE resolves to foo; it must be one of worker, secrets-store, sts'
+      ),
+    ]);
   });
 
   it('fail the development entry in any config but the development config', () => {

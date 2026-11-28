@@ -1,6 +1,7 @@
 import type { UtsEnvironment } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
+import type { UtsSecrets } from '../secrets';
 import { APPLE_APP_ATTEST_ROOT, type AppAttestSettings } from './app-attest';
 import {
   GOOGLE_PLAY_INTEGRITY_ENDPOINTS,
@@ -12,30 +13,35 @@ import {
 } from './play-integrity';
 
 /**
- * Attestation configuration from the Worker's vars and one secret (names only here; README "Mobile
- * attestation" gives where each value comes from). `kilo-mobile` is served only where every value
- * is set and valid. Anything less refuses the client: in staging and production whatever is set,
- * and in development as soon as one value is set. Development with no value at all serves the
- * client without attestation, for the local tests (decision Q67).
+ * Attestation configuration from the Worker's vars and one runtime secret (names only here; README
+ * "Mobile attestation" gives where each value comes from). `kilo-mobile` is served only where every
+ * value is set and valid. Anything less refuses the client: in staging and production whatever is
+ * set, and in development as soon as one value is set. Development with no value at all serves the
+ * client without attestation, for the local tests (decision Q67). With a var set and no usable STS
+ * bundle the config is `unavailable`: the client is still sent to sign in, and its code exchange
+ * answers 503 until the bundle comes back.
  *
  * Vars (plain): `ATTEST_APPLE_TEAM_ID`, `ATTEST_APPLE_BUNDLE_ID`,
  * `ATTEST_PLAY_INTEGRITY_PACKAGE_NAME`, `ATTEST_PLAY_INTEGRITY_CERT_DIGESTS` (comma-separated
  * SHA-256 digests of the accepted app signing certificates).
- * Secret: `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` (the service account's JSON key file).
+ * Secret: `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` (the service account's JSON key file), from
+ * the source `SECRETS_SOURCE` selects (src/secrets.ts).
  * Development only: `ATTEST_DEV_ENDPOINTS`, a stand-in App Attest root and Play Integrity origin.
  */
 
 const REQUIRED_VAR_NAMES = [
   'ATTEST_APPLE_TEAM_ID',
   'ATTEST_APPLE_BUNDLE_ID',
-  'ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY',
   'ATTEST_PLAY_INTEGRITY_CERT_DIGESTS',
   'ATTEST_PLAY_INTEGRITY_PACKAGE_NAME',
 ] as const;
 const DEV_ENDPOINTS_VAR = 'ATTEST_DEV_ENDPOINTS';
+const KEY_SECRET = 'ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY';
 
 export type AttestVarName = (typeof REQUIRED_VAR_NAMES)[number] | typeof DEV_ENDPOINTS_VAR;
 export type AttestEnv = Partial<Record<AttestVarName, string>>;
+/** A value a misconfigured attestation names: a var or the secret. */
+export type AttestProblem = AttestVarName | typeof KEY_SECRET;
 
 /** Every attestation var, the development stand-in included. */
 export const ATTEST_VAR_NAMES: readonly AttestVarName[] = [
@@ -54,22 +60,26 @@ export type AttestationSettings = {
 
 /**
  * `on`: every value is valid. `off`: none is set. `misconfigured`: the names of the values that
- * are missing or invalid (never a value).
+ * are missing or invalid (never a value). `unavailable`: a var is set and STS gave no usable
+ * bundle, so the key is unknown.
  */
 export type AttestationConfig =
   | { status: 'on'; settings: AttestationSettings }
   | { status: 'off' }
-  | { status: 'misconfigured'; problems: readonly AttestVarName[] };
+  | { status: 'misconfigured'; problems: readonly AttestProblem[] }
+  | { status: 'unavailable' };
 
 /**
  * What the endpoints do for a client that needs attestation. `verified`: serve it and verify every
  * code exchange. `unattested_development`: development with no attestation config. `refused`: do
- * not serve it; `problems` names the values to fix, empty when none is set.
+ * not serve it; `problems` names the values to fix, empty when none is set. `unavailable`: serve
+ * it, and answer its code exchange with a retryable 503 until the key can be read.
  */
 export type AttestationPolicy =
   | { kind: 'verified'; settings: AttestationSettings }
   | { kind: 'unattested_development' }
-  | { kind: 'refused'; problems: readonly AttestVarName[] };
+  | { kind: 'refused'; problems: readonly AttestProblem[] }
+  | { kind: 'unavailable' };
 
 const TeamIdSchema = z.string().regex(/^[A-Z0-9]{10}$/);
 /** A reverse-domain app id: an iOS bundle id or an Android package name. */
@@ -142,12 +152,17 @@ function devEndpoints(raw: string): DevEndpoints | null {
 
 export function readAttestationConfig(
   env: AttestEnv,
+  secrets: UtsSecrets,
   environment: UtsEnvironment
 ): AttestationConfig {
   const present = (name: AttestVarName) => (env[name] ?? '').trim() !== '';
-  if (!REQUIRED_VAR_NAMES.some(present) && !present(DEV_ENDPOINTS_VAR)) return { status: 'off' };
+  const varSet = REQUIRED_VAR_NAMES.some(present) || present(DEV_ENDPOINTS_VAR);
+  // The key as the read holds it; null when STS gave no usable bundle.
+  const rawKey = secrets.status === 'read' ? (secrets.values[KEY_SECRET] ?? '').trim() : null;
+  if (!varSet && (rawKey === null || rawKey === '')) return { status: 'off' };
+  if (rawKey === null) return { status: 'unavailable' };
 
-  const problems: AttestVarName[] = [];
+  const problems: AttestProblem[] = [];
   const check = <Output>(name: AttestVarName, schema: z.ZodType<Output, string>) => {
     const parsed = schema.safeParse((env[name] ?? '').trim());
     if (!parsed.success) problems.push(name);
@@ -155,7 +170,9 @@ export function readAttestationConfig(
   };
   const teamId = check('ATTEST_APPLE_TEAM_ID', TeamIdSchema);
   const bundleId = check('ATTEST_APPLE_BUNDLE_ID', AppIdSchema);
-  const key = check('ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY', ServiceAccountKeyJsonSchema);
+  const parsedKey = ServiceAccountKeyJsonSchema.safeParse(rawKey);
+  if (!parsedKey.success) problems.push(KEY_SECRET);
+  const key = parsedKey.data;
   const digests = check('ATTEST_PLAY_INTEGRITY_CERT_DIGESTS', DigestsSchema);
   const packageName = check('ATTEST_PLAY_INTEGRITY_PACKAGE_NAME', AppIdSchema);
 
@@ -200,6 +217,7 @@ export function attestationPolicy(
   environment: UtsEnvironment
 ): AttestationPolicy {
   if (config.status === 'on') return { kind: 'verified', settings: config.settings };
+  if (config.status === 'unavailable') return { kind: 'unavailable' };
   if (config.status === 'off' && environment === 'development') {
     return { kind: 'unattested_development' };
   }

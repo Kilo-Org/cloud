@@ -189,6 +189,18 @@ describe('token endpoint: kilo-mobile code exchange', () => {
     expect(grants.calls).toEqual([]);
   });
 
+  it('answers 503 with Retry-After while STS gives no bundle, and leaves the code unused', async () => {
+    const grants = fakeGrants();
+    const response = await call(
+      await exchangeRequest(randomCredential()),
+      oauthDeps(grants.access, { attestation: { kind: 'unavailable' } })
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).not.toBeNull();
+    expect(await errorOf(response)).toBe('temporarily_unavailable');
+    expect(grants.calls).toEqual([]);
+  });
+
   it('asks for an attestation when the request carries none and the code has none', async () => {
     const store = recordingStore(() => ({ outcome: 'proof_required' }));
     const { attestation } = await service(store.access);

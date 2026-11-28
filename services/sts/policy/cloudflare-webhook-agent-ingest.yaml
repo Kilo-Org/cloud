@@ -1,4 +1,13 @@
-# Registration only: services/webhook-agent-ingest/wrangler.jsonc. No environment, identity or grant.
+# The cloudflare-webhook-agent-ingest Worker (services/webhook-agent-ingest/wrangler.jsonc).
+# Production only: the config has no staging block, and its `dev` block binds no STS. Its three
+# runtime reads (src/secrets.ts WebhookSecretName), each resolved from /shared. Reads stay on the
+# Secrets Store until the Worker's SECRETS_SOURCE is `sts`.
 workload: cloudflare-webhook-agent-ingest
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET
+  - CALLBACK_TOKEN_SECRET
+  - NEXTAUTH_SECRET

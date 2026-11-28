@@ -1,4 +1,5 @@
 import { test, describe, expect, beforeEach, afterEach } from '@jest/globals';
+import { version } from 'uuid';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
 import {
@@ -989,8 +990,6 @@ describe('usage accounting error reports', () => {
 
   describe('processTokenData without usage statistics', () => {
     const contextSentinel = {
-      system_prompt_prefix: 'zzq-system-prefix',
-      user_prompt_prefix: 'zzq-user-prefix',
       email: 'zzq-account@example.com',
       machine_id: 'zzq-machine',
       session_id: 'zzq-session',
@@ -1008,7 +1007,7 @@ describe('usage accounting error reports', () => {
       provider: 'openrouter',
       requested_model: 'anthropic/claude-3.7-sonnet',
       promptInfo: {
-        system_prompt_length: contextSentinel.system_prompt_prefix.length,
+        system_prompt_length: 17,
         system_prompt_kind: null,
       },
       fraudHeaders: getFraudDetectionHeaders(
@@ -1626,8 +1625,6 @@ describe('logMicrodollarUsage', () => {
       expect(usageRecord?.provider).toBe('openrouter');
       expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
       expect(metadataRecord?.system_prompt_length).toBe(27);
-      expect(metadataRecord?.user_prompt_prefix).toBeNull();
-      expect(metadataRecord?.system_prompt_prefix_id).toBeNull();
       expect(metadataRecord?.max_tokens).toBe(200);
       expect(metadataRecord?.has_middle_out_transform).toBe(true);
       if (expected === null) {
@@ -1922,12 +1919,6 @@ describe('logMicrodollarUsage', () => {
     expect(metadata1.ja4_digest_id).toBe(metadata2.ja4_digest_id);
     expect(metadata1.ja4_digest_id).not.toBe(metadata3.ja4_digest_id);
 
-    // Prompt text is never recorded, whatever the request sent
-    for (const metadata of [metadata1, metadata2, metadata3]) {
-      expect(metadata.system_prompt_prefix_id).toBeNull();
-      expect(metadata.user_prompt_prefix).toBeNull();
-    }
-
     // All records should have their expected non-shared metadata
     expect(metadata1.max_tokens).toBe(200);
     expect(metadata2.max_tokens).toBe(200);
@@ -1937,7 +1928,7 @@ describe('logMicrodollarUsage', () => {
     expect(metadata3.has_middle_out_transform).toBe(true);
   });
 
-  test('nullifies sensitive data for organization usage (data minimization)', async () => {
+  test('records organization usage against the organization', async () => {
     const user = await insertTestUser({
       id: 'test-org-user-1',
       microdollars_used: 500,
@@ -1972,11 +1963,6 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.organization_id).toBe(organization.id);
     expect(usageRecord?.cost).toBe(500);
 
-    // Verify data minimization: sensitive prompt data should be null for organizations
-    expect(metadataRecord?.user_prompt_prefix).toBe(null);
-    expect(metadataRecord?.system_prompt_prefix_id).toBe(null);
-
-    // Other fields should still be populated normally
     expect(usageRecord?.input_tokens).toBe(100);
     expect(usageRecord?.output_tokens).toBe(50);
     expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
@@ -1997,6 +1983,34 @@ describe('logMicrodollarUsage', () => {
         kilo_user_id: user.id,
         microdollar_usage: 500,
       });
+    });
+  });
+
+  // Remove with the follow-up that drops these columns from microdollar_usage_metadata.
+  test('legacy sender prompt prefix and abuse values are accepted but not persisted', async () => {
+    const user = await insertTestUser({
+      id: 'test-legacy-metadata-user',
+      google_user_email: 'legacy-metadata@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+    const legacyMetadata = {
+      ...metadata,
+      user_prompt_prefix: 'legacy-user-prompt',
+      system_prompt_prefix: 'legacy-system-prompt',
+      abuse_delay: 5,
+      abuse_downgraded_from: 'legacy-model',
+    };
+
+    await insertUsageRecord({ ...core, kilo_user_id: user.id }, legacyMetadata);
+
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, core.id),
+    });
+    expect(metadataRecord).toMatchObject({
+      user_prompt_prefix: null,
+      system_prompt_prefix_id: null,
+      abuse_delay: null,
+      abuse_downgraded_from: null,
     });
   });
 
@@ -3313,9 +3327,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(core.inference_provider).toBe('prov');
     expect(core.requested_model).toBe('reqmodel');
 
-    // metadata fields (prompt text is never recorded; the rest come from the upstream response)
-    expect(metadata.system_prompt_prefix).toBeNull();
-    expect(metadata.user_prompt_prefix).toBeNull();
+    // metadata fields (from the upstream response)
     expect(metadata.upstream_id).toBe('up');
     expect(metadata.finish_reason).toBe('stop');
     expect(metadata.message_id).toBe('msgid');
@@ -3356,6 +3368,13 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     expect(metadata.http_x_vercel_ip_city).toBe('Amsterdam');
     expect(metadata.http_x_vercel_ip_country).toBe('NL');
     expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
+  });
+
+  test('generates a UUIDv7 usage id unless the context supplies one', () => {
+    expect(version(extractUsageContextInfo(makeUsageContext()).id)).toBe(7);
+
+    const usageId = crypto.randomUUID();
+    expect(extractUsageContextInfo(makeUsageContext({ usageId })).id).toBe(usageId);
   });
 
   test('is a no-op on records without NUL bytes', async () => {

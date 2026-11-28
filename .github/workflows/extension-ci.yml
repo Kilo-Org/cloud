@@ -10,14 +10,23 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-permissions:
-  contents: read
-  pull-requests: read
+# Every job runs repository and dependency code from the triggering ref, which
+# a pull request controls, so no job holds a secret or a write scope. Each job
+# names the read scopes it needs.
+permissions: {}
 
 jobs:
   changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # 10 not 5: the Blacksmith checkout's mirror refresh took ~400 s (3 x 120 s
+    # fetch attempts plus waits) in a slowdown, and that post step had no room in
+    # a 5 minute budget, which cancelled this required gate.
+    # The actions/checkout below drops the mirror refresh.
+    timeout-minutes: 10
+    # dorny/paths-filter lists a pull request's changed files through the API.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       extension: ${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}
       # What the Chrome e2e shards read. The bundle holds the extension, the two
@@ -29,18 +38,27 @@ jobs:
       # start the shards for an input the bundle cannot observe.
       extension_e2e: ${{ steps.filter.outputs.extension_e2e == 'true' }}
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
+      # Full history so the detection resolves the PR's base sha or
+      # `github.event.before`, and no blobs up front: the diff is tree-only,
+      # while the objects `scripts/affected-workspaces.mjs` reads come from the
+      # public repository on demand.
+      # actions/checkout has no Blacksmith mirror to refresh.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          filter: blob:none
+          # Nothing here pushes, and the repository is public: the lazy blob
+          # fetches below need no token.
+          persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Mount pnpm store
         uses: ./.github/actions/pnpm-store
 
       - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
 
@@ -114,7 +132,7 @@ jobs:
 
       - name: Detect explicit changes
         id: filter
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
           filters: |
             extension:
@@ -167,8 +185,12 @@ jobs:
     if: needs.changes.outputs.extension == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -240,10 +262,14 @@ jobs:
     # 26.04, where the pinned Playwright has no Chromium build.
     runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-24.04' }}
     timeout-minutes: 20
+    permissions:
+      contents: read
     env:
       CI: 'true'
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -295,7 +321,9 @@ jobs:
       # those specs measure — so a shard needs an X server. xvfb-run supplies
       # one; every other spec keeps its own headless launch and does not use it.
       - name: Run Chrome e2e shard
-        run: xvfb-run -a pnpm --filter kilo-extension run e2e:chrome:shard --shard=${{ matrix.shard }}/2
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: xvfb-run -a pnpm --filter kilo-extension run e2e:chrome:shard "--shard=$SHARD/2"
 
       # One artifact name per shard: two uploads under one name collide.
       - name: Upload Playwright report on failure
@@ -317,6 +345,7 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
+    permissions: {}
     steps:
       - name: Check e2e results
         env:

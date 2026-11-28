@@ -180,7 +180,6 @@ import type {
   CustomLlmCredentialsEnvelope,
   CodingPlanInventoryCredentialEnvelope,
   OpenAiChatGptConnectionEnvelope,
-  EncryptedData,
   ByocCredentialEnvelope,
   ByocSetupStatus,
   ByocUpgradeStatus,
@@ -2904,6 +2903,77 @@ export const microdollar_usage_daily_repairs = pgTable(
 );
 
 export type MicrodollarUsageDailyRepair = typeof microdollar_usage_daily_repairs.$inferSelect;
+
+// Obsolete: replaced by `leaderboard_usage_hourly`. Nothing reads or writes this
+// table any more; drop it in a later migration.
+export const leaderboard_usage_daily = pgTable(
+  'leaderboard_usage_daily',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    usage_date: date({ mode: 'string' }).notNull(),
+    provider: text(),
+    requested_model: text(),
+    model: text(),
+    inference_provider: text(),
+    mode: text(),
+    // Usage without a metadata row, or with a NULL flag, counts as not BYOK.
+    is_user_byok: boolean().notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    request_count: bigint({ mode: 'number' }).notNull(),
+    error_count: bigint({ mode: 'number' }).notNull(),
+  },
+  table => [index('IDX_leaderboard_usage_daily_usage_date').on(table.usage_date)]
+);
+
+export type LeaderboardUsageDaily = typeof leaderboard_usage_daily.$inferSelect;
+
+// Global per-hour usage rollup behind the public leaderboard routes, with no
+// user or organization dimension. Each UTC hour is built whole from recent
+// usage by the `leaderboard-usage-hourly-rollup` cron. Leaderboard filters are
+// applied when reading, so the stored dimensions stay unfiltered.
+export const leaderboard_usage_hourly = pgTable(
+  'leaderboard_usage_hourly',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    provider: text(),
+    requested_model: text(),
+    model: text(),
+    inference_provider: text(),
+    mode: text(),
+    // Usage without a metadata row, or with a NULL flag, counts as not BYOK.
+    is_user_byok: boolean().notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    request_count: bigint({ mode: 'number' }).notNull(),
+    error_count: bigint({ mode: 'number' }).notNull(),
+  },
+  // No unique index over the dimensions: they are unbounded text, and one value
+  // too wide for a B-tree entry would fail the hour's write and drop its day.
+  // The rollup merges each hour in memory and replaces it under a lock instead.
+  table => [index('IDX_leaderboard_usage_hourly_hour_start').on(table.hour_start)]
+);
+
+export type LeaderboardUsageHourly = typeof leaderboard_usage_hourly.$inferSelect;
+
+// One row per UTC hour built into `leaderboard_usage_hourly`, including hours
+// with no usage, so readers can tell a complete day from a partly built one.
+export const leaderboard_usage_hours = pgTable('leaderboard_usage_hours', {
+  hour_start: timestamp({ withTimezone: true, mode: 'string' }).primaryKey(),
+  rows: integer().notNull(),
+  built_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+});
 
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',
@@ -8073,13 +8143,6 @@ export const openai_chatgpt_connections = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    /**
-     * OBSOLETE: the static-key copy of the payload from before the KMS migration. Nothing
-     * reads it. Writers store a placeholder that holds no key material, only so a rollback
-     * to the dual-write release keeps reading `encrypted_connection_envelope`; it stays
-     * `NOT NULL` until a migration drops it.
-     */
-    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
     /** The connection payload, encrypted through the BYOK KMS service. */
     encrypted_connection_envelope: jsonb().$type<OpenAiChatGptConnectionEnvelope>(),
     is_enabled: boolean().default(true).notNull(),
@@ -11132,13 +11195,6 @@ export const coding_plan_key_inventory = pgTable(
     provider_id: text().notNull(),
     upstream_plan_id: text().notNull(),
     upstream_usage_id: text(),
-    /**
-     * OBSOLETE: the static-key copy of the credential from before the KMS migration. Nothing
-     * reads it. Writers store a placeholder that holds no key material, only so a rollback
-     * to the dual-write release keeps reading `encrypted_api_key_envelope`, and every clear
-     * path still nulls it. Drop it in a migration.
-     */
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
     /** The credential, encrypted through the BYOK KMS service. Null once it is removed. */
     encrypted_api_key_envelope: jsonb().$type<CodingPlanInventoryCredentialEnvelope>(),
     credential_fingerprint: text().notNull(),

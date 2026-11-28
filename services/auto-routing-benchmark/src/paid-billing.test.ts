@@ -337,6 +337,94 @@ describe('paid billing outbox', () => {
     await drainPaidBillingOutbox(env(), { limit: 5, now: 120_000 });
     expect(outboxStatus(`pins:${REQUEST_ID}`)).toBe('delivered');
   });
+
+  describe('pool pins credential', () => {
+    function seedPinIntent(): void {
+      seedRequest('completed');
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_request_cases
+            (request_id, engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
+              charged_microdollars, reason, updated_at)
+          VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'done', 0, 0, NULL, ?)`
+        )
+        .run(REQUEST_ID, AT);
+      seedReadyProfile('vendor/alpha', 'run-ready');
+      seedOutbox(`pins:${REQUEST_ID}`);
+    }
+
+    function recordingFetch(seen: Headers[]): typeof fetch {
+      return ((input: RequestInfo | URL, init?: RequestInit) => {
+        seen.push(new Headers(init?.headers));
+        return fetch(input, init);
+      }) as typeof fetch;
+    }
+
+    it('sends the internal secret while WEB_INTERNAL_AUTH is unset', async () => {
+      seedPinIntent();
+      const seen: Headers[] = [];
+      const summary = await drainPaidBillingOutbox(env(), {
+        limit: 5,
+        fetchImpl: recordingFetch(seen),
+      });
+      expect(summary.pinned).toBe(1);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.get('x-internal-api-key')).toBe('secret');
+      expect(seen[0]?.has('authorization')).toBe(false);
+    });
+
+    it('sends a web:auto-routing.pool-pins.write STS token under sts, never the secret', async () => {
+      seedPinIntent();
+      const seen: Headers[] = [];
+      const secret = vi.fn(async () => 'secret');
+      const minted: unknown[] = [];
+      const summary = await drainPaidBillingOutbox(
+        {
+          ...env(),
+          INTERNAL_API_SECRET_PROD: { get: secret },
+          WEB_INTERNAL_AUTH: 'sts',
+          STS: {
+            async mintTokens(request) {
+              minted.push(request);
+              return {
+                status: 'ok',
+                tokens: request.tokens.map(({ audience, scope }) => ({
+                  status: 'issued',
+                  audience,
+                  scope,
+                  token: 'sts-pins-token',
+                  jti: 'jti-pins',
+                  expiresAt: Math.floor(Date.now() / 1000) + 300,
+                })),
+              };
+            },
+          },
+        },
+        { limit: 5, fetchImpl: recordingFetch(seen) }
+      );
+      expect(summary.pinned).toBe(1);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.get('authorization')).toBe('Bearer sts-pins-token');
+      expect(seen[0]?.has('x-internal-api-key')).toBe(false);
+      expect(secret).not.toHaveBeenCalled();
+      expect(minted).toEqual([
+        { tokens: [{ audience: 'web', scope: 'web:auto-routing.pool-pins.write' }] },
+      ]);
+    });
+
+    it('keeps the intent pending without a request when sts has no STS binding', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      seedPinIntent();
+      const seen: Headers[] = [];
+      const summary = await drainPaidBillingOutbox(
+        { ...env(), WEB_INTERNAL_AUTH: 'sts' },
+        { limit: 5, fetchImpl: recordingFetch(seen), now: 1_000 }
+      );
+      expect(summary.retried).toBe(1);
+      expect(seen).toHaveLength(0);
+      expect(outboxStatus(`pins:${REQUEST_ID}`)).toBe('pending');
+    });
+  });
 });
 
 describe('paid pool pins', () => {

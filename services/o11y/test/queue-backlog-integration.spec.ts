@@ -6,6 +6,7 @@ import {
   DEAD_LETTER_QUEUE_NAME,
   ENKRYPT_DEAD_LETTER_QUEUE_NAME,
 } from '../src/alerting/dead-letter-queue';
+import { stsBundle } from './sts-bundle-fixture';
 
 const USAGE_ID = 'a'.repeat(32);
 const USAGE_NAME = 'usage-ingest-processing-eu';
@@ -59,10 +60,6 @@ function enkryptDeadLetterQueueResponse(url: string, backlogCount: number): Resp
     });
   }
   return undefined;
-}
-
-function makeSecret(value: string): SecretsStoreSecret {
-  return { get: async () => value } as unknown as SecretsStoreSecret;
 }
 
 function makeKv() {
@@ -142,10 +139,12 @@ describe('evaluateAlerts infrastructure isolation', () => {
         ALERT_CONFIG_DO: makeUnavailableAlertConfigNamespace(),
         O11Y_ALERT_STATE: kv,
         O11Y_CF_ACCOUNT_ID: 'test-account',
-        O11Y_CF_AE_API_TOKEN: makeSecret('ae-token'),
-        O11Y_CF_CONTAINERS_API_TOKEN: makeSecret('read-token'),
-        O11Y_SLACK_WEBHOOK_PAGE: makeSecret('https://hooks.slack.com/page'),
-        O11Y_SLACK_WEBHOOK_TICKET: makeSecret('https://hooks.slack.com/ticket'),
+        STS: stsBundle({
+          O11Y_CF_AE_API_TOKEN: 'ae-token',
+          O11Y_CF_CONTAINERS_API_TOKEN: 'read-token',
+          O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/page',
+          O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/ticket',
+        }),
       } as Env;
 
       await expect(evaluateAlerts(env)).rejects.toThrow(
@@ -204,10 +203,12 @@ describe('evaluateAlerts dead-letter queue', () => {
       ALERT_CONFIG_DO: makeUnavailableAlertConfigNamespace(),
       O11Y_ALERT_STATE: kv,
       O11Y_CF_ACCOUNT_ID: 'test-account',
-      O11Y_CF_AE_API_TOKEN: makeSecret('ae-token'),
-      O11Y_CF_CONTAINERS_API_TOKEN: makeSecret('read-token'),
-      O11Y_SLACK_WEBHOOK_PAGE: makeSecret('https://hooks.slack.com/page'),
-      O11Y_SLACK_WEBHOOK_TICKET: makeSecret('https://hooks.slack.com/ticket'),
+      STS: stsBundle({
+        O11Y_CF_AE_API_TOKEN: 'ae-token',
+        O11Y_CF_CONTAINERS_API_TOKEN: 'read-token',
+        O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/page',
+        O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/ticket',
+      }),
     } as unknown as Env;
   }
 

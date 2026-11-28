@@ -1,13 +1,24 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
-import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import {
+  UsageRecordRequestSchema,
+  toUsageRecordWireBody,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
   recordLlmUsage,
   type LlmUsageWriteOutcome,
 } from '@kilocode/worker-utils/usage-writer-client';
+import {
+  STS_WEB_USAGE_RECORD_CLASSIFIER,
+  resolveWebInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { ZodError } from 'zod';
 import type { DecisionScope } from './decision-cache';
+import { readAutoRoutingSecret } from './secrets';
 
 export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
 
@@ -78,8 +89,6 @@ export async function buildClassifierUsage(
       http_x_vercel_ip_latitude: null,
       http_x_vercel_ip_longitude: null,
       http_x_vercel_ja4_digest: null,
-      user_prompt_prefix: null,
-      system_prompt_prefix: null,
       system_prompt_length: 0,
       http_user_agent: clean(payload.userAgent),
       max_tokens: null,
@@ -107,8 +116,6 @@ export async function buildClassifierUsage(
       market_cost: Math.round(costUsd * 1_000_000),
       non_inference_cost: null,
       is_free: false,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
       system_prompt_kind: null,
     },
     prior_microdollar_usage: 0,
@@ -117,14 +124,27 @@ export async function buildClassifierUsage(
 }
 
 export async function writeClassifierUsage(
-  env: Pick<ClassifierUsageEnv, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
-  usage: UsageRecordRequest
+  env: Pick<ClassifierUsageEnv, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'> &
+    WebInternalAuthEnv,
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
   try {
-    return await recordLlmUsage(usage, {
-      url: new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href,
-      secret: await env.INTERNAL_API_SECRET_PROD.get(),
-    });
+    // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
+    // `web:usage.classifier.record` STS token. Without either the DO keeps the event and retries.
+    const credential = await resolveWebInternalCredential(
+      env,
+      STS_WEB_USAGE_RECORD_CLASSIFIER,
+      () => readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx)
+    );
+    if (credential.kind === 'unavailable') return { kind: 'unavailable', reason: 'missing_config' };
+    const url = new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href;
+    return await recordLlmUsage(
+      usage,
+      credential.kind === 'sts'
+        ? { url, serviceToken: credential.token }
+        : { url, secret: credential.secret }
+    );
   } catch {
     return { kind: 'unavailable', reason: 'missing_config' };
   }
@@ -158,7 +178,8 @@ export async function recordClassifierUsage(
       env.AUTO_ROUTING_DECISION_CACHE.get(
         env.AUTO_ROUTING_DECISION_CACHE.idFromName(`${identity.scope}:${identity.conversationKey}`)
       ),
-    stub => stub.recordClassifierUsage(usage),
+    // A new Worker can reach a Durable Object still running the previous version.
+    stub => stub.recordClassifierUsage(toUsageRecordWireBody(usage)),
     'recordClassifierUsage'
   );
 }

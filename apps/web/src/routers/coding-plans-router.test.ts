@@ -4,7 +4,6 @@ import { generateText } from 'ai';
 import { eq, sql } from 'drizzle-orm';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import { OBSOLETE_STATIC_KEY_PLACEHOLDER } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-credential';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
@@ -1057,7 +1056,6 @@ describe('coding plans router', () => {
     for (const row of rows) {
       const wasQueued = queuedIds.includes(row.id);
       expect(row.status).toBe(wasQueued ? 'revocation_pending' : 'available');
-      expect(row.encrypted_api_key).toEqual(wasQueued ? null : OBSOLETE_STATIC_KEY_PLACEHOLDER);
       expect(row.encrypted_api_key_envelope === null).toBe(wasQueued);
       if (wasQueued) {
         expect(row.revocation_requested_at).not.toBeNull();
@@ -1183,7 +1181,7 @@ describe('coding plans router', () => {
       upstreamPlanId: 'minimax-deprovision-plan',
       subscriptionExpiresAt,
     });
-    expect(queue[0]).not.toHaveProperty('encrypted_api_key');
+    expect(queue[0]).not.toHaveProperty('encrypted_api_key_envelope');
     expect(queue[0]).not.toHaveProperty('apiKey');
 
     await adminCaller.codingPlans.adminMarkRevocationFailed({
@@ -1195,7 +1193,6 @@ describe('coding plans router', () => {
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(failed.status).toBe('revocation_failed');
-    expect(failed.encrypted_api_key).toBeNull();
     expect(failed.encrypted_api_key_envelope).toBeNull();
     expect(failed.last_revocation_error).toContain('bearer [redacted]');
 
@@ -1210,14 +1207,12 @@ describe('coding plans router', () => {
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(credential.status).toBe('available');
     expect(credential.upstream_plan_id).toBe('minimax-deprovision-plan');
-    expect(credential.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(credential.encrypted_api_key_envelope).not.toBeNull();
 
     await db
       .update(coding_plan_key_inventory)
       .set({
         status: 'revocation_pending',
-        encrypted_api_key: null,
         encrypted_api_key_envelope: null,
       })
       .where(eq(coding_plan_key_inventory.id, workItem.id));
@@ -1228,7 +1223,6 @@ describe('coding plans router', () => {
       .where(eq(coding_plan_key_inventory.id, workItem.id));
     expect(revoked.status).toBe('revoked');
     expect(revoked.upstream_plan_id).toBe('minimax-deprovision-plan');
-    expect(revoked.encrypted_api_key).toBeNull();
     expect(revoked.encrypted_api_key_envelope).toBeNull();
   });
 
@@ -1738,7 +1732,6 @@ describe('coding plans router', () => {
     expect(replacedAvailable.credential_fingerprint).toBe(
       codingPlanCredentialFingerprint('available-replacement-key')
     );
-    expect(replacedAvailable.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(
       decryptApiKey(
         replacedAvailable.encrypted_api_key_envelope!.encrypted_data,
@@ -1760,7 +1753,6 @@ describe('coding plans router', () => {
       .from(byok_api_keys)
       .where(eq(byok_api_keys.id, installedByok.id));
     expect(replacedAssigned.status).toBe('assigned');
-    expect(replacedAssigned.encrypted_api_key).toEqual(OBSOLETE_STATIC_KEY_PLACEHOLDER);
     expect(
       decryptApiKey(replacedAssigned.encrypted_api_key_envelope!.encrypted_data, TEST_BYOK_DATA_KEY)
     ).toBe('assigned-replacement-key');

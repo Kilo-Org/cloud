@@ -38,9 +38,11 @@ const NumericDateSchema = z.number().int().positive();
 
 /**
  * The claims of a UTS access token, exactly (design 5.3, RFC 9068): `iss exp aud sub client_id iat
- * jti scope org act req sid auth_time amr env`, one audience and one scope of that audience.
- * `org` names the one bound organization; `act` and `req` appear only on a delegated token (RFC
- * 8693); `sid`, `auth_time` and `amr` appear on every token minted from a grant.
+ * jti scope org act req sid auth_time amr env bot_user`, one audience and one scope of that
+ * audience. `org` names the one bound organization; `act` appears only on a delegated token (RFC
+ * 8693) and `req` on a delegated token or a bot token; `sid`, `auth_time` and `amr` appear on
+ * every token minted from a grant; `bot_user` is `true` on a bot token (`bot-token.ts`) and
+ * absent on every other token.
  *
  * Phase 2 owns the published claim contract (`AccessTokenClaimsSchema` in
  * `@kilocode/sts-contracts`). Until that package carries it on this branch, UTS declares its own
@@ -63,6 +65,7 @@ export const UtsAccessTokenClaimsSchema = z
     auth_time: NumericDateSchema.optional(),
     amr: z.array(z.string().min(1)).min(1).max(8).optional(),
     env: UtsEnvironmentSchema,
+    bot_user: z.literal(true).optional(),
   })
   .refine(
     claims => audienceOfScope(claims.scope) === claims.aud,

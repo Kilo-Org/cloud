@@ -5,7 +5,11 @@ import {
   type AutoRouter,
   type ClassifierOutput,
 } from '@kilocode/auto-routing-contracts';
-import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  UsageRecordRequestSchema,
+  toUsageRecordWireBody,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 import { USAGE_WRITER_TIMEOUT_MS } from '@kilocode/worker-utils/usage-writer-client';
 import { DurableObject } from 'cloudflare:workers';
 import * as z from 'zod';
@@ -25,6 +29,11 @@ const UsageRetryEntrySchema = z.object({
   nextAttemptAt: z.number().finite(),
 });
 type UsageRetryEntry = z.infer<typeof UsageRetryEntrySchema>;
+
+// Stored with the retired usage keys, so a rolled-back version can still parse retry entries.
+function storedRetryEntry(entry: UsageRetryEntry): UsageRetryEntry {
+  return { ...entry, usage: toUsageRecordWireBody(entry.usage) };
+}
 // Cloudflare caps storage.delete() at 128 keys per call.
 const DELETE_BATCH_SIZE = 128;
 
@@ -87,13 +96,13 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
       firstAttemptAt: now,
       nextAttemptAt: now + USAGE_WRITER_TIMEOUT_MS,
     };
-    await this.ctx.storage.put(key, entry);
+    await this.ctx.storage.put(key, storedRetryEntry(entry));
     await this.scheduleAlarm(entry.nextAttemptAt);
     await this.attemptUsage(key, entry);
   }
 
   private async attemptUsage(key: string, entry: UsageRetryEntry): Promise<void> {
-    const outcome = await writeClassifierUsage(this.env, entry.usage);
+    const outcome = await writeClassifierUsage(this.env, entry.usage, this.ctx);
     if (outcome.kind !== 'unavailable') {
       await this.ctx.storage.delete(key);
       return;
@@ -116,11 +125,7 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
       now + Math.min(USAGE_RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 20), USAGE_RETRY_MAX_MS),
       entry.firstAttemptAt + USAGE_RETRY_RETENTION_MS
     );
-    await this.ctx.storage.put(key, {
-      ...entry,
-      attempts,
-      nextAttemptAt,
-    } satisfies UsageRetryEntry);
+    await this.ctx.storage.put(key, storedRetryEntry({ ...entry, attempts, nextAttemptAt }));
     await this.scheduleAlarm(nextAttemptAt);
   }
 
@@ -167,10 +172,10 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
       if (!key.startsWith(USAGE_PREFIX)) continue;
       const retry = UsageRetryEntrySchema.parse(entry);
       if (retry.nextAttemptAt <= now) {
-        await this.ctx.storage.put(key, {
-          ...retry,
-          nextAttemptAt: now + USAGE_WRITER_TIMEOUT_MS,
-        } satisfies UsageRetryEntry);
+        await this.ctx.storage.put(
+          key,
+          storedRetryEntry({ ...retry, nextAttemptAt: now + USAGE_WRITER_TIMEOUT_MS })
+        );
         await this.attemptUsage(key, retry);
       }
     }

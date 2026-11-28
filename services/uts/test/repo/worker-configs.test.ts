@@ -2,12 +2,20 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
+import { UTS_MINT_DEPLOYMENTS, type UtsEnvironment, utsScopeEntry } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
 import {
   FEED_CONFIG,
+  FEED_MAX_LOG_SAMPLING_RATE,
+  FEED_TEST_CONFIG,
+  JOSE_UNHANDLED_REJECTION_DATE,
+  JOSE_UNHANDLED_REJECTION_FLAG,
   MINT_CONFIG,
   MINT_DEV_CONFIG,
+  MINT_TEST_CONFIG,
   parseWorkerConfig,
   repoRoot,
   utsConfigProblems,
@@ -15,6 +23,9 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { botTokenPolicies } from '../../src/bot-token/policy';
+import { ciPolicies } from '../../src/ci/policy';
+import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
 /**
  * Reads a config with Wrangler's own JSON, JSONC and TOML parser, the one a deploy uses. It lives
@@ -57,11 +68,28 @@ describe('repository Worker configs', () => {
   it('keep the two UTS Workers as configured: names, eu jurisdiction, placement, no traces', () => {
     expect(utsConfigProblems(repoConfigs())).toEqual([]);
   });
+
+  it('deploy the mint Worker under exactly the names @kilocode/uts-contracts exports', () => {
+    expect(UTS_MINT_DEPLOYMENTS).toEqual({
+      production: 'uts',
+      staging: 'uts-staging',
+      development: 'uts-local',
+    });
+    const mint = z
+      .object({ name: z.string(), env: z.object({ staging: z.object({ name: z.string() }) }) })
+      .parse(configAt(MINT_CONFIG).config);
+    const dev = z.object({ name: z.string() }).parse(configAt(MINT_DEV_CONFIG).config);
+    expect([mint.name, mint.env.staging.name, dev.name]).toEqual([
+      UTS_MINT_DEPLOYMENTS.production,
+      UTS_MINT_DEPLOYMENTS.staging,
+      UTS_MINT_DEPLOYMENTS.development,
+    ]);
+  });
 });
 
 describe('UTS Durable Object classes', () => {
-  it('fail a config outside the mint Worker that names the signer or the key-set shard class', () => {
-    for (const className of ['UtsSignerDO', 'UtsKeySetDO']) {
+  it('fail a config outside the mint Worker that names the signer, key-set shard or feed class', () => {
+    for (const className of ['UtsSignerDO', 'UtsKeySetDO', 'UtsFeedDO']) {
       const problems = workerConfigProblems([
         consumer({ durable_objects: { bindings: [{ name: 'OBJECTS', class_name: className }] } }),
       ]);
@@ -115,12 +143,13 @@ describe('UTS Durable Object classes', () => {
   });
 });
 
-describe('the SignerKeys entrypoint', () => {
+describe('the SignerKeys and FeedReads entrypoints', () => {
   it('fails any other config that binds the mint Worker, at any entrypoint', () => {
     for (const binding of [
       mintBinding('uts', 'consumer'),
       { binding: 'UTS', service: 'uts-staging' },
       mintBinding('uts-local', 'uts-feed-local'),
+      { ...mintBinding('uts', 'consumer'), entrypoint: 'FeedReads' },
     ]) {
       expect(workerConfigProblems([consumer({ services: [binding] })])).toEqual([
         expect.stringContaining('only the feed Worker may'),
@@ -128,12 +157,101 @@ describe('the SignerKeys entrypoint', () => {
     }
   });
 
-  it('lets another config bind the feed Worker', () => {
+  it('fails a feed config that does not bind SignerKeys and FeedReads once each', () => {
+    const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);
+    const feed = configAt(FEED_CONFIG);
+    const signerKeysOnly = parseWorkerConfig(FEED_CONFIG, {
+      ...feed.config,
+      services: [mintBinding('uts', 'uts-feed')],
+    });
+    expect(utsConfigProblems([...configs, signerKeysOnly])).toEqual([
+      expect.stringContaining('(top level): binds the mint Worker at SignerKeys; expected'),
+    ]);
+  });
+});
+
+describe('the FeedReader entrypoint', () => {
+  const readerBinding = (service: string, caller: unknown) => ({
+    binding: 'UTS_FEED',
+    service,
+    entrypoint: 'FeedReader',
+    props: { caller },
+  });
+
+  it('lets Kilo MCP read the feed as kilo-mcp, and its dev deployment only as kilo-mcp-dev', () => {
+    const kiloMcp = (devCaller: string) =>
+      consumer(
+        {
+          name: 'kilo-mcp',
+          services: [readerBinding('uts-feed', 'kilo-mcp')],
+          env: {
+            dev: {
+              name: 'kilo-mcp-dev',
+              services: [readerBinding('uts-feed', devCaller)],
+            },
+          },
+        },
+        'services/kilo-mcp/wrangler.jsonc'
+      );
+    expect(workerConfigProblems([kiloMcp('kilo-mcp-dev')])).toEqual([]);
+    expect(workerConfigProblems([kiloMcp('kilo-mcp')])).toEqual([
+      expect.stringContaining('sets props.caller "kilo-mcp"'),
+    ]);
+  });
+
+  it('lets another config bind the feed Worker at FeedReader under its own name', () => {
     expect(
-      workerConfigProblems([consumer({ services: [{ binding: 'FEED', service: 'uts-feed' }] })])
+      workerConfigProblems([consumer({ services: [readerBinding('uts-feed', 'consumer')] })])
+    ).toEqual([]);
+    expect(
+      workerConfigProblems([
+        consumer({
+          env: {
+            staging: {
+              name: 'consumer-staging',
+              services: [readerBinding('uts-feed-staging', 'consumer-staging')],
+            },
+          },
+        }),
+      ])
     ).toEqual([]);
   });
 
+  it('fails a reader that poses as another caller, carries no props, or binds the default entrypoint', () => {
+    const problemsOf = (binding: Record<string, unknown>) =>
+      workerConfigProblems([consumer({ services: [binding] })]);
+    expect(problemsOf(readerBinding('uts-feed', 'o11y'))).toEqual([
+      expect.stringContaining('sets props.caller "o11y"'),
+    ]);
+    const { props: _props, ...propless } = readerBinding('uts-feed', 'consumer');
+    expect(problemsOf(propless)).toEqual([expect.stringContaining('sets props.caller undefined')]);
+    const { entrypoint: _entrypoint, ...atDefault } = readerBinding('uts-feed', 'consumer');
+    expect(problemsOf(atDefault)).toEqual([
+      expect.stringContaining('binds entrypoint (default); bind FeedReader'),
+    ]);
+    expect(problemsOf(readerBinding('uts-feed-canary', 'consumer'))).toEqual([
+      expect.stringContaining('not a feed Worker deployment'),
+    ]);
+  });
+
+  it('fails a reader in a preview and the mint Worker reading the feed this way', () => {
+    expect(
+      workerConfigProblems([
+        consumer({ previews: { services: [readerBinding('uts-feed', 'consumer')] } }),
+      ])
+    ).toEqual([expect.stringContaining('a preview runs unreviewed code')]);
+    const mint = configAt(MINT_CONFIG);
+    const reading = parseWorkerConfig(MINT_CONFIG, {
+      ...mint.config,
+      services: [readerBinding('uts-feed', 'uts')],
+    });
+    expect(workerConfigProblems([reading])).toEqual([
+      expect.stringContaining('binds the feed Worker; a UTS Worker does not'),
+    ]);
+  });
+});
+
+describe('feed Worker bindings of the mint Worker', () => {
   it('fails a feed block whose caller is not its own deployed name, or that carries no props', () => {
     const problems = workerConfigProblems(
       withFeed(raw => ({ ...raw, services: [mintBinding('uts', 'uts-feed-staging')] }))
@@ -197,12 +315,50 @@ describe('the UTS configs themselves', () => {
 
   it('fail traces enabled in any block', () => {
     const problems = utsConfigProblems(
-      mintWith(raw => ({ ...raw, observability: { enabled: true, traces: { enabled: true } } }))
+      mintWith(raw => ({
+        ...raw,
+        observability: { enabled: true, traces: { enabled: true }, redact_query_string: true },
+      }))
     );
     expect(problems.length).toBeGreaterThanOrEqual(2);
     expect(problems.every(problem => problem.includes('traces.enabled resolves to true'))).toBe(
       true
     );
+  });
+
+  it('fail a mint block whose logs keep query strings, where a callback carries its code', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        observability: { enabled: true, traces: { enabled: false } },
+      }))
+    );
+    expect(problems).toEqual([
+      `${MINT_CONFIG} (top level): observability.redact_query_string resolves to undefined; it must be true`,
+      `${MINT_CONFIG} (env.staging): observability.redact_query_string resolves to undefined; it must be true`,
+    ]);
+    const staging = utsConfigProblems(
+      mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        return {
+          ...raw,
+          env: {
+            ...env,
+            staging: {
+              ...env.staging,
+              observability: {
+                enabled: true,
+                traces: { enabled: false },
+                redact_query_string: false,
+              },
+            },
+          },
+        };
+      })
+    );
+    expect(staging).toEqual([
+      `${MINT_CONFIG} (env.staging): observability.redact_query_string resolves to false; it must be true`,
+    ]);
   });
 
   it('fail a deployed mint block without the eu jurisdiction or the Frankfurt placement', () => {
@@ -316,6 +472,20 @@ describe('the UTS configs themselves', () => {
     }
   }, 120_000);
 
+  it('fail a mint block that produces to any queue but its own UTS audit queue', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => ({
+        ...raw,
+        queues: { producers: [{ binding: 'AUDIT_QUEUE', queue: 'kilo-audit' }] },
+      }))
+    );
+    expect(problems).toEqual([
+      expect.stringContaining(
+        '(top level): produces to AUDIT_QUEUE=kilo-audit; expected AUDIT_QUEUE=kilo-audit-uts'
+      ),
+    ]);
+  });
+
   it('fail placement on the feed Worker', () => {
     const configs = repoConfigs().filter(worker => worker.path !== FEED_CONFIG);
     const feed = configAt(FEED_CONFIG);
@@ -324,5 +494,271 @@ describe('the UTS configs themselves', () => {
       placement: { region: 'aws:eu-central-1' },
     });
     expect(utsConfigProblems([...configs, placed])).toHaveLength(3);
+  });
+
+  it('fail a UTS test config that deploys under any name but its own', () => {
+    for (const [path, edit] of [
+      [MINT_TEST_CONFIG, { name: 'uts' }],
+      [FEED_TEST_CONFIG, { env: { staging: { name: 'uts-staging' } } }],
+    ] as const) {
+      const configs = repoConfigs().filter(worker => worker.path !== path);
+      const renamed = parseWorkerConfig(path, { ...configAt(path).config, ...edit });
+      expect(utsConfigProblems([...configs, renamed])).toEqual([
+        expect.stringContaining(`${path} deploys`),
+      ]);
+    }
+  });
+
+  // jose's `verifyCompact` returns a promise it does not await, so a caught verification failure
+  // reaches workerd as a briefly unhandled rejection; workerd stops reporting it from the
+  // compatibility date that makes `unhandled_rejection_after_microtask_checkpoint` the default and
+  // refuses an explicit listing there (panva/jose#892). The flag therefore goes with a date before
+  // that one, so a config behaves the same before and after it.
+  const withFlag = (raw: Record<string, unknown>, date: string) => ({
+    ...raw,
+    compatibility_date: date,
+    compatibility_flags: [
+      ...((raw.compatibility_flags ?? []) as string[]),
+      JOSE_UNHANDLED_REJECTION_FLAG,
+    ],
+  });
+
+  // The feed Worker verifies STS tokens with jose for its HTTPS feed (src/https-auth.ts), so its
+  // configs follow the same rule.
+  const JOSE_BLOCKS: ReadonlyMap<string, readonly string[]> = new Map([
+    [MINT_CONFIG, ['(top level)', '(env.staging)']],
+    [MINT_DEV_CONFIG, ['(top level)']],
+    [MINT_TEST_CONFIG, ['(top level)']],
+    [FEED_CONFIG, ['(top level)', '(env.staging)', '(env.local)']],
+    [FEED_TEST_CONFIG, ['(top level)']],
+  ]);
+
+  it('fail a jose-verifying config that drops below the fix without listing the flag', () => {
+    for (const [path, blocks] of JOSE_BLOCKS) {
+      const problems = utsConfigProblems(
+        configWith(path, raw => ({ ...raw, compatibility_date: '2025-06-01' }))
+      );
+      expect(problems.map(problem => problem.split(':')[0])).toEqual(
+        blocks.map(block => `${path} ${block}`)
+      );
+      expect(
+        problems.every(problem => problem.includes(`must list ${JOSE_UNHANDLED_REJECTION_FLAG}`))
+      ).toBe(true);
+    }
+  });
+
+  it('accept a jose-verifying config before the fix that lists the flag', () => {
+    for (const path of JOSE_BLOCKS.keys()) {
+      const problems = utsConfigProblems(configWith(path, raw => withFlag(raw, '2025-06-01')));
+      expect(problems).toEqual([]);
+    }
+  });
+
+  it('fail a jose-verifying config that lists the flag where workerd makes it the default', () => {
+    for (const [path, blocks] of JOSE_BLOCKS) {
+      const problems = utsConfigProblems(
+        configWith(path, raw => withFlag(raw, JOSE_UNHANDLED_REJECTION_DATE))
+      );
+      expect(problems.map(problem => problem.split(':')[0])).toEqual(
+        blocks.map(block => `${path} ${block}`)
+      );
+      expect(problems.every(problem => problem.includes('drop it'))).toBe(true);
+    }
+  });
+
+  it('fail a jose-verifying config that leaves the compatibility date out', () => {
+    for (const path of JOSE_BLOCKS.keys()) {
+      const problems = utsConfigProblems(
+        configWith(path, ({ compatibility_date: _date, ...raw }) => raw)
+      );
+      expect(problems.length).toBeGreaterThan(0);
+      expect(
+        problems.every(problem => problem.includes('compatibility_date resolves to undefined'))
+      ).toBe(true);
+    }
+  });
+
+  it('leave the HTTPS feed off in staging and production, and on only in the local block', () => {
+    const feed = configAt(FEED_CONFIG).config;
+    const varsOf = (vars: Record<string, unknown> | undefined) => ({
+      enabled: vars?.FEED_HTTPS_ENABLED,
+      sts: vars?.STS_URL,
+    });
+    expect(varsOf(feed.vars)).toEqual({ enabled: undefined, sts: undefined });
+    expect(varsOf(feed.env?.staging?.vars)).toEqual({ enabled: undefined, sts: undefined });
+    expect(varsOf(feed.env?.local?.vars)).toEqual({
+      enabled: 'true',
+      sts: STS_ISSUERS.development,
+    });
+  });
+
+  it('keep the CI token exchange off in production, and every configured CI trust policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.CI_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    const blocks: [unknown, UtsEnvironment][] = [
+      [staging, 'staging'],
+      [
+        experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+        'development',
+      ],
+      [
+        experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+        'development',
+      ],
+    ];
+    for (const [block, environment] of blocks) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = ciPolicies(
+        { CI_TOKEN_POLICIES: z.string().parse(value) },
+        environment,
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
+  });
+
+  it('keep the bot-token mint off in production, and every configured bot-token policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.BOT_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    for (const block of [
+      staging,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+    ]) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = botTokenPolicies(
+        { BOT_TOKEN_POLICIES: z.string().parse(value) },
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
+  });
+
+  it('leave the login rotation off in every deployed block, and name the configs it switches', () => {
+    const raw = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    const BlockSchema = z.object({
+      vars: z.object({ LOGIN_ROTATION: z.literal('off') }).loose(),
+      hyperdrive: z.array(z.object({ binding: z.string(), id: z.string() })),
+    });
+    const top = BlockSchema.parse(raw);
+    const staging = BlockSchema.parse(
+      z.object({ env: z.object({ staging: z.unknown() }) }).parse(raw).env.staging
+    );
+    const ids = (block: z.infer<typeof BlockSchema>) =>
+      Object.fromEntries(block.hyperdrive.map(({ binding, id }) => [binding, id]));
+    for (const [block, environment] of [
+      [top, 'production'],
+      [staging, 'staging'],
+    ] as const) {
+      const configs = HYPERDRIVE_CONFIG_IDS[environment];
+      expect(ids(block)).toEqual({
+        IDENTITY_STORE: configs.app,
+        IDENTITY_STORE_PAT: configs.pat,
+        IDENTITY_STORE_REPLICA: configs.reader,
+      });
+    }
+  });
+
+  it('fail a feed switch that is not exactly true, and an STS issuer of another environment', () => {
+    const edited = (top: Record<string, unknown>, staging: Record<string, unknown>) =>
+      configWith(FEED_CONFIG, raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const stagingVars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        return {
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), ...top },
+          env: { ...env, staging: { ...env.staging, vars: { ...stagingVars, ...staging } } },
+        };
+      });
+    expect(utsConfigProblems(edited({ FEED_HTTPS_ENABLED: 'yes' }, {}))).toEqual([
+      expect.stringContaining(`${FEED_CONFIG} (top level): FEED_HTTPS_ENABLED`),
+    ]);
+    expect(
+      utsConfigProblems(
+        edited(
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.staging },
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.staging }
+        )
+      )
+    ).toEqual([expect.stringContaining(`${FEED_CONFIG} (top level): STS_URL`)]);
+    expect(
+      utsConfigProblems(
+        edited(
+          { FEED_HTTPS_ENABLED: 'true', STS_URL: STS_ISSUERS.production },
+          { STS_URL: 'http://localhost:8825' }
+        )
+      )
+    ).toEqual([expect.stringContaining(`${FEED_CONFIG} (env.staging): STS_URL`)]);
+  });
+
+  it('leave the home-widget exchange off in every mint block, and fail a malformed or production switch', () => {
+    const mint = configAt(MINT_CONFIG).config;
+    expect(mint.vars?.HOME_WIDGET_GRANT_ENABLED).toBeUndefined();
+    expect(mint.env?.staging?.vars?.HOME_WIDGET_GRANT_ENABLED).toBeUndefined();
+    const edited = (top: Record<string, unknown>, staging: Record<string, unknown>) =>
+      mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const stagingVars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        return {
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), ...top },
+          env: { ...env, staging: { ...env.staging, vars: { ...stagingVars, ...staging } } },
+        };
+      });
+    expect(utsConfigProblems(edited({}, { HOME_WIDGET_GRANT_ENABLED: 'true' }))).toEqual([]);
+    expect(utsConfigProblems(edited({}, { HOME_WIDGET_GRANT_ENABLED: 'on' }))).toEqual([
+      expect.stringContaining(`${MINT_CONFIG} (env.staging): HOME_WIDGET_GRANT_ENABLED is "on"`),
+    ]);
+    expect(utsConfigProblems(edited({ HOME_WIDGET_GRANT_ENABLED: 'true' }, {}))).toEqual([
+      expect.stringContaining(`${MINT_CONFIG} (top level): HOME_WIDGET_GRANT_ENABLED stays off`),
+    ]);
+  });
+
+  it('keep the feed logs at a 5 percent head sample in every block, and fail a larger or missing one', () => {
+    expect(configAt(FEED_CONFIG).config.observability?.logs?.head_sampling_rate).toBe(
+      FEED_MAX_LOG_SAMPLING_RATE
+    );
+    const withObservability = (observability: Record<string, unknown>) =>
+      configWith(FEED_CONFIG, raw => ({ ...raw, observability }));
+    const blocks = ['(top level)', '(env.staging)', '(env.local)'];
+    expect(
+      utsConfigProblems(
+        withObservability({ enabled: true, logs: { enabled: true }, traces: { enabled: false } })
+      )
+    ).toEqual(
+      blocks.map(
+        where =>
+          `${FEED_CONFIG} ${where}: observability.logs.head_sampling_rate resolves to 1; the feed Worker keeps at most 0.05 of its invocation logs`
+      )
+    );
+    expect(
+      utsConfigProblems(
+        withObservability({
+          enabled: true,
+          head_sampling_rate: 0.01,
+          logs: { enabled: true, head_sampling_rate: 0.1 },
+          traces: { enabled: false },
+        })
+      )
+    ).toEqual(
+      blocks.map(where =>
+        expect.stringContaining(
+          `${FEED_CONFIG} ${where}: observability.logs.head_sampling_rate resolves to 0.1`
+        )
+      )
+    );
+    expect(
+      utsConfigProblems(
+        withObservability({ enabled: true, head_sampling_rate: 0.01, traces: { enabled: false } })
+      )
+    ).toEqual([]);
   });
 });

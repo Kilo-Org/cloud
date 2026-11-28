@@ -10,23 +10,40 @@ import {
   type LeaseLimitedReason,
 } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 import migrations from '../../drizzle.lease/migrations';
 import {
   leaseCreatedEvent,
+  leaseReplicaSweptEvent,
   leaseRevokedEvent,
   type LeaseAuditCaller,
   type LeaseRevocationResult,
   type LeaseRevokeCause,
+  type ReplicaSweepResult,
 } from '../audit/events';
 import { AuditLog } from '../audit/log';
 import {
   LEASE_CREATE_BUDGET_MS,
   LEASE_CREATES_PER_MINUTE,
   LEASE_EXPIRY_TOLERANCE_MS,
+  LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR,
+  LEASE_REPLICA_SWEEP_INTERVAL_MS,
   LEASE_RETRY_AFTER_SECONDS,
   LEASE_REVOKE_CLEANUP_MS,
   LEASE_REVOKE_RETRIES_PER_ALARM,
@@ -38,6 +55,7 @@ import {
 import * as schema from '../db/lease-schema';
 import { readConfig, type Env, type StsConfig } from '../env';
 import { InfisicalClient, type DynamicSecretRef } from '../infisical/client';
+import { sweepReplica, type ReplicaSweep } from '../leases/replica-sweep';
 import { getSignerStub } from './stubs';
 
 type LeaseDatabase = DrizzleSqliteDODatabase<typeof schema>;
@@ -49,25 +67,16 @@ type LeaseRow = typeof schema.lease.$inferSelect;
  */
 export const LEASE_DYNAMIC_SECRETS: Readonly<Record<LeaseGrant, DynamicSecretRef>> = {
   'replica-read': { name: 'replica-read', path: '/dynamic/replica-read' },
-  'ci-migration': { name: 'ci-migration', path: '/dynamic/ci-migration' },
 };
 
 const MINUTE_MS = 60 * 1000;
 
+/** A lease caller is a Worker in the account: only `replica-read` exists, for worker bindings. */
 const CallerSchema = z.strictObject({
   workload: WorkloadNameSchema,
-  identity: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
-  channel: z.enum(['worker-binding', 'http']),
-  run: z
-    .strictObject({
-      jobWorkflowRef: z.string().min(1).max(512),
-      runId: z.string().regex(/^[0-9]{1,20}$/),
-      runAttempt: z
-        .string()
-        .regex(/^[0-9]{1,20}$/)
-        .optional(),
-    })
-    .nullable(),
+  identity: z.literal('worker-binding'),
+  channel: z.literal('worker-binding'),
+  run: z.null(),
 });
 
 /** What STS asks the lease object for, after its policy check allowed the grant and the lifetime. */
@@ -119,7 +128,7 @@ const LeaseRevokeRequestSchema = z.strictObject({
 export type LeaseRevokeOutcome =
   | { status: 'revoked' }
   /** The caller hears `not_found` in every case; the reason is for its denial row. */
-  | { status: 'not_found'; reason: 'not_owner' | 'other_run' | 'unknown_lease' }
+  | { status: 'not_found'; reason: 'not_owner' | 'unknown_lease' }
   | { status: 'unavailable'; retryAfterSeconds: number };
 
 function retryAfterSeconds(ms: number | null): number {
@@ -129,6 +138,23 @@ function retryAfterSeconds(ms: number | null): number {
 
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
+}
+
+/** A replica's sweep result for logs and audit: the error's name and code (a SQLSTATE or errno). */
+function sweepFailureDetail(error: unknown): string {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : null;
+  return code === null ? errorName(error) : `${errorName(error)} ${code}`;
+}
+
+/** A Hyperdrive binding as the sweep uses it. */
+const HyperdriveBindingSchema = z.object({ connectionString: z.string().min(1) });
+
+/** `LEASE_REPLICA_SWEEP_BINDINGS` names a binding this Worker does not have. */
+class ReplicaBindingMissingError extends Error {
+  override name = 'ReplicaBindingMissingError';
 }
 
 /**
@@ -154,11 +180,21 @@ function unconfirmedEnd(row: LeaseRow, now: number): Partial<LeaseRow> {
  * revoked at once. A revocation Infisical does not confirm is audited as `revoke_failed` and retried
  * by the alarm until Infisical confirms it, also after the lease expired (expiry stops new logins,
  * not open sessions), for at most a day past the expiry; then it is audited as `unconfirmed` and
- * logged as an error. Leases are few (a few hundred a day), so one object serves the environment.
+ * logged as an error. It also sweeps each configured read replica once a minute, ending there the
+ * sessions of lease roles that are gone, blocked or past `VALID UNTIL`, since a revocation or an
+ * expiry ends sessions on the primary only (design decision Q63). Leases are few (a few hundred a
+ * day), so one object serves the environment.
  * A stub can call every prototype method, so everything but `create`, `revoke` and `alarm` is
- * ECMAScript-private: no caller revokes a lease past `revoke`'s owner check.
+ * ECMAScript-private: no caller revokes a lease past `revoke`'s owner check. `ensureSweeping` only
+ * schedules the alarm.
  */
 export class LeaseDO extends DurableObject<Env> {
+  /**
+   * Runs one sweep of one replica; a test replaces it, as no Postgres runs in the Workers pool
+   * (the end-to-end check runs the real one, README "Tests").
+   */
+  static replicaSweep: ReplicaSweep = sweepReplica;
+
   readonly #config: StsConfig;
   readonly #db: LeaseDatabase;
   readonly #audit: AuditLog;
@@ -223,7 +259,6 @@ export class LeaseDO extends DurableObject<Env> {
       .values({
         workload: caller.workload,
         caller: JSON.stringify(caller),
-        runId: caller.run?.runId ?? null,
         grant,
         state: 'pending',
         createdAt: callStartedAt,
@@ -314,11 +349,10 @@ export class LeaseDO extends DurableObject<Env> {
 
   /**
    * Revokes one of the caller's own leases. A lease id STS never handed to this workload is
-   * `not_found`, whoever holds it, and so is a GitHub run's lease asked for by another run. A lease
-   * STS already revoked answers `revoked` without a manager call, and one whose revocation STS
-   * stopped unconfirmed answers `unavailable` without one; an expired one still goes to Infisical,
-   * since expiry alone does not end an open session (Infisical answers 404 once its own expiry
-   * revocation succeeded).
+   * `not_found`, whoever holds it. A lease STS already revoked answers `revoked` without a manager
+   * call, and one whose revocation STS stopped unconfirmed answers `unavailable` without one; an
+   * expired one still goes to Infisical, since expiry alone does not end an open session (Infisical
+   * answers 404 once its own expiry revocation succeeded).
    */
   async revoke(raw: LeaseRevokeRequest): Promise<LeaseRevokeOutcome> {
     const input = LeaseRevokeRequestSchema.parse(raw);
@@ -334,9 +368,6 @@ export class LeaseDO extends DurableObject<Env> {
       return { status: 'not_found', reason: 'unknown_lease' };
     }
     if (row.workload !== input.caller.workload) return { status: 'not_found', reason: 'not_owner' };
-    if (row.runId !== null && row.runId !== (input.caller.run?.runId ?? null)) {
-      return { status: 'not_found', reason: 'other_run' };
-    }
     if (row.state === 'revoked') return { status: 'revoked' };
     if (row.state === 'unconfirmed') {
       return { status: 'unavailable', retryAfterSeconds: LEASE_RETRY_AFTER_SECONDS };
@@ -357,33 +388,71 @@ export class LeaseDO extends DurableObject<Env> {
       : { status: 'revoked' };
   }
 
+  /**
+   * The cron calls this every 5 minutes while replicas are configured, so the sweep runs without
+   * a lease call: Infisical's own expiry never calls STS. Idempotent.
+   */
+  async ensureSweeping(): Promise<void> {
+    await this.#scheduleAlarm(Date.now(), false);
+  }
+
+  /**
+   * The replica sweep starts first and runs beside the rest, timed from when the alarm fired, so a
+   * slow or failing relay, Infisical call or row write never delays it; neither can a throw in that
+   * upkeep skip the sweep or the next alarm. The next alarm is scheduled as soon as the sweep ends,
+   * so a long upkeep cannot hold it back, and again once the upkeep ends.
+   */
   async alarm(): Promise<void> {
-    let failed = false;
+    const firedAt = Date.now();
+    const sweep = this.#sweepReplicas(firedAt).catch((error: unknown) => {
+      console.error('sts: replica sweep did not run; the next alarm retries it', {
+        reason: errorName(error),
+      });
+    });
+    const upkeep = this.#upkeep();
+    await sweep;
+    await this.#scheduleSweepAlarm(Date.now());
+    const relayFailed = await upkeep;
+    await this.#scheduleAlarm(Date.now(), relayFailed);
+  }
+
+  /**
+   * The alarm's work beside the sweep: the audit relay, owed revocations, stopping unconfirmed ones
+   * and pruning. Never throws; answers whether the relay failed.
+   */
+  async #upkeep(): Promise<boolean> {
+    let relayFailed = false;
     try {
       await this.#audit.relay(this.#stream);
     } catch (error) {
-      failed = true;
+      relayFailed = true;
       console.warn('sts: lease audit relay failed; rows stay for the next alarm', {
         reason: errorName(error),
       });
     }
-    await this.#retryOwedRevocations();
-    const now = Date.now();
-    await this.#stopUnconfirmedRevocations(now);
-    this.#audit.pruneIfDue(now);
-    this.#db
-      .delete(schema.lease)
-      .where(
-        and(
-          isNull(schema.lease.revokeCause),
-          lt(
-            sql`coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt})`,
-            now - LEASE_ROW_RETENTION_MS
+    try {
+      await this.#retryOwedRevocations();
+      const now = Date.now();
+      await this.#stopUnconfirmedRevocations(now);
+      this.#audit.pruneIfDue(now);
+      this.#db
+        .delete(schema.lease)
+        .where(
+          and(
+            isNull(schema.lease.revokeCause),
+            lt(
+              sql`coalesce(${schema.lease.endedAt}, ${schema.lease.expiresAt})`,
+              now - LEASE_ROW_RETENTION_MS
+            )
           )
         )
-      )
-      .run();
-    await this.#scheduleAlarm(Date.now(), failed);
+        .run();
+    } catch (error) {
+      console.error('sts: lease alarm upkeep failed; the next alarm retries it', {
+        reason: errorName(error),
+      });
+    }
+    return relayFailed;
   }
 
   /**
@@ -640,6 +709,118 @@ export class LeaseDO extends DurableObject<Env> {
     return row === undefined || row.due === null ? null : row.due;
   }
 
+  /**
+   * Sweeps each configured replica whose sweep is due, all at once, and forgets the rows of
+   * replicas no longer configured. Each replica gets one attempt per interval; a failure waits for
+   * the next one (README "Replica sessions").
+   */
+  async #sweepReplicas(firedAt: number): Promise<void> {
+    const replicas = this.#config.replicaSweepBindings;
+    this.#db
+      .delete(schema.leaseReplicaSweep)
+      .where(
+        replicas.length === 0
+          ? undefined
+          : notInArray(schema.leaseReplicaSweep.replica, [...replicas])
+      )
+      .run();
+    if (replicas.length === 0) return;
+    const rows = new Map(
+      this.#db
+        .select()
+        .from(schema.leaseReplicaSweep)
+        .all()
+        .map(row => [row.replica, row])
+    );
+    await Promise.all(
+      replicas
+        .filter(replica => (rows.get(replica)?.nextAt ?? firedAt) <= firedAt)
+        .map(replica => this.#sweepReplica(replica, rows.get(replica)?.failures ?? 0, firedAt))
+    );
+  }
+
+  /**
+   * One sweep of one replica. Its next sweep is due one interval after `firedAt`, the time the
+   * alarm fired, written before the attempt, so the interval does not grow by the sweep's own time.
+   * A sweep that ended sessions, or the first to succeed after failures, writes
+   * `lease.replica_swept` with result `ended`; the first failure of a streak and the
+   * `LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR`th write it with result `failed`. Failures are
+   * warnings until that one, which is logged as an error once per streak.
+   */
+  async #sweepReplica(replica: string, failuresBefore: number, firedAt: number): Promise<void> {
+    const nextAt = firedAt + LEASE_REPLICA_SWEEP_INTERVAL_MS;
+    this.#db
+      .insert(schema.leaseReplicaSweep)
+      .values({ replica, nextAt, failures: failuresBefore })
+      .onConflictDoUpdate({ target: schema.leaseReplicaSweep.replica, set: { nextAt } })
+      .run();
+    let failures = 0;
+    let sweep: ReplicaSweepResult | null = null;
+    try {
+      const binding = HyperdriveBindingSchema.safeParse(Reflect.get(this.env, replica));
+      if (!binding.success) throw new ReplicaBindingMissingError();
+      const sessions = await LeaseDO.replicaSweep(binding.data.connectionString);
+      if (sessions > 0) {
+        console.log('sts: replica sweep ended sessions of ended leases', { replica, sessions });
+      }
+      if (sessions > 0 || failuresBefore > 0) {
+        sweep = { result: 'ended', sessions, afterFailures: failuresBefore };
+      }
+    } catch (error) {
+      failures = failuresBefore + 1;
+      const detail = sweepFailureDetail(error);
+      const fields = { replica, consecutiveFailures: failures, detail };
+      if (failures === LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR) {
+        console.error(
+          'sts: replica sweep keeps failing; replica sessions of ended leases may stay open',
+          fields
+        );
+      } else {
+        console.warn('sts: replica sweep failed; the next sweep retries it', fields);
+      }
+      if (failures === 1 || failures === LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR) {
+        sweep = { result: 'failed', consecutiveFailures: failures, detail };
+      }
+    }
+    this.#db
+      .update(schema.leaseReplicaSweep)
+      .set({ failures })
+      .where(eq(schema.leaseReplicaSweep.replica, replica))
+      .run();
+    if (sweep === null) return;
+    try {
+      await this.#audit.append(
+        this.#stream,
+        leaseReplicaSweptEvent({ environment: this.#config.environment, replica, sweep })
+      );
+    } catch (error) {
+      console.error('sts: replica sweep audit append failed', {
+        replica,
+        reason: errorName(error),
+      });
+    }
+  }
+
+  /**
+   * When the next replica sweep is due: now for a configured replica never swept, or null when no
+   * replica is configured.
+   */
+  #nextSweepAt(now: number): number | null {
+    const replicas = this.#config.replicaSweepBindings;
+    if (replicas.length === 0) return null;
+    const due = new Map(
+      this.#db
+        .select({
+          replica: schema.leaseReplicaSweep.replica,
+          nextAt: schema.leaseReplicaSweep.nextAt,
+        })
+        .from(schema.leaseReplicaSweep)
+        .all()
+        .map(row => [row.replica, row.nextAt])
+    );
+    return Math.min(...replicas.map(replica => due.get(replica) ?? now));
+  }
+
   async #scheduleAlarm(now: number, failed: boolean): Promise<void> {
     let target = Number.POSITIVE_INFINITY;
     if (this.#audit.hasUnrelayed()) {
@@ -654,6 +835,23 @@ export class LeaseDO extends DurableObject<Env> {
     }
     const rowDue = this.#nextRowDueAt();
     if (rowDue !== null) target = Math.min(target, Math.max(now + 1_000, rowDue));
+    const sweepDue = this.#nextSweepAt(now);
+    if (sweepDue !== null) target = Math.min(target, Math.max(now + 1_000, sweepDue));
+    await this.#moveAlarmTo(target, now);
+  }
+
+  /**
+   * Sets the alarm for the next replica sweep only. The alarm calls it as soon as the sweep ends,
+   * before the upkeep has updated the relay and revocation state that `#scheduleAlarm` reads, so
+   * a stale owed revocation cannot pull the alarm in and skip its 30-second backoff.
+   */
+  async #scheduleSweepAlarm(now: number): Promise<void> {
+    const sweepDue = this.#nextSweepAt(now);
+    if (sweepDue !== null) await this.#moveAlarmTo(Math.max(now + 1_000, sweepDue), now);
+  }
+
+  /** Moves the alarm to `target` when none is set, it is later, or it already passed. */
+  async #moveAlarmTo(target: number, now: number): Promise<void> {
     if (target === Number.POSITIVE_INFINITY) return;
     const current = await this.ctx.storage.getAlarm();
     if (current === null || current > target || current < now) {

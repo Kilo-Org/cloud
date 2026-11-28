@@ -30,6 +30,8 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { isKiloUserCredentialPepperCurrent } from '@kilocode/worker-utils/kilo-token-pepper';
 import { findEffectiveOrganizationMemberRole } from '@kilocode/worker-utils/organization-membership';
 import * as z from 'zod';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readAutoRoutingSecret } from './secrets';
 
 export class CustomRouterError extends Error {
   readonly code: CustomRouterErrorCode;
@@ -81,8 +83,17 @@ export function clearEmailDomainBlacklistCache(): void {
   emailDomainBlacklist.clear();
 }
 
-async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTokenPayload> {
-  const secret = await getCachedSecret(env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
+async function verifyCallerToken(
+  env: CallerEnv,
+  token: string,
+  ctx?: SecretsExecutionContext
+): Promise<KiloTokenPayload> {
+  // A lazy binding, not an eager read: `getCachedSecret` keeps the resolved value for the
+  // isolate, so one read serves every later request whichever source `SECRETS_SOURCE` selects.
+  const secret = await getCachedSecret(
+    { get: () => readAutoRoutingSecret(env, 'NEXTAUTH_SECRET', ctx) },
+    'NEXTAUTH_SECRET'
+  );
   let payload: KiloTokenPayload;
   try {
     // The CLI presents its gateway token, so accept exactly the audiences the gateway accepts.
@@ -103,10 +114,14 @@ async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTok
 // Mirrors the gateway's user authentication: token, current pepper, an account outside the
 // blocked email domains and not blocked, and effective organization membership for the
 // organization context.
-export async function authenticateCaller(env: CallerEnv, headers: Headers): Promise<Caller> {
+export async function authenticateCaller(
+  env: CallerEnv,
+  headers: Headers,
+  ctx?: SecretsExecutionContext
+): Promise<Caller> {
   const token = extractBearerToken(headers.get('authorization'));
   if (!token) throw new CustomRouterError('unauthorized', 'Authentication required');
-  const payload = await verifyCallerToken(env, token);
+  const payload = await verifyCallerToken(env, token, ctx);
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
   const [user] = await db

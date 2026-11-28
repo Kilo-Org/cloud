@@ -26,6 +26,7 @@ const ORG_ID = '99999999-9999-4999-8999-999999999999';
 const ROUTER_ID = '11111111-1111-4111-8111-111111111111';
 const POOL_REQUEST = '55555555-5555-4555-8555-555555555555';
 const AT = '2026-01-01T00:00:00.000Z';
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const INVOCATION: BenchmarkCaseInvocation = {
   engineIdentity: 'engine-test',
@@ -247,6 +248,7 @@ describe('case inference payer resolution', () => {
     };
     expect(row.state).toBe('selecting');
     expect(row.usage_id).toBe(payer.usageId);
+    expect(payer.usageId).toMatch(UUID_V7);
     expect(row.project_id).toBe(payer.projectId);
     expect(row.platform_organization_id).toBeNull();
   });

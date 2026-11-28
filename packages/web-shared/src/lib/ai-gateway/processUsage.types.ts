@@ -284,8 +284,6 @@ export type UsageMetaData = SharedUsageRecordFields & {
   http_x_vercel_ip_latitude: number | null;
   http_x_vercel_ip_longitude: number | null;
   http_x_vercel_ja4_digest: string | null;
-  user_prompt_prefix: string | null;
-  system_prompt_prefix: string | null;
   system_prompt_length: number | null;
   http_user_agent: string | null;
   upstream_id: string | null;
@@ -311,8 +309,6 @@ export type UsageMetaData = SharedUsageRecordFields & {
   non_inference_cost: number | null;
   /** Widened row column: the context always knows the value, the column is nullable. */
   is_free: boolean | null;
-  abuse_delay: number | null;
-  abuse_downgraded_from: string | null;
   /** Widened row column: the context carries a known kind, the column is plain text. */
   system_prompt_kind: string | null;
 };

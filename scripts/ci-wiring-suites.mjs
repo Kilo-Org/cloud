@@ -18,6 +18,12 @@ export const wiringSuites = [
   'scripts/meta-janitor-approve.test.mjs',
   'scripts/mobile-sbom-workflow.test.mjs',
   'scripts/sts-deployment-watch.test.mjs',
+  'scripts/wrangler-nonproduction-fence.test.mjs',
+  'scripts/sts-deploy-token.test.mjs',
+  'scripts/inherit-secret-bindings.test.mjs',
+  'scripts/r2-temp-credentials.test.mjs',
+  'scripts/sts-bundle-action.test.mjs',
+  'scripts/cloud-agent-e2e-workflow.test.mjs',
 ];
 
 export const wiringCommand = `node --test ${wiringSuites.join(' ')}`;

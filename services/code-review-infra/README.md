@@ -22,6 +22,28 @@ Copy `.dev.vars.example` to `.dev.vars` for local development. Required values a
 - `CLOUD_AGENT_NEXT_URL`: Cloud Agent Next service URL.
 
 Production secrets are set with `wrangler secret put`; public URLs are configured in `wrangler.jsonc`.
+`SECRETS_SOURCE` selects where the runtime reads them: `secrets-store` (the bindings above) or `sts`
+(the bundle over the `STS` SecretsBroker binding). An unrecognised value refuses every read, and the
+`sts` source never falls back to the legacy binding.
+
+### Status writes (`CODE_REVIEW_STATUS_CALLBACK_AUTH`)
+
+The review Durable Object writes `running` and failure status to the web app's
+`POST /api/internal/code-review-status/{reviewId}` itself. Its credential is
+`CODE_REVIEW_STATUS_CALLBACK_AUTH` (`src/status-callback-auth.ts`):
+
+- absent, empty or `legacy`: the `X-Callback-Token` derived from `CALLBACK_TOKEN_SECRET`, as before;
+- `sts`: only a `web:code-review.status-callback` STS service
+  token in `Authorization: Bearer`, minted over the `STS` binding (`props.caller`
+  `kilo-code-review-worker`), never following a redirect. Without a token the write fails; it never
+  falls back to the derived token.
+
+Production leaves it unset. Set `sts` only once the web route accepts that token; rollback is
+`legacy`. `wrangler.jsonc` binds `STS` and this Worker's worker-binding policy; the registry PR adds
+the status-write grant, and until it lands `sts` fails closed as denied (`unknown_scope`). The
+callback target handed to Cloud Agent Next keeps the derived token:
+Cloud Agent Next delivers that callback with its own credential. The test config
+(`wrangler.test.jsonc`) binds no STS and stays on `legacy`.
 
 ## Development
 

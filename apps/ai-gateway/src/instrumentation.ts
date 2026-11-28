@@ -10,6 +10,11 @@ export async function register() {
     const { installSelectedInternalApiSecretRead } =
       await import('@kilocode/web-shared/lib/sts-secret-reader');
     installSelectedInternalApiSecretRead();
+    // Names this app in `x-kilo-caller` on every Bouncer call; BOUNCER_CLIENT_AUTH is checked per
+    // call (`bouncer/sts-auth.ts`), and unset sends the legacy key alone. The scopes come from
+    // `BOUNCER_APP_SCOPES`, which a test keeps equal to the production grant of `ai-gateway.yaml`.
+    const { installBouncerAuth } = await import('@kilocode/web-shared/lib/bouncer/sts-auth');
+    installBouncerAuth('kilocode-ai-gateway');
   }
 }
 

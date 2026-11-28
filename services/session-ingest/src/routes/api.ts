@@ -49,6 +49,7 @@ import {
   sessionTitleSchema,
 } from '../services/session-title';
 import { signSessionShareToken } from '../services/session-share-token';
+import { requestContext } from '../request-context';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
 import { clearSessionLocalState } from '../services/session-local-state';
@@ -1056,7 +1057,8 @@ api.post('/session/:sessionId/share', bodyLimit({ maxSize: 1024 }), async c => {
         publicId,
         ...shareOptions.data,
       },
-      { now: () => new Date(sharedAt) }
+      { now: () => new Date(sharedAt) },
+      requestContext(c)
     );
   } catch (error) {
     await removeSnapshot();

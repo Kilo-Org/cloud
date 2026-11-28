@@ -178,7 +178,11 @@ import {
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  bouncerEnabledForDeployment,
+  normalizeJa4,
+  signupDecide,
+} from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
 import { getDomain } from 'tldts';
@@ -828,7 +832,8 @@ export async function createOrUpdateUser(
     return failureResult('ADMISSION_REQUIRED');
   }
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
-  if (!IS_DEVELOPMENT && !options.skipSignupAdmission) {
+  // A preview or staging deployment calls no Bouncer, so it admits signups as development does.
+  if (!IS_DEVELOPMENT && bouncerEnabledForDeployment() && !options.skipSignupAdmission) {
     // Subdomains of one registrable domain share Bouncer's domain counter.
     const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
     const verdict = bouncerIp
@@ -1743,7 +1748,6 @@ export async function anonymizeCloudUserData(
   await tx.execute(sql`
      UPDATE coding_plan_key_inventory
      SET status = 'revocation_pending',
-         encrypted_api_key = NULL,
          encrypted_api_key_envelope = NULL,
          assigned_to_user_id = NULL,
          revocation_requested_at = now(),

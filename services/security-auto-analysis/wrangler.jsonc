@@ -20,6 +20,9 @@
       "persist": true,
       "invocation_logs": false,
     },
+    // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts).
+    "traces": { "enabled": false },
   },
   "logpush": true,
   "version_metadata": {
@@ -35,6 +38,11 @@
   "vars": {
     "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the lifecycle push to
+    // `/api/internal/security-agent/notifications` sends `INTERNAL_API_SECRET` as
+    // `X-Internal-Secret`. `"sts"` sends a `web:security-notifications.lifecycle` STS service token
+    // over the `STS` binding instead; set it only once the Worker has that binding, STS grants the
+    // scope and the route accepts STS. Removing it is the rollback.
     "SESSION_INGEST_WORKER_URL": "https://ingest.kilosessions.ai",
     "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
     "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "https://app.kilo.ai",
@@ -46,6 +54,10 @@
     "SECURITY_AGENT_COMMAND_RUNNING_TIMEOUT_MS": "1800000",
     "SECURITY_AGENT_COMMAND_RETENTION_DAYS": "30",
     "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "triggers": {
     "crons": ["* * * * *"],
@@ -139,6 +151,16 @@
       "service": "git-token-service",
       "entrypoint": "GitTokenRPCEntrypoint",
     },
+    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+    // security-auto-analysis.yaml grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
+    // NEXTAUTH_SECRET. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "security-auto-analysis" },
+    },
   ],
   "secrets_store_secrets": [
     {
@@ -160,10 +182,17 @@
   "env": {
     "dev": {
       "name": "security-auto-analysis-dev",
+      "routes": [],
       "workers_dev": false,
+      "preview_urls": false,
+      "triggers": {
+        "crons": [],
+      },
       "vars": {
         "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
+        // The local app accepts only the secret.
+        "WEB_INTERNAL_AUTH": "legacy",
         "SESSION_INGEST_WORKER_URL": "http://localhost:8800",
         "SECURITY_ANALYSIS_CALLBACK_ROUTING_MODE": "worker",
         "SECURITY_ANALYSIS_CALLBACK_WEB_BASE_URL": "http://localhost:3000",
@@ -178,7 +207,7 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

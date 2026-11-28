@@ -2,13 +2,17 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import {
   UTS_ENDPOINTS,
+  UTS_FEED_READER_ENTRYPOINT,
+  UTS_FEED_READS_ENTRYPOINT,
+  UTS_MINT_DEPLOYMENTS,
   UTS_SIGNER_KEYS_ENTRYPOINT,
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
-import { FEED_DEPLOYMENTS, MINT_DEPLOYMENTS } from '../../src/env';
+import { FEED_DEPLOYMENTS } from '../../src/env';
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -29,11 +33,32 @@ const UTS_CONFIGS = new Set([
   FEED_TEST_CONFIG,
 ]);
 
-/** Every UTS Durable Object class and the configs that alone may bind it. */
+/** The one name each test config deploys as, in the Workers test pool only. */
+const TEST_CONFIG_NAMES: ReadonlyMap<string, string> = new Map([
+  [MINT_TEST_CONFIG, 'uts-test'],
+  [FEED_TEST_CONFIG, 'uts-feed-test'],
+]);
+
+/**
+ * Every UTS Durable Object class and the configs that alone may bind it. Only the mint Worker
+ * binds the feed objects, so only it writes feed entries; the feed Worker reads them through the
+ * mint Worker's `FeedReads` entrypoint (design 5.7).
+ */
 export const UTS_DURABLE_OBJECT_CLASSES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['UtsSignerDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
   ['UtsKeySetDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsFeedDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsAuditRelayDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
+  ['UtsManagerAuthDO', new Set([MINT_CONFIG, MINT_DEV_CONFIG, MINT_TEST_CONFIG])],
 ]);
+
+/** The mint Worker entrypoints the feed Worker binds, each once per block. */
+export const MINT_ENTRYPOINTS: readonly string[] = [
+  UTS_SIGNER_KEYS_ENTRYPOINT,
+  UTS_FEED_READS_ENTRYPOINT,
+];
+
+const FEED_DEPLOYMENT_NAMES = new Set(Object.values(FEED_DEPLOYMENTS));
 
 /** The placement region of the identity store's primary (Frankfurt). */
 export const MINT_PLACEMENT_REGION = 'aws:eu-central-1';
@@ -59,6 +84,33 @@ const WRANGLER_ENVIRONMENTS: ReadonlyMap<string | null, UtsEnvironment> = new Ma
   ['local', 'development'],
 ]);
 
+/** The UTS audit queue of each environment; only the mint Worker of that environment sends to it. */
+const UTS_AUDIT_QUEUES: Readonly<Record<UtsEnvironment, string>> = {
+  production: 'kilo-audit-uts',
+  staging: 'kilo-audit-uts-staging',
+  development: 'kilo-audit-uts-local',
+};
+
+/**
+ * The identity store's three Hyperdrive configs in each deployed environment (README "Deploys"):
+ * the primary, the PAT lookup config and the read replica. A deployed block binds exactly these,
+ * never a local connection string.
+ */
+export const IDENTITY_STORE_HYPERDRIVE: Readonly<
+  Record<'production' | 'staging', Readonly<Record<string, string>>>
+> = {
+  production: {
+    IDENTITY_STORE: '314ea5eee7314e09b59728ff5453e9d9',
+    IDENTITY_STORE_PAT: 'f041609cd77043d7b81bdd9265f46cec',
+    IDENTITY_STORE_REPLICA: '4194e3ece2b442e381ec6d82f9bc0dcf',
+  },
+  staging: {
+    IDENTITY_STORE: '5dd523ea0fa447ebaf442a0300d8f848',
+    IDENTITY_STORE_PAT: '48227f1c669742618bb7bc6adf9a416c',
+    IDENTITY_STORE_REPLICA: '5fa4d303a52e4274a9750b20e2f507f0',
+  },
+};
+
 // Prefix match, wider than the deployment lists on purpose: a name that only looks like UTS
 // fails here instead of slipping past an exact-name list.
 const isUtsName = (name: string) => name === 'uts' || name.startsWith('uts-');
@@ -79,6 +131,7 @@ const ServiceBindingSchema = z.looseObject({
   environment: z.string().optional(),
   props: z.record(z.string(), z.unknown()).optional(),
 });
+type ServiceBinding = z.infer<typeof ServiceBindingSchema>;
 
 const ScriptReferenceSchema = z.looseObject({ script_name: z.string().optional() });
 const ServiceReferenceSchema = z.looseObject({ service: z.string() });
@@ -95,6 +148,20 @@ const RouteSchema = z.union([
 const BindingsShape = {
   vars: z.record(z.string(), z.unknown()).optional(),
   services: z.array(ServiceBindingSchema).optional(),
+  hyperdrive: z
+    .array(
+      z.looseObject({
+        binding: z.string(),
+        id: z.string(),
+        localConnectionString: z.string().optional(),
+      })
+    )
+    .optional(),
+  queues: z
+    .looseObject({
+      producers: z.array(z.looseObject({ binding: z.string(), queue: z.string() })).optional(),
+    })
+    .optional(),
   durable_objects: z
     .looseObject({
       bindings: z.array(
@@ -113,7 +180,12 @@ const BindingsShape = {
     .array(z.looseObject({ outbound: ServiceReferenceSchema.optional() }))
     .optional(),
   observability: z
-    .looseObject({ traces: z.looseObject({ enabled: z.boolean().optional() }).optional() })
+    .looseObject({
+      head_sampling_rate: z.number().optional(),
+      logs: z.looseObject({ head_sampling_rate: z.number().optional() }).optional(),
+      traces: z.looseObject({ enabled: z.boolean().optional() }).optional(),
+      redact_query_string: z.boolean().optional(),
+    })
     .optional(),
 };
 
@@ -121,6 +193,8 @@ const EnvironmentSchema = z.looseObject({
   ...BindingsShape,
   name: z.string().optional(),
   main: z.string().optional(),
+  compatibility_date: z.string().optional(),
+  compatibility_flags: z.array(z.string()).optional(),
   build: z.looseObject({ command: z.string().optional() }).optional(),
   workers_dev: z.boolean().optional(),
   route: RouteSchema.optional(),
@@ -287,55 +361,85 @@ function durableObjectProblems(path: string, block: Block): string[] {
 }
 
 /**
- * The `SignerKeys` entrypoint answers one caller per environment: the feed Worker, whose binding
- * names the mint deployment of its own environment at that named entrypoint and carries its own
- * deployed name as `props.caller`. The mint Worker's test config binds itself. Nothing else binds
- * the mint Worker, at any entrypoint.
+ * The `SignerKeys` and `FeedReads` entrypoints answer one caller per environment: the feed
+ * Worker, whose bindings name the mint deployment of its own environment at those named
+ * entrypoints and carry its own deployed name as `props.caller`. The mint Worker's test config
+ * binds itself. Nothing else binds the mint Worker, at any entrypoint.
  */
-function serviceBindingProblems(path: string, block: Block): string[] {
+function mintBindingProblems(path: string, block: Block, binding: ServiceBinding): string[] {
+  const where = `${block.where}: ${binding.binding}`;
+  if (path === MINT_TEST_CONFIG && binding.service === block.deployedName) return [];
+  if (path !== FEED_CONFIG) {
+    return [`${where} binds the UTS mint Worker ${binding.service}; only the feed Worker may`];
+  }
+  if (block.preview) return [`${where} binds ${binding.service}; a preview runs unreviewed code`];
+  const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+  if (environment === undefined) return [`${where}: env.${block.env} is not a UTS environment`];
   const problems: string[] = [];
-  for (const binding of block.bindings.services ?? []) {
-    const where = `${block.where}: ${binding.binding}`;
-    if (!isMintName(binding.service)) continue;
-    if (path === MINT_TEST_CONFIG && binding.service === block.deployedName) continue;
-    if (path !== FEED_CONFIG) {
-      problems.push(
-        `${where} binds the UTS mint Worker ${binding.service}; only the feed Worker may`
-      );
-      continue;
-    }
-    if (block.preview) {
-      problems.push(`${where} binds ${binding.service}; a preview runs unreviewed code`);
-      continue;
-    }
-    const environment = WRANGLER_ENVIRONMENTS.get(block.env);
-    if (environment === undefined) {
-      problems.push(`${where}: env.${block.env} is not a UTS environment`);
-      continue;
-    }
-    if (binding.service !== MINT_DEPLOYMENTS[environment]) {
-      problems.push(
-        `${where} binds ${binding.service}; this block must bind ${MINT_DEPLOYMENTS[environment]}`
-      );
-    }
-    if (binding.entrypoint !== UTS_SIGNER_KEYS_ENTRYPOINT) {
-      problems.push(
-        `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${UTS_SIGNER_KEYS_ENTRYPOINT}`
-      );
-    }
-    if (binding.environment !== undefined) {
-      problems.push(
-        `${where} names service environment ${binding.environment}; bind the deployed name`
-      );
-    }
-    const caller = binding.props?.caller;
-    if (caller !== block.deployedName || caller !== FEED_DEPLOYMENTS[environment]) {
-      problems.push(
-        `${where} sets props.caller ${JSON.stringify(caller)}; expected ${FEED_DEPLOYMENTS[environment]}, the block's own deployed name`
-      );
-    }
+  if (binding.service !== UTS_MINT_DEPLOYMENTS[environment]) {
+    problems.push(
+      `${where} binds ${binding.service}; this block must bind ${UTS_MINT_DEPLOYMENTS[environment]}`
+    );
+  }
+  if (binding.entrypoint === undefined || !MINT_ENTRYPOINTS.includes(binding.entrypoint)) {
+    problems.push(
+      `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${MINT_ENTRYPOINTS.join(' or ')}`
+    );
+  }
+  if (binding.environment !== undefined) {
+    problems.push(
+      `${where} names service environment ${binding.environment}; bind the deployed name`
+    );
+  }
+  const caller = binding.props?.caller;
+  if (caller !== block.deployedName || caller !== FEED_DEPLOYMENTS[environment]) {
+    problems.push(
+      `${where} sets props.caller ${JSON.stringify(caller)}; expected ${FEED_DEPLOYMENTS[environment]}, the block's own deployed name`
+    );
   }
   return problems;
+}
+
+/**
+ * A Worker verifier reads the revocation feed through the feed Worker's `FeedReader` entrypoint,
+ * bound by a feed deployment's name with its own deployed name as `props.caller`, so no reader
+ * poses as another (design 5.6). The feed Worker's test config binds itself; the UTS Workers do
+ * not read the feed this way, and no preview does.
+ */
+function feedReaderProblems(path: string, block: Block, binding: ServiceBinding): string[] {
+  const where = `${block.where}: ${binding.binding}`;
+  if (path === FEED_TEST_CONFIG && binding.service === block.deployedName) return [];
+  if (UTS_CONFIGS.has(path)) return [`${where} binds the feed Worker; a UTS Worker does not`];
+  if (block.preview) return [`${where} binds ${binding.service}; a preview runs unreviewed code`];
+  const problems: string[] = [];
+  if (!FEED_DEPLOYMENT_NAMES.has(binding.service)) {
+    problems.push(`${where} binds ${binding.service}, which is not a feed Worker deployment`);
+  }
+  if (binding.entrypoint !== UTS_FEED_READER_ENTRYPOINT) {
+    problems.push(
+      `${where} binds entrypoint ${binding.entrypoint ?? '(default)'}; bind ${UTS_FEED_READER_ENTRYPOINT}`
+    );
+  }
+  if (binding.environment !== undefined) {
+    problems.push(
+      `${where} names service environment ${binding.environment}; bind the deployed name`
+    );
+  }
+  const caller = binding.props?.caller;
+  if (block.deployedName === undefined || caller !== block.deployedName) {
+    problems.push(
+      `${where} sets props.caller ${JSON.stringify(caller)}; expected the block's own deployed name`
+    );
+  }
+  return problems;
+}
+
+function serviceBindingProblems(path: string, block: Block): string[] {
+  return (block.bindings.services ?? []).flatMap(binding => {
+    if (isFeedName(binding.service)) return feedReaderProblems(path, block, binding);
+    if (isMintName(binding.service)) return mintBindingProblems(path, block, binding);
+    return [];
+  });
 }
 
 function routeProblems(path: string, block: Block): string[] {
@@ -410,12 +514,49 @@ function expectedDeployments(
     .join(', ');
 }
 
+/** A mint block produces only to its own environment's UTS audit queue. */
+function auditQueueProblems(
+  where: string,
+  bindings: Bindings,
+  environment: UtsEnvironment
+): string[] {
+  const produced = (bindings.queues?.producers ?? [])
+    .map(producer => `${producer.binding}=${producer.queue}`)
+    .join(', ');
+  const expected = `AUDIT_QUEUE=${UTS_AUDIT_QUEUES[environment]}`;
+  return produced === expected
+    ? []
+    : [`${where}: produces to ${produced || 'nothing'}; expected ${expected}`];
+}
+
+function hyperdriveProblems(
+  where: string,
+  bindings: Bindings,
+  environment: 'production' | 'staging'
+): string[] {
+  const bound = (bindings.hyperdrive ?? [])
+    .map(config =>
+      config.localConnectionString === undefined
+        ? `${config.binding}=${config.id}`
+        : `${config.binding}=${config.id} with a local connection string`
+    )
+    .sort()
+    .join(', ');
+  const expected = Object.entries(IDENTITY_STORE_HYPERDRIVE[environment])
+    .map(([binding, id]) => `${binding}=${id}`)
+    .sort()
+    .join(', ');
+  return bound === expected
+    ? []
+    : [`${where}: binds Hyperdrive ${bound || 'nothing'}; expected ${expected}`];
+}
+
 /** Problems with the development config; `utsConfigProblems` lists its rules. */
 function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
   const problems: string[] = [];
   const deployed = deployments(dev);
-  const expected = expectedDeployments(MINT_DEPLOYMENTS, ['development']);
+  const expected = expectedDeployments(UTS_MINT_DEPLOYMENTS, ['development']);
   if (deployed !== expected) {
     problems.push(`${MINT_DEV_CONFIG} deploys ${deployed}; expected ${expected}`);
   }
@@ -431,17 +572,131 @@ function devConfigProblems(dev: WorkerConfig): string[] {
   if (config.route !== undefined || (config.routes ?? []).length > 0) {
     problems.push(`${MINT_DEV_CONFIG}: the development config has no routes`);
   }
+  problems.push(...auditQueueProblems(MINT_DEV_CONFIG, config, 'development'));
   return problems;
 }
 
 /**
+ * The feed Worker's HTTPS switch and STS issuer in one block: `FEED_HTTPS_ENABLED` is absent (off)
+ * or exactly `true`, and `STS_URL`, when set, is the STS issuer of the block's own environment, so
+ * a deployed block can never accept another environment's service tokens. A loopback stand-in is
+ * set only on the command line of a local run, never here.
+ */
+function feedHttpsProblems(block: Block): string[] {
+  const problems: string[] = [];
+  const vars = block.bindings.vars ?? {};
+  const enabled = vars.FEED_HTTPS_ENABLED;
+  if (enabled !== undefined && enabled !== 'true') {
+    problems.push(
+      `${block.where}: FEED_HTTPS_ENABLED is ${JSON.stringify(enabled)}; it is exactly "true" or absent (off)`
+    );
+  }
+  const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+  if (
+    vars.STS_URL !== undefined &&
+    (environment === undefined || vars.STS_URL !== STS_ISSUERS[environment])
+  ) {
+    problems.push(
+      `${block.where}: STS_URL is ${JSON.stringify(vars.STS_URL)}; it must be the STS issuer of ${String(environment)}`
+    );
+  }
+  return problems;
+}
+
+/**
+ * The home-widget exchange's switch in one mint block: `HOME_WIDGET_GRANT_ENABLED` is absent (off)
+ * or exactly `true`, and production keeps it off until the widget moves to UTS (phase 4).
+ */
+function homeWidgetSwitchProblems(block: Block, environment: UtsEnvironment | undefined): string[] {
+  const enabled = block.bindings.vars?.HOME_WIDGET_GRANT_ENABLED;
+  if (enabled === undefined) return [];
+  if (enabled !== 'true') {
+    return [
+      `${block.where}: HOME_WIDGET_GRANT_ENABLED is ${JSON.stringify(enabled)}; it is exactly "true" or absent (off)`,
+    ];
+  }
+  return environment === 'production'
+    ? [`${block.where}: HOME_WIDGET_GRANT_ENABLED stays off in production`]
+    : [];
+}
+
+/**
+ * The configs that run the jose verification path: every mint Worker config, and the feed
+ * Worker's, which verifies STS tokens for its HTTPS feed (`@kilocode/verify`). The rule below
+ * covers only these: asserted repo-wide it would fail Workers that reach jose through a package
+ * with an older date, such as services/ai-attribution, which is not this rule's subject.
+ */
+const JOSE_CONFIGS: ReadonlySet<string> = new Set([
+  MINT_CONFIG,
+  MINT_DEV_CONFIG,
+  MINT_TEST_CONFIG,
+  FEED_CONFIG,
+  FEED_TEST_CONFIG,
+]);
+
+/**
+ * The first compatibility date that carries workerd's fix for jose's verification path: jose's
+ * `verifyCompact` returns a promise it does not await, so a verification error is briefly
+ * unhandled and workerd reported it as a duplicate unhandled rejection although the caller caught
+ * it (panva/jose#892). The flag below is the default from this date on.
+ */
+export const JOSE_UNHANDLED_REJECTION_DATE = '2026-03-03';
+
+/** The flag that fixes that report; workerd refuses it at or above `JOSE_UNHANDLED_REJECTION_DATE`. */
+export const JOSE_UNHANDLED_REJECTION_FLAG = 'unhandled_rejection_after_microtask_checkpoint';
+
+/**
+ * A jose-verifying config lists the flag exactly when its date is before the fix, so the Worker
+ * behaves the same whether or not the date carries it: before `JOSE_UNHANDLED_REJECTION_DATE` the
+ * flag is what keeps a caught verification failure from surfacing as an unhandled rejection, and
+ * from that date on the flag is the default, listed or not, and workerd refuses an explicit listing.
+ * Dates and flags are inherited from the top level, as Wrangler inherits them into an env block.
+ */
+function joseCompatibilityProblems({ path, config }: WorkerConfig): string[] {
+  const problems: string[] = [];
+  for (const block of blocksOf({ path, config })) {
+    const date = block.block?.compatibility_date ?? config.compatibility_date;
+    const flags = block.block?.compatibility_flags ?? config.compatibility_flags ?? [];
+    const listed = flags.includes(JOSE_UNHANDLED_REJECTION_FLAG);
+    if (date === undefined) {
+      problems.push(
+        `${block.where}: compatibility_date resolves to undefined; set one, so the ${JOSE_UNHANDLED_REJECTION_FLAG} rule for jose's verification errors applies (panva/jose#892)`
+      );
+    } else if (date < JOSE_UNHANDLED_REJECTION_DATE) {
+      if (!listed) {
+        problems.push(
+          `${block.where}: compatibility_date ${date} is before ${JOSE_UNHANDLED_REJECTION_DATE}, so compatibility_flags must list ${JOSE_UNHANDLED_REJECTION_FLAG} (panva/jose#892)`
+        );
+      }
+    } else if (listed) {
+      problems.push(
+        `${block.where}: compatibility_date ${date} is ${JOSE_UNHANDLED_REJECTION_DATE} or later, where ${JOSE_UNHANDLED_REJECTION_FLAG} is the default and workerd refuses the listing; drop it (panva/jose#892)`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * The largest head sample of the feed Worker's logs: each HTTPS feed read is one invocation, so the
+ * approved log budget allows 1 to 5 percent of them.
+ */
+export const FEED_MAX_LOG_SAMPLING_RATE = 0.05;
+
+/**
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
- * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer objects hold
- * private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps the signer and
- * key-set shard objects in the `eu` jurisdiction, and places its fetch handler next to the
- * identity store; the development config is one block that runs the development entry under the
- * development name, unrouted, behind the build command that fails every command but `dev`; the
- * feed Worker runs without placement and binds no Durable Object.
+ * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
+ * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
+ * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store, and
+ * keeps query strings (a provider callback's authorization code) out of its logs, and offers the
+ * home-widget exchange only with `HOME_WIDGET_GRANT_ENABLED` exactly `true`, never in production;
+ * the development config is one block that runs the development entry under the development name,
+ * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
+ * without placement, binds no Durable Object, binds each mint entrypoint once, keeps at most a
+ * `FEED_MAX_LOG_SAMPLING_RATE` head sample of its logs, and turns its HTTPS feed on only with
+ * `FEED_HTTPS_ENABLED` exactly `true` and the STS issuer of its own environment; and every
+ * jose-verifying config lists `unhandled_rejection_after_microtask_checkpoint` exactly when its
+ * compatibility date is before 2026-03-03, the date the flag became workerd's default (jose#892).
  */
 export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   const problems: string[] = [];
@@ -452,6 +707,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
       problems.push(`${path} is missing`);
       continue;
     }
+    if (JOSE_CONFIGS.has(path)) problems.push(...joseCompatibilityProblems(worker));
     for (const block of blocksOf(worker)) {
       if (block.tracesEnabled !== false) {
         problems.push(
@@ -463,10 +719,19 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
   }
   const mint = byPath.get(MINT_CONFIG);
   if (mint !== undefined) {
-    const expected = expectedDeployments(MINT_DEPLOYMENTS, ['production', 'staging']);
+    const expected = expectedDeployments(UTS_MINT_DEPLOYMENTS, ['production', 'staging']);
     if (deployments(mint) !== expected)
       problems.push(`${MINT_CONFIG} deploys ${deployments(mint)}; expected ${expected}`);
     for (const block of blocksOf(mint)) {
+      const environment = WRANGLER_ENVIRONMENTS.get(block.env);
+      // Each block produces only to its own environment's UTS audit queue, the one queue whose
+      // batches the audit relay reads as UTS streams (services/audit-relay/src/relay).
+      if (environment !== undefined && !block.preview) {
+        problems.push(...auditQueueProblems(block.where, block.bindings, environment));
+        if (environment === 'production' || environment === 'staging') {
+          problems.push(...hyperdriveProblems(block.where, block.bindings, environment));
+        }
+      }
       const main = block.block?.main ?? mint.config.main;
       if (main !== MINT_DEPLOYED_ENTRY) {
         problems.push(
@@ -481,6 +746,15 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
           `${block.where}: placement.region resolves to ${String(block.placementRegion)}; expected ${MINT_PLACEMENT_REGION}`
         );
       }
+      // A provider callback's query carries its authorization code; no log may keep it.
+      const redacted = (block.block?.observability ?? mint.config.observability)
+        ?.redact_query_string;
+      if (redacted !== true) {
+        problems.push(
+          `${block.where}: observability.redact_query_string resolves to ${String(redacted)}; it must be true`
+        );
+      }
+      problems.push(...homeWidgetSwitchProblems(block, environment));
     }
   }
   const dev = byPath.get(MINT_DEV_CONFIG);
@@ -499,17 +773,43 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
         problems.push(`${block.where}: the feed Worker runs without placement`);
       }
       if ((block.bindings.durable_objects?.bindings ?? []).length > 0) {
-        problems.push(`${block.where}: the feed Worker binds no Durable Object yet`);
+        problems.push(`${block.where}: the feed Worker binds no Durable Object`);
       }
-      const signerKeys = (block.bindings.services ?? []).filter(binding =>
-        isMintName(binding.service)
-      );
-      if (signerKeys.length !== 1) {
+      if ((block.bindings.queues?.producers ?? []).length > 0) {
+        problems.push(`${block.where}: the feed Worker produces to no queue`);
+      }
+      const mintEntrypoints = (block.bindings.services ?? [])
+        .filter(binding => isMintName(binding.service))
+        .map(binding => binding.entrypoint ?? '(default)')
+        .sort();
+      if (mintEntrypoints.join(',') !== [...MINT_ENTRYPOINTS].sort().join(',')) {
         problems.push(
-          `${block.where}: binds the mint Worker ${signerKeys.length} times; expected once`
+          `${block.where}: binds the mint Worker at ${mintEntrypoints.join(', ') || 'no entrypoint'}; expected ${MINT_ENTRYPOINTS.join(' and ')} once each`
         );
       }
+      // Cloudflare samples logs at `logs.head_sampling_rate`, else the observability-wide rate,
+      // else keeps every invocation.
+      const observability = block.block?.observability ?? feed.config.observability;
+      const logRate =
+        observability?.logs?.head_sampling_rate ?? observability?.head_sampling_rate ?? 1;
+      if (logRate > FEED_MAX_LOG_SAMPLING_RATE) {
+        problems.push(
+          `${block.where}: observability.logs.head_sampling_rate resolves to ${logRate}; the feed Worker keeps at most ${FEED_MAX_LOG_SAMPLING_RATE} of its invocation logs`
+        );
+      }
+      problems.push(...feedHttpsProblems(block));
     }
+  }
+  // The test configs run only in the Workers test pool; each deploys only its own name, so neither
+  // can take a deployed UTS name and the rights (an audit queue producer) granted to that name.
+  for (const [path, name] of TEST_CONFIG_NAMES) {
+    const worker = byPath.get(path);
+    if (worker === undefined) continue;
+    const names = blocksOf(worker)
+      .map(block => String(block.deployedName))
+      .sort()
+      .join(', ');
+    if (names !== name) problems.push(`${path} deploys ${names}; expected only ${name}`);
   }
   return problems;
 }

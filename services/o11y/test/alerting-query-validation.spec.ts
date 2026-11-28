@@ -9,12 +9,13 @@ import {
 import { registerAlertingConfigRoutes } from '../src/alerting/config-routes';
 import type { AeQueryEnv } from '../src/alerting/query';
 import type { Env } from '../src/index';
+import { stsBundle } from './sts-bundle-fixture';
 
 function makeAeEnv(): AeQueryEnv {
   return {
     O11Y_CF_ACCOUNT_ID: 'test-account-id',
-    O11Y_CF_AE_API_TOKEN: { get: async () => 'test-ae-token' },
-  } as unknown as AeQueryEnv;
+    STS: stsBundle({ O11Y_CF_AE_API_TOKEN: 'test-ae-token' }),
+  };
 }
 
 let lastSqlBody = '';
@@ -104,11 +105,11 @@ describe('baseline route validation', () => {
 
   function makeRouteEnv(): Env {
     return {
-      O11Y_KILO_GATEWAY_CLIENT_SECRET: {
-        get: async () => 'test-admin-token',
-      },
       O11Y_CF_ACCOUNT_ID: 'test-account-id',
-      O11Y_CF_AE_API_TOKEN: { get: async () => 'test-ae-token' },
+      STS: stsBundle({
+        O11Y_KILO_GATEWAY_CLIENT_SECRET: 'test-admin-token',
+        O11Y_CF_AE_API_TOKEN: 'test-ae-token',
+      }),
     } as unknown as Env;
   }
 

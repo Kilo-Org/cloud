@@ -1,7 +1,8 @@
-import type { UtsEnvironment } from '@kilocode/uts-contracts';
+import type { UtsEnvironment, UtsOrgRole } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import type { IdentityStore } from '../db/client';
-import { CLIENT_KINDS } from '../db/enums';
+import { CLIENT_KINDS, ORG_ROLES } from '../db/enums';
+import { type FeedEntry, StatementFeedEntriesSchema } from '../revocation/entries';
 
 /**
  * The OAuth grant statements (migration `0004_oauth_grants.sql`). Each call is one SQL statement:
@@ -25,6 +26,8 @@ export type IssueCodeInput = {
   codeHash: Uint8Array;
   client:
     | { kind: 'first_party'; clientId: string; dpopJkt: Uint8Array }
+    /** The web BFF: no DPoP key; `browserSessionId` names the session it will hold a handle to. */
+    | { kind: 'confidential_web'; clientId: string }
     | { kind: 'third_party'; clientId: string; consentId: string };
   accountId: string;
   browserSessionId: string | null;
@@ -37,7 +40,15 @@ export type IssueCodeInput = {
   authTime: Date;
   amr: readonly string[];
 };
-export type IssueCodeResult = 'issued' | 'access_denied' | 'consent_required';
+
+/**
+ * `orgRole`: the caller's role in `orgId` (`uts.org_role`), null without an organization.
+ * `invalid_scope`: a requested scope is limited to membership roles the caller does not hold
+ * (`uts.scope_org_roles`); nothing was stored.
+ */
+export type IssueCodeResult =
+  | { outcome: 'issued'; orgRole: UtsOrgRole | null }
+  | { outcome: 'access_denied' | 'consent_required' | 'invalid_scope' };
 
 /** `scopes` and `resources` null mean "not named in the request". */
 type TokenSelection = { scopes: readonly string[] | null; resources: readonly string[] | null };
@@ -86,6 +97,11 @@ export type ThirdPartyRefreshInput = TokenSelection & {
 export type Minted = {
   subjectId: string;
   orgId: string | null;
+  /**
+   * The subject's membership role in `orgId`, read by the mint statement (migration 0005); null
+   * without an organization and for a third-party refresh, which reads no role.
+   */
+  orgRole: UtsOrgRole | null;
   authTime: Date;
   amr: string[];
   /** One `jti` per token, in the order of `scopes`. */
@@ -95,19 +111,27 @@ export type Minted = {
 
 type SelectionFailure = 'invalid_grant' | 'invalid_scope' | 'invalid_target';
 
-/** `dpop_replay`: the proof's `jti` was recorded under its key before. */
+/**
+ * `dpop_replay`: the proof's `jti` was recorded under its key before. A failed exchange carries
+ * the feed entries its statement wrote: a second use of a code revokes the grant the code created.
+ */
 export type ExchangeResult =
   | ({ outcome: 'issued'; refreshExpiresAt: Date } & Minted)
-  | { outcome: SelectionFailure | 'dpop_replay' };
+  | { outcome: SelectionFailure | 'dpop_replay'; feedEntries: FeedEntry[] };
 export type FirstPartyRefreshResult =
   | ({ outcome: 'issued' } & Minted)
   | { outcome: SelectionFailure | 'dpop_mismatch' | 'dpop_replay' };
+/** A failed third-party refresh carries the feed entries of a family that reuse revoked. */
 export type ThirdPartyRefreshResult =
   | ({ outcome: 'issued'; familyId: string; refreshExpiresAt: Date } & Minted)
-  | { outcome: SelectionFailure | 'reuse_detected' };
+  | { outcome: SelectionFailure | 'reuse_detected'; feedEntries: FeedEntry[] };
 
 export type RevokeInput = { environment: UtsEnvironment; tokenHash: Uint8Array; clientId: string };
-export type RevokeResult = 'revoked' | 'already_revoked' | 'unknown' | 'client_mismatch';
+/** The outcome and the feed entries the statement wrote, which the caller publishes. */
+export type RevokeResult = {
+  outcome: 'revoked' | 'already_revoked' | 'unknown' | 'client_mismatch';
+  feedEntries: FeedEntry[];
+};
 
 export type IntrospectInput = {
   tokenHash: Uint8Array;
@@ -127,16 +151,69 @@ export type IntrospectResult =
   | ({ outcome: 'active' } & ActiveRefreshToken)
   | { outcome: 'inactive' | 'dpop_replay' };
 
-export type ThirdPartyClientRecord = { clientId: string; name: string; redirectUris: string[] };
+/**
+ * The store step of the RFC 8693 broker exchange (migration 0012), after the Worker verified the
+ * caller and the subject token. `grantId` is the subject token's `sid`: a consent family for a
+ * third-party client, a refresh grant for a first-party one.
+ */
+export type DelegatedExchangeInput = {
+  environment: UtsEnvironment;
+  clientKind: (typeof CLIENT_KINDS)[number];
+  accountId: string;
+  clientId: string;
+  grantId: string;
+  orgId: string | null;
+  subjectScope: string;
+  subjectIssuedAt: Date;
+  subjectTokenId: string;
+  subjectKid: string;
+  scope: string;
+  /** The calling workload: `act.sub` and `req` of the new token. */
+  actor: string;
+  lifetimeSeconds: number;
+};
+
+/** `issued` names the one token the caller signs; nothing else was written but the audit row. */
+export type DelegatedExchangeResult =
+  | { outcome: 'issued'; tokenId: string }
+  | { outcome: 'invalid_grant' | 'invalid_scope' };
+
+/**
+ * The store step of the home-widget exchange (migration 0024), after the Worker verified the DPoP
+ * proof and the form. `parentTokenHash` and `parentGrantId` name the mobile app's grant;
+ * `widgetGrantId` and `widgetTokenHash` the new widget grant; `orgId` the organization the
+ * request names, null when it names none.
+ */
+export type HomeWidgetExchangeInput = {
+  environment: UtsEnvironment;
+  parentTokenHash: Uint8Array;
+  parentGrantId: string;
+  clientId: string;
+  proof: ProofBinding;
+  widgetGrantId: string;
+  widgetTokenHash: Uint8Array;
+  scope: string;
+  orgId: string | null;
+};
+
+/**
+ * `issued` carries the feed entry of the widget grant it replaced (empty when there was none),
+ * which the caller publishes. No other outcome wrote anything but at most one denied audit row.
+ */
+export type HomeWidgetExchangeResult =
+  | ({ outcome: 'issued'; refreshExpiresAt: Date; feedEntries: FeedEntry[] } & Minted)
+  | { outcome: 'invalid_grant' | 'invalid_scope' | 'dpop_mismatch' | 'dpop_replay' | 'org_denied' }
+  | { outcome: 'rate_limited'; retryAfterSeconds: number };
 
 export type GrantStore = {
-  findThirdPartyClient(clientId: string): Promise<ThirdPartyClientRecord | null>;
   issueCode(input: IssueCodeInput): Promise<IssueCodeResult>;
   exchangeCode(input: ExchangeCodeInput): Promise<ExchangeResult>;
   refreshFirstParty(input: FirstPartyRefreshInput): Promise<FirstPartyRefreshResult>;
   refreshThirdParty(input: ThirdPartyRefreshInput): Promise<ThirdPartyRefreshResult>;
   revoke(input: RevokeInput): Promise<RevokeResult>;
   introspect(input: IntrospectInput): Promise<IntrospectResult>;
+  exchangeDelegated(input: DelegatedExchangeInput): Promise<DelegatedExchangeResult>;
+  exchangeHomeWidget(input: HomeWidgetExchangeInput): Promise<HomeWidgetExchangeResult>;
 };
 
 /** Runs `work` with the grant store of one request's identity-store connection. */
@@ -153,10 +230,16 @@ const MintedColumns = {
   token_scopes: z.array(z.string()).min(1),
 };
 
-function minted(row: z.output<z.ZodObject<typeof MintedColumns>>): Minted {
+const OrgRoleColumn = { org_role: z.enum(ORG_ROLES).nullable() };
+
+function minted(
+  row: z.output<z.ZodObject<typeof MintedColumns>>,
+  orgRole: UtsOrgRole | null
+): Minted {
   return {
     subjectId: row.subject_id,
     orgId: row.bound_org_id,
+    orgRole,
     authTime: row.signed_in_at,
     amr: row.sign_in_methods,
     tokenIds: row.token_ids,
@@ -167,17 +250,36 @@ function minted(row: z.output<z.ZodObject<typeof MintedColumns>>): Minted {
 const failure = <const Outcomes extends readonly [string, ...string[]]>(outcomes: Outcomes) =>
   z.object({ outcome: z.enum(outcomes) });
 
-const IssueCodeRowSchema = z.object({
-  outcome: z.enum(['issued', 'access_denied', 'consent_required']),
-});
+/** A failure row of a statement that can revoke: it carries the entries the statement wrote. */
+const revokingFailure = <const Outcomes extends readonly [string, ...string[]]>(
+  outcomes: Outcomes
+) => z.object({ outcome: z.enum(outcomes), feed_entries: StatementFeedEntriesSchema });
+
+/**
+ * The select list of a grant function that can revoke: its row, and for any outcome but `issued`
+ * the feed entries the statement wrote (`uts.feed_entries_of_statement()`, migration 0006). The
+ * CASE leaves the issued path, the hot one, without the extra probe.
+ */
+const WITH_FEED_ENTRIES = `result.*, CASE WHEN result.outcome = 'issued' THEN '[]'::jsonb
+  ELSE uts.feed_entries_of_statement() END AS feed_entries`;
+
+const IssueCodeRowSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('issued'), ...OrgRoleColumn }),
+  failure(['access_denied', 'consent_required', 'invalid_scope']),
+]);
 
 const ExchangeRowSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('issued'), ...MintedColumns, refresh_expires_at: z.date() }),
-  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_replay']),
+  z.object({
+    outcome: z.literal('issued'),
+    ...MintedColumns,
+    ...OrgRoleColumn,
+    refresh_expires_at: z.date(),
+  }),
+  revokingFailure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_replay']),
 ]);
 
 const FirstPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('issued'), ...MintedColumns }),
+  z.object({ outcome: z.literal('issued'), ...MintedColumns, ...OrgRoleColumn }),
   failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'dpop_mismatch', 'dpop_replay']),
 ]);
 
@@ -188,11 +290,12 @@ const ThirdPartyRefreshRowSchema = z.discriminatedUnion('outcome', [
     family_id: z.uuid(),
     refresh_expires_at: z.date(),
   }),
-  failure(['invalid_grant', 'invalid_scope', 'invalid_target', 'reuse_detected']),
+  revokingFailure(['invalid_grant', 'invalid_scope', 'invalid_target', 'reuse_detected']),
 ]);
 
 const RevokeRowSchema = z.object({
   outcome: z.enum(['revoked', 'already_revoked', 'unknown', 'client_mismatch']),
+  feed_entries: StatementFeedEntriesSchema,
 });
 
 const IntrospectRowSchema = z.discriminatedUnion('outcome', [
@@ -208,10 +311,29 @@ const IntrospectRowSchema = z.discriminatedUnion('outcome', [
   failure(['inactive', 'dpop_replay']),
 ]);
 
-const ThirdPartyClientRowSchema = z.object({
-  client_name: z.string(),
-  redirect_uris: z.array(z.string()),
-});
+const DelegatedExchangeRowSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('issued'), token_id: z.uuid() }),
+  failure(['invalid_grant', 'invalid_scope']),
+]);
+
+/**
+ * The home-widget exchange's row: an `issued` row selects the feed entries its statement wrote
+ * (the replaced widget grant's); no other outcome revokes anything.
+ */
+const HomeWidgetExchangeRowSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('issued'),
+    ...MintedColumns,
+    ...OrgRoleColumn,
+    refresh_expires_at: z.date(),
+    feed_entries: StatementFeedEntriesSchema,
+  }),
+  z.object({
+    outcome: z.literal('rate_limited'),
+    retry_after_seconds: z.number().int().positive(),
+  }),
+  failure(['invalid_grant', 'invalid_scope', 'dpop_mismatch', 'dpop_replay', 'org_denied']),
+]);
 
 /** Every grant statement over one identity-store connection. */
 export function identityStoreGrants(store: IdentityStore): GrantStore {
@@ -226,20 +348,6 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
   }
 
   return {
-    async findThirdPartyClient(clientId) {
-      const row = await store.maybeOne(
-        {
-          text: `SELECT client_name, redirect_uris FROM uts.third_party_clients
-                 WHERE client_id = $1 AND status = 'active'`,
-          values: [clientId],
-        },
-        ThirdPartyClientRowSchema
-      );
-      return row === null
-        ? null
-        : { clientId, name: row.client_name, redirectUris: row.redirect_uris };
-    },
-
     async issueCode(input) {
       const row = await one(
         'SELECT * FROM uts.issue_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
@@ -247,7 +355,8 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
           input.environment,
           input.codeHash,
           input.client.clientId,
-          input.client.kind,
+          // `uts.client_kind` has no web kind: the web BFF is a first-party client.
+          input.client.kind === 'third_party' ? 'third_party' : 'first_party',
           input.accountId,
           input.browserSessionId,
           input.redirectUri,
@@ -262,14 +371,16 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ],
         IssueCodeRowSchema
       );
-      return row.outcome;
+      return row.outcome === 'issued'
+        ? { outcome: 'issued', orgRole: row.org_role }
+        : { outcome: row.outcome };
     },
 
     async exchangeCode(input) {
       const firstParty = input.binding.kind === 'first_party' ? input.binding : null;
       const device = firstParty?.device ?? null;
       const row = await one(
-        'SELECT * FROM uts.exchange_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.exchange_authorization_code($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) AS result`,
         [
           input.environment,
           input.codeHash,
@@ -292,8 +403,12 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ],
         ExchangeRowSchema
       );
-      if (row.outcome !== 'issued') return { outcome: row.outcome };
-      return { outcome: 'issued', refreshExpiresAt: row.refresh_expires_at, ...minted(row) };
+      if (row.outcome !== 'issued') return { outcome: row.outcome, feedEntries: row.feed_entries };
+      return {
+        outcome: 'issued',
+        refreshExpiresAt: row.refresh_expires_at,
+        ...minted(row, row.org_role),
+      };
     },
 
     async refreshFirstParty(input) {
@@ -312,12 +427,12 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         FirstPartyRefreshRowSchema
       );
       if (row.outcome !== 'issued') return { outcome: row.outcome };
-      return { outcome: 'issued', ...minted(row) };
+      return { outcome: 'issued', ...minted(row, row.org_role) };
     },
 
     async refreshThirdParty(input) {
       const row = await one(
-        'SELECT * FROM uts.refresh_third_party($1, $2, $3, $4, $5, $6)',
+        `SELECT ${WITH_FEED_ENTRIES} FROM uts.refresh_third_party($1, $2, $3, $4, $5, $6) AS result`,
         [
           input.environment,
           input.tokenHash,
@@ -328,22 +443,25 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         ],
         ThirdPartyRefreshRowSchema
       );
-      if (row.outcome !== 'issued') return { outcome: row.outcome };
+      if (row.outcome !== 'issued') return { outcome: row.outcome, feedEntries: row.feed_entries };
       return {
         outcome: 'issued',
         familyId: row.family_id,
         refreshExpiresAt: row.refresh_expires_at,
-        ...minted(row),
+        ...minted(row, null),
       };
     },
 
     async revoke(input) {
       const row = await one(
-        'SELECT * FROM uts.revoke_refresh_token($1, $2, $3)',
+        `SELECT result.*, CASE result.outcome
+           WHEN 'already_revoked' THEN uts.live_feed_entries_of_refresh_token($2, $3)
+           ELSE uts.feed_entries_of_statement() END AS feed_entries
+         FROM uts.revoke_refresh_token($1, $2, $3) AS result`,
         [input.environment, input.tokenHash, input.clientId],
         RevokeRowSchema
       );
-      return row.outcome;
+      return { outcome: row.outcome, feedEntries: row.feed_entries };
     },
 
     async introspect(input) {
@@ -361,6 +479,63 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
         scopes: row.granted_scopes,
         issuedAt: row.issued_at,
         expiresAt: row.expires_at,
+      };
+    },
+
+    async exchangeDelegated(input) {
+      const row = await one(
+        `SELECT * FROM uts.exchange_delegated_token(
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          input.environment,
+          input.clientKind,
+          input.accountId,
+          input.clientId,
+          input.grantId,
+          input.orgId,
+          input.subjectScope,
+          input.subjectIssuedAt,
+          input.subjectTokenId,
+          input.subjectKid,
+          input.scope,
+          input.actor,
+          input.lifetimeSeconds,
+        ],
+        DelegatedExchangeRowSchema
+      );
+      return row.outcome === 'issued'
+        ? { outcome: 'issued', tokenId: row.token_id }
+        : { outcome: row.outcome };
+    },
+
+    async exchangeHomeWidget(input) {
+      const row = await one(
+        `SELECT result.*, CASE WHEN result.outcome = 'issued'
+           THEN uts.feed_entries_of_statement() ELSE '[]'::jsonb END AS feed_entries
+         FROM uts.exchange_home_widget_grant($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) AS result`,
+        [
+          input.environment,
+          input.parentTokenHash,
+          input.parentGrantId,
+          input.clientId,
+          input.proof.jkt,
+          input.proof.jti,
+          input.widgetGrantId,
+          input.widgetTokenHash,
+          input.scope,
+          input.orgId,
+        ],
+        HomeWidgetExchangeRowSchema
+      );
+      if (row.outcome === 'rate_limited') {
+        return { outcome: 'rate_limited', retryAfterSeconds: row.retry_after_seconds };
+      }
+      if (row.outcome !== 'issued') return { outcome: row.outcome };
+      return {
+        outcome: 'issued',
+        refreshExpiresAt: row.refresh_expires_at,
+        feedEntries: row.feed_entries,
+        ...minted(row, row.org_role),
       };
     },
   };

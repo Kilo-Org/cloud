@@ -54,6 +54,7 @@ import {
 } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
+import { requestContext } from './secrets';
 import { getRoutingTable } from './routing-table';
 import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
@@ -888,7 +889,8 @@ async function decideCustomRouter(
         c.env,
         promise => c.executionCtx.waitUntil(promise),
         routing,
-        payload.input.requestedModel
+        payload.input.requestedModel,
+        requestContext(c)
       )
     );
     return c.json({ ...run.response, decision: customRouterDecision(routing, run) });

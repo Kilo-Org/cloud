@@ -6,6 +6,8 @@ import {
   type LeaseRequest,
   type LeaseResult,
   type LeaseRevokeResult,
+  type GithubRunAttestationRequest,
+  type GithubRunAttestationResult,
   type MintRequest,
   type MintResult,
 } from '@kilocode/sts-contracts';
@@ -19,6 +21,7 @@ import type { GithubRun } from './identity/verify';
 import { recordLeaseDenial, serveLease, serveLeaseRevoke, type LeaseCaller } from './leases/serve';
 import { policyIndex } from './policy';
 import type { PolicyIndex } from './policy/load';
+import { serveAttestGithubRun } from './migration/attest';
 import { callWithDeadline } from './rpc';
 import { defaultMintAuthority, serveMint, type MintAuthority } from './tokens/mint';
 
@@ -99,6 +102,21 @@ export class SecretsBroker extends WorkerEntrypoint<Env, SecretsBrokerProps> {
     if (entry.status === 'denied') return entry;
     const { config, caller } = entry;
     return await serveLeaseRevoke(this.env, config, { caller, request: { leaseId }, waitUntil });
+  }
+
+  /**
+   * Attests a GitHub job's migration run for the migration proxy (README "Migration run
+   * attestation"): only the props caller `migration-proxy` is served. The token must carry
+   * `MIGRATION_PROXY_AUDIENCE` and match a policy with the `migration-run` grant.
+   */
+  async attestGithubRun(request: GithubRunAttestationRequest): Promise<GithubRunAttestationResult> {
+    const props = CallerPropsSchema.safeParse(this.ctx.props);
+    return await serveAttestGithubRun(this.env, readConfig(this.env), {
+      caller: props.success ? props.data.caller : null,
+      request,
+      policies: (this.constructor as typeof SecretsBroker).mintAuthority.policies,
+      waitUntil: promise => this.ctx.waitUntil(promise),
+    });
   }
 }
 

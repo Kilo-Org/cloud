@@ -1,6 +1,7 @@
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import {
   UsageRecordRequestSchema,
+  toUsageRecordWireBody,
   type EnkryptUsageQueueMessage,
   type ExaUsageQueueMessage,
   type LlmUsageQueueMessage,
@@ -29,6 +30,7 @@ export type Env = Omit<
   | 'USAGE_INGEST_HEDGE_DELAY_MS'
   | 'USAGE_INGEST_HEDGE_PERCENT'
   | 'USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED'
+  | 'USAGE_WRITER_AUTH'
   // `StsEnv` (sts.ts) types the STS binding and vars, `StsCanaryEnv` (sts-canary.ts) the canary's.
   | 'STS'
   | 'STS_CANARY_ENABLED'
@@ -147,15 +149,16 @@ async function handlePublishUsage(
     return errorResponse('Invalid usage payload', 400);
   }
 
+  // The queued body, with the retired metadata keys, so a rolled-back consumer still accepts it.
+  const usage = toUsageRecordWireBody(result.data);
   try {
-    if (new TextEncoder().encode(JSON.stringify(result.data)).byteLength > MAX_USAGE_BYTES) {
+    if (new TextEncoder().encode(JSON.stringify(usage)).byteLength > MAX_USAGE_BYTES) {
       return errorResponse('Usage payload too large', 413);
     }
   } catch {
     return errorResponse('Usage payload too large', 413);
   }
 
-  const usage = result.data;
   if (
     hedgeMode(env.USAGE_INGEST_HEDGE_MODE) === 'on' &&
     hedgeEligible(usage.core.id, hedgePercent(env.USAGE_INGEST_HEDGE_PERCENT))

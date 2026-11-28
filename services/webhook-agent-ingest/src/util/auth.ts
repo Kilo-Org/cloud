@@ -8,10 +8,16 @@
 
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
-import { getSecretValue } from './secret';
+import { expectedSecret, secretUnavailableResponse } from '../secrets';
+import { compareSecretsOnce } from '../secrets-compare';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -37,7 +43,8 @@ export function validateInternalApiKey(
 
 /**
  * Hono middleware for authenticating internal API requests.
- * Validates X-Internal-API-Key header against INTERNAL_API_SECRET.
+ * Validates X-Internal-API-Key header against INTERNAL_API_SECRET from the source that
+ * `SECRETS_SOURCE` selects (src/secrets.ts).
  * Does NOT set user context - routes extract userId/orgId from URL path.
  */
 export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, next) => {
@@ -52,15 +59,23 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
     return next();
   }
 
-  const apiKeyHeader = c.req.header(INTERNAL_API_KEY_HEADER);
-  const secret = await getSecretValue(c.env.INTERNAL_API_SECRET);
+  const apiKeyHeader = c.req.header(INTERNAL_API_KEY_HEADER) ?? null;
+  const expected = await expectedSecret(c.env, 'INTERNAL_API_SECRET', apiKeyHeader);
+  if (expected.status === 'refused') {
+    return secretUnavailableResponse('internal-api', expected.reason);
+  }
 
-  if (!secret) {
+  if (expected.status === 'read' && !expected.secret) {
     logger.error('INTERNAL_API_SECRET not configured');
     return c.json(resError('Internal server error'), 500);
   }
 
-  const result = validateInternalApiKey(apiKeyHeader ?? null, secret);
+  // A keyless request under `sts` read no secret; validation refuses it as missing before any
+  // comparison.
+  const result = validateInternalApiKey(
+    apiKeyHeader,
+    expected.status === 'read' ? expected.secret : ''
+  );
 
   if (!result.success) {
     logger.warn('Internal API authentication failed', { error: result.error });
@@ -68,6 +83,15 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
   }
 
   logger.info('Internal API request authenticated');
+  observeInternalAuth(
+    'webhook-agent-ingest',
+    'api',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  // Pre-flip STS copy check, off unless enabled (src/secrets-compare.ts). It runs in the
+  // background and never changes this answer.
+  compareSecretsOnce(c.env, () => c.executionCtx);
 
   await next();
 });

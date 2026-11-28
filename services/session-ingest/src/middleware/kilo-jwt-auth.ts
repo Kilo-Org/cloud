@@ -13,6 +13,8 @@ import {
 import { decodeJwt } from 'jose';
 
 import type { Env } from '../env';
+import { readSessionIngestSecret } from '../secrets';
+import { requestContext } from '../request-context';
 import { resolveConnectionTicket } from '../dos/connection-ticket';
 
 export type KiloJwtAuthVariables = {
@@ -21,9 +23,25 @@ export type KiloJwtAuthVariables = {
 };
 
 const SESSION_LEAF_DELETE_PATH = /^\/api\/session\/[^/]+$/;
+const CLI_WEBSOCKET_PATH = '/api/user/cli';
+const WEB_WEBSOCKET_PATH = '/api/user/web';
 
 function isSessionLeafDelete(method: string, path: string): boolean {
   return method === 'DELETE' && SESSION_LEAF_DELETE_PATH.test(path);
+}
+
+// The CLI client (kilocode packages/opencode/src/kilo-sessions/remote-ws.ts)
+// treats close codes 4401, 4403 and 4409 as permanent, but an HTTP status before
+// the upgrade only reaches it as an abnormal close (1006), which it retries
+// forever with backoff capped at 60 s. A websocket that fails authentication is
+// therefore accepted and immediately closed with 4401 so a stale token stops
+// retrying.
+function rejectCliWebsocket(reason: 'missing-token' | 'invalid-token'): Response {
+  console.warn('cli websocket rejected', { reason });
+  const pair = new WebSocketPair();
+  pair[1].accept();
+  pair[1].close(4401, 'unauthorized');
+  return new Response(null, { status: 101, webSocket: pair[0] });
 }
 
 export const kiloJwtAuthMiddleware = createMiddleware<{
@@ -34,7 +52,8 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   // opaque ticket minted by POST /api/user/web-ticket. This branch runs before
   // the JWT path so a missing ticket is not mistaken for a missing JWT, and so
   // the Authorization header / ?token= query are never read on this path.
-  if (c.req.header('Upgrade') === 'websocket' && c.req.path === '/api/user/web') {
+  const websocketUpgrade = c.req.header('Upgrade') === 'websocket';
+  if (websocketUpgrade && c.req.path === WEB_WEBSOCKET_PATH) {
     const ticket = c.req.query('ticket');
     if (!ticket) {
       return c.json({ success: false, error: 'Missing or invalid ticket' }, 401);
@@ -51,20 +70,26 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   let token = extractBearerToken(c.req.header('Authorization'));
-  if (!token && c.req.header('Upgrade') === 'websocket') {
+  if (!token && websocketUpgrade) {
     token = c.req.query('token') ?? null;
   }
 
+  const cliWebsocketUpgrade =
+    websocketUpgrade && c.req.method === 'GET' && c.req.path === CLI_WEBSOCKET_PATH;
+
   if (!token) {
+    if (cliWebsocketUpgrade) return rejectCliWebsocket('missing-token');
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }
+
+  const ctx = requestContext(c);
 
   let auth;
   let deletionAudience = false;
   try {
     const deletionAuth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
       token,
-      nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+      nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
       connectionString: c.env.HYPERDRIVE.connectionString,
       audience: SESSION_INGEST_USER_DELETION_AUDIENCE,
       allowBlocked: true,
@@ -81,7 +106,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     } else {
       auth = await verifyKiloBearerOrInternalAssertionAgainstCurrentPepper({
         token,
-        nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
+        nextAuthSecret: { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
         connectionString: c.env.HYPERDRIVE.connectionString,
         resourceAudience: { audience: SESSION_INGEST_AUDIENCE, mode: 'allow-legacy' },
       });
@@ -98,6 +123,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   if (!auth) {
+    if (cliWebsocketUpgrade) return rejectCliWebsocket('invalid-token');
     return c.json({ success: false, error: 'Invalid or expired token' }, 401);
   }
 
@@ -107,7 +133,10 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   if (runtimeAuthorization.success) {
     let attested: boolean;
     try {
-      const secret = await getCachedSecret(c.env.NEXTAUTH_SECRET_PROD, 'NEXTAUTH_SECRET');
+      const secret = await getCachedSecret(
+        { get: () => readSessionIngestSecret(c.env, 'NEXTAUTH_SECRET', ctx) },
+        'NEXTAUTH_SECRET'
+      );
       attested = await verifyRuntimeProxyAttestation({
         value: c.req.header(RUNTIME_PROXY_ATTESTATION_HEADER),
         secret,

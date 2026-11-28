@@ -43,11 +43,13 @@ function stubFetch() {
 }
 
 /**
- * An env whose legacy secret can come from either source; `reads` records every Secrets Store
- * read and `bundleCalls` every STS bundle call, so a test can prove the secret was not read.
+ * An env bound to both secret sources; `reads` records every Secrets Store read and `bundleCalls`
+ * every STS bundle call, so a test can prove which one the legacy check used.
+ * `sinkWrites` records every API-metrics write to Analytics Engine and the pipeline.
  */
 function makeEnv(vars: Record<string, string | undefined>) {
   const reads: string[] = [];
+  const sinkWrites: string[] = [];
   let bundleCalls = 0;
   const bundle: BundleResult = {
     status: 'ok',
@@ -66,6 +68,16 @@ function makeEnv(vars: Record<string, string | undefined>) {
         return LEGACY_SECRET;
       },
     },
+    O11Y_API_METRICS: {
+      writeDataPoint() {
+        sinkWrites.push('analytics-engine');
+      },
+    },
+    API_METRICS_STREAM: {
+      async send() {
+        sinkWrites.push('pipeline');
+      },
+    },
     STS: {
       async getBundle() {
         bundleCalls += 1;
@@ -74,7 +86,7 @@ function makeEnv(vars: Record<string, string | undefined>) {
     },
     ...vars,
   } as unknown as Env;
-  return { env, reads, bundleCalls: () => bundleCalls };
+  return { env, reads, sinkWrites, bundleCalls: () => bundleCalls };
 }
 
 /** Routes behind a fresh guard, so no key set carries over between tests. */
@@ -148,22 +160,21 @@ describe('the admin route contract', () => {
 });
 
 describe.each([undefined, 'legacy-only'])('mode %s (the default)', mode => {
-  it.each(['secrets-store', 'sts'])(
-    'accepts the shared secret from %s and makes no key-set fetch',
-    async source => {
-      const fetches = stubFetch();
-      const { env } = makeEnv({ ADMIN_CREDENTIAL_ACCEPT: mode, SECRETS_SOURCE: source });
-      const response = await call(app(), 'apiMetricsWrite', env, {
-        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
-      });
-      expect(response.status).toBe(204);
-      expect(fetches).toEqual([]);
-    }
-  );
+  it('accepts the shared secret from the bundle and makes no key-set fetch', async () => {
+    const fetches = stubFetch();
+    const { env, reads, bundleCalls } = makeEnv({ ADMIN_CREDENTIAL_ACCEPT: mode });
+    const response = await call(app(), 'apiMetricsWrite', env, {
+      'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+    });
+    expect(response.status).toBe(204);
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(1);
+    expect(fetches).toEqual([]);
+  });
 
   it('ignores an STS bearer: the legacy check decides, with no key-set fetch', async () => {
     const fetches = stubFetch();
-    const { env, reads } = makeEnv({
+    const { env, reads, bundleCalls } = makeEnv({
       ADMIN_CREDENTIAL_ACCEPT: mode,
       STS_ENVIRONMENT: 'production',
     });
@@ -172,7 +183,8 @@ describe.each([undefined, 'legacy-only'])('mode %s (the default)', mode => {
     });
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ success: false, error: 'Unauthorized' });
-    expect(reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(1);
     expect(fetches).toEqual([]);
   });
 
@@ -362,7 +374,7 @@ describe.each(['legacy-and-sts', 'sts-only'])('mode %s', mode => {
 describe('the shared secret header without a bearer', () => {
   it('runs the legacy check in legacy-and-sts', async () => {
     const fetches = stubFetch();
-    const { env, reads } = makeEnv({
+    const { env, reads, bundleCalls } = makeEnv({
       ADMIN_CREDENTIAL_ACCEPT: 'legacy-and-sts',
       STS_ENVIRONMENT: 'production',
     });
@@ -370,7 +382,8 @@ describe('the shared secret header without a bearer', () => {
       'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
     });
     expect(response.status).toBe(200);
-    expect(reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(1);
     expect(fetches).toEqual([]);
   });
 
@@ -412,6 +425,30 @@ describe('GET /.well-known/oauth-protected-resource on the Worker', () => {
     ['an unknown mode', { ADMIN_CREDENTIAL_ACCEPT: 'sts', STS_ENVIRONMENT: 'production' }],
     ['an STS mode without STS_ENVIRONMENT', { ADMIN_CREDENTIAL_ACCEPT: 'sts-only' }],
     ['an STS mode in staging', { ADMIN_CREDENTIAL_ACCEPT: 'sts-only', STS_ENVIRONMENT: 'staging' }],
+    [
+      'the api-metrics override without STS_ENVIRONMENT',
+      { API_METRICS_CREDENTIAL_ACCEPT: 'sts-only' },
+    ],
+    [
+      'the api-metrics override in staging',
+      { API_METRICS_CREDENTIAL_ACCEPT: 'sts-only', STS_ENVIRONMENT: 'staging' },
+    ],
+    [
+      'the api-metrics override disabled',
+      { API_METRICS_CREDENTIAL_ACCEPT: 'disabled', STS_ENVIRONMENT: 'production' },
+    ],
+    [
+      'an unknown api-metrics override',
+      { API_METRICS_CREDENTIAL_ACCEPT: 'sts', STS_ENVIRONMENT: 'production' },
+    ],
+    [
+      'an unknown mode under a valid api-metrics override',
+      {
+        ADMIN_CREDENTIAL_ACCEPT: 'sts',
+        API_METRICS_CREDENTIAL_ACCEPT: 'sts-only',
+        STS_ENVIRONMENT: 'production',
+      },
+    ],
   ])('answers the ordinary 404 when %s', async (_label, vars) => {
     const fetches = stubFetch();
     const metadata = await get(METADATA_URL, vars);
@@ -454,4 +491,395 @@ describe('GET /.well-known/oauth-protected-resource on the Worker', () => {
       );
     }
   );
+
+  it.each([
+    [
+      'api-metrics sts-only, alerting unset',
+      { API_METRICS_CREDENTIAL_ACCEPT: 'sts-only' },
+      ['o11y:api-metrics.write'],
+    ],
+    [
+      'api-metrics legacy-and-sts, alerting legacy-only',
+      { ADMIN_CREDENTIAL_ACCEPT: 'legacy-only', API_METRICS_CREDENTIAL_ACCEPT: 'legacy-and-sts' },
+      ['o11y:api-metrics.write'],
+    ],
+    [
+      'api-metrics rolled back to legacy-only, alerting sts-only',
+      { ADMIN_CREDENTIAL_ACCEPT: 'sts-only', API_METRICS_CREDENTIAL_ACCEPT: 'legacy-only' },
+      ['o11y:alerting.read', 'o11y:alerting.write'],
+    ],
+    [
+      'an unknown api-metrics override, alerting sts-only',
+      { ADMIN_CREDENTIAL_ACCEPT: 'sts-only', API_METRICS_CREDENTIAL_ACCEPT: 'sts' },
+      ['o11y:alerting.read', 'o11y:alerting.write'],
+    ],
+    [
+      'an empty api-metrics override, alerting sts-only',
+      { ADMIN_CREDENTIAL_ACCEPT: 'sts-only', API_METRICS_CREDENTIAL_ACCEPT: '' },
+      ['o11y:api-metrics.write', 'o11y:alerting.read', 'o11y:alerting.write'],
+    ],
+  ])('lists only the scopes of routes that admit STS: %s', async (_label, modes, scopes) => {
+    const fetches = stubFetch();
+    const { response, reads, bundleCalls } = await get(METADATA_URL, {
+      ...modes,
+      STS_ENVIRONMENT: 'production',
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      resource: 'https://o11y.kiloapps.io',
+      authorization_servers: [STS_ISSUERS.production],
+      bearer_methods_supported: ['header'],
+      scopes_supported: scopes,
+    });
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(0);
+    expect(fetches).toEqual([]);
+  });
+});
+
+const METRICS_SCOPE = ADMIN_ROUTES.apiMetricsWrite.scope;
+
+/** The STS refusal lines logged so far; each names the route family, status and rule only. */
+function refusals(warn: { mock: { calls: unknown[][] } }): unknown[] {
+  return warn.mock.calls
+    .map(([line]) => String(line))
+    .filter(line => line.includes('"o11y_admin_sts_refused"'))
+    .map(line => {
+      const decoded: unknown = JSON.parse(line);
+      return decoded;
+    });
+}
+
+describe('API_METRICS_CREDENTIAL_ACCEPT, the api-metrics write alone', () => {
+  it.each([
+    [undefined, 'legacy-only', 204],
+    ['', undefined, 204],
+    ['', 'sts-only', 401],
+  ])(
+    'an override of %j follows ADMIN_CREDENTIAL_ACCEPT %j on the shared secret',
+    async (override, mode, status) => {
+      stubFetch();
+      const { env } = makeEnv({
+        ADMIN_CREDENTIAL_ACCEPT: mode,
+        API_METRICS_CREDENTIAL_ACCEPT: override,
+        STS_ENVIRONMENT: 'production',
+      });
+      const response = await call(app(), 'apiMetricsWrite', env, {
+        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+      });
+      expect(response.status).toBe(status);
+    }
+  );
+
+  it.each(['sts', 'STS-ONLY', 'legacy-or-sts', ' sts-only'])(
+    'answers 500 on the api-metrics write for the unknown override %j and leaves alerting alone',
+    async override => {
+      const fetches = stubFetch();
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { env, reads, bundleCalls } = makeEnv({
+        API_METRICS_CREDENTIAL_ACCEPT: override,
+        STS_ENVIRONMENT: 'production',
+      });
+      const hono = app();
+      const legacy = await call(hono, 'apiMetricsWrite', env, {
+        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+      });
+      const sts = await call(hono, 'apiMetricsWrite', env, {
+        Authorization: `Bearer ${await token({}, 'ai-gateway', METRICS_SCOPE)}`,
+      });
+      expect([legacy.status, sts.status]).toEqual([500, 500]);
+      expect(await legacy.json()).toEqual({ error: 'server_misconfigured' });
+      const logged = error.mock.calls.map(([line]) => {
+        const decoded: unknown = JSON.parse(String(line));
+        return decoded;
+      });
+      expect(logged).toEqual([
+        { event: 'o11y_admin_auth_misconfigured', reason: 'api_metrics_accept_mode' },
+        { event: 'o11y_admin_auth_misconfigured', reason: 'api_metrics_accept_mode' },
+      ]);
+      expect(reads).toEqual([]);
+      expect(bundleCalls()).toBe(0);
+      expect(fetches).toEqual([]);
+
+      const alerting = await call(hono, 'alertingRead', env, {
+        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+      });
+      expect(alerting.status).toBe(200);
+      expect(reads).toEqual([]);
+      expect(bundleCalls()).toBe(1);
+    }
+  );
+
+  it('answers 500 for an unknown ADMIN_CREDENTIAL_ACCEPT despite a valid override', async () => {
+    const fetches = stubFetch();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { env, reads } = makeEnv({
+      ADMIN_CREDENTIAL_ACCEPT: 'sts',
+      API_METRICS_CREDENTIAL_ACCEPT: 'sts-only',
+      STS_ENVIRONMENT: 'production',
+    });
+    const response = await call(app(), 'apiMetricsWrite', env, {
+      Authorization: `Bearer ${await token({}, 'ai-gateway', METRICS_SCOPE)}`,
+    });
+    expect(response.status).toBe(500);
+    const logged = error.mock.calls.map(([line]) => {
+      const decoded: unknown = JSON.parse(String(line));
+      return decoded;
+    });
+    expect(logged).toEqual([{ event: 'o11y_admin_auth_misconfigured', reason: 'accept_mode' }]);
+    expect(reads).toEqual([]);
+    expect(fetches).toEqual([]);
+  });
+
+  describe('sts-only for the api-metrics write while alerting stays legacy-only', () => {
+    const vars = { API_METRICS_CREDENTIAL_ACCEPT: 'sts-only', STS_ENVIRONMENT: 'production' };
+
+    it.each(['ai-gateway', 'web'])(
+      'accepts the api-metrics token from %s without reading the shared secret',
+      async workload => {
+        const fetches = stubFetch();
+        const { env, reads, bundleCalls } = makeEnv(vars);
+        const response = await call(app(), 'apiMetricsWrite', env, {
+          Authorization: `Bearer ${await token({}, workload, METRICS_SCOPE)}`,
+        });
+        expect(response.status).toBe(204);
+        expect(reads).toEqual([]);
+        expect(bundleCalls()).toBe(0);
+        expect(fetches).toEqual([JWKS_URL]);
+      }
+    );
+
+    it.each([
+      ['an alerting.read token from web', 'web', ADMIN_ROUTES.alertingRead.scope, 'scope_mismatch'],
+      [
+        'an alerting.write token from web',
+        'web',
+        ADMIN_ROUTES.alertingWrite.scope,
+        'scope_mismatch',
+      ],
+      [
+        'the metrics scope from usage-ingest',
+        'usage-ingest',
+        METRICS_SCOPE,
+        'workload_not_allowed',
+      ],
+      ['the metrics scope from o11y itself', 'o11y', METRICS_SCOPE, 'workload_not_allowed'],
+    ])(
+      'refuses %s with 403 and never reads the shared secret',
+      async (_label, workload, scope, reason) => {
+        stubFetch();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const { env, reads, bundleCalls } = makeEnv(vars);
+        const response = await call(app(), 'apiMetricsWrite', env, {
+          Authorization: `Bearer ${await token({}, workload, scope)}`,
+        });
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({ error: 'insufficient_scope' });
+        expect(response.headers.get('www-authenticate')).toContain(`scope="${METRICS_SCOPE}"`);
+        expect(refusals(warn)).toEqual([
+          { event: 'o11y_admin_sts_refused', route: 'apiMetricsWrite', status: 403, reason },
+        ]);
+        expect(reads).toEqual([]);
+        expect(bundleCalls()).toBe(0);
+      }
+    );
+
+    it('refuses a staging token: STS_ENVIRONMENT pins the issuer and env claim', async () => {
+      stubFetch();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { env, reads } = makeEnv(vars);
+      const bearer = await token(
+        { env: 'staging', iss: STS_ISSUERS.staging },
+        'ai-gateway',
+        METRICS_SCOPE
+      );
+      const response = await call(app(), 'apiMetricsWrite', env, {
+        Authorization: `Bearer ${bearer}`,
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ error: 'invalid_token' });
+      expect(reads).toEqual([]);
+    });
+
+    it('answers the shared secret alone with the bare challenge, never reading it', async () => {
+      const fetches = stubFetch();
+      const { env, reads, bundleCalls } = makeEnv(vars);
+      const response = await call(app(), 'apiMetricsWrite', env, {
+        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+      });
+      expect(response.status).toBe(401);
+      expect(response.headers.get('www-authenticate')).toBe(
+        'Bearer resource_metadata="https://o11y.kiloapps.io/.well-known/oauth-protected-resource"'
+      );
+      expect(reads).toEqual([]);
+      expect(bundleCalls()).toBe(0);
+      expect(fetches).toEqual([]);
+    });
+
+    it('refuses both credentials together without reading the secret', async () => {
+      stubFetch();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { env, reads } = makeEnv(vars);
+      const response = await call(app(), 'apiMetricsWrite', env, {
+        Authorization: `Bearer ${await token({}, 'ai-gateway', METRICS_SCOPE)}`,
+        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+      });
+      expect(response.status).toBe(400);
+      expect(reads).toEqual([]);
+    });
+
+    it('keeps the alerting routes on the shared secret, ignoring an STS bearer', async () => {
+      const fetches = stubFetch();
+      const { env, reads, bundleCalls } = makeEnv(vars);
+      const hono = app();
+      const read = await call(hono, 'alertingRead', env, { 'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET });
+      const write = await call(hono, 'alertingWrite', env, { 'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET });
+      const bearer = await call(hono, 'alertingRead', env, {
+        Authorization: `Bearer ${await token()}`,
+      });
+      expect([read.status, write.status, bearer.status]).toEqual([200, 200, 401]);
+      expect(await bearer.json()).toEqual({ success: false, error: 'Unauthorized' });
+      expect(reads).toEqual([]);
+      expect(bundleCalls()).toBe(1);
+      expect(fetches).toEqual([]);
+    });
+
+    it.each([undefined, 'staging'])(
+      'answers 500 on the api-metrics write alone when STS_ENVIRONMENT is %j',
+      async environment => {
+        const fetches = stubFetch();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { env, reads } = makeEnv({ ...vars, STS_ENVIRONMENT: environment });
+        const hono = app();
+        const legacy = await call(hono, 'apiMetricsWrite', env, {
+          'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+        });
+        const sts = await call(hono, 'apiMetricsWrite', env, {
+          Authorization: `Bearer ${await token({}, 'ai-gateway', METRICS_SCOPE)}`,
+        });
+        expect([legacy.status, sts.status]).toEqual([500, 500]);
+        expect(reads).toEqual([]);
+        expect(fetches).toEqual([]);
+        const alerting = await call(hono, 'alertingRead', env, {
+          'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+        });
+        expect(alerting.status).toBe(200);
+      }
+    );
+  });
+
+  it('legacy-and-sts admits both credentials on the api-metrics write alone', async () => {
+    const fetches = stubFetch();
+    const vars = { API_METRICS_CREDENTIAL_ACCEPT: 'legacy-and-sts', STS_ENVIRONMENT: 'production' };
+    const hono = app();
+    const legacyEnv = makeEnv(vars);
+    const legacy = await call(hono, 'apiMetricsWrite', legacyEnv.env, {
+      'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+    });
+    const stsEnv = makeEnv(vars);
+    const sts = await call(hono, 'apiMetricsWrite', stsEnv.env, {
+      Authorization: `Bearer ${await token({}, 'ai-gateway', METRICS_SCOPE)}`,
+    });
+    const alertingEnv = makeEnv(vars);
+    const alerting = await call(hono, 'alertingRead', alertingEnv.env, {
+      Authorization: `Bearer ${await token()}`,
+    });
+    expect([legacy.status, sts.status, alerting.status]).toEqual([204, 204, 401]);
+    expect(legacyEnv.reads).toEqual([]);
+    expect(legacyEnv.bundleCalls()).toBe(1);
+    expect(stsEnv.reads).toEqual([]);
+    expect(stsEnv.bundleCalls()).toBe(0);
+    expect(alertingEnv.reads).toEqual([]);
+    expect(alertingEnv.bundleCalls()).toBe(1);
+    expect(fetches).toEqual([JWKS_URL]);
+  });
+
+  it('legacy-only rolls the api-metrics write back while alerting stays sts-only', async () => {
+    stubFetch();
+    const vars = {
+      ADMIN_CREDENTIAL_ACCEPT: 'sts-only',
+      API_METRICS_CREDENTIAL_ACCEPT: 'legacy-only',
+      STS_ENVIRONMENT: 'production',
+    };
+    const hono = app();
+    const metricsEnv = makeEnv(vars);
+    const metrics = await call(hono, 'apiMetricsWrite', metricsEnv.env, {
+      'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+    });
+    const alertingEnv = makeEnv(vars);
+    const alerting = await call(hono, 'alertingRead', alertingEnv.env, {
+      'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+    });
+    expect([metrics.status, alerting.status]).toEqual([204, 401]);
+    expect(metricsEnv.reads).toEqual([]);
+    expect(metricsEnv.bundleCalls()).toBe(1);
+    expect(alertingEnv.reads).toEqual([]);
+    expect(alertingEnv.bundleCalls()).toBe(0);
+  });
+});
+
+describe('POST /ingest/api-metrics on the Worker with the api-metrics write sts-only', () => {
+  const vars = { API_METRICS_CREDENTIAL_ACCEPT: 'sts-only', STS_ENVIRONMENT: 'production' };
+  const body = {
+    kiloUserId: 'user_123',
+    isAnonymous: false,
+    isStreaming: true,
+    userByok: false,
+    provider: 'openai',
+    requestedModel: 'kilo-auto/frontier',
+    resolvedModel: 'anthropic/claude-sonnet-4.5',
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs: 45,
+    completeRequestMs: 123,
+    statusCode: 200,
+  };
+
+  /** The deployed route: its own `requireAdmin` guard, validator and sink writes. */
+  async function ingest(headers: Record<string, string>) {
+    const { env, reads, sinkWrites, bundleCalls } = makeEnv(vars);
+    const response = await new Worker(createExecutionContext(), env).fetch(
+      new Request('https://o11y.kiloapps.io/ingest/api-metrics', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+      })
+    );
+    return { response, reads, sinkWrites, bundleCalls };
+  }
+
+  it('writes the metric for an api-metrics token from the gateway', async () => {
+    stubFetch();
+    const result = await ingest({
+      Authorization: `Bearer ${await token({}, 'ai-gateway', METRICS_SCOPE)}`,
+    });
+    expect(result.response.status).toBe(204);
+    expect(result.sinkWrites).toEqual(['analytics-engine', 'pipeline']);
+    expect(result.reads).toEqual([]);
+    expect(result.bundleCalls()).toBe(0);
+  });
+
+  it.each([
+    ['an alerting.write token from web', 'web', ADMIN_ROUTES.alertingWrite.scope, 'scope_mismatch'],
+    ['the metrics scope from usage-ingest', 'usage-ingest', METRICS_SCOPE, 'workload_not_allowed'],
+  ])('writes nothing for %s', async (_label, workload, scope, reason) => {
+    stubFetch();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await ingest({ Authorization: `Bearer ${await token({}, workload, scope)}` });
+    expect(result.response.status).toBe(403);
+    expect(refusals(warn)).toEqual([
+      { event: 'o11y_admin_sts_refused', route: 'apiMetricsWrite', status: 403, reason },
+    ]);
+    expect(result.sinkWrites).toEqual([]);
+    expect(result.reads).toEqual([]);
+  });
+
+  it('writes nothing for the shared secret and never reads it', async () => {
+    stubFetch();
+    const result = await ingest({ 'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET });
+    expect(result.response.status).toBe(401);
+    expect(result.sinkWrites).toEqual([]);
+    expect(result.reads).toEqual([]);
+    expect(result.bundleCalls()).toBe(0);
+  });
 });

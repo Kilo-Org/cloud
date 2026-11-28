@@ -1,0 +1,133 @@
+/**
+ * The migration proxy (design Q64a; README): applies production's Postgres migrations for the
+ * deploy workflows' db-gate job. The top level is production; `env.staging` is staging. Wrangler
+ * inherits no bindings or vars into an environment, so each block repeats every one.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "migration-proxy",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  // Traces stay off: a trace keeps outbound URLs and Durable Object SQL bindings.
+  "observability": {
+    "enabled": true,
+    // Invocation logs hold request details, possibly the Authorization header (README).
+    "logs": { "enabled": true, "invocation_logs": false },
+    "traces": { "enabled": false },
+  },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "routes": [
+    { "pattern": "migration-proxy.kiloapps.io", "zone_name": "kiloapps.io", "custom_domain": true },
+  ],
+  // Keeps the object's alarm set, so the hourly sampled check runs while no run is active.
+  "triggers": { "crons": ["*/15 * * * *"] },
+  /**
+   * STS serves the bundle (MIGRATION_PROXY_DB_PASSWORD, MIGRATION_PROXY_GITHUB_APP_KEY) and
+   * attests the db-gate job's GitHub token; props.caller is this Worker's top-level name.
+   */
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "migration-proxy" },
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "MIGRATION_RUN_DO", "class_name": "MigrationRunDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MigrationRunDO"] }],
+  /**
+   * The object owns its one container (ctx.container). A durable_object entry takes no
+   * max_instances: the bound is that the Worker addresses only the object named `runs`. The
+   * image builds from container/ alone, outside the pnpm workspace.
+   */
+  "containers": [
+    {
+      "class_name": "MigrationRunDO",
+      "scheduling_policy": "durable_object",
+      "images": {
+        "proxy": { "dockerfile": "./container/Dockerfile", "build_context": "./container" },
+      },
+    },
+  ],
+  "queues": {
+    "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-migration-proxy" }],
+  },
+  "vars": {
+    // The one constant every environment rule derives from (contract §3); no default.
+    "MIGRATION_PROXY_ENVIRONMENT": "production",
+    // Production's direct host, <host>:5432/postgres; set by slice E once its IPv4 reach is checked.
+    "MIGRATION_DB_TARGET": "",
+    "MIGRATION_DB_USER": "kilo_migration_proxy",
+    "MIGRATION_DB_LOGIN_MODE": "member",
+    // The direct host keeps application_name (spike A), so production keys leftovers by label.
+    "MIGRATION_SESSION_KEY": "label",
+    "MIGRATION_SESSION_SAMPLE_MINUTES": "60",
+    "MIGRATION_RUN_DEADLINE_SECONDS": "21600",
+    // The kilo-migration-proxy GitHub App; set by slice E.
+    "MIGRATION_PROXY_GITHUB_APP_ID": "",
+    "MIGRATION_PROXY_GITHUB_INSTALLATION_ID": "",
+    // The last target_sha the old db-gate migrated here; set by slice E.
+    "MIGRATION_REVIEW_BASELINE_SHA": "",
+  },
+  "env": {
+    "staging": {
+      "routes": [
+        {
+          "pattern": "migration-proxy-staging.kiloapps.io",
+          "zone_name": "kiloapps.io",
+          "custom_domain": true,
+        },
+      ],
+      // Staging runs no sampled check, so no schedule.
+      "triggers": { "crons": [] },
+      "services": [
+        {
+          "binding": "STS",
+          "service": "sts-staging",
+          "entrypoint": "SecretsBroker",
+          "props": { "caller": "migration-proxy" },
+        },
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "MIGRATION_RUN_DO", "class_name": "MigrationRunDO" }],
+      },
+      "containers": [
+        {
+          "class_name": "MigrationRunDO",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "proxy": { "dockerfile": "./container/Dockerfile", "build_context": "./container" },
+          },
+        },
+      ],
+      "queues": {
+        "producers": [{ "binding": "AUDIT_QUEUE", "queue": "kilo-audit-migration-proxy-staging" }],
+      },
+      "vars": {
+        "MIGRATION_PROXY_ENVIRONMENT": "staging",
+        // The direct host: IPv4, and it keeps application_name (spike A).
+        "MIGRATION_DB_TARGET": "db.xrcpuwfztrhiazsslhuu.supabase.co:5432/postgres",
+        // Staging (PostgreSQL 17.6) cannot grant postgres to a member login, so it logs in as
+        // postgres itself: pid-mode cleanup and no sample, which readConfig enforces.
+        "MIGRATION_DB_USER": "postgres",
+        "MIGRATION_DB_LOGIN_MODE": "direct",
+        "MIGRATION_SESSION_KEY": "pid",
+        "MIGRATION_SESSION_SAMPLE_MINUTES": "0",
+        "MIGRATION_RUN_DEADLINE_SECONDS": "21600",
+        "MIGRATION_PROXY_GITHUB_APP_ID": "5952011",
+        "MIGRATION_PROXY_GITHUB_INSTALLATION_ID": "186479258",
+        // Proof step (contract §10 step 4): the parent of #13020, the newest migration PR on main,
+        // so the first run reviews one real migration change. Afterwards it goes back to the last
+        // staging-migrated commit.
+        // If staging has not applied 0387 yet, lower the baseline to 8471da39032a (the parent of
+        // #12973) before the first run.
+        "MIGRATION_REVIEW_BASELINE_SHA": "dd05d644626ca17bacb80a8b43384622f87a0605",
+      },
+    },
+  },
+}

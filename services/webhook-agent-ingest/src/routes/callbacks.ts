@@ -3,9 +3,11 @@ import { z } from 'zod';
 import type { HonoContext } from '../index';
 import { logger } from '../util/logger';
 import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
+import { INTERNAL_CALLER_HEADER } from '@kilocode/worker-utils/internal-auth-observation';
 import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
-import { getSecretValue } from '../util/secret';
+import { expectedSecret, secretUnavailableResponse } from '../secrets';
+import { compareSecretsOnce } from '../secrets-compare';
 
 const callbacks = new Hono<HonoContext>();
 
@@ -34,23 +36,36 @@ callbacks.post('/execution', async c => {
     return c.json(resError('Missing webhook identification headers'), 400);
   }
 
-  const callbackTokenSecret = await getSecretValue(c.env.CALLBACK_TOKEN_SECRET);
-  if (!callbackTokenSecret) {
+  const callbackToken = c.req.header('X-Callback-Token');
+  const expected = await expectedSecret(c.env, 'CALLBACK_TOKEN_SECRET', callbackToken);
+  if (expected.status === 'refused') {
+    return secretUnavailableResponse('execution-callback', expected.reason);
+  }
+  if (expected.status === 'read' && !expected.secret) {
     logger.error('Callback authentication secret not configured');
     return c.json(resError('Internal server error'), 500);
   }
 
-  const callbackToken = c.req.header('X-Callback-Token');
-  const validCallbackToken = await verifyCallbackToken({
-    token: callbackToken,
-    secret: callbackTokenSecret,
-    scope: 'webhook-execution-callback',
-    resourceParts: [namespace, triggerId, requestId],
-  });
+  // A tokenless request under `sts` read no secret and is refused here without a check.
+  const validCallbackToken =
+    expected.status === 'read' &&
+    (await verifyCallbackToken({
+      token: callbackToken,
+      secret: expected.secret,
+      scope: 'webhook-execution-callback',
+      resourceParts: [namespace, triggerId, requestId],
+      observation: {
+        receiver: 'webhook-agent-ingest',
+        caller: c.req.header(INTERNAL_CALLER_HEADER) ?? null,
+      },
+    }));
   if (!validCallbackToken) {
     logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
     return c.json(resError('Unauthorized'), 401);
   }
+  // Pre-flip STS copy check, off unless enabled (src/secrets-compare.ts). It runs in the
+  // background and never changes this answer.
+  compareSecretsOnce(c.env, () => c.executionCtx);
 
   let payload: z.infer<typeof ExecutionCallbackPayloadSchema>;
   try {

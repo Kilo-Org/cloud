@@ -44,6 +44,11 @@ export const AccountRowSchema = z.strictObject({
   event_version: z.bigint(),
   created_at: timestamp,
   updated_at: timestamp,
+  sign_in_denied_audited_at: timestamp.nullable(),
+  imported_at: timestamp.nullable(),
+  revoked_before: timestamp.nullable(),
+  status_version: z.bigint(),
+  email_version: z.bigint(),
 });
 
 export const SsoConnectionRowSchema = z.strictObject({
@@ -53,6 +58,7 @@ export const SsoConnectionRowSchema = z.strictObject({
   status: z.enum(enums.SSO_CONNECTION_STATUSES),
   created_at: timestamp,
   updated_at: timestamp,
+  workos_organization_id: z.string().nullable(),
 });
 
 export const SsoDomainRowSchema = z.strictObject({
@@ -60,7 +66,7 @@ export const SsoDomainRowSchema = z.strictObject({
   org_id: uuid,
   domain: z.string(),
   status: z.enum(enums.SSO_DOMAIN_STATUSES),
-  dns_challenge_hash: sha256,
+  dns_challenge_hash: sha256.nullable(),
   requested_at: timestamp,
   verified_at: timestamp.nullable(),
 });
@@ -91,6 +97,8 @@ export const SignInMethodRowSchema = z.strictObject({
   sso_connection_id: uuid.nullable(),
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
+  gate_pass_id: uuid.nullable(),
+  gate_pass_action: z.enum(enums.GATED_ACTIONS),
 });
 
 export const PasskeyCredentialRowSchema = z.strictObject({
@@ -107,12 +115,18 @@ export const PasskeyCredentialRowSchema = z.strictObject({
   name: z.string(),
   added_at: timestamp,
   last_used_at: timestamp.nullable(),
+  user_handle: bytes,
+  gate_pass_id: uuid.nullable(),
+  gate_pass_action: z.enum(enums.GATED_ACTIONS),
+  denied_audited_at: timestamp.nullable(),
+  imported_at: timestamp.nullable(),
 });
 
 export const BrowserSessionRowSchema = z.strictObject({
   id: uuid,
   account_id: z.string(),
-  token_hash: sha256,
+  /** Null for a session the legacy bridge created, which has no sign-in cookie. */
+  token_hash: sha256.nullable(),
   auth_time: timestamp,
   amr,
   created_at: timestamp,
@@ -124,6 +138,16 @@ export const BrowserSessionRowSchema = z.strictObject({
   status: z.enum(enums.SESSION_STATUSES),
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
+  denied_audited_at: timestamp.nullable(),
+  cleanup_kept_at: timestamp.nullable(),
+  device_key_hash: sha256.nullable(),
+  /** The web BFF's handle (migration 0013): its hash, issue time and the sign-in it carries. */
+  handle_hash: sha256.nullable(),
+  handle_issued_at: timestamp.nullable(),
+  handle_auth_time: timestamp.nullable(),
+  handle_amr: amr.nullable(),
+  sso_connection_id: z.string().nullable(),
+  sso_organization_id: z.string().nullable(),
 });
 
 export const DeviceSessionRowSchema = z.strictObject({
@@ -187,6 +211,10 @@ export const RefreshGrantRowSchema = z.strictObject({
   revoked_at: timestamp.nullable(),
   revoke_reason: z.enum(enums.REVOKE_REASONS).nullable(),
   denied_audited_at: timestamp.nullable(),
+  /** The app grant a widget grant was exchanged from (migration 0024); null for any other grant. */
+  parent_grant_id: uuid.nullable(),
+  /** The environment a widget grant's audit rows name (migration 0024); null for any other grant. */
+  audit_environment: z.enum(['development', 'staging', 'production']).nullable(),
 });
 
 export const ThirdPartyClientRowSchema = z.strictObject({
@@ -284,6 +312,11 @@ export const DeviceCodeRowSchema = z.strictObject({
   approved_at: timestamp.nullable(),
   denied_at: timestamp.nullable(),
   consumed_at: timestamp.nullable(),
+  auth_time: timestamp.nullable(),
+  amr: amr.nullable(),
+  grant_id: uuid.nullable(),
+  dpop_jkt: sha256.nullable(),
+  anonymous_writer: z.string().nullable(),
 });
 
 export const EmailCodeRowSchema = z.strictObject({
@@ -291,12 +324,17 @@ export const EmailCodeRowSchema = z.strictObject({
   purpose: z.enum(enums.EMAIL_CODE_PURPOSES),
   email_hash: sha256,
   account_id: z.string().nullable(),
-  code_hash: sha256,
+  code_hash: sha256.nullable(),
   attempts: z.number().int(),
   created_at: timestamp,
   expires_at: timestamp,
   status: z.enum(enums.EMAIL_CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  address: z.enum(enums.EMAIL_CODE_ADDRESSES).nullable(),
+  email: z.string().nullable(),
+  link_hash: sha256.nullable(),
+  return_to: z.string().nullable(),
+  binder_hash: sha256.nullable(),
 });
 
 export const EmailCodeLimitRowSchema = z.strictObject({
@@ -308,6 +346,7 @@ export const EmailCodeLimitRowSchema = z.strictObject({
   failures_in_day: z.number().int(),
   status: z.enum(enums.EMAIL_CODE_LIMIT_STATUSES),
   stopped_until: timestamp.nullable(),
+  links_in_hour: z.number().int(),
 });
 
 export const TicketRowSchema = z.strictObject({
@@ -320,6 +359,56 @@ export const TicketRowSchema = z.strictObject({
   expires_at: timestamp,
   status: z.enum(enums.CODE_STATUSES),
   consumed_at: timestamp.nullable(),
+  grant_id: uuid,
+  client_id: z.string(),
+  org_id: uuid.nullable(),
+  denied_audited_at: timestamp.nullable(),
+});
+
+export const WebauthnChallengeRowSchema = z.strictObject({
+  challenge_hash: sha256,
+  ceremony: z.enum(enums.WEBAUTHN_CEREMONIES),
+  rp_id: z.string(),
+  account_id: z.string().nullable(),
+  browser_session_id: uuid.nullable(),
+  user_handle: bytes.nullable(),
+  created_at: timestamp,
+  expires_at: timestamp,
+  status: z.enum(enums.CODE_STATUSES),
+  consumed_at: timestamp.nullable(),
+});
+
+export const SignInFlowRowSchema = z.strictObject({
+  state_hash: sha256,
+  provider: z.enum(enums.SIGN_IN_PROVIDERS),
+  binder_hash: sha256,
+  intent: z.enum(enums.SIGN_IN_INTENTS),
+  link_session_id: uuid.nullable(),
+  gate_pass_id: uuid.nullable(),
+  sso_connection_id: uuid.nullable(),
+  return_to: z.string(),
+  created_at: timestamp,
+  expires_at: timestamp,
+  status: z.enum(enums.CODE_STATUSES),
+  consumed_at: timestamp.nullable(),
+});
+
+export const AccountUserCodeFailureRowSchema = z.strictObject({
+  account_id: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
+});
+
+export const NetworkUserCodeFailureRowSchema = z.strictObject({
+  client_network: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
+});
+
+export const NetworkEmailCodeFailureRowSchema = z.strictObject({
+  client_network: z.string(),
+  failures: z.number().int(),
+  window_started_at: timestamp,
 });
 
 export const PersonalAccessTokenRowSchema = z.strictObject({
@@ -406,6 +495,34 @@ export const RevocationRowSchema = z.strictObject({
   feed_expires_at: timestamp,
 });
 
+export const SubjectOperationRowSchema = z.strictObject({
+  operation_id: uuid,
+  operation: z.enum(enums.SUBJECT_OPERATIONS),
+  target: z.string(),
+  source_version: z.bigint(),
+  feed_entries: z.array(z.unknown()),
+  created_at: timestamp,
+  expires_at: timestamp,
+});
+
+export const SubjectTombstoneRowSchema = z.strictObject({
+  id: z.bigint(),
+  subject: z.string(),
+  operation: z.enum(enums.SUBJECT_OPERATIONS),
+  reason: z.string().nullable(),
+  source_version: z.bigint(),
+  operation_id: uuid,
+  created_at: timestamp,
+});
+
+export const AppAccountEventRowSchema = z.strictObject({
+  event_id: uuid,
+  event_type: z.literal('user.created'),
+  account_id: z.string(),
+  primary_email: z.string(),
+  occurred_at: timestamp,
+});
+
 export const DpopProofRowSchema = z.strictObject({
   jkt: sha256,
   jti: z.string(),
@@ -420,10 +537,54 @@ export const NoticeRowSchema = z.strictObject({
   audit_event_id: uuid.nullable(),
   created_at: timestamp,
   delivery: z.enum(enums.NOTICE_DELIVERIES),
-  delivered_via: z.enum(enums.NOTICE_CHANNELS).nullable(),
   delivered_at: timestamp.nullable(),
   failed_at: timestamp.nullable(),
   read_at: timestamp.nullable(),
+  next_attempt_at: timestamp,
+  rounds: z.number().int().min(0).max(3),
+  claim_id: uuid.nullable(),
+  claimed_at: timestamp.nullable(),
+  recipient_email: z.string().nullable(),
+  old_email: z.string().nullable(),
+});
+
+export const NoticeAttemptRowSchema = z.strictObject({
+  notice_id: uuid,
+  round: z.number().int().min(1).max(3),
+  position: z.number().int().min(1).max(2),
+  channel: z.enum(enums.NOTICE_CHANNELS),
+  outcome: z.enum(enums.NOTICE_ATTEMPT_OUTCOMES),
+  attempted_at: timestamp,
+});
+
+export const KnownDeviceRowSchema = z.strictObject({
+  account_id: z.string(),
+  device_key: sha256,
+  first_seen_at: timestamp,
+  last_seen_at: timestamp,
+});
+
+export const KnownNetworkRowSchema = z.strictObject({
+  account_id: z.string(),
+  network_key: z.string(),
+  first_seen_at: timestamp,
+  last_seen_at: timestamp,
+});
+
+export const SignInRowSchema = z.strictObject({
+  id: uuid,
+  account_id: z.string(),
+  session_kind: z.enum(enums.SIGN_IN_SESSION_KINDS),
+  browser_session_id: uuid.nullable(),
+  device_session_id: uuid.nullable(),
+  signed_in_at: timestamp,
+  amr,
+  device_label: z.string().nullable(),
+  platform: z.string().nullable(),
+  ...network,
+  new_device: z.boolean(),
+  new_network: z.boolean(),
+  notice_id: uuid.nullable(),
 });
 
 export const AuditEventRowSchema = z.strictObject({
@@ -443,6 +604,24 @@ export const AuditRelayWatermarkRowSchema = z.strictObject({
   last_id: z.bigint(),
   last_seq: z.bigint(),
   updated_at: timestamp,
+});
+
+export const AppAttestKeyRowSchema = z.strictObject({
+  key_id: sha256,
+  public_key: bytes,
+  sign_count: z.bigint(),
+  created_at: timestamp,
+  last_used_at: timestamp,
+});
+
+export const CodeAttestationRowSchema = z.strictObject({
+  code_hash: sha256,
+  attestation_type: z.enum(enums.IDENTITY_STORE_ENUMS.attestation_type).nullable(),
+  key_id: sha256.nullable(),
+  state: z.enum(enums.ATTESTATION_STATES),
+  claim_id: uuid,
+  claimed_at: timestamp,
+  settled_at: timestamp.nullable(),
 });
 
 /** Each row schema by its table name in the `uts` schema. */
@@ -469,6 +648,11 @@ export const IDENTITY_STORE_TABLES = {
   email_codes: EmailCodeRowSchema,
   email_code_limits: EmailCodeLimitRowSchema,
   tickets: TicketRowSchema,
+  webauthn_challenges: WebauthnChallengeRowSchema,
+  sign_in_flows: SignInFlowRowSchema,
+  account_user_code_failures: AccountUserCodeFailureRowSchema,
+  network_user_code_failures: NetworkUserCodeFailureRowSchema,
+  network_email_code_failures: NetworkEmailCodeFailureRowSchema,
   personal_access_tokens: PersonalAccessTokenRowSchema,
   org_bot_keys: OrgBotKeyRowSchema,
   ci_trust_policies: CiTrustPolicyRowSchema,
@@ -476,6 +660,15 @@ export const IDENTITY_STORE_TABLES = {
   revocations: RevocationRowSchema,
   dpop_proofs: DpopProofRowSchema,
   notices: NoticeRowSchema,
+  notice_attempts: NoticeAttemptRowSchema,
+  known_devices: KnownDeviceRowSchema,
+  known_networks: KnownNetworkRowSchema,
+  sign_ins: SignInRowSchema,
+  subject_operations: SubjectOperationRowSchema,
+  subject_tombstones: SubjectTombstoneRowSchema,
+  app_account_events: AppAccountEventRowSchema,
   audit_events: AuditEventRowSchema,
   audit_relay_watermarks: AuditRelayWatermarkRowSchema,
+  app_attest_keys: AppAttestKeyRowSchema,
+  code_attestations: CodeAttestationRowSchema,
 } as const;

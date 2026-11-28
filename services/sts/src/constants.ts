@@ -147,9 +147,6 @@ export const TOKEN_AUDIT_RETENTION_MS = 60 * 60 * 1000;
 /** How often a token signer prunes; a prune that hits its batch bound runs again next alarm. */
 export const TOKEN_AUDIT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
 
-/** A lease or revoke request body is a grant and a lifetime, or a lease id; above this is refused. */
-export const LEASE_REQUEST_MAX_BODY_BYTES = 1024;
-
 /**
  * The lease object gives up on a lease whose creation took longer than this, measured from when
  * STS called the object (so the object's cold start and the call to it count), and checked again
@@ -197,6 +194,25 @@ export const LEASE_EXPIRY_TOLERANCE_MS = 2 * 60 * 1000;
 export const LEASE_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * The lease object sweeps each configured replica this often (README "Replica sessions"): it ends
+ * there the sessions of lease roles that are gone, blocked or past `VALID UNTIL`. Each alarm starts
+ * the sweep before any other work, and the next sweep is due this long after that alarm fired, so
+ * a replica session of an ended lease ends at most this plus 10 seconds (the timeouts below) after
+ * the role change reaches the replica, plus however late the platform runs the alarm, while the
+ * replica answers.
+ */
+export const LEASE_REPLICA_SWEEP_INTERVAL_MS = 60_000;
+
+/** One sweep connects within this, then its statement must answer within the same again. */
+export const LEASE_REPLICA_SWEEP_STEP_TIMEOUT_MS = 5_000;
+
+/**
+ * A replica's sweep failing this many times in a row (15 minutes) is logged as an error, once per
+ * streak; earlier failures are warnings, since the next sweep retries a minute later.
+ */
+export const LEASE_REPLICA_SWEEP_FAILURES_BEFORE_ERROR = 15;
+
+/**
  * The manager folder that holds the token-minting credentials (design 4.4). Only the deploy-token
  * object reads it, with a read of its own; the refresher drops it from its `/ci` copy, and no
  * policy may name a secret in `MINTING_SECRET_NAMES`, so no bundle can carry one.
@@ -233,7 +249,9 @@ export type CloudflareDeployGroupPin = { id: string; scope: 'account' | 'zone' }
  * - `forbiddenGroupIds`: the groups that create or edit API tokens or manage members, roles or
  *   account settings, whose holder could make a credential that outlives the 1-hour bound.
  * - `allowedGroups`: the only groups a grant may list, each with its scope (the deploy groups:
- *   Workers Scripts Write and Containers Write on the account, Workers Routes Write on a zone).
+ *   Workers Scripts Write and Containers Write on the account, Workers Routes Write on a zone;
+ *   for Kilo-Org/cloud's own deploys also Queues, D1, R2 Storage, Vectorize Write and Workers AI
+ *   Read on the account).
  * - `allowedZones`: per STS environment, the only zones a grant of that environment may list.
  *   Staging and production deploy to the one `kiloapps.io` zone, so it is in both lists and the
  *   zone check cannot separate them; it keeps every other zone out.
@@ -264,11 +282,24 @@ export const CLOUDFLARE_DEPLOY_PINS: CloudflareDeployPins = {
     { id: 'e086da7e2179491d91ee5f35b3ca210a', scope: 'account' }, // Workers Scripts Write
     { id: 'bdbcd690c763475a985e8641dddc09f7', scope: 'account' }, // Workers Containers Write
     { id: '28f4b596e7d643029c524985477ae49a', scope: 'zone' }, // Workers Routes Write
+    // Kilo-Org/cloud's deploys (README "Cloudflare deploy tokens", cloud deploy policies). Taken
+    // 2026-11-27 from Cloudflare's global permission-group list as published in
+    // alchemy-run/alchemy packages/cloudflare/src/ApiToken/PermissionGroups.ts, which gives the
+    // three ids above exactly; setup step 3 confirms them against this account's list, and the
+    // first mint deletes a token whose returned name for an id differs.
+    { id: '366f57075ffc42689627bcf8242a1b6d', scope: 'account' }, // Queues Write
+    { id: '09b2857d1c31407795e75e3fed8617a1', scope: 'account' }, // D1 Write
+    { id: 'bf7481a1826f439697cb59a20b22293e', scope: 'account' }, // Workers R2 Storage Write
+    { id: '64156ba5be47441096c83c7fc17c488b', scope: 'account' }, // Vectorize Write
+    { id: 'a92d2450e05d4e7bb7d0a64968f83d11', scope: 'account' }, // Workers AI Read
   ],
   allowedZones: {
     development: [],
     staging: ['9f7103cbcadbe93a052c120f231e8507'], // kiloapps.io
-    production: ['9f7103cbcadbe93a052c120f231e8507'], // kiloapps.io
+    production: [
+      '9f7103cbcadbe93a052c120f231e8507', // kiloapps.io
+      '1417bcc629d528e478b1da6615ea3799', // kiloapps.ai (cloud-agent-next's zone route; Igor, 2026-11-27)
+    ],
   },
 };
 

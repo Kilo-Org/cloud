@@ -27,6 +27,17 @@ for (const cachingDisabled of [undefined, false, true]) {
       );
       copyFileSync(join(root, 'wrangler.jsonc'), join(directory, 'wrangler.jsonc'));
       symlinkSync(join(root, 'node_modules'), join(directory, 'node_modules'));
+      if (cachingDisabled === true) {
+        // Production may flip `SECRETS_SOURCE` to `sts`; staging binds no STS, so the renderer must
+        // pin the store source instead of copying the flip into a Worker that would refuse reads.
+        const sourcePath = join(directory, 'wrangler.jsonc');
+        const flipped = readFileSync(sourcePath, 'utf8').replaceAll(
+          '"SECRETS_SOURCE": "secrets-store"',
+          '"SECRETS_SOURCE": "sts"'
+        );
+        assert.notEqual(flipped, readFileSync(sourcePath, 'utf8'), 'the flip must reach the copy');
+        writeFileSync(sourcePath, flipped);
+      }
       const manifest = {
         accountID: '0123456789abcdef0123456789abcdef',
         hyperdriveID: '123456789abcdef0123456789abcdef0',
@@ -77,6 +88,9 @@ for (const cachingDisabled of [undefined, false, true]) {
           tag: 'v4',
           new_sqlite_classes: ['SessionNotificationsDO'],
         });
+        // The rendered staging Worker reads its own Secrets Store items and binds no STS.
+        assert.equal(config.vars.SECRETS_SOURCE, 'secrets-store');
+        assert.equal(config.services, undefined);
       } else {
         assert.match(result.stderr, /caching disabled/);
       }

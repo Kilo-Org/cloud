@@ -1,7 +1,7 @@
 import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
-// Snowflake projection for the model a leaderboard row is attributed to.
+// SQL projection for the model a leaderboard row is attributed to.
 // OpenRouter router ids (openrouter/auto, ...) are attributed to the model that
 // served the request; everything else to the model the client requested.
 export const LEADERBOARD_MODEL_SQL = `case

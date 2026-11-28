@@ -3,6 +3,7 @@ import type { PostMessageAsUserParams, PostMessageAsUserResult } from '@kilocode
 import type * as TokenMintingModule from './services/token-minting-service.js';
 import type * as SessionAccessModule from '@kilocode/worker-utils/cloud-agent-session-access';
 import { checkWorkspaceChatTarget } from '@kilocode/worker-utils/cloud-agent-session-access';
+import type { BundleBinding } from '@kilocode/secrets-client';
 
 vi.mock('@kilocode/worker-utils/cloud-agent-session-access', async importOriginal => ({
   ...(await importOriginal<typeof SessionAccessModule>()),
@@ -45,6 +46,8 @@ vi.mock('./util/do-retry', () => ({
     _label: string
   ): Promise<T> => op(getStub()),
 }));
+
+vi.mock('cloudflare:workers', () => ({ waitUntil: vi.fn() }));
 
 import { handleWebhookDeliveryBatch, processKiloclawChatMessage } from './queue-consumer';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
@@ -970,6 +973,204 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
       );
       expect(ack).toHaveBeenCalledTimes(1);
       expect(retry).not.toHaveBeenCalled();
+    }
+  );
+});
+
+// Synthetic fixture values only. Each source holds a different value, so a dispatch that read the
+// wrong source, or fell back to it, sends a value the test refuses.
+const STORE_INTERNAL = 'store-internal-fixture-0123456789abcdef';
+const STORE_CALLBACK = 'store-callback-fixture-0123456789abcdef';
+const BUNDLE_INTERNAL = 'bundle-internal-fixture-0123456789abcdef';
+const BUNDLE_CALLBACK = 'bundle-callback-fixture-0123456789abcdef';
+const UNAVAILABLE = 'Webhook credentials are temporarily unavailable';
+
+type BundleResult = Awaited<ReturnType<BundleBinding['getBundle']>>;
+
+function stsBundle(secrets: Record<string, string>): BundleResult {
+  return {
+    status: 'ok',
+    workload: 'cloudflare-webhook-agent-ingest',
+    environment: 'production',
+    etag: '"0123456789abcdef"',
+    stale: false,
+    fetchedAt: '2026-11-27T00:00:00.000Z',
+    secrets: Object.fromEntries(
+      Object.entries(secrets).map(([name, value]) => [name, { value, version: 1 }])
+    ),
+    missing: [],
+  };
+}
+
+const FULL_BUNDLE = stsBundle({
+  INTERNAL_API_SECRET: BUNDLE_INTERNAL,
+  CALLBACK_TOKEN_SECRET: BUNDLE_CALLBACK,
+});
+
+describe('queue consumer secrets source', () => {
+  beforeEach(() => {
+    vi.mocked(checkWorkspaceChatTarget).mockReset().mockResolvedValue(null);
+    mockMintToken
+      .mockReset()
+      .mockResolvedValue({ token: 'test-token', userId: 'user-1', isBot: false });
+  });
+
+  /** One message for a trigger of `targetType`; a fresh STS binding per harness. */
+  function harness(
+    targetType: 'cloud_agent' | 'cloud_agent_chat',
+    source: string | undefined,
+    bundle: BundleResult = FULL_BUNDLE
+  ) {
+    const config = makeTriggerConfig({
+      targetType,
+      mode: 'code',
+      model: 'model-1',
+      githubRepo: 'owner/repo',
+      cloudAgentSessionId:
+        targetType === 'cloud_agent_chat' ? 'workspace_00000000-0000-4000-8000-000000000003' : null,
+    });
+    const request = { ...makeRequest(), id: 'req-1', cloudAgentSessionId: null };
+    const stub = {
+      getRequest: vi.fn(async () => ({ ...request })),
+      getConfig: vi.fn(async () => config),
+      updateRequest: vi.fn(async () => ({ success: true })),
+    };
+    const calls: Request[] = [];
+    const fetch = vi.fn(async (outgoing: Request) => {
+      calls.push(outgoing);
+      if (outgoing.url.includes('/trpc/prepareSession')) {
+        return Response.json({ result: { data: { cloudAgentSessionId: 'session-1' } } });
+      }
+      if (outgoing.url.includes('/trpc/send')) {
+        const body = (await outgoing.clone().json()) as {
+          cloudAgentSessionId: string;
+          message: { id: string };
+        };
+        return Response.json({
+          result: {
+            data: { messageId: body.message.id, cloudAgentSessionId: body.cloudAgentSessionId },
+          },
+        });
+      }
+      return Response.json({ result: { data: { status: 'running' } } });
+    });
+    const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
+    const internalGet = vi.fn(async () => STORE_INTERNAL);
+    const callbackGet = vi.fn(async () => STORE_CALLBACK);
+    const env = {
+      ...makeEnv(),
+      ...(source === undefined ? {} : { SECRETS_SOURCE: source }),
+      WEBHOOK_AGENT_URL: 'https://hooks.test',
+      WEBHOOK_TOKEN_CACHE: { get: vi.fn(async () => 'cached-token'), put: vi.fn() },
+      INTERNAL_API_SECRET: { get: internalGet },
+      CALLBACK_TOKEN_SECRET: { get: callbackGet },
+      STS: { getBundle },
+      TRIGGER_DO: { idFromName: (name: string) => name, get: () => stub },
+      CLOUD_AGENT: { fetch },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const deliver = (attempts = 1) =>
+      handleWebhookDeliveryBatch(
+        {
+          queue: 'webhook-delivery',
+          messages: [{ body: makeWebhook(), attempts, ack, retry }],
+        } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>,
+        env
+      );
+    return { stub, calls, getBundle, internalGet, callbackGet, ack, retry, deliver };
+  }
+
+  async function expectedCallbackToken(secret: string) {
+    const webhook = makeWebhook();
+    return deriveCallbackToken({
+      secret,
+      scope: 'webhook-execution-callback',
+      resourceParts: [webhook.namespace, webhook.triggerId, webhook.requestId],
+    });
+  }
+
+  it.each([undefined, 'secrets-store'])(
+    'dispatches with the Secrets Store values and reads no bundle (%j)',
+    async source => {
+      const h = harness('cloud_agent', source);
+
+      await h.deliver();
+
+      const prepare = h.calls[0];
+      expect(prepare?.headers.get('x-internal-api-key')).toBe(STORE_INTERNAL);
+      expect(await prepare?.json()).toMatchObject({
+        callbackTarget: {
+          headers: { 'X-Callback-Token': await expectedCallbackToken(STORE_CALLBACK) },
+        },
+      });
+      expect(h.getBundle).not.toHaveBeenCalled();
+      expect(h.ack).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('dispatches with the bundle values under sts and never reads the Secrets Store', async () => {
+    const h = harness('cloud_agent', 'sts');
+
+    await h.deliver();
+
+    const [prepare, initiate] = h.calls;
+    expect(prepare?.headers.get('x-internal-api-key')).toBe(BUNDLE_INTERNAL);
+    expect(initiate?.headers.get('x-internal-api-key')).toBe(BUNDLE_INTERNAL);
+    expect(await prepare?.json()).toMatchObject({
+      callbackTarget: {
+        headers: { 'X-Callback-Token': await expectedCallbackToken(BUNDLE_CALLBACK) },
+      },
+    });
+    expect(h.getBundle).toHaveBeenCalledOnce();
+    expect(h.internalGet).not.toHaveBeenCalled();
+    expect(h.callbackGet).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it('sends an existing-chat message with the bundle key under sts', async () => {
+    const h = harness('cloud_agent_chat', 'sts');
+
+    await h.deliver();
+
+    expect(h.calls.map(call => new URL(call.url).pathname)).toEqual(['/trpc/send']);
+    expect(h.calls[0]?.headers.get('x-internal-api-key')).toBe(BUNDLE_INTERNAL);
+    expect(h.internalGet).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
+
+  it.each<[string, 'cloud_agent' | 'cloud_agent_chat', string, BundleResult]>([
+    ['a missing grant', 'cloud_agent', 'sts', stsBundle({})],
+    ['a malformed SECRETS_SOURCE', 'cloud_agent', 'STS', FULL_BUNDLE],
+    ['a missing grant', 'cloud_agent_chat', 'sts', stsBundle({})],
+    ['a malformed SECRETS_SOURCE', 'cloud_agent_chat', 'STS', FULL_BUNDLE],
+  ])(
+    'retries %s on a %s trigger with a fixed message, sends nothing and never falls back',
+    async (_case, targetType, source, bundle) => {
+      const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      try {
+        const h = harness(targetType, source, bundle);
+
+        await h.deliver(1);
+        expect(h.retry).toHaveBeenCalledOnce();
+        expect(h.ack).not.toHaveBeenCalled();
+
+        await h.deliver(3);
+        expect(h.stub.updateRequest).toHaveBeenLastCalledWith(
+          'req-1',
+          expect.objectContaining({ process_status: 'failed', error_message: UNAVAILABLE })
+        );
+        expect(log).toHaveBeenCalledWith(
+          'Failed to process webhook',
+          expect.objectContaining({ error: UNAVAILABLE })
+        );
+        expect(h.calls).toHaveLength(0);
+        expect(h.internalGet).not.toHaveBeenCalled();
+        expect(h.callbackGet).not.toHaveBeenCalled();
+        expect(h.ack).toHaveBeenCalledOnce();
+      } finally {
+        log.mockRestore();
+      }
     }
   );
 });

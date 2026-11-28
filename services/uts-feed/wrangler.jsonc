@@ -14,10 +14,12 @@
     "port": 8801,
     "local_protocol": "http",
   },
-  // Traces stay off, as in every UTS Worker. Every env block inherits this.
+  // Traces stay off, as in every UTS Worker. Invocation logs keep a 5 percent head sample, the log
+  // budget approved for the HTTPS feed, where every read is one invocation (services/uts/test/repo
+  // checks at most 0.05). Every env block inherits this.
   "observability": {
     "enabled": true,
-    "logs": { "enabled": true, "invocation_logs": true },
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 0.05 },
     "traces": { "enabled": false },
   },
   "logpush": true,
@@ -28,17 +30,30 @@
       "custom_domain": true,
     },
   ],
+  // This deployment's version id keys the feed's data-center cache, so no other Worker on the zone
+  // can read or plant an entry (src/revocation.ts). Every env block binds it too.
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // The HTTPS feed (head, list, bootstrap; src/https-auth.ts) stays off here and in staging:
+  // without FEED_HTTPS_ENABLED "true" and STS_URL set to this environment's STS issuer, those paths
+  // answer 503 with Retry-After. services/uts/test/repo checks both blocks leave it off.
   "vars": {
     "UTS_ENVIRONMENT": "production",
   },
-  // The mint Worker's SignerKeys entrypoint. It answers only the caller named here, which must be
-  // this block's deployed name (services/uts/test/repo checks both). Placement does not apply to a
-  // named entrypoint, so the key read runs where this Worker runs.
+  // The mint Worker's SignerKeys and FeedReads entrypoints. Each answers only the caller named
+  // here, which must be this block's deployed name (services/uts/test/repo checks both). Placement
+  // does not apply to a named entrypoint, so the reads run where this Worker runs. FeedReads reads
+  // the two feed objects, which only the mint Worker binds.
   "services": [
     {
       "binding": "UTS_MINT",
       "service": "uts",
       "entrypoint": "SignerKeys",
+      "props": { "caller": "uts-feed" },
+    },
+    {
+      "binding": "UTS_FEED_READS",
+      "service": "uts",
+      "entrypoint": "FeedReads",
       "props": { "caller": "uts-feed" },
     },
   ],
@@ -53,6 +68,7 @@
           "custom_domain": true,
         },
       ],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "vars": {
         "UTS_ENVIRONMENT": "staging",
       },
@@ -63,6 +79,12 @@
           "entrypoint": "SignerKeys",
           "props": { "caller": "uts-feed-staging" },
         },
+        {
+          "binding": "UTS_FEED_READS",
+          "service": "uts-staging",
+          "entrypoint": "FeedReads",
+          "props": { "caller": "uts-feed-staging" },
+        },
       ],
     },
     // Local development only; no deploy workflow targets this name.
@@ -70,14 +92,24 @@
       "name": "uts-feed-local",
       "workers_dev": false,
       "routes": [],
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      // The local end-to-end runs replace STS_URL with their own stand-in STS on loopback.
       "vars": {
         "UTS_ENVIRONMENT": "development",
+        "FEED_HTTPS_ENABLED": "true",
+        "STS_URL": "http://localhost:8825",
       },
       "services": [
         {
           "binding": "UTS_MINT",
           "service": "uts-local",
           "entrypoint": "SignerKeys",
+          "props": { "caller": "uts-feed-local" },
+        },
+        {
+          "binding": "UTS_FEED_READS",
+          "service": "uts-local",
+          "entrypoint": "FeedReads",
           "props": { "caller": "uts-feed-local" },
         },
       ],

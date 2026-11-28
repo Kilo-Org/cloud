@@ -84,7 +84,7 @@ describe('repository Worker configs', () => {
     expect(paths).toContain('services/sts/wrangler.jsonc');
     expect(paths).toContain('services/o11y/wrangler.jsonc');
     expect(paths).toContain('services/sts/wrangler.test.jsonc');
-    // cloud-agent-e2e-deploy.yml deploys this one to the account.
+    // cloud-agent-e2e.yml deploys this one to the account.
     expect(paths).toContain('services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc');
     expect(paths.filter(path => path.includes('node_modules/'))).toEqual([]);
   });
@@ -184,6 +184,7 @@ describe("Wrangler's config schema", () => {
       ...keysOf(definition('WorkerEntrypointExport')),
     ],
     'secrets_store_secrets[]': keysOf(environment('secrets_store_secrets', 'items')),
+    'hyperdrive[]': keysOf(environment('hyperdrive', 'items')),
   };
 
   it('has no key the check leaves unclassified, at any level the check models', () => {
@@ -291,8 +292,9 @@ describe('worker config rules', () => {
       MANAGER_IDENTITY_ID: 'identity',
       DO_JURISDICTION: 'eu',
       TOKEN_SIGNING_KIDS_REVOKED: '',
-      LEASE_CI_MIGRATION_TARGET: '',
+      MIGRATION_PROXY_AUDIENCE: '',
       CF_DEPLOY_ACCOUNT_ID: '',
+      LEASE_REPLICA_SWEEP_BINDINGS: '',
     };
     const sts = (blockVars: Record<string, string>) =>
       parseWorkerConfig('services/sts/wrangler.jsonc', { name: 'sts', vars: blockVars });
@@ -312,16 +314,18 @@ describe('worker config rules', () => {
         sts({
           ...vars,
           MANAGER_PROJECT_SLUG: 'kilo-project',
-          LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:5432/postgres',
+          MIGRATION_PROXY_AUDIENCE: 'https://migration-proxy-staging.kiloapps.io',
           CF_DEPLOY_ACCOUNT_ID: 'e115e769bcdd4c3d66af59d3332cb394',
         }),
       ])
     ).toEqual([]);
     for (const bad of [
       { MANAGER_PROJECT_SLUG: 'Kilo Project' },
-      { LEASE_CI_MIGRATION_TARGET: 'postgres://user:secret@db.example.invalid/postgres' },
-      { LEASE_CI_MIGRATION_TARGET: 'db.example.invalid:99999/postgres' },
+      { MIGRATION_PROXY_AUDIENCE: 'http://migration-proxy-staging.kiloapps.io' },
+      { MIGRATION_PROXY_AUDIENCE: 'migration-proxy-staging' },
       { CF_DEPLOY_ACCOUNT_ID: 'cfat_not-an-account-id' },
+      { LEASE_REPLICA_SWEEP_BINDINGS: 'REPLICA' },
+      { LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_A,LEASE_SWEEP_A' },
     ]) {
       expect(stsVarProblems([sts({ ...vars, ...bad })]), JSON.stringify(bad)).toEqual([
         expect.stringContaining('vars do not pass EnvVarsSchema'),
@@ -329,6 +333,33 @@ describe('worker config rules', () => {
     }
     expect(stsVarProblems([sts({ ...vars, STS_ISSUER: 'https://sts.kiloapps.io' })])).toEqual([
       'services/sts/wrangler.jsonc (top level): STS_ISSUER is https://sts.kiloapps.io, expected https://sts-staging.kiloapps.io',
+    ]);
+  });
+
+  it('refuses an STS block that sweeps a replica it has no Hyperdrive binding for', () => {
+    const vars = {
+      STS_ENVIRONMENT: 'staging',
+      STS_ISSUER: 'https://sts-staging.kiloapps.io',
+      MANAGER_BASE_URL: 'https://eu.infisical.com',
+      MANAGER_PROJECT_ID: 'project',
+      MANAGER_PROJECT_SLUG: '',
+      MANAGER_ENVIRONMENT_SLUG: 'staging',
+      MANAGER_IDENTITY_ID: 'identity',
+      DO_JURISDICTION: 'eu',
+      TOKEN_SIGNING_KIDS_REVOKED: '',
+      MIGRATION_PROXY_AUDIENCE: '',
+      CF_DEPLOY_ACCOUNT_ID: '',
+      LEASE_REPLICA_SWEEP_BINDINGS: 'LEASE_SWEEP_EU_WEST, LEASE_SWEEP_EU_NORTH',
+    };
+    const sts = (hyperdrive: string[]) =>
+      parseWorkerConfig('services/sts/wrangler.jsonc', {
+        name: 'sts',
+        vars,
+        hyperdrive: hyperdrive.map(binding => ({ binding, id: `${binding.toLowerCase()}-id` })),
+      });
+    expect(stsVarProblems([sts(['LEASE_SWEEP_EU_WEST', 'LEASE_SWEEP_EU_NORTH'])])).toEqual([]);
+    expect(stsVarProblems([sts(['LEASE_SWEEP_EU_WEST'])])).toEqual([
+      'services/sts/wrangler.jsonc (top level): LEASE_REPLICA_SWEEP_BINDINGS names LEASE_SWEEP_EU_NORTH, which is no Hyperdrive binding of this block',
     ]);
   });
 
@@ -466,9 +497,17 @@ describe('worker config rules', () => {
         { name: 'AUDIT_SIGNER', class_name: 'SignerDO' },
       ],
     };
-    const relayQueues = (queue: string) => ({
-      consumers: [{ queue, dead_letter_queue: `${queue}-dlq` }, { queue: `${queue}-dlq` }],
-    });
+    const relayQueues = (queue: string) => {
+      const uts = queue.replace('kilo-audit', 'kilo-audit-uts');
+      return {
+        consumers: [
+          { queue, dead_letter_queue: `${queue}-dlq` },
+          { queue: `${queue}-dlq` },
+          { queue: uts, dead_letter_queue: `${uts}-dlq` },
+          { queue: `${uts}-dlq` },
+        ],
+      };
+    };
     const archive = (bucket_name: string, jurisdiction?: string) => [
       { binding: 'AUDIT_ARCHIVE', bucket_name, ...(jurisdiction ? { jurisdiction } : {}) },
     ];
@@ -509,7 +548,7 @@ describe('worker config rules', () => {
     expect(internalWorkerProblems(configs)).toEqual([]);
   });
 
-  it('refuses a producer on an audit queue outside the STS deployment of that environment', () => {
+  it('refuses a producer on an audit queue outside its own producer and environment', () => {
     const audit = (queue: string) => ({ producers: [{ binding: 'AUDIT', queue }] });
     const foreign = consumer({
       queues: {
@@ -527,19 +566,26 @@ describe('worker config rules', () => {
       name: 'sts',
       ...NO_TRACES,
       queues: audit('kilo-audit-staging'),
-      env: { local: { name: 'sts-local', queues: audit('kilo-audit-local') } },
+      env: { local: { name: 'sts-local', queues: audit('kilo-audit-uts-local') } },
     });
     const relay = parseWorkerConfig('services/audit-relay/wrangler.jsonc', {
       name: 'audit-relay',
       ...NO_TRACES,
       queues: audit('kilo-audit'),
     });
-    expect(problemsOf(foreign, crossed, relay)).toEqual([
+    const utsOnSts = parseWorkerConfig('services/uts/wrangler.jsonc', {
+      name: 'uts',
+      ...NO_TRACES,
+      queues: audit('kilo-audit'),
+    });
+    expect(problemsOf(foreign, crossed, relay, utsOnSts)).toEqual([
       `${PATH} (top level): AUDIT produces to kilo-audit; only sts may`,
       `${PATH} (env.staging): AUDIT produces to kilo-audit-staging; only sts-staging may`,
       `${PATH} (env.local): AUDIT produces to kilo-audit-local-dlq; no Worker may`,
       'services/sts/wrangler.jsonc (top level): AUDIT produces to kilo-audit-staging; only sts-staging may',
+      'services/sts/wrangler.jsonc (env.local): AUDIT produces to kilo-audit-uts-local; only uts-local, uts-test may',
       'services/audit-relay/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
+      'services/uts/wrangler.jsonc (top level): AUDIT produces to kilo-audit; only sts may',
     ]);
   });
 

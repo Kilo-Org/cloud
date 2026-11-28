@@ -4,6 +4,7 @@ import {
   CloudflareTokenIdSchema,
   DEPLOY_TOKEN_DENIED_REASONS,
   DEPLOY_TOKEN_LIMITED_REASONS,
+  GITHUB_RUN_ATTESTATION_DENIED_REASONS,
   LEASE_DENIED_REASONS,
   LEASE_LIMITED_REASONS,
   LeaseGrantSchema,
@@ -29,15 +30,13 @@ export type TokenDeniedReason = (typeof TOKEN_DENIED_REASONS)[number];
 
 /**
  * Why STS refused a lease or a revoke: the caller's answer (`denied` or `limited`), or, for a
- * revoke the caller hears as `not_found`, whether the lease is another workload's (`not_owner`),
- * another GitHub run's of the same workload (`other_run`), or one STS never issued
- * (`unknown_lease`).
+ * revoke the caller hears as `not_found`, whether the lease is another workload's (`not_owner`) or
+ * one STS never issued (`unknown_lease`).
  */
 export const LEASE_DENIAL_REASONS = [
   ...LEASE_DENIED_REASONS,
   ...LEASE_LIMITED_REASONS,
   'not_owner',
-  'other_run',
   'unknown_lease',
 ] as const;
 export type LeaseDenialReason = (typeof LEASE_DENIAL_REASONS)[number];
@@ -58,7 +57,8 @@ export const DEPLOY_TOKEN_DENIAL_REASONS = [
 export type DeployTokenDenialReason = (typeof DEPLOY_TOKEN_DENIAL_REASONS)[number];
 
 type DenialBase = {
-  channel: 'worker-binding' | 'http';
+  /** `migration-attest`: an `attestGithubRun` call, from the migration proxy's binding. */
+  channel: 'worker-binding' | 'http' | 'migration-attest';
   actor: string;
   claims: Record<string, string>;
 };
@@ -96,13 +96,28 @@ export type DeployTokenDenial = DenialBase & {
   tokenId?: string;
 };
 
-export type Denial = BundleDenial | TokenDenial | LeaseDenial | DeployTokenDenial;
+/**
+ * A refused migration run attestation: a props caller other than the migration proxy
+ * (`caller_not_allowed`, the caller as actor), or a GitHub token whose signature verified but
+ * whose policy does not fit (the policy workload or `github:<repository_id>` as actor).
+ */
+export type MigrationAttestDenial = DenialBase & {
+  kind: 'migration_attest';
+  reason: (typeof GITHUB_RUN_ATTESTATION_DENIED_REASONS)[number];
+};
+
+export type Denial =
+  | BundleDenial
+  | TokenDenial
+  | LeaseDenial
+  | DeployTokenDenial
+  | MigrationAttestDenial;
 
 /** The longest actor, claim value, audience or scope a denial row holds. */
 export const DENIAL_FIELD_MAX_LENGTH = 256;
 
 const DenialBaseSchema = {
-  channel: z.enum(['worker-binding', 'http']),
+  channel: z.enum(['worker-binding', 'http', 'migration-attest']),
   actor: z.string().min(1).max(DENIAL_FIELD_MAX_LENGTH),
   claims: z
     .record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.string().max(DENIAL_FIELD_MAX_LENGTH))
@@ -134,6 +149,11 @@ export const DenialSchema: z.ZodType<Denial> = z.union([
     kind: z.literal('deploy_token'),
     reason: z.enum(DEPLOY_TOKEN_DENIAL_REASONS),
     tokenId: CloudflareTokenIdSchema.optional(),
+  }),
+  z.strictObject({
+    ...DenialBaseSchema,
+    kind: z.literal('migration_attest'),
+    reason: z.enum(GITHUB_RUN_ATTESTATION_DENIED_REASONS),
   }),
 ]);
 
@@ -174,6 +194,15 @@ export function denialKey(denial: Denial): string {
       claims,
     ]);
   }
+  if (denial.kind === 'migration_attest') {
+    return JSON.stringify([
+      'migration_attest',
+      denial.channel,
+      denial.reason,
+      denial.actor,
+      claims,
+    ]);
+  }
   return JSON.stringify([denial.channel, denial.reason, denial.actor, claims]);
 }
 
@@ -190,6 +219,8 @@ export function overflowDenial(denial: Denial): Denial {
   switch (denial.kind) {
     case 'token':
       return { ...base, kind: 'token', reason: denial.reason };
+    case 'migration_attest':
+      return { ...base, kind: 'migration_attest', reason: denial.reason };
     case 'lease':
       return { ...base, kind: 'lease', reason: denial.reason };
     case 'deploy_token':

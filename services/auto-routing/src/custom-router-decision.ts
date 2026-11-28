@@ -18,6 +18,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   customRouterBenchmarkContext,
   fetchCustomRouterEpoch,
@@ -182,15 +183,9 @@ type CachedTableEntry = {
 };
 
 const tableCache = new Map<string, CachedTableEntry>();
-/**
- * One in-flight rebuild per context. Two requests that arrive while the same pool is being rebuilt
- * share it, so a burst of traffic after a publish costs one epoch read and one table fetch.
- */
-const tableRefreshes = new Map<string, Promise<CustomRouterTableLoad>>();
 
 export function clearCustomRouterTableCache(): void {
   tableCache.clear();
-  tableRefreshes.clear();
 }
 
 let cacheSequence = 0;
@@ -221,74 +216,74 @@ function cacheEntry(key: string, entry: CachedTableEntry): void {
  * - the 60 s TTL still bounds what the epoch and fingerprint do not cover (catalog prices); a pool
  *   serving a pin re-reads at 15 s, because a catalog retirement writes no epoch and no pool row;
  * - an unprovable epoch (older benchmark Worker answering 404 during a staggered deploy, a 5xx, an
- *   unreadable body) never reads as "unchanged": the actual table is fetched on that request,
- *   single-flighted so a burst shares one fetch, and it is never cached as proof, so a later 503
- *   cannot resurrect an older rank. A failed table fetch is the retryable routing failure it was.
+ *   unreadable body) never reads as "unchanged": the actual table is fetched on that request and it
+ *   is never cached as proof, so a later 503 cannot resurrect an older rank. A failed table fetch is
+ *   the retryable routing failure it was. The fetch is never shared with another request: workerd
+ *   binds a promise's I/O to the request that created it, so a request that joined a rebuild
+ *   started elsewhere fails with it the moment that other request ends.
  */
 async function loadCustomRouterTable(
   env: Env,
-  router: CustomRouterDefinition
+  router: CustomRouterDefinition,
+  waitUntil: (promise: Promise<unknown>) => void,
+  ctx?: SecretsExecutionContext
 ): Promise<CustomRouterTableLoad> {
   const context = customRouterBenchmarkContext(router);
   const key = JSON.stringify(context);
-  const epoch = await fetchCustomRouterEpoch(env, router.baseRouter);
+  const epoch = await fetchCustomRouterEpoch(env, router.baseRouter, ctx);
   const cached = tableCache.get(key);
   const cacheTtl =
     cached && (cached.load.servingPins.size > 0 || cached.load.servingFallback.size > 0)
       ? CUSTOM_ROUTER_PINNED_TABLE_CACHE_TTL_MS
       : CUSTOM_ROUTER_TABLE_CACHE_TTL_MS;
+  // The fingerprint this request already read while checking the cached table.
+  let prefetchedVersion: string | null = null;
   if (cached && epoch !== null && Date.now() - cached.builtAt < cacheTtl) {
     if (cached.epoch === epoch) return cached.load;
     // The router's registry moved. Only this pool's own ready set decides whether it rebuilds, and
     // the record of that check must not extend `builtAt`: the hard TTL still has to expire so
     // catalogue and pricing changes refresh.
-    const version = await fetchCustomRouterTableVersion(env, context);
-    if (version !== null && version === cached.version) {
+    prefetchedVersion = await fetchCustomRouterTableVersion(env, context, ctx);
+    if (prefetchedVersion !== null && prefetchedVersion === cached.version) {
       if (cached.epoch === null || epoch > cached.epoch) {
         cacheEntry(key, { ...cached, epoch });
       }
       return cached.load;
     }
   }
-  // An unprovable epoch (an older benchmark Worker answering 404 during a staggered deploy, a 5xx,
-  // an unreadable body) is never treated as proof: the actual table is fetched on this request. It
-  // is single-flighted per context so a burst shares one fetch, and it is cached as unknown so a
-  // later 503 cannot keep serving a table that a previous 404 let us keep.
-  const flightKey = `${key}\u0000${epoch ?? 'unproven'}`;
-  const inFlight = tableRefreshes.get(flightKey);
-  if (inFlight) return inFlight;
+  // `sequence` keeps an older build from replacing a newer one that finished first.
   cacheSequence += 1;
   const sequence = cacheSequence;
   const startedAt = Date.now();
-  const refresh = (async (): Promise<CustomRouterTableLoad> => {
+  const build = (async (): Promise<CustomRouterTableLoad> => {
     // Fingerprint before the table: a change landing after it advances the epoch again, so the next
     // request re-checks instead of trusting this build.
-    const version = await fetchCustomRouterTableVersion(env, context);
-    const load = await fetchCustomRouterTable(env, context);
+    const version = prefetchedVersion ?? (await fetchCustomRouterTableVersion(env, context, ctx));
+    const load = await fetchCustomRouterTable(env, context, ctx);
     cacheEntry(key, { load, epoch, version, builtAt: startedAt, sequence });
     return load;
-  })()
-    .catch((error: unknown) => {
-      console.warn(
-        JSON.stringify({
-          event: 'auto_routing_custom_router_table_read_failed',
-          customRouterId: router.id,
-          ...formatError(error),
-        })
-      );
-      // A failed table read is a retryable routing failure. Serving the previous table would be
-      // exactly the pre-settlement lie the epoch exists to prevent.
-      throw new CustomRouterError(
-        'internal_error',
-        'Custom router table is temporarily unavailable',
-        DEPENDENCY_RETRY_AFTER_SECONDS
-      );
-    })
-    .finally(() => {
-      tableRefreshes.delete(flightKey);
-    });
-  tableRefreshes.set(flightKey, refresh);
-  return refresh;
+  })();
+  // The build belongs to this request, so it is never joined by another one, but the runtime keeps
+  // it alive through `waitUntil`: a request the gateway cancels still finishes its cache write.
+  waitUntil(build.catch(() => {}));
+  try {
+    return await build;
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: 'auto_routing_custom_router_table_read_failed',
+        customRouterId: router.id,
+        ...formatError(error),
+      })
+    );
+    // A failed table read is a retryable routing failure. Serving the previous table would be
+    // exactly the pre-settlement lie the epoch exists to prevent.
+    throw new CustomRouterError(
+      'internal_error',
+      'Custom router table is temporarily unavailable',
+      DEPENDENCY_RETRY_AFTER_SECONDS
+    );
+  }
 }
 
 // Drops every candidate outside the pool or not servable by this client, then empty routes.
@@ -327,7 +322,8 @@ export function customRouterTarget(
   env: Env,
   waitUntil: (promise: Promise<unknown>) => void,
   routing: CustomRouting,
-  requestedModel = customRouterModelId(routing.router.ownerType, routing.router.slug)
+  requestedModel = customRouterModelId(routing.router.ownerType, routing.router.slug),
+  ctx?: SecretsExecutionContext
 ): DecisionTarget {
   const { router } = routing;
   return {
@@ -336,7 +332,7 @@ export function customRouterTarget(
     deniedModelIds: routing.deniedModelIds,
     loadRouting: async timings => {
       const tableStartedAt = performance.now();
-      const loaded = await loadCustomRouterTable(env, router);
+      const loaded = await loadCustomRouterTable(env, router, waitUntil, ctx);
       // The benchmark worker is the authority on which pins still have a usable measurement.
       routing.usablePins = new Map(loaded.servingPins);
       routing.servingFallback = new Set(loaded.servingFallback);

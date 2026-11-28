@@ -5,6 +5,13 @@ import {
   recordLlmUsage,
   type LlmUsageWriteOutcome,
 } from '@kilocode/worker-utils/usage-writer-client';
+import {
+  STS_WEB_USAGE_RECORD_BENCHMARK_GRADER,
+  resolveWebInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 export const GRADER_USAGE_MODEL = 'auto-routing/grader';
 
@@ -52,8 +59,6 @@ export async function buildGraderUsage(
       http_x_vercel_ip_latitude: null,
       http_x_vercel_ip_longitude: null,
       http_x_vercel_ja4_digest: null,
-      user_prompt_prefix: null,
-      system_prompt_prefix: null,
       system_prompt_length: 0,
       http_user_agent: null,
       max_tokens: null,
@@ -81,8 +86,6 @@ export async function buildGraderUsage(
       market_cost: microdollars,
       non_inference_cost: null,
       is_free: false,
-      abuse_delay: null,
-      abuse_downgraded_from: null,
       system_prompt_kind: null,
     },
     prior_microdollar_usage: 0,
@@ -91,11 +94,23 @@ export async function buildGraderUsage(
 }
 
 export async function writeGraderUsage(
-  env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
-  usage: UsageRecordRequest
+  env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'> & WebInternalAuthEnv,
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
-  return recordLlmUsage(usage, {
-    url: new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href,
-    secret: await env.INTERNAL_API_SECRET_PROD.get(),
-  });
+  // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:usage.benchmark-grader.record` STS token.
+  const credential = await resolveWebInternalCredential(
+    env,
+    STS_WEB_USAGE_RECORD_BENCHMARK_GRADER,
+    () => readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx)
+  );
+  if (credential.kind === 'unavailable') return { kind: 'unavailable', reason: 'missing_config' };
+  const url = new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href;
+  return recordLlmUsage(
+    usage,
+    credential.kind === 'sts'
+      ? { url, serviceToken: credential.token }
+      : { url, secret: credential.secret }
+  );
 }

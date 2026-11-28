@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // NOTE: Base config is for PRODUCTION environment
-  // Use --env dev for development deployments
+  // `env.dev` is local-only: run it with `pnpm dev`
   "name": "cloudflare-webhook-agent-ingest",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
@@ -17,6 +17,14 @@
   // Observability - enables Workers Logs
   "observability": {
     "enabled": true,
+    // Traces stay off: a trace records outbound URLs and Durable Object SQL
+    // bindings, and a Worker that binds STS records none
+    // (services/sts/test/repo/worker-configs.ts). `env.dev` inherits this
+    // block. Cloudflare records no traces without `traces.enabled: true`, so
+    // this pins the current setting.
+    "traces": {
+      "enabled": false,
+    },
   },
   "logpush": true,
   "version_metadata": {
@@ -35,6 +43,18 @@
     "WEBHOOK_AGENT_URL": "https://hooks.kilosessions.ai",
     "KILOCLAW_API_URL": "https://claw.kilosessions.ai",
     "SHARED_RESOURCE_TOKENS_ENABLED": "true",
+    // Where every INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and
+    // NEXTAUTH_SECRET read goes (src/secrets.ts): `secrets-store` reads the
+    // Secrets Store bindings below, `sts` reads the STS bundle over the `STS`
+    // binding and never falls back. An absent value means `secrets-store`;
+    // any other value refuses every read.
+    "SECRETS_SOURCE": "secrets-store",
+    // One pre-flip check per isolate that the STS copy of each of the three
+    // names equals the Secrets Store value served above
+    // (src/secrets-compare.ts). Only `true` turns it on, and only with
+    // `secrets-store` in production; it never changes the source. `env.dev`
+    // does not set it.
+    "SECRETS_COMPARE_ENABLED": "false",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [
@@ -46,6 +66,19 @@
       "binding": "KILO_CHAT",
       "service": "kilo-chat",
       "entrypoint": "KiloChatService",
+    },
+    // STS serves the runtime secret bundle over the account-internal binding.
+    // `props.caller` is what STS authorizes on and must equal this Worker's
+    // top-level name. This block deploys production only, so it binds the
+    // production `sts`; services/sts/policy/cloudflare-webhook-agent-ingest.yaml
+    // grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET,
+    // each resolved from /shared. The rollback kept the bindings below in
+    // place, so re-selecting `sts` with comparison off is one redeploy.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloudflare-webhook-agent-ingest" },
     },
   ],
   // PRODUCTION Queue for webhook delivery
@@ -103,7 +136,9 @@
       "new_sqlite_classes": [],
     },
   ],
-  // PRODUCTION Secrets Store (shared Kilo secrets store)
+  // PRODUCTION Secrets Store (shared Kilo secrets store). The `secrets-store`
+  // source reads these bindings, which production selects after the rollback
+  // from STS. They stay bound, so re-selecting `sts` is one redeploy away.
   "secrets_store_secrets": [
     {
       "binding": "INTERNAL_API_SECRET",
@@ -123,13 +158,17 @@
   ],
   // ============================================
   // DEVELOPMENT ENVIRONMENT
-  // Deploy with: wrangler deploy --env dev
-  // This creates a SEPARATE worker: cloudflare-webhook-agent-dev
+  // Local-only: run with `pnpm dev` (wrangler dev). Never deploy it; it has
+  // no hosted route, workers.dev URL or schedule, and a local-only database.
   // ============================================
   "env": {
     "dev": {
       "name": "cloudflare-webhook-agent-ingest-dev",
-      "workers_dev": true,
+      // Fence: named envs inherit top-level routes; never publish dev to prod hosts.
+      "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
+      "triggers": { "crons": [] },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA",
       },
@@ -206,7 +245,7 @@
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],

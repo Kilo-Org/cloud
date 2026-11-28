@@ -4,8 +4,18 @@ import { captureException } from '@sentry/nextjs';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
+import {
+  REGION_HANDOFF_TOKEN_WAIT_MS,
+  STS_WEB_USAGE_RECORD_REGION_HANDOFF,
+  webInternalSenderCredential,
+  type WebInternalSenderCredential,
+} from '@kilocode/web-shared/lib/web-internal-sts';
 import type { UsageRecordInsertResult } from './processUsage.types';
-import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  UsageRecordResponseSchema,
+  toUsageRecordWireBody,
+  type UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 
 /**
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.
@@ -73,14 +83,28 @@ function isRetryableError(error: unknown): boolean {
 export async function recordUsageInPrimaryRegion(
   payload: UsageRecordRequest
 ): Promise<RemoteUsageRecordOutcome> {
-  let internalApiSecret: string;
+  // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:usage.region-handoff.record` STS token. Without one the caller writes locally. A cold
+  // mint waits at most `REGION_HANDOFF_TOKEN_WAIT_MS`, taken out of the first attempt's budget,
+  // so the whole handoff stays within the attempts' timeouts.
+  const startedAt = Date.now();
+  let credential: WebInternalSenderCredential;
   try {
-    internalApiSecret = await readInternalApiSecret();
+    credential = await webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+      legacySecret: readInternalApiSecret,
+      tokenWait: REGION_HANDOFF_TOKEN_WAIT_MS,
+    });
   } catch {
     return { kind: 'unavailable', reason: 'internal_api_secret_unavailable' };
   }
-  if (!internalApiSecret) {
-    return { kind: 'unavailable', reason: 'missing_internal_api_secret' };
+  if (credential.kind === 'unavailable') {
+    return {
+      kind: 'unavailable',
+      reason:
+        credential.reason === 'secret_missing'
+          ? 'missing_internal_api_secret'
+          : `credential_${credential.reason}`,
+    };
   }
   if (!APP_URL) {
     return { kind: 'unavailable', reason: 'missing_app_url' };
@@ -90,8 +114,9 @@ export async function recordUsageInPrimaryRegion(
   }
 
   const url = new URL(USAGE_RECORD_PATH, APP_URL).toString();
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify(toUsageRecordWireBody(payload));
   let lastReason = 'unknown';
+  const firstAttemptTimeoutMs = Math.max(1, ATTEMPT_TIMEOUT_MS - (Date.now() - startedAt));
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -99,11 +124,11 @@ export async function recordUsageInPrimaryRegion(
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-internal-api-key': internalApiSecret,
+          [credential.header]: credential.value,
           'x-usage-write-source': 'region_handoff',
         },
         body,
-        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(attempt === 1 ? firstAttemptTimeoutMs : ATTEMPT_TIMEOUT_MS),
         cache: 'no-store',
       });
 

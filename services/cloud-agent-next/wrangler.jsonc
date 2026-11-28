@@ -76,6 +76,8 @@
     // deployment of its own.
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai,https://staging-app.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    // SESSION_INGEST_CALLER_AUTH is unset (legacy, X-Internal-Secret): set `binding` only once
+    // Session Ingest authorizes the SESSION_INGEST binding's props.caller. src/session-ingest-caller-auth.ts.
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
     "TOOL_CGROUP_SERVER_CPU_WEIGHT": "75",
@@ -121,6 +123,7 @@
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
       "entrypoint": "SessionIngestRPC",
+      "props": { "caller": "cloud-agent-next" },
     },
     {
       "binding": "GIT_TOKEN_SERVICE",
@@ -374,13 +377,15 @@
       // Do not inherit the top-level custom-domain route. `wrangler dev` takes its
       // origin host from the first route, which would hide the preview Host.
       "routes": [],
+      "workers_dev": false,
+      "preview_urls": false,
       "triggers": {
-        "crons": ["17 2 * * *", "*/5 * * * *"],
+        "crons": [],
       },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",
-          "id": "624ec80650dd414199349f4e217ddb10",
+          "id": "local-only",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
@@ -415,6 +420,7 @@
           "binding": "SESSION_INGEST",
           "service": "session-ingest",
           "entrypoint": "SessionIngestRPC",
+          "props": { "caller": "cloud-agent-next-dev" },
         },
         {
           "binding": "GIT_TOKEN_SERVICE",

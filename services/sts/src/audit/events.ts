@@ -11,7 +11,13 @@ import {
 import type { PolicySnapshotEntry } from '../policy/load';
 import type { KeyRevocation, KeyRingChange } from '../tokens/key-ring';
 import type { GithubRun } from '../identity/verify';
-import type { BundleDenial, DeployTokenDenial, LeaseDenial, TokenDenial } from './denials';
+import type {
+  BundleDenial,
+  DeployTokenDenial,
+  LeaseDenial,
+  MigrationAttestDenial,
+  TokenDenial,
+} from './denials';
 
 /** Attributes hold at most 256 values; longer lists are cut and flagged. */
 function attributeList(values: string[]): { values: string[]; truncated: boolean } {
@@ -520,6 +526,48 @@ export function leaseRevokedEvent(input: {
   });
 }
 
+/**
+ * One sweep of one replica that changed something (README "Replica sessions"): `ended` sessions of
+ * lease roles that are gone, blocked or past `VALID UNTIL` (written when it ended at least one, or
+ * when it is the first sweep to succeed after failures), or `failed` (the first failure of a
+ * streak, and the one that is logged as an error). `replica` is the Hyperdrive binding name; no
+ * row carries a role name, a host or a credential.
+ */
+export type ReplicaSweepResult =
+  | { result: 'ended'; sessions: number; afterFailures: number }
+  | { result: 'failed'; consecutiveFailures: number; detail: string };
+
+export function leaseReplicaSweptEvent(input: {
+  environment: StsEnvironment;
+  replica: string;
+  sweep: ReplicaSweepResult;
+}): AuditEvent {
+  const { sweep } = input;
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.lease.replica_swept',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.delete,
+      outcome: sweep.result === 'ended' ? 'success' : 'failure',
+      outcomeDetail: sweep.result,
+      actor: { kind: 'system', id: `sts:${input.environment}` },
+      attributes: {
+        environment: input.environment,
+        replica: input.replica,
+        result: sweep.result,
+        ...(sweep.result === 'ended'
+          ? { sessions: sweep.sessions, afterFailures: sweep.afterFailures }
+          : { consecutiveFailures: sweep.consecutiveFailures, detail: sweep.detail.slice(0, 200) }),
+      },
+    },
+  });
+}
+
 /** `count` identical refused lease or revoke requests in the minute starting at `windowStart`. */
 export function leaseDeniedEvent(input: {
   environment: StsEnvironment;
@@ -556,6 +604,50 @@ export function leaseDeniedEvent(input: {
         workload: denial.actor,
         ...(denial.grant === undefined ? {} : { grant: denial.grant }),
         ...(denial.leaseId === undefined ? {} : { leaseId: denial.leaseId }),
+        count: input.count,
+        windowStart: input.windowStart,
+        overflow: input.overflow,
+        claims,
+      },
+    },
+  });
+}
+
+/**
+ * `count` identical refused migration run attestations in the minute starting at `windowStart`
+ * (README "Migration run attestation"). STS writes no row for an attestation it gave.
+ */
+export function migrationAttestDeniedEvent(input: {
+  environment: StsEnvironment;
+  denial: MigrationAttestDenial;
+  count: number;
+  windowStart: string;
+  overflow: boolean;
+}): AuditEvent {
+  const { denial } = input;
+  const claims = Object.keys(denial.claims)
+    .sort()
+    .map(name => `${name}=${denial.claims[name]}`.slice(0, 256));
+  return AuditEventSchema.parse({
+    specversion: '1.0',
+    id: crypto.randomUUID(),
+    source: stsSource(input.environment),
+    type: 'ai.kilo.sts.migration_attest.denied',
+    time: new Date().toISOString(),
+    datacontenttype: 'application/json',
+    data: {
+      classUid: OCSF_CLASS.apiActivity,
+      activityId: OCSF_API_ACTIVITY.read,
+      outcome: 'denied',
+      outcomeDetail: denial.reason,
+      actor: {
+        kind: denial.reason === 'caller_not_allowed' ? 'workload' : 'service',
+        id: denial.actor,
+      },
+      attributes: {
+        environment: input.environment,
+        channel: denial.channel,
+        reason: denial.reason,
         count: input.count,
         windowStart: input.windowStart,
         overflow: input.overflow,

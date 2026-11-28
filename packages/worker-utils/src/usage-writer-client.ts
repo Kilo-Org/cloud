@@ -3,6 +3,7 @@ import {
   ExaUsageWriteResponseSchema,
   UsageRecordResponseSchema,
   USAGE_CLASS_LIMIT_HEADER,
+  toUsageRecordWireBody,
   type EnkryptUsageWrite,
   type EnkryptUsageWriteResponse,
   type ExaUsageRecord,
@@ -210,7 +211,7 @@ export function recordLlmUsage(
   return sendUsageWrite(
     {
       usageId: payload.core.id,
-      body: payload,
+      body: toUsageRecordWireBody(payload),
       acknowledge(value) {
         const parsed = UsageRecordResponseSchema.safeParse(value);
         if (!parsed.success) return 'invalid';

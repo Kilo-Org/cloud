@@ -6,7 +6,9 @@ import {
   StepUpRequiredError,
   type AdminStepUpDecision,
   type AdminStepUpState,
+  type PrivilegedCredentialKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { staffRefusalTrpcError } from '@kilocode/web-shared/lib/admin/admin-guard';
 import { runStepUpGuard, stepUpDecisionCovers } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import {
   isOperationStepUpClass,
@@ -31,6 +33,18 @@ function refuse(actionClass: SupportActionClass): never {
       maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
     }),
   });
+}
+
+/**
+ * The request's credential as a support step-up names it. A UTS browser session carries no staff
+ * authority until design 5.12 is built for it, so it is refused by name, as `admitStaff` refuses
+ * it, whatever `ADMIN_STEP_UP_ENABLED` says. It is never passed on as another credential.
+ */
+export function supportStepUpCredential(
+  credential: PrivilegedCredentialKind | undefined
+): SupportStepUpCredential | undefined {
+  if (credential === 'uts_session') throw staffRefusalTrpcError({ kind: 'uts_session' });
+  return credential;
 }
 
 /**

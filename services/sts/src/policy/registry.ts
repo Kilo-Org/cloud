@@ -11,9 +11,14 @@ export const POLICY_FILES = [
   'usage-ingest.yaml',
   'web.yaml',
   'ci-deploy-bouncer.yaml',
+  'ci-deploy-cloud.yaml',
+  'ci-deploy-cloud-staging.yaml',
+  'ci-deploy-cloud-runtime.yaml',
+  'ci-deploy-cloud-mcp-catalog.yaml',
   'ci-kilocode-release.yaml',
   'ci-kilocode-release-jetbrains.yaml',
   'ci-kilocode-app-key.yaml',
+  'ci-kilocode-app-key-v2.yaml',
   'ci-kilocode-scan-notify.yaml',
   'ci-kilocode-community.yaml',
   'ci-kilocode-notify.yaml',
@@ -22,8 +27,6 @@ export const POLICY_FILES = [
   'ai-gateway-secure-proxy.yaml',
   'auto-routing.yaml',
   'auto-routing-benchmark.yaml',
-  'ci-sts-deploy-proof-production.yaml',
-  'ci-sts-deploy-proof-staging.yaml',
   'cloud-agent-next.yaml',
   'cloudflare-gmail-push.yaml',
   'cloudflare-scim-sync.yaml',
@@ -46,6 +49,9 @@ export const POLICY_FILES = [
   'session-ingest.yaml',
   'session-sync.yaml',
   'user-data-export.yaml',
+  'ci-db-migrate.yaml',
+  'ci-db-migrate-staging.yaml',
+  'migration-proxy.yaml',
 ] as const;
 
 export type PolicyFile = (typeof POLICY_FILES)[number];

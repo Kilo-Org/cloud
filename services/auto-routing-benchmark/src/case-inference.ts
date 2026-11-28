@@ -36,10 +36,14 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import type { Context, Hono } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
 import { BENCHMARK_CASE_HEADER, verifyCaseInferenceCapability } from './case-inference-capability';
+import { readAutoRoutingBenchmarkSecret, requestContext } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   admitPaidModelRequestStatements,
   readPaidCaseRun,
@@ -926,9 +930,10 @@ async function readPoolRequestActorUserId(
 
 export async function createCaseInferenceDeps(
   env: CaseInferenceBindings,
-  fetchImpl?: typeof fetch
+  fetchImpl?: typeof fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<CaseInferenceDeps> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   const selectPayer: CaseInferencePayerResolver = async ({ invocation, api, modelRequestId }) => {
     const key = caseKeyFromInvocation(invocation);
     const run = await readPaidCaseRun(env.BENCH_DB, key);
@@ -951,7 +956,7 @@ export async function createCaseInferenceDeps(
     });
     if (veto) return refused('permanently_failed');
     const assignmentId = crypto.randomUUID();
-    const usageId = crypto.randomUUID();
+    const usageId = createUsageId();
     const selected = await env.BENCH_DB.batch(
       selectPaidModelRequestPayerStatements(env.BENCH_DB, {
         key,
@@ -1099,6 +1104,7 @@ export async function createCaseInferenceDeps(
       // read cannot outlive the request that asked for it.
       signal: options.signal,
       deadline: options.deadline,
+      ctx,
     }).catch((error: unknown) => {
       console.warn(
         JSON.stringify({
@@ -1299,11 +1305,13 @@ async function authoritativeCaseIdentity(
 export async function handleCaseAdmit(
   env: CaseInferenceBindings,
   authorization: string | null,
-  body: unknown
+  body: unknown,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   if (!(await authorizedInternalBearer(authorization, secret)))
     return jsonResponse({ error: { code: 'unauthorized', message: 'Not authorized.' } }, 401);
+  observeInternalAuth('auto-routing-benchmark', 'case_admit', 'legacy_shared_secret');
   const parsed = BenchmarkCaseAdmitRequestSchema.safeParse(body);
   if (!parsed.success)
     return jsonResponse({ error: { code: 'invalid_admit', message: 'Invalid admission.' } }, 400);
@@ -1432,7 +1440,7 @@ export function registerCaseInferenceRoutes(app: Hono<HonoEnv>): void {
   const handleInference = async (c: Context<HonoEnv>) => {
     const api = caseInferenceApiFromPath(new URL(c.req.url).pathname);
     if (!api) return jsonResponse(failure('not_found', 'Unknown case inference route.'), 404);
-    const deps = await createCaseInferenceDeps(c.env);
+    const deps = await createCaseInferenceDeps(c.env, undefined, requestContext(c));
     // The real request context owns the drain: after the runner disconnects, Hono's
     // `waitUntil` keeps the provider stream finishing so the native usage row still commits.
     // `executionCtx` is absent only in direct unit calls, where the caller supplies its own.
@@ -1456,7 +1464,8 @@ export function registerCaseInferenceRoutes(app: Hono<HonoEnv>): void {
     handleCaseAdmit(
       c.env,
       c.req.header('authorization') ?? null,
-      await c.req.json().catch(() => null)
+      await c.req.json().catch(() => null),
+      requestContext(c)
     )
   );
 }

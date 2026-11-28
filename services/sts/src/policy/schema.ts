@@ -5,6 +5,7 @@ import {
   LEASE_GRANT_MAX_TTL_SECONDS,
   LEASE_MIN_TTL_SECONDS,
   LeaseGrantSchema,
+  MIGRATION_RUN_GRANT,
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   ScopeSchema,
@@ -22,6 +23,7 @@ import {
   CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS,
   CLOUDFLARE_DEPLOY_PINS,
   type CloudflareDeployPins,
+  DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING,
   MINTING_FOLDER,
   MINTING_SECRET_NAMES,
 } from '../constants';
@@ -57,6 +59,38 @@ export const GITHUB_EVENTS = ['push', 'schedule', 'workflow_dispatch', 'workflow
 
 /** A production GitHub policy accepts only jobs that run on this ref (design 4.2). */
 export const GITHUB_PRODUCTION_REF = 'refs/heads/main';
+
+/**
+ * The production GitHub policies that may accept a ref other than `GITHUB_PRODUCTION_REF`, each
+ * pinned to the whole policy: its workload, repository and ids, GitHub environment, one ref, one
+ * workflow file at that ref, events, and exactly its secrets, with no token, dynamic or
+ * environment grant. A policy that differs in any field is refused like any other production
+ * policy off `main`. Today it holds one entry:
+ *
+ * - `ci-kilocode-app-key-v2` (manager ruling M76, the pattern of M62's v2 publish rule): the
+ *   `progress-commit` job of kilocode's `kilo-v2.yml` on `v2`, which opens the progress-map pull
+ *   request with the Kilo Maintainer app. The job runs only on a push to `v2`; the `automation`
+ *   environment admits deployments from `main` and `v2` alone.
+ */
+export const GITHUB_PRODUCTION_REF_EXCEPTIONS = [
+  {
+    workload: 'ci-kilocode-app-key-v2',
+    repository: 'Kilo-Org/kilocode',
+    repositoryId: '946087422',
+    repositoryOwnerId: '201822503',
+    environment: 'automation',
+    refs: ['refs/heads/v2'],
+    jobWorkflowRefs: ['Kilo-Org/kilocode/.github/workflows/kilo-v2.yml@refs/heads/v2'],
+    events: ['push'],
+    environments: ['production'],
+    secrets: ['KILOCODE_MAINTAINER_APP_KEY'],
+  },
+] as const;
+
+/** Equal lists in the same order; the exception pins each list exactly as written. */
+function sameList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
 
 /** The bundle folder of a GitHub policy is `/ci/<workload>`, so its name starts with this. */
 export const GITHUB_WORKLOAD_PREFIX = 'ci-';
@@ -115,7 +149,7 @@ export type GithubIdentity = z.infer<typeof GithubIdentitySchema>;
  * HOW TO UPGRADE: when npm fixes #9969 -> add the Azure federated credential for
  * `repo:Kilo-Org@201822503/kilocode@946087422:ref:refs/heads/main` -> turn on use_immutable_subject
  * for kilocode -> prove oidc_check on main and v2 -> delete this exception (this constant, the
- * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the seven
+ * `legacySubject` field and its loader check, `githubLegacySubject`, and the flag in the eight
  * `ci-kilocode-*` policies).
  */
 export const GITHUB_LEGACY_SUBJECT_REPOSITORY = {
@@ -215,11 +249,10 @@ function hasDuplicates(values: readonly string[]): boolean {
 
 /**
  * The most active leases a policy may allow per grant: `replica-read` covers bouncer-watch's hourly
- * and daily runs, which overlap; a migration re-run may start before a failed run's lease ends.
+ * and daily runs, which overlap.
  */
 export const LEASE_MAX_ACTIVE_CEILING: Readonly<Record<LeaseGrant, number>> = {
   'replica-read': 4,
-  'ci-migration': 2,
 };
 
 /**
@@ -240,6 +273,34 @@ export const CLOUDFLARE_DEPLOY_GRANT = 'cloudflare-deploy';
 /** The most unexpired Cloudflare deploy tokens, and mints per hour, a policy may allow. */
 export const CLOUDFLARE_DEPLOY_MAX_ACTIVE_CEILING = 3;
 export const CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING = 12;
+
+/**
+ * The most mint requests one GitHub run attempt may make in an hour under a grant with
+ * `maxPerRun`. Kilo-Org/cloud's deploy-workers.yml runs one job per changed Worker (31 today) in
+ * parallel, each with its own token.
+ */
+export const CLOUDFLARE_DEPLOY_MAX_PER_RUN_CEILING = 64;
+
+/**
+ * Q71 carve-out for Cloudflare deploy grants (Q71b, decided by Igor 2026-11-27).
+ * The workflow files whose deploy-only policies may accept `workflow_run` together with
+ * `schedule` and `workflow_dispatch`, and grant production. Q71 refuses that elsewhere because
+ * STS cannot see the upstream run. Here the deploy job already receives the stored
+ * `CLOUDFLARE_API_TOKEN` on the same `workflow_run` trigger, runs main's workflow code and deploys
+ * the commit that `check-deployment-changes.yml` (or the runtime publisher's admission) picked from
+ * main, so a 1-hour token is no stronger than the stored token it replaces (Q65). A policy uses
+ * the carve-out only when it is a Kilo-Org/cloud policy (ids below), binds a GitHub environment,
+ * names only these files and holds nothing but its `cloudflare-deploy` grant.
+ */
+export const Q71_CLOUDFLARE_DEPLOY_CARVE_OUT = {
+  repository: 'Kilo-Org/cloud',
+  repositoryId: '1145038391',
+  repositoryOwnerId: '201822503',
+  jobWorkflowRefs: [
+    'Kilo-Org/cloud/.github/workflows/deploy-workers.yml@refs/heads/main',
+    'Kilo-Org/cloud/.github/workflows/cloud-agent-runtime-publish.yml@refs/heads/main',
+  ],
+} as const;
 
 /** A Cloudflare account, zone or permission-group id: 32 lowercase hexadecimal characters. */
 export const CloudflareIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
@@ -270,9 +331,10 @@ const CloudflarePermissionGroupSchema = z.strictObject({
 /**
  * One Cloudflare deploy-token grant (design 4.5, 6.3 `dynamic`): the permission set a GitHub
  * deploy job's token carries, its lifetime, and the workload's limits. `intendedScripts` names the
- * Workers the job deploys and `intendedRoutes` the zone route patterns it may add or change, for
- * audit and review only: Cloudflare's API cannot limit an API token to named Workers or routes, so
- * the token can change every Worker and route its permission groups reach in the account.
+ * Workers the job deploys (empty for a job that deploys none) and `intendedRoutes` the zone route
+ * patterns it may add or change, for audit and review only: Cloudflare's API cannot limit an API
+ * token to named Workers or routes, so the token can change every Worker and route its permission
+ * groups reach in the account.
  */
 export const CloudflareDeployGrantSchema = z.strictObject({
   grant: z.literal(CLOUDFLARE_DEPLOY_GRANT),
@@ -281,8 +343,8 @@ export const CloudflareDeployGrantSchema = z.strictObject({
   zones: z.array(CloudflareIdSchema).max(4).default([]),
   intendedScripts: z
     .array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/))
-    .min(1)
-    .max(16),
+    .max(64)
+    .default([]),
   intendedRoutes: z.array(z.string().min(1).max(256)).max(16).default([]),
   ttlSeconds: z
     .number()
@@ -292,19 +354,40 @@ export const CloudflareDeployGrantSchema = z.strictObject({
     .default(CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS),
   maxActive: z.number().int().min(1),
   maxPerHour: z.number().int().min(1),
+  /**
+   * Counts `maxActive` and `maxPerHour` in GitHub run attempts (run id and attempt) instead of
+   * tokens, and allows each run attempt this many mint requests per hour (`run_limit` beyond).
+   * For a workflow whose parallel jobs each deploy with their own token; absent: one token each.
+   */
+  maxPerRun: z.number().int().min(1).max(CLOUDFLARE_DEPLOY_MAX_PER_RUN_CEILING).optional(),
 });
 
 export type CloudflareDeployGrant = z.infer<typeof CloudflareDeployGrantSchema>;
 
+/**
+ * The grant of a trigger-only policy (design Q64a): its GitHub job may start a migration run
+ * through the migration proxy, which asks `attestGithubRun`, and nothing else. No other field: the
+ * proxy holds the database login, never the job.
+ */
+const MigrationRunGrantSchema = z.strictObject({ grant: z.literal(MIGRATION_RUN_GRANT) });
+
+export type MigrationRunGrant = z.infer<typeof MigrationRunGrantSchema>;
+
 const DynamicGrantSchema = z.discriminatedUnion('grant', [
   LeaseDynamicGrantSchema,
   CloudflareDeployGrantSchema,
+  MigrationRunGrantSchema,
 ]);
 
 export type DynamicGrant = z.infer<typeof DynamicGrantSchema>;
 
 export function isLeaseDynamicGrant(entry: DynamicGrant): entry is LeaseDynamicGrant {
-  return entry.grant !== CLOUDFLARE_DEPLOY_GRANT;
+  return LeaseGrantSchema.safeParse(entry.grant).success;
+}
+
+/** True for a trigger-only policy: one that holds the `migration-run` grant. */
+export function holdsMigrationRun(policy: Policy): boolean {
+  return policy.dynamic.some(entry => entry.grant === MIGRATION_RUN_GRANT);
 }
 
 /** The policy's lease entry for `grant`, or undefined when it lists none. */
@@ -347,7 +430,7 @@ export const PolicySchema = z.strictObject({
    */
   dynamic: z
     .array(DynamicGrantSchema)
-    .max(LeaseGrantSchema.options.length + 1)
+    .max(LeaseGrantSchema.options.length + 2)
     .default([]),
   /** Grants for one STS environment only, each key one of `environments`; absent adds none. */
   environmentGrants: z
@@ -410,10 +493,9 @@ export const PolicySnapshotEntrySchema = z.strictObject({
 export const PolicySnapshotSchema = z.array(PolicySnapshotEntrySchema);
 
 /**
- * Lease grants (design 6.3): at most one entry per grant, lifetimes within the grant's ceiling, and
- * each grant only for the identity it was built for. `replica-read` serves Workers in the account
- * (bouncer-watch); `ci-migration` serves a GitHub job, and only one bound to a protected GitHub
- * environment (production also needs `refs/heads/main`, checked with the other GitHub rules).
+ * Dynamic grants (design 6.3): at most one entry per grant, lease lifetimes within the grant's
+ * ceiling, and each grant only for the identity it was built for. `replica-read` serves Workers in
+ * the account (bouncer-watch); `cloudflare-deploy` and `migration-run` serve GitHub jobs.
  */
 function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
   const problems: string[] = [];
@@ -421,8 +503,12 @@ function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
     problems.push('dynamic lists a grant twice');
   }
   for (const entry of policy.dynamic) {
-    if (!isLeaseDynamicGrant(entry)) {
+    if (entry.grant === CLOUDFLARE_DEPLOY_GRANT) {
       problems.push(...cloudflareDeployProblems(policy, entry, pins));
+      continue;
+    }
+    if (entry.grant === MIGRATION_RUN_GRANT) {
+      problems.push(...migrationRunProblems(policy));
       continue;
     }
     const ceiling = LEASE_GRANT_MAX_TTL_SECONDS[entry.grant];
@@ -437,19 +523,46 @@ function dynamicProblems(policy: Policy, pins: CloudflareDeployPins): string[] {
         `dynamic ${entry.grant}: maxActive is above ${LEASE_MAX_ACTIVE_CEILING[entry.grant]}`
       );
     }
-    const { identity } = policy;
-    if (entry.grant === 'replica-read' && identity.kind !== 'worker-binding') {
+    if (entry.grant === 'replica-read' && policy.identity.kind !== 'worker-binding') {
       problems.push('dynamic replica-read is only for a worker-binding policy');
     }
-    if (entry.grant === 'ci-migration') {
-      if (identity.kind !== 'github-oidc') {
-        problems.push('dynamic ci-migration is only for a github-oidc policy');
-      } else if (identity.environment === undefined) {
-        problems.push(
-          'a github-oidc policy with dynamic ci-migration must bind identity.environment'
-        );
-      }
+  }
+  return problems;
+}
+
+/**
+ * A trigger-only policy (design Q64a): a GitHub job bound to a protected GitHub environment (a
+ * production one accepts `refs/heads/main` alone, checked with the other GitHub rules) that may
+ * start a migration run and hold nothing else: no secret, token grant, other dynamic grant or
+ * environment grant. A token of its job then opens nothing at STS but `attestGithubRun`.
+ */
+function migrationRunProblems(policy: Policy): string[] {
+  const problems: string[] = [];
+  const { identity } = policy;
+  if (identity.kind !== 'github-oidc') {
+    problems.push(`dynamic ${MIGRATION_RUN_GRANT} is only for a github-oidc policy`);
+  } else {
+    if (identity.environment === undefined) {
+      problems.push(
+        `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} must bind identity.environment`
+      );
     }
+    // In every environment: the job only triggers a run of what is on `main`, so no other ref has
+    // a reason to trigger one.
+    if (identity.refs.length !== 1 || identity.refs[0] !== GITHUB_PRODUCTION_REF) {
+      problems.push(
+        `a github-oidc policy with dynamic ${MIGRATION_RUN_GRANT} accepts only ${GITHUB_PRODUCTION_REF}`
+      );
+    }
+  }
+  if (
+    policy.secrets.length > 0 ||
+    policy.audiences.length > 0 ||
+    policy.scopes.length > 0 ||
+    policy.dynamic.length > 1 ||
+    Object.keys(policy.environmentGrants).length > 0
+  ) {
+    problems.push(`a policy with dynamic ${MIGRATION_RUN_GRANT} holds nothing else`);
   }
   return problems;
 }
@@ -500,6 +613,16 @@ function cloudflareDeployProblems(
   }
   if (entry.maxPerHour < entry.maxActive) {
     problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxPerHour is below maxActive`);
+  }
+  // Under maxPerRun every active run may hold maxPerRun tokens at once; together they must fit in
+  // this environment's share of the account's tokens.
+  if (
+    entry.maxPerRun !== undefined &&
+    entry.maxActive * entry.maxPerRun > DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING
+  ) {
+    problems.push(
+      `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxActive times maxPerRun is above ${DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING}`
+    );
   }
   if (hasDuplicates(entry.permissionGroups.map(group => group.id))) {
     problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permissionGroups lists a group twice`);
@@ -590,6 +713,31 @@ function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
   return problems;
 }
 
+/**
+ * True for a policy inside `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b): a Kilo-Org/cloud
+ * policy, by its ids, bound to a GitHub environment, naming only the carved-out workflow files,
+ * accepting nothing beyond `workflow_run`, `schedule` and `workflow_dispatch`, and holding its
+ * `cloudflare-deploy` grant and nothing else.
+ */
+function usesCloudflareDeployCarveOut(policy: Policy, identity: GithubIdentity): boolean {
+  const carveOut = Q71_CLOUDFLARE_DEPLOY_CARVE_OUT;
+  const files: readonly string[] = carveOut.jobWorkflowRefs;
+  return (
+    identity.repository === carveOut.repository &&
+    identity.repositoryId === carveOut.repositoryId &&
+    identity.repositoryOwnerId === carveOut.repositoryOwnerId &&
+    identity.environment !== undefined &&
+    identity.jobWorkflowRefs.every(entry => files.includes(entry)) &&
+    identity.events.every(event => event !== 'push') &&
+    policy.dynamic.length === 1 &&
+    cloudflareDeployGrant(policy) !== undefined &&
+    policy.secrets.length === 0 &&
+    policy.audiences.length === 0 &&
+    policy.scopes.length === 0 &&
+    Object.keys(policy.environmentGrants).length === 0
+  );
+}
+
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
 function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
@@ -614,17 +762,26 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
     problems.push('identity.jobWorkflowRefs contains a duplicate');
   }
   if (hasDuplicates(identity.events)) problems.push('identity.events contains a duplicate');
-  if (identity.events.includes('workflow_run') && identity.events.length > 1) {
+  // Q71 carve-out (Igor, 2026-11-27): a trigger-only policy holds nothing a token could read; its
+  // job only asks the migration proxy to apply what is on `main`, which the proxy checks itself
+  // (design Q64a). So it alone may list workflow_run with other events and grant production.
+  // Q71b (Igor, 2026-11-27): the deploy-only policies of Q71_CLOUDFLARE_DEPLOY_CARVE_OUT may too.
+  const carvedOut = holdsMigrationRun(policy) || usesCloudflareDeployCarveOut(policy, identity);
+  if (!carvedOut && identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }
   // A workflow_run job follows a run a pull request may have started, and its token carries the
   // default branch whatever that run was; only an environment's protection rules stand between it
   // and the policy's values, in any STS environment. STS cannot see the upstream run, so no
-  // production policy accepts it.
+  // production policy accepts it, except a carved-out one.
   if (identity.events.includes('workflow_run') && identity.environment === undefined) {
     problems.push('a github-oidc policy that accepts workflow_run must bind identity.environment');
   }
-  if (identity.events.includes('workflow_run') && policy.environments.includes('production')) {
+  if (
+    !carvedOut &&
+    identity.events.includes('workflow_run') &&
+    policy.environments.includes('production')
+  ) {
     problems.push('a github-oidc policy that accepts workflow_run cannot grant production');
   }
   const workflowPrefix = `${identity.repository}/.github/workflows/`;
@@ -641,7 +798,24 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
     if (identity.environment === undefined) {
       problems.push('a github-oidc policy that grants production must bind identity.environment');
     }
-    if (identity.refs.some(ref => ref !== GITHUB_PRODUCTION_REF)) {
+    const pinnedException = GITHUB_PRODUCTION_REF_EXCEPTIONS.some(
+      exception =>
+        policy.workload === exception.workload &&
+        identity.repository === exception.repository &&
+        identity.repositoryId === exception.repositoryId &&
+        identity.repositoryOwnerId === exception.repositoryOwnerId &&
+        identity.environment === exception.environment &&
+        sameList(identity.refs, exception.refs) &&
+        sameList(identity.jobWorkflowRefs, exception.jobWorkflowRefs) &&
+        sameList(identity.events, exception.events) &&
+        sameList(policy.environments, exception.environments) &&
+        sameList(policy.secrets, exception.secrets) &&
+        policy.audiences.length === 0 &&
+        policy.scopes.length === 0 &&
+        policy.dynamic.length === 0 &&
+        Object.keys(policy.environmentGrants).length === 0
+    );
+    if (identity.refs.some(ref => ref !== GITHUB_PRODUCTION_REF) && !pinnedException) {
       problems.push(
         `a github-oidc policy that grants production accepts only ${GITHUB_PRODUCTION_REF}`
       );

@@ -1,11 +1,12 @@
 import {
   AuditBatchTooLargeError,
+  AuditEventInvalidError,
+  assertRelayable,
   encodeAuditBatch,
   type AuditEvent,
 } from '@kilocode/sts-contracts';
 import { describe, expect, it } from 'vitest';
 import { tokenDeniedEvent, tokenIssuedEvent, tokenKeyRotatedEvent } from '../../src/audit/events';
-import { AuditEventInvalidError, assertRelayable } from '../../src/audit/relay';
 
 // The token events as STS builds them, at their largest: they must pass the producer-side check
 // before every append, and travel alone and in full batches. The audit relay's own tests decode,

@@ -1671,8 +1671,9 @@ In this order:
    and `outcome` `link_required` or `email_unverified`, and `ai.kilo.uts.account.created` audit
    rows whose `attributes` name `provider` `linkedin`. The new production LinkedIn app gives
    imported users a new member id, so they link only through a proven email, and a different
-   LinkedIn email creates a separate account (design decision M161): these counts show how many
-   were refused a link and how many got a separate account.
+   LinkedIn email creates a separate account (design decision M161): these counts bound how many
+   link attempts were refused (attempts, not users) and how many may have got a separate account
+   (new LinkedIn accounts, which also include first-time users).
 
 **Rollback**, in this order: remove the four `SIGNIN_<PROVIDER>_CLIENT_ID` vars from the top level
 of `wrangler.jsonc` and let that deploy, so production offers none of the four providers (the proof

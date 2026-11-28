@@ -426,7 +426,7 @@ describe('the UTS configs themselves', () => {
     const productionVars = (edit: (vars: Record<string, unknown>) => Record<string, unknown>) =>
       mintWith(raw => ({ ...raw, vars: edit(z.record(z.string(), z.unknown()).parse(raw.vars)) }));
     const CLIENT_IDS =
-      'SIGNIN_GITHUB_CLIENT_ID, SIGNIN_GITLAB_CLIENT_ID, SIGNIN_LINKEDIN_CLIENT_ID, SIGNIN_GOOGLE_CLIENT_ID';
+      'SIGNIN_GITHUB_CLIENT_ID, SIGNIN_GITLAB_CLIENT_ID, SIGNIN_GOOGLE_CLIENT_ID, SIGNIN_LINKEDIN_CLIENT_ID';
 
     it('set GitHub, Google, GitLab and LinkedIn in production, accepted once SECRETS_SOURCE reads sts', () => {
       const vars = z.record(z.string(), z.unknown()).parse(configAt(MINT_CONFIG).config.vars);

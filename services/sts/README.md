@@ -564,11 +564,11 @@ binding arrives with that Worker's own change; until then the repository check i
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
 
-GitHub Actions workloads (`github-oidc`, production only, `refs/heads/main`, each workflow file
-pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2` on `refs/heads/v2`; see
-[GitHub Actions callers](#github-actions-callers)). All are in `Kilo-Org/kilocode` (repository id
-`946087422`, owner id `201822503`) and grant no token, lease or deploy token; their bundles are
-`/ci/<workload>`:
+GitHub Actions workloads of `Kilo-Org/kilocode` (`github-oidc`, production only,
+`refs/heads/main`, each workflow file pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2`
+on `refs/heads/v2`; see [GitHub Actions callers](#github-actions-callers)). All are in
+`Kilo-Org/kilocode` (repository id `946087422`, owner id `201822503`) and grant no token, lease or
+deploy token; their bundles are `/ci/<workload>`:
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
@@ -604,6 +604,52 @@ Three kilocode-side rules hold these policies to what they name:
   repository code and runtimes pinned by version and digest: STS cannot tell the jobs of one
   workflow file apart, so another job of `publish.yml` declaring the environment receives the
   bundle too.
+
+GitHub Actions secret bundles of `Kilo-Org/cloud` (repository id `1145038391`, owner id
+`201822503`, immutable subjects, `refs/heads/main` only, one workflow file per policy). They grant
+no token, lease or deploy token; their bundles are `/ci/<workload>`, read with
+`.github/actions/sts-bundle` (its README lists the job rules and their exceptions):
+
+| Workload | STS environment | GitHub environment | Workflow file | Events | Secrets |
+|---|---|---|---|---|---|
+| `ci-vercel-stage-production-app` | production | `production-vercel-app` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP` |
+| `ci-vercel-stage-production-ai-gateway` | production | `production-vercel-ai-gateway` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY` |
+| `ci-vercel-stage-production-ai-gateway-secure-proxy` | production | `production-vercel-ai-gateway-secure-proxy` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
+| `ci-vercel-stage-staging-app` | production | `staging-vercel-app` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP` |
+| `ci-vercel-stage-staging-ai-gateway` | production | `staging-vercel-ai-gateway` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY` |
+| `ci-vercel-promote` | production | `production` | `promote-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN`, `AXIOM_ANNOTATION_TOKEN` |
+| `ci-cloud-agent-sentry` | production | `production` | `cloud-agent-sentry-sourcemaps.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `SENTRY_AUTH_TOKEN` |
+| `ci-cloud-agent-sentry-staging` | production | `staging` | `cloud-agent-sentry-sourcemaps.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `SENTRY_AUTH_TOKEN` |
+| `ci-kilo-app-release` | production | `release` | `kilo-app-release.yml` | `push`, `schedule`, `workflow_dispatch` | `EXPO_TOKEN` |
+| `ci-auto-docs` | production | `production` | `auto-docs.yml` | `push`, `workflow_dispatch` | `DOC_WEBHOOK_URL`, `DOC_WEBHOOK_SECRET` |
+| `ci-kiloclaw-dev-push` | staging | none | `push-dev-kiloclaw.yml` | `workflow_dispatch` | `FLY_DEV_API_TOKEN` |
+
+The stage job runs in one GitHub environment per Vercel environment and project, and each of those
+environments has its own policy holding that project's token alone: every caller of the file
+presents the same `job_workflow_ref`, so the `environment` claim is what keeps one project's stage
+job from opening another project's token. The promote policy holds the one team token
+(`VERCEL_TOKEN`), which a project token cannot replace: promotion with the project tokens failed
+and was reverted (#5513). The Vercel project tokens can deploy production, so the staging stage
+policies read them from the production manager too. The first eight are reusable workflows: a
+deploy workflow's own file belongs to its trigger-only policy (see "Trigger-only policies" below),
+so the reader jobs live in files of their own, and `scripts/sts-bundle-callers.test.mjs` pins every
+caller. Their callers run on `workflow_run`, `schedule` and `workflow_dispatch`, which those
+policies accept under the D53/M112 carve-out (manager ruling M112, extending D53):
+`D53_M112_CI_BUNDLE_CARVE_OUT` in `src/policy/schema.ts` lists exactly
+`stage-vercel-deployment.yml`, `promote-vercel-deployment.yml` and
+`cloud-agent-sentry-sourcemaps.yml`, and admits a policy only when it is a `Kilo-Org/cloud` policy
+on `refs/heads/main`, binds a GitHub environment, names exactly one of those files, accepts no
+event beyond those three, holds at least one secret, and grants no token, dynamic grant or
+environment grant. These jobs already received the same values as GitHub secrets on the same
+triggers; the environments `production`, `staging` and `release` admit deployments from `main`
+only (read back 2026-11-27), and the five `*-vercel-*` environments must be created with the same
+`main`-only branch policy before the first run.
+
+Exceptions that stay outside STS on purpose (criterion 2): `sts-deployment-watch.yml` and
+`sts-deployment-watch-health.yml` (the watcher of STS's own deployments, with its own Cloudflare
+read token), and `notify-main-failure.yml` and `notify-production-deploy-failure.yml` (manager
+ruling M112b). All four post with the `DEPLOY_NOTIFY_SLACK_WEBHOOK_URL` GitHub secret, because
+each alert must still reach Slack when STS is down.
 
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
@@ -860,7 +906,9 @@ Rules the loader enforces:
   `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
   lists `workflow_run` lists no other event, binds an `environment`, and does not grant
   `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
-  pull request started the upstream run, and STS cannot see that run.
+  pull request started the upstream run, and STS cannot see that run. Three carve-outs: trigger-only
+  policies (Q71, below), the deploy-only policies of `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b,
+  below), and the secret bundles of `D53_M112_CI_BUNDLE_CARVE_OUT` (above).
 - A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`,
   unless it equals an entry of `GITHUB_PRODUCTION_REF_EXCEPTIONS` in every field (today only
   `ci-kilocode-app-key-v2`); a policy with token grants binds an `environment`.
@@ -950,9 +998,11 @@ verifier, so its job's token opens nothing there even with the STS audience.
 `environment` (production also only `refs/heads/main`); no secret, audience, scope, other dynamic
 grant or environment grant; and no other policy, in any environment, naming one of its workflow
 files (on top of the rule that two policies may not share a repository, environment and workflow
-file). Q71 carve-out (Igor, 2026-11-27): only such a policy may list `workflow_run` together with
-`schedule` and `workflow_dispatch` and grant production; the workflow's `workflow_run` trigger
-stays limited to `branches: [main]`. The name `migration-proxy` is registered for the proxy's own
+file). Q71 carve-out (Igor, 2026-11-27): such a policy may list `workflow_run` together with
+`schedule` and `workflow_dispatch` and grant production, as may the deploy-only policies of
+`Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b) and the D53/M112 secret bundles above; the workflow's
+`workflow_run` trigger stays limited to `branches: [main]`. The name
+`migration-proxy` is registered for the proxy's own
 Worker: the change that adds the Worker turns it into its `worker-binding` policy (staging and
 production, `MIGRATION_PROXY_DB_PASSWORD` and `MIGRATION_PROXY_GITHUB_APP_KEY` in
 `/workloads/migration-proxy`), since the repository check refuses a worker-binding policy no

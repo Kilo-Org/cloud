@@ -162,6 +162,7 @@ export async function handleEmailRequest(
   }
   const setting = methods.email;
   if (setting.status === 'off') return null;
+  if (setting.status === 'unavailable') return unavailablePage(true);
   if (setting.status === 'misconfigured') {
     logMisconfigured('email', setting.missing);
     return messagePage('Sign in to Kilo', 'Email sign-in is not available.', 500, null);

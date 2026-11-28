@@ -14,9 +14,9 @@ export const UTS_TOKEN_ALG = 'EdDSA';
 export const UTS_TOKEN_TYPE = 'at+jwt';
 
 /**
- * The longest lifetime any UTS-signed token has: the CI token and the sandbox fallback token live
- * 1 hour (design 5.3). A retired key stays published until this plus 10 minutes after it stopped
- * signing, so the signer refuses any claim set that would outlive it.
+ * The longest lifetime any UTS-signed token has: the CI token, the bot token and the sandbox
+ * fallback token live 1 hour (design 5.3). A retired key stays published until this plus 10
+ * minutes after it stopped signing, so the signer refuses any claim set that would outlive it.
  */
 export const UTS_MAX_TOKEN_LIFETIME_SECONDS = 60 * 60;
 
@@ -56,6 +56,8 @@ export const SignableClaimsSchema = z
     auth_time: NumericDateSchema.optional(),
     amr: z.array(z.string().min(1)).min(1).optional(),
     env: UtsEnvironmentSchema,
+    /** Design 5.3: `true` on a bot token, absent on every other token. */
+    bot_user: z.literal(true).optional(),
   })
   .refine(claims => claims.scope.startsWith(`${claims.aud}:`), 'scope must belong to the audience')
   .refine(claims => claims.exp > claims.iat, 'exp must be after iat')

@@ -501,10 +501,14 @@ describe('VercelSnapshotBuild persistence isolation', () => {
       owner_type: 'user',
       credential_id: CREDENTIAL_ID,
     });
-    expect(mocks.fetchCredential).toHaveBeenCalledWith(expect.anything(), {
-      userId: PERSONAL_USER_ID,
-      credentialId: CREDENTIAL_ID,
-    });
+    expect(mocks.fetchCredential).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        userId: PERSONAL_USER_ID,
+        credentialId: CREDENTIAL_ID,
+      },
+      expect.anything()
+    );
 
     await build.cleanup(input);
 
@@ -534,7 +538,8 @@ describe('VercelSnapshotBuild persistence isolation', () => {
         userId: PERSONAL_USER_ID,
         credentialId: CREDENTIAL_ID,
         setupStatus: 'building',
-      })
+      }),
+      expect.anything()
     );
   });
 
@@ -1533,7 +1538,8 @@ describe('VercelSnapshotBuild cleanup', () => {
 
     expect(mocks.projectStatus).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ setupStatus: 'failed' })
+      expect.objectContaining({ setupStatus: 'failed' }),
+      expect.anything()
     );
     expect(mocks.client.stopSession.mock.calls).toEqual([
       ['validator-failed', state.validator_name],
@@ -1587,7 +1593,8 @@ describe('VercelSnapshotBuild cleanup', () => {
 
     expect(mocks.projectStatus).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ setupStatus: 'failed', runtimeSnapshotId: null })
+      expect.objectContaining({ setupStatus: 'failed', runtimeSnapshotId: null }),
+      expect.anything()
     );
     expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('snapshot-failed');
     expect(storedRow(fixture)).toBeUndefined();
@@ -2172,7 +2179,8 @@ describe('VercelSnapshotBuild runtime preparation', () => {
       expect.objectContaining({
         setupStatus: 'failed',
         setupError: 'runtime_startup_unavailable',
-      })
+      }),
+      expect.anything()
     );
   });
 
@@ -2244,7 +2252,8 @@ describe('VercelSnapshotBuild runtime preparation', () => {
         setupStatus: 'ready',
         runtimeSnapshotId: 'snapshot-ready',
         runtimeDigest: 'digest-test',
-      })
+      }),
+      expect.anything()
     );
     expect(mocks.client.deleteSnapshot).toHaveBeenCalledWith('snapshot-old');
     expect(storedRow(fixture)).toBeUndefined();
@@ -2268,7 +2277,8 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
       expect(mocks.projectStatus).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ setupStatus: 'ready', runtimeSnapshotId: 'snapshot-ready' })
+        expect.objectContaining({ setupStatus: 'ready', runtimeSnapshotId: 'snapshot-ready' }),
+        expect.anything()
       );
       expect(mocks.client.deleteSnapshot).not.toHaveBeenCalled();
       expect(storedRow(fixture)).toBeUndefined();
@@ -2298,7 +2308,8 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
       expect(mocks.projectStatus).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ setupStatus: 'ready', runtimeSnapshotId: 'snapshot-ready' })
+        expect.objectContaining({ setupStatus: 'ready', runtimeSnapshotId: 'snapshot-ready' }),
+        expect.anything()
       );
       expect(mocks.client.deleteSnapshot.mock.calls).toEqual([['snapshot-old']]);
       expect(storedRow(fixture)).toBeUndefined();
@@ -2342,7 +2353,8 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     await runNextAlarm(fixture);
     expect(mocks.projectStatus).toHaveBeenLastCalledWith(
       expect.anything(),
-      expect.objectContaining({ setupStatus: 'failed' })
+      expect.objectContaining({ setupStatus: 'failed' }),
+      expect.anything()
     );
     expect(storedRow(fixture)).toBeUndefined();
   });
@@ -2361,7 +2373,8 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
     expect(mocks.projectStatus).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ setupStatus: 'ready', runtimeSnapshotId: 'snapshot-ready' })
+      expect.objectContaining({ setupStatus: 'ready', runtimeSnapshotId: 'snapshot-ready' }),
+      expect.anything()
     );
     expect(mocks.client.deleteSnapshot).not.toHaveBeenCalled();
     expect(storedRow(fixture)).toBeUndefined();

@@ -1292,6 +1292,85 @@ describe('User', () => {
         await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
       ).toBeDefined();
     });
+
+    describe('outside Vercel production', () => {
+      const runtimeNames = ['VERCEL_ENV', 'VERCEL_TARGET_ENV'] as const;
+      const saved = Object.fromEntries(runtimeNames.map(name => [name, process.env[name]]));
+      const bouncerCalls = (spy: jest.SpiedFunction<typeof fetch>) =>
+        spy.mock.calls
+          .map(([input]) => (input instanceof Request ? input.url : String(input)))
+          .filter(url => url.startsWith('https://bouncer.example.com/'));
+
+      afterEach(() => {
+        for (const name of runtimeNames) {
+          if (saved[name] === undefined) delete process.env[name];
+          else process.env[name] = saved[name];
+        }
+      });
+
+      it.each([
+        { name: 'staging', env: 'preview', target: 'staging' },
+        { name: 'preview', env: 'preview', target: 'preview' },
+      ])(
+        'creates the user on a $name deployment without calling Bouncer',
+        async ({ name, env, target }) => {
+          process.env.VERCEL_ENV = env;
+          process.env.VERCEL_TARGET_ENV = target;
+          mockSignupDecide.mockImplementation(actualSignupDecide);
+          const fetchSpy = jest
+            .spyOn(global, 'fetch')
+            .mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+          const email = `bouncer-skipped-${name}@example.com`;
+          const result = await createOrUpdateUser(
+            {
+              google_user_email: email,
+              google_user_name: 'Bouncer Skipped',
+              google_user_image_url: '',
+              hosted_domain: null,
+              provider: 'google',
+              provider_account_id: `google-bouncer-skipped-${name}`,
+            },
+            undefined,
+            false,
+            new Headers({ 'x-forwarded-for': '203.0.113.61' })
+          );
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.isNew).toBe(true);
+          expect(mockSignupDecide).not.toHaveBeenCalled();
+          expect(bouncerCalls(fetchSpy)).toEqual([]);
+          expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+        }
+      );
+
+      it('still asks Bouncer on a Vercel production deployment', async () => {
+        process.env.VERCEL_ENV = 'production';
+        process.env.VERCEL_TARGET_ENV = 'production';
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchSpy = jest
+          .spyOn(global, 'fetch')
+          .mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: 'bouncer-production@example.com',
+            google_user_name: 'Bouncer Production',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-production',
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.62' })
+        );
+
+        expect(result.success).toBe(true);
+        expect(bouncerCalls(fetchSpy)).toEqual([
+          'https://bouncer.example.com/api/v1/signup-decide',
+        ]);
+      });
+    });
     it.each([
       'unknown response',
       'invalid nine-flag rejection',

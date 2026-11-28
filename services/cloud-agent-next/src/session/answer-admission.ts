@@ -20,6 +20,7 @@ import {
 import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { withDORetry } from '../utils/do-retry.js';
 import type {
   ControlPlaneAnswerReply,
@@ -70,6 +71,8 @@ export type AnswerAdmissionOutcome =
  */
 export async function answerWithAdmission(params: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   authToken?: string;
   cloudAgentSessionId: string;
@@ -96,6 +99,7 @@ export async function answerWithAdmission(params: {
 
   const balance = await (params.deps?.validatePromptBalance ?? defaultValidatePromptBalance)({
     env: params.env,
+    ctx: params.ctx,
     authToken,
     userId: params.userId,
     cloudAgentSessionId: params.cloudAgentSessionId,
@@ -114,7 +118,7 @@ export async function answerWithAdmission(params: {
   };
   const admitted = await preflightAndAdmitPromptMessage(
     input,
-    { env: params.env, userId: params.userId, authToken },
+    { env: params.env, executionCtx: params.ctx, userId: params.userId, authToken },
     'kilo.answer',
     () =>
       withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneContinuationAdmissionResult>(

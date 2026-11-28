@@ -220,11 +220,13 @@ describe('STS success log', () => {
 
     expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', null)).toEqual({
       status: 'keyless',
+      source: 'sts',
     });
     expect(info).not.toHaveBeenCalled();
 
     expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', 'presented')).toEqual({
       status: 'read',
+      source: 'sts',
       secret: BUNDLE_VALUES.CALLBACK_TOKEN_SECRET,
     });
     expect(info).toHaveBeenCalledOnce();
@@ -251,6 +253,7 @@ describe('expectedSecret', () => {
 
     expect(await expectedSecret(env, 'INTERNAL_API_SECRET', null)).toEqual({
       status: 'read',
+      source: 'secrets-store',
       secret: STORE_VALUE,
     });
     expect(storeGet).toHaveBeenCalledOnce();
@@ -264,6 +267,7 @@ describe('expectedSecret', () => {
 
       expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', presented)).toEqual({
         status: 'keyless',
+        source: 'sts',
       });
       expect(getBundle).not.toHaveBeenCalled();
       expect(storeGet).not.toHaveBeenCalled();
@@ -275,6 +279,7 @@ describe('expectedSecret', () => {
 
     expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', 'presented')).toEqual({
       status: 'read',
+      source: 'sts',
       secret: BUNDLE_VALUES.CALLBACK_TOKEN_SECRET,
     });
     expect(storeGet).not.toHaveBeenCalled();

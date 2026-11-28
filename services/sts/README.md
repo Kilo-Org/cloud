@@ -507,6 +507,7 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `uts` | staging, production | `services/uts/wrangler.jsonc`; reads stay on the Worker secrets until `SECRETS_SOURCE` is `sts`; no development, because the `uts-local` config binds no STS |
 | `kilo-ai-attribution` | production | `services/ai-attribution/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `auto-routing` | production | `services/auto-routing/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `auto-routing-benchmark` | production | `services/auto-routing-benchmark/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
@@ -525,6 +526,8 @@ Workloads with a policy, all over `worker-binding`:
 | `kilo-code-review-worker` | production | `services/code-review-infra/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
 | `session-sync` | production | `services/session-sync/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `user-data-export` | production | `services/user-data-export/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
+| `kilo-ops` | production | `services/kilo-ops/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc`; reads stay on the Worker secret and Secrets Store bindings until `SECRETS_SOURCE` is `sts` |
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.

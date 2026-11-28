@@ -8,10 +8,12 @@
     "dev": "wrangler dev --env dev",
     "deploy:prod": "wrangler deploy",
     "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
     "types": "wrangler types --include-runtime=false"
   },
   "dependencies": {
     "@cloudflare/containers": "0.3.4",
+    "@kilocode/secrets-client": "workspace:*",
     "hono": "catalog:",
     "jose": "catalog:"
   },
@@ -19,6 +21,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:vitest5",
     "wrangler": "catalog:"
   }
 }

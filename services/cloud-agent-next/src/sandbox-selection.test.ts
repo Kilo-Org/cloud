@@ -379,12 +379,23 @@ describe('sandbox selection policy', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('hands the invocation context to both BYOC enrollment lookups', async () => {
+    const ctx = { waitUntil: vi.fn() };
+    const env = { SANDBOX_SELECTION_IDS: '*', BYOC_VERCEL_IDS: '*' } as Env;
+
+    await resolveVercelSelectionReadiness(env, owner, undefined, ctx);
+    await resolveVercelSelectionReadiness(env, { userId: owner.userId }, undefined, ctx);
+
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(env, owner.orgId, ctx);
+    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(env, owner.userId, ctx);
+  });
+
   it('uses the personal BYOC credential lookup without platform credentials', async () => {
     const env = { SANDBOX_SELECTION_IDS: '*', BYOC_VERCEL_IDS: '*' } as Env;
     const personal = { userId: owner.userId };
 
     await expect(resolveVercelSelectionReadiness(env, personal)).resolves.toEqual({});
-    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(env, owner.userId);
+    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(env, owner.userId, undefined);
     expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
 
     const capabilities = await getSandboxSelectionCapabilities(env, personal);

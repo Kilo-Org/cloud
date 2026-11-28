@@ -89,7 +89,7 @@ function logStsReadOnce(value: string): void {
  * Reads one name from the STS bundle and returns it as delivered, empty included, so each caller
  * keeps its own empty-value handling. It never throws and never reads the Secrets Store: a failure
  * returns only a fixed reason, so no error name, message or cause reaches a log or a response. It
- * does not check `SECRETS_SOURCE`; the `sts` source and the pre-flip comparison
+ * does not check `SECRETS_SOURCE`; the `sts` source and the source comparison
  * (src/secrets-compare.ts) both read through it.
  */
 export async function readStsSecret(
@@ -160,13 +160,13 @@ export async function readSecret<N extends WebhookSecretName>(
 }
 
 /**
- * What an inbound credential is checked against. `read` holds the value as the source returned it.
+ * What an inbound credential is checked against. `read` holds the value as `source` returned it.
  * `keyless` means the `sts` source read nothing because the request presents no credential; the
  * verifier refuses it as it refuses any missing credential. `refused` carries a fixed reason.
  */
 export type ExpectedSecret =
-  | { status: 'read'; secret: string }
-  | { status: 'keyless' }
+  | { status: 'read'; source: WebhookSecretsSource; secret: string }
+  | { status: 'keyless'; source: 'sts' }
   | { status: 'refused'; reason: SecretRefusal };
 
 /**
@@ -183,25 +183,25 @@ export async function expectedSecret<N extends WebhookSecretName>(
   const source = secretsSource(env);
   const bindings: Record<N, SecretsStoreSecret | string> = env;
   if (source === 'secrets-store') {
-    return { status: 'read', secret: await getSecretValue(bindings[name]) };
+    return { status: 'read', source, secret: await getSecretValue(bindings[name]) };
   }
   if (source === undefined) return { status: 'refused', reason: 'invalid_source' };
-  if (!presented) return { status: 'keyless' };
+  if (!presented) return { status: 'keyless', source };
   const read = await readStsSecret(env, name);
   if (read.ok) logStsReadOnce(read.value);
   return read.ok
-    ? { status: 'read', secret: read.value }
+    ? { status: 'read', source, secret: read.value }
     : { status: 'refused', reason: read.reason };
 }
+
+/** The two inbound verifiers, as fixed log labels. */
+export type VerifierRoute = 'internal-api' | 'execution-callback';
 
 /**
  * The generic, retryable answer a verifier gives when it cannot get its expected value, before it
  * reads the body or calls a Durable Object. The log line carries only fixed fields.
  */
-export function secretUnavailableResponse(
-  route: 'internal-api' | 'execution-callback',
-  reason: SecretRefusal
-): Response {
+export function secretUnavailableResponse(route: VerifierRoute, reason: SecretRefusal): Response {
   logger.error('Webhook verifier secret unavailable', { route, reason });
   return Response.json(resError('Internal key unavailable'), {
     status: 503,

@@ -234,7 +234,7 @@ Captured requests go through the following status lifecycle:
 | `ENVIRONMENT` | `production` or `development` |
 | `KILOCODE_BACKEND_BASE_URL` | Backend API URL |
 | `SECRETS_SOURCE` | Where the three secrets below are read; see [Secrets source](#secrets-source) |
-| `SECRETS_COMPARE_ENABLED` | `true` runs the pre-flip STS copy check; see [Secrets source](#secrets-source) |
+| `SECRETS_COMPARE_ENABLED` | `true` runs the background source comparison; see [Secrets source](#secrets-source) |
 
 ## Secrets (via Secrets Store)
 
@@ -253,7 +253,9 @@ Captured requests go through the following status lifecycle:
 
 Any other value refuses every read in the same way. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants the three names, each resolved from `/shared` (a name not yet copied there reads as missing).
 
-`SECRETS_COMPARE_ENABLED` (only the exact value `true`) turns on the pre-flip check in `src/secrets-compare.ts`. It runs once per isolate, after the first request that passes the legacy authentication — an `X-Internal-API-Key` check on `/api/*` or an `X-Callback-Token` check on `/api/callbacks/execution` — so it never runs before an authorized request and never on one that is refused. It compares the STS copy of each of the three names with the bytes the Secrets Store serves and logs one `webhook_secrets_compare` event holding only the three names and their booleans. It never changes a response, and a comparison that has not settled within 25 s reports every name `false`. It requires production and `SECRETS_SOURCE` `secrets-store`: with `sts` selected it never runs, and `env.dev` sets neither value. To stop every comparison, set the flag to `false` or unset it.
+Every `401` from `/api/*` or `/api/callbacks/execution` logs its warning with fixed fields only: `route` (`internal-api` or `execution-callback`), `secret`, the serving `source` and `reason` (`missing` or `invalid`).
+
+`SECRETS_COMPARE_ENABLED` (only the exact value `true`, and only in production) turns on the background check in `src/secrets-compare.ts`, under either source. It compares the bytes the serving source gave with the other source and never changes a response or serves the other source's value. For the route's own name it uses the value the request was checked against. After the first request in an isolate that passes an `X-Internal-API-Key` check on `/api/*` or an `X-Callback-Token` check on `/api/callbacks/execution`, it compares all three names once and logs one `webhook_secrets_compare` event: the three names and their booleans as before, plus `route`, `source` and `mismatched` (the names whose two values were both read and differ). After the first refused credential per route in an isolate, it compares that route's name only and logs one `webhook_secrets_compare_refused` event with `route`, `secret`, `source` and `result` (`match`, `mismatch` or `unproven`). A request without a credential never starts one. A comparison that has not settled within 25 s proves nothing. `env.dev` sets neither value. To stop every comparison, set the flag to `false` or unset it; nothing is then read for it.
 
 ## Authentication
 

@@ -8,10 +8,53 @@ name: Notifications runtime copy (M84, temporary)
 # and it runs only from Kilo-Org/cloud main in the protected `notifications-runtime-copy`
 # environment. That environment must already exist with main as its only deployment branch,
 # no admin bypass, and required reviewers with self-review prevented (the dispatcher cannot
-# approve their own run). A first job with no secret and no environment reads it back; the copy
-# job references the environment only after that guard passes, so a dispatch can never
-# auto-create it unprotected. The driver reads it back again. This workflow never creates
-# or configures it.
+# approve their own run). GitHub enforces those rules when the copy job starts. This workflow
+# never creates, configures or reads it: the job token cannot read environment settings
+# (that needs the administration permission, which GITHUB_TOKEN never gets).
+#
+# Before dispatch (operator, with an organization and repository admin login), in this order.
+#
+# 1. Read the environment back. A 404 means it does not exist; do not dispatch, because a
+#    dispatch would create it with no protection.
+#
+#   gh api repos/Kilo-Org/cloud/environments/notifications-runtime-copy --jq '{
+#     adminBypassOff: (.can_admins_bypass == false),
+#     customBranchPolicyOnly: (.deployment_branch_policy
+#       == {protected_branches: false, custom_branch_policies: true}),
+#     reviewers: ([.protection_rules[] | select(.type == "required_reviewers")]
+#       | length == 1 and .[0].prevent_self_review == true and (.[0].reviewers | length >= 2)
+#       and any(.[0].reviewers[]; .reviewer.login == "iscekic"))}'
+#   gh api repos/Kilo-Org/cloud/environments/notifications-runtime-copy/deployment-branch-policies \
+#     --jq '{onlyMain: ([.branch_policies[] | {name, type}] == [{name: "main", type: "branch"}])}'
+#
+#    All four booleans must be true.
+#
+# 2. List Actions secrets and variables outside the environment, names only. No M65_* name may
+#    exist at organization level (or be shared with this repository) or at repository level: such
+#    a value would stand in for a missing environment value. Each command must print only empty
+#    lists.
+#
+#   gh api --paginate 'orgs/Kilo-Org/actions/secrets?per_page=100' \
+#     --jq '[.secrets[].name | select(startswith("M65_"))]'
+#   gh api --paginate 'orgs/Kilo-Org/actions/variables?per_page=30' \
+#     --jq '[.variables[].name | select(startswith("M65_"))]'
+#   gh api --paginate 'repos/Kilo-Org/cloud/actions/organization-secrets?per_page=100' \
+#     --jq '[.secrets[].name | select(startswith("M65_"))]'
+#   gh api --paginate 'repos/Kilo-Org/cloud/actions/organization-variables?per_page=30' \
+#     --jq '[.variables[].name | select(startswith("M65_"))]'
+#   gh api --paginate 'repos/Kilo-Org/cloud/actions/secrets?per_page=100' \
+#     --jq '[.secrets[].name | select(startswith("M65_"))]'
+#   gh api --paginate 'repos/Kilo-Org/cloud/actions/variables?per_page=30' \
+#     --jq '[.variables[].name | select(startswith("M65_"))]'
+#
+# 3. Immediately before setting the environment's writer secrets (M65_INFISICAL_CLIENT_SECRET,
+#    M65_OPERATOR_PREFLIGHT), run the two step 1 reads and the step 2 lists again. Set the secrets
+#    only when all four booleans are still true and every list is still empty, then dispatch.
+#    Keep the window from this step to the reviewers' approval short.
+#
+# After the run, the operator deletes both environment secrets. Record every boolean and every
+# empty list in the run notes. The first job (no secret, no environment, `contents: read` only;
+# the guard step gets no token) refuses a wrong dispatch before reviewers are asked.
 #
 # Concurrency: its own group, so it can never replace or cancel a pending production or
 # staging rollout. Instead the driver refuses while any Worker rollout workflow is queued or
@@ -38,13 +81,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  environment-guard:
+  dispatch-guard:
     if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
-      actions: read
     steps:
       - name: Checkout the dispatched commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -57,14 +99,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Read back the protected environment
+      - name: Check the dispatch
         env:
           EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/secrets-migration/m84-notifications-run.mjs --environment-guard
+        run: node scripts/secrets-migration/m84-notifications-run.mjs --dispatch-guard
 
   copy:
-    needs: environment-guard
+    needs: dispatch-guard
     if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 80

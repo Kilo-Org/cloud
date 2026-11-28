@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
-import type { Env } from '../../env';
+import type { UtsSecrets } from '../../secrets';
 
 /**
  * RFC 8628 user codes (section 6.1): 8 characters from 20 consonants, shown as `XXXX-XXXX`, so a
@@ -45,18 +45,23 @@ export function formatUserCode(normalized: string): string {
 export type UserCodeKey = CryptoKey;
 
 /**
- * The environment's user-code secret: `off` where it is unset, `misconfigured` where it is not 32
- * bytes in base64url. It never throws: in both cases the device grant is not served, and a bad
- * value cannot fail the token, metadata or any other route.
+ * The environment's user-code secret, `DEVICE_USER_CODE_KEY` from the selected secrets source
+ * (src/secrets.ts): `off` where it is unset or empty (a manager placeholder), `misconfigured` where
+ * it is not 32 bytes in base64url, `unavailable` where STS gave no usable bundle. It never throws:
+ * in each of these cases the device grant is not served, and a bad value cannot fail the token,
+ * metadata or any other route.
  */
 export type UserCodeSecret =
   | { status: 'on'; secret: string }
   | { status: 'off' }
-  | { status: 'misconfigured' };
+  | { status: 'misconfigured' }
+  | { status: 'unavailable' };
 
-export function userCodeSecret(env: Pick<Env, 'DEVICE_USER_CODE_KEY'>): UserCodeSecret {
-  if (env.DEVICE_USER_CODE_KEY === undefined) return { status: 'off' };
-  const parsed = KeySchema.safeParse(env.DEVICE_USER_CODE_KEY);
+export function userCodeSecret(secrets: UtsSecrets): UserCodeSecret {
+  if (secrets.status === 'unavailable') return { status: 'unavailable' };
+  const value = secrets.values.DEVICE_USER_CODE_KEY;
+  if (value === undefined || value === '') return { status: 'off' };
+  const parsed = KeySchema.safeParse(value);
   return parsed.success ? { status: 'on', secret: parsed.data } : { status: 'misconfigured' };
 }
 

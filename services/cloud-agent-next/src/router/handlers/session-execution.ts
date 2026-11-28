@@ -63,6 +63,7 @@ export function createSessionExecutionV2Handlers() {
           const admissionInput = { cloudAgentSessionId: input.cloudAgentSessionId };
           const admissionContext = {
             env: ctx.env,
+            executionCtx: ctx.executionCtx,
             userId: ctx.userId,
             botId: ctx.botId,
             authToken: ctx.authToken,
@@ -77,6 +78,7 @@ export function createSessionExecutionV2Handlers() {
 
           await preflightPreparedInitialPromptModel({
             env: ctx.env,
+            ctx: ctx.executionCtx,
             userId: ctx.userId,
             cloudAgentSessionId: input.cloudAgentSessionId,
             procedure: 'initiateFromKilocodeSessionV2',
@@ -157,6 +159,7 @@ export function createSessionExecutionV2Handlers() {
           };
           const admissionContext = {
             env: ctx.env,
+            executionCtx: ctx.executionCtx,
             userId: ctx.userId,
             botId: ctx.botId,
             authToken: ctx.authToken,

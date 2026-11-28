@@ -2,7 +2,8 @@ import { TRPCError } from '@trpc/server';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess } from '@kilocode/worker-utils';
 import { z } from 'zod';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { DEFAULT_BACKEND_URL } from '../../constants.js';
 import { getPgDb } from '../../db/pg.js';
 import { logger } from '../../logger.js';
@@ -12,6 +13,7 @@ import {
   type WorkspacePullRequestSummary,
 } from '../../session/workspace-pull-request.js';
 import type { Env } from '../../types.js';
+import { WEB_HOSTED_WORKSPACE_PR_REFRESH, webInternalCredential } from '../../web-internal-auth.js';
 import { protectedProcedure } from '../auth.js';
 
 const REFRESH_PATH = '/api/internal/cloud-agent-next/hosted-workspace-pull-request/refresh';
@@ -75,11 +77,15 @@ export const refreshHostedWorkspacePullRequest = protectedProcedure
       }
     }
 
-    const refresh = await requestWorkspacePullRequestRefresh(ctx.env, {
-      workspaceId: input.workspaceId,
-      userId: workspace.userId,
-      organizationId: workspace.organizationId,
-    });
+    const refresh = await requestWorkspacePullRequestRefresh(
+      ctx.env,
+      {
+        workspaceId: input.workspaceId,
+        userId: workspace.userId,
+        organizationId: workspace.organizationId,
+      },
+      ctx.executionCtx
+    );
     const summaries = await readWorkspacePullRequestSummaries(ctx.env, {
       userId: ctx.userId,
       workspaces: [{ workspaceId: input.workspaceId }],
@@ -95,24 +101,37 @@ export const refreshHostedWorkspacePullRequest = protectedProcedure
 
 async function requestWorkspacePullRequestRefresh(
   env: Env,
-  body: { workspaceId: string; userId: string; organizationId: string | null }
+  body: { workspaceId: string; userId: string; organizationId: string | null },
+  ctx?: SecretsExecutionContext
 ): Promise<RefreshResult> {
-  const secret = await resolveSecret(env.INTERNAL_API_SECRET);
-  if (!secret) {
-    logger.error('hosted workspace PR refresh unavailable: internal API secret is not configured');
-    return { status: 'unavailable', retryAt: null };
-  }
-
   const backendUrl = (env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL)
     .trim()
     .replace(/\/+$/, '');
+  const url = `${backendUrl}${REFRESH_PATH}`;
+  const credential = await webInternalCredential({
+    auth: env.PR_REFRESH_SENDER_AUTH,
+    sts: env.STS,
+    url,
+    token: WEB_HOSTED_WORKSPACE_PR_REFRESH,
+    legacySecret: () => readCloudAgentNextSecret(env, 'INTERNAL_API_SECRET', ctx),
+    ctx,
+  });
+  if (credential.kind === 'unavailable') {
+    logger
+      .withFields({
+        credentialReason: credential.reason,
+        ...(credential.deniedReason === undefined ? {} : { deniedReason: credential.deniedReason }),
+      })
+      .error('hosted workspace PR refresh unavailable: no credential for the web app');
+    return { status: 'unavailable', retryAt: null };
+  }
 
   try {
-    const response = await fetch(`${backendUrl}${REFRESH_PATH}`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': secret,
+        ...credential.headers,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),

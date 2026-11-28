@@ -524,6 +524,8 @@ Every other resource kind is refused by the key allowlist, whatever it names.
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
 | Secrets Store: only `NEXTAUTH_SECRET` → `NEXTAUTH_SECRET_DEV`; `INTERNAL_API_SECRET_PROD` dropped | Verifies the ticket and API token, and seals runtime authorization, with the non-production signing key. |
 | Not changed: `KILOCODE_BACKEND_BASE_URL=https://api.kilo.ai`, `KILO_SESSION_INGEST_URL` and the other production URL vars | Outbound addresses only, with no production credential bound; a staging backend replaces them. |
+| `STS` service binding removed | The broker authorizes on `props.caller`, which must equal the Worker's own name, and the e2e Worker is named `cloud-agent-e2e-test`. |
+| `SECRETS_SOURCE` pinned to `secrets-store` | The e2e Worker keeps reading the legacy bindings it deploys, even after the production manifest flips to `sts`. |
 
 ### Container classes and migrations
 

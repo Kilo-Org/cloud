@@ -109,6 +109,7 @@ const startSessionHandler = protectedProcedure
           request,
           {
             env: ctx.env,
+            executionCtx: ctx.executionCtx,
             userId: ctx.userId,
             authToken: ctx.authToken,
             botId: ctx.botId,
@@ -137,6 +138,7 @@ const startSessionHandler = protectedProcedure
         request,
         {
           env: ctx.env,
+          executionCtx: ctx.executionCtx,
           userId: ctx.userId,
           authToken: ctx.authToken,
           botId: ctx.botId,

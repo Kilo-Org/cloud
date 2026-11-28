@@ -17,7 +17,7 @@ export function ClawHeader({
   status: ClawState;
   sandboxId: string | null;
   region: string | null;
-  gatewayUrl: string;
+  gatewayUrl: string | null;
   gatewayReady?: boolean;
   isSetupWizard?: boolean;
 }) {

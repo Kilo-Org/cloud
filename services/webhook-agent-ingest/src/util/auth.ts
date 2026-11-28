@@ -8,10 +8,16 @@
 
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
 import { expectedSecret, secretUnavailableResponse } from '../secrets';
+import { compareSecretsOnce } from '../secrets-compare';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -77,6 +83,15 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
   }
 
   logger.info('Internal API request authenticated');
+  observeInternalAuth(
+    'webhook-agent-ingest',
+    'api',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  // Pre-flip STS copy check, off unless enabled (src/secrets-compare.ts). It runs in the
+  // background and never changes this answer.
+  compareSecretsOnce(c.env, () => c.executionCtx);
 
   await next();
 });

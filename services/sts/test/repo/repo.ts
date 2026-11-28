@@ -8,6 +8,27 @@ export const serviceRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '
 export const repoRoot = join(serviceRoot, '..', '..');
 export const policyDir = join(serviceRoot, 'policy');
 
+/**
+ * The names whose value is one value across Workloads, so the copier keeps a single copy in
+ * `/shared`. Every other Worker policy name is a credential of one Workload and lives in its own
+ * `/workloads/<workload>` folder; STS resolves that folder before `/shared`, so same-named
+ * per-Workload credentials (the R2 pairs of `user-data-export` and `kilo-chat`) must stay out of
+ * `/shared`. CI (`github-oidc`) policies resolve from `/ci/<workload>` and are not part of either
+ * copier table. Both copier tables import this one list, because a folder decided differently in two
+ * tables would let a co-located `/shared` value serve the wrong Workload.
+ */
+export const SHARED_SECRET_NAMES: readonly string[] = [
+  'INTERNAL_API_SECRET',
+  'NEXTAUTH_SECRET',
+  'CALLBACK_TOKEN_SECRET',
+  // Held by several Workloads (auto-routing and o11y, auto-routing and its benchmark Worker).
+  'O11Y_CF_AE_API_TOKEN',
+  'OPENROUTER_API_KEY',
+  // Single holder, but the value is already shared outside STS: apps/web's bot-token mint
+  // authenticates with it too, so it cannot live in one Workload's folder.
+  'BOT_TOKEN_MINT_SECRET',
+];
+
 export function policyFileNames(): string[] {
   return readdirSync(policyDir)
     .filter(file => file.endsWith('.yaml'))

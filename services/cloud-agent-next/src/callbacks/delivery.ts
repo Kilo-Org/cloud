@@ -50,6 +50,22 @@ export function classifyCallbackError(
 /** One delivery's outcome. `retryable` marks a refusal that redelivery can fix whatever its status. */
 export type TargetResult = { ok: boolean; status?: number; error?: string; retryable?: boolean };
 
+/**
+ * The origin a 3xx answer points at, for the log. Only the origin: the path or
+ * query of a redirect target can carry tokens. A missing or invalid Location
+ * yields nothing.
+ */
+function redirectOrigin(response: Response, targetUrl: string): string | undefined {
+  if (response.status < 300 || response.status >= 400) return undefined;
+  const location = response.headers.get('Location');
+  if (!location) return undefined;
+  try {
+    return new URL(location, targetUrl).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 async function deliverToTarget(
   target: CallbackTarget,
   payload: ExecutionCallbackPayload,
@@ -61,10 +77,14 @@ async function deliverToTarget(
       headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-      // A redirect would carry the callback's credential to wherever it points.
+      // A redirect would carry the target's headers (service credentials) to
+      // another URL, so it counts as a non-2xx answer, never as a hop to follow.
+      // Targets must be final https URLs; a moved host must be updated where it
+      // is registered.
       redirect: 'manual',
     };
     const response = await fetch(target.url, requestInit);
+    const movedTo = redirectOrigin(response, target.url);
 
     logger
       .withFields({
@@ -73,6 +93,7 @@ async function deliverToTarget(
         messageId: payload.messageId,
         status: response.status,
         ok: response.ok,
+        ...(movedTo === undefined ? {} : { redirectOrigin: movedTo }),
       })
       .info('Callback HTTP response received');
 

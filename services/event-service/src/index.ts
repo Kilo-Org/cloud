@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   connectTicketQuerySchema,
   RequestDeadlineError,
@@ -25,6 +26,21 @@ export { ConnectionTicketDO } from './do/connection-ticket-do';
 const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
+
+/**
+ * Hono's `executionCtx` getter throws outside a request context, which is how unit tests call the
+ * routes. A missing context only costs the `waitUntil` keep-alive for a bundle revalidation; it
+ * never changes which secret a read returns.
+ */
+function requestContext(c: {
+  executionCtx: SecretsExecutionContext;
+}): SecretsExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
 
 type TicketMintOutcome = 'ok' | 'unauthorized' | 'mint_failed' | 'mint_unavailable' | 'timeout';
 
@@ -148,11 +164,12 @@ async function consumeConnectionTicket(env: Env, ticket: string): Promise<string
  */
 async function authenticateAndMintTicket(
   env: Env,
-  token: string | null
+  token: string | null,
+  ctx?: SecretsExecutionContext
 ): Promise<TicketMintResult> {
   try {
     return await withDeadline(TICKET_MINT_BUDGET_MS, async () => {
-      const auth = await authenticateToken(token, env);
+      const auth = await authenticateToken(token, env, ctx === undefined ? {} : { ctx });
       if (!auth) {
         return { outcome: 'unauthorized' } satisfies TicketMintResult;
       }
@@ -183,7 +200,7 @@ async function authenticateAndMintTicket(
 app.post('/connect-ticket', async c => {
   const startedAt = Date.now();
   const token = extractBearerToken(c.req.header('authorization'));
-  const result = await authenticateAndMintTicket(c.env, token);
+  const result = await authenticateAndMintTicket(c.env, token, requestContext(c));
 
   if (result.outcome === 'unauthorized') {
     logger.debug('connect-ticket: unauthorized');

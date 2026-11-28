@@ -12,6 +12,11 @@ import {
   type ProductionAutoMetrics,
   type ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
+import {
+  STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+  webInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { getBenchmarkConfig } from './config';
 import {
   getRoutingCaseResultsForEntries,
@@ -28,6 +33,8 @@ import {
 } from './subscriptions';
 import { isGradedSweepResult, summarizeSweep } from './scoreboard/sweep';
 import type { OfflineSweep, OfflineSweepSummary } from './scoreboard/schema';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 export const MIN_ACCURACY_GRID = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9] as const;
 export const ACCURACY_NOISE_BAND_GRID = [0, 0.02, 0.05, 0.08, 0.1] as const;
@@ -268,13 +275,27 @@ export function optimizeThresholdPolicy(params: {
  * endpoint is unavailable, slow, or has no data, so the daily run keeps the
  * last computed values instead of inventing numbers or stalling the tick.
  */
-export async function fetchProductionAutoMetrics(env: Env): Promise<ProductionAutoMetrics | null> {
+export async function fetchProductionAutoMetrics(
+  env: Env & WebInternalAuthEnv,
+  ctx?: SecretsExecutionContext
+): Promise<ProductionAutoMetrics | null> {
   try {
-    const secret = await env.INTERNAL_API_SECRET_PROD.get();
+    // The route reads a bearer either way: the internal secret unless `WEB_INTERNAL_AUTH=sts`,
+    // then an STS `web:auto-routing.production-profile.read` token.
+    const credential = await webInternalCredential(
+      env,
+      STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+      {
+        header: 'authorization',
+        secret: () => readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx),
+        format: secret => `Bearer ${secret}`,
+      }
+    );
+    if (credential.kind === 'unavailable') return null;
     const response = await fetch(
       `${env.KILO_WEB_API_BASE_URL}/api/internal/auto-routing-benchmark/production-profile`,
       {
-        headers: { authorization: `Bearer ${secret}` },
+        headers: { [credential.header]: credential.value },
         signal: AbortSignal.timeout(10_000),
       }
     );

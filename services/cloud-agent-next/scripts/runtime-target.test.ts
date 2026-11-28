@@ -266,8 +266,7 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
     release,
   });
   const output = buildE2eWorkerConfig(prepared, {
-    workerUrl: 'https://e2e.example.test',
-    kiloOpenRouterBase: 'https://fake.example.test/api/openrouter',
+    fakeLlmHostname: 'fake.example.test',
   });
   expect(output.vars).toMatchObject({
     RUNTIME_STARTUP_MODE: 'downloaded',
@@ -277,10 +276,9 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
   expect(output.containers[0].images).toEqual({
     'runtime-free': { image: release.baseImage, dockerfile: undefined },
   });
-  expect(output.r2_buckets).toContainEqual({
-    binding: 'RUNTIME_RELEASE_BUCKET',
-    bucket_name: release.bucket,
-  });
+  // The runtime bucket is production's publication bucket, so the e2e Worker
+  // never binds it.
+  expect(output).not.toHaveProperty('r2_buckets');
   // The E2E Worker is renamed, so it may not keep the broker binding whose props.caller names the
   // production Worker, and it may not inherit a later flip to the `sts` source.
   expect(output.services ?? []).not.toContainEqual(expect.objectContaining({ binding: 'STS' }));

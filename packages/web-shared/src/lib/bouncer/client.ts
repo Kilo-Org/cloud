@@ -4,6 +4,20 @@ import { createHash } from 'crypto';
 
 import * as z from 'zod';
 
+import {
+  BOUNCER_ADMISSION_WAIT,
+  BOUNCER_AFTER_RESPONSE_WAIT,
+  BOUNCER_NO_WAIT,
+  BOUNCER_SIGNUP_WAIT,
+  bouncerAuthHeaders,
+  bouncerRefusalBlamesToken,
+  bouncerSendsLegacyKey,
+  bouncerTokenRefused,
+  type BouncerAuthHeaders,
+  type BouncerTokenRefusal,
+  type BouncerTokenWait,
+} from '@kilocode/web-shared/lib/bouncer/sts-auth';
+import type { BouncerScope } from '@kilocode/web-shared/lib/bouncer/sts-auth-contract';
 import { BOUNCER_URL } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
@@ -25,6 +39,11 @@ import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-
  * delivered. Webhooks and store notifications never call them: they only enqueue to the outbox.
  * Signup admission returns null on an unavailable or invalid verdict. The caller rejects signup
  * with a retryable error before creating a Stripe customer or account.
+ *
+ * Every call sends `x-internal-api-key`, except with `BOUNCER_CLIENT_AUTH=sts`; an app that
+ * installed `BouncerAuth` (`sts-auth.ts`) also names itself in `x-kilo-caller` and, with `dual` or
+ * `sts`, sends the route's STS token as `Authorization: Bearer`. A missing token never stops a
+ * call; in `sts` such a call carries no credential and Bouncer refuses it.
  */
 
 /** Bouncer keeps ids to 128 characters. */
@@ -445,6 +464,31 @@ function compact<T extends Record<string, unknown>>(body: T): Record<string, unk
   return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
 }
 
+let targetMismatchLogged = false;
+
+/**
+ * Whether this process calls Bouncer at all. Bouncer runs in production only. `VERCEL_ENV`, which
+ * Vercel always sets, decides: `production` calls it; `preview` (previews and the `staging` custom
+ * environment) never does, whatever `BOUNCER_URL` says, and takes the same path as an unset
+ * `BOUNCER_URL` (signup admission is skipped as in development). Anything else (outside Vercel,
+ * or `development`) keeps today's behaviour: `BOUNCER_URL` alone decides. A production deployment
+ * whose `VERCEL_TARGET_ENV` names another environment keeps calling Bouncer, so production never
+ * loses it silently, and logs one config error per instance.
+ */
+export function bouncerEnabledForDeployment(
+  runtime: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  const { VERCEL_ENV: environment, VERCEL_TARGET_ENV: target } = runtime;
+  if (environment === 'production') {
+    if (target !== undefined && target !== 'production' && !targetMismatchLogged) {
+      targetMismatchLogged = true;
+      console.error('[bouncer] config error: VERCEL_TARGET_ENV is not production', { target });
+    }
+    return true;
+  }
+  return environment !== 'preview';
+}
+
 type PostResult =
   | { ok: true; status: number; response: Response }
   /** The endpoint or the key is absent, or the endpoint is not one this client sends to. */
@@ -461,33 +505,80 @@ type PostResult =
  * The request URL comes from the shared endpoint helper, so it derives from the value the transport
  * rule accepted instead of from concatenation. A configured endpoint that carries a trailing
  * separator therefore still reaches the worker's own path, and a value outside the rule, or a
- * missing key, is `unconfigured` and sends nothing.
+ * missing key outside `sts`, is `unconfigured` and sends nothing. The STS headers are read within
+ * the call's own deadline: one signal bounds the token wait (the call's `BouncerTokenWait`,
+ * `sts-auth.ts`; outbox deliveries never wait) and the request, so the call never takes longer
+ * than `timeoutMs`; that read never fails, and a token goes only to `BOUNCER_STS_ORIGIN`. A 401 or
+ * 403 to a call that carried a token is reported with its reason. In `dual`, when Bouncer blamed
+ * the token (401 `invalid_token`, 403 `insufficient_scope`), the auth also holds that scope's token
+ * back for a while, and an admission call sends itself once more without the token, within the
+ * same deadline; a 401 naming no token error is the legacy key's failure and gets neither. `sts`
+ * does neither. That retry and the hold-back go away with the legacy key (main design 9.5).
  */
 async function postWithResult(
-  path: string,
+  path: BouncerApiPath,
   body: unknown,
   timeoutMs: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  wait: BouncerTokenWait = BOUNCER_ROUTES[path].wait
 ): Promise<PostResult> {
-  const endpoint = parseInternalServiceEndpoint(BOUNCER_URL, path);
+  const endpoint = bouncerEnabledForDeployment()
+    ? parseInternalServiceEndpoint(BOUNCER_URL, path)
+    : null;
   if (!endpoint) return { ok: false, kind: 'unconfigured' };
-  let internalApiSecret: string;
-  try {
-    internalApiSecret = await readInternalApiSecret();
-  } catch (error) {
-    return failedWithoutResponse(error);
+  // `sts` sends no legacy key, so the secret is neither read nor required there.
+  let internalApiSecret: string | null = null;
+  const legacyKey = bouncerSendsLegacyKey();
+  if (legacyKey) {
+    try {
+      internalApiSecret = await readInternalApiSecret();
+    } catch (error) {
+      return failedWithoutResponse(error);
+    }
+    if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
   }
-  if (!internalApiSecret) return { ok: false, kind: 'unconfigured' };
   const timeout = AbortSignal.timeout(timeoutMs);
-  try {
-    const response = await fetch(endpoint, {
+  const deadline = signal ? AbortSignal.any([timeout, signal]) : timeout;
+  const { scope } = BOUNCER_ROUTES[path];
+  const auth = await bouncerAuthHeaders({
+    scope,
+    wait,
+    origin: endpoint.origin,
+    signal: deadline,
+  }).catch((): BouncerAuthHeaders => ({}));
+  const send = async (headers: BouncerAuthHeaders) =>
+    await fetch(endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': internalApiSecret },
+      headers: {
+        ...headers,
+        'content-type': 'application/json',
+        ...(internalApiSecret === null ? {} : { 'x-internal-api-key': internalApiSecret }),
+      },
       body: JSON.stringify(body),
-      signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
+      signal: deadline,
       cache: 'no-store',
+      // The request carries the internal key and an STS token: a redirect is never followed, and a
+      // 3xx is a failed call.
+      redirect: 'manual',
     });
+  try {
+    let response = await send(auth);
+    const refusal = auth.authorization === undefined ? null : tokenRefusal(response);
+    if (refusal !== null) {
+      bouncerTokenRefused(scope, refusal);
+      // `dual` only, an admission call only, and only when Bouncer blamed the token: the legacy
+      // key still carries a call there. A plain 401 is the legacy key's own failure, which a resend
+      // with the same key cannot fix; without the key (`sts`) a call without the token is a certain
+      // refusal.
+      if (legacyKey && wait.admission && bouncerRefusalBlamesToken(refusal.reason)) {
+        await response.body?.cancel();
+        response = await send(
+          Object.fromEntries(Object.entries(auth).filter(([name]) => name !== 'authorization'))
+        );
+      }
+    }
     if (!response.ok) {
+      if (response.status >= 300 && response.status < 400) await response.body?.cancel();
       return {
         ok: false,
         kind: 'failed',
@@ -499,6 +590,18 @@ async function postWithResult(
   } catch (error) {
     return failedWithoutResponse(error);
   }
+}
+
+/**
+ * Bouncer's refusal of a call that carried a token (`BouncerTokenRefusalReason`): a 401 or 403,
+ * read by the RFC 6750 `error` of its `WWW-Authenticate` header. Null for any other status.
+ */
+function tokenRefusal(response: Response): BouncerTokenRefusal | null {
+  const { status } = response;
+  if (status !== 401 && status !== 403) return null;
+  const error = /\berror="([a-z_]+)"/.exec(response.headers.get('www-authenticate') ?? '')?.[1];
+  if (status === 401) return { status, reason: error === 'invalid_token' ? error : 'legacy_key' };
+  return { status, reason: error === 'insufficient_scope' ? error : 'http_403' };
 }
 
 /** A request that got no answer: a transport error, a timeout, or a secret that could not be read. */
@@ -518,12 +621,13 @@ function failedWithoutResponse(error: unknown): PostResult {
  * verdict-shaped callers read a JSON body; a body-less/non-JSON success resolves to null.
  */
 async function post(
-  path: string,
+  path: BouncerApiPath,
   body: unknown,
   timeoutMs: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  wait?: BouncerTokenWait
 ): Promise<unknown> {
-  const result = await postWithResult(path, body, timeoutMs, signal);
+  const result = await postWithResult(path, body, timeoutMs, signal, wait);
   if (result.ok) {
     try {
       return await result.response.json();
@@ -552,6 +656,32 @@ const DECIDE_PATH = '/api/v1/decide';
 const CHARGE_DECIDE_PATH = '/api/v1/charge-decide';
 const SIGNUP_DECIDE_PATH = '/api/v1/signup-decide';
 const RELEASE_PATH = '/api/v1/release';
+
+type BouncerApiPath =
+  | typeof CREDIT_EVENT_PATH
+  | typeof USAGE_EVENT_PATH
+  | typeof DECIDE_PATH
+  | typeof CHARGE_DECIDE_PATH
+  | typeof SIGNUP_DECIDE_PATH
+  | typeof RELEASE_PATH;
+
+/**
+ * The STS scope Bouncer requires on each route (`ROUTE_SCOPES` in bouncer's `src/api-auth.ts`),
+ * and how long a call on it waits for a token it does not hold (`BouncerTokenWait`): the admission
+ * calls wait; release waits in `sts` only, after the response; the credit and usage event routes
+ * belong to the outbox drainers, whose refused rows are retried, so they never wait (the inline
+ * best-effort usage event passes its own wait, `reportUsageEvent`).
+ */
+const BOUNCER_ROUTES: Readonly<
+  Record<BouncerApiPath, { scope: BouncerScope; wait: BouncerTokenWait }>
+> = {
+  [CREDIT_EVENT_PATH]: { scope: 'bouncer:usage.write', wait: BOUNCER_NO_WAIT },
+  [USAGE_EVENT_PATH]: { scope: 'bouncer:usage.write', wait: BOUNCER_NO_WAIT },
+  [DECIDE_PATH]: { scope: 'bouncer:decide', wait: BOUNCER_ADMISSION_WAIT },
+  [CHARGE_DECIDE_PATH]: { scope: 'bouncer:decide', wait: BOUNCER_ADMISSION_WAIT },
+  [SIGNUP_DECIDE_PATH]: { scope: 'bouncer:signup.decide', wait: BOUNCER_SIGNUP_WAIT },
+  [RELEASE_PATH]: { scope: 'bouncer:decide', wait: BOUNCER_AFTER_RESPONSE_WAIT },
+};
 
 const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {
   'store.purchase': true,
@@ -671,7 +801,7 @@ export async function deliverUsageEventWireBody(
 }
 
 async function deliverWireBody(
-  path: string,
+  path: BouncerApiPath,
   body: Record<string, unknown>,
   timeoutMs: number,
   signal?: AbortSignal
@@ -716,9 +846,18 @@ export function usageEventWireBody(event: UsageEvent): Record<string, unknown> {
     : compact({ ...common, accountId: event.accountId, siwc: event.siwc === true || undefined });
 }
 
-/** Reports one inference request after its upstream response. Resolves on any failure. */
+/**
+ * Reports one inference request after its upstream response. Resolves on any failure. Nothing
+ * retries it (it has no outbox), so in `sts` it waits up to 250 ms for its token.
+ */
 export async function reportUsageEvent(event: UsageEvent): Promise<void> {
-  await post(USAGE_EVENT_PATH, usageEventWireBody(event), USAGE_TIMEOUT_MS);
+  await post(
+    USAGE_EVENT_PATH,
+    usageEventWireBody(event),
+    USAGE_TIMEOUT_MS,
+    undefined,
+    BOUNCER_AFTER_RESPONSE_WAIT
+  );
 }
 
 /**

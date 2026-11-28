@@ -6,6 +6,7 @@ import {
   LEADERBOARD_SERVED_MODEL_SQL,
   resolveLeaderboardModel,
 } from '@/lib/leaderboard-model';
+import { LEADERBOARD_WINDOW_USAGE_SQL } from '@/lib/leaderboard-usage-hourly-rollup';
 import { createPublicReport, publicReportOptions } from '@/lib/public-report';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
@@ -31,11 +32,9 @@ select
       end as mode
     , (sum(mu.input_tokens) + sum(mu.output_tokens))::float8 as "tokens"
     , ${sql.raw(LEADERBOARD_SERVED_MODEL_SQL)} as "served_model"
-from leaderboard_usage_daily as mu
+from ${LEADERBOARD_WINDOW_USAGE_SQL} as mu
 where
-    mu.usage_date >= (now() at time zone 'UTC')::date - 7
-    and mu.usage_date < (now() at time zone 'UTC')::date
-    and mu.input_tokens > 0
+    mu.input_tokens > 0
     and (
         mu.provider != 'custom'
         or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'
@@ -89,10 +88,10 @@ export const GET = createPublicReport({
   errorMessage: 'Failed to fetch leaderboard model usage',
   load: async () => {
     const { rows } = await readDb.execute<ModelUsageRow>(LEADERBOARD_MODEL_USAGE_QUERY);
-    // An empty window means the rollup has not been built yet; failing keeps
-    // the last good report in the in-process cache instead of caching nothing.
+    // An empty window means no day in it is complete yet; failing keeps the
+    // last good report in the in-process cache instead of caching nothing.
     if (rows.length === 0) {
-      throw new Error('leaderboard_usage_daily has no rows for the leaderboard window');
+      throw new Error('leaderboard_usage_hourly has no complete days in the leaderboard window');
     }
     return await aggregateModelUsage(rows);
   },

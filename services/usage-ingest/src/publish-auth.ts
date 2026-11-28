@@ -1,6 +1,13 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { STS_USAGE_PUBLISH } from '@kilocode/sts-contracts';
 import { failureResponse } from '@kilocode/verify';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  internalAuthAnalyticsSink,
+  observeInternalAuth,
+  type InternalAuthAnalyticsBinding,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { logSafely } from './diagnostics';
 import {
   publishVerifierFor,
@@ -21,6 +28,8 @@ export type PublishAuthMode = 'legacy' | 'dual' | 'sts';
 export type PublishAuthEnv = StsEnv & {
   USAGE_INGEST_PUBLISH_SECRET?: string;
   USAGE_INGEST_PUBLISH_AUTH?: string;
+  /** Item-9 counter rows for this Worker, which has no Logpush (see the wrangler comment). */
+  INTERNAL_AUTH_COUNTER?: InternalAuthAnalyticsBinding;
 };
 
 /**
@@ -46,6 +55,13 @@ export const PUBLISH_WORKLOADS: Readonly<Record<PublishPath, string>> = {
   '/usage': 'ai-gateway',
   '/enkrypt-usage': 'ai-gateway',
   '/exa-usage': 'web',
+};
+
+/** The observation label of each publish path (design section 9.4, item 9). */
+const PUBLISH_ROUTE_LABELS: Readonly<Record<PublishPath, string>> = {
+  '/usage': 'usage_publish',
+  '/enkrypt-usage': 'enkrypt_usage_publish',
+  '/exa-usage': 'exa_usage_publish',
 };
 
 /**
@@ -97,11 +113,23 @@ export async function authorizePublish(
   }
   const secret = env.USAGE_INGEST_PUBLISH_SECRET;
   const authorization = request.headers.get('Authorization');
+  // This Worker has no Logpush (see wrangler.jsonc), so each counter line also becomes one
+  // Analytics Engine data point that o11y reads back into Axiom.
+  const counterSink = internalAuthAnalyticsSink(env.INTERNAL_AUTH_COUNTER);
   if (mode !== 'sts') {
     const legacy = Boolean(
       secret && authorization && timingSafeEqual(authorization, `Bearer ${secret}`)
     );
-    if (legacy) return mode === 'legacy' ? {} : { auth: 'legacy' };
+    if (legacy) {
+      observeInternalAuth(
+        'usage-ingest',
+        PUBLISH_ROUTE_LABELS[path],
+        'legacy_shared_secret',
+        callerLabel(request.headers.get(INTERNAL_CALLER_HEADER)),
+        counterSink
+      );
+      return mode === 'legacy' ? {} : { auth: 'legacy' };
+    }
     if (mode === 'legacy' || authorization === null || !JWS_BEARER.test(authorization)) {
       return secret
         ? errorResponse('Unauthorized', 401)
@@ -148,5 +176,12 @@ export async function authorizePublish(
       { status: 403, headers: { 'cache-control': 'no-store' } }
     );
   }
+  observeInternalAuth(
+    'usage-ingest',
+    PUBLISH_ROUTE_LABELS[path],
+    'sts',
+    callerLabel(workload),
+    counterSink
+  );
   return { auth: 'sts', auth_caller: workload };
 }

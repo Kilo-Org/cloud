@@ -1,6 +1,8 @@
 import { importPKCS8, SignJWT } from 'jose';
 
 import type { BillingLogFields } from './logger.js';
+import { readKiloclawBillingSecret } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type { BillingWorkerEnv } from './types.js';
 
 const SNOWFLAKE_JWT_ALGORITHM = 'RS256';
@@ -290,7 +292,40 @@ async function pollStatement(params: {
   throw new Error('Snowflake statement poll timed out');
 }
 
-export function getMissingSnowflakeConfig(env: BillingWorkerEnv): string[] {
+/**
+ * Reads one Snowflake credential, treating an unset binding as empty so the diagnostic reports it:
+ * the reader fails closed on a binding the deployment does not set, while
+ * `getMissingSnowflakeConfig` is what names it (the sweep logs that report and skips).
+ */
+async function readSnowflakeSecret(
+  env: BillingWorkerEnv,
+  name: 'SNOWFLAKE_PRIVATE_KEY_PEM' | 'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+  ctx?: SecretsExecutionContext
+): Promise<string> {
+  try {
+    return await readKiloclawBillingSecret(env, name, ctx);
+  } catch (error) {
+    if (error instanceof Error && error.message === `${name} is not configured`) return '';
+    throw error;
+  }
+}
+
+/** The two Snowflake credentials, read through the STS-flagged reader. */
+async function snowflakeSecretValues(
+  env: BillingWorkerEnv,
+  ctx?: SecretsExecutionContext
+): Promise<{ privateKeyPem: string; publicKeyFingerprint: string }> {
+  const [privateKeyPem, publicKeyFingerprint] = await Promise.all([
+    readSnowflakeSecret(env, 'SNOWFLAKE_PRIVATE_KEY_PEM', ctx),
+    readSnowflakeSecret(env, 'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT', ctx),
+  ]);
+  return { privateKeyPem, publicKeyFingerprint };
+}
+
+function missingSnowflakeConfig(
+  env: BillingWorkerEnv,
+  secrets: { privateKeyPem: string; publicKeyFingerprint: string }
+): string[] {
   const configEntries = [
     ['SNOWFLAKE_ACCOUNT_HOST', env.SNOWFLAKE_ACCOUNT_HOST],
     ['SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER', env.SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER],
@@ -299,8 +334,8 @@ export function getMissingSnowflakeConfig(env: BillingWorkerEnv): string[] {
     ['SNOWFLAKE_WAREHOUSE', env.SNOWFLAKE_WAREHOUSE],
     ['SNOWFLAKE_DATABASE', env.SNOWFLAKE_DATABASE],
     ['SNOWFLAKE_SCHEMA', env.SNOWFLAKE_SCHEMA],
-    ['SNOWFLAKE_PRIVATE_KEY_PEM', env.SNOWFLAKE_PRIVATE_KEY_PEM],
-    ['SNOWFLAKE_PUBLIC_KEY_FINGERPRINT', env.SNOWFLAKE_PUBLIC_KEY_FINGERPRINT],
+    ['SNOWFLAKE_PRIVATE_KEY_PEM', secrets.privateKeyPem],
+    ['SNOWFLAKE_PUBLIC_KEY_FINGERPRINT', secrets.publicKeyFingerprint],
   ] as const;
 
   return configEntries
@@ -308,8 +343,19 @@ export function getMissingSnowflakeConfig(env: BillingWorkerEnv): string[] {
     .map(([key]) => key);
 }
 
-export function resolveSnowflakeConfig(env: BillingWorkerEnv): SnowflakeConfig | null {
-  if (getMissingSnowflakeConfig(env).length > 0) {
+export async function getMissingSnowflakeConfig(
+  env: BillingWorkerEnv,
+  ctx?: SecretsExecutionContext
+): Promise<string[]> {
+  return missingSnowflakeConfig(env, await snowflakeSecretValues(env, ctx));
+}
+
+export async function resolveSnowflakeConfig(
+  env: BillingWorkerEnv,
+  ctx?: SecretsExecutionContext
+): Promise<SnowflakeConfig | null> {
+  const secrets = await snowflakeSecretValues(env, ctx);
+  if (missingSnowflakeConfig(env, secrets).length > 0) {
     return null;
   }
 
@@ -321,8 +367,8 @@ export function resolveSnowflakeConfig(env: BillingWorkerEnv): SnowflakeConfig |
     warehouse: env.SNOWFLAKE_WAREHOUSE ?? '',
     database: env.SNOWFLAKE_DATABASE ?? '',
     schema: env.SNOWFLAKE_SCHEMA ?? '',
-    privateKeyPem: env.SNOWFLAKE_PRIVATE_KEY_PEM ?? '',
-    publicKeyFingerprint: env.SNOWFLAKE_PUBLIC_KEY_FINGERPRINT ?? '',
+    privateKeyPem: secrets.privateKeyPem,
+    publicKeyFingerprint: secrets.publicKeyFingerprint,
   };
 }
 
@@ -330,12 +376,13 @@ export async function queryKiloclawActiveUserIds(params: {
   env: BillingWorkerEnv;
   userIds: string[];
   log: SnowflakeLogFn;
+  ctx?: SecretsExecutionContext;
 }): Promise<Set<string>> {
   if (params.userIds.length === 0) {
     return new Set();
   }
 
-  const config = resolveSnowflakeConfig(params.env);
+  const config = await resolveSnowflakeConfig(params.env, params.ctx);
   if (!config) {
     throw new Error('Snowflake configuration is incomplete');
   }

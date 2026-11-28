@@ -185,6 +185,13 @@ export interface Env {
   STS?: BundleBinding & MintBinding;
   /** `legacy` (default) or `sts`: the credential of this Worker's own status writes. */
   CODE_REVIEW_STATUS_CALLBACK_AUTH?: string;
+  /**
+   * Which credentials web's calls to the review routes may carry (`src/backend-auth.ts`): unset or
+   * `legacy-only` (the `BACKEND_AUTH_TOKEN` bearer), `legacy-and-sts`, `sts-only` or `disabled`.
+   */
+  BACKEND_CREDENTIAL_ACCEPT?: string;
+  /** The STS environment whose tokens the review routes accept; read only in an STS mode. */
+  STS_ENVIRONMENT?: string;
 
   // Optional Sentry
   SENTRY_DSN?: string;

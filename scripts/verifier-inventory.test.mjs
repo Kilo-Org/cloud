@@ -396,11 +396,11 @@ const EXCEPTIONS = {
     signals: { primitive: 1 },
     pins: ['export async function verifyEd25519('],
   },
-  'services/code-review-infra/src/index.ts': {
+  'services/code-review-infra/src/backend-auth.ts': {
     reason:
-      'Outside decision Q1: backendAuthMiddleware on BACKEND_AUTH_TOKEN, a Kilo shared secret; recorded for a decision, not converted',
-    signals: { 'helper-call': 1, 'helper-import': 1 },
-    pins: ['BACKEND_AUTH_TOKEN'],
+      'Outside decision Q1: the review routes take the BACKEND_AUTH_TOKEN bearer, a Kilo shared secret, through backendAuthMiddleware (moved here from src/index.ts), or an STS service token for the code-review audience under BACKEND_CREDENTIAL_ACCEPT; recorded for a decision',
+    signals: { 'helper-call': 1, 'helper-import': 1, primitive: 1, 'verify-library': 1 },
+    pins: ['BACKEND_AUTH_TOKEN', 'audience: CODE_REVIEW_STS_AUDIENCE,'],
   },
   'services/gmail-push/src/auth/oidc.ts': {
     reason: 'Third party (section 9.6): Google OIDC push token',

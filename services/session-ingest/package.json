@@ -20,6 +20,8 @@
     "@kilocode/notifications": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@streamparser/json": "0.0.22",
     "drizzle-orm": "catalog:",

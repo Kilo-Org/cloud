@@ -273,6 +273,8 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
     NATIVE_RUNTIME_IMAGE: 'runtime-free',
     RUNTIME_RELEASE_DESCRIPTOR: release.descriptorSha256,
   });
+  expect(prepared.vars).toHaveProperty('KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED', 'true');
+  expect(output.vars).not.toHaveProperty('KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED');
   expect(output.containers[0].images).toEqual({
     'runtime-free': { image: release.baseImage, dockerfile: undefined },
   });

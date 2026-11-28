@@ -96,6 +96,7 @@
     // `secrets-store`; any other value refuses every read. The `sts` source never falls back to
     // the legacy binding.
     "SECRETS_SOURCE": "secrets-store",
+    "KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED": "true",
   },
   "placement": { "mode": "smart" },
   "ai": { "binding": "AI" },

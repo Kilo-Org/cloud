@@ -110,7 +110,7 @@ if [ "$SKIP_ROOT" = false ]; then
 fi
 
 start_service "$CLOUD_DIR/services/session-ingest" "session" "$YELLOW" \
-  pnpm exec wrangler dev --inspector-port 9230
+  pnpm run dev --inspector-port 9230
 
 start_service "$CLOUD_DIR/services/code-review-infra" "review" "$BLUE" \
   pnpm exec wrangler dev --inspector-port 9231

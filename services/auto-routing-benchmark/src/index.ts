@@ -6,7 +6,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
-import { authMiddleware } from './auth';
+import { RESOURCE_METADATA_PATH, authMiddleware, protectedResourceMetadata } from './auth';
 import { registerClientEvalRoutes } from './client-eval';
 import type { HonoEnv } from './hono-env';
 import { fetchProductionAutoMetrics, reevaluateSystemOptimalSettings } from './system-optimal';
@@ -150,6 +150,13 @@ app.post('/container/case-result', async c => {
 // The same is true of inference: the case capability (an HMAC over the exact paid
 // generation) is its credential, so these routes also precede the backend-secret middleware.
 registerCaseInferenceRoutes(app);
+// The RFC 9728 document the STS challenge names, public while the admin switch admits STS.
+// Otherwise the request continues to the guard below, exactly as before this route existed.
+app.use(RESOURCE_METADATA_PATH, async (c, next) => {
+  const metadata = c.req.method === 'GET' ? protectedResourceMetadata(c.env) : null;
+  if (metadata !== null) return metadata;
+  await next();
+});
 app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));
 

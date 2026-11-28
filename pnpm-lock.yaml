@@ -2582,9 +2582,15 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../../packages/usage-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -2628,9 +2634,15 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../../packages/usage-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

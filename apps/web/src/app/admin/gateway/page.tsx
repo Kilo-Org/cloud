@@ -20,6 +20,7 @@ import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 import { EnkryptCallsContent } from '@/app/admin/gateway/EnkryptCallsContent';
+import { EnkryptLimitsContent } from '@/app/admin/gateway/EnkryptLimitsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -193,7 +194,8 @@ export default function AdminGatewayPage() {
           <TabsContent value="provider-metadata" className="mt-4">
             <ProviderMetadataContent />
           </TabsContent>
-          <TabsContent value="enkrypt-calls" className="mt-4">
+          <TabsContent value="enkrypt-calls" className="mt-4 flex flex-col gap-y-6">
+            <EnkryptLimitsContent />
             <EnkryptCallsContent />
           </TabsContent>
         </Tabs>

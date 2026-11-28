@@ -4,7 +4,7 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   guardrailBlockMessage,
-  REQUEST_TOO_LARGE_MESSAGE,
+  requestTooLargeMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
@@ -13,6 +13,8 @@ import {
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
+
+const REQUEST_TOO_LARGE_MESSAGE = requestTooLargeMessage(ENKRYPT_MAX_SCAN_CHARACTERS);
 
 const mockedWarnExceptInTest = jest.fn();
 
@@ -81,6 +83,7 @@ function deps(
     fetch: jest.fn(fetchImpl) as unknown as typeof fetch,
     timeoutMs: 1_000,
     signal: new AbortController().signal,
+    maxScanCharacters: ENKRYPT_MAX_SCAN_CHARACTERS,
     ...overrides,
   };
 }
@@ -668,6 +671,61 @@ describe('scanRequest', () => {
         expect(dependencies.fetch).not.toHaveBeenCalled();
       }
     );
+  });
+
+  it('applies a configured scan limit, and names it in the block message', async () => {
+    const dependencies = deps(async () => detectResponse({ summary: {} }), {
+      maxScanCharacters: 50_000,
+    });
+
+    const result = await scanRequest(makeScan({ text: 'a'.repeat(50_001) }), dependencies);
+
+    expect(result.verdict).toEqual({
+      action: 'block',
+      message: requestTooLargeMessage(50_000),
+    });
+    expect(requestTooLargeMessage(50_000)).toContain('50,000 characters');
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+  });
+
+  it('fails open without a call when the rate limit refuses it', async () => {
+    const admitCall = jest.fn(() => false);
+    const dependencies = deps(async () => detectResponse({ summary: {} }), {
+      admitCall,
+    });
+
+    const result = await scanRequest(makeScan(), dependencies);
+
+    expect(admitCall).toHaveBeenCalledTimes(1);
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+    expect(result.verdict).toEqual({ action: 'fail_open' });
+    expect(result.usageRecords).toEqual([]);
+    expect(result.report).toMatchObject({
+      decision: 'error_fail_open',
+      error: 'rate_limited',
+      scanned_characters: 0,
+      attempts: 0,
+    });
+    expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
+  });
+
+  it('asks the rate limit only for a call it is about to make', async () => {
+    const admitCall = jest.fn(() => true);
+    const dependencies = deps(async () => detectResponse({ summary: {} }), {
+      admitCall,
+    });
+
+    await scanRequest(makeScan({ text: '' }), dependencies);
+    await scanRequest(
+      makeScan({ text: 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1) }),
+      dependencies
+    );
+    expect(admitCall).not.toHaveBeenCalled();
+
+    const result = await scanRequest(makeScan(), dependencies);
+    expect(admitCall).toHaveBeenCalledTimes(1);
+    expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+    expect(result.verdict).toEqual({ action: 'allow' });
   });
 
   it('says that a too-large request is split into scans, and that retrying unchanged will not help', () => {

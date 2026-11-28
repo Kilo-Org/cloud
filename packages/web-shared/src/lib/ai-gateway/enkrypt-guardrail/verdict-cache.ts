@@ -181,9 +181,10 @@ function keyedUnits(
   request: EnkryptScanContext,
   part: RequestPart,
   segments: RequestSegment[],
-  cache: VerdictCache | null
+  cache: VerdictCache | null,
+  maxScanCharacters: number
 ): KeyedUnit[] {
-  return scanUnits(segments).map(unit => ({
+  return scanUnits(segments, maxScanCharacters).map(unit => ({
     ...unit,
     key: cache ? verdictCacheKey(request, cache.config, part, unit.text) : null,
   }));
@@ -539,10 +540,11 @@ async function planSegmentsPart(
   part: EnkryptSegmentsPart,
   segments: RequestSegment[],
   request: EnkryptScanContext,
-  cache: VerdictCache | null
+  cache: VerdictCache | null,
+  maxScanCharacters: number
 ): Promise<PartPlan> {
   const rendered = segments.map(renderSegment);
-  const keyed = keyedUnits(request, part, segments, cache);
+  const keyed = keyedUnits(request, part, segments, cache, maxScanCharacters);
   const { status, verdicts } = await lookup(request.organizationId, keyed, cache);
   const units = withVerdicts(keyed, verdicts);
   const totalCharacters = joinSegments(rendered).length;
@@ -760,13 +762,14 @@ type ToolPlan = {
 async function planTools(
   tools: RequestToolDefinition[],
   request: EnkryptScanContext,
-  cache: VerdictCache | null
+  cache: VerdictCache | null,
+  maxScanCharacters: number
 ): Promise<PartPlan> {
   const { config } = request;
   const toolUnits = tools.map(tool => ({
     tool,
     rendered: tool.segments.map(renderSegment),
-    units: keyedUnits(request, 'tools', tool.segments, cache),
+    units: keyedUnits(request, 'tools', tool.segments, cache, maxScanCharacters),
   }));
   const { status, verdicts } = await lookup(
     request.organizationId,
@@ -934,9 +937,11 @@ export async function scanRequestWithVerdictCache(
   const { config } = request;
   const cache = store && config.status === 'ready' ? { store, config } : null;
   const [tools, system, conversation] = await Promise.all([
-    parts.tools.length > 0 ? planTools(parts.tools, request, cache) : null,
-    parts.system.length > 0 ? planSegmentsPart('system', parts.system, request, cache) : null,
-    planSegmentsPart('conversation', parts.conversation, request, cache),
+    parts.tools.length > 0 ? planTools(parts.tools, request, cache, deps.maxScanCharacters) : null,
+    parts.system.length > 0
+      ? planSegmentsPart('system', parts.system, request, cache, deps.maxScanCharacters)
+      : null,
+    planSegmentsPart('conversation', parts.conversation, request, cache, deps.maxScanCharacters),
   ]);
   const plans = [tools, system, conversation].filter(plan => plan !== null);
   const scanOrder = [conversation, system, tools].flatMap(plan => plan?.scanOrder ?? []);

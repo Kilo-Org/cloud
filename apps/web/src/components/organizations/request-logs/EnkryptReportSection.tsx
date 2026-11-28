@@ -358,8 +358,12 @@ function pluralCalls(count: number, singular: string, plural: string): string {
 }
 
 /** What a timed-out input scan ran out of, and why its calls stopped. */
-function timeoutMessage(scan: EnkryptInputScanReport, sharedWithBlocking: boolean): string {
-  const deadline = `All of the request's calls share one ${ENKRYPT_GUARDRAIL_TIMEOUT_MS / 1_000} s deadline${
+function timeoutMessage(
+  scan: EnkryptInputScanReport,
+  sharedWithBlocking: boolean,
+  deadlineMs: number
+): string {
+  const deadline = `All of the request's calls share one ${deadlineMs / 1_000} s deadline${
     sharedWithBlocking ? ', and the blocking scan runs first.' : '.'
   }`;
   const outcomes = scan.call_outcomes;
@@ -373,9 +377,9 @@ function timeoutMessage(scan: EnkryptInputScanReport, sharedWithBlocking: boolea
   return `Timed out: ${stopped}. ${deadline}`;
 }
 
-function scanError(scan: Scan, sharedWithBlocking: boolean): string | null {
+function scanError(scan: Scan, sharedWithBlocking: boolean, deadlineMs: number): string | null {
   if (scan.error !== 'timeout' || scan.part === 'response') return scan.error;
-  return timeoutMessage(scan, sharedWithBlocking && scan.scan === 'log_only');
+  return timeoutMessage(scan, sharedWithBlocking && scan.scan === 'log_only', deadlineMs);
 }
 
 /** Hidden when no segment was split into slices, so it would repeat the units cached. */
@@ -460,13 +464,15 @@ function ScanCard({
   scan,
   failedOpen,
   sharedWithBlocking,
+  deadlineMs,
 }: {
   scan: Scan;
   failedOpen: boolean;
   sharedWithBlocking: boolean;
+  deadlineMs: number;
 }) {
   const decision = scanDecision(scan);
-  const error = scanError(scan, sharedWithBlocking);
+  const error = scanError(scan, sharedWithBlocking, deadlineMs);
   const part = PART_LABELS[scan.part];
   const stored = scan.part === 'response' || failedOpen ? null : storedDespiteError(scan);
   const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
@@ -591,6 +597,10 @@ function GuardrailReportBody({
               scan={scan}
               failedOpen={report.verdict === 'fail_open'}
               sharedWithBlocking={!!settings?.detectors.some(each => each.action === 'block')}
+              deadlineMs={
+                ('deadline_ms' in report ? report.deadline_ms : undefined) ??
+                ENKRYPT_GUARDRAIL_TIMEOUT_MS
+              }
             />
           ))}
         </ol>

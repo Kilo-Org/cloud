@@ -3,8 +3,6 @@ import 'server-only';
 import { after, NextResponse } from 'next/server';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
-  ENKRYPT_GUARDRAIL_TIMEOUT_MS,
-  ENKRYPT_MAX_SCAN_CHARACTERS,
   scanLogFields,
   scanRequest,
   type EnkryptGuardrailScanResult,
@@ -33,7 +31,11 @@ import type {
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { KEEP_ALIVE_COMMENT } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
-import { countEnkryptCalls } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
+import {
+  countEnkryptCalls,
+  enkryptCallRateLimiter,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
+import { getRuntimeEnkryptLimits } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/limits';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -62,22 +64,20 @@ const SHORTER_RESPONSE_ADVICE =
 
 const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot hold back more than ${MAX_HELD_OUTPUT_BYTES / 1024 / 1024} MB of model response at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
+export function responseTooLargeMessage(maxScanCharacters: number): string {
+  return `Your organization's Enkrypt AI guardrail cannot scan more than ${maxScanCharacters.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
+}
 
 type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'>;
 
-const outputTooLarge: OutputScanResult = {
-  verdict: { action: 'block', message: RESPONSE_TOO_LARGE_MESSAGE },
-  usageRecords: [],
-};
-
-/**
- * A response is scanned in one call, so one longer than a call can hold is blocked without a scan.
- * Checking it here, rather than leaving it to `scanRequest`, words the block for the response and
- * records why the output was not scanned.
- */
-function isTooLargeToScan(text: string): boolean {
-  return text.length > ENKRYPT_MAX_SCAN_CHARACTERS;
+function outputTooLarge(maxScanCharacters: number): OutputScanResult {
+  return {
+    verdict: {
+      action: 'block',
+      message: responseTooLargeMessage(maxScanCharacters),
+    },
+    usageRecords: [],
+  };
 }
 
 /**
@@ -290,11 +290,20 @@ export async function guardEnkryptOutput({
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const captureResponse = Promise.withResolvers<boolean>();
   const calls = countEnkryptCalls();
+  const limits = await getRuntimeEnkryptLimits();
+  /**
+   * A response is scanned in one call, so one longer than a call can hold is blocked without a
+   * scan. Checking it here, rather than leaving it to `scanRequest`, words the block for the
+   * response and records why the output was not scanned.
+   */
+  const isTooLargeToScan = (text: string) => text.length > limits.max_scan_characters;
   const deps = {
     apiKey: ENKRYPT_API_KEY,
     fetch: calls.fetch,
-    timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
+    timeoutMs: limits.timeout_ms,
     signal,
+    maxScanCharacters: limits.max_scan_characters,
+    admitCall: () => enkryptCallRateLimiter.tryAcquire(limits.calls_per_minute),
     requestLog: captureRequestLogs && {
       guardrail: 'output' as const,
       capture: (entry: Promise<EnkryptRequestLog>) => {
@@ -437,7 +446,9 @@ export async function guardEnkryptOutput({
     });
     const blockingResult = text
       .then(scannedText =>
-        isTooLargeToScan(scannedText) ? outputTooLarge : scanOutput(blocking, scannedText)
+        isTooLargeToScan(scannedText)
+          ? outputTooLarge(limits.max_scan_characters)
+          : scanOutput(blocking, scannedText)
       )
       .catch((error: unknown): OutputScanResult => {
         console.error('[enkrypt-guardrail] output scan failed unexpectedly; response withheld', {

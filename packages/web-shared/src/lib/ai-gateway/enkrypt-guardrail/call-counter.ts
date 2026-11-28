@@ -87,6 +87,102 @@ export function countEnkryptCalls(
   };
 }
 
+/** How old the shared count a rate limit decision is based on may get. */
+export const ENKRYPT_CALL_RATE_REFRESH_MS = 5_000;
+
+export type EnkryptCallRateStore = {
+  get(key: string): Promise<unknown>;
+};
+
+export type EnkryptCallRateLimiter = {
+  /**
+   * Whether one more Enkrypt call may start now under `callsPerMinute`, counting it when it may.
+   * Never waits for Redis.
+   */
+  tryAcquire(callsPerMinute: number): boolean;
+};
+
+/**
+ * A coarse limit on the Enkrypt calls of all gateway instances together, per minute bucket.
+ *
+ * The estimate of the current minute's calls is the shared count of that minute, which the call
+ * counter writes, plus the calls this instance admitted since the count was read. The shared count
+ * is read from the closest Redis replica, in the background at most every
+ * `ENKRYPT_CALL_RATE_REFRESH_MS`, so a decision never waits for Redis and never crosses the
+ * Atlantic. The estimate trails: other instances' calls appear once their requests flushed their
+ * counts and the read after that refreshed it, and a new minute starts from this instance's calls
+ * alone. A failed read keeps the last count, so a Redis outage never stops calls.
+ */
+export function createEnkryptCallRateLimiter(
+  store: EnkryptCallRateStore = redisClient,
+  now: () => number = Date.now
+): EnkryptCallRateLimiter {
+  let minute = enkryptCallMinute(now());
+  /** Calls this instance admitted in `minute`. */
+  let admitted = 0;
+  let shared: { minute: number; count: number; admittedAtRead: number } | null = null;
+  let lastReadAt = Number.NEGATIVE_INFINITY;
+  let reading = false;
+  let warnedMinute: number | null = null;
+
+  const refresh = (at: number) => {
+    if (reading || at - lastReadAt < ENKRYPT_CALL_RATE_REFRESH_MS) return;
+    reading = true;
+    lastReadAt = at;
+    const readMinute = minute;
+    const admittedAtRead = admitted;
+    void Promise.resolve()
+      .then(() => store.get(enkryptCallsMinuteRedisKey(readMinute)))
+      .then(value => {
+        if (readMinute === minute) {
+          shared = {
+            minute: readMinute,
+            count: parseCount(value),
+            admittedAtRead,
+          };
+        }
+      })
+      .catch((error: unknown) => {
+        warnExceptInTest('[enkrypt-guardrail] call rate count read failed; using the last count', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        reading = false;
+      });
+  };
+
+  return {
+    tryAcquire(callsPerMinute) {
+      const at = now();
+      const current = enkryptCallMinute(at);
+      if (current !== minute) {
+        minute = current;
+        admitted = 0;
+        lastReadAt = Number.NEGATIVE_INFINITY;
+      }
+      refresh(at);
+      const counted =
+        shared?.minute === minute ? shared.count + admitted - shared.admittedAtRead : admitted;
+      if (counted >= callsPerMinute) {
+        if (warnedMinute !== minute) {
+          warnedMinute = minute;
+          warnExceptInTest('[enkrypt-guardrail] call rate limit reached; calls fail open', {
+            calls_per_minute: callsPerMinute,
+            counted_calls: counted,
+          });
+        }
+        return false;
+      }
+      admitted += 1;
+      return true;
+    },
+  };
+}
+
+/** The rate limiter shared by the guardrails of this instance. */
+export const enkryptCallRateLimiter = createEnkryptCallRateLimiter();
+
 export type EnkryptCallCounts = {
   /** Start of each minute bucket, oldest first, as epoch milliseconds. */
   bucketStarts: number[];

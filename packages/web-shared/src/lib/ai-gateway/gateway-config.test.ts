@@ -4,6 +4,9 @@ import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   GatewayOrganizationFeaturesConfigSchema,
+  GatewayEnkryptLimitsConfigSchema,
+  EnkryptLimitsInputSchema,
+  DEFAULT_ENKRYPT_LIMITS,
   OrganizationFeaturesInputSchema,
   NOTE_MAX_LENGTH,
   VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH,
@@ -284,6 +287,62 @@ describe('OrganizationFeaturesInputSchema', () => {
         enkrypt_output_guardrail: [],
         gateway_settings: [],
         org_permission_policy: [],
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('GatewayEnkryptLimitsConfigSchema', () => {
+  test('defaults to 1,000 calls per minute, a 60-second timeout and 100,000-character scans', () => {
+    expect(GatewayEnkryptLimitsConfigSchema.parse({}).enkrypt).toEqual({
+      calls_per_minute: 1_000,
+      timeout_ms: 60_000,
+      max_scan_characters: 100_000,
+    });
+    expect(DEFAULT_ENKRYPT_LIMITS).toEqual(GatewayEnkryptLimitsConfigSchema.parse({}).enkrypt);
+  });
+
+  test('reads stored limits, and an invalid one as its default', () => {
+    expect(
+      GatewayEnkryptLimitsConfigSchema.parse({
+        enkrypt: {
+          calls_per_minute: 50,
+          timeout_ms: 0,
+          max_scan_characters: 'x',
+        },
+      }).enkrypt
+    ).toEqual({
+      calls_per_minute: 50,
+      timeout_ms: 60_000,
+      max_scan_characters: 100_000,
+    });
+    expect(GatewayEnkryptLimitsConfigSchema.parse({ enkrypt: 'x' }).enkrypt).toEqual(
+      DEFAULT_ENKRYPT_LIMITS
+    );
+  });
+});
+
+describe('EnkryptLimitsInputSchema', () => {
+  test('accepts limits within bounds', () => {
+    const limits = {
+      calls_per_minute: 1,
+      timeout_ms: 1_000,
+      max_scan_characters: 20_000,
+    };
+    expect(EnkryptLimitsInputSchema.parse(limits)).toEqual(limits);
+  });
+
+  test.each([
+    { calls_per_minute: 0 },
+    { calls_per_minute: 1.5 },
+    { timeout_ms: 999 },
+    { timeout_ms: 300_001 },
+    { max_scan_characters: 19_999 },
+  ])('rejects %o', override => {
+    expect(
+      EnkryptLimitsInputSchema.safeParse({
+        ...DEFAULT_ENKRYPT_LIMITS,
+        ...override,
       }).success
     ).toBe(false);
   });

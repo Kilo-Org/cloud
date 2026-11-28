@@ -49,14 +49,15 @@
     // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
     // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
     // Production reads its runtime secrets from its STS bundle /workloads/uts; the Worker secrets
-    // stay set for rollback, which is this one var (README, "Runtime secrets").
+    // stay set for a rollback. In production the rollback order is its client ids first, then this
+    // var (README, "Production sign-in providers").
     "SECRETS_SOURCE": "sts",
     // GitHub, Google, GitLab and LinkedIn sign-in. Production holds their
     // SIGNIN_<PROVIDER>_CLIENT_SECRET values only in its /workloads/uts bundle, never as Worker
-    // secrets, so test/repo refuses these client ids unless SECRETS_SOURCE above reads `sts`: this
-    // change merges only after the flip, and a rollback removes them before the source goes back
-    // (README, "Production sign-in providers"). Production sets no Discord client id: that
-    // registration and its secret are not ready.
+    // secrets, so test/repo refuses these client ids unless SECRETS_SOURCE above reads `sts`; the
+    // flip merged before them, and a rollback removes them before the source goes back (README,
+    // "Production sign-in providers"). Production sets no Discord client id: that registration and
+    // its secret are not ready.
     "SIGNIN_GITHUB_CLIENT_ID": "Ov23lie6u5czgxYlcfcO",
     "SIGNIN_GOOGLE_CLIENT_ID": "1000529458754-3qjv67tvqek9r5q1u8ico35mng699t96.apps.googleusercontent.com",
     "SIGNIN_GITLAB_CLIENT_ID": "1d7b8acf64d4298f8438f0d7019e91c17c205832c19151f73460fc224e1d3f56",

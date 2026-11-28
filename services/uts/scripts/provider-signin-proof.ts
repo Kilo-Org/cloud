@@ -2,8 +2,10 @@
  * Proof that a deployed issuer offers its sign-in providers as configured, with no credentials
  * (README, "Production sign-in providers"). It reads `/signin/passkeys` and checks that the page
  * offers exactly the expected providers, then calls each provider's start without following the
- * redirect and checks it (`scripts/provider-start.ts`). It never completes a sign-in, so it proves
- * the client id and the redirect, not the client secret.
+ * redirect and checks it (`scripts/provider-start.ts`). It never completes a sign-in, so it shows
+ * only what UTS sends, the authorization URL it builds from the client id, not what the provider
+ * accepts; a completed sign-in per provider after the deploy (README, "Production sign-in
+ * providers") proves the provider side.
  *
  * Each start stores one sign-in flow row, which expires unused after 10 minutes, and takes one
  * anonymous sign-in write slot of the caller's address. It prints the public client ids and

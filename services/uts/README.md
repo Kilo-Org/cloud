@@ -1165,8 +1165,10 @@ pnpm exec tsx scripts/provider-signin-proof.ts
 `UTS_PROOF_PROVIDERS` lists every provider the issuer must offer, with the client id from that
 environment's block in `wrangler.jsonc` (above: the five of the staging block); leave it empty for
 an issuer that offers none. Each start stores one flow row, which expires unused after 10 minutes,
-and takes one anonymous sign-in write slot. The proof never completes a sign-in, so it proves the
-client id and the redirect, not the client secret.
+and takes one anonymous sign-in write slot. The proof never completes a sign-in, so it shows only
+what UTS sends, the authorization URL it builds from the client id, not what the provider accepts;
+the completed sign-ins per provider after the deploy ("Production sign-in providers") prove the
+provider side.
 
 ## Security notices
 
@@ -1637,23 +1639,21 @@ Production offers GitHub, Google, GitLab and LinkedIn sign-in through the four c
 the top level of `wrangler.jsonc`. Their client secrets exist only in production's
 `/workloads/uts` folder, never as Worker secrets, so the providers work only under
 `SECRETS_SOURCE` `sts`. `test/repo` refuses a production block that sets any
-`SIGNIN_<PROVIDER>_CLIENT_ID` under another source. The client id change never changes
-`SECRETS_SOURCE`: until the flip of step 2 is on the base branch, that change fails `test/repo` in
-CI, so it cannot merge before the flip, and a rollback must remove the client ids before the
-source goes back. Enable, in this order:
+`SIGNIN_<PROVIDER>_CLIENT_ID` under another source, which keeps a future re-add of a client id
+from merging while production reads `worker`. The client id change never changes `SECRETS_SOURCE`.
+In this order:
 
 1. **Prerequisites merged and deployed:** the `uts` STS policy (`services/sts/policy/uts.yaml`,
    which grants `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`,
    `SIGNIN_GITLAB_CLIENT_SECRET` and `SIGNIN_LINKEDIN_CLIENT_SECRET` in production) and the
    `SECRETS_SOURCE` reader (`src/secrets.ts`).
-2. **Flip production to `sts`** in its own change, with the parity check, deploy and one-hour
+2. **Production flipped to `sts`** in its own change, with the parity check, deploy and one-hour
    watch of "Runtime secrets" above. Parity compares only the names that have a Worker secret, so
-   the four sign-in client secrets are not part of it. In the watch, production's
-   `uts.secrets.read` lines with `source` `sts` must name none of the four client secrets under
-   `absent` or `empty`: the bundle then holds a value for each before any client id needs it.
-3. **Merge the base branch into the client id change** after the flip has merged. Its `test/repo`
-   check then passes in CI, and its diff adds only the four client ids. Merge it; the deploy
-   workflow deploys it.
+   the four sign-in client secrets are not part of it. The watch required production's
+   `uts.secrets.read` lines with `source` `sts` to name none of the four client secrets under
+   `absent` or `empty`, so the bundle held a value for each before any client id needed it.
+3. **The client id change merged** after the flip was on the base branch, so its `test/repo` check
+   passed in CI; the deploy workflow deploys it on merge.
 4. **Prove it** against production with the client ids from `wrangler.jsonc`:
 
    ```sh
@@ -1666,12 +1666,20 @@ source goes back. Enable, in this order:
    per provider with a team member's own account, and one Google sign-in with an account outside
    the organization, which proves the Google consent screen is published for external users.
    Check the hour after the deploy for no new `uts.signin.misconfigured` or
-   `uts.secrets.unavailable` line and no provider failure in the callback logs.
+   `uts.secrets.unavailable` line and no provider failure in the callback logs, and count that
+   hour's LinkedIn refusals and new accounts: `uts.signin.outcome` lines with `provider` `linkedin`
+   and `outcome` `link_required` or `email_unverified`, and `ai.kilo.uts.account.created` audit
+   rows whose `attributes` name `provider` `linkedin`. The new production LinkedIn app gives
+   imported users a new member id, so they link only through a proven email, and a different
+   LinkedIn email creates a separate account (design decision M161): these counts show how many
+   were refused a link and how many got a separate account.
 
-**Rollback**, in this order: revert the client id change and let it deploy, so production offers
-none of the four providers (the proof with `UTS_PROOF_PROVIDERS` empty passes); then, only if the
-source itself must go back, deploy `SECRETS_SOURCE` `worker` as in step 4 of "Runtime secrets".
-`test/repo` refuses the reverse order, because under `worker` production holds no client secret.
+**Rollback**, in this order: remove the four `SIGNIN_<PROVIDER>_CLIENT_ID` vars from the top level
+of `wrangler.jsonc` and let that deploy, so production offers none of the four providers (the proof
+with `UTS_PROOF_PROVIDERS` empty passes; reverting the change instead would also delete the proof
+script, the `test/repo` rule and this runbook); then, only if the source itself must go back,
+deploy `SECRETS_SOURCE` `worker` as in step 4 of "Runtime secrets". `test/repo` refuses the reverse
+order, because under `worker` production holds no client secret.
 Accounts created through these providers keep their other methods only: production has no email
 sign-in, so an account whose only other method is a passkey signs in with the passkey alone until
 the providers return, and an account with no passkey cannot sign in until then.

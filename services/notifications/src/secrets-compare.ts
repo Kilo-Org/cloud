@@ -8,6 +8,7 @@ import {
   type NotificationsSecretsEnv,
   type NotificationsSecretsSource,
 } from './secrets';
+import { apnsPemBody, importApnsPrivateKey } from './lib/apns-live-activity';
 
 /**
  * The comparison runs only when `WORKER_ENV` is `production` and `SECRETS_COMPARE_ENABLED` is
@@ -55,7 +56,7 @@ export type RefusedCheck = CheckedRoute & { secret: NotificationsSecretName; sel
 /**
  * The admitted-request events. The first carries the three names' booleans, the fixed route and
  * serving source, and the names whose two values were both read and differ. The second carries
- * Expo's own `match`, `mismatch` or `unproven`.
+ * Expo's own `match`, `mismatch` or `unproven`. The APNs key event below may follow the first.
  */
 export const SECRETS_COMPARE_EVENT = 'notifications_secrets_compare';
 export const SECRETS_COMPARE_EXPO_EVENT = 'notifications_secrets_compare_expo';
@@ -65,6 +66,18 @@ export const SECRETS_COMPARE_EXPO_EVENT = 'notifications_secrets_compare_expo';
  * `match`, `mismatch` or `unproven`.
  */
 export const SECRETS_COMPARE_REFUSED_EVENT = 'notifications_secrets_compare_refused';
+
+/**
+ * Follows the admitted-request event only when both APNs key values were read and their bytes
+ * differ. Fixed booleans say whether the two values are equal after `trim()`, after turning
+ * literal `\n` sequences and CRLF into LF, and as the base64 body the signer decodes, and, per
+ * source, whether the signer's own import accepts the value. `samePublicKey` compares the full
+ * RFC 7638 thumbprints of the two public keys in memory; each source's thumbprint is logged only
+ * as its first `APNS_THUMBPRINT_LOG_HEX` hex digits, `null` when the value does not import.
+ */
+export const SECRETS_COMPARE_APNS_EVENT = 'notifications_secrets_compare_apns';
+
+export const APNS_THUMBPRINT_LOG_HEX = 12;
 
 /**
  * A comparison settles within this time, inside the 30 s a request's `waitUntil` may run after its
@@ -81,7 +94,8 @@ type Lifetime = () => SecretsExecutionContext;
  * Returns the isolate's two hooks. `admitted` compares the three names and Expo once per isolate,
  * after the first accepted request. `refused` compares only the guard's own name, once per isolate
  * and route, after a presented credential fails against a value the guard already read. Both run
- * under the request's `waitUntil`, log fixed fields only, never throw and never delay the caller.
+ * under the request's `waitUntil`, never throw and never delay the caller. They log fixed fields
+ * only; the APNs key event adds each source's shortened public-key thumbprint.
  * A disabled hook reads nothing, the execution context included; a context that cannot be read
  * skips the call and stays armed.
  */
@@ -108,8 +122,9 @@ export function createSecretsComparison() {
       if (admittedStarted) return;
       admittedStarted = start(env, lifetime, ctx =>
         Promise.all([
-          compareAdmitted(env, ctx, checked).then(line => {
+          compareAdmitted(env, ctx, checked).then(({ line, apns }) => {
             console.log(SECRETS_COMPARE_EVENT, line);
+            if (apns !== undefined) console.log(SECRETS_COMPARE_APNS_EVENT, apns);
           }),
           compareOne(env, ctx, checked, EXPO_NAME).then(line => {
             console.log(SECRETS_COMPARE_EXPO_EVENT, line);
@@ -133,12 +148,25 @@ export const secretsComparison = createSecretsComparison();
 
 type AdmittedLine = SecretsCompareResult & CheckedRoute & { mismatched: ComparedName[] };
 
+type ApnsKeyLine = CheckedRoute & {
+  equalAfterTrim: boolean;
+  equalAfterNewlines: boolean;
+  equalPemBody: boolean;
+  secretsStoreImportable: boolean;
+  stsImportable: boolean;
+  samePublicKey: boolean;
+  secretsStoreThumbprint: string | null;
+  stsThumbprint: string | null;
+};
+
+type Admitted = { line: AdmittedLine; apns?: ApnsKeyLine };
+
 async function compareAdmitted(
   env: SecretsCompareEnv,
   ctx: SecretsExecutionContext,
   checked: CheckedRoute
-): Promise<AdmittedLine> {
-  const unproven: AdmittedLine = { ...NOT_PROVEN, ...checked, mismatched: [] };
+): Promise<Admitted> {
+  const unproven: Admitted = { line: { ...NOT_PROVEN, ...checked, mismatched: [] } };
   return withinDeadline(compareAll(env, ctx, checked), unproven);
 }
 
@@ -146,18 +174,19 @@ async function compareAll(
   env: SecretsCompareEnv,
   ctx: SecretsExecutionContext,
   checked: CheckedRoute
-): Promise<AdmittedLine> {
-  const [apnsKey, nextAuth, internalApi] = await Promise.all([
-    compareName(env, ctx, checked.source, 'NOTIFICATIONS_APNS_PRIVATE_KEY'),
+): Promise<Admitted> {
+  const [apnsPair, nextAuth, internalApi] = await Promise.all([
+    readPair(env, ctx, checked.source, 'NOTIFICATIONS_APNS_PRIVATE_KEY'),
     compareName(env, ctx, checked.source, 'NEXTAUTH_SECRET'),
     compareName(env, ctx, checked.source, 'INTERNAL_API_SECRET'),
   ]);
+  const apnsKey = compareBytes(apnsPair);
   const results: Record<ComparedName, Comparison> = {
     NOTIFICATIONS_APNS_PRIVATE_KEY: apnsKey,
     NEXTAUTH_SECRET: nextAuth,
     INTERNAL_API_SECRET: internalApi,
   };
-  return {
+  const line: AdmittedLine = {
     NOTIFICATIONS_APNS_PRIVATE_KEY: apnsKey === 'match',
     NEXTAUTH_SECRET: nextAuth === 'match',
     INTERNAL_API_SECRET: internalApi === 'match',
@@ -165,6 +194,8 @@ async function compareAll(
     source: checked.source,
     mismatched: COMPARED_NAMES.filter(name => results[name] === 'mismatch'),
   };
+  if (apnsPair === undefined || apnsKey !== 'mismatch') return { line };
+  return { line, apns: await diagnoseApnsKey(apnsPair, checked) };
 }
 
 async function compareOne(
@@ -191,14 +222,40 @@ async function withinDeadline<T>(work: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+type ReadPair = { served: string; other: string };
+
 /**
- * Exact bytes, never a parsed form. The APNs reader strips the PEM armour and every whitespace
- * character before decoding (`pemToDer` in lib/apns-live-activity.ts), so a copy that differs only
- * in whitespace would sign the same, yet is a `mismatch` here. `selected` is the value the guard
- * already checked; otherwise the serving source is read. Without the STS binding nothing is read.
- * A missing, empty or unreadable value on either side is `unproven`; the error itself is dropped
- * so no value reaches a log.
+ * Both values of `name`, or `undefined` when either is missing, empty or unreadable; the error
+ * itself is dropped so no value reaches a log. `selected` is the value the guard already checked;
+ * otherwise the serving source is read. Without the STS binding nothing is read.
  */
+async function readPair(
+  env: SecretsCompareEnv,
+  ctx: SecretsExecutionContext,
+  source: NotificationsSecretsSource,
+  name: NotificationsSecretName,
+  selected?: string
+): Promise<ReadPair | undefined> {
+  const binding = env.STS;
+  if (binding === undefined) return undefined;
+  const otherSource = source === 'sts' ? 'secrets-store' : 'sts';
+  const [served, other] = await Promise.all([
+    selected ?? readFrom(env, binding, ctx, source, name),
+    readFrom(env, binding, ctx, otherSource, name),
+  ]);
+  if (!served || !other) return undefined;
+  return { served, other };
+}
+
+/**
+ * Exact bytes, never a parsed form: an APNs key copy that differs only in whitespace signs the
+ * same, yet is a `mismatch` here. `diagnoseApnsKey` reports how such a key copy differs.
+ */
+function compareBytes(pair: ReadPair | undefined): Comparison {
+  if (pair === undefined) return 'unproven';
+  return timingSafeEqual(pair.served, pair.other) ? 'match' : 'mismatch';
+}
+
 async function compareName(
   env: SecretsCompareEnv,
   ctx: SecretsExecutionContext,
@@ -206,15 +263,60 @@ async function compareName(
   name: NotificationsSecretName,
   selected?: string
 ): Promise<Comparison> {
-  const binding = env.STS;
-  if (binding === undefined) return 'unproven';
-  const otherSource = source === 'sts' ? 'secrets-store' : 'sts';
-  const [served, other] = await Promise.all([
-    selected ?? readFrom(env, binding, ctx, source, name),
-    readFrom(env, binding, ctx, otherSource, name),
+  return compareBytes(await readPair(env, ctx, source, name, selected));
+}
+
+/** Works only on the two values already read: it reads nothing else and logs nothing itself. */
+async function diagnoseApnsKey(
+  { served, other }: ReadPair,
+  checked: CheckedRoute
+): Promise<ApnsKeyLine> {
+  const [servedThumbprint, otherThumbprint] = await Promise.all([
+    apnsThumbprint(served),
+    apnsThumbprint(other),
   ]);
-  if (!served || !other) return 'unproven';
-  return timingSafeEqual(served, other) ? 'match' : 'mismatch';
+  const [secretsStore, sts] =
+    checked.source === 'secrets-store'
+      ? [servedThumbprint, otherThumbprint]
+      : [otherThumbprint, servedThumbprint];
+  return {
+    route: checked.route,
+    source: checked.source,
+    equalAfterTrim: timingSafeEqual(served.trim(), other.trim()),
+    equalAfterNewlines: timingSafeEqual(normalizeNewlines(served), normalizeNewlines(other)),
+    equalPemBody: timingSafeEqual(apnsPemBody(served), apnsPemBody(other)),
+    secretsStoreImportable: secretsStore !== undefined,
+    stsImportable: sts !== undefined,
+    samePublicKey:
+      secretsStore !== undefined && sts !== undefined && timingSafeEqual(secretsStore, sts),
+    secretsStoreThumbprint: secretsStore?.slice(0, APNS_THUMBPRINT_LOG_HEX) ?? null,
+    stsThumbprint: sts?.slice(0, APNS_THUMBPRINT_LOG_HEX) ?? null,
+  };
+}
+
+/** An escaped copy's literal `\n` sequences and CRLF line endings both become LF. */
+function normalizeNewlines(value: string): string {
+  return value.replaceAll('\\n', '\n').replaceAll('\r\n', '\n');
+}
+
+/**
+ * The full hex RFC 7638 SHA-256 thumbprint of the public key the signer's own import yields, or
+ * `undefined` when that import or the export fails; the error is dropped. Only the public `x` and
+ * `y` enter the digest.
+ */
+async function apnsThumbprint(pem: string): Promise<string | undefined> {
+  try {
+    const key = await importApnsPrivateKey(pem, true);
+    const jwk = await crypto.subtle.exportKey('jwk', key);
+    if (jwk instanceof ArrayBuffer || typeof jwk.x !== 'string' || typeof jwk.y !== 'string') {
+      return undefined;
+    }
+    const members = JSON.stringify({ crv: 'P-256', kty: 'EC', x: jwk.x, y: jwk.y });
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(members));
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return undefined;
+  }
 }
 
 async function readFrom(

@@ -34,6 +34,11 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   `NEXTAUTH_SECRET` must stay set on the `kilocode-ai-gateway` project: it
   verifies HS256 bearer tokens. It is no longer checked at boot, so a missing
   value shows up as every bearer token being refused.
+- `next.config.mjs` also inlines `KILO_STS_WORKLOAD=ai-gateway`: the forward to
+  the Secure Proxy sends an STS token under `SECURE_PROXY_SENDER_AUTH=sts` only
+  from this build. STS grants the forward scope only to the `ai-gateway`
+  workload, so a build without it sends nothing rather than ask for a token it
+  cannot hold.
 - Requests only arrive here under `/api/v1`. The LLM proxy's path validation
   accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`

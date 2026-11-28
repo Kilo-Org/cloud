@@ -1,8 +1,23 @@
 import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
+import { STS_SECURE_PROXY_FORWARD } from '@kilocode/sts-contracts';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { stsServiceTokenIfHeld } from '@kilocode/web-shared/lib/sts-service-tokens';
 import { buildDirectProvider } from './build-direct-provider';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
+  // Read at each send, so a test sets the switch through `mockSenderAuth`.
+  get SECURE_PROXY_SENDER_AUTH() {
+    return mockSenderAuth.value;
+  },
+}));
+
+jest.mock('@kilocode/web-shared/lib/sts-service-tokens', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/sts-service-tokens'),
+  stsServiceTokenIfHeld: jest.fn(),
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -13,6 +28,14 @@ jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
 }));
+
+const mockSenderAuth: { value: string | undefined } = { value: undefined };
+const heldToken = jest.mocked(stsServiceTokenIfHeld);
+const PRODUCTION = {
+  VERCEL_ENV: 'production',
+  VERCEL_TARGET_ENV: 'production',
+  KILO_STS_WORKLOAD: 'ai-gateway',
+} as const;
 
 const originalFetch = global.fetch;
 
@@ -41,7 +64,7 @@ function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_i
   );
 }
 
-async function sendThroughSecureProxy(
+async function sendUpstream(
   disable_url_suffix: boolean,
   user_hash_as_mt_user_id = false,
   prompt_cache_key = 'task-cache-key'
@@ -79,31 +102,51 @@ async function sendThroughSecureProxy(
     reasoningEffort: null,
     durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
+  return { result, fetchMock, sent: body };
+}
 
+async function sendThroughSecureProxy(
+  disable_url_suffix: boolean,
+  user_hash_as_mt_user_id = false,
+  prompt_cache_key = 'task-cache-key'
+) {
+  const { result, fetchMock, sent } = await sendUpstream(
+    disable_url_suffix,
+    user_hash_as_mt_user_id,
+    prompt_cache_key
+  );
   expect(result.type).toBe('success');
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [url, init] = fetchMock.mock.calls[0];
   return {
     url,
+    init,
     headers: new Headers(init?.headers),
     body: SecureProxyRequestBodySchema.parse(JSON.parse(init?.body as string)),
-    sent: body,
+    sent,
   };
 }
 
 describe('upstreamRequest through the secure proxy', () => {
   afterEach(() => {
     global.fetch = originalFetch;
+    mockSenderAuth.value = undefined;
+    heldToken.mockReset();
+    delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.KILO_STS_WORKLOAD;
   });
 
   it('sends only the proxy secret to the proxy and moves upstream auth into the body', async () => {
-    const { url, headers, body, sent } = await sendThroughSecureProxy(false);
+    const { url, init, headers, body, sent } = await sendThroughSecureProxy(false);
 
     expect(url).toBe('https://secure-proxy.example.com/api/proxy');
+    expect(init?.redirect).toBe('follow');
     expect(Object.fromEntries(headers)).toEqual({
       'content-type': 'application/json',
       authorization: 'Bearer proxy-secret',
     });
+    expect(heldToken).not.toHaveBeenCalled();
     expect(body).toEqual({
       ...sent,
       kilo_secure_proxy: {
@@ -147,4 +190,84 @@ describe('upstreamRequest through the secure proxy', () => {
       expect(body.prompt_cache_key).toBe(cacheKey);
     }
   );
+});
+
+describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+    mockSenderAuth.value = undefined;
+    heldToken.mockReset();
+    delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.KILO_STS_WORKLOAD;
+    jest.restoreAllMocks();
+  });
+
+  it('sends only a held STS token to the exact proxy, never the stored secret', async () => {
+    mockSenderAuth.value = 'sts';
+    Object.assign(process.env, PRODUCTION);
+    heldToken.mockResolvedValue({ kind: 'token', token: 'sts-token' });
+
+    const { url, init, headers, body, sent } = await sendThroughSecureProxy(false);
+
+    expect(url).toBe('https://secure-proxy.example.com/api/proxy');
+    expect(init?.redirect).toBe('error');
+    expect(Object.fromEntries(headers)).toEqual({
+      'content-type': 'application/json',
+      authorization: 'Bearer sts-token',
+    });
+    expect(JSON.stringify(init)).not.toContain('proxy-secret');
+    expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1/chat/completions?trace=1');
+    expect(sent).not.toHaveProperty('kilo_secure_proxy');
+    expect(heldToken).toHaveBeenCalledWith('production', STS_SECURE_PROXY_FORWARD);
+  });
+
+  it('refuses the forward as retryable while no token is held, with no blocking mint', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSenderAuth.value = 'sts';
+    Object.assign(process.env, PRODUCTION);
+    heldToken.mockResolvedValue({ kind: 'not_held' });
+
+    const { result, fetchMock } = await sendUpstream(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.type).toBe('error');
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.response.status).toBe(503);
+    expect(result.notInvoked).toBe(true);
+    expect(await result.response.json()).toMatchObject({
+      error_type: 'temporarily_unavailable',
+    });
+    // The sender asks for a held token only; the read that mints one runs on in the background.
+    expect(heldToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing for a value outside the closed set', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSenderAuth.value = 'dual';
+
+    const { result, fetchMock } = await sendUpstream(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.type).toBe('error');
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.response.status).toBe(503);
+    expect(result.notInvoked).toBe(true);
+    expect(heldToken).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing from a build that is not the ai-gateway workload', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSenderAuth.value = 'sts';
+    delete process.env.KILO_STS_WORKLOAD;
+    Object.assign(process.env, { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' });
+
+    const { result, fetchMock } = await sendUpstream(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.type).toBe('error');
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.response.status).toBe(503);
+    expect(heldToken).not.toHaveBeenCalled();
+  });
 });

@@ -18,6 +18,7 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { secureProxyCredential } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy-sender';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
 import {
@@ -309,6 +310,28 @@ function upstreamFetchFailureResponse(
   );
 }
 
+/**
+ * No credential was available for the secure-proxy forward, so the proxy was never dialled: no
+ * request left the gateway and no provider was billed. 503 because the reason is almost always a
+ * cold start: `stsServiceTokenIfHeld` started the mint on `waitUntil`, and the retry uses its
+ * token. The sender logged the reason once (`secure-proxy-sender.ts`).
+ */
+function secureProxyCredentialResponse(vercelRequestId: string | null | undefined) {
+  const error = withRequestId(
+    'The gateway could not authenticate its secure proxy, so the request was not sent upstream. Retry the request.',
+    vercelRequestId
+  );
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.temporarily_unavailable,
+      message: error,
+      ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
+    },
+    { status: 503 }
+  );
+}
+
 async function buildSignedBedrockRequest({
   url,
   method,
@@ -348,9 +371,9 @@ export type UpstreamFetchResult =
       fetchFailure?: { timedOut: boolean };
       /**
        * Affirmative proof that nothing was dialled: the gateway refused the target before it
-       * opened a connection. Only the URL-policy refusal sets it. A redirect refusal and every
-       * fetch failure leave it unset because the request reached the network, so "no
-       * `fetchFailure`" alone never means "the provider was not called".
+       * opened a connection. The URL-policy refusal and a missing secure-proxy credential set it.
+       * A redirect refusal and every fetch failure leave it unset because the request reached the
+       * network, so "no `fetchFailure`" alone never means "the provider was not called".
        */
       notInvoked?: true;
     };
@@ -445,27 +468,43 @@ async function sendUpstreamFetch({
   try {
     const targetUrl = resolveUrl();
 
-    const outgoing = provider.secureProxy
-      ? buildSecureProxyRequest({
-          proxyUrl: provider.secureProxy.url,
-          secret: provider.apiKey,
-          upstreamUrl: targetUrl,
-          upstreamHeaders: headers,
-          body,
-        })
-      : provider.awsBedrock
-        ? await buildSignedBedrockRequest({
-            url: targetUrl,
-            method,
-            headers,
-            body,
-            credentials: provider.awsBedrock,
-          })
-        : {
-            url: targetUrl,
-            headers,
-            body: body instanceof FormData ? body : JSON.stringify(body),
-          };
+    let outgoing: { url: string; headers: Headers; body: string | FormData };
+    let credentialMode: 'legacy' | 'sts' | null = null;
+    if (provider.secureProxy) {
+      const credential = await secureProxyCredential({ legacySecret: () => provider.apiKey });
+      if (credential.kind === 'unavailable') {
+        budgetSignal.removeEventListener('abort', onBudgetExceeded);
+        return {
+          type: 'error',
+          response: secureProxyCredentialResponse(vercelRequestId),
+          // The credential is read before any connection is opened, so the provider was never
+          // dialled and was not billed.
+          notInvoked: true,
+        };
+      }
+      credentialMode = credential.mode;
+      outgoing = buildSecureProxyRequest({
+        proxyUrl: provider.secureProxy.url,
+        authorization: credential.authorization,
+        upstreamUrl: targetUrl,
+        upstreamHeaders: headers,
+        body,
+      });
+    } else if (provider.awsBedrock) {
+      outgoing = await buildSignedBedrockRequest({
+        url: targetUrl,
+        method,
+        headers,
+        body,
+        credentials: provider.awsBedrock,
+      });
+    } else {
+      outgoing = {
+        url: targetUrl,
+        headers,
+        body: body instanceof FormData ? body : JSON.stringify(body),
+      };
+    }
 
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.
@@ -500,7 +539,9 @@ async function sendUpstreamFetch({
       method,
       headers: outgoing.headers,
       body: outgoing.body,
-      redirect: enforceUrlPolicy ? 'manual' : 'follow',
+      // An STS token never reaches a redirect target, so that hop refuses one outright; the legacy
+      // bearer keeps its behaviour. The URL policy answers a redirect itself.
+      redirect: enforceUrlPolicy ? 'manual' : credentialMode === 'sts' ? 'error' : 'follow',
       duplex: 'half',
       signal: combinedSignal,
       ...(dispatcher ? { dispatcher } : {}),

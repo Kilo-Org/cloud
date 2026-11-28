@@ -7,11 +7,14 @@ const monorepoRoot = resolve(import.meta.dirname, '../..');
 const nextConfig = {
   poweredByHeader: false,
 
-  // Inlined at build time, so no request or runtime variable can change it: the
-  // gateway authenticates by bearer token only and never reads the NextAuth
-  // session cookie (packages/web-shared/src/lib/user/server.ts).
+  // Inlined at build time, so no request or runtime variable can change them:
+  // - the gateway authenticates by bearer token only and never reads the NextAuth
+  //   session cookie (packages/web-shared/src/lib/user/server.ts);
+  // - its Vercel identity is the STS `ai-gateway` workload, the only caller STS grants the
+  //   secure-proxy forward scope (packages/web-shared/src/lib/ai-gateway/providers/secure-proxy-sender.ts).
   env: {
     KILO_BROWSER_SESSIONS: 'disabled',
+    KILO_STS_WORKLOAD: 'ai-gateway',
   },
 
   // Both values MUST be set to the monorepo root and kept in sync; see

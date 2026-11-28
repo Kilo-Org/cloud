@@ -25,6 +25,7 @@ import type { Env, SandboxId } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { createMessageId } from './message-id.js';
@@ -64,6 +65,8 @@ export class ControlPlaneMessageInputError extends Error {
  */
 export async function buildControlPlaneMessagePayload(input: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   sessionId: SessionId;
   metadata: SessionMetadata;
@@ -78,6 +81,7 @@ export async function buildControlPlaneMessagePayload(input: {
     input.turn.type === 'prompt'
       ? await buildSignedPromptAttachments({
           env: input.env,
+          ctx: input.ctx,
           userId: input.userId,
           sessionId: input.sessionId,
           attachments: input.turn.attachments,

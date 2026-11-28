@@ -1,5 +1,6 @@
 import type { QueueAckResponse } from '../router/schemas.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type { SessionId } from '../types/ids.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
@@ -26,7 +27,7 @@ export type PreparedInitialAdmissionInput = {
 
 export async function replayPreparedInitialMessageIfAlreadyAdmitted(
   input: PreparedInitialAdmissionInput,
-  ctx: { env: Env; userId: string; botId?: string }
+  ctx: { env: Env; userId: string; botId?: string; executionCtx?: SecretsExecutionContext }
 ): Promise<QueueAckResponse | undefined> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, sessionId);
@@ -52,7 +53,7 @@ export async function replayPreparedInitialMessageIfAlreadyAdmitted(
 
 export async function admitPreparedInitialMessage(
   input: PreparedInitialAdmissionInput,
-  ctx: { env: Env; userId: string; botId?: string }
+  ctx: { env: Env; userId: string; botId?: string; executionCtx?: SecretsExecutionContext }
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, sessionId);
@@ -88,6 +89,7 @@ export async function admitPreparedInitialMessage(
   try {
     payload = await buildControlPlaneMessagePayload({
       env: ctx.env,
+      ctx: ctx.executionCtx,
       userId: ctx.userId,
       sessionId,
       metadata,

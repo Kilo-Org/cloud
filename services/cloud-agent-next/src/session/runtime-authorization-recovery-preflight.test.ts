@@ -42,8 +42,6 @@ vi.mock('./metadata.js', () => ({
   })),
 }));
 
-vi.mock('../auth.js', () => ({ resolveSecret: vi.fn(async () => 'secret') }));
-
 vi.mock('@kilocode/worker-utils/runtime-authorization', async importOriginal => ({
   ...(await importOriginal<typeof RuntimeAuthorizationModule>()),
   createRuntimeAuthorization: createRuntimeAuthorizationMock,
@@ -77,7 +75,7 @@ const scopedToken = jwt.sign(
 );
 
 const ctx = {
-  env: { HYPERDRIVE: { connectionString: 'postgres://test' } } as never,
+  env: { HYPERDRIVE: { connectionString: 'postgres://test' }, NEXTAUTH_SECRET: 'secret' } as never,
   userId: 'usr_1',
   authToken: delegatedToken,
 };

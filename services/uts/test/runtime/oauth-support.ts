@@ -205,9 +205,6 @@ export function oauthDeps(
     sign: signerAccess(env, config),
     scopes: testScopes,
     publish: recordingPublisher().publish,
-    handoff: async () => {
-      throw new Error('unexpected hand-off');
-    },
     device: { status: 'off' },
     homeWidget: { status: 'off' },
     signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },

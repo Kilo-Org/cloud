@@ -499,11 +499,19 @@ describe('the UTS configs themselves', () => {
   });
 
   it('accept secrets-store, the shared rollback value, and fail an unknown source', () => {
+    // Production sets no sign-in client id here, so the source is the only thing the rule reads.
     const withSource = (source: string) =>
       utsConfigProblems(
         mintWith(raw => ({
           ...raw,
-          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), SECRETS_SOURCE: source },
+          vars: {
+            ...Object.fromEntries(
+              Object.entries(z.record(z.string(), z.unknown()).parse(raw.vars)).filter(
+                ([name]) => !name.endsWith('_CLIENT_ID')
+              )
+            ),
+            SECRETS_SOURCE: source,
+          },
         }))
       );
     expect(withSource('secrets-store')).toEqual([]);

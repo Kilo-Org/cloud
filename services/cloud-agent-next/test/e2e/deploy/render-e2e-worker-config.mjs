@@ -373,6 +373,8 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     vars.E2E_ACCESS_AUD = verifiedAccess.aud;
     vars.E2E_ACCESS_TEAM_DOMAIN = verifiedAccess.teamDomain;
   }
+  // Q9 admission observation is production-only; the e2e Worker never inherits it.
+  delete vars.KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED;
   config.vars = vars;
 
   config.secrets_store_secrets = [structuredClone(E2E_SIGNING_SECRET)];

@@ -29,7 +29,10 @@ function buildMountedApp(secret: string | undefined = TEST_SECRET) {
   app.route('/api', api);
   app.route('/api/callbacks', callbacksStub);
 
-  const env = { INTERNAL_API_SECRET: { get: async () => secret } } as unknown as Env;
+  const env = {
+    ENVIRONMENT: 'development',
+    INTERNAL_API_SECRET: { get: async () => secret },
+  } as unknown as Env;
   return { app, env };
 }
 
@@ -131,16 +134,18 @@ function bundleWith(secrets: Record<string, string>): BundleResult {
 
 /** A fresh STS binding per call: the reader keeps one bundle per binding for the isolate. */
 function sourceApp(
-  source: string | undefined,
-  bundle: BundleResult = bundleWith({ INTERNAL_API_SECRET: BUNDLE_KEY })
+  environment: string | undefined,
+  bundle: BundleResult | 'no-binding' = bundleWith({ INTERNAL_API_SECRET: BUNDLE_KEY })
 ) {
-  const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
+  const getBundle = vi.fn<BundleBinding['getBundle']>(async () =>
+    bundle === 'no-binding' ? bundleWith({}) : bundle
+  );
   const storeGet = vi.fn(async () => STORE_KEY);
   const { app } = buildMountedApp();
   const env = {
-    ...(source === undefined ? {} : { SECRETS_SOURCE: source }),
+    ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
     INTERNAL_API_SECRET: { get: storeGet },
-    STS: { getBundle },
+    ...(bundle === 'no-binding' ? {} : { STS: { getBundle } }),
   } as unknown as Env;
   const call = (key?: string, path = '/api/triggers/user/u/t') =>
     app.request(
@@ -156,22 +161,20 @@ describe('internalApiMiddleware secrets source', () => {
     vi.restoreAllMocks();
   });
 
-  it.each([undefined, 'secrets-store'])(
-    'accepts only the Secrets Store key and reads no bundle (SECRETS_SOURCE %j)',
-    async source => {
-      const { call, getBundle, storeGet } = sourceApp(source);
+  it('accepts only the Secrets Store key and reads no bundle in development', async () => {
+    const { call, getBundle, storeGet } = sourceApp('development');
 
-      expect((await call(STORE_KEY)).status).toBe(200);
-      expect((await call(BUNDLE_KEY)).status).toBe(401);
-      expect((await call()).status).toBe(401);
-      // The Secrets Store source reads the binding for every request, a keyless one included.
-      expect(storeGet).toHaveBeenCalledTimes(3);
-      expect(getBundle).not.toHaveBeenCalled();
-    }
-  );
+    expect((await call(STORE_KEY)).status).toBe(200);
+    expect((await call(BUNDLE_KEY)).status).toBe(401);
+    expect((await call()).status).toBe(401);
+    // Development reads the binding for every request, a keyless one included.
+    expect(storeGet).toHaveBeenCalledTimes(3);
+    expect(getBundle).not.toHaveBeenCalled();
+  });
 
-  it('accepts only the bundle key under sts and never reads the Secrets Store', async () => {
-    const { call, getBundle, storeGet } = sourceApp('sts');
+  it('accepts only the bundle key in production and never reads the Secrets Store', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const { call, getBundle, storeGet } = sourceApp('production');
 
     expect((await call()).status).toBe(401);
     expect((await call('')).status).toBe(401);
@@ -182,25 +185,36 @@ describe('internalApiMiddleware secrets source', () => {
     expect((await call(STORE_KEY)).status).toBe(401);
     expect(getBundle).toHaveBeenCalledOnce();
     expect(storeGet).not.toHaveBeenCalled();
+    const refusal = (error: string, reason: string) => [
+      'Internal API authentication failed',
+      { error, route: 'internal-api', secret: 'INTERNAL_API_SECRET', source: 'sts', reason },
+    ];
+    expect(warn.mock.calls).toEqual([
+      refusal('Missing internal API key', 'missing'),
+      refusal('Missing internal API key', 'missing'),
+      refusal('Invalid internal API key', 'invalid'),
+    ]);
   });
 
-  it('reads nothing for the exempt callbacks subtree under sts', async () => {
-    const { call, getBundle, storeGet } = sourceApp('sts');
+  it('reads nothing for the exempt callbacks subtree in production', async () => {
+    const { call, getBundle, storeGet } = sourceApp('production');
 
     expect((await call(undefined, '/api/callbacks/execution')).status).toBe(200);
     expect(getBundle).not.toHaveBeenCalled();
     expect(storeGet).not.toHaveBeenCalled();
   });
 
-  it.each<[string, string, BundleResult, string]>([
-    ['no grant', 'sts', bundleWith({}), 'not_granted'],
-    ['an STS denial', 'sts', { status: 'denied', reason: 'unknown_workload' }, 'denied'],
-    ['a malformed SECRETS_SOURCE', 'STS', bundleWith({}), 'invalid_source'],
+  it.each<[string, string | undefined, BundleResult | 'no-binding', string]>([
+    ['no grant', 'production', bundleWith({}), 'not_granted'],
+    ['an STS denial', 'production', { status: 'denied', reason: 'unknown_workload' }, 'denied'],
+    ['no STS binding in production', 'production', 'no-binding', 'binding_missing'],
+    ['a staging ENVIRONMENT', 'staging', bundleWith({}), 'unsupported_environment'],
+    ['no ENVIRONMENT', undefined, bundleWith({}), 'unsupported_environment'],
   ])(
     'answers a generic 503 on %s, logs fixed fields only, and never falls back',
-    async (_case, source, bundle, reason) => {
+    async (_case, environment, bundle, reason) => {
       const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-      const { call, storeGet } = sourceApp(source, bundle);
+      const { call, getBundle, storeGet } = sourceApp(environment, bundle);
 
       const response = await call(STORE_KEY);
 
@@ -216,12 +230,13 @@ describe('internalApiMiddleware secrets source', () => {
         reason,
       });
       expect(storeGet).not.toHaveBeenCalled();
+      if (environment !== 'production') expect(getBundle).not.toHaveBeenCalled();
     }
   );
 
   it('keeps the unconfigured answer for an empty bundle value', async () => {
     vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-    const { call } = sourceApp('sts', bundleWith({ INTERNAL_API_SECRET: '' }));
+    const { call } = sourceApp('production', bundleWith({ INTERNAL_API_SECRET: '' }));
 
     expect((await call(BUNDLE_KEY)).status).toBe(500);
   });

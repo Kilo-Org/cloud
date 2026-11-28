@@ -7,7 +7,6 @@ import {
 } from '@kilocode/secrets-client';
 import type * as WorkerdModule from 'cloudflare:workers';
 import { resError } from '@kilocode/worker-utils';
-import { z } from 'zod';
 import { logger } from './util/logger';
 import { getSecretValue } from './util/secret';
 
@@ -18,27 +17,27 @@ import { getSecretValue } from './util/secret';
  */
 export type WebhookSecretName = 'INTERNAL_API_SECRET' | 'CALLBACK_TOKEN_SECRET' | 'NEXTAUTH_SECRET';
 
-const SecretsSourceSchema = z.enum(['secrets-store', 'sts']);
-
-export type WebhookSecretsSource = z.infer<typeof SecretsSourceSchema>;
+/** Where the three secrets are read: the STS bundle, or the Worker's own bindings. */
+export type WebhookSecretsSource = 'secrets-store' | 'sts';
 
 /**
- * `SECRETS_SOURCE` selects where every read of the three secrets goes: `secrets-store` (or no
- * value) reads the Secrets Store binding exactly as before, `sts` reads the bundle over the `STS`
- * service binding and never falls back to the Secrets Store.
+ * `ENVIRONMENT` fixes where every read of the three secrets goes. `production` reads the bundle
+ * over the `STS` service binding and never falls back to the Secrets Store. `development` (the
+ * local-only `env.dev`) reads its own bindings, `.dev.vars` strings included. Any other value, an
+ * absent one included, reads neither and refuses.
  */
 export type WebhookSecretsSelection = {
-  SECRETS_SOURCE?: string;
+  ENVIRONMENT?: string;
   STS?: BundleBinding;
 };
 
-/** The selection plus the Secrets Store binding that the `secrets-store` source reads for `N`. */
+/** The selection plus the binding that `development` reads for `N`. */
 export type WebhookSecretsEnv<N extends WebhookSecretName> = WebhookSecretsSelection &
   Record<N, SecretsStoreSecret | string>;
 
-/** Why a non-legacy source gave no value. Every value is fixed here; none comes from an error. */
+/** Why no value was read. Every value is fixed here; none comes from an error. */
 export type SecretRefusal =
-  | 'invalid_source'
+  | 'unsupported_environment'
   | 'binding_missing'
   | 'missing'
   | 'not_granted'
@@ -63,28 +62,35 @@ const stsClients = new WeakMap<BundleBinding, Secrets>();
 let workerdModule: Promise<typeof WorkerdModule> | undefined;
 
 /**
- * The selected source, or `undefined` for an unrecognised value. Callers fail closed on
- * `undefined` and read neither source.
+ * The source `ENVIRONMENT` fixes, or `undefined` for an environment this Worker does not deploy.
+ * Callers fail closed on `undefined` and read neither source.
  */
 export function secretsSource(
-  env: Pick<WebhookSecretsSelection, 'SECRETS_SOURCE'>
+  env: Pick<WebhookSecretsSelection, 'ENVIRONMENT'>
 ): WebhookSecretsSource | undefined {
-  const parsed = SecretsSourceSchema.safeParse(env.SECRETS_SOURCE ?? 'secrets-store');
-  return parsed.success ? parsed.data : undefined;
+  if (env.ENVIRONMENT === 'production') return 'sts';
+  if (env.ENVIRONMENT === 'development') return 'secrets-store';
+  return undefined;
 }
 
 type StsReadResult = { ok: true; value: string } | { ok: false; reason: SecretRefusal };
 
-const INVALID_SOURCE: StsReadResult = { ok: false, reason: 'invalid_source' };
+const UNSUPPORTED_ENVIRONMENT: StsReadResult = { ok: false, reason: 'unsupported_environment' };
+
+let stsReadLogged = false;
+
+function logStsReadOnce(value: string): void {
+  if (stsReadLogged || value === '') return;
+  stsReadLogged = true;
+  logger.info('Webhook secret source read succeeded', { source: 'sts' });
+}
 
 /**
  * Reads one name from the STS bundle and returns it as delivered, empty included, so each caller
  * keeps its own empty-value handling. It never throws and never reads the Secrets Store: a failure
- * returns only a fixed reason, so no error name, message or cause reaches a log or a response. It
- * does not check `SECRETS_SOURCE`; the `sts` source and the source comparison
- * (src/secrets-compare.ts) both read through it.
+ * returns only a fixed reason, so no error name, message or cause reaches a log or a response.
  */
-export async function readStsSecret(
+async function readStsSecret(
   env: Pick<WebhookSecretsSelection, 'STS'>,
   name: WebhookSecretName
 ): Promise<StsReadResult> {
@@ -116,8 +122,8 @@ export async function readStsSecret(
 }
 
 /**
- * A sender could not get a secret from a non-legacy source. The message is fixed and safe to store
- * as a request's failure text; `secret` and `reason` hold fixed values only.
+ * A sender could not get a secret from STS, or `ENVIRONMENT` names no source. The message is fixed
+ * and safe to store as a request's failure text; `secret` and `reason` hold fixed values only.
  */
 export class SecretSourceUnavailableError extends Error {
   constructor(
@@ -130,9 +136,9 @@ export class SecretSourceUnavailableError extends Error {
 }
 
 /**
- * The value a sender uses. The `secrets-store` source returns or throws exactly what it did
- * before. The `sts` source returns the delivered value; a failed read, and an unrecognised
- * `SECRETS_SOURCE`, log a fixed event and throw `SecretSourceUnavailableError`.
+ * The value a sender uses. `development` returns or throws exactly what its binding gives.
+ * `production` returns the delivered bundle value; a failed read, and an unsupported
+ * `ENVIRONMENT`, log a fixed event and throw `SecretSourceUnavailableError`.
  */
 export async function readSecret<N extends WebhookSecretName>(
   env: WebhookSecretsEnv<NoInfer<N>>,
@@ -142,15 +148,18 @@ export async function readSecret<N extends WebhookSecretName>(
   // Widening to the binding record keeps `bindings[name]` typed as the binding.
   const bindings: Record<N, SecretsStoreSecret | string> = env;
   if (source === 'secrets-store') return getSecretValue(bindings[name]);
-  const read = source === 'sts' ? await readStsSecret(env, name) : INVALID_SOURCE;
-  if (read.ok) return read.value;
+  const read = source === 'sts' ? await readStsSecret(env, name) : UNSUPPORTED_ENVIRONMENT;
+  if (read.ok) {
+    logStsReadOnce(read.value);
+    return read.value;
+  }
   logger.error('Webhook secret unavailable', { secret: name, reason: read.reason });
   throw new SecretSourceUnavailableError(name, read.reason);
 }
 
 /**
  * What an inbound credential is checked against. `read` holds the value as `source` returned it.
- * `keyless` means the `sts` source read nothing because the request presents no credential; the
+ * `keyless` means production read nothing because the request presents no credential; the
  * verifier refuses it as it refuses any missing credential. `refused` carries a fixed reason.
  */
 export type ExpectedSecret =
@@ -159,10 +168,10 @@ export type ExpectedSecret =
   | { status: 'refused'; reason: SecretRefusal };
 
 /**
- * The expected value for a verifier. The comparison stays at the verifier. The `secrets-store`
- * source reads the binding for every request, a keyless one included, and returns or throws
- * exactly what it did before. The `sts` source reads the bundle only for a request that presents
- * a credential and never falls back.
+ * The expected value for a verifier. The comparison stays at the verifier. `development` reads
+ * its binding for every request, a keyless one included, and returns or throws exactly what it
+ * gives. `production` reads the bundle only for a request that presents a credential and never
+ * falls back.
  */
 export async function expectedSecret<N extends WebhookSecretName>(
   env: WebhookSecretsEnv<NoInfer<N>>,
@@ -174,9 +183,10 @@ export async function expectedSecret<N extends WebhookSecretName>(
   if (source === 'secrets-store') {
     return { status: 'read', source, secret: await getSecretValue(bindings[name]) };
   }
-  if (source === undefined) return { status: 'refused', reason: 'invalid_source' };
+  if (source === undefined) return { status: 'refused', reason: 'unsupported_environment' };
   if (!presented) return { status: 'keyless', source };
   const read = await readStsSecret(env, name);
+  if (read.ok) logStsReadOnce(read.value);
   return read.ok
     ? { status: 'read', source, secret: read.value }
     : { status: 'refused', reason: read.reason };

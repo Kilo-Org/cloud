@@ -1,3 +1,4 @@
+import type { BundleBinding } from '@kilocode/secrets-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { createRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
@@ -19,6 +20,7 @@ vi.mock('../db/queries.js', () => ({
   ensureBotUserForOrg,
   isDirectOrgMember,
 }));
+vi.mock('cloudflare:workers', () => ({ waitUntil: vi.fn() }));
 
 const secret = 'test-secret-at-least-thirty-two-characters';
 
@@ -28,11 +30,27 @@ function decodeJwt(token: string): Record<string, unknown> {
   return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
 }
 
+/** Production signs with the STS bundle value; its Secrets Store binding stays bound but unread. */
 function service(sharedResourceTokensEnabled?: string | boolean) {
+  const getBundle = vi.fn<BundleBinding['getBundle']>(async () => ({
+    status: 'ok',
+    workload: 'cloudflare-webhook-agent-ingest',
+    environment: 'production',
+    etag: '"0123456789abcdef"',
+    stale: false,
+    fetchedAt: '2026-11-27T00:00:00.000Z',
+    secrets: { NEXTAUTH_SECRET: { value: secret, version: 1 } },
+    missing: [],
+  }));
   return new TokenMintingService({
     HYPERDRIVE: { connectionString: 'postgres://test' },
-    NEXTAUTH_SECRET: { get: async () => secret },
+    NEXTAUTH_SECRET: {
+      get: async () => {
+        throw new Error('production never reads the Secrets Store');
+      },
+    },
     ENVIRONMENT: 'production',
+    STS: { getBundle },
     SHARED_RESOURCE_TOKENS_ENABLED: sharedResourceTokensEnabled,
   });
 }

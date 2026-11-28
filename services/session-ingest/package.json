@@ -2,7 +2,7 @@
   "name": "cloudflare-session-ingest",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --var KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED:false",
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --include-runtime=false --env-interface CloudflareBindings",
     "test": "vitest run",

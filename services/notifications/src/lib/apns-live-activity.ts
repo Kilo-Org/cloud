@@ -40,12 +40,30 @@ export type LiveActivityAlert = { title: string; body: string };
 
 const encoder = new TextEncoder();
 
+/** The base64 body `pemToDer` decodes: the PEM armour and every whitespace character removed. */
+export function apnsPemBody(pem: string): string {
+  return pem.replace(APNS_KEY_PREFIX, '').replace(APNS_KEY_SUFFIX, '').replace(/\s/g, '');
+}
+
 function pemToDer(pem: string): Uint8Array {
-  const body = pem.replace(APNS_KEY_PREFIX, '').replace(APNS_KEY_SUFFIX, '').replace(/\s/g, '');
-  const binary = atob(body);
+  const binary = atob(apnsPemBody(pem));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+/**
+ * Imports the APNs key exactly as signing does. Signing never asks for an extractable key; only
+ * the source comparison (src/secrets-compare.ts) does, to read the public half.
+ */
+export async function importApnsPrivateKey(pem: string, extractable: boolean): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'pkcs8',
+    pemToDer(pem),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    extractable,
+    ['sign']
+  );
 }
 
 /** Sign a short-lived ES256 APNs provider token (JWT). */
@@ -61,13 +79,7 @@ export async function signApnsJwt(
   );
   const signingInput = `${header}.${claims}`;
 
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToDer(credentials.privateKeyPem),
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    false,
-    ['sign']
-  );
+  const key = await importApnsPrivateKey(credentials.privateKeyPem, false);
   const signature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     key,

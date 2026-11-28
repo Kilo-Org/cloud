@@ -49,8 +49,9 @@ export function createRelayServer(handle: (request: RelayRequest) => Promise<Res
         res.end();
         return;
       }
-      await pipeline(Readable.fromWeb(response.body), res).catch(() => res.destroy());
-    })();
+      await pipeline(Readable.fromWeb(response.body), res);
+      // A failed write or a broken stream ends this one response, never the process.
+    })().catch(() => res.destroy());
   });
   server.headersTimeout = HEADERS_TIMEOUT_MS;
   server.requestTimeout = REQUEST_TIMEOUT_MS;

@@ -1,0 +1,46 @@
+# /etc/systemd/system/github-relay.service on the relay host (README, "Deploy").
+[Unit]
+Description=GitHub relay (services/github-relay)
+After=network-online.target
+Wants=network-online.target
+# Restart=always must never give up, however often the process exits.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/opt/node/bin/node --max-old-space-size=160 /opt/github-relay/server.mjs
+# Staging only until the production STS grant; then `staging,production` (README, "Production").
+Environment=RELAY_STS_ENVIRONMENTS=staging
+Environment=RELAY_PUBLIC_URL=https://github-relay.kiloapps.io
+Environment=RELAY_PORT=8080
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+# No state, no secrets, no privileges: the relay only needs outbound HTTPS and a loopback port.
+DynamicUser=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0077
+MemoryMax=256M
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

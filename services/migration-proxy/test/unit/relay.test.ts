@@ -41,7 +41,10 @@ function github(read: (url: string) => Promise<Response>): { fetcher: GithubFetc
   return { fetcher, calls };
 }
 
-function client(fetcher: GithubFetch, token: () => Promise<string> = async () => 'sts-relay-token') {
+function client(
+  fetcher: GithubFetch,
+  token: () => Promise<string> = async () => 'sts-relay-token'
+) {
   return createGithubClient(
     {
       appId: '5952011',
@@ -60,7 +63,8 @@ async function failure(promise: Promise<unknown>): Promise<GithubUnavailableErro
     () => null,
     (caught: unknown) => caught
   );
-  if (!(error instanceof GithubUnavailableError)) throw new Error(`expected unavailable, got ${String(error)}`);
+  if (!(error instanceof GithubUnavailableError))
+    throw new Error(`expected unavailable, got ${String(error)}`);
   return error;
 }
 

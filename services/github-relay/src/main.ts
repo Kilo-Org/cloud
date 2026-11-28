@@ -37,13 +37,16 @@ const verifiers: StsVerifier[] = environments.map(environment => ({
 const relay = createRelay({
   verifiers,
   fetch: (url, init) => fetch(url, init),
-  log: line => process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...line })}\n`),
+  log: line =>
+    process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...line })}\n`),
   // The process outlives every request, so a background refresh only needs to stay referenced.
   waitUntil: promise => void promise.catch(() => undefined),
 });
 
 const server = createRelayServer(relay);
 server.listen(port, '127.0.0.1', () => {
-  process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), listening: port, environments })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ at: new Date().toISOString(), listening: port, environments })}\n`
+  );
 });
 process.on('SIGTERM', () => server.close(() => process.exit(0)));

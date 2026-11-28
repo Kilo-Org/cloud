@@ -17,7 +17,13 @@ const SHA = 'c'.repeat(40);
 const TREE = `/migration-proxy/repos/Kilo-Org/cloud/git/trees/${SHA}`;
 const INSTALLATION_TOKEN = 'ghs_installationtokenvalue';
 
-type Issuer = { issuer: string; environment: 'staging' | 'production'; kid: string; key: CryptoKey; jwks: JwksSource };
+type Issuer = {
+  issuer: string;
+  environment: 'staging' | 'production';
+  kid: string;
+  key: CryptoKey;
+  jwks: JwksSource;
+};
 
 async function issuer(url: string, environment: Issuer['environment']): Promise<Issuer> {
   const { privateKey, publicKey } = await generateKeyPair('EdDSA', { extractable: true });
@@ -74,7 +80,10 @@ function verifierOf(from: Issuer): StsVerifier {
 
 type Upstream = { url: string; init: RequestInit };
 
-function setup(answer: (url: string, init: RequestInit) => Promise<Response>, extra: Partial<RelayDeps> = {}) {
+function setup(
+  answer: (url: string, init: RequestInit) => Promise<Response>,
+  extra: Partial<RelayDeps> = {}
+) {
   const upstream: Upstream[] = [];
   const logs: RelayLog[] = [];
   const relay = createRelay({
@@ -197,7 +206,11 @@ describe('the relay', () => {
   it.each([
     ['another workload', { sub: 'service:web', client_id: 'web', req: 'web' }, 403],
     ['another audience', { aud: 'session-ingest' }, 403],
-    ['an expired token', { exp: Math.floor(Date.now() / 1000) - 600, iat: Math.floor(Date.now() / 1000) - 900 }, 401],
+    [
+      'an expired token',
+      { exp: Math.floor(Date.now() / 1000) - 600, iat: Math.floor(Date.now() / 1000) - 900 },
+      401,
+    ],
     ['the wrong environment claim', { env: 'staging' }, 401],
   ])('refuses %s', async (_label, overrides, status) => {
     const { relay, upstream } = setup(async () => githubTree());
@@ -228,21 +241,24 @@ describe('the relay', () => {
     ['POST', { method: 'POST' }, 405],
     ['HEAD', { method: 'HEAD' }, 405],
     ['a body', { hasBody: true }, 400],
-  ])('refuses %s from an authenticated caller without calling GitHub', async (_label, overrides, status) => {
-    const { relay, upstream } = setup(async () => githubTree());
-    const response = await relay(
-      request(
-        TREE,
-        {
-          [RELAY_AUTHORIZATION_HEADER]: `Bearer ${await stsToken(production)}`,
-          authorization: `token ${INSTALLATION_TOKEN}`,
-        },
-        overrides
-      )
-    );
-    expect(response.status).toBe(status);
-    expect(upstream).toEqual([]);
-  });
+  ])(
+    'refuses %s from an authenticated caller without calling GitHub',
+    async (_label, overrides, status) => {
+      const { relay, upstream } = setup(async () => githubTree());
+      const response = await relay(
+        request(
+          TREE,
+          {
+            [RELAY_AUTHORIZATION_HEADER]: `Bearer ${await stsToken(production)}`,
+            authorization: `token ${INSTALLATION_TOKEN}`,
+          },
+          overrides
+        )
+      );
+      expect(response.status).toBe(status);
+      expect(upstream).toEqual([]);
+    }
+  );
 
   it('never calls GitHub without the caller GitHub token', async () => {
     const { relay, upstream } = setup(async () => githubTree());
@@ -288,7 +304,9 @@ describe('the relay', () => {
       [RELAY_AUTHORIZATION_HEADER]: `Bearer ${await stsToken(production)}`,
       authorization: `token ${INSTALLATION_TOKEN}`,
     };
-    const moved = setup(async () => new Response('', { status: 301, headers: { location: 'https://evil.example/' } }));
+    const moved = setup(
+      async () => new Response('', { status: 301, headers: { location: 'https://evil.example/' } })
+    );
     const redirect = await moved.relay(request(TREE, auth));
     expect(redirect.status).toBe(301);
     expect(redirect.headers.get('location')).toBeNull();
@@ -321,6 +339,50 @@ describe('the relay', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('ok\n');
     expect(logs).toEqual([]);
+  });
+
+  it('logs no token, path parameter or query on any refusal either', async () => {
+    const { relay, logs } = setup(async () => githubTree());
+    const token = await stsToken(production);
+    const other = await stsToken(production, { sub: 'service:web', client_id: 'web', req: 'web' });
+    const target = `/migration-proxy/repos/Kilo-Org/cloud/compare/${SHA}...main?per_page=7`;
+    const cases: RelayRequest[] = [
+      request(`/migration-proxy/repos/Kilo-Org/cloud/git/trees/${SHA}?recursive=1`, {
+        [RELAY_AUTHORIZATION_HEADER]: `Bearer ${token}`,
+        authorization: `token ${INSTALLATION_TOKEN}`,
+      }),
+      request(TREE, {
+        [RELAY_AUTHORIZATION_HEADER]: `Bearer ${token}x`,
+        authorization: `token ${INSTALLATION_TOKEN}`,
+      }),
+      request(TREE, {
+        [RELAY_AUTHORIZATION_HEADER]: `Bearer ${other}`,
+        authorization: `token ${INSTALLATION_TOKEN}`,
+      }),
+      request(TREE, { authorization: `Bearer ${token}` }),
+      request(target, { [RELAY_AUTHORIZATION_HEADER]: `Bearer ${token}` }),
+      request(
+        target,
+        {
+          [RELAY_AUTHORIZATION_HEADER]: `Bearer ${token}`,
+          authorization: `token ${INSTALLATION_TOKEN}`,
+        },
+        { method: 'POST' }
+      ),
+    ];
+    for (const entry of cases) await relay(entry);
+    expect(logs.map(line => [line.status, line.reason])).toEqual([
+      [403, 'query_not_allowed'],
+      [401, expect.any(String)],
+      [403, 'caller_not_allowed'],
+      [401, expect.any(String)],
+      [400, 'github_authorization_missing'],
+      [405, 'method_not_allowed'],
+    ]);
+    const logged = JSON.stringify(logs);
+    for (const secret of [token, other, INSTALLATION_TOKEN, SHA, 'per_page', 'recursive']) {
+      expect(logged).not.toContain(secret);
+    }
   });
 });
 

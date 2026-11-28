@@ -55,7 +55,11 @@ export type RelayLog = {
   ms: number;
 };
 
-export type StsVerifier = { issuer: string; environment: StsEnvironment; verifier: Verifier<false> };
+export type StsVerifier = {
+  issuer: string;
+  environment: StsEnvironment;
+  verifier: Verifier<false>;
+};
 
 export type RelayDeps = {
   /** One per STS environment the relay serves; the first answers tokens of no known issuer. */
@@ -87,10 +91,7 @@ export function bearerIssuer(authorization: string | null): string | null {
 }
 
 function refusal(status: number, error: string, headers: Record<string, string> = {}): Response {
-  return Response.json(
-    { error },
-    { status, headers: { 'cache-control': 'no-store', ...headers } }
-  );
+  return Response.json({ error }, { status, headers: { 'cache-control': 'no-store', ...headers } });
 }
 
 export function createRelay(deps: RelayDeps): (request: RelayRequest) => Promise<Response> {
@@ -212,7 +213,8 @@ export function createRelay(deps: RelayDeps): (request: RelayRequest) => Promise
             release();
             controller.close();
           } else {
-            controller.enqueue(chunk.value);
+            // Node types a fetch body's chunks as `any`; they are always bytes.
+            controller.enqueue(chunk.value as Uint8Array);
           }
         } catch (error) {
           release();

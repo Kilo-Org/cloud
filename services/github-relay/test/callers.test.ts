@@ -60,29 +60,82 @@ describe('the migration proxy allow-list', () => {
     await client.reviews(13020);
     await client.blobAt(SHA, 'packages/db/src/migrations/meta/_journal.json');
 
-    expect(direct).toEqual(['POST https://api.github.com/app/installations/186479258/access_tokens']);
-    expect(relayed.map(url => {
-      const result = matchTarget(new URL(url));
-      return result.ok ? result.route.name : result.reason;
-    })).toEqual(['compare', 'compare', 'tree', 'blob', 'commits', 'commit-pulls', 'reviews', 'contents']);
+    expect(direct).toEqual([
+      'POST https://api.github.com/app/installations/186479258/access_tokens',
+    ]);
+    expect(
+      relayed.map(url => {
+        const result = matchTarget(new URL(url));
+        return result.ok ? result.route.name : result.reason;
+      })
+    ).toEqual([
+      'compare',
+      'compare',
+      'tree',
+      'blob',
+      'commits',
+      'commit-pulls',
+      'reviews',
+      'contents',
+    ]);
   });
 
   it.each([
-    ['another repository', `/migration-proxy/repos/Kilo-Org/kilocode/git/trees/${SHA}`, 'path_not_allowed'],
-    ['the installation repository list', '/migration-proxy/installation/repositories', 'path_not_allowed'],
-    ['the token mint', '/migration-proxy/app/installations/186479258/access_tokens', 'path_not_allowed'],
-    ['a dot segment out of the repository', `${repo}/git/trees/../../../../user`, 'path_not_allowed'],
-    ['an encoded dot segment', `${repo}/contents/packages/db/src/migrations/%2e%2e/%2e%2e/x`, 'path_not_allowed'],
+    [
+      'another repository',
+      `/migration-proxy/repos/Kilo-Org/kilocode/git/trees/${SHA}`,
+      'path_not_allowed',
+    ],
+    [
+      'the installation repository list',
+      '/migration-proxy/installation/repositories',
+      'path_not_allowed',
+    ],
+    [
+      'the token mint',
+      '/migration-proxy/app/installations/186479258/access_tokens',
+      'path_not_allowed',
+    ],
+    [
+      'a dot segment out of the repository',
+      `${repo}/git/trees/../../../../user`,
+      'path_not_allowed',
+    ],
+    [
+      'an encoded dot segment',
+      `${repo}/contents/packages/db/src/migrations/%2e%2e/%2e%2e/x`,
+      'path_not_allowed',
+    ],
     ['an encoded slash', `${repo}/contents/packages/db/src/migrations/a%2Fb`, 'path_not_allowed'],
-    ['contents outside the migrations', `${repo}/contents/.github/CODEOWNERS?ref=${SHA}`, 'path_not_allowed'],
+    [
+      'contents outside the migrations',
+      `${repo}/contents/.github/CODEOWNERS?ref=${SHA}`,
+      'path_not_allowed',
+    ],
     ['a branch name in a tree', `${repo}/git/trees/main`, 'path_not_allowed'],
     ['a compare base that is a branch', `${repo}/compare/main...${SHA}`, 'path_not_allowed'],
     ['a trailing slash', `${repo}/git/trees/${SHA}/`, 'path_not_allowed'],
     ['an unknown query key', `${repo}/git/trees/${SHA}?recursive=1`, 'query_not_allowed'],
-    ['a repeated query key', `${repo}/compare/${SHA}...${SHA}?per_page=1&per_page=2`, 'query_not_allowed'],
-    ['a commits path outside the migrations', `${repo}/commits?sha=${SHA}&path=.github/CODEOWNERS`, 'query_not_allowed'],
-    ['a contents ref that is a branch', `${repo}/contents/packages/db/src/migrations/x.sql?ref=main`, 'query_not_allowed'],
-    ['another caller prefix', `/migration-proxyx/repos/Kilo-Org/cloud/git/trees/${SHA}`, 'unknown_caller'],
+    [
+      'a repeated query key',
+      `${repo}/compare/${SHA}...${SHA}?per_page=1&per_page=2`,
+      'query_not_allowed',
+    ],
+    [
+      'a commits path outside the migrations',
+      `${repo}/commits?sha=${SHA}&path=.github/CODEOWNERS`,
+      'query_not_allowed',
+    ],
+    [
+      'a contents ref that is a branch',
+      `${repo}/contents/packages/db/src/migrations/x.sql?ref=main`,
+      'query_not_allowed',
+    ],
+    [
+      'another caller prefix',
+      `/migration-proxyx/repos/Kilo-Org/cloud/git/trees/${SHA}`,
+      'unknown_caller',
+    ],
     ['no caller prefix', `/repos/Kilo-Org/cloud/git/trees/${SHA}`, 'unknown_caller'],
   ])('refuses %s', (_label, target, reason) => {
     expect(matchTarget(new URL(target, RELAY))).toEqual({ ok: false, reason });
@@ -90,7 +143,10 @@ describe('the migration proxy allow-list', () => {
 
   it('forwards the checked path and query exactly, without the caller prefix', () => {
     const result = matchTarget(
-      new URL(`${repo}/commits?sha=${SHA}&path=packages%2Fdb%2Fsrc%2Fmigrations%2Fx.sql&per_page=1`, RELAY)
+      new URL(
+        `${repo}/commits?sha=${SHA}&path=packages%2Fdb%2Fsrc%2Fmigrations%2Fx.sql&per_page=1`,
+        RELAY
+      )
     );
     expect(result).toMatchObject({
       ok: true,

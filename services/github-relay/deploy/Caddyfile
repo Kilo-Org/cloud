@@ -1,0 +1,18 @@
+# /etc/caddy/Caddyfile on the relay host (README, "Deploy").
+#
+# Caddy terminates TLS for the relay's host name and proxies to the Node service on loopback.
+# The certificate comes from Let's Encrypt over TLS-ALPN-01 on port 443, the only port the
+# firewall opens; Caddy renews it on its own. There is no `log` directive on purpose: an access
+# log would record request targets and headers. The relay writes its own line per request.
+{
+	auto_https disable_redirects
+}
+
+github-relay.kiloapps.io {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+	reverse_proxy 127.0.0.1:8080
+}

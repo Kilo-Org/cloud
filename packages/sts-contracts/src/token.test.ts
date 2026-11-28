@@ -216,11 +216,7 @@ describe('STS scope registry', () => {
     ['security-sync:manual-sync.enqueue', 'security-sync', STS_SECURITY_SYNC_MANUAL_SYNC],
     ['security-sync:dismiss-finding.enqueue', 'security-sync', STS_SECURITY_SYNC_DISMISS_FINDING],
     ['web:security-notifications.dispatch', 'web', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
-    [
-      'github-relay:migration-proxy.read',
-      'github-relay',
-      STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
-    ],
+    ['github-relay:migration-proxy.read', 'github-relay', STS_GITHUB_RELAY_MIGRATION_PROXY_READ],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });
     expect(scopeAudience(pair.scope)).toBe(pair.audience);

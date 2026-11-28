@@ -52,7 +52,9 @@ const VarsSchema = z.object({
   MIGRATION_PROXY_GITHUB_INSTALLATION_ID: z.string(),
   MIGRATION_REVIEW_BASELINE_SHA: z.string(),
   MIGRATION_PROXY_GITHUB_API_URL: z.url({ protocol: /^https?$/ }).optional(),
-  MIGRATION_PROXY_GITHUB_RELAY_URL: z.union([z.literal(''), z.url({ protocol: /^https?$/ })]).optional(),
+  MIGRATION_PROXY_GITHUB_RELAY_URL: z
+    .union([z.literal(''), z.url({ protocol: /^https?$/ })])
+    .optional(),
 });
 
 /** Reads and checks the vars; the problems name vars and rules, never a value. */

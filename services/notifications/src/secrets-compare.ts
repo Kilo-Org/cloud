@@ -97,7 +97,7 @@ type Lifetime = () => SecretsExecutionContext;
  * under the request's `waitUntil`, never throw and never delay the caller. They log fixed fields
  * only; the APNs key event adds each source's shortened public-key thumbprint.
  * A disabled hook reads nothing, the execution context included; a context that cannot be read
- * skips the call and stays armed.
+ * or refuses the `waitUntil` registration skips the call and stays armed.
  */
 export function createSecretsComparison() {
   let admittedStarted = false;
@@ -108,13 +108,17 @@ export function createSecretsComparison() {
     work: (ctx: SecretsExecutionContext) => Promise<unknown>
   ) => {
     if (env.SECRETS_COMPARE_ENABLED !== 'true' || env.WORKER_ENV !== 'production') return false;
+    // `waitUntil` registers a placeholder first: the comparison, and with it every read, starts
+    // only once the request has accepted it, so a refused registration reads nothing.
+    const registered = Promise.withResolvers<unknown>();
     let ctx: SecretsExecutionContext;
     try {
       ctx = lifetime();
+      ctx.waitUntil(registered.promise);
     } catch {
       return false;
     }
-    ctx.waitUntil(work(ctx));
+    registered.resolve(work(ctx));
     return true;
   };
   return {

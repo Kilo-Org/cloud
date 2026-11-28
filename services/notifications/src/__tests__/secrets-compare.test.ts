@@ -238,6 +238,54 @@ describe('createSecretsComparison', () => {
     expect(logs.lines(EVENT.compare)).toEqual([compareLine(STORE_DISPATCH, ALL_MATCH)]);
   });
 
+  it('reads nothing and stays armed when the request refuses the registration', async () => {
+    const { compareEnv, getBundle, storeReads } = fixture();
+    const logs = captureLogs();
+    const compare = createSecretsComparison();
+    const finished = {
+      waitUntil: () => {
+        throw new Error('request finished');
+      },
+    };
+
+    expect(() => {
+      compare.admitted(compareEnv, () => finished, STORE_DISPATCH);
+      compare.refused(compareEnv, () => finished, refusedInternal);
+    }).not.toThrow();
+    // A refused start exposes no promise to await. Let an early comparison microtask run.
+    await Promise.resolve();
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(storeReads()).toBe(0);
+    expect(logs.raw()).toBe('[]');
+
+    // Neither latch was spent: both hooks start later, each registered before any read.
+    const admittedLater = lifetime();
+    const readsAtRegistration: number[] = [];
+    const ctx = {
+      waitUntil: (promise: Promise<unknown>) => {
+        readsAtRegistration.push(getBundle.mock.calls.length + storeReads());
+        admittedLater.ctx.waitUntil(promise);
+      },
+    };
+    compare.admitted(compareEnv, () => ctx, STORE_DISPATCH);
+    await admittedLater.settled();
+    const refusedLater = lifetime();
+    compare.refused(compareEnv, () => refusedLater.ctx, refusedInternal);
+    await refusedLater.settled();
+
+    expect(readsAtRegistration).toEqual([0]);
+    expect(logs.lines(EVENT.compare)).toEqual([compareLine(STORE_DISPATCH, ALL_MATCH)]);
+    expect(logs.lines(EVENT.expo)).toEqual([expoLine(STORE_DISPATCH, 'match')]);
+    expect(logs.lines(EVENT.refused)).toEqual([
+      {
+        route: 'dispatch',
+        secret: 'INTERNAL_API_SECRET',
+        source: 'secrets-store',
+        result: 'match',
+      },
+    ]);
+  });
+
   it('logs the three names and Expo for exact copies, once per isolate', async () => {
     const { compareEnv, getBundle, apnsKey, nextAuth, internal, expo } = fixture();
     const logs = captureLogs();

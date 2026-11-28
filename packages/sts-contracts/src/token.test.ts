@@ -20,6 +20,11 @@ import {
   STS_SECURITY_SYNC_DISMISS_FINDING,
   STS_SECURITY_SYNC_MANUAL_SYNC,
   STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
+  STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
+  STS_MODEL_EVAL_INGEST_INTERNAL_CALL,
+  STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
+  STS_SESSION_SYNC_INTERNAL_CALL,
+  STS_NOTIFICATIONS_INTERNAL_CALL,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
   STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK,
@@ -246,11 +251,14 @@ describe('STS scope registry', () => {
           'bouncer:signup.history',
         ],
       },
-      'webhook-agent-ingest': { scopes: ['webhook-agent-ingest:execution.callback'] },
+      'webhook-agent-ingest': {
+        scopes: ['webhook-agent-ingest:execution.callback', 'webhook-agent-ingest:internal.call'],
+      },
       'security-auto-analysis': {
         scopes: [
           'security-auto-analysis:analysis.callback',
           'security-auto-analysis:remediation.callback',
+          'security-auto-analysis:internal.call',
         ],
       },
       'code-review': {
@@ -262,6 +270,9 @@ describe('STS scope registry', () => {
         ],
       },
       'session-ingest': { scopes: ['session-ingest:session-access.invalidate'] },
+      'model-eval-ingest': { scopes: ['model-eval-ingest:internal.call'] },
+      'session-sync': { scopes: ['session-sync:internal.call'] },
+      notifications: { scopes: ['notifications:internal.call'] },
       'community-contributions-dashboard': {
         scopes: ['community-contributions-dashboard:opencode.sync'],
       },
@@ -365,6 +376,19 @@ describe('STS scope registry', () => {
       'session-ingest',
       STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
     ],
+    [
+      'security-auto-analysis:internal.call',
+      'security-auto-analysis',
+      STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
+    ],
+    ['model-eval-ingest:internal.call', 'model-eval-ingest', STS_MODEL_EVAL_INGEST_INTERNAL_CALL],
+    [
+      'webhook-agent-ingest:internal.call',
+      'webhook-agent-ingest',
+      STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
+    ],
+    ['session-sync:internal.call', 'session-sync', STS_SESSION_SYNC_INTERNAL_CALL],
+    ['notifications:internal.call', 'notifications', STS_NOTIFICATIONS_INTERNAL_CALL],
     ['web:mcp-catalog-token.mint', 'web', STS_WEB_MCP_CATALOG_TOKEN_MINT],
     [
       'community-contributions-dashboard:opencode.sync',

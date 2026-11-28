@@ -158,11 +158,15 @@ export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
   UTS_BOT_KEYS_MANAGE_SCOPE,
 ];
 
-/** The account API acts on the caller's session: every action reads the grant its `sid` names. */
+/**
+ * The account API acts on the caller's session: every action reads the session its `sid` names, a
+ * CLI grant or the web BFF's browser session. The BFF manages PATs and bot keys for its signed-in
+ * user (design 5.5), always as the subject of that session.
+ */
 const ACCOUNT_API = {
   audience: UTS_ACCOUNT_AUDIENCE,
   maxLifetimeSeconds: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
-  allowedClients: [CLI],
+  allowedClients: [CLI, BFF],
   subjects: { kind: 'any_user' },
   thirdPartySafe: false,
   stepUp: false,
@@ -215,7 +219,13 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   [UTS_PATS_MANAGE_SCOPE]: ACCOUNT_API,
   // The routes check that the caller is an owner or admin of the organization in the path.
   [UTS_BOT_KEYS_MANAGE_SCOPE]: ACCOUNT_API,
-  [UTS_PROBE_READ_SCOPE]: { ...ACCOUNT_API, patEligible: true, requiresSession: false },
+  // A PAT carries it; of the grant clients, only the CLI may hold it.
+  [UTS_PROBE_READ_SCOPE]: {
+    ...ACCOUNT_API,
+    allowedClients: [CLI],
+    patEligible: true,
+    requiresSession: false,
+  },
   [UTS_SECURITY_READ_SCOPE]: firstPartyScope(UTS_ACCOUNT_AUDIENCE, [BFF], {
     requiresSession: true,
   }),

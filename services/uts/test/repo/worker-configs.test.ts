@@ -23,6 +23,7 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { botTokenPolicies } from '../../src/bot-token/policy';
 import { ciPolicies } from '../../src/ci/policy';
 import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
@@ -364,7 +365,7 @@ describe('the UTS configs themselves', () => {
     const problems = utsConfigProblems(
       mintWith(raw => ({
         ...raw,
-        vars: { UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'none' },
+        vars: { UTS_ENVIRONMENT: 'production', DO_JURISDICTION: 'none', SECRETS_SOURCE: 'worker' },
         placement: { mode: 'smart' },
       }))
     );
@@ -384,9 +385,56 @@ describe('the UTS configs themselves', () => {
 
   it('fail a mint config whose deployments drift from the deployment list', () => {
     const problems = utsConfigProblems(
-      mintWith(raw => ({ ...raw, vars: { UTS_ENVIRONMENT: 'staging', DO_JURISDICTION: 'eu' } }))
+      mintWith(raw => ({
+        ...raw,
+        vars: { UTS_ENVIRONMENT: 'staging', DO_JURISDICTION: 'eu', SECRETS_SOURCE: 'worker' },
+      }))
     );
     expect(problems).toEqual([expect.stringContaining('deploys uts-staging=staging, uts=staging')]);
+  });
+
+  it('fail a deployed mint block without a secrets source or with another STS binding', () => {
+    const problems = utsConfigProblems(
+      mintWith(raw => {
+        const { SECRETS_SOURCE: _source, ...vars } = z
+          .record(z.string(), z.unknown())
+          .parse(raw.vars);
+        return {
+          ...raw,
+          vars,
+          services: [
+            {
+              binding: 'STS',
+              service: 'sts-staging',
+              entrypoint: 'SecretsBroker',
+              props: { caller: 'uts' },
+            },
+          ],
+        };
+      })
+    );
+    expect(problems).toEqual([
+      expect.stringContaining('(top level): SECRETS_SOURCE resolves to undefined'),
+      expect.stringContaining(
+        '(top level): binds STS as sts-staging/SecretsBroker/uts; expected sts/SecretsBroker/uts'
+      ),
+    ]);
+  });
+
+  it('accept secrets-store, the shared rollback value, and fail an unknown source', () => {
+    const withSource = (source: string) =>
+      utsConfigProblems(
+        mintWith(raw => ({
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), SECRETS_SOURCE: source },
+        }))
+      );
+    expect(withSource('secrets-store')).toEqual([]);
+    expect(withSource('foo')).toEqual([
+      expect.stringContaining(
+        '(top level): SECRETS_SOURCE resolves to foo; it must be one of worker, secrets-store, sts'
+      ),
+    ]);
   });
 
   it('fail the development entry in any config but the development config', () => {
@@ -614,6 +662,27 @@ describe('the UTS configs themselves', () => {
       const loaded = ciPolicies(
         { CI_TOKEN_POLICIES: z.string().parse(value) },
         environment,
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
+  });
+
+  it('keep the bot-token mint off in production, and every configured bot-token policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.BOT_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    for (const block of [
+      staging,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+    ]) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = botTokenPolicies(
+        { BOT_TOKEN_POLICIES: z.string().parse(value) },
         utsScopeEntry
       );
       expect(loaded.status).not.toBe('misconfigured');

@@ -6,8 +6,9 @@ import { readConfig, type Env, type UtsConfig } from './env';
 import { identityStoreBinding } from './grants/binding';
 import { retainNotices, sweepNotices } from './notices/dispatch';
 import { type NoticesAccess, noticesAccess } from './notices/store';
+import { readUtsSecrets } from './secrets';
 import { noticeEmailTransport, platformFetch } from './signin/email/delivery';
-import { type MailSettings, logMisconfigured, signInConfigFor } from './signin/providers/config';
+import { type MailSettings, logMisconfigured, mailSettingsFor } from './signin/providers/config';
 
 /** Arms each shard's relay object; logs `uts.audit_relay.not_started` for one that failed or refused. */
 export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
@@ -30,19 +31,19 @@ export async function startRelays(env: Env, config: UtsConfig): Promise<void> {
 
 /**
  * The cron's notice step. Mail `off`: the sweep settles email as `not_configured`. Mail `on`: it
- * sends through Mailgun. Mail `misconfigured` (a deploy error): the step claims nothing and only
- * runs retention, because a round now would settle every due notice's email as `not_configured`
- * for good; the notices stay pending and go out once the settings are fixed, within their 24
- * hours. Push has no deployed provider yet, so it waits with them and then settles as
- * `not_configured`.
+ * sends through Mailgun. Mail `misconfigured` (a deploy error) or `unavailable` (no usable STS
+ * bundle): the step claims nothing and only runs retention, because a round now would settle every
+ * due notice's email as `not_configured` for good; the notices stay pending and go out once the
+ * settings are fixed or the bundle is back, within their 24 hours. Push has no deployed provider
+ * yet, so it waits with them and then settles as `not_configured`.
  */
 export async function noticeStep(
   mail: MailSettings,
   notices: NoticesAccess,
   fetcher: typeof fetch
 ): Promise<void> {
-  if (mail.status === 'misconfigured') {
-    logMisconfigured('notice_email', mail.missing);
+  if (mail.status === 'misconfigured' || mail.status === 'unavailable') {
+    if (mail.status === 'misconfigured') logMisconfigured('notice_email', mail.missing);
     await retainNotices(notices);
     return;
   }
@@ -87,9 +88,9 @@ export async function scheduled(
   await step('connect', () =>
     withIdentityStore(binding.connectionString, context, store => runMaintenance(store))
   );
-  await step('notices', () =>
+  await step('notices', async () =>
     noticeStep(
-      signInConfigFor(env, config).mail,
+      await mailSettingsFor(env, () => readUtsSecrets(env, config, context), config),
       noticesAccess(binding.connectionString, context),
       platformFetch
     )

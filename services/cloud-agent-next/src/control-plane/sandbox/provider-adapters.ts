@@ -17,6 +17,7 @@ import type { SandboxContainers } from '../../sandbox-containers/SandboxContaine
 import type { VercelProviderLocator } from '../../sandbox-control/vercel-provider.js';
 import type { SandboxKind } from '../../sandbox-placement.js';
 import type { AgentSandboxProvider, Env } from '../../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { createByocAwsProviderAdapter } from '../../byoc/aws-provider.js';
 import { awsOperationStorage } from './aws-operation-storage.js';
 
@@ -44,6 +45,8 @@ export type StoredProviderPin = {
 /** What an adapter needs from the Sandbox DO that owns the pin. */
 export type ProviderAdapterDeps = {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   sandboxId: string;
   persistRuntimeLocator: (allocationName: string, locator: VercelProviderLocator) => Promise<void>;
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
@@ -62,6 +65,7 @@ export function createProviderAdapter(
       if (!pin.byoc) throw new ProviderCreationError('invalid_configuration');
       return createByocAwsProviderAdapter({
         env: deps.env,
+        ctx: deps.ctx,
         source: pin.byoc,
         sandboxId: deps.sandboxId,
         storage: awsOperationStorage(deps.operationStorage),
@@ -73,6 +77,7 @@ export function createProviderAdapter(
       if (pin.byoc) {
         return createByocVercelProviderAdapter({
           env: deps.env,
+          ctx: deps.ctx,
           source: pin.byoc,
           sandboxName: allocationName,
           resources,

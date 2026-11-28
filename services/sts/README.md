@@ -458,14 +458,12 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `web` | `code-review`: `code-review:review.dispatch`, `code-review:review.status-read`, `code-review:review.cancel`, `code-review:review.retry-fresh`; `session-ingest`: `session-ingest:session-access.invalidate` | | production only (`environmentGrants`) |
-| `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 | `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 | `ai-gateway` | `web`: `web:usage.region-handoff.record`, `web:claude-billing.payer-state.read` | none | production only (`environmentGrants`) |
-| `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `notifications` | `web`: `web:glanceable-snapshot.read` | in its file | production |
 | `container-usage-meter` | `web`: `web:compute-balance-alert.send` | in its file | production |
 | `cloudflare-scim-sync` | `web`: `web:scim.sync` | none | production |
@@ -528,6 +526,7 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `uts` | staging, production | `services/uts/wrangler.jsonc`; reads stay on the Worker secrets until `SECRETS_SOURCE` is `sts`; no development, because the `uts-local` config binds no STS |
 | `kilo-ai-attribution` | production | `services/ai-attribution/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `auto-routing` | production | `services/auto-routing/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `auto-routing-benchmark` | production | `services/auto-routing-benchmark/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
@@ -546,11 +545,9 @@ Workloads with a policy, all over `worker-binding`:
 | `kilo-code-review-worker` | production | `services/code-review-infra/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
 | `session-sync` | production | `services/session-sync/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `user-data-export` | production | `services/user-data-export/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
-| `cloudflare-scim-sync` | production | `services/scim-sync/wrangler.jsonc` |
+| `kilo-ops` | production | `services/kilo-ops/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc`; reads stay on the Worker secret and Secrets Store bindings until `SECRETS_SOURCE` is `sts` |
 | `cloudflare-security-sync` | production | `services/security-sync/wrangler.jsonc` |
-| `auto-routing-benchmark` | production | `services/auto-routing-benchmark/wrangler.jsonc` |
-| `auto-routing` | production | `services/auto-routing/wrangler.jsonc` |
-| `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc` |
 
 The phase 2 C1 grants make policies of several of these Workers. Each config's production STS
 binding arrives with that Worker's own change; until then the repository check in

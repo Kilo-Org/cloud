@@ -61,7 +61,7 @@ export class ContainersOutbound extends WorkerEntrypoint<
           policy.data);
     const stamped =
       typeof request.headers?.has === 'function'
-        ? await withRuntimeProxyOrigin(request, this.env, containerId)
+        ? await withRuntimeProxyOrigin(request, this.env, containerId, this.ctx)
         : request;
     return proxySandboxEgress(
       stamped,

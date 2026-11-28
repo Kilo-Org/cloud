@@ -3,12 +3,14 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { BundleBinding } from '@kilocode/secrets-client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import worker from '../../src/index';
-import { SECRETS_COMPARE_EVENT } from '../../src/secrets-compare';
+import { SECRETS_COMPARE_EVENT, SECRETS_COMPARE_REFUSED_EVENT } from '../../src/secrets-compare';
 
 // Its own file, so its isolate has not compared yet: the first authenticated request here is an
-// execution callback. Synthetic fixture values only.
+// execution callback. STS serves a callback secret that differs from the Secrets Store copy.
+// Synthetic fixture values only.
 const INTERNAL = 'compare-internal-fixture-0123456789abcdef';
 const CALLBACK = 'compare-callback-fixture-0123456789abcdef';
+const BUNDLE_CALLBACK = 'compare-bundle-callback-fixture-0123456789';
 const NEXTAUTH = 'compare-nextauth-fixture-0123456789abcdef';
 const NAMESPACE = 'user/compare-user';
 const TRIGGER_ID = 'compare-trigger';
@@ -50,10 +52,10 @@ async function send(serviceEnv: object, secret: string) {
   return result;
 }
 
-it('compares once from an authenticated execution callback and keeps its answer', async () => {
+it('records a callback secret mismatch under sts and never accepts the Secrets Store copy', async () => {
   const secrets = {
     INTERNAL_API_SECRET: INTERNAL,
-    CALLBACK_TOKEN_SECRET: CALLBACK,
+    CALLBACK_TOKEN_SECRET: BUNDLE_CALLBACK,
     NEXTAUTH_SECRET: NEXTAUTH,
   };
   const getBundle = vi.fn<BundleBinding['getBundle']>(async () => ({
@@ -69,37 +71,51 @@ it('compares once from an authenticated execution callback and keeps its answer'
     missing: [],
   }));
   const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-  const results = () =>
-    log.mock.calls.filter(([event]) => event === SECRETS_COMPARE_EVENT).map(([, r]) => r);
+  const events = (name: string) =>
+    log.mock.calls.filter(([event]) => event === name).map(([, r]) => r);
   const serviceEnv = {
     ...env,
     ENVIRONMENT: 'production',
-    SECRETS_SOURCE: 'secrets-store',
+    SECRETS_SOURCE: 'sts',
     SECRETS_COMPARE_ENABLED: 'true',
     STS: { getBundle },
     INTERNAL_API_SECRET: INTERNAL,
     CALLBACK_TOKEN_SECRET: CALLBACK,
     NEXTAUTH_SECRET: NEXTAUTH,
   };
+  const unauthorized = { status: 401, body: { success: false, error: 'Unauthorized' } };
 
-  const legacy = await send({ ...serviceEnv, SECRETS_COMPARE_ENABLED: undefined }, CALLBACK);
+  const legacy = await send({ ...serviceEnv, SECRETS_COMPARE_ENABLED: undefined }, BUNDLE_CALLBACK);
   expect(legacy).toEqual({ status: 404, body: { success: false, error: 'Request not found' } });
-  expect(await send(serviceEnv, 'wrong-secret')).toEqual({
-    status: 401,
-    body: { success: false, error: 'Unauthorized' },
-  });
-  expect(getBundle).not.toHaveBeenCalled();
 
-  expect(await send(serviceEnv, CALLBACK)).toEqual(legacy);
-  expect(getBundle).toHaveBeenCalledOnce();
-  expect(results()).toEqual([
-    { INTERNAL_API_SECRET: true, CALLBACK_TOKEN_SECRET: true, NEXTAUTH_SECRET: true },
+  // No fallback: the Secrets Store copy is refused while STS serves another value.
+  expect(await send(serviceEnv, CALLBACK)).toEqual(unauthorized);
+  expect(await send(serviceEnv, CALLBACK)).toEqual(unauthorized);
+  expect(events(SECRETS_COMPARE_REFUSED_EVENT)).toEqual([
+    {
+      route: 'execution-callback',
+      secret: 'CALLBACK_TOKEN_SECRET',
+      source: 'sts',
+      result: 'mismatch',
+    },
   ]);
+  expect(events(SECRETS_COMPARE_EVENT)).toEqual([]);
 
-  expect(await send(serviceEnv, CALLBACK)).toEqual(legacy);
+  expect(await send(serviceEnv, BUNDLE_CALLBACK)).toEqual(legacy);
+  expect(await send(serviceEnv, BUNDLE_CALLBACK)).toEqual(legacy);
   expect(getBundle).toHaveBeenCalledOnce();
-  expect(results()).toHaveLength(1);
-  for (const value of [INTERNAL, CALLBACK, NEXTAUTH]) {
+  expect(events(SECRETS_COMPARE_EVENT)).toEqual([
+    {
+      INTERNAL_API_SECRET: true,
+      CALLBACK_TOKEN_SECRET: false,
+      NEXTAUTH_SECRET: true,
+      route: 'execution-callback',
+      source: 'sts',
+      mismatched: ['CALLBACK_TOKEN_SECRET'],
+    },
+  ]);
+  expect(events(SECRETS_COMPARE_REFUSED_EVENT)).toHaveLength(1);
+  for (const value of [INTERNAL, CALLBACK, BUNDLE_CALLBACK, NEXTAUTH]) {
     expect(JSON.stringify(log.mock.calls)).not.toContain(value);
   }
 });

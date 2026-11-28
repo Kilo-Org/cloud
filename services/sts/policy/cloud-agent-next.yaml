@@ -1,14 +1,25 @@
 # The cloud-agent-next Worker (services/cloud-agent-next/wrangler.jsonc). Production only. Over its
-# `STS` SecretsBroker binding it reads and writes BYOC credentials and refreshes hosted workspace
-# pull requests at the web app, and sends its callbacks: bot session, security analysis and code
-# review agent status to the web app, execution to Webhook Agent Ingest, and analysis and
-# remediation to Security Auto Analysis, one scope each.
+# `STS` SecretsBroker binding it reads its runtime secrets; SECRETS_SOURCE stays `secrets-store`
+# (the Worker secret and Secrets Store binding it holds today) until secrets-cutover flips it.
+# INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve from /shared; the rest live in
+# /workloads/cloud-agent-next.
+# Only names the Worker reads are granted: its deployment still holds GITHUB_APP_PRIVATE_KEY,
+# GITHUB_LITE_APP_PRIVATE_KEY, SSEC_KEY and R2_SECRET_ACCESS_KEY as unused plain secrets, which are
+# deleted rather than copied (src/secrets.ts).
+# Over the same binding it reads and writes BYOC credentials and refreshes hosted workspace pull
+# requests at the web app, and sends its callbacks: bot session, security analysis and code review
+# agent status to the web app, execution to Webhook Agent Ingest, and analysis and remediation to
+# Security Auto Analysis, one scope each.
 workload: cloud-agent-next
 environments:
   - production
 identity:
   kind: worker-binding
-secrets: []
+secrets:
+  - INTERNAL_API_SECRET
+  - NEXTAUTH_SECRET
+  - AGENT_ENV_VARS_PRIVATE_KEY
+  - R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY
 audiences:
   - web
   - webhook-agent-ingest

@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
+import type { MintRequest } from '@kilocode/sts-contracts';
 import { encryptKeyedEnvelope, parseKeyedEnvelope } from '@kilocode/encryption';
 import {
   AWS_BYOC_ENVELOPE_KEY_ID,
@@ -9,6 +10,7 @@ import type { Env } from '../types.js';
 import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import { fetchAwsByocConnection, resolveAwsByocConfiguration } from './aws-credential-resolver.js';
 import { byocOwnerKey, type ByocSource } from './owner.js';
+import { WEB_BYOC_CREDENTIALS_READ } from '../web-internal-auth.js';
 
 const keys = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -123,5 +125,56 @@ describe('AWS BYOC connection authority', () => {
     await expect(fetchAwsByocConnection(env, source)).rejects.toThrow('byoc_aws_not_ready');
     expect(transport).toHaveBeenCalledTimes(1);
     expect(transport.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ redirect: 'manual' }));
+  });
+  describe('under BYOC_LOOKUP_SENDER_AUTH=sts', () => {
+    const MINTED = 'minted.byoc.token';
+    function mintBinding() {
+      return {
+        getBundle: vi.fn(),
+        mintTokens: vi.fn(async (request: MintRequest) => ({
+          status: 'ok' as const,
+          tokens: request.tokens.map(({ audience, scope }) => ({
+            status: 'issued' as const,
+            audience,
+            scope,
+            token: MINTED,
+            jti: 'jti-byoc',
+            expiresAt: Math.floor(Date.now() / 1000) + 300,
+          })),
+        })),
+      };
+    }
+
+    it('reads the connection with only a BYOC read token', async () => {
+      stubConnection();
+      const STS = mintBinding();
+      const internal = vi.fn(async () => 'internal-secret');
+      const stsEnv = {
+        ...env,
+        KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+        BYOC_LOOKUP_SENDER_AUTH: 'sts',
+        INTERNAL_API_SECRET_PROD: { get: internal },
+        STS,
+      } as Env;
+
+      await expect(resolveAwsByocConfiguration(stsEnv, source)).resolves.toEqual(
+        AWS_TEST_CONFIGURATION
+      );
+      expect(STS.mintTokens).toHaveBeenCalledWith({ tokens: [WEB_BYOC_CREDENTIALS_READ] });
+      expect(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).toEqual({
+        authorization: `Bearer ${MINTED}`,
+      });
+      expect(internal).not.toHaveBeenCalled();
+    });
+
+    it('never sends a token to a backend outside the web production origins', async () => {
+      stubConnection();
+      const STS = mintBinding();
+      await expect(
+        fetchAwsByocConnection({ ...env, BYOC_LOOKUP_SENDER_AUTH: 'sts', STS } as Env, source)
+      ).rejects.toThrow('byoc_aws_not_ready');
+      expect(STS.mintTokens).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });

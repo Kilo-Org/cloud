@@ -735,6 +735,7 @@ describe('functions', () => {
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_subject_operation_rows', grantee: 'uts_app' },
       { routine: 'maintain_third_party_client_rows', grantee: 'uts_app' },
+      { routine: 'mint_bot_token', grantee: 'uts_app' },
       { routine: 'mint_web_session_token', grantee: 'uts_app' },
       { routine: 'open_browser_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },

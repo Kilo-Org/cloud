@@ -14,6 +14,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { z } from 'zod';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   ByocCredentialMissingError,
   fetchByocVercelCredential,
@@ -180,6 +181,8 @@ function allowedByocOwner(
  */
 export async function resolveEnvironmentBuildTarget(args: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   db: WorkerDb;
   reference: EnvironmentReference;
   repoFullName: string | undefined;
@@ -196,6 +199,7 @@ export async function resolveEnvironmentBuildTarget(args: {
   const allocation = await resolveSavedSandboxAllocation({
     db: args.db,
     env,
+    ...(args.ctx === undefined ? {} : { ctx: args.ctx }),
     owner: selectionOwner(reference),
     repositoryType: repository.identity.platform,
     ...(args.sandboxAllocation ? { environmentAllocation: args.sandboxAllocation } : {}),
@@ -204,7 +208,7 @@ export async function resolveEnvironmentBuildTarget(args: {
   });
 
   if (allocation !== undefined && getSandboxAllocationProvider(allocation) === 'vercel') {
-    return resolveVercelTarget(env, reference, allocation);
+    return resolveVercelTarget(env, reference, allocation, args.ctx);
   }
 
   if (!allowedNativeBuild(env)) {
@@ -223,7 +227,8 @@ export async function resolveEnvironmentBuildTarget(args: {
 async function resolveVercelTarget(
   env: Env,
   reference: EnvironmentReference,
-  allocation: SandboxAllocation
+  allocation: SandboxAllocation,
+  ctx?: SecretsExecutionContext
 ): Promise<BuildTargetResolution> {
   if (!allowedByocOwner(env, reference)) {
     return { ok: false, provider: 'vercel', reason: 'Vercel BYOC is not enabled for this owner' };
@@ -233,11 +238,12 @@ async function resolveVercelTarget(
     // ready base snapshot. It is decrypted only in the operation that uses it.
     const enrollment =
       reference.owner.type === 'organization'
-        ? await fetchByocVercelEnrollment(env, reference.owner.id)
-        : await fetchByocVercelEnrollmentForUser(env, reference.owner.id);
+        ? await fetchByocVercelEnrollment(env, reference.owner.id, ctx)
+        : await fetchByocVercelEnrollmentForUser(env, reference.owner.id, ctx);
     const credential = await fetchByocVercelCredential(
       env,
-      credentialInput(reference, enrollment.credentialId)
+      credentialInput(reference, enrollment.credentialId),
+      ctx
     );
     if (
       credential.setupStatus !== 'ready' ||

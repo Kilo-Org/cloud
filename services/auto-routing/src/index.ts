@@ -7,7 +7,7 @@ import {
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
 } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
-import { authMiddleware } from './auth';
+import { RESOURCE_METADATA_PATH, authMiddleware, protectedResourceMetadata } from './auth';
 import { classifierAnalyticsHandler } from './admin-classifier-analytics';
 import { getClassifierModelHandler, putClassifierModelHandler } from './admin-classifier-model';
 import { getRoutingModeHandler, putRoutingModeHandler } from './admin-routing-mode';
@@ -24,6 +24,14 @@ export { AutoRoutingDecisionCacheDO } from './decision-cache';
 export { AutoRoutingModeConfigDO } from './routing-mode';
 
 export const app = new Hono<HonoEnv>();
+
+// The RFC 9728 document the STS challenge names, public while the switch admits STS. Otherwise
+// the request continues to the guard below, exactly as before this route existed.
+app.use(RESOURCE_METADATA_PATH, async (c, next) => {
+  const metadata = c.req.method === 'GET' ? protectedResourceMetadata(c.env) : null;
+  if (metadata !== null) return metadata;
+  await next();
+});
 
 // User-authenticated routes verify the caller's Kilo token; every other route is internal.
 app.use(

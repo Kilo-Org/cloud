@@ -349,6 +349,79 @@ describe('dispatchSecurityLifecycleEventForFinding', () => {
     });
   });
 
+  it('presents a web:security-notifications.lifecycle STS token under sts', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({
+      id: findingId,
+      owned_by_user_id: 'user-1',
+      owned_by_organization_id: null,
+    } as never);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const secret = vi.fn().mockResolvedValue('internal-secret');
+    const minted: unknown[] = [];
+
+    await dispatchSecurityLifecycleEventForFinding({
+      env: {
+        KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: { get: secret },
+        WEB_INTERNAL_AUTH: 'sts',
+        STS: {
+          async mintTokens(request: { tokens: { audience: string; scope: string }[] }) {
+            minted.push(request);
+            return {
+              status: 'ok',
+              tokens: request.tokens.map(({ audience, scope }) => ({
+                status: 'issued',
+                audience,
+                scope,
+                token: 'sts-push-token',
+                jti: 'jti-push',
+                expiresAt: Math.floor(Date.now() / 1000) + 300,
+              })),
+            };
+          },
+        },
+      } as never,
+      db: {} as never,
+      findingId,
+      event: 'remediation_queued',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer sts-push-token');
+    expect(headers['X-Internal-Secret']).toBeUndefined();
+    expect(secret).not.toHaveBeenCalled();
+    expect(minted).toEqual([
+      { tokens: [{ audience: 'web', scope: 'web:security-notifications.lifecycle' }] },
+    ]);
+  });
+
+  it('drops the push without calling the app when no STS token can be had', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({
+      id: findingId,
+      owned_by_user_id: 'user-1',
+      owned_by_organization_id: null,
+    } as never);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      dispatchSecurityLifecycleEventForFinding({
+        env: {
+          KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+          INTERNAL_API_SECRET: { get: vi.fn().mockResolvedValue('internal-secret') },
+          WEB_INTERNAL_AUTH: 'sts',
+        } as never,
+        db: {} as never,
+        findingId,
+        event: 'analysis_completed',
+      })
+    ).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('resolves org owners and posts the org scope', async () => {
     vi.mocked(getSecurityFindingById).mockResolvedValue({
       id: findingId,

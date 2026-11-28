@@ -9,9 +9,46 @@ import {
   type SignerKeysRequest,
   type UtsJwks,
 } from '@kilocode/uts-contracts';
+import type { RevocationFeedSource } from '@kilocode/verify';
+import { calculateJwkThumbprint, exportJWK, generateKeyPair } from 'jose';
 import { getKeySetShardStub, getSignerStub, KEY_SET_SHARD_COUNT } from '../../src/dos/stubs';
+import { signFeedHead } from '../../src/feed/head';
 import type { SignableClaims } from '../../src/keys/claims';
+import { type FeedEntry, serializeList } from '../../src/revocation/entries';
 import { config, env } from './test-env';
+
+/**
+ * The UTS revocation feed as a verifier reads it: heads signed now under a feed key the test
+ * holds, over UTS's own list serialization of `entries`.
+ */
+export async function utsFeed() {
+  const { publicKey, privateKey } = await generateKeyPair('EdDSA', { extractable: true });
+  const jwk = await exportJWK(publicKey);
+  const kid = `uts-feed-0-${await calculateJwkThumbprint(jwk, 'sha256')}`;
+  const lists = new Map<string, Uint8Array<ArrayBuffer>>();
+  const feed = {
+    entries: [] as FeedEntry[],
+    reachable: true,
+    key: { ...jwk, kid, alg: 'EdDSA', use: 'sig' },
+    source: {
+      async head() {
+        if (!feed.reachable) throw new Error('feed unreachable');
+        const list = serializeList(feed.entries);
+        lists.set(list.hash, new Uint8Array(new TextEncoder().encode(list.text)));
+        return await signFeedHead(privateKey, kid, {
+          iat: Math.floor(Date.now() / 1000),
+          list_hash: list.hash,
+        });
+      },
+      async list(hash) {
+        const bytes = lists.get(hash);
+        if (bytes === undefined) throw new Error('unknown list hash');
+        return bytes;
+      },
+    } satisfies RevocationFeedSource,
+  };
+  return feed;
+}
 
 /** A claim set the development signer accepts. */
 export function claims(overrides: Partial<SignableClaims> = {}): SignableClaims {

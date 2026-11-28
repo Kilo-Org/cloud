@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+// Node's URL: `readFileSync` does not accept the Workers runtime's global `URL`.
+import { URL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import {

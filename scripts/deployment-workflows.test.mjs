@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +16,8 @@ import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 
 import { load } from 'js-yaml';
+
+import { jsoncToJson } from './jsonc.mjs';
 
 function workflow(name) {
   return load(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
@@ -1476,7 +1486,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   assert.equal(ingest.needs, undefined);
   assert.equal(
     ingest.if,
-    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true'"
+    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true' && vars.DEPLOY_TOKEN_SOURCE != 'sts'"
   );
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);
@@ -1597,7 +1607,7 @@ test('the UTS feed Worker deploys after the UTS mint Worker job when both change
   assert.equal(mint.needs, undefined);
   assert.equal(
     mint.if,
-    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_uts_feed_after_uts == 'true'"
+    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_uts_feed_after_uts == 'true' && vars.DEPLOY_TOKEN_SOURCE != 'sts'"
   );
   assert.equal(mint.environment, '${{ inputs.target_environment }}');
 
@@ -1872,5 +1882,319 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
     assert.equal(substituted.output, '');
   } finally {
     rmSync(markerDirectory, { recursive: true, force: true });
+  }
+});
+
+// The STS deploy-token twins (services/sts/README.md, "Cloudflare deploy tokens"): the repository
+// variable DEPLOY_TOKEN_SOURCE runs each deploy job (unset or `secret`) or its `-sts` twin (`sts`).
+test('only the Worker deploy calls may hold an OIDC token in a deploy workflow', () => {
+  // Each deploy-workers call carries id-token as the ceiling of its called jobs, of which only the
+  // `-sts` twins request it (see the STS twin tests below); their tokens name deploy-workers.yml.
+  // Detection calls the same workflow, and GitHub checks every job in it, so the ceiling is needed
+  // even though the matrix-only call skips those jobs.
+  for (const [name, deployment] of [
+    ['production', production],
+    ['staging', staging],
+  ]) {
+    assert.equal(deployment.permissions['id-token'], undefined, `${name} workflow-level block`);
+    const minting = Object.entries(deployment.jobs)
+      .filter(([, job]) => job.permissions?.['id-token'] !== undefined)
+      .map(([id, job]) => [id, job.permissions['id-token']]);
+    assert.deepEqual(
+      minting.sort(),
+      [
+        ['deploy-workers', 'write'],
+        ['detect-workers', 'write'],
+      ].sort(),
+      `${name} jobs with id-token`
+    );
+    for (const id of ['deploy-workers', 'detect-workers']) {
+      assert.deepEqual(deployment.jobs[id].permissions, {
+        contents: 'read',
+        actions: 'read',
+        'id-token': 'write',
+      });
+    }
+  }
+});
+
+const runtimePublish = workflow('cloud-agent-runtime-publish');
+const mcpCatalog = workflow('kilo-mcp-catalog');
+const STS_TWINS = [
+  [workers, 'deploy-manual'],
+  [workers, 'deploy-changed'],
+  [workers, 'deploy-session-ingest'],
+  [workers, 'deploy-cloud-agent-after-session-ingest'],
+  [workers, 'deploy-uts'],
+  [workers, 'deploy-uts-feed-after-uts'],
+  [runtimePublish, 'publish'],
+];
+const STS_ONLY_STEPS = new Set([
+  'Check DEPLOY_TOKEN_SOURCE',
+  'Get a runtime token from STS',
+  'Get a deploy token from STS',
+  'Get temporary R2 credentials',
+  'Revoke the runtime token',
+  'Inherit Secrets Store bindings',
+  'Revoke the deploy token',
+]);
+const STORED_DEPLOY_SECRET = /secrets\.(CLOUDFLARE_API_TOKEN|CLOUD_AGENT_RUNTIME_R2_)/;
+
+/**
+ * A twin as its secret-path job would read: the STS-only steps dropped, each minted value
+ * replaced by the secret it stands for, and the condition, permissions and `needs` suffix that
+ * the switch adds removed.
+ */
+function asSecretJob(job) {
+  const copy = structuredClone(job);
+  delete copy.if;
+  delete copy.permissions;
+  if (copy.needs !== undefined) copy.needs = copy.needs.replace(/-sts$/, '');
+  copy.steps = copy.steps
+    .filter(step => !STS_ONLY_STEPS.has(step.name))
+    .map(step => {
+      const text = JSON.stringify(step)
+        .replaceAll('${{ steps.sts.outputs.token }}', '${{ secrets.CLOUDFLARE_API_TOKEN }}')
+        .replaceAll('${{ steps.sts_runtime.outputs.token }}', '${{ secrets.CLOUDFLARE_API_TOKEN }}')
+        .replaceAll(
+          '${{ steps.r2.outputs.access_key_id }}',
+          '${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}'
+        )
+        .replaceAll(
+          '${{ steps.r2.outputs.secret_access_key }}',
+          '${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}'
+        );
+      const mapped = JSON.parse(text);
+      if (mapped.env !== undefined) delete mapped.env.RUNTIME_R2_SESSION_TOKEN;
+      return mapped;
+    });
+  return copy;
+}
+
+test('each STS twin is its deploy job plus only the token steps', () => {
+  for (const [file, id] of STS_TWINS) {
+    const job = file.jobs[id];
+    const twin = file.jobs[`${id}-sts`];
+    assert.ok(twin, `${id} has an STS twin`);
+    const legacy = structuredClone(job);
+    delete legacy.if;
+    assert.deepEqual(asSecretJob(twin), legacy, `${id}-sts must stay in step with ${id}`);
+    // The same condition, with the switch flipped and the ordered predecessor's twin.
+    assert.match(job.if, / && \s*vars\.DEPLOY_TOKEN_SOURCE != 'sts'$/, `${id} condition`);
+    assert.equal(
+      twin.if.replace("vars.DEPLOY_TOKEN_SOURCE == 'sts'", "vars.DEPLOY_TOKEN_SOURCE != 'sts'"),
+      job.if.replace(/(deploy-session-ingest|deploy-uts)\.result/, '$1-sts.result'),
+      `${id}-sts condition`
+    );
+  }
+});
+
+test('only the STS twins hold an OIDC token, and none reads the stored deploy secrets', () => {
+  const twins = [
+    ...STS_TWINS.map(([file, id]) => [file, `${id}-sts`]),
+    [mcpCatalog, 'catalog-index-sts'],
+  ];
+  for (const file of [workers, runtimePublish, mcpCatalog]) {
+    assert.equal(file.permissions['id-token'], undefined, 'no workflow-level id-token');
+    for (const [id, job] of Object.entries(file.jobs)) {
+      const sts = twins.some(([twinFile, twinId]) => twinFile === file && twinId === id);
+      assert.equal(job.permissions?.['id-token'], sts ? 'write' : undefined, `${id} id-token`);
+      const text = JSON.stringify(job);
+      if (sts) {
+        assert.doesNotMatch(text, STORED_DEPLOY_SECRET, `${id} reads no stored deploy secret`);
+        assert.match(job.if, /vars\.DEPLOY_TOKEN_SOURCE == 'sts'$/, `${id} runs only on sts`);
+      } else if (STORED_DEPLOY_SECRET.test(text)) {
+        // P2-9: a stored deploy secret sits only in a job that `sts` skips.
+        assert.match(job.if, /vars\.DEPLOY_TOKEN_SOURCE != 'sts'$/, `${id} is skipped on sts`);
+      }
+    }
+  }
+  for (const [file, id] of twins) {
+    const steps = file.jobs[id].steps;
+    const names = steps.map(step => step.name);
+    assert.equal(names[0], 'Check DEPLOY_TOKEN_SOURCE', `${id} checks the exact value first`);
+    assert.match(steps[0].run, /\[\[ \$DEPLOY_TOKEN_SOURCE != sts \]\]/);
+    const mint = steps.findIndex(step => step.id === 'sts');
+    assert.equal(steps[mint].run, 'bash scripts/ci/sts-deploy-token.sh mint', id);
+    assert.match(
+      steps[mint].env.STS_ENVIRONMENT,
+      /^(production|\$\{\{ inputs\.target_environment \}\})$/
+    );
+    // The token reaches only steps after the mint, through the step output, never the job env.
+    assert.equal(file.jobs[id].env, undefined, `${id} has no job-level env`);
+    steps.forEach((step, index) => {
+      if (JSON.stringify(step).includes('steps.sts.outputs.token }}')) {
+        assert.ok(index > mint, `${id}: ${step.name ?? step.uses} uses the token after the mint`);
+      }
+      assert.ok(
+        !(step.run ?? '').includes('steps.sts.outputs.token'),
+        `${id}: the token goes through env, never into a script's text`
+      );
+    });
+    const revoke = steps.at(-1);
+    assert.equal(revoke.name, 'Revoke the deploy token', `${id} revokes last`);
+    assert.equal(revoke.if, "always() && steps.sts.outputs.token_id != ''");
+    assert.equal(revoke.run, 'bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"');
+    assert.equal(revoke.env.STS_ENVIRONMENT, steps[mint].env.STS_ENVIRONMENT);
+  }
+  // Every Worker deploy step of a twin runs after the inherit step, which rewrites the config the
+  // deploy reads.
+  for (const [file, id] of STS_TWINS.filter(([file]) => file === workers)) {
+    const steps = file.jobs[`${id}-sts`].steps;
+    const inherit = steps.findIndex(step => step.name === 'Inherit Secrets Store bindings');
+    assert.ok(inherit > 0, `${id}-sts inherits its Secrets Store bindings`);
+    steps.forEach((step, index) => {
+      if (step.uses?.startsWith('cloudflare/wrangler-action@') || step.run === 'pnpm run deploy') {
+        assert.ok(index > inherit, `${id}-sts: ${step.name} deploys after the inherit step`);
+      }
+    });
+  }
+});
+
+test('cloud-agent-next mints its deploy token after the runtime handoff wait', () => {
+  // The preparation waits up to 45 minutes (HANDOFF_WAIT_MS) for the runtime handoff; a 1-hour
+  // token minted before it could expire before the deploy and its retry.
+  for (const id of [
+    'deploy-manual-sts',
+    'deploy-changed-sts',
+    'deploy-cloud-agent-after-session-ingest-sts',
+  ]) {
+    const steps = workers.jobs[id].steps;
+    const at = predicate => steps.findIndex(predicate);
+    const runtimeMint = at(step => step.id === 'sts_runtime');
+    const r2 = at(step => step.id === 'r2');
+    const handoff = at(step => step.id === 'runtime');
+    const runtimeRevoke = at(step => step.name === 'Revoke the runtime token');
+    const deployMint = at(step => step.id === 'sts');
+    assert.ok(
+      runtimeMint >= 0 && runtimeMint < r2 && r2 < handoff && handoff < runtimeRevoke,
+      `${id}: the runtime token serves the handoff wait alone`
+    );
+    assert.ok(deployMint > handoff, `${id}: the deploy token is minted after the handoff step`);
+    assert.equal(steps[runtimeRevoke].if, "always() && steps.sts_runtime.outputs.token_id != ''");
+    assert.equal(steps[r2].env.CLOUDFLARE_API_TOKEN, '${{ steps.sts_runtime.outputs.token }}');
+    assert.equal(steps[r2].env.RUNTIME_R2_PERMISSION, 'object-read-only', `${id} only reads R2`);
+    assert.equal(steps[handoff].env.CLOUDFLARE_API_TOKEN, '${{ steps.sts_runtime.outputs.token }}');
+    steps.forEach((step, index) => {
+      if (JSON.stringify(step).includes('steps.sts_runtime.outputs.token }}')) {
+        assert.ok(
+          index > runtimeMint && index < runtimeRevoke,
+          `${id}: ${step.name} in its window`
+        );
+      }
+    });
+  }
+  const publisher = runtimePublish.jobs['publish-sts'].steps.find(step => step.id === 'r2');
+  assert.equal(
+    publisher.env.RUNTIME_R2_PERMISSION,
+    'object-read-write',
+    'only the publisher writes'
+  );
+});
+
+test('the STS twins name the right STS for each target environment', () => {
+  for (const [file, id] of STS_TWINS.filter(([file]) => file === workers)) {
+    const mint = file.jobs[`${id}-sts`].steps.find(step => step.id === 'sts');
+    assert.equal(mint.env.STS_ENVIRONMENT, '${{ inputs.target_environment }}', id);
+  }
+  // A target environment is production or staging (the dispatch choice and both callers).
+  assert.deepEqual(workers.on.workflow_dispatch.inputs.target_environment.options, [
+    'production',
+    'staging',
+  ]);
+  assert.equal(staging.jobs['deploy-workers'].with.target_environment, 'staging');
+  assert.equal(production.jobs['deploy-workers'].with.target_environment, undefined);
+});
+
+/** The deployable Workers deploy-workers.yml discovers, with their production and staging names. */
+function deployableWorkers() {
+  const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix').run;
+  const excluded = [
+    ...detect
+      .slice(detect.indexOf('EXCLUDED=('), detect.indexOf(')\n', detect.indexOf('EXCLUDED=(')))
+      .matchAll(/^\s+(services\/[a-z0-9-]+)/gm),
+  ].map(match => match[1]);
+  assert.ok(excluded.includes('services/migration-proxy'), 'the exclusion list was read');
+  // The same set as the workflow's `find services -name wrangler.jsonc -not -path
+  // "*/node_modules/*" -not -path "*/test/fixtures/*"`.
+  const root = new URL('../', import.meta.url);
+  const walk = dir =>
+    readdirSync(new URL(dir, root), { withFileTypes: true }).flatMap(entry => {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        // A local build's .wrangler state is not in a CI checkout.
+        return entry.name === 'node_modules' ||
+          entry.name.startsWith('.') ||
+          `${path}/`.includes('/test/fixtures/')
+          ? []
+          : walk(path);
+      }
+      return entry.name === 'wrangler.jsonc' ? [path] : [];
+    });
+  const configs = walk('services');
+  return configs
+    .map(path => path.slice(0, -'/wrangler.jsonc'.length))
+    .filter(dir => !excluded.includes(dir))
+    .map(dir => {
+      const config = JSON.parse(
+        jsoncToJson(readFileSync(new URL(`${dir}/wrangler.jsonc`, root), 'utf8'))
+      );
+      const staging = config.env?.staging;
+      return {
+        dir,
+        config,
+        production: config.name,
+        staging: staging === undefined ? undefined : (staging.name ?? `${config.name}-staging`),
+      };
+    });
+}
+
+test('the STS deploy policies intend exactly the Workers deploy-workers.yml can deploy', () => {
+  const deployable = deployableWorkers();
+  for (const [policy, names] of [
+    ['ci-deploy-cloud', deployable.map(worker => worker.production)],
+    ['ci-deploy-cloud-staging', deployable.map(worker => worker.staging).filter(Boolean)],
+  ]) {
+    const source = load(
+      readFileSync(new URL(`../services/sts/policy/${policy}.yaml`, import.meta.url), 'utf8')
+    );
+    const [grant] = source.dynamic;
+    assert.deepEqual([...grant.intendedScripts].sort(), [...names].sort(), policy);
+    assert.deepEqual(source.identity.jobWorkflowRefs, [
+      'Kilo-Org/cloud/.github/workflows/deploy-workers.yml@refs/heads/main',
+    ]);
+    // One token per deploy job of a run, plus cloud-agent-next's runtime token and one spare for an
+    // ordered job that follows: maxPerRun covers the most a run can mint.
+    assert.ok(
+      grant.maxPerRun >= names.length + 2,
+      `${policy} maxPerRun covers ${names.length} jobs and the follow-on tokens`
+    );
+  }
+});
+
+/** Zone ids of the zones deploy-workers.yml routes to (CLOUDFLARE_DEPLOY_PINS, production). */
+const ROUTE_ZONE_IDS = {
+  'kiloapps.io': '9f7103cbcadbe93a052c120f231e8507',
+  'kiloapps.ai': '1417bcc629d528e478b1da6615ea3799',
+};
+
+test('every zone route a production Worker deploys is in ci-deploy-cloud zones and intended routes', () => {
+  const policy = load(
+    readFileSync(new URL('../services/sts/policy/ci-deploy-cloud.yaml', import.meta.url), 'utf8')
+  );
+  const [grant] = policy.dynamic;
+  const routes = deployableWorkers().flatMap(({ config }) =>
+    [...(config.routes ?? []), ...(config.route === undefined ? [] : [config.route])].filter(
+      route => typeof route === 'string' || route.custom_domain !== true
+    )
+  );
+  assert.ok(routes.length > 0, 'zone routes were read');
+  for (const route of routes) {
+    const pattern = typeof route === 'string' ? route : route.pattern;
+    const zone = typeof route === 'string' ? undefined : route.zone_name;
+    assert.ok(zone, `${pattern} names its zone`);
+    assert.ok(grant.intendedRoutes.includes(pattern), `${pattern} is an intended route`);
+    assert.ok(ROUTE_ZONE_IDS[zone], `${zone} (${pattern}) has a known zone id`);
+    assert.ok(grant.zones.includes(ROUTE_ZONE_IDS[zone]), `${zone} (${pattern}) is a policy zone`);
   }
 });

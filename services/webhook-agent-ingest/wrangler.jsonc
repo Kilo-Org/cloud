@@ -49,6 +49,12 @@
     // binding and never falls back. An absent value means `secrets-store`;
     // any other value refuses every read.
     "SECRETS_SOURCE": "secrets-store",
+    // One pre-flip check per isolate that the STS copy of each of the three
+    // names equals the Secrets Store value served above
+    // (src/secrets-compare.ts). Only `true` turns it on, and only with
+    // `secrets-store` in production; it never changes the source. `env.dev`
+    // does not set it.
+    "SECRETS_COMPARE_ENABLED": "false",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [
@@ -66,8 +72,8 @@
     // top-level name. This block deploys production only, so it binds the
     // production `sts`; services/sts/policy/cloudflare-webhook-agent-ingest.yaml
     // grants INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET,
-    // each resolved from /shared. Nothing reads them while SECRETS_SOURCE is
-    // `secrets-store`.
+    // each resolved from /shared. The rollback kept the bindings below in
+    // place, so re-selecting `sts` with comparison off is one redeploy.
     {
       "binding": "STS",
       "service": "sts",
@@ -131,8 +137,8 @@
     },
   ],
   // PRODUCTION Secrets Store (shared Kilo secrets store). The `secrets-store`
-  // source reads these bindings. They stay bound while STS reads are proven,
-  // so a rollback is one redeploy with SECRETS_SOURCE set to `secrets-store`.
+  // source reads these bindings, which production selects after the rollback
+  // from STS. They stay bound, so re-selecting `sts` is one redeploy away.
   "secrets_store_secrets": [
     {
       "binding": "INTERNAL_API_SECRET",

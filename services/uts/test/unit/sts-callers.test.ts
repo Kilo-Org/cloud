@@ -3,6 +3,7 @@ import { STS_ISSUERS } from '@kilocode/sts-contracts';
 import {
   UTS_APP_EVENTS_SCOPE,
   UTS_AUTHORITY_SCOPE,
+  UTS_BOT_TOKEN_MINT_SCOPE,
   UTS_ENDPOINTS,
   UTS_TOKEN_EXCHANGE_ACTOR,
   UTS_TOKEN_EXCHANGE_STS_SCOPE,
@@ -121,6 +122,27 @@ describe('deployed STS callers', () => {
     );
     // Production offers no exchange while it admits no exchange caller.
     expect(callers('production').stsCallers).toBeNull();
+  });
+
+  it('hands the bot-token route any service workload on its scope, in every environment, and leaves the allow-list to its policies', async () => {
+    for (const environment of ['production', 'staging'] as const) {
+      const watch = await stsToken('bouncer-watch', UTS_BOT_TOKEN_MINT_SCOPE, { environment });
+      expect(
+        await callers(environment).botTokenCallers(`Bearer ${watch}`, UTS_BOT_TOKEN_MINT_SCOPE)
+      ).toEqual({ status: 'verified', workload: 'bouncer-watch' });
+      resetStsCallerVerifier();
+    }
+    const { botTokenCallers, serviceTokens } = callers('staging');
+    const other = await stsToken('bouncer-watch', UTS_AUTHORITY_SCOPE);
+    expect(await botTokenCallers(`Bearer ${other}`, UTS_BOT_TOKEN_MINT_SCOPE)).toEqual({
+      status: 'insufficient_scope',
+    });
+    // The bot scope does not open the web app's routes to the workload.
+    const watch = await stsToken('bouncer-watch', UTS_BOT_TOKEN_MINT_SCOPE);
+    expect(await serviceTokens(`Bearer ${watch}`, UTS_BOT_TOKEN_MINT_SCOPE)).toEqual({
+      status: 'workload_refused',
+      workload: 'bouncer-watch',
+    });
   });
 
   it('admits the broker on the exchange scope only', async () => {

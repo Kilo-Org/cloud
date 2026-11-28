@@ -5,8 +5,10 @@ import {
   type ServiceTokens,
   type ServiceTokensExecutionContext,
 } from '@kilocode/service-token-client';
+import type { BundleBinding } from '@kilocode/secrets-client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { readCodeReviewInfraSecret, type CodeReviewInfraSecretsEnv } from './secrets';
 
 /**
  * The STS audience and scope of this Worker's own status writes to the web app's
@@ -34,10 +36,10 @@ const StatusCallbackAuthSchema = z.preprocess(
   z.enum(['legacy', 'sts']).default('legacy')
 );
 
-export type StatusCallbackEnv = {
-  STS?: MintBinding;
+export type StatusCallbackEnv = CodeReviewInfraSecretsEnv & {
+  /** One binding serves both entry points: the bundle RPC and the token mint. */
+  STS?: MintBinding & BundleBinding;
   CODE_REVIEW_STATUS_CALLBACK_AUTH?: string;
-  CALLBACK_TOKEN_SECRET: string;
 };
 
 /** The derived callback token's scope; the web route checks it per review and attempt. */
@@ -82,8 +84,8 @@ function tokensFor(binding: MintBinding): ServiceTokens {
 
 /**
  * The credential of one of this Worker's own status writes: its headers, and under `sts` a redirect
- * policy that never carries the token to another origin. Throws `StatusCallbackCredentialError`
- * rather than send a write without its credential.
+ * policy that never carries the token to another origin. Throws `StatusCallbackCredentialError`, or
+ * the secret reader's error in `legacy` mode, rather than send a write without its credential.
  */
 export async function statusCallbackCredential(
   env: StatusCallbackEnv,
@@ -95,7 +97,11 @@ export async function statusCallbackCredential(
   if (!mode.success) throw new StatusCallbackCredentialError('invalid_auth');
   if (mode.data === 'legacy') {
     return {
-      headers: await derivedCallbackHeaders(env.CALLBACK_TOKEN_SECRET, reviewId, attemptId),
+      headers: await derivedCallbackHeaders(
+        await readCodeReviewInfraSecret(env, 'CALLBACK_TOKEN_SECRET', ctx),
+        reviewId,
+        attemptId
+      ),
     };
   }
   if (env.STS === undefined) throw new StatusCallbackCredentialError('sts_binding_missing');

@@ -32,6 +32,11 @@ import { isolateSignerKeys, newKeyCopyState, shardSignerKeys } from '../exchange
 import { newExchangeWindows } from '../exchange/limits';
 import { grantsAccess, identityStoreBinding } from '../grants/binding';
 import type { GrantsAccess } from '../grants/store';
+import {
+  type HomeWidgetService,
+  handleHomeWidgetExchange,
+  homeWidgetService,
+} from '../home-widget/exchange';
 import type { MintOptions } from '../http';
 import { type FeedPublish, feedPublisher } from '../revocation/publish';
 import type { UtsSecrets } from '../secrets';
@@ -115,6 +120,8 @@ export type OAuthDeps = {
   thirdParty: ThirdPartyAccess;
   /** The RFC 8693 broker exchange; null until an STS token verifier is wired. */
   exchange: ExchangeService | null;
+  /** The home-widget exchange's switch (src/home-widget/exchange.ts). */
+  homeWidget: HomeWidgetService;
   /** The CI token exchange (src/ci/); off unless `CI_TOKEN_POLICIES` lists trust policies. */
   ci: CiExchangeService;
   /**
@@ -281,6 +288,7 @@ export function oauthService(
               windows: exchangeWindows,
               now: Date.now,
             },
+      homeWidget: homeWidgetService(env),
       ci: ciExchange(env, config, scopes, binding.connectionString, ctx),
       secretDeps: () => {
         secretDeps ??= buildSecretDeps();
@@ -351,6 +359,10 @@ export async function handleOAuthRequest(
         attestation: async () => (await deps.secretDeps()).attestation,
         webClient: (tokenRequest, grantType, params) =>
           handleWebClientToken(tokenRequest, grantType, params, deps.web),
+        homeWidgetGrant:
+          deps.homeWidget.status === 'on'
+            ? (tokenRequest, params) => handleHomeWidgetExchange(tokenRequest, params, deps)
+            : null,
       });
     case UTS_REVOKE_PATH:
       return await handleRevoke(request, deps);

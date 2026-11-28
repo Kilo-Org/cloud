@@ -1,4 +1,13 @@
-# Registration only: services/auto-routing-benchmark/wrangler.jsonc. No environment, identity or grant.
+# The auto-routing-benchmark Worker (services/auto-routing-benchmark/wrangler.jsonc). It reads its
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the
+# Secrets Store bindings) until secrets-cutover flips it. All three resolve from /shared. The Node
+# CLI scripts under src/ read OPENROUTER_API_KEY from `process.env` and bind no STS.
 workload: auto-routing-benchmark
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - BOT_TOKEN_MINT_SECRET
+  - INTERNAL_API_SECRET
+  - OPENROUTER_API_KEY

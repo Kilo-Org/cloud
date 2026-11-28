@@ -81,6 +81,7 @@ export function fakeGrants(implementation: Partial<GrantStore> = {}) {
     revoke: recorded('revoke', calls, implementation.revoke),
     introspect: recorded('introspect', calls, implementation.introspect),
     exchangeDelegated: recorded('exchangeDelegated', calls, implementation.exchangeDelegated),
+    exchangeHomeWidget: recorded('exchangeHomeWidget', calls, implementation.exchangeHomeWidget),
   };
   const access: GrantsAccess = work => work(store);
   return { access, calls };
@@ -204,6 +205,7 @@ export function oauthDeps(
     sign: signerAccess(env, config),
     scopes: testScopes,
     publish: recordingPublisher().publish,
+    homeWidget: { status: 'off' },
     tickets: { config, tickets: unexpectedStore },
     clients: async () => {
       throw new Error('unexpected client lookup');

@@ -1,4 +1,4 @@
-import { STS_ISSUERS, STS_SCOPE_REGISTRY, type StsScopeRegistry } from '@kilocode/sts-contracts';
+import { STS_ISSUERS, STS_SCOPE_REGISTRY } from '@kilocode/sts-contracts';
 import { resetInternalAuthObservation } from '@kilocode/worker-utils/internal-auth-observation';
 import { Hono } from 'hono';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,14 +23,6 @@ const ISSUER = STS_ISSUERS.production;
 const JWKS_URL = `${ISSUER}/.well-known/jwks.json`;
 const LEGACY_SECRET = 'legacy-internal-value';
 
-/** The pending scopes, registered the way igor/sts-c1-scopes registers them. */
-const REGISTRY: StsScopeRegistry = {
-  ...STS_SCOPE_REGISTRY,
-  [AUTO_ROUTING_STS_AUDIENCE]: {
-    scopes: Object.values(ROUTE_CONTRACTS).map(contract => contract.scope),
-  },
-};
-
 const FAMILY_ROUTE: Record<RouteFamily, { method: string; path: string }> = {
   adminRead: { method: 'GET', path: '/admin/classifier-model' },
   adminWrite: { method: 'PUT', path: '/admin/routing-mode' },
@@ -40,6 +32,12 @@ const FAMILY_WORKLOAD: Record<RouteFamily, string> = {
   adminRead: 'web',
   adminWrite: 'web',
   decide: 'ai-gateway',
+};
+/** Main's item-9 route labels, unchanged for both credentials. */
+const FAMILY_COUNTER_ROUTE: Record<RouteFamily, string> = {
+  adminRead: 'admin',
+  adminWrite: 'admin',
+  decide: 'decide',
 };
 const FAMILIES = Object.keys(FAMILY_ROUTE) as RouteFamily[];
 
@@ -95,9 +93,9 @@ const DUAL = { INTERNAL_CREDENTIAL_ACCEPT: 'legacy-and-sts', STS_ENVIRONMENT: 'p
 const STS_ONLY = { INTERNAL_CREDENTIAL_ACCEPT: 'sts-only', STS_ENVIRONMENT: 'production' };
 
 /** Every governed route behind a fresh guard, so no key set carries over between tests. */
-function testApp(registry: StsScopeRegistry | null = REGISTRY) {
+function testApp() {
   const hono = new Hono<HonoEnv>();
-  hono.use('*', createAuthMiddleware(registry ? { scopeRegistry: registry } : {}));
+  hono.use('*', createAuthMiddleware());
   for (const route of GOVERNED_ROUTES) {
     hono.on(route.method, route.path, c => c.json({ ok: true }));
   }
@@ -175,7 +173,7 @@ describe('legacy-only (the default)', () => {
     expect(counterLines()).toEqual([
       expect.objectContaining({
         receiver: 'auto-routing',
-        route: ROUTE_CONTRACTS[family].label,
+        route: FAMILY_COUNTER_ROUTE[family],
         auth: 'legacy_shared_secret',
       }),
     ]);
@@ -234,7 +232,7 @@ describe('legacy-and-sts', () => {
     expect(line).toMatchObject({
       event: 'kilo_internal_auth',
       receiver: 'auto-routing',
-      route: ROUTE_CONTRACTS[family].label,
+      route: FAMILY_COUNTER_ROUTE[family],
       auth: 'sts',
       caller: FAMILY_WORKLOAD[family],
       count: 1,
@@ -352,12 +350,19 @@ describe('STS token checks', () => {
     expect(response.status).toBe(status);
     expect(secretReads()).toBe(0);
     expect(counterLines()).toEqual([]);
+    // The refusal line alone names the route family and its scope.
+    const refusal = logs.find(line => line.includes('"auto_routing_sts_refused"'));
+    expect(JSON.parse(refusal ?? '{}')).toMatchObject({
+      family: 'decide',
+      scope: 'auto-routing:decide',
+      status,
+    });
   });
 
-  it('refuses the pending scopes while the default registry lacks them', async () => {
-    const { env } = makeEnv(DUAL);
-    const response = await call(testApp(null), 'decide', env, bearer(await token('decide')));
-    expect(response.status).toBe(403);
+  it('requires exactly the scopes STS_SCOPE_REGISTRY lists for this audience', () => {
+    expect(STS_SCOPE_REGISTRY[AUTO_ROUTING_STS_AUDIENCE]?.scopes).toEqual(
+      Object.values(ROUTE_CONTRACTS).map(contract => contract.scope)
+    );
   });
 });
 

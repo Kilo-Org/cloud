@@ -26,7 +26,8 @@
   // `ADMIN_CREDENTIAL_ACCEPT` is unset here, which means `legacy-only`: `/admin/*` accepts only
   // `Authorization: Bearer <INTERNAL_API_SECRET>`, exactly as before (src/auth.ts); every other
   // route keeps that secret in every mode. Accepting STS service tokens needs the
-  // `auto-routing-benchmark` scopes registered and granted, then a separate change that sets it
+  // `auto-routing-benchmark` scopes granted in STS policy (they are registered in
+  // @kilocode/sts-contracts), then a separate change that sets it
   // (`legacy-and-sts`, later `sts-only`) and `STS_ENVIRONMENT` `production`. Rollback is a
   // redeploy with it unset or `legacy-only`.
   "vars": {

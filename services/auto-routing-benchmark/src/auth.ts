@@ -13,10 +13,12 @@ import {
   PLATFORM_MEASUREMENTS_PATH,
 } from '@kilocode/auto-routing-contracts';
 import {
+  STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ,
+  STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE,
+  STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ,
   STS_ISSUERS,
   StsEnvironmentSchema,
   type StsEnvironment,
-  type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import { createVerifier, failureResponse, httpJwksSource, type Verifier } from '@kilocode/verify';
 import { backendAuthMiddleware } from '@kilocode/worker-utils';
@@ -65,37 +67,26 @@ export function adminCredentialAcceptance(mode: string | undefined): Acceptance 
   return isAcceptMode(mode) ? ACCEPTANCE[mode] : null;
 }
 
-// --- Scopes pending registration in @kilocode/sts-contracts. ----------------------------------
-// Once registered, import them from @kilocode/sts-contracts and delete this block. Until then the
-// verifier's default registry refuses them, so no STS token can pass here even if a mode allowed it.
-export const STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ = {
-  audience: 'auto-routing-benchmark',
-  scope: 'auto-routing-benchmark:routing-tables.read',
-} as const;
-export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ = {
-  audience: 'auto-routing-benchmark',
-  scope: 'auto-routing-benchmark:admin.read',
-} as const;
-export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE = {
-  audience: 'auto-routing-benchmark',
-  scope: 'auto-routing-benchmark:admin.write',
-} as const;
-// --- End of scopes pending registration. -------------------------------------------------------
-
-/** The STS audience of this Worker; every scope above belongs to it. */
+/** The STS audience of this Worker; all three benchmark scopes belong to it. */
 export const AUTO_ROUTING_BENCHMARK_STS_AUDIENCE = STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.audience;
 
 /** The counter's receiver label (`INTERNAL_CALLERS`). */
 const RECEIVER = 'auto-routing-benchmark';
 
+/**
+ * The item-9 counter's one route label, as main writes it for the shared secret; an STS admission
+ * uses the same label so saved queries keep matching (M149/M186).
+ */
+const COUNTER_ROUTE = 'admin_and_client';
+
 export type RouteFamily = 'routingTablesRead' | 'adminRead' | 'adminWrite';
 
 /**
- * One route family's STS contract: its one scope, the STS workloads that may call it, and its
- * observation label (design section 9.4, item 9). STS policy grants the scope only to these
- * workloads; the route repeats the check, so a policy change alone never opens a route.
+ * One route family's STS contract: its one scope and the STS workloads that may call it. STS
+ * policy grants the scope only to these workloads; the route repeats the check, so a policy change
+ * alone never opens a route.
  */
-export type RouteContract = { scope: string; workloads: readonly string[]; label: string };
+export type RouteContract = { scope: string; workloads: readonly string[] };
 
 export const ROUTE_CONTRACTS: Readonly<Record<RouteFamily, RouteContract>> = {
   /**
@@ -105,20 +96,11 @@ export const ROUTE_CONTRACTS: Readonly<Record<RouteFamily, RouteContract>> = {
   routingTablesRead: {
     scope: STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.scope,
     workloads: ['ai-gateway', 'auto-routing', 'web'],
-    label: 'routing_tables_read',
   },
   /** The web admin console and custom-router pages read configuration, runs and status. */
-  adminRead: {
-    scope: STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.scope,
-    workloads: ['web'],
-    label: 'admin_read',
-  },
+  adminRead: { scope: STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.scope, workloads: ['web'] },
   /** The same web pages, and the catalog alias sync, change configuration and start work. */
-  adminWrite: {
-    scope: STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE.scope,
-    workloads: ['web'],
-    label: 'admin_write',
-  },
+  adminWrite: { scope: STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE.scope, workloads: ['web'] },
 };
 
 /**
@@ -251,34 +233,24 @@ function misconfigured(reason: string): Response {
   return Response.json({ error: 'server_misconfigured' }, { status: 500, headers: NO_STORE });
 }
 
-function refusedLog(route: string, status: number, reason: string): void {
-  // Never the credential: the route family, the status and the rule only.
+function refusedLog(family: RouteFamily | null, status: number, reason: string): void {
+  // Never the credential: the route family and its scope, the status and the rule only.
+  const scope = family === null ? null : ROUTE_CONTRACTS[family].scope;
   console.warn(
-    JSON.stringify({ event: 'auto_routing_benchmark_sts_refused', route, status, reason })
+    JSON.stringify({ event: 'auto_routing_benchmark_sts_refused', family, scope, status, reason })
   );
 }
-
-/** The counter label of a legacy admission; a route outside the families keeps its old label. */
-function legacyLabel(c: Context<HonoEnv>): string {
-  const family = routeFamily(c.req.method, c.req.path);
-  return family === null ? 'admin_and_client' : ROUTE_CONTRACTS[family].label;
-}
-
-export type AuthOptions = {
-  /** Tests only: the STS scope registry; production uses `STS_SCOPE_REGISTRY`. */
-  scopeRegistry?: StsScopeRegistry;
-};
 
 /**
  * The guard of every route after the container routes. Create it at module scope: it holds one STS
  * verifier per environment, built on the first STS request, so its key set serves every later
  * request of the isolate.
  */
-export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandler<HonoEnv> {
+export function createAuthMiddleware(): MiddlewareHandler<HonoEnv> {
   // The shared-secret check, unchanged: `Authorization: Bearer <INTERNAL_API_SECRET>`.
   const legacy = backendAuthMiddleware<HonoEnv>(
     c => readAutoRoutingBenchmarkSecret(c.env, 'INTERNAL_API_SECRET', requestContext(c)),
-    { receiver: RECEIVER, route: legacyLabel }
+    { receiver: RECEIVER, route: COUNTER_ROUTE }
   );
   const verifiers = new Map<StsEnvironment, Verifier<false>>();
 
@@ -292,11 +264,8 @@ export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandl
       audience: AUTO_ROUTING_BENCHMARK_STS_AUDIENCE,
       environment,
       resourceMetadataUrl: `${origin}${RESOURCE_METADATA_PATH}`,
-      sts: {
-        issuer,
-        jwks: httpJwksSource(issuer),
-        ...(options.scopeRegistry ? { scopeRegistry: options.scopeRegistry } : {}),
-      },
+      // The default registry, `STS_SCOPE_REGISTRY`, where the three benchmark scopes live.
+      sts: { issuer, jwks: httpJwksSource(issuer) },
     });
     verifiers.set(environment, verifier);
     return verifier;
@@ -309,7 +278,7 @@ export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandl
     config: StsRouteConfig,
     authorization: string | null
   ): Promise<Response | null> {
-    const { scope, workloads, label } = ROUTE_CONTRACTS[family];
+    const { scope, workloads } = ROUTE_CONTRACTS[family];
     const ctx = requestContext(c);
     const result = await verifierFor(config).verify(
       authorization,
@@ -317,12 +286,12 @@ export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandl
       { waitUntil: promise => (ctx ? ctx.waitUntil(promise) : void promise) }
     );
     if (!result.ok) {
-      refusedLog(label, result.status, result.reason);
+      refusedLog(family, result.status, result.reason);
       return failureResponse(result);
     }
     const workload = result.caller.kind === 'service' ? result.caller.workload : null;
     if (workload === null || !workloads.includes(workload)) {
-      refusedLog(label, 403, 'workload_not_allowed');
+      refusedLog(family, 403, 'workload_not_allowed');
       return Response.json(
         { error: 'insufficient_scope', scope },
         {
@@ -334,7 +303,7 @@ export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandl
         }
       );
     }
-    observeInternalAuth(RECEIVER, label, 'sts', callerLabel(workload));
+    observeInternalAuth(RECEIVER, COUNTER_ROUTE, 'sts', callerLabel(workload));
     return null;
   }
 
@@ -352,7 +321,7 @@ export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandl
     // Both credentials travel in `Authorization`, so a request carries two only as a repeated or
     // comma-joined header. Answer neither, so no request is decided by the weaker one.
     if (authorization?.includes(',')) {
-      refusedLog(legacyLabel(c), 400, 'mixed_credentials');
+      refusedLog(routeFamily(c.req.method, c.req.path), 400, 'mixed_credentials');
       return Response.json({ error: 'invalid_request' }, { status: 400, headers: NO_STORE });
     }
     // Under `legacy-and-sts`, a bearer that is not a compact JWS is the shared secret or nothing.
@@ -362,7 +331,7 @@ export function createAuthMiddleware(options: AuthOptions = {}): MiddlewareHandl
 
     const family = routeFamily(c.req.method, c.req.path);
     if (family === null) {
-      refusedLog(legacyLabel(c), 401, 'no_route_scope');
+      refusedLog(null, 401, 'no_route_scope');
       return unauthorized(c);
     }
     const config = stsRouteConfig(env);

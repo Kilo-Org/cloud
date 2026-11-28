@@ -1,5 +1,5 @@
 import { PAID_BENCHMARK_ADMIN_ROUTING_TABLE_PATH } from '@kilocode/auto-routing-contracts';
-import { STS_ISSUERS, STS_SCOPE_REGISTRY, type StsScopeRegistry } from '@kilocode/sts-contracts';
+import { STS_ISSUERS, STS_SCOPE_REGISTRY } from '@kilocode/sts-contracts';
 import { resetInternalAuthObservation } from '@kilocode/worker-utils/internal-auth-observation';
 import { Hono } from 'hono';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,13 +25,8 @@ const ISSUER = STS_ISSUERS.production;
 const JWKS_URL = `${ISSUER}/.well-known/jwks.json`;
 const LEGACY_SECRET = 'legacy-internal-value';
 
-/** The pending scopes, registered the way igor/sts-c1-scopes registers them. */
-const REGISTRY: StsScopeRegistry = {
-  ...STS_SCOPE_REGISTRY,
-  [AUTO_ROUTING_BENCHMARK_STS_AUDIENCE]: {
-    scopes: Object.values(ROUTE_CONTRACTS).map(contract => contract.scope),
-  },
-};
+/** Main's one item-9 route label, unchanged for both credentials. */
+const COUNTER_ROUTE = 'admin_and_client';
 
 const FAMILY_ROUTE: Record<RouteFamily, { method: string; path: string }> = {
   routingTablesRead: { method: 'GET', path: '/admin/routing-table' },
@@ -98,9 +93,9 @@ const DUAL = { ADMIN_CREDENTIAL_ACCEPT: 'legacy-and-sts', STS_ENVIRONMENT: 'prod
 const STS_ONLY = { ADMIN_CREDENTIAL_ACCEPT: 'sts-only', STS_ENVIRONMENT: 'production' };
 
 /** Every governed route and one client route behind a fresh guard. */
-function testApp(registry: StsScopeRegistry | null = REGISTRY) {
+function testApp() {
   const hono = new Hono<HonoEnv>();
-  hono.use('*', createAuthMiddleware(registry ? { scopeRegistry: registry } : {}));
+  hono.use('*', createAuthMiddleware());
   for (const route of GOVERNED_ROUTES) {
     hono.on(route.method, route.path, c => c.json({ ok: true }));
   }
@@ -189,7 +184,7 @@ describe('legacy-only (the default)', () => {
     expect(counterLines()).toEqual([
       expect.objectContaining({
         receiver: 'auto-routing-benchmark',
-        route: ROUTE_CONTRACTS[family].label,
+        route: COUNTER_ROUTE,
         auth: 'legacy_shared_secret',
       }),
     ]);
@@ -248,7 +243,7 @@ describe('legacy-and-sts', () => {
     expect(line).toMatchObject({
       event: 'kilo_internal_auth',
       receiver: 'auto-routing-benchmark',
-      route: ROUTE_CONTRACTS[family].label,
+      route: COUNTER_ROUTE,
       auth: 'sts',
       caller: FAMILY_WORKLOAD[family],
       count: 1,
@@ -360,12 +355,19 @@ describe('STS token checks', () => {
     expect(response.status).toBe(status);
     expect(secretReads()).toBe(0);
     expect(counterLines()).toEqual([]);
+    // The refusal line alone names the route family and its scope.
+    const refusal = logs.find(line => line.includes('"auto_routing_benchmark_sts_refused"'));
+    expect(JSON.parse(refusal ?? '{}')).toMatchObject({
+      family: 'adminWrite',
+      scope: 'auto-routing-benchmark:admin.write',
+      status,
+    });
   });
 
-  it('refuses the pending scopes while the default registry lacks them', async () => {
-    const { env } = makeEnv(DUAL);
-    const response = await call(testApp(null), 'adminRead', env, bearer(await token('adminRead')));
-    expect(response.status).toBe(403);
+  it('requires exactly the scopes STS_SCOPE_REGISTRY lists for this audience', () => {
+    expect(STS_SCOPE_REGISTRY[AUTO_ROUTING_BENCHMARK_STS_AUDIENCE]?.scopes).toEqual(
+      Object.values(ROUTE_CONTRACTS).map(contract => contract.scope)
+    );
   });
 
   it.each(['web', 'ai-gateway', 'auto-routing'])(

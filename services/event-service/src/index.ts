@@ -15,7 +15,7 @@ import {
   isDurableObjectRetryDeadline,
   isTransientDurableObjectFailure,
 } from '@kilocode/worker-utils';
-import { authenticateToken } from './auth';
+import { authenticateBearer, type BearerAuthEnv, eventServiceUserGate } from './auth';
 import { TICKET_MINT_BUDGET_MS } from './ticket-mint-budget';
 import { configureDevLogging, logger, withLogTags } from './util/logger';
 import { type TicketMintRequest } from './do/connection-ticket-do';
@@ -23,7 +23,9 @@ import { type TicketMintRequest } from './do/connection-ticket-do';
 export { UserSessionDO } from './do/user-session-do';
 export { ConnectionTicketDO } from './do/connection-ticket-do';
 
-const app = new Hono<{ Bindings: Env }>();
+type Bindings = Env & Pick<BearerAuthEnv, 'USER_BEARER_ACCEPT' | 'UTS_FEED'>;
+
+const app = new Hono<{ Bindings: Bindings }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
 
@@ -42,11 +44,18 @@ function requestContext(c: {
   }
 }
 
-type TicketMintOutcome = 'ok' | 'unauthorized' | 'mint_failed' | 'mint_unavailable' | 'timeout';
+type TicketMintOutcome =
+  | 'ok'
+  | 'unauthorized'
+  | 'refused'
+  | 'mint_failed'
+  | 'mint_unavailable'
+  | 'timeout';
 
 type TicketMintResult =
   | { outcome: 'ok'; ticket: string; userId: string }
-  | { outcome: Exclude<TicketMintOutcome, 'ok'> };
+  | { outcome: 'refused'; response: Response }
+  | { outcome: Exclude<TicketMintOutcome, 'ok' | 'refused'> };
 
 /**
  * One allow-listed line per request, emitted with `console.log` rather than
@@ -96,6 +105,15 @@ app.use('*', async (c, next) => {
 });
 
 app.get('/health', c => c.json({ ok: true }));
+
+// RFC 9728 metadata that every UTS 401 challenge names; 404 while the Worker accepts no UTS token.
+app.get('/.well-known/oauth-protected-resource', c =>
+  eventServiceUserGate.metadata({
+    mode: c.env.USER_BEARER_ACCEPT,
+    environment: c.env.WORKER_ENV,
+    feed: c.env.UTS_FEED,
+  })
+);
 
 function acceptsWebSocketProtocol(header: string | undefined): boolean {
   if (!header) return false;
@@ -154,23 +172,29 @@ async function consumeConnectionTicket(env: Env, ticket: string): Promise<string
 }
 
 /**
- * Authenticate the bearer and mint the ticket under one deadline. The auth read
- * and the mint share the same budget, so a stalled hop in either resolves the
- * route with `timeout` instead of hanging past the gateway's budget. A rejected
- * hop is reported as `mint_failed`; a hop that the platform dropped is
+ * Authenticate the bearer and mint the ticket under one deadline. Authentication
+ * (the legacy JWT and pepper read, or the UTS verification with its key-set and
+ * revocation-feed reads and then the account lookup) and the mint share the
+ * same budget, so a stalled hop in any of them resolves the route with
+ * `timeout` instead of hanging past the gateway's budget. A rejected hop is
+ * reported as `mint_failed`; a hop that the platform dropped is
  * `mint_unavailable`. Both are retryable by the client's reconnect-and-retry,
  * but only the second one is a transient condition, so they answer different
- * statuses.
+ * statuses. A refused UTS bearer answers the gate's own response (401/403 with
+ * its challenge, or 503 with Retry-After while a dependency is down).
  */
 async function authenticateAndMintTicket(
-  env: Env,
+  env: Bindings,
   token: string | null,
   ctx?: SecretsExecutionContext
 ): Promise<TicketMintResult> {
   try {
     return await withDeadline(TICKET_MINT_BUDGET_MS, async () => {
-      const auth = await authenticateToken(token, env, ctx === undefined ? {} : { ctx });
-      if (!auth) {
+      const auth = await authenticateBearer(token, env, ctx === undefined ? {} : { ctx });
+      if (auth.outcome === 'refused') {
+        return { outcome: 'refused', response: auth.response } satisfies TicketMintResult;
+      }
+      if (auth.outcome === 'unauthorized') {
         return { outcome: 'unauthorized' } satisfies TicketMintResult;
       }
 
@@ -201,6 +225,18 @@ app.post('/connect-ticket', async c => {
   const startedAt = Date.now();
   const token = extractBearerToken(c.req.header('authorization'));
   const result = await authenticateAndMintTicket(c.env, token, requestContext(c));
+
+  if (result.outcome === 'refused') {
+    logger.debug('connect-ticket: bearer refused');
+    logRequestDuration({
+      route: '/connect-ticket',
+      method: c.req.method,
+      status: result.response.status,
+      durationMs: Date.now() - startedAt,
+      outcome: result.outcome,
+    });
+    return result.response;
+  }
 
   if (result.outcome === 'unauthorized') {
     logger.debug('connect-ticket: unauthorized');

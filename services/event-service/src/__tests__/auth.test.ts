@@ -5,7 +5,14 @@ import {
   signKiloToken,
 } from '@kilocode/worker-utils';
 import { type KiloUserPepperResult } from '@kilocode/worker-utils/kilo-token-auth';
-import { type AuthEnv, authenticateToken } from '../auth';
+import { createUtsUserGate } from '@kilocode/worker-uts-auth';
+import {
+  FIXTURE_CLIENT,
+  FIXTURE_REVOKED_SUBJECT,
+  createUtsFixture,
+  fixtureScopeRegistry,
+} from '@kilocode/worker-uts-auth/testing';
+import { type AuthEnv, authenticateBearer, authenticateToken } from '../auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const currentPepperByUserId = new Map<string, KiloUserPepperResult>();
@@ -246,5 +253,105 @@ describe('authenticateToken', () => {
         getUserPepper: async () => Promise.reject(new Error('lookup unavailable')),
       })
     ).rejects.toThrow('lookup unavailable');
+  });
+});
+
+describe('authenticateBearer', () => {
+  const SUBSCRIBE = 'event-service:events.subscribe';
+  const gate = createUtsUserGate({
+    audience: EVENT_SERVICE_AUDIENCE,
+    resourceOriginOf: () => 'https://events.kiloapps.io',
+    routes: { connectTicket: { scope: SUBSCRIBE, requiresSession: true, org: 'forbidden' } },
+    scopeRegistry: fixtureScopeRegistry({ [SUBSCRIBE]: { allowedClients: [FIXTURE_CLIENT] } }),
+  });
+  // The generated Env types WORKER_ENV as "production", so this suite verifies production tokens.
+  const fixture = createUtsFixture('production');
+
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    currentPepperByUserId.clear();
+    currentPepperByUserId.set('user-uts-1', { pepper: null, blocked: false });
+    currentPepperByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
+  });
+
+  async function authenticate(
+    token: string | null,
+    mode = 'legacy-and-uts',
+    lookup: typeof getUserPepper = getUserPepper
+  ) {
+    const { feed } = await fixture;
+    const pending: Promise<unknown>[] = [];
+    const result = await authenticateBearer(
+      token,
+      { ...makeEnv(), USER_BEARER_ACCEPT: mode, UTS_FEED: feed },
+      { getUserPepper: lookup, gate, ctx: { waitUntil: promise => void pending.push(promise) } }
+    );
+    await Promise.allSettled(pending);
+    return result;
+  }
+
+  const mint = async (claims: { aud?: string; scope?: string; sub?: string; org?: string } = {}) =>
+    (await fixture).mint({
+      aud: EVENT_SERVICE_AUDIENCE,
+      scope: SUBSCRIBE,
+      sub: 'user-uts-1',
+      ...claims,
+    });
+
+  it('admits a UTS token for the subscribe scope', async () => {
+    await expect(authenticate(await mint())).resolves.toEqual({
+      outcome: 'user',
+      userId: 'user-uts-1',
+    });
+  });
+
+  it('keeps the legacy token on the legacy path in every mode that accepts legacy', async () => {
+    const { token } = await signEventServiceToken({ pepper: 'pepper-current', env: 'production' });
+    for (const mode of ['legacy-only', 'legacy-and-uts']) {
+      await expect(authenticate(token, mode)).resolves.toEqual({
+        outcome: 'user',
+        userId: 'user-xyz-789',
+      });
+    }
+  });
+
+  it('sends a UTS token in legacy-only mode to the legacy verifier, which refuses it', async () => {
+    await expect(authenticate(await mint(), 'legacy-only')).resolves.toEqual({
+      outcome: 'unauthorized',
+    });
+  });
+
+  it('refuses a token for another audience with 403 insufficient_scope and reads no account', async () => {
+    const lookup = vi.fn(getUserPepper);
+    const result = await authenticate(await mint({ aud: 'kilo-chat' }), 'legacy-and-uts', lookup);
+    expect(result.outcome === 'refused' && result.response.status).toBe(403);
+    expect(
+      result.outcome === 'refused' && result.response.headers.get('www-authenticate')
+    ).toContain(`error="insufficient_scope", scope="${SUBSCRIBE}"`);
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['an organization-bound token', { org: 'org-1' }, 403],
+    ['another scope', { scope: 'event-service:events.publish' }, 403],
+    ['a revoked subject', { sub: FIXTURE_REVOKED_SUBJECT }, 401],
+  ])('refuses %s with the verifier response', async (_name, claims, status) => {
+    const result = await authenticate(await mint(claims));
+    expect(result.outcome === 'refused' && result.response.status).toBe(status);
+  });
+
+  it('refuses an account the database no longer has or marks blocked', async () => {
+    currentPepperByUserId.delete('user-uts-1');
+    await expect(authenticate(await mint())).resolves.toEqual({ outcome: 'unauthorized' });
+    currentPepperByUserId.set('user-uts-1', { pepper: null, blocked: true });
+    await expect(authenticate(await mint())).resolves.toEqual({ outcome: 'unauthorized' });
+  });
+
+  it('answers 503 with Retry-After when the account check fails', async () => {
+    const result = await authenticate(await mint(), 'legacy-and-uts', async () =>
+      Promise.reject(new Error('lookup unavailable'))
+    );
+    expect(result.outcome === 'refused' && result.response.status).toBe(503);
+    expect(result.outcome === 'refused' && result.response.headers.get('retry-after')).toBe('5');
   });
 });

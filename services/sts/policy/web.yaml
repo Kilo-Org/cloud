@@ -40,8 +40,13 @@ scopes:
 # events; bouncer:signup.decide for signup), beside the legacy key while Bouncer runs
 # STS_AUTH=dual. The web app makes no signup-history call, so it holds no bouncer:signup.history.
 # The web app's calls to the Code Review Worker (code-review: dispatch, status read, cancel, fresh
-# retry) and its session access invalidation at Session Ingest (session-ingest) are a production
-# grant, like every phase 2 C1 grant; another environment gets them by adding its key.
+# retry), its session access invalidation at Session Ingest (session-ingest), its manual sync and
+# finding dismissal enqueues at Security Sync (security-sync), its calls to the web-called
+# /internal/* routes of Security Auto Analysis, Model Eval Ingest, Webhook Agent Ingest, Session
+# Sync and the Notifications Worker (one internal.call scope each), its Auto Routing admin reads
+# and writes (auto-routing), and its Auto Routing Benchmark admin reads, writes and routing-table
+# reads (auto-routing-benchmark) are a production grant, like every phase 2 C1 grant; another
+# environment gets them by adding its key.
 # INTERNAL_API_SECRET, staging and production only: the internal API secret read under
 # SECRETS_SOURCE=sts (packages/web-shared/src/lib/sts-secret-reader.ts); previews keep `env`.
 environmentGrants:
@@ -65,6 +70,14 @@ environmentGrants:
       - bouncer
       - code-review
       - session-ingest
+      - security-sync
+      - security-auto-analysis
+      - model-eval-ingest
+      - webhook-agent-ingest
+      - session-sync
+      - notifications
+      - auto-routing
+      - auto-routing-benchmark
     scopes:
       - bouncer:decide
       - bouncer:usage.write
@@ -74,5 +87,17 @@ environmentGrants:
       - code-review:review.cancel
       - code-review:review.retry-fresh
       - session-ingest:session-access.invalidate
+      - security-sync:manual-sync.enqueue
+      - security-sync:dismiss-finding.enqueue
+      - security-auto-analysis:internal.call
+      - model-eval-ingest:internal.call
+      - webhook-agent-ingest:internal.call
+      - session-sync:internal.call
+      - notifications:internal.call
+      - auto-routing:admin.read
+      - auto-routing:admin.write
+      - auto-routing-benchmark:admin.read
+      - auto-routing-benchmark:admin.write
+      - auto-routing-benchmark:routing-tables.read
     secrets:
       - INTERNAL_API_SECRET

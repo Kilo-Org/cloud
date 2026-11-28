@@ -1,5 +1,11 @@
 import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import {
+  STS_AUTO_ROUTING_ADMIN_READ,
+  STS_AUTO_ROUTING_ADMIN_WRITE,
+  STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ,
+  STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE,
+  STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ,
+  STS_AUTO_ROUTING_DECIDE,
   STS_BOUNCER_DECIDE,
   STS_BOUNCER_SIGNUP_DECIDE,
   STS_BOUNCER_SIGNUP_HISTORY,
@@ -13,18 +19,23 @@ import {
   STS_DENIED_PROBE_WORKLOAD,
   STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
   STS_ENVIRONMENTS,
+  STS_MODEL_EVAL_INGEST_INTERNAL_CALL,
+  STS_NOTIFICATIONS_INTERNAL_CALL,
   STS_SECURE_PROXY_FORWARD,
   STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK,
+  STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
   STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK,
   STS_SECURITY_SYNC_DISMISS_FINDING,
   STS_SECURITY_SYNC_MANUAL_SYNC,
   STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
+  STS_SESSION_SYNC_INTERNAL_CALL,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
   STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK,
+  STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
   STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE,
   STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
   STS_WEB_BOT_SESSION_CALLBACK,
@@ -913,10 +924,16 @@ describe('phase 4 service scopes and CI scopes under the shipped policies', () =
       STS_O11Y_ALERTING_WRITE,
     ],
   };
-  /** The phase 2 C1 grant of a phase 4 scope, production only: Security Sync's dispatch. */
+  /**
+   * The phase 2 C1 grants of phase 4 scopes, production only: Security Sync's dispatch, and the web
+   * app's manual sync and finding dismissal enqueues at Security Sync.
+   */
   const PRODUCTION_GRANTED: Readonly<
     Record<string, readonly { audience: string; scope: string }[]>
-  > = { 'cloudflare-security-sync': [STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH] };
+  > = {
+    'cloudflare-security-sync': [STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
+    web: [STS_SECURITY_SYNC_MANUAL_SYNC, STS_SECURITY_SYNC_DISMISS_FINDING],
+  };
   const shipped = STS_ENVIRONMENTS.flatMap(environment =>
     defaultMintAuthority.policies
       .forEnvironment(environment)
@@ -1076,7 +1093,10 @@ describe('phase 4 service scopes and CI scopes under the shipped policies', () =
 });
 
 describe('phase 2 C1 grants under the shipped policies', () => {
-  /** Each phase 2 C1 scope and its one sender, the workload its docblock in scopes.ts names. */
+  /**
+   * Each phase 2 C1 scope and its sender, the workload its docblock in scopes.ts names. Only
+   * auto-routing-benchmark:routing-tables.read has more than one sender, one row each.
+   */
   const SENDERS = [
     [STS_WEB_COMPUTE_BALANCE_ALERT, 'container-usage-meter'],
     [STS_WEB_SCIM_SYNC, 'cloudflare-scim-sync'],
@@ -1106,6 +1126,21 @@ describe('phase 2 C1 grants under the shipped policies', () => {
     [STS_CODE_REVIEW_CANCEL, 'web'],
     [STS_CODE_REVIEW_RETRY_FRESH, 'web'],
     [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE, 'web'],
+    [STS_SECURITY_SYNC_MANUAL_SYNC, 'web'],
+    [STS_SECURITY_SYNC_DISMISS_FINDING, 'web'],
+    [STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL, 'web'],
+    [STS_MODEL_EVAL_INGEST_INTERNAL_CALL, 'web'],
+    [STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL, 'web'],
+    [STS_SESSION_SYNC_INTERNAL_CALL, 'web'],
+    [STS_NOTIFICATIONS_INTERNAL_CALL, 'web'],
+    [STS_AUTO_ROUTING_ADMIN_READ, 'web'],
+    [STS_AUTO_ROUTING_ADMIN_WRITE, 'web'],
+    [STS_AUTO_ROUTING_DECIDE, 'ai-gateway'],
+    [STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ, 'web'],
+    [STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE, 'web'],
+    [STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ, 'web'],
+    [STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ, 'ai-gateway'],
+    [STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ, 'auto-routing'],
   ] as const;
   const production = defaultMintAuthority.policies
     .forEnvironment('production')
@@ -1142,7 +1177,13 @@ describe('phase 2 C1 grants under the shipped policies', () => {
   it.each(production)(
     'refuses $workload in production every phase 2 C1 scope it is not granted, never as unknown_scope',
     async ({ workload }) => {
-      for (const [entry] of SENDERS.filter(([, sender]) => sender !== workload)) {
+      const granted = new Set(
+        SENDERS.filter(([, sender]) => sender === workload).map(([entry]) => entry.scope)
+      );
+      const refused = new Set(
+        SENDERS.map(([entry]) => entry).filter(entry => !granted.has(entry.scope))
+      );
+      for (const entry of refused) {
         expect(await mintAsShipped('production', workload, entry)).toEqual({
           status: 'ok',
           tokens: [

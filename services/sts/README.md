@@ -383,7 +383,9 @@ under `uts` the scopes `uts:subjects.revoke`, `uts:browser-sessions.end`,
 `uts:api-credentials.revoke` and `uts:token-exchange`, under `bouncer` the scopes `bouncer:decide`,
 `bouncer:usage.write`, `bouncer:signup.decide` and `bouncer:signup.history`, the phase 4
 service scopes, and the phase 2 C1 scopes listed in the grant table below, under `web`,
-`webhook-agent-ingest`, `security-auto-analysis`, `code-review` and `session-ingest`) and belong
+`webhook-agent-ingest`, `security-auto-analysis`, `code-review`, `session-ingest`,
+`model-eval-ingest`, `session-sync`, `notifications`, `auto-routing` and
+`auto-routing-benchmark`) and belong
 to a listed audience, every audience needs at least one scope, and no audience may be the workload
 itself. A reserved scope
 (`STS_RESERVED_SCOPES`, today `canary:denied-probe`) and its audience fail the load whatever the
@@ -458,12 +460,15 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `web` | `code-review`: `code-review:review.dispatch`, `code-review:review.status-read`, `code-review:review.cancel`, `code-review:review.retry-fresh`; `session-ingest`: `session-ingest:session-access.invalidate` | | production only (`environmentGrants`) |
+| `web` | `security-sync`: `security-sync:manual-sync.enqueue`, `security-sync:dismiss-finding.enqueue`; `security-auto-analysis`: `security-auto-analysis:internal.call`; `model-eval-ingest`: `model-eval-ingest:internal.call`; `webhook-agent-ingest`: `webhook-agent-ingest:internal.call`; `session-sync`: `session-sync:internal.call`; `notifications`: `notifications:internal.call` | | production only (`environmentGrants`) |
+| `web` | `auto-routing`: `auto-routing:admin.read`, `auto-routing:admin.write`; `auto-routing-benchmark`: `auto-routing-benchmark:admin.read`, `auto-routing-benchmark:admin.write`, `auto-routing-benchmark:routing-tables.read` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 | `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 | `ai-gateway` | `web`: `web:usage.region-handoff.record`, `web:claude-billing.payer-state.read` | none | production only (`environmentGrants`) |
+| `ai-gateway` | `auto-routing`: `auto-routing:decide`; `auto-routing-benchmark`: `auto-routing-benchmark:routing-tables.read` | none | production only (`environmentGrants`) |
 | `notifications` | `web`: `web:glanceable-snapshot.read` | in its file | production |
 | `container-usage-meter` | `web`: `web:compute-balance-alert.send` | in its file | production |
 | `cloudflare-scim-sync` | `web`: `web:scim.sync` | none | production |
@@ -471,7 +476,7 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `cloudflare-security-sync` | `web`: `web:security-notifications.dispatch` | none | production |
 | `security-auto-analysis` | `web`: `web:security-notifications.lifecycle` | none | production |
 | `auto-routing-benchmark` | `web`: `web:auto-routing.pool-pins.write`, `web:usage.receipts.read`, `web:auto-routing.production-profile.read`, `web:usage.benchmark-grader.record` | none | production |
-| `auto-routing` | `web`: `web:usage.classifier.record` | none | production |
+| `auto-routing` | `web`: `web:usage.classifier.record`; `auto-routing-benchmark`: `auto-routing-benchmark:routing-tables.read` | none | production |
 | `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback`, `security-auto-analysis:remediation.callback` | none | production |
 | `kilo-code-review-worker` | `web`: `web:code-review.status-callback` | none | production |
 
@@ -480,10 +485,13 @@ are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only
 production STS tokens. `bouncer:signup.history` is registered for the signup-history import job,
 and no policy grants it yet. The phase 2 C1 grants are production only, and each scope has
 exactly one sender: its docblock in `packages/sts-contracts/src/scopes.ts` names it, and the
-policy tests pin it. The two region scopes go to `ai-gateway` alone: only the gateway runs in the
-US region (the web app runs in Frankfurt only), and STS refuses the `web` workload its own
-audience. `session-ingest:session-access.invalidate` is an STS scope; UTS's user scopes under the
-same audience are a separate registry. The `kilo-mcp` grant
+policy tests pin it. The one exception is `auto-routing-benchmark:routing-tables.read`, whose
+docblock names three senders (`web`, `ai-gateway` and `auto-routing`) because all three read the
+same read-only tables and the token's subject names the caller. The two region scopes go to
+`ai-gateway` alone: only the gateway runs in the US region (the web app runs in Frankfurt only),
+and STS refuses the `web` workload its own audience. `session-ingest:session-access.invalidate`
+is an STS scope; UTS's user scopes under the same audience are a separate registry. The `kilo-mcp`
+grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
 config check below refuses a `worker-binding` policy that no config here binds. Its local block

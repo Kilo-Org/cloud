@@ -34,6 +34,14 @@ const WEB_PRODUCTION_AUDIENCES = [
   'bouncer',
   'code-review',
   'session-ingest',
+  'security-sync',
+  'security-auto-analysis',
+  'model-eval-ingest',
+  'webhook-agent-ingest',
+  'session-sync',
+  'notifications',
+  'auto-routing',
+  'auto-routing-benchmark',
 ];
 const WEB_PRODUCTION_SCOPES = [
   ...WEB_BASE_SCOPES,
@@ -45,15 +53,29 @@ const WEB_PRODUCTION_SCOPES = [
   'code-review:review.cancel',
   'code-review:review.retry-fresh',
   'session-ingest:session-access.invalidate',
+  'security-sync:manual-sync.enqueue',
+  'security-sync:dismiss-finding.enqueue',
+  'security-auto-analysis:internal.call',
+  'model-eval-ingest:internal.call',
+  'webhook-agent-ingest:internal.call',
+  'session-sync:internal.call',
+  'notifications:internal.call',
+  'auto-routing:admin.read',
+  'auto-routing:admin.write',
+  'auto-routing-benchmark:admin.read',
+  'auto-routing-benchmark:admin.write',
+  'auto-routing-benchmark:routing-tables.read',
 ];
 
-/** The shipped ai-gateway policy's audiences and scopes in production: Bouncer, then its web calls. */
+/** The shipped ai-gateway policy's audiences and scopes in production: Bouncer, then its C1 calls. */
 const GATEWAY_PRODUCTION_AUDIENCES = [
   'usage-ingest',
   'o11y',
   'ai-gateway-secure-proxy',
   'bouncer',
   'web',
+  'auto-routing',
+  'auto-routing-benchmark',
 ];
 const GATEWAY_PRODUCTION_SCOPES = [
   ...GATEWAY_BASE_SCOPES,
@@ -61,6 +83,8 @@ const GATEWAY_PRODUCTION_SCOPES = [
   'bouncer:usage.write',
   'web:usage.region-handoff.record',
   'web:claude-billing.payer-state.read',
+  'auto-routing:decide',
+  'auto-routing-benchmark:routing-tables.read',
 ];
 
 function withGrants(grants: string): string {
@@ -996,36 +1020,52 @@ describe('dual-accept grants of the shipped policies', () => {
 });
 
 describe('phase 2 C1 grants of the shipped policies', () => {
-  /** Each phase 2 C1 scope and its one sender (its docblock in scopes.ts), production only. */
-  const SENDERS: Readonly<Record<string, string>> = {
-    'web:compute-balance-alert.send': 'container-usage-meter',
-    'web:scim.sync': 'cloudflare-scim-sync',
-    'web:user-data-exports.ready': 'user-data-export',
-    'web:security-notifications.dispatch': 'cloudflare-security-sync',
-    'web:security-notifications.lifecycle': 'security-auto-analysis',
-    'web:auto-routing.pool-pins.write': 'auto-routing-benchmark',
-    'web:usage.receipts.read': 'auto-routing-benchmark',
-    'web:auto-routing.production-profile.read': 'auto-routing-benchmark',
-    'web:usage.benchmark-grader.record': 'auto-routing-benchmark',
-    'web:usage.classifier.record': 'auto-routing',
-    'web:usage.region-handoff.record': 'ai-gateway',
-    'web:claude-billing.payer-state.read': 'ai-gateway',
-    'web:glanceable-snapshot.read': 'notifications',
-    'web:byoc-credentials.read': 'cloud-agent-next',
-    'web:byoc-credentials.write': 'cloud-agent-next',
-    'web:hosted-workspace-pull-requests.refresh': 'cloud-agent-next',
-    'web:bot-session.callback': 'cloud-agent-next',
-    'web:security-analysis.callback': 'cloud-agent-next',
-    'web:code-review.agent-callback': 'cloud-agent-next',
-    'webhook-agent-ingest:execution.callback': 'cloud-agent-next',
-    'security-auto-analysis:analysis.callback': 'cloud-agent-next',
-    'security-auto-analysis:remediation.callback': 'cloud-agent-next',
-    'web:code-review.status-callback': 'kilo-code-review-worker',
-    'code-review:review.dispatch': 'web',
-    'code-review:review.status-read': 'web',
-    'code-review:review.cancel': 'web',
-    'code-review:review.retry-fresh': 'web',
-    'session-ingest:session-access.invalidate': 'web',
+  /**
+   * Each phase 2 C1 scope and its senders (its docblock in scopes.ts), production only. Every scope
+   * has one sender except auto-routing-benchmark:routing-tables.read, whose docblock names three.
+   */
+  const SENDERS: Readonly<Record<string, readonly string[]>> = {
+    'web:compute-balance-alert.send': ['container-usage-meter'],
+    'web:scim.sync': ['cloudflare-scim-sync'],
+    'web:user-data-exports.ready': ['user-data-export'],
+    'web:security-notifications.dispatch': ['cloudflare-security-sync'],
+    'web:security-notifications.lifecycle': ['security-auto-analysis'],
+    'web:auto-routing.pool-pins.write': ['auto-routing-benchmark'],
+    'web:usage.receipts.read': ['auto-routing-benchmark'],
+    'web:auto-routing.production-profile.read': ['auto-routing-benchmark'],
+    'web:usage.benchmark-grader.record': ['auto-routing-benchmark'],
+    'web:usage.classifier.record': ['auto-routing'],
+    'web:usage.region-handoff.record': ['ai-gateway'],
+    'web:claude-billing.payer-state.read': ['ai-gateway'],
+    'web:glanceable-snapshot.read': ['notifications'],
+    'web:byoc-credentials.read': ['cloud-agent-next'],
+    'web:byoc-credentials.write': ['cloud-agent-next'],
+    'web:hosted-workspace-pull-requests.refresh': ['cloud-agent-next'],
+    'web:bot-session.callback': ['cloud-agent-next'],
+    'web:security-analysis.callback': ['cloud-agent-next'],
+    'web:code-review.agent-callback': ['cloud-agent-next'],
+    'webhook-agent-ingest:execution.callback': ['cloud-agent-next'],
+    'security-auto-analysis:analysis.callback': ['cloud-agent-next'],
+    'security-auto-analysis:remediation.callback': ['cloud-agent-next'],
+    'web:code-review.status-callback': ['kilo-code-review-worker'],
+    'code-review:review.dispatch': ['web'],
+    'code-review:review.status-read': ['web'],
+    'code-review:review.cancel': ['web'],
+    'code-review:review.retry-fresh': ['web'],
+    'session-ingest:session-access.invalidate': ['web'],
+    'security-sync:manual-sync.enqueue': ['web'],
+    'security-sync:dismiss-finding.enqueue': ['web'],
+    'security-auto-analysis:internal.call': ['web'],
+    'model-eval-ingest:internal.call': ['web'],
+    'webhook-agent-ingest:internal.call': ['web'],
+    'session-sync:internal.call': ['web'],
+    'notifications:internal.call': ['web'],
+    'auto-routing:admin.read': ['web'],
+    'auto-routing:admin.write': ['web'],
+    'auto-routing:decide': ['ai-gateway'],
+    'auto-routing-benchmark:admin.read': ['web'],
+    'auto-routing-benchmark:admin.write': ['web'],
+    'auto-routing-benchmark:routing-tables.read': ['ai-gateway', 'auto-routing', 'web'],
   };
   /** The Workers that send C1 tokens over a production-only worker binding and hold no other grant. */
   const ACTIVATED = [
@@ -1042,17 +1082,20 @@ describe('phase 2 C1 grants of the shipped policies', () => {
 
   it.each(Object.entries(SENDERS))(
     'grants %s to %s in production and to no other policy',
-    (scope, sender) => {
-      expect(policyFor('production', sender)).toMatchObject({
-        audiences: expect.arrayContaining([scope.slice(0, scope.indexOf(':'))]),
-        scopes: expect.arrayContaining([scope]),
-      });
+    (scope, senders) => {
+      for (const sender of senders) {
+        expect(policyFor('production', sender)).toMatchObject({
+          audiences: expect.arrayContaining([scope.slice(0, scope.indexOf(':'))]),
+          scopes: expect.arrayContaining([scope]),
+        });
+      }
       expect(
         policyIndex
           .forEnvironment('production')
           .filter(policy => policy.scopes.includes(scope))
           .map(policy => policy.workload)
-      ).toEqual([sender]);
+          .sort()
+      ).toEqual(senders);
     }
   );
 
@@ -1075,7 +1118,7 @@ describe('phase 2 C1 grants of the shipped policies', () => {
   it('grants each activated Worker only its own C1 scopes', () => {
     for (const workload of ACTIVATED) {
       const own = Object.entries(SENDERS)
-        .filter(([, sender]) => sender === workload)
+        .filter(([, senders]) => senders.includes(workload))
         .map(([scope]) => scope);
       expect(policyFor('production', workload)?.scopes).toEqual(own);
     }

@@ -371,10 +371,10 @@ no audit row; the operator action that blocks or unblocks the client writes it.
 Attest and Android Play Integrity (`src/attest/`, migration 0017). The client is served only
 where the environment's attestation config is complete (`src/attest/config.ts`); anything less
 refuses it at `/authorize` with `unauthorized_client` and logs `uts.attestation.misconfigured`
-with the names (never the values) of what is missing. Development with no attestation value at
-all serves it without attestation, for the local tests. With a var set and no usable STS bundle
-(Deploys, "Runtime secrets") the client is still sent to sign in and its code exchange answers 503
-with `Retry-After` until the key can be read.
+with the names (never the values) of what is missing. The vars are the switch: development with
+none of them set serves it without attestation, for the local tests, whatever the bundle holds.
+With a var set and no usable STS bundle (Deploys, "Runtime secrets") the client is still sent to
+sign in and its code exchange answers 503 with `Retry-After` until the key can be read.
 
 | Name | Kind | Value |
 |---|---|---|
@@ -1107,9 +1107,11 @@ Open items before deploy:
 ### Configuration
 
 A method is offered only when every value it needs is set; with some set and others missing it is
-not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only). The secrets
-come from the source `SECRETS_SOURCE` names (Deploys, "Runtime secrets"); with a method's vars set
-and no usable STS bundle it is not offered and its routes answer 503 with `Retry-After`.
+not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only). A method
+with none of its plain vars set is `off`, whatever the secret source holds: the vars are the switch.
+The secrets come from the source `SECRETS_SOURCE` names (Deploys, "Runtime secrets"); with a
+method's vars set and no usable STS bundle it is not offered and its routes answer 503 with
+`Retry-After`.
 
 | Method | Vars | Secrets |
 |---|---|---|
@@ -1524,12 +1526,12 @@ GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSE
   legacy value other services use, means the same here (it logs `source` `worker`), so the
   standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
 
-Both environments read `worker` until their flips (below). Staging and production refuse to start
-without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
-or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set under
-either source, so a rollback is the var alone. The `worker` source is removed in the same change
-that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret;
-the rotation job always reads it from the bundle ("Login rotation").
+Staging reads `sts` and production reads `worker` until its flip (below). Staging and production
+refuse to start without the var (`src/env.ts`), and `test/repo` fails a deployed block that does
+not name a source or does not bind its own environment's STS as caller `uts`. The Worker secrets
+stay set under either source, so a rollback is the var alone. The `worker` source is removed in
+the same change that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has
+no Worker secret; the rotation job always reads it from the bundle ("Login rotation").
 
 Under `sts` the client holds the whole bundle in every request isolate that reads it. Once the
 policy grants `UTS_HYPERDRIVE_SWITCH_TOKEN`, that token, which can edit every Hyperdrive config in
@@ -1543,12 +1545,15 @@ created credential's notice email (after the answer) and the minute cron's notic
 `/revoke`, `/introspect`, `/tickets`, the browser-session API, the account API and the PAT routes
 never wait for STS. What a read finds:
 
-| Bundle state | Methods with their vars set | Methods without vars |
+| Bundle state | Methods with their vars set | Methods with none of their vars set |
 |---|---|---|
 | Delivered, name present | `on` | `off` |
 | Delivered, name missing (policy grants it, the manager holds no value, or the value is empty) | `misconfigured`: not offered, routes answer 500 | `off` |
 | STS refuses the `uts` workload, or `STS` is not bound (`uts.secrets.unavailable` with `reason` `denied` or `not_bound`) | as a delivered bundle without the name: `misconfigured` | `off` |
 | No usable bundle: none yet on a cold isolate, or the held copy is 24 hours old (`uts.secrets.unavailable`, `reason` `unavailable`) | `unavailable`: not offered, routes answer 503 with `Retry-After` | `off` |
+
+A method that needs only a secret (the email hash key) follows the secret: `on` when the bundle
+delivers it, `off` when the bundle holds no value for it, and `unavailable` with no usable bundle.
 
 With no usable bundle, the device grant answers 503 (`temporarily_unavailable` on
 `/device_authorization` and at `/token`) and the issuer metadata leaves it out with
@@ -1566,7 +1571,7 @@ The secrets client caches a denial per isolate: once STS refuses the `uts` workl
 keeps refusing until it is replaced. After fixing a denial (`uts.secrets.unavailable` with
 `reason` `denied`), redeploy UTS, or roll the var back to `worker`.
 
-**Flip, per environment** (staging first, production only after the staging flip held), with the
+**Flip, per environment** (staging first, then production after the staging flip held), with the
 environment's `uts` policy live in STS:
 
 1. **Parity.** Every name in the environment's `/workloads/uts` holds the Worker secret's value,
@@ -1597,7 +1602,7 @@ environment's `uts` policy live in STS:
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
 | `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations; staging sets all five, production sets none, so production offers none of these providers (Sign-in providers, "Configuration") |
 | `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
-| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); staging `sts`, production `worker` until its flip |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ## Identity store

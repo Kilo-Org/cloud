@@ -1545,7 +1545,7 @@ never wait for STS. What a read finds:
 
 | Bundle state | Methods with their vars set | Methods without vars |
 |---|---|---|
-| Delivered, name present | `on` | `off` |
+| Delivered, name present | `on` | `off` when the method has no vars at all; a provider or WorkOS with its secret delivered but its client id unset is `misconfigured` (500) |
 | Delivered, name missing (policy grants it, the manager holds no value, or the value is empty) | `misconfigured`: not offered, routes answer 500 | `off` |
 | STS refuses the `uts` workload, or `STS` is not bound (`uts.secrets.unavailable` with `reason` `denied` or `not_bound`) | as a delivered bundle without the name: `misconfigured` | `off` |
 | No usable bundle: none yet on a cold isolate, or the held copy is 24 hours old (`uts.secrets.unavailable`, `reason` `unavailable`) | `unavailable`: not offered, routes answer 503 with `Retry-After` | `off` |

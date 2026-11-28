@@ -6,8 +6,10 @@ import {
   encryptWithPublicKey,
   parseKeyedEnvelope,
 } from '@kilocode/encryption';
+import type { MintRequest } from '@kilocode/sts-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
+import { WEB_BYOC_CREDENTIALS_READ, WEB_BYOC_CREDENTIALS_WRITE } from '../web-internal-auth.js';
 import {
   ByocCredentialResolverError,
   fetchByocVercelCredential,
@@ -493,4 +495,89 @@ describe('internal credential request redirects', () => {
       );
     }
   );
+});
+
+describe('BYOC_LOOKUP_SENDER_AUTH=sts', () => {
+  const MINTED = 'minted.byoc.token';
+  const projection = {
+    ...identity,
+    buildGeneration: snapshot.buildGeneration,
+    setupStatus: 'failed' as const,
+    setupStep: null,
+    setupError: 'test',
+    teamSlug: null,
+    projectSlug: null,
+    runtimeBuildId: null,
+    runtimeSnapshotId: null,
+    setupStartedAt: null,
+    setupCompletedAt: null,
+  };
+
+  function stsEnv() {
+    const STS = {
+      getBundle: vi.fn(),
+      mintTokens: vi.fn(async (request: MintRequest) => ({
+        status: 'ok' as const,
+        tokens: request.tokens.map(({ audience, scope }) => ({
+          status: 'issued' as const,
+          audience,
+          scope,
+          token: MINTED,
+          jti: 'jti-byoc',
+          expiresAt: Math.floor(Date.now() / 1000) + 300,
+        })),
+      })),
+    };
+    const internal = vi.fn(async () => 'internal-secret');
+    const value = {
+      ...env,
+      KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+      BYOC_LOOKUP_SENDER_AUTH: 'sts',
+      INTERNAL_API_SECRET_PROD: { get: internal },
+      STS,
+    } as Env;
+    return { env: value, STS, internal };
+  }
+
+  it('projects a build status with only the BYOC write token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ updated: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const test = stsEnv();
+
+    await expect(projectByocVercelStatus(test.env, projection)).resolves.toBe(true);
+
+    expect(test.STS.mintTokens).toHaveBeenCalledWith({ tokens: [WEB_BYOC_CREDENTIALS_WRITE] });
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+      'content-type': 'application/json',
+      authorization: `Bearer ${MINTED}`,
+    });
+    expect(test.internal).not.toHaveBeenCalled();
+  });
+
+  it('reads an enrollment with only the BYOC read token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const test = stsEnv();
+
+    await expect(
+      fetchByocVercelEnrollmentForUser(test.env, personalIdentity.userId)
+    ).rejects.toThrow();
+
+    expect(test.STS.mintTokens).toHaveBeenCalledWith({ tokens: [WEB_BYOC_CREDENTIALS_READ] });
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({ authorization: `Bearer ${MINTED}` });
+    expect(test.internal).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing without the STS binding and never falls back to the secret', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const test = stsEnv();
+
+    await expect(
+      fetchByocVercelCredential({ ...test.env, STS: undefined }, identity)
+    ).rejects.toBeInstanceOf(ByocCredentialResolverError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(test.internal).not.toHaveBeenCalled();
+  });
 });

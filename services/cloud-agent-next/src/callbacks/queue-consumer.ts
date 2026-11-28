@@ -1,3 +1,4 @@
+import type { ServiceTokensExecutionContext } from '@kilocode/service-token-client';
 import type { CallbackQueueJob } from './types.js';
 import { deliverCallbackJob } from './delivery.js';
 import { logger } from '../logger.js';
@@ -9,17 +10,21 @@ import type { Env } from '../types.js';
 import { deliverWorkspaceSessionCallback } from './parent-session.js';
 import { deliverParentWorkspaceCallback } from './parent-workspace.js';
 
-export function createCallbackQueueConsumer(env: Env) {
+export function createCallbackQueueConsumer(env: Env, ctx: ServiceTokensExecutionContext) {
   return async function callbackQueueConsumer(
     batch: MessageBatch<CallbackQueueJob>
   ): Promise<void> {
     for (const message of batch.messages) {
-      await processMessage(message, env);
+      await processMessage(message, env, ctx);
     }
   };
 }
 
-async function processMessage(message: Message<CallbackQueueJob>, env: Env): Promise<void> {
+async function processMessage(
+  message: Message<CallbackQueueJob>,
+  env: Env,
+  ctx: ServiceTokensExecutionContext
+): Promise<void> {
   const job = message.body;
   const interaction = 'type' in job;
   const identity = interaction
@@ -37,7 +42,7 @@ async function processMessage(message: Message<CallbackQueueJob>, env: Env): Pro
         ? await deliverWorkspaceSessionCallback(env, job, message.attempts)
         : interaction
           ? { type: 'failed' as const, error: 'Invalid question callback target' }
-          : await deliverCallbackJob(job.target, job.payload, message.attempts);
+          : await deliverCallbackJob(job.target, job.payload, message.attempts, { env, ctx });
 
   switch (result.type) {
     case 'success':

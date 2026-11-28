@@ -9,7 +9,7 @@ const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href)
 const STORE = '342a86d9e3a94da698e82d0c6e2a36f0';
 
 describe('webhook-agent-ingest wrangler.jsonc secrets', () => {
-  it('reads production secrets from the Secrets Store with comparison off and keeps every binding', () => {
+  it('reads production secrets from STS with comparison on and keeps every binding', () => {
     const production = unstable_readConfig({ config });
 
     expect(production.name).toBe('cloudflare-webhook-agent-ingest');
@@ -20,8 +20,8 @@ describe('webhook-agent-ingest wrangler.jsonc secrets', () => {
       WEBHOOK_AGENT_URL: 'https://hooks.kilosessions.ai',
       KILOCLAW_API_URL: 'https://claw.kilosessions.ai',
       SHARED_RESOURCE_TOKENS_ENABLED: 'true',
-      SECRETS_SOURCE: 'secrets-store',
-      SECRETS_COMPARE_ENABLED: 'false',
+      SECRETS_SOURCE: 'sts',
+      SECRETS_COMPARE_ENABLED: 'true',
     });
     expect(production.services).toEqual([
       { binding: 'CLOUD_AGENT', service: 'cloud-agent-next' },

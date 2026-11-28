@@ -10,6 +10,7 @@ import {
   resolveServiceSenderAuth,
   serviceSenderHeaders,
 } from '@kilocode/web-shared/lib/service-sender-auth';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS, withinBudget } from '@/lib/bounded-service-fetch';
 
 const ModelEvalSyncResultSchema = z.object({
   success: z.literal(true),
@@ -44,14 +45,18 @@ export async function syncModelEvalPromotions(
     throw new Error('MODEL_EVAL_INGEST_URL is not configured');
   }
 
-  // Throws before anything is sent for a refused switch or no token.
-  const credential = await serviceSenderHeaders({
-    sender: modelEvalIngestSender,
-    variable: 'MODEL_EVAL_INGEST_SENDER_AUTH',
-    label: 'model eval ingest client',
-    request: STS_MODEL_EVAL_INGEST_INTERNAL_CALL,
-    legacyHeaders: async () => ({ 'x-internal-api-key': await readInternalApiSecret() }),
-  });
+  // Throws before anything is sent for a refused switch, or no token within the internal-service
+  // budget: a cold mint never holds the admin request open.
+  const credential = await withinBudget(
+    serviceSenderHeaders({
+      sender: modelEvalIngestSender,
+      variable: 'MODEL_EVAL_INGEST_SENDER_AUTH',
+      label: 'model eval ingest client',
+      request: STS_MODEL_EVAL_INGEST_INTERNAL_CALL,
+      legacyHeaders: async () => ({ 'x-internal-api-key': await readInternalApiSecret() }),
+    }),
+    CONTROL_PLANE_UPSTREAM_BUDGET_MS
+  );
   const init: RequestInit = {
     method: 'POST',
     headers: {

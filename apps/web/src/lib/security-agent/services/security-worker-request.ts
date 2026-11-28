@@ -16,6 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/service-sender-auth';
 import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+  ServiceFetchTimeoutError,
   fetchWithinBudget,
   readJsonWithinBudget,
   withinBudget,
@@ -170,9 +171,11 @@ export function isDefinitiveSecurityWorkerRejection(params: {
  * settles the intent `failed`, and the retry is a fresh intent.
  *
  * The credential comes first, inside the same budget: the Worker's switch picks the internal API
- * secret or an STS token for `scope`. Legacy without the secret is the not-configured
- * precondition, as before; a refused switch, no token, or a mint past the budget throws before
- * anything is sent. An STS token is for the Worker's origin only, so a redirect is an error.
+ * secret or an STS token for `scope`. Nothing is sent without it, so each failure is definitive
+ * and carries a sentence the clients map by exact match: legacy without the secret and a refused
+ * switch are the not-configured precondition; no STS token, or none within the budget, is the
+ * unavailable marker, like a connection that was never established. A failed secret read
+ * propagates as before. An STS token is for the Worker's origin only, so a redirect is an error.
  *
  * The URL, the internal-service token, the request body and the response body
  * are never attached to the error.
@@ -187,30 +190,49 @@ export async function postSecurityWorkerJson(params: {
 }): Promise<{ response: Response; body: unknown }> {
   const startedAt = Date.now();
   const { sender, variable, label } = params.worker;
-  const credential = await withinBudget(
-    serviceSenderHeaders({
-      sender,
-      variable,
-      label,
-      request: params.scope,
-      legacyHeaders: async () => {
-        const internalApiSecret = await readInternalApiSecret();
-        if (!internalApiSecret) {
-          // Mirrored by the mobile security mutation classifier: a stable
-          // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
-          // classifier treats as retryable transport. The sentence is the shared
-          // SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE, which the mobile ledger maps
-          // by exact match (stable-error-messages).
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
-          });
-        }
-        return { 'x-internal-api-key': internalApiSecret };
-      },
-    }),
-    CONTROL_PLANE_UPSTREAM_BUDGET_MS
-  );
+  let credential: Record<string, string>;
+  try {
+    credential = await withinBudget(
+      serviceSenderHeaders({
+        sender,
+        variable,
+        label,
+        request: params.scope,
+        legacyHeaders: async () => {
+          const internalApiSecret = await readInternalApiSecret();
+          if (!internalApiSecret) {
+            // Mirrored by the mobile security mutation classifier: a stable
+            // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
+            // classifier treats as retryable transport. The sentence is the shared
+            // SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE, which the mobile ledger maps
+            // by exact match (stable-error-messages).
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+            });
+          }
+          return { 'x-internal-api-key': internalApiSecret };
+        },
+      }),
+      CONTROL_PLANE_UPSTREAM_BUDGET_MS
+    );
+  } catch (error) {
+    if (sender.kind === 'legacy') throw error;
+    // `serviceSenderHeaders` logged a refusal or a token failure; a mint past the budget is
+    // still pending there, so it is logged here.
+    if (error instanceof ServiceFetchTimeoutError) {
+      console.error(`${label}: no STS token within the budget; request refused`, {
+        budgetMs: error.totalBudgetMs,
+      });
+    }
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message:
+        sender.kind === 'refused'
+          ? SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE
+          : SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
+    });
+  }
   const init: RequestInit = {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...credential },

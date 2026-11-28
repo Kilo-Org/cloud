@@ -313,6 +313,26 @@ vi.mock('@/lib/app-actions/session-catalog', () => ({
   clearSessionCatalogBestEffort: vi.fn(),
 }));
 
+// The Home widget's refresh credential is cleared through its own module, which
+// reaches the native bridge and the tRPC client; the bootstrap's wiring is what
+// this suite pins, so the clear is a spy.
+const homeWidgetRefreshMock = vi.hoisted(() => ({
+  clearHomeWidgetRefresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  syncHomeWidgetRefresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  restoreNativeHomeWidgetData: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/glanceable/home-widget-refresh', () => homeWidgetRefreshMock);
+
+// The retry's storage record and request are its own suite's; this suite pins
+// the provider's triggers (a launch and a foreground, signed in or out).
+const pendingDeviceRevokeMock = vi.hoisted(() => ({
+  retryPendingDeviceSessionRevoke: vi
+    .fn<() => Promise<{ kind: 'none' }>>()
+    .mockResolvedValue({ kind: 'none' }),
+  recordPendingDeviceSessionRevoke: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/auth/pending-device-revoke', () => pendingDeviceRevokeMock);
+
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
 vi.mock('@/lib/consent', () => ({
@@ -507,6 +527,7 @@ vi.mock('@/lib/storage-keys', () => ({
   ORGANIZATION_STORAGE_KEY: 'organization',
   ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
+  PENDING_DEVICE_REVOKE_KEY: 'pending-device-revoke',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
   PICKER_RESTORE_RECORD_KEY: 'picker-restore-record',
   REFRESH_TOKEN_KEY: 'refresh-token',
@@ -2201,6 +2222,65 @@ describe('bootstrap and foreground race fencing', () => {
     // The take drops the parked value, so the clear afterwards has nothing left
     // to lose.
     expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('regression: a signed-out launch clears the Home widget credential the signed-in tree owns', async () => {
+    // The widget refreshes natively with its own 30-day credential, which the
+    // app's bearer teardown never touches. No signed-in mount runs on this
+    // launch to clear it, so the bootstrap must.
+    homeWidgetRefreshMock.clearHomeWidgetRefresh.mockClear();
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    expect(homeWidgetRefreshMock.clearHomeWidgetRefresh).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('a restore-failure bootstrap leaves the Home widget credential alone', async () => {
+    useFakeBackoffClock();
+    // The keychain could not be read, so a session may still be stored and the
+    // widget credential belongs to it. Only a positively signed-out launch may
+    // clear it.
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    homeWidgetRefreshMock.clearHomeWidgetRefresh.mockClear();
+
+    const { getCtx, unmount } = await mountProvider();
+    await settleBootstrap(getCtx);
+    expect(getCtx().restoreFailed).toBe(true);
+
+    expect(homeWidgetRefreshMock.clearHomeWidgetRefresh).not.toHaveBeenCalled();
+    unmount();
+  }, 60_000);
+
+  it('regression: a launch asks for the sign-out revoke the teardown could not finish', async () => {
+    // The teardown's revoke failed, so it recorded the refresh token. This
+    // launch is signed out, which is exactly the state that never mounts the
+    // signed-in reconciliation — the record must still be retried.
+    pendingDeviceRevokeMock.retryPendingDeviceSessionRevoke.mockClear();
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    expect(pendingDeviceRevokeMock.retryPendingDeviceSessionRevoke).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('regression: a signed-out foreground also asks for the pending revoke', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBeUndefined();
+    pendingDeviceRevokeMock.retryPendingDeviceSessionRevoke.mockClear();
+
+    const eventListener = hoisted.appState.addEventListener.mock.calls.at(-1)?.[1];
+    await act(async () => {
+      eventListener?.('active');
+      await Promise.resolve();
+    });
+
+    expect(pendingDeviceRevokeMock.retryPendingDeviceSessionRevoke).toHaveBeenCalledTimes(1);
 
     unmount();
   });

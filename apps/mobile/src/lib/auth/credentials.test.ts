@@ -50,6 +50,20 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({
   runLogoutCleanup: vi.fn().mockResolvedValue(undefined),
+  unregisterActivityTokensAndTombstone: vi.fn().mockResolvedValue(undefined),
+}));
+// The Home widget's refresh module reaches the `expo` root, which the node test
+// environment cannot load; the sign-out teardown's clear is a spy here.
+vi.mock('@/lib/glanceable/home-widget-refresh', () => ({
+  clearHomeWidgetRefresh: vi.fn().mockResolvedValue(undefined),
+  syncHomeWidgetRefresh: vi.fn().mockResolvedValue(undefined),
+  restoreNativeHomeWidgetData: vi.fn().mockResolvedValue(undefined),
+}));
+// The launch's revoke retry reads its own record; keeping it out of this suite
+// leaves the SecureStore call order (the credential writes under test) intact.
+vi.mock('@/lib/auth/pending-device-revoke', () => ({
+  retryPendingDeviceSessionRevoke: vi.fn().mockResolvedValue({ kind: 'none' }),
+  recordPendingDeviceSessionRevoke: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn(), invalidateQueries: vi.fn() },

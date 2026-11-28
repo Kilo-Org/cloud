@@ -113,11 +113,22 @@ export const PERSIST_MIGRATION_FAILURES_KEY = 'persist-db-migration-failures';
 export const ACTIVE_USER_ID_KEY = 'active-user-id';
 /**
  * Sign-out cleanup tombstone (Phase 2, class `safe-retry`). Records which
- * remote cleanup parts (session revoke / push unregister) failed at logout so
- * the next authenticated opportunity can reconcile them. Deliberately NOT
- * epoch-fenced and NOT deleted on sign-out: it must survive the teardown.
+ * remote cleanup parts (push unregister / activity unregister) failed at
+ * logout so the next authenticated opportunity can reconcile them.
+ * Deliberately NOT epoch-fenced and NOT deleted on sign-out: it must survive
+ * the teardown.
  */
 export const LOGOUT_CLEANUP_TOMBSTONE_KEY = 'logout-cleanup-tombstone';
+/**
+ * The refresh tokens of sign-outs whose device-session revoke failed (class
+ * `safe-retry`). The revoke runs while the access token still authenticates it;
+ * when that call fails (offline, deadline, 5xx, an already-expired access
+ * token) the session row stays live and its Home widget keeps refreshing. The
+ * token is the only credential left that can revoke it, so it is kept here
+ * until the server settles it or it expires. Deliberately NOT epoch-fenced and
+ * NOT deleted on sign-out: it must survive the teardown.
+ */
+export const PENDING_DEVICE_REVOKE_KEY = 'pending-device-revoke';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';

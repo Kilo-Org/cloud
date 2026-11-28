@@ -1,5 +1,5 @@
 import * as SecureStore from '@/lib/auth/secure-store';
-import { readStoredValueForUpdate } from '@/lib/auth/secure-store-value';
+import { readStoredValueForUpdate, readStoredValueSafe } from '@/lib/auth/secure-store-value';
 import {
   forgetUnreadableStoreReports,
   reportUnreadableStore,
@@ -12,8 +12,9 @@ import { type ActivityTokenLifetime, getGlanceableDelivery } from '@/lib/glancea
 import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
-import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
+import { LOGOUT_CLEANUP_TOMBSTONE_KEY, REFRESH_TOKEN_KEY } from '@/lib/storage-keys';
 import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
+import { recordFailedDeviceSessionRevoke } from '@/lib/auth/pending-device-revoke';
 import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 
 /**
@@ -26,12 +27,13 @@ import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
  * obligations already pending for the same account, and a record written for
  * one account is never removed or rewritten while another account is handled.
  *
- * A failed device-session revoke is NOT retried. The device already destroyed
- * the refresh token locally, and the access token expires within 1 h, so the
- * orphaned row is dead — it only lingers in the session list until then. A
- * push token is different: an unregistered device keeps receiving
- * notifications for the signed-out account until the row is gone, which the
- * user sees.
+ * A failed device-session revoke is NOT retried from this record. It is
+ * retried by its refresh token (`lib/auth/pending-device-revoke`), because this
+ * record is reconciled only from a mounted signed-in tree: the app can stay on
+ * the login screen for days, while the unrevoked session row keeps its Home
+ * widget refreshing. A push token is different again: an unregistered device
+ * keeps receiving notifications for the signed-out account until the row is
+ * gone, which the user sees.
  *
  * The record is written directly with `SecureStore.setItemAsync`, deliberately
  * NOT epoch-fenced: it must survive sign-out by design, and sign-out must
@@ -298,11 +300,15 @@ function uniqueTokens(tokens: readonly string[]): string[] {
  *   deletion to the race. The push step is capped at half that budget, so a
  *   stalled unregister is retried from its record while the revoke still gets
  *   its own attempt on the budget that is left.
- * - A failed revoke is not recorded: see the record type for why. A failed
- *   push or activity-token unregister is merged into this account's record; a
- *   fully successful one leaves this account's record only when no earlier
- *   obligation for it is still pending, and never touches another account's
- *   record.
+ * - A failed revoke is retried from the refresh token, never from this
+ *   account's record: sign-out may leave the app on the login screen for days,
+ *   and the unrevoked session keeps its Home widget refreshing for as long as
+ *   the server accepts the widget credential. The refresh token is read before
+ *   the pair below, while the credential still exists, and recorded only when
+ *   the revoke did not settle (`lib/auth/pending-device-revoke`). A failed push
+ *   or activity-token unregister is merged into this account's record; a fully
+ *   successful one leaves this account's record only when no earlier obligation
+ *   for it is still pending, and never touches another account's record.
  */
 export async function runLogoutCleanup(): Promise<void> {
   try {
@@ -335,23 +341,36 @@ export async function runLogoutCleanup(): Promise<void> {
     const activityResult = await getGlanceableDelivery().unregisterTokens();
     const needsActivityUnregister = !activityResult.ok;
 
+    // The refresh token is the only credential that can revoke this session
+    // once the local pair is deleted below, so it is read first. A failed read
+    // is not fatal: the access-token revoke may still succeed.
+    const refreshToken = await readStoredValueSafe(REFRESH_TOKEN_KEY);
+
     // The device push token goes before the revoke, and the pair shares ONE
     // control-plane budget; see `retireDeviceRemoteState`.
     const unregister = await retireDeviceRemoteState(pushToken);
 
+    // A revoke the server did not settle leaves the session (and the Home
+    // widget credential that rechecks it) alive, so its refresh token is kept
+    // for the next launch or foreground to retry. The record is best effort and
+    // never fails sign-out.
+    if (unregister.revoke.status === 'retryable') {
+      await recordFailedDeviceSessionRevoke(refreshToken);
+    }
+
     // A fulfilled unregister for a real token is a definitive outcome; emit
     // it. No emit when there is no token (nothing was unregistered).
-    if (pushToken !== null && unregister.status === 'fulfilled') {
+    if (pushToken !== null && unregister.push.status === 'fulfilled') {
       emitNotificationTokenUpdated('unregistered');
     }
 
     const needsPushUnregister =
-      pushLookupFailed || (pushToken !== null && unregister.status === 'rejected');
+      pushLookupFailed || (pushToken !== null && unregister.push.status === 'rejected');
 
     try {
       await chainLogoutCleanupRecords(records => {
         const pending = logoutCleanupRecordFor(records, userId);
-        const pushTokenHandled = pushToken !== null && unregister.status === 'fulfilled';
+        const pushTokenHandled = pushToken !== null && unregister.push.status === 'fulfilled';
         const record: LogoutCleanupRecord = {
           userId,
           // Keep token values still owed by an earlier logout of this

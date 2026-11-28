@@ -19,6 +19,7 @@ import {
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
+  revokeDeviceSessionByRefreshToken,
   MAX_LIVE_APP_SESSIONS,
 } from './device-sessions';
 import { KeyCollisionError } from './native-admission';
@@ -1211,6 +1212,73 @@ describe('device-sessions', () => {
       expect(remaining.map(row => row.token_hash)).toEqual([
         createHash('sha256').update(refreshToken).digest('hex'),
       ]);
+    });
+  });
+
+  describe('revokeDeviceSessionByRefreshToken', () => {
+    test('revokes the session a live refresh token belongs to', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      await expect(revokeDeviceSessionByRefreshToken(refreshToken)).resolves.toEqual({
+        outcome: 'revoked',
+      });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).not.toBeNull();
+      expect(session!.revoked_reason).toBe('logout');
+    });
+
+    test('revokes the session for a token the client already rotated away from', async () => {
+      // The widget verifier only looks at the session, so a stale token still
+      // has to end the session row it names.
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      await rotateRefreshToken(refreshToken);
+
+      await expect(revokeDeviceSessionByRefreshToken(refreshToken)).resolves.toEqual({
+        outcome: 'revoked',
+      });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).not.toBeNull();
+    });
+
+    test('keeps the first revocation and reports an already revoked session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      await revokeDeviceSession(sessionId, 'security_incident');
+
+      await expect(revokeDeviceSessionByRefreshToken(refreshToken)).resolves.toEqual({
+        outcome: 'already_revoked',
+      });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_reason).toBe('security_incident');
+    });
+
+    test('reports an unknown token without revoking anything', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      await issueSessionCredentials(fakeUser, sessionId);
+
+      await expect(revokeDeviceSessionByRefreshToken('bogus-token-12345')).resolves.toEqual({
+        outcome: 'unknown_token',
+      });
+
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(session!.revoked_at).toBeNull();
     });
   });
 

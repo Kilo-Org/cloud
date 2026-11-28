@@ -6,6 +6,7 @@ const store = new Map<string, string>();
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 vi.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
   getItemAsync: vi.fn((key: string) => store.get(key) ?? null),
   setItemAsync: vi.fn((key: string, value: string) => {
     store.set(key, value);
@@ -15,7 +16,10 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
-vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+}));
 
 const trpcMock = vi.hoisted(() => ({
   revokeCurrentDeviceSession: { mutate: vi.fn() },
@@ -76,7 +80,11 @@ import {
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { getActiveToken } from '@/lib/auth/token-owner';
 import { queryClient } from '@/lib/query-client';
-import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
+import {
+  LOGOUT_CLEANUP_TOMBSTONE_KEY,
+  PENDING_DEVICE_REVOKE_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/lib/storage-keys';
 /* eslint-enable import/first */
 
 const GET_ME_QUERY_KEY: readonly unknown[] = [['user', 'getMe'], { type: 'query' }];
@@ -271,6 +279,47 @@ describe('runLogoutCleanup', () => {
     // means nothing is outstanding.
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+  });
+
+  it('records the refresh token when the revoke does not settle', async () => {
+    pushOutcome('none');
+    store.set(REFRESH_TOKEN_KEY, 'stored-refresh-token');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
+
+    await runLogoutCleanup();
+
+    // The session may still be live, and so may its Home widget credential;
+    // the refresh token is the only credential left to revoke it.
+    const raw = store.get(PENDING_DEVICE_REVOKE_KEY) ?? '';
+    expect(JSON.parse(raw)).toMatchObject({
+      version: 1,
+      revokes: [{ refreshToken: 'stored-refresh-token' }],
+    });
+  });
+
+  it('records no revoke retry when the revoke is settled', async () => {
+    pushOutcome('none');
+    store.set(REFRESH_TOKEN_KEY, 'stored-refresh-token');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+
+    await runLogoutCleanup();
+
+    expect(store.has(PENDING_DEVICE_REVOKE_KEY)).toBe(false);
+  });
+
+  it('reports, without a token, a failed revoke it cannot retry', async () => {
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockRejectedValue(new Error('network down'));
+
+    await runLogoutCleanup();
+
+    expect(store.has(PENDING_DEVICE_REVOKE_KEY)).toBe(false);
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      'Device session revoke could not be retried',
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'device_revoke_retry_unavailable' }),
+      })
+    );
   });
 
   it('records the push token when the unregister rejects', async () => {

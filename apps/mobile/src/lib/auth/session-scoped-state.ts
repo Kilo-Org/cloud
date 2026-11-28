@@ -15,6 +15,7 @@ import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
 import { clearScopeNames } from '@/lib/code-reviewer-scope-name';
 import { clearFormDrafts } from '@/lib/form-draft';
+import { clearHomeWidgetRefresh } from '@/lib/glanceable/home-widget-refresh';
 import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
@@ -59,14 +60,15 @@ function clearSearchIndexBestEffort(): void {
  *
  * The members here are the ones the account boundary clears that a signed-out
  * launch can still observe: the OS search index, the App Intents catalog, the
- * on-disk artifact mirror, the device-global PR recents and the OS launcher
- * surfaces. The boundary's clear of any of them can be lost to a process killed
- * during sign-out's awaited teardown, or to an OS call the platform refused, so
- * a launch that positively restored no session repeats them. The rest of the
- * boundary's in-process members start empty in a fresh process, and the durable
- * preferences it clears are not re-run here.
+ * on-disk artifact mirror, the device-global PR recents, the OS launcher
+ * surfaces and the Home widget's own refresh credential. The boundary's clear
+ * of any of them can be lost to a process killed during sign-out's awaited
+ * teardown, or to an OS call the platform refused, so a launch that positively
+ * restored no session repeats them. The rest of the boundary's in-process
+ * members start empty in a fresh process, and the durable preferences it clears
+ * are not re-run here.
  */
-export function clearSystemSearchIndexOnSignedOutLaunch(): void {
+export function clearDeviceWideStateOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
   clearSessionCatalogBestEffort();
   runClear(clearArtifactMirror);
@@ -82,6 +84,17 @@ export function clearSystemSearchIndexOnSignedOutLaunch(): void {
     noteLauncherSurfacesCleared();
   });
   runClear(clearRecentPrsBestEffort);
+  // The Home widget refreshes natively with its own 30-day credential, which
+  // the app's bearer tree never touches, so a signed-out launch that kept it
+  // would keep drawing the previous account's live sessions (`configure` is the
+  // app's only writer, and no signed-in mount runs here to clear it). The
+  // clear also deletes the stored frame and timeline, so the placed widget
+  // falls back to its count-less locked state instead of the last live rows; it
+  // needs no terminal frame, and writing one would end followed session cards
+  // and unregister their tokens without a session to authorize the calls.
+  runClear(() => {
+    void clearHomeWidgetRefresh();
+  });
 }
 
 /**

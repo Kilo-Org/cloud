@@ -2,6 +2,7 @@ import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BundleBinding } from '@kilocode/secrets-client';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { base64urlToBytes } from '@kilocode/worker-utils/base64url';
 import { NOTIFICATIONS_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 import type { NotificationsService } from '../index';
@@ -45,6 +46,7 @@ const EVENT = {
   stsRead: 'notifications_secret_source_read',
   credentialRefused: 'notifications_credential_refused',
   secretUnavailable: 'notifications_secret_unavailable',
+  apns: 'notifications_secrets_compare_apns',
 } as const;
 
 // The route's dispatch work is faked: these specs prove where the comparison runs, not what a
@@ -251,6 +253,7 @@ describe('createSecretsComparison', () => {
 
     expect(logs.lines(EVENT.compare)).toEqual([compareLine(STORE_DISPATCH, ALL_MATCH)]);
     expect(logs.lines(EVENT.expo)).toEqual([expoLine(STORE_DISPATCH, 'match')]);
+    expect(logs.lines(EVENT.apns)).toEqual([]);
     expect(later.waitUntil).not.toHaveBeenCalled();
     expect(getBundle).toHaveBeenCalledOnce();
     for (const read of [apnsKey.get, nextAuth.get, internal.get, expo.get]) {
@@ -371,6 +374,7 @@ describe('createSecretsComparison', () => {
 
     expect(logs.lines(EVENT.compare)).toEqual([compareLine(STORE_DISPATCH, NONE_PROVEN)]);
     expect(logs.lines(EVENT.expo)).toEqual([expoLine(STORE_DISPATCH, 'unproven')]);
+    expect(logs.lines(EVENT.apns)).toEqual([]);
   });
 
   it('compares only the refused name, against the value read, once per route', async () => {
@@ -432,6 +436,269 @@ describe('createSecretsComparison', () => {
     expect(internal.get).toHaveBeenCalledOnce();
     expect(getBundle).not.toHaveBeenCalled();
     for (const value of FIXTURE_VALUES) expect(logs.raw()).not.toContain(value);
+  });
+});
+
+describe('APNs key copies that differ in bytes', () => {
+  const PEM_HEADER = '-----BEGIN PRIVATE KEY-----';
+  const PEM_FOOTER = '-----END PRIVATE KEY-----';
+  // PrivateKeyInfo for P-256: version 0, then ecPublicKey with prime256v1.
+  const PKCS8_ALGORITHM = '0201003013' + '06072a8648ce3d0201' + '06082a8648ce3d030107';
+
+  type SyntheticKey = {
+    pem: string;
+    der: Uint8Array;
+    d: Uint8Array;
+    point: Uint8Array;
+    thumbprint: string;
+    markers: string[];
+  };
+
+  function hexBytes(hex: string): Uint8Array {
+    return Uint8Array.from(hex.match(/../g) ?? [], pair => Number.parseInt(pair, 16));
+  }
+
+  function toHex(bytes: Uint8Array): string {
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  function toPem(der: Uint8Array, width = 64): string {
+    const lines = btoa(String.fromCharCode(...der)).match(new RegExp(`.{1,${width}}`, 'g')) ?? [];
+    return `${PEM_HEADER}\n${lines.join('\n')}\n${PEM_FOOTER}\n`;
+  }
+
+  /** The same private scalar without the optional public key: another DER of the same key. */
+  function withoutPublicKey(d: Uint8Array): Uint8Array {
+    return hexBytes(`3041${PKCS8_ALGORITHM}04273025020101` + `0420${toHex(d)}`);
+  }
+
+  /** The private scalar `d` carrying `point` as its public key, which may belong to another key. */
+  function withPublicKey(d: Uint8Array, point: Uint8Array): Uint8Array {
+    return hexBytes(
+      `308187${PKCS8_ALGORITHM}046d306b020101` + `0420${toHex(d)}` + `a14403420004${toHex(point)}`
+    );
+  }
+
+  async function syntheticKey(): Promise<SyntheticKey> {
+    const pair = (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
+      'sign',
+      'verify',
+    ])) as CryptoKeyPair;
+    const der = new Uint8Array(
+      (await crypto.subtle.exportKey('pkcs8', pair.privateKey)) as ArrayBuffer
+    );
+    const jwk = (await crypto.subtle.exportKey('jwk', pair.privateKey)) as JsonWebKey;
+    const [d, x, y] = [jwk.d, jwk.x, jwk.y].map(part => base64urlToBytes(part ?? ''));
+    // RFC 7638 members, written out here rather than built the way the module builds them.
+    const members = `{"crv":"P-256","kty":"EC","x":"${jwk.x}","y":"${jwk.y}"}`;
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(members));
+    const thumbprint = toHex(new Uint8Array(digest));
+    const body = btoa(String.fromCharCode(...der));
+    return {
+      pem: toPem(der),
+      der,
+      d,
+      point: Uint8Array.from([...x, ...y]),
+      thumbprint,
+      // A leaked value, PEM or key part would contain one of these; the logged 12-digit
+      // thumbprint prefix never contains the full thumbprint.
+      markers: [jwk.d ?? '', jwk.x ?? '', jwk.y ?? '', thumbprint, body.slice(64, 96)],
+    };
+  }
+
+  let store: SyntheticKey;
+  let other: SyntheticKey;
+
+  beforeEach(async () => {
+    [store, other] = await Promise.all([syntheticKey(), syntheticKey()]);
+    for (const key of [store, other]) {
+      expect(key.d).toHaveLength(32);
+      expect(key.point).toHaveLength(64);
+    }
+  });
+
+  async function runCopy(copy: string, checked: CheckedRoute = STORE_DISPATCH) {
+    const { compareEnv, getBundle, apnsKey } = fixture(
+      okBundle({ ...MATCHING_BUNDLE, NOTIFICATIONS_APNS_PRIVATE_KEY: copy }),
+      checked.source
+    );
+    apnsKey.get.mockResolvedValue(store.pem);
+    const logs = await runAdmitted(compareEnv, checked);
+    for (const marker of [...store.markers, ...other.markers]) {
+      expect(logs.raw()).not.toContain(marker);
+    }
+    return { logs, getBundle, storeRead: apnsKey.get };
+  }
+
+  const prefix = (key: SyntheticKey) => key.thumbprint.slice(0, 12);
+
+  it('logs no APNs line for an exact copy and reads each source once', async () => {
+    const { logs, getBundle, storeRead } = await runCopy(store.pem);
+
+    expect(logs.lines(EVENT.compare)).toEqual([compareLine(STORE_DISPATCH, ALL_MATCH)]);
+    expect(logs.lines(EVENT.apns)).toEqual([]);
+    expect(getBundle).toHaveBeenCalledOnce();
+    expect(storeRead).toHaveBeenCalledOnce();
+  });
+
+  type Case = {
+    name: string;
+    copy: (store: SyntheticKey, other: SyntheticKey) => string;
+    equalAfterTrim: boolean;
+    equalAfterNewlines: boolean;
+    equalPemBody: boolean;
+    /** The key the copy imports as, or `null` when the signer's import refuses it. */
+    imports: 'store' | 'other' | null;
+  };
+
+  const sameKey = { imports: 'store' } as const;
+  const cases: Case[] = [
+    {
+      name: 'a trailing newline',
+      copy: key => `${key.pem}\n`,
+      equalAfterTrim: true,
+      equalAfterNewlines: false,
+      equalPemBody: true,
+      ...sameKey,
+    },
+    {
+      name: 'CRLF line endings',
+      copy: key => key.pem.replaceAll('\n', '\r\n'),
+      equalAfterTrim: false,
+      equalAfterNewlines: true,
+      equalPemBody: true,
+      ...sameKey,
+    },
+    {
+      name: 'a different line width',
+      copy: key => toPem(key.der, 76),
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: true,
+      ...sameKey,
+    },
+    {
+      name: 'no PEM armour',
+      copy: key => btoa(String.fromCharCode(...key.der)),
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: true,
+      ...sameKey,
+    },
+    {
+      name: 'another DER encoding of the same key',
+      copy: key => toPem(withoutPublicKey(key.d)),
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: false,
+      ...sameKey,
+    },
+    {
+      name: 'literal \\n sequences, which the signer cannot decode',
+      copy: key => key.pem.replaceAll('\n', '\\n'),
+      equalAfterTrim: false,
+      equalAfterNewlines: true,
+      equalPemBody: false,
+      imports: null,
+    },
+    {
+      name: 'a different key',
+      copy: (_key, otherKey) => otherKey.pem,
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: false,
+      imports: 'other',
+    },
+    {
+      name: 'a truncated copy',
+      copy: key => toPem(key.der.slice(0, 100)),
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: false,
+      imports: null,
+    },
+    {
+      name: 'the key scalar with its own public point',
+      copy: key => toPem(withPublicKey(key.d, key.point), 76),
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: true,
+      ...sameKey,
+    },
+    {
+      name: "the key's scalar with another key's public point",
+      copy: (key, otherKey) => toPem(withPublicKey(key.d, otherKey.point)),
+      equalAfterTrim: false,
+      equalAfterNewlines: false,
+      equalPemBody: false,
+      imports: null,
+    },
+  ];
+
+  it.each(cases)('classifies $name', async ({ copy, imports, ...equal }) => {
+    const { logs } = await runCopy(copy(store, other));
+    const stsKey = imports === 'store' ? store : imports === 'other' ? other : null;
+
+    expect(logs.lines(EVENT.compare)).toEqual([
+      compareLine(STORE_DISPATCH, [false, true, true], ['NOTIFICATIONS_APNS_PRIVATE_KEY']),
+    ]);
+    expect(logs.lines(EVENT.apns)).toEqual([
+      {
+        ...STORE_DISPATCH,
+        equalAfterTrim: equal.equalAfterTrim,
+        equalAfterNewlines: equal.equalAfterNewlines,
+        equalPemBody: equal.equalPemBody,
+        secretsStoreImportable: true,
+        stsImportable: stsKey !== null,
+        samePublicKey: stsKey === store,
+        secretsStoreThumbprint: prefix(store),
+        stsThumbprint: stsKey === null ? null : prefix(stsKey),
+      },
+    ]);
+  });
+
+  it('labels each thumbprint by its own source while sts serves', async () => {
+    const checked: CheckedRoute = { route: 'badges', source: 'sts' };
+
+    const { logs } = await runCopy(other.pem, checked);
+
+    expect(logs.lines(EVENT.apns)).toEqual([
+      {
+        ...checked,
+        equalAfterTrim: false,
+        equalAfterNewlines: false,
+        equalPemBody: false,
+        secretsStoreImportable: true,
+        stsImportable: true,
+        samePublicKey: false,
+        secretsStoreThumbprint: prefix(store),
+        stsThumbprint: prefix(other),
+      },
+    ]);
+  });
+
+  it('reports neither side importable for two undecodable values', async () => {
+    const { compareEnv, apnsKey } = fixture(
+      okBundle({ ...MATCHING_BUNDLE, NOTIFICATIONS_APNS_PRIVATE_KEY: 'not a key\\n' })
+    );
+    apnsKey.get.mockResolvedValue('not a key\n');
+
+    const logs = await runAdmitted(compareEnv, STORE_DISPATCH);
+
+    expect(logs.lines(EVENT.apns)).toEqual([
+      {
+        ...STORE_DISPATCH,
+        equalAfterTrim: false,
+        equalAfterNewlines: true,
+        equalPemBody: false,
+        secretsStoreImportable: false,
+        stsImportable: false,
+        samePublicKey: false,
+        secretsStoreThumbprint: null,
+        stsThumbprint: null,
+      },
+    ]);
+    expect(logs.raw()).not.toContain('not a key');
   });
 });
 

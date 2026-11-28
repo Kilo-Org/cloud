@@ -7,7 +7,7 @@ import {
   type KiloOpsSecretsEnv,
 } from '../../../kilo-ops/src/secrets';
 import { PolicySchema, type Policy } from '../../src/policy/schema';
-import { repoRoot, shippedPolicyDocuments } from './repo';
+import { repoRoot, SHARED_SECRET_NAMES, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
 
 /**
@@ -124,15 +124,13 @@ async function serving<N extends string>(
 }
 
 /**
- * The bundle key STS reads: another shipped policy granting the same name puts it in the fallback
- * folder `/shared`, otherwise it is this workload's own entry in `/workloads/kilo-ops`
- * (src/policy/schema.ts `bundleFolder`). EXPECTED_ROWS pins the result, so a wrong folder fails.
+ * The bundle key STS reads: the names whose value is one value across Workloads live in `/shared`
+ * (`SHARED_SECRET_NAMES`, the one list both copier tables import), every other name in this
+ * workload's own `/workloads/kilo-ops` folder (src/policy/schema.ts `bundleFolder`). EXPECTED_ROWS
+ * pins the result, so a wrong folder fails.
  */
 function stsLookup(name: string): string {
-  const elsewhere = shippedPolicies().filter(
-    policy => policy.workload !== WORKLOAD && policy.secrets.includes(name)
-  );
-  return elsewhere.length > 0 ? `/shared/${name}` : `/workloads/${WORKLOAD}/${name}`;
+  return SHARED_SECRET_NAMES.includes(name) ? `/shared/${name}` : `/workloads/${WORKLOAD}/${name}`;
 }
 
 describe('the secrets copier table for kilo-ops', () => {

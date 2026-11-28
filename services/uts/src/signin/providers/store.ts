@@ -140,8 +140,11 @@ export type EmailLinkResult =
   | { outcome: 'confirm_other_browser'; returnTo: string }
   | { outcome: AccountRefusal; returnTo: string };
 
-/** What the link's confirmation page shows: the address, and whether this browser asked. */
-export type EmailLinkRead = { email: string; binderHash: Uint8Array } | null;
+/**
+ * What the link's confirmation page shows: the address, and whether this browser asked. Its
+ * `returnTo` is where the link's sign-in returns, which sets the page's `form-action`.
+ */
+export type EmailLinkRead = { email: string; binderHash: Uint8Array; returnTo: string } | null;
 
 export type ProviderSignInStore = {
   startFlow(input: StartFlowInput): Promise<StartFlowResult>;
@@ -234,6 +237,7 @@ const EmailLinkRowSchema = z.discriminatedUnion('outcome', [
 const EmailLinkReadRowSchema = z.object({
   email: z.string(),
   binder_hash: z.instanceof(Uint8Array),
+  return_to: z.string(),
 });
 
 function signedInOf(
@@ -385,14 +389,16 @@ export function identityStoreProviderSignIn(store: IdentityStore): ProviderSignI
     async readEmailLink(linkHash) {
       const row = await store.maybeOne(
         {
-          text: `SELECT email, binder_hash FROM uts.email_codes
+          text: `SELECT email, binder_hash, return_to FROM uts.email_codes
                  WHERE link_hash = $1 AND purpose = 'sign_in'
                    AND status IN ('pending', 'exhausted') AND expires_at > now()`,
           values: [linkHash],
         },
         EmailLinkReadRowSchema
       );
-      return row === null ? null : { email: row.email, binderHash: row.binder_hash };
+      return row === null
+        ? null
+        : { email: row.email, binderHash: row.binder_hash, returnTo: row.return_to };
     },
   };
 }

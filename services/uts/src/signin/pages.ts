@@ -24,7 +24,9 @@ const TURNSTILE_SCRIPT = `${TURNSTILE_ORIGIN}/turnstile/v0/api.js`;
 
 /**
  * `form-action` also governs where a form submission redirects, so a page whose form ends in an
- * app's redirect names that URI's scheme beside `'self'`.
+ * app's redirect names that URI's scheme beside `'self'`. A sign-in page whose form returns to an
+ * authorization request that ends on a client's registered callback names only that callback's
+ * origin (`clientReturnOrigin`, src/signin/form-action.ts); without one it names `'self'` alone.
  *
  * A page that runs a passkey ceremony also names `https://<rpId>/.well-known/webauthn` in
  * `connect-src`. In production the relying-party id is the app host, not the page's host, so the
@@ -50,11 +52,12 @@ function contentSecurityPolicy(formAction: string, rpId: string | null, turnstil
   return `default-src 'none'; script-src ${script};${frame} connect-src ${connect}; img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
-function securityHeaders(rpId: string | null, turnstile = false) {
+function securityHeaders(rpId: string | null, turnstile: boolean, clientOrigin: string | null) {
+  const formAction = clientOrigin === null ? "'self'" : `'self' ${clientOrigin}`;
   return {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
-    'Content-Security-Policy': contentSecurityPolicy("'self'", rpId, turnstile),
+    'Content-Security-Policy': contentSecurityPolicy(formAction, rpId, turnstile),
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
     // No referrer leaves for another origin. `no-referrer` would also make a browser send
@@ -88,7 +91,9 @@ function render(
   body: string,
   status: number,
   passkey: PasskeyUse | null,
-  turnstile = false
+  turnstile = false,
+  /** The client origin of `clientReturnOrigin`, which `form-action` names beside `'self'`. */
+  clientOrigin: string | null = null
 ): Response {
   const rpId = passkey === null ? '' : ` data-rp-id="${escapeHtml(passkey.rpId)}"`;
   const notice =
@@ -115,19 +120,33 @@ ${notice}${body}
 `;
   return new Response(html, {
     status,
-    headers: securityHeaders(passkey?.rpId ?? null, turnstile),
+    headers: securityHeaders(passkey?.rpId ?? null, turnstile, clientOrigin),
   });
 }
 
-/** One page: `page` names what the script wires up (`data-page`). */
-export function page(title: string, pageName: string, body: string, status = 200): Response {
-  return render(title, pageName, body, status, null);
+/**
+ * One page: `page` names what the script wires up (`data-page`). A page whose form returns to an
+ * authorization request passes the request's `clientReturnOrigin` (src/signin/form-action.ts).
+ */
+export function page(
+  title: string,
+  pageName: string,
+  body: string,
+  status = 200,
+  clientOrigin: string | null = null
+): Response {
+  return render(title, pageName, body, status, null, false, clientOrigin);
 }
 
 /** The sign-in methods the page offers besides the passkey (`signInChoices`, src/signin/flows.ts). */
 export type SignInChoices = {
   /** The path the sign-in returns to: the authorization URL that showed the page, or another. */
   returnTo: string;
+  /**
+   * The registered client origin the authorization request in `returnTo` redirects to, which the
+   * page's `form-action` names beside `'self'` (`clientReturnOrigin`), or null.
+   */
+  clientOrigin: string | null;
   /** The relying-party id of the passkey sign-in (`WEBAUTHN_RP_ID`). */
   rpId: string;
   providers: readonly { provider: UtsOAuthProvider; name: string }[];
@@ -194,7 +213,8 @@ ${widget}<button type="submit">Email me a sign-in link and code</button>
         ? 'This browser cannot use a Kilo passkey on this page. Sign in another way below.'
         : 'This browser cannot use a Kilo passkey on this page. Update the browser or use another one.',
     },
-    choices.email !== null && choices.email.turnstileSiteKey !== null
+    choices.email !== null && choices.email.turnstileSiteKey !== null,
+    choices.clientOrigin
   );
 }
 

@@ -23,6 +23,7 @@ import { logMisconfigured, recipientAllowed } from '../providers/config';
 import { requestNetwork } from '../network';
 import { isSameOriginPost } from '../requests';
 import { anonymousWriteRetryAfter } from '../limits';
+import { clientReturnOrigin } from '../form-action';
 import { mailAddress } from './address';
 import { TURNSTILE_RESPONSE_FIELD } from './turnstile';
 
@@ -101,7 +102,17 @@ function emailCookieName(linkHash: Uint8Array): string {
 
 const EMAIL_COOKIE_MAX_AGE_SECONDS = 600;
 
-function codeEntryPage(email: string, withCode: boolean, message: string | null, status = 200) {
+/**
+ * The code entry. The code's POST redirects to the sign-in's `returnTo`, so the page's
+ * `form-action` names that request's `clientOrigin` (`clientReturnOrigin`) beside `'self'`.
+ */
+function codeEntryPage(
+  email: string,
+  withCode: boolean,
+  clientOrigin: string | null,
+  message: string | null,
+  status = 200
+) {
   const address = maskedAddress(email);
   const intro = withCode
     ? `We sent a sign-in link and a six-digit code to ${address}. Open the link, or enter the code here. Both work for 10 minutes.`
@@ -119,16 +130,23 @@ function codeEntryPage(email: string, withCode: boolean, message: string | null,
     'Check your email',
     'email-code',
     `${note}<p>${escapeHtml(intro)}</p>\n${form}`,
-    status
+    status,
+    clientOrigin
   );
 }
 
 /**
  * The link's confirmation page. It names the account's address; opened in another browser than
  * the one that asked for the email, it says so and its button confirms that, because a link
- * someone else asked for would sign the reader into that person's account.
+ * someone else asked for would sign the reader into that person's account. Its POST redirects to
+ * the email's `returnTo`, whose `clientOrigin` the page's `form-action` names beside `'self'`.
  */
-function linkConfirmPage(token: string, email: string, sameBrowser: boolean): Response {
+function linkConfirmPage(
+  token: string,
+  email: string,
+  sameBrowser: boolean,
+  clientOrigin: string | null
+): Response {
   const address = escapeHtml(maskedAddress(email));
   const text = sameBrowser
     ? `<p>Sign in as ${address}?</p>`
@@ -140,7 +158,9 @@ function linkConfirmPage(token: string, email: string, sameBrowser: boolean): Re
 <form method="post" action="${UTS_EMAIL_LINK_PATH}">
 <input type="hidden" name="token" value="${escapeHtml(token)}">
 ${sameBrowser ? '' : '<input type="hidden" name="other_browser" value="confirmed">\n'}<button type="submit">Sign in as ${address}</button>
-</form>`
+</form>`,
+    200,
+    clientOrigin
   );
 }
 
@@ -183,7 +203,12 @@ export async function handleEmailRequest(
     if (read === null) return refusalPage('invalid_link', null);
     const binder = flowBinder(request, emailCookieName(linkHash));
     const sameBrowser = binder !== null && sameBytes(await sha256(binder), read.binderHash);
-    return linkConfirmPage(token, read.email, sameBrowser);
+    return linkConfirmPage(
+      token,
+      read.email,
+      sameBrowser,
+      clientReturnOrigin(read.returnTo, environment)
+    );
   }
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'method_not_allowed' }, 405, { Allow: 'POST' });
@@ -252,7 +277,12 @@ export async function handleEmailRequest(
       console.error(JSON.stringify({ event: 'uts.signin.mail_failed', result: sent }));
       return upstreamFailurePage(sent === 'retryable', returnTo);
     }
-    const response = codeEntryPage(email, stored.withCode, null);
+    const response = codeEntryPage(
+      email,
+      stored.withCode,
+      clientReturnOrigin(returnTo, environment),
+      null
+    );
     // Ties the email to this browser: its link signs in here without the other-browser warning.
     response.headers.append(
       'Set-Cookie',
@@ -293,7 +323,13 @@ export async function handleEmailRequest(
         result.entriesLeft > 0
           ? `That code is not right. ${result.entriesLeft} tries left.`
           : 'No code is waiting for this address. Request a new email.';
-      return codeEntryPage(email, result.entriesLeft > 0, message, 400);
+      return codeEntryPage(
+        email,
+        result.entriesLeft > 0,
+        clientReturnOrigin(result.returnTo, environment),
+        message,
+        400
+      );
     }
     if (result.outcome === 'codes_stopped') return refusalPage('codes_stopped', null);
     if (result.outcome === 'network_limited') return refusalPage('network_limited', null);

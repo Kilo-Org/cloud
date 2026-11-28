@@ -181,6 +181,7 @@ async function settle() {
 const signIn = () =>
   signInPage({
     returnTo: '/signin/done',
+    clientOrigin: null,
     rpId: RP_ID,
     providers: [],
     email: { turnstileSiteKey: null },
@@ -275,6 +276,7 @@ describe('passkey sign-in on the issuer host', () => {
     const page = await load(
       signInPage({
         returnTo: '/signin/done',
+        clientOrigin: null,
         rpId: 'localhost',
         providers: [],
         email: { turnstileSiteKey: null },

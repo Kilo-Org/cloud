@@ -31,6 +31,7 @@ import {
   identifyClient,
   clientServedIn,
   isRegisteredRedirect,
+  isRegisteredWebRedirect,
 } from './clients';
 import { jktOfParameter } from './dpop';
 import { classifyFailure, oauthError, temporarilyUnavailable } from './errors';
@@ -212,7 +213,7 @@ export async function handleAuthorize(request: Request, deps: AuthorizeDeps): Pr
       redirectKind: thirdPartyRedirectKind(redirectUri),
     };
   } else if (webClient?.kind === 'confidential_web') {
-    if (!webClient.redirectUris[deps.config.environment].includes(redirectUri)) {
+    if (!isRegisteredWebRedirect(webClient, deps.config.environment, redirectUri)) {
       return directError('invalid_request', 'redirect_uri is not registered for this client');
     }
     if ((await deps.web.keys()).status !== 'ready') return webClientUnavailable();

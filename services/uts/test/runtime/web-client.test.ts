@@ -19,13 +19,14 @@ import {
   exportJWK,
   generateKeyPair,
 } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { legacyBridgeKeys, webClientKeys } from '../../src/bff/client-auth';
 import type { LegacySsoAuthority, WebClientDeps } from '../../src/bff/deps';
 import type { WebSession, WebSessionAccess, WebSessionStore } from '../../src/bff/store';
 import type { PendingAuthorization } from '../../src/oauth/authorize';
 import { authorizationServerMetadata } from '../../src/metadata/authorization-server';
 import { handleOAuthRequest } from '../../src/oauth/routes';
+import { signInHandoff } from '../../src/signin/handoff';
 import { browserSessionHandleOfExchange, randomCredential } from '../../src/token/credentials';
 import {
   errorOf,
@@ -35,6 +36,7 @@ import {
   recordingPublisher,
   testScopes,
 } from './oauth-support';
+import { fakeSignIn } from './signin-support';
 import { config } from './test-env';
 
 /**
@@ -928,6 +930,28 @@ describe('authorize for kilo-web', () => {
     );
     expect(response.status).toBe(400);
     expect(response.headers.get('Location')).toBeNull();
+  });
+
+  it("shows the sign-in page without a session, whose form-action adds only the registered callback's origin", async () => {
+    const signIn = fakeSignIn();
+    const handoff = vi.fn(signInHandoff(signIn.deps, null));
+    const deps = oauthDeps(fakeGrants().access, { web: webDeps(fakeSessions()), handoff });
+    const shown = await handleOAuthRequest(new Request(authorizeUrl()), '/authorize', deps);
+    expect(shown?.status).toBe(200);
+    expect(shown?.headers.get('Content-Security-Policy')).toBe(
+      `default-src 'none'; script-src 'self'; connect-src 'self' https://${config.relyingParty.rpId}/.well-known/webauthn; img-src 'self'; style-src 'self'; form-action 'self' http://localhost:3000; base-uri 'none'; frame-ancestors 'none'`
+    );
+    expect(handoff).toHaveBeenCalledTimes(1);
+    // A request whose redirect is not registered is refused before the hand-off shows any page.
+    const tampered = await handleOAuthRequest(
+      new Request(authorizeUrl({ redirect_uri: 'https://evil.example/api/auth/uts/callback' })),
+      '/authorize',
+      deps
+    );
+    expect(tampered?.status).toBe(400);
+    expect(tampered?.headers.get('Location')).toBeNull();
+    expect(handoff).toHaveBeenCalledTimes(1);
+    expect(signIn.calls).toEqual([]);
   });
 
   it.each([

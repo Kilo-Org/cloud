@@ -522,6 +522,10 @@ export const SECURE_PROXY_SENDER_AUTH = getEnvVariable('SECURE_PROXY_SENDER_AUTH
 // KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN. Unset or another origin refuses the forward before any
 // token read.
 export const SECURE_PROXY_EXPECTED_ORIGIN = getEnvVariable('SECURE_PROXY_EXPECTED_ORIGIN');
+// The credential the AI Gateway's US-region senders present to the web app's own /api/internal/*
+// routes (web-internal-sts.ts): absent, empty or `legacy` sends the internal secret; `sts` an STS
+// service token.
+export const WEB_INTERNAL_SENDER_AUTH = getEnvVariable('WEB_INTERNAL_SENDER_AUTH');
 
 // Pylon chat widget (support chat on Code Reviewer pages).
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign

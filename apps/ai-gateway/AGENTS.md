@@ -34,14 +34,17 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   `NEXTAUTH_SECRET` must stay set on the `kilocode-ai-gateway` project: it
   verifies HS256 bearer tokens. It is no longer checked at boot, so a missing
   value shows up as every bearer token being refused.
-- `next.config.mjs` also inlines `KILO_STS_WORKLOAD=ai-gateway`: the forward to
-  the Secure Proxy sends an STS token under `SECURE_PROXY_SENDER_AUTH=sts` only
-  from this build. STS grants the forward scope only to the `ai-gateway`
-  workload, so a build without it sends nothing rather than ask for a token it
-  cannot hold. Under `sts` the destination is pinned: the forward is refused
-  before any token read unless the proxy URL's origin is exactly
-  `SECURE_PROXY_EXPECTED_ORIGIN` (the same value as the proxy's
-  `KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN`).
+- `next.config.mjs` also inlines `KILO_STS_WORKLOAD=ai-gateway`, the workload
+  STS grants the secure-proxy forward scope and the web internal sender scopes
+  to; a build without it sends nothing rather than ask for a token it cannot
+  hold. Under `SECURE_PROXY_SENDER_AUTH=sts` the forward to the Secure Proxy
+  sends an STS token only from this build, and the destination is pinned: the
+  forward is refused before any token read unless the proxy URL's origin is
+  exactly `SECURE_PROXY_EXPECTED_ORIGIN` (the same value as the proxy's
+  `KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN`). The US-region usage handoffs and the
+  Claude payer-state read send an STS token under `WEB_INTERNAL_SENDER_AUTH=sts`
+  only from this build; STS refuses `kilocode-app` a token for its own `web`
+  audience.
 - Requests only arrive here under `/api/v1`. The LLM proxy's path validation
   accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`

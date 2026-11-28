@@ -12,12 +12,7 @@ import { sendAlertNotification, type SloAlertPayload } from '../src/alerting/not
 import { queryErrorRates } from '../src/alerting/query';
 import { queryQueueBacklog } from '../src/alerting/queue-backlog-query';
 import { resolveQueueId } from '../src/alerting/queue-lookup';
-import {
-  SecretNotConfiguredError,
-  readO11ySecret,
-  secretsSource,
-  type O11ySecretName,
-} from '../src/secrets';
+import { SecretNotConfiguredError, readO11ySecret, type O11ySecretName } from '../src/secrets';
 
 const ETAG = '"0123456789abcdef"';
 const CONTAINERS_TOKEN = 'O11Y_CF_CONTAINERS_API_TOKEN';
@@ -74,106 +69,45 @@ function stsBinding(result: BundleResult) {
   return { requests, binding };
 }
 
-describe('secretsSource', () => {
-  it('defaults to the Secrets Store', () => {
-    expect(secretsSource({})).toBe('secrets-store');
-  });
-
-  it('accepts sts', () => {
-    expect(secretsSource({ SECRETS_SOURCE: 'sts' })).toBe('sts');
-  });
-
-  it('fails closed on an unknown source', () => {
-    expect(() => secretsSource({ SECRETS_SOURCE: 'infisical-direct' })).toThrow(/SECRETS_SOURCE/);
-  });
-});
-
 describe('readO11ySecret', () => {
-  it('reads the Secrets Store binding by default', async () => {
+  it('reads the bundle value and never the bound Secrets Store value', async () => {
     const { env, reads } = storeEnv({
       [CONTAINERS_TOKEN]: 'store-token',
       O11Y_CF_AE_API_TOKEN: 'ae-token',
     });
-
-    expect(await readO11ySecret(env, CONTAINERS_TOKEN)).toBe('store-token');
-    expect(reads).toEqual([CONTAINERS_TOKEN]);
-  });
-
-  it('reads the STS bundle when the source is sts', async () => {
-    const { env, reads } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
     const { binding, requests } = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
 
-    const resolved = await readO11ySecret(
-      { ...env, SECRETS_SOURCE: 'sts', STS: binding },
-      CONTAINERS_TOKEN
-    );
+    const resolved = await readO11ySecret({ ...env, STS: binding }, CONTAINERS_TOKEN);
 
     expect(resolved).toBe('bundle-token');
     expect(reads).toEqual([]);
     expect(requests).toEqual([{}]);
   });
 
-  it('rolls back to the Secrets Store when the source flips back', async () => {
-    const { env, reads } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
-    const { binding } = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
-
-    expect(
-      await readO11ySecret({ ...env, SECRETS_SOURCE: 'sts', STS: binding }, CONTAINERS_TOKEN)
-    ).toBe('bundle-token');
-    expect(
-      await readO11ySecret(
-        { ...env, SECRETS_SOURCE: 'secrets-store', STS: binding },
-        CONTAINERS_TOKEN
-      )
-    ).toBe('store-token');
-    expect(reads).toEqual([CONTAINERS_TOKEN]);
-  });
-
   it('reuses one bundle across reads and env objects in an isolate', async () => {
     const { binding, requests } = stsBinding(
       bundle({ [CONTAINERS_TOKEN]: 'bundle-token', O11Y_CF_AE_API_TOKEN: 'bundle-ae' })
     );
+    const env = { STS: binding };
 
-    expect(await readO11ySecret({ SECRETS_SOURCE: 'sts', STS: binding }, CONTAINERS_TOKEN)).toBe(
-      'bundle-token'
-    );
-    expect(
-      await readO11ySecret({ SECRETS_SOURCE: 'sts', STS: binding }, 'O11Y_CF_AE_API_TOKEN')
-    ).toBe('bundle-ae');
+    expect(await readO11ySecret(env, CONTAINERS_TOKEN)).toBe('bundle-token');
+    expect(await readO11ySecret(env, 'O11Y_CF_AE_API_TOKEN')).toBe('bundle-ae');
     expect(requests).toHaveLength(1);
   });
 
   it('surfaces a non-retryable failure for a granted name the manager does not hold', async () => {
     const { binding } = stsBinding(bundle({}, [CONTAINERS_TOKEN]));
-    const error = await readO11ySecret(
-      { SECRETS_SOURCE: 'sts', STS: binding },
-      CONTAINERS_TOKEN
-    ).catch((err: unknown) => err);
+    const error = await readO11ySecret({ STS: binding }, CONTAINERS_TOKEN).catch(
+      (err: unknown) => err
+    );
 
     expect(error).toBeInstanceOf(SecretUnavailableError);
     expect(error).toMatchObject({ reason: 'missing', retryable: false });
   });
 
-  it('requires the STS binding when the source is sts', async () => {
-    await expect(readO11ySecret({ SECRETS_SOURCE: 'sts' }, CONTAINERS_TOKEN)).rejects.toThrow(
-      /STS service binding is missing/
-    );
-  });
-
-  it('refuses to read from an unknown source', async () => {
-    const { env, reads } = storeEnv({ [CONTAINERS_TOKEN]: 'store-token' });
-    const { binding, requests } = stsBinding(bundle({ [CONTAINERS_TOKEN]: 'bundle-token' }));
-
-    await expect(
-      readO11ySecret({ ...env, SECRETS_SOURCE: 'vault', STS: binding }, CONTAINERS_TOKEN)
-    ).rejects.toThrow(/SECRETS_SOURCE/);
-    expect(reads).toEqual([]);
-    expect(requests).toEqual([]);
-  });
-
-  it('reports an unconfigured Secrets Store value with the secret name', async () => {
-    const { env } = storeEnv({ [CONTAINERS_TOKEN]: '' });
-    await expect(readO11ySecret(env, CONTAINERS_TOKEN)).rejects.toThrow(
+  it('reports an empty bundle value with the secret name', async () => {
+    const { binding } = stsBinding(bundle({ [CONTAINERS_TOKEN]: '' }));
+    await expect(readO11ySecret({ STS: binding }, CONTAINERS_TOKEN)).rejects.toThrow(
       `${CONTAINERS_TOKEN} secret is not configured`
     );
   });
@@ -200,7 +134,6 @@ describe('every o11y secret read site over the STS source', () => {
     );
     const env = {
       ...store,
-      SECRETS_SOURCE: 'sts',
       STS: binding,
       O11Y_CF_ACCOUNT_ID: 'account',
     } as unknown as Env;
@@ -248,32 +181,29 @@ describe('every o11y secret read site over the STS source', () => {
     expect(reads).toEqual([]);
   });
 
-  it.each(['secrets-store', 'sts'] as const)(
-    'refuses an empty admin header when the %s value is empty',
-    async source => {
-      const name = 'O11Y_KILO_GATEWAY_CLIENT_SECRET';
-      const { env: store } = storeEnv({ [name]: '' });
-      const { binding } = stsBinding(bundle({ [name]: '' }));
-      const env = { ...store, SECRETS_SOURCE: source, STS: binding } as unknown as Env;
-      const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin('alertingRead'), c =>
-        c.text('ok')
-      );
-      const executionCtx = { waitUntil() {}, passThroughOnException() {}, props: {} };
+  it('refuses an empty admin header when the bundle value is empty', async () => {
+    const name = 'O11Y_KILO_GATEWAY_CLIENT_SECRET';
+    const { env: store } = storeEnv({ [name]: '' });
+    const { binding } = stsBinding(bundle({ [name]: '' }));
+    const env = { ...store, STS: binding } as unknown as Env;
+    const app = new Hono<{ Bindings: Env }>().get('/admin', requireAdmin('alertingRead'), c =>
+      c.text('ok')
+    );
+    const executionCtx = { waitUntil() {}, passThroughOnException() {}, props: {} };
 
-      const withEmpty = await app.request(
-        '/admin',
-        { headers: { 'X-O11Y-ADMIN-TOKEN': '' } },
-        env,
-        executionCtx
-      );
-      const withoutHeader = await app.request('/admin', {}, env, executionCtx);
+    const withEmpty = await app.request(
+      '/admin',
+      { headers: { 'X-O11Y-ADMIN-TOKEN': '' } },
+      env,
+      executionCtx
+    );
+    const withoutHeader = await app.request('/admin', {}, env, executionCtx);
 
-      expect(withEmpty.status).toBe(401);
-      expect(withoutHeader.status).toBe(401);
-      await expect(readO11ySecret(env, name)).rejects.toThrow(SecretNotConfiguredError);
-      await expect(readO11ySecret(env, name)).rejects.toThrow(`${name} secret is not configured`);
-    }
-  );
+    expect(withEmpty.status).toBe(401);
+    expect(withoutHeader.status).toBe(401);
+    await expect(readO11ySecret(env, name)).rejects.toThrow(SecretNotConfiguredError);
+    await expect(readO11ySecret(env, name)).rejects.toThrow(`${name} secret is not configured`);
+  });
 
   it('queries Analytics Engine with the bundle token', async () => {
     const { env, reads } = stsOnlyEnv();

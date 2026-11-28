@@ -696,10 +696,18 @@ Every account route takes a UTS access token for the `uts` audience with the rou
 holds, read through an isolate copy of the key list (one Durable Object call per isolate per 10
 seconds, or per 2 seconds while tokens name a kid the copy lacks, so a flood of forged tokens costs
 no call each), `typ` `at+jwt`, the issuer, 60 seconds of skew and
-the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
-only). A PAT names no session, so it is refused there. Each action is one statement that reads the
-grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
-account fails at once, with no feed lookup.
+the claim profile, and a client that the scope registry allows for the scope (`kilo-cli` or
+`kilo-web` only). A PAT names no session, so it is refused there. Each action is one statement that
+reads the grant or browser session the `sid` names, so a revoked grant, an ended session or a
+blocked account fails at once, with no feed lookup.
+
+**The profile API key and released clients (decision D54).** The released CLI, extension and mobile
+app send one profile API key to the gateway for inference, and to the kilo-api (reads and writes)
+and Session Ingest. A UTS PAT holds one audience and one scope, so the PAT the profile page creates
+serves gateway inference only (a product choice; other PAT-eligible scopes exist). Released clients
+keep their legacy profile key for kilo-api and Session Ingest calls until the phase 5 client
+releases; no compatibility credential exists. The criterion 4 measure counts legacy profile-key
+issuance as a released-app path, labelled separately from UTS-issued credentials.
 
 `/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
 as a dependency: `utsScopeEntry` in every deployed Worker, plus the `fixture:*` scopes in the
@@ -750,6 +758,17 @@ organization a request names against the subject itself.
 | `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff; tier B gate, since keeping restores long-lived access | `uts.keep_bot_key` |
 | `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per client (an IPv4 address or an IPv6 /64) per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
 
+- The CLI and the web BFF `kilo-web` hold `uts:pats.manage` and `uts:bot-keys.manage` (design
+  5.5). A `kilo-web` token names its browser session in `sid`: `uts.account_session` (migration
+  0025) finds a live browser session of the token's subject that holds a BFF handle, or a CLI
+  grant and its device session, and refuses a session of any other account. The token's `sub` and
+  `sid` come from the same session row at the mint, so the BFF manages the credentials of its
+  signed-in user only. A create's tier B gate, and a keep's, runs on that session, and the consumed
+  pass names it. A session the legacy bridge created holds no UTS sign-in cookie, so its sign-in
+  time (the web app's claim) never counts as a recent sign-in; only a passkey step-up of that
+  session could pass. `uts.open_tier_a_gate_pass` answers `invalid_session` for a browser session,
+  which uses `uts.open_browser_tier_a_gate_pass`. In the account audit rows `grantId` is the
+  token's `sid`, and the create and keep rows and their refusals name the client (`clientId`).
 - A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
   notice and the audit row in one statement. The push and email notice goes through the
   `CredentialNotices` port after the statement; slice 3.8 (security notices) implements the port,
@@ -765,7 +784,8 @@ organization a request names against the subject itself.
   6-character CRC-32 checksum (`src/pat/format.ts`, the format `@kilocode/verify` parses). The
   identity store keeps the SHA-256 and the last four characters; audit rows name a credential by
   its id and `uts.credential_reference` of the hash, never by its value, its hash or its name.
-- A refused gate writes at most one `ai.kilo.uts.gate.refused` row per grant per minute.
+- A refused gate writes at most one `ai.kilo.uts.gate.refused` row per grant, or per browser
+  session, per minute.
 - `uts.remove_org_member` applies a membership-removed event: it revokes the member's org-bound
   PATs and grants, flags the bot keys the member created (they stop 7 days later unless an admin
   keeps them) and gives each owner and admin one notice; a stale event changes nothing.
@@ -797,7 +817,8 @@ organization a request names against the subject itself.
   any role or in listed roles; no delegated token carries a privileged, step-up, staff or
   credential-changing scope; a scope limited to listed roles is neither third-party-safe nor
   PAT-eligible). It lists the account API scopes (`uts:pats.manage`, `uts:bot-keys.manage`,
-  session-bound), `uts:probe.read`, `uts:security.read` (the web app's security view,
+  session-bound, for the CLI and the web BFF), `uts:probe.read` (PATs, and the CLI),
+  `uts:security.read` (the web app's security view,
   session-bound), `uts:browser-session.read` (the web app's bootstrap at its code exchange,
   session-bound, no account change), `kilo-api:profile.read` (CLI and PATs), the CLI's Kilo API
   route scopes
@@ -818,7 +839,13 @@ organization a request names against the subject itself.
   Its code names the browser session it was approved in and has no DPoP key; the code exchange
   returns that session and an opaque handle (migration 0013), and the BFF then calls
   `POST /account/browser-sessions/{read,token,end,end-all}` and `/account/devices/revoke`
-  (`@kilocode/uts-contracts` `browser-sessions.ts`). The legacy bridge (RFC 8693, subject token
+  (`@kilocode/uts-contracts` `browser-sessions.ts`). `token` takes an optional `org` (design 5.8):
+  `uts.mint_web_session_token` (migration 0025) reads the subject's membership and the
+  organization's SSO policy in the minting statement and binds the token only for an active member
+  in a role the scope allows whose handle sign-in meets the SSO rule, else 403 `access_denied`; a
+  scope that needs the `org` claim needs `org`. A member removal refuses the next mint; a token
+  minted before it is not revoked and ends at its expiry, 10 minutes at most. The legacy bridge
+  (RFC 8693, subject token
   `typ` `kilo-legacy-session+jwt`) is a high-risk switch: its subject token vouches for a legacy
   session of any app user. It runs only where `LEGACY_BRIDGE_ENABLED` is `true`, and verifies the
   token only under its own one or two Ed25519 keys in `KILO_WEB_BRIDGE_JWKS` (kid prefix

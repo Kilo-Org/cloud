@@ -23,7 +23,9 @@ import {
   createErrorHandler,
   createNotFoundHandler,
 } from '@kilocode/worker-utils';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { doNameForAttempt } from './do-name';
+import { readCodeReviewInfraSecret } from './secrets';
 
 // Import base Durable Object
 import {
@@ -38,13 +40,40 @@ export const CodeReviewOrchestrator = CodeReviewOrchestratorBase;
 type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
 
-// Authentication middleware
+/**
+ * Hono's `executionCtx` getter throws outside a request context, which is how unit tests call the
+ * routes. A missing context only costs the `waitUntil` keep-alive for a bundle revalidation; it
+ * never changes which secret a read returns.
+ */
+function requestContext(c: {
+  executionCtx: SecretsExecutionContext;
+}): SecretsExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
+
+// Authentication middleware. A failed secret read leaves the token undefined, which the middleware
+// already answers 401: a missing `BACKEND_AUTH_TOKEN` was a 401 before this switch and stays one.
+// The failure is logged so an unavailable secret source is distinguishable from a wrong token; the
+// error names the secret, never a value.
 app.use(
   '*',
-  backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN, {
-    receiver: 'code-review-infra',
-    route: 'review',
-  })
+  backendAuthMiddleware<HonoEnv>(
+    c =>
+      readCodeReviewInfraSecret(c.env, 'BACKEND_AUTH_TOKEN', requestContext(c)).catch(error => {
+        // Name only: an outage means one line per request, and the name is enough to tell an outage
+        // from a bad token. The error's message names the secret, never its value.
+        console.warn(
+          '[CodeReviewWorker] BACKEND_AUTH_TOKEN unavailable',
+          error instanceof Error ? error.name : 'unknown'
+        );
+        return undefined;
+      }),
+    { receiver: 'code-review-infra', route: 'review' }
+  )
 );
 
 // Route: POST /review

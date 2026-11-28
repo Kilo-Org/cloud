@@ -7,6 +7,7 @@ import {
   type QueueBacklogMetrics,
 } from '../src/alerting/queue-backlog';
 import type { AlertPayload } from '../src/alerting/notify';
+import { stsBundle } from './sts-bundle-fixture';
 
 const STATE_KEY = `o11y:queue_backlog:${MONITORED_QUEUE_ID}`;
 
@@ -26,17 +27,15 @@ function makeKv() {
   } as unknown as KVNamespace & { store: Map<string, string>; putCount: number };
 }
 
-function makeSecret(value: string): SecretsStoreSecret {
-  return { get: async () => value } as unknown as SecretsStoreSecret;
-}
-
 function makeEnv(kv: KVNamespace) {
   return {
     O11Y_ALERT_STATE: kv,
     O11Y_CF_ACCOUNT_ID: 'test-account',
-    O11Y_CF_CONTAINERS_API_TOKEN: makeSecret('test-token'),
-    O11Y_SLACK_WEBHOOK_PAGE: makeSecret('https://hooks.slack.com/page'),
-    O11Y_SLACK_WEBHOOK_TICKET: makeSecret('https://hooks.slack.com/ticket'),
+    STS: stsBundle({
+      O11Y_CF_CONTAINERS_API_TOKEN: 'test-token',
+      O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/page',
+      O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/ticket',
+    }),
   };
 }
 

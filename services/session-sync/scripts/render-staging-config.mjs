@@ -95,7 +95,9 @@ try {
     observability: source.observability,
     workers_dev: true,
     preview_urls: false,
-    vars: { ...source.vars, ENVIRONMENT: 'staging' },
+    // Staging reads its own Secrets Store items below and binds no `STS`, so the source is pinned
+    // here: inheriting a production flip to `sts` would refuse every staging read.
+    vars: { ...source.vars, ENVIRONMENT: 'staging', SECRETS_SOURCE: 'secrets-store' },
     ratelimits: source.ratelimits.map((binding, index) => ({
       ...binding,
       namespace_id: String(1028 + index),

@@ -47,6 +47,10 @@ import {
   type SecurityRemediationOrigin,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
+  STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
+  webInternalCredential,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { and, asc, desc, eq, inArray, isNull, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -2299,18 +2303,23 @@ export async function dispatchSecurityLifecycleEventForFinding(params: {
     const recipientUserIds = await resolveSecurityLifecycleRecipientUserIds(params.db, finding);
     if (recipientUserIds.length === 0) return;
     const backendUrl = params.env.KILOCODE_BACKEND_BASE_URL;
-    const internalSecret = await readSecurityAutoAnalysisSecret(
+    if (!backendUrl) return;
+    // A push is best effort; without a credential it is dropped like any other failed push.
+    const credential = await webInternalCredential(
       params.env,
-      'INTERNAL_API_SECRET',
-      params.ctx
+      STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
+      {
+        header: 'X-Internal-Secret',
+        secret: () => readSecurityAutoAnalysisSecret(params.env, 'INTERNAL_API_SECRET', params.ctx),
+      }
     );
-    if (!backendUrl || !internalSecret) return;
+    if (credential.kind === 'unavailable') return;
     const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
       method: 'POST',
       signal: AbortSignal.timeout(10_000),
       headers: {
         'Content-Type': 'application/json',
-        'X-Internal-Secret': internalSecret,
+        [credential.header]: credential.value,
       },
       body: JSON.stringify({
         event: params.event,

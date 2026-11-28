@@ -273,6 +273,14 @@ describe('POST /v1/runs', () => {
       };
       const limited = await post(proxy, head);
       expect(limited.body.retryAfterSeconds).toBeGreaterThan(500);
+      // The GitHub relay answers 503 with Retry-After when busy or when its STS key set is out.
+      proxy.github.outage = { status: 503, headers: { 'retry-after': '120' } };
+      const busy = await post(proxy, head);
+      expect(busy.status).toBe(503);
+      expect(busy.body).toMatchObject({ status: 'unavailable', reason: 'github_unavailable' });
+      // 120 s from the GitHub call; the clock read before it can add one second.
+      expect([120, 121]).toContain(busy.body.retryAfterSeconds);
+      expect(busy.headers.get('Retry-After')).toBe(String(busy.body.retryAfterSeconds));
     });
   });
 

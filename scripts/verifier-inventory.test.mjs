@@ -1,5 +1,5 @@
 // Phase 4 surface inventory. SURFACES below is design section 9.6 (decision Q1,
-// updated 2026-11-26), in its order: 25 entries, without the retired
+// updated 2026-11-28), in its order: 26 entries, without the retired
 // `services/images-mcp` and `services/db-proxy`. The scan (verifier-inventory.mjs)
 // reads the tracked production source of every workspace; a credential check outside the
 // listed surfaces fails the test until a decision lists it or an exact file
@@ -100,6 +100,16 @@ const SURFACES = [
     entry: 'services/git-token-service',
     dir: 'services/git-token-service',
     evidence: [['services/git-token-service/src/index.ts', 'helper-call']],
+  },
+  {
+    entry: 'services/github-relay',
+    dir: 'services/github-relay',
+    // Verifies the migration proxy's STS service token for the github-relay
+    // audience (its only caller); it holds no GitHub credential of its own.
+    evidence: [
+      ['services/github-relay/src/main.ts', 'verify-library'],
+      ['services/github-relay/src/relay.ts', 'verify-library'],
+    ],
   },
   {
     entry: 'services/kilo-chat',

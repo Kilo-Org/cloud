@@ -1,5 +1,10 @@
 import { createWorkerSecrets, type Secrets } from '@kilocode/secrets-client';
-import { migrationProxyAuditStream, type StsEnvironment } from '@kilocode/sts-contracts';
+import { createWorkerServiceTokens, type ServiceTokens } from '@kilocode/service-token-client';
+import {
+  STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
+  migrationProxyAuditStream,
+  type StsEnvironment,
+} from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import { and, asc, desc, eq, gt, inArray, lt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -166,6 +171,7 @@ export class MigrationRunDO extends DurableObject<Env> {
   private readonly audit: AuditLog;
   private secrets: Secrets | null = null;
   private githubClient: { key: string; client: GithubClient } | null = null;
+  private serviceTokens: ServiceTokens | null = null;
   /** Run creation and samples run one at a time (§3, §6). */
   private chain: Promise<unknown> = Promise.resolve();
   /** A step finished a phase: the next alarm comes at once instead of after the 15 s tick. */
@@ -1168,22 +1174,34 @@ export class MigrationRunDO extends DurableObject<Env> {
   }
 
   private github(config: ProxyConfig): GithubClient {
-    const key = `${config.github.appId}:${config.github.installationId}:${config.github.apiUrl}`;
+    const { appId, installationId, apiUrl, relayUrl } = config.github;
+    const key = `${appId}:${installationId}:${apiUrl}:${relayUrl ?? ''}`;
     if (this.githubClient?.key !== key) {
       this.githubClient = {
         key,
         client: createGithubClient(
           {
-            appId: config.github.appId,
-            installationId: config.github.installationId,
-            apiUrl: config.github.apiUrl,
+            appId,
+            installationId,
+            apiUrl,
             privateKey: () => this.secret(GITHUB_APP_KEY),
+            ...(relayUrl === null
+              ? {}
+              : { relay: { url: relayUrl, token: () => this.relayToken() } }),
           },
           (url, init) => fetch(url, init)
         ),
       };
     }
     return this.githubClient.client;
+  }
+
+  /** The STS token for the GitHub relay, held by the client until shortly before it expires. */
+  private relayToken(): Promise<string> {
+    this.serviceTokens ??= createWorkerServiceTokens(this.env.STS);
+    return this.serviceTokens.get(STS_GITHUB_RELAY_MIGRATION_PROXY_READ, {
+      waitUntil: promise => this.ctx.waitUntil(promise),
+    });
   }
 
   private view(row: RunRow): RunView {

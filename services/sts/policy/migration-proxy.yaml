@@ -12,3 +12,12 @@ identity:
 secrets:
   - MIGRATION_PROXY_DB_PASSWORD
   - MIGRATION_PROXY_GITHUB_APP_KEY
+# Its GitHub reads go through the GitHub relay (services/github-relay), whose fixed address is on
+# the Kilo-Org IP allow list. Staging first; production is a key added below after the staging
+# proof.
+environmentGrants:
+  staging:
+    audiences:
+      - github-relay
+    scopes:
+      - github-relay:migration-proxy.read

@@ -7,6 +7,7 @@ import {
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
+  STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
@@ -166,7 +167,7 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes and the CI scopes, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes, the GitHub relay scope and the CI scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: {
         scopes: [
@@ -192,6 +193,7 @@ describe('STS scope registry', () => {
       'security-sync': {
         scopes: ['security-sync:manual-sync.enqueue', 'security-sync:dismiss-finding.enqueue'],
       },
+      'github-relay': { scopes: ['github-relay:migration-proxy.read'] },
       bouncer: {
         scopes: [
           'bouncer:decide',
@@ -244,6 +246,7 @@ describe('STS scope registry', () => {
     ['security-sync:manual-sync.enqueue', 'security-sync', STS_SECURITY_SYNC_MANUAL_SYNC],
     ['security-sync:dismiss-finding.enqueue', 'security-sync', STS_SECURITY_SYNC_DISMISS_FINDING],
     ['web:security-notifications.dispatch', 'web', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
+    ['github-relay:migration-proxy.read', 'github-relay', STS_GITHUB_RELAY_MIGRATION_PROXY_READ],
     ['bouncer:decide', 'bouncer', STS_BOUNCER_DECIDE],
     ['bouncer:usage.write', 'bouncer', STS_BOUNCER_USAGE_WRITE],
     ['bouncer:signup.decide', 'bouncer', STS_BOUNCER_SIGNUP_DECIDE],

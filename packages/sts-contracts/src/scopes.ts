@@ -72,6 +72,15 @@ export const STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH = {
 } as const;
 
 /**
+ * The migration proxy reads Kilo-Org/cloud through the GitHub relay, whose fixed address is on the
+ * Kilo-Org IP allow list (services/github-relay). Each relay caller has a scope of its own.
+ */
+export const STS_GITHUB_RELAY_MIGRATION_PROXY_READ = {
+  audience: 'github-relay',
+  scope: 'github-relay:migration-proxy.read',
+} as const;
+
+/**
  * The web app and the AI gateway call Bouncer (repo Kilo-Org/bouncer) for verdicts: `decide`,
  * `charge-decide` and `release`. Bouncer's `ROUTE_SCOPES` (`src/api-auth.ts`) names the scope of
  * each route; the four Bouncer pairs here match it.
@@ -124,8 +133,9 @@ export const STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC = {
  * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
  * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
  * finding dismissal (`STS_SECURITY_SYNC_*`), the web app's security notification dispatch
- * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), and the Bouncer scopes (`STS_BOUNCER_*`). The CI
- * scopes are the web app's catalog token mint (`STS_WEB_MCP_CATALOG_TOKEN_MINT`) and the
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), the Bouncer scopes (`STS_BOUNCER_*`) and the
+ * migration proxy's reads through the GitHub relay (`STS_GITHUB_RELAY_MIGRATION_PROXY_READ`). The
+ * CI scopes are the web app's catalog token mint (`STS_WEB_MCP_CATALOG_TOKEN_MINT`) and the
  * community contributions dashboard's opencode sync
  * (`STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC`). STS mints each one only where a policy
  * grants it (default deny).
@@ -160,6 +170,9 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   'security-sync': {
     scopes: [STS_SECURITY_SYNC_MANUAL_SYNC.scope, STS_SECURITY_SYNC_DISMISS_FINDING.scope],
+  },
+  [STS_GITHUB_RELAY_MIGRATION_PROXY_READ.audience]: {
+    scopes: [STS_GITHUB_RELAY_MIGRATION_PROXY_READ.scope],
   },
   [STS_BOUNCER_DECIDE.audience]: {
     scopes: [

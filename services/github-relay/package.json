@@ -1,0 +1,23 @@
+{
+  "name": "github-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/server.mjs",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/github-relay/src services/github-relay/test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "esbuild": "0.28.2",
+    "jose": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5"
+  }
+}

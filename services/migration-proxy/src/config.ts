@@ -23,7 +23,8 @@ export type ProxyConfig = {
   /** Minutes between sampled checks while idle; 0 turns the check off. */
   sampleMinutes: number;
   runDeadlineSeconds: number;
-  github: { appId: string; installationId: string; apiUrl: string };
+  /** `relayUrl`: the GitHub relay that carries the reads, or null for straight to `apiUrl`. */
+  github: { appId: string; installationId: string; apiUrl: string; relayUrl: string | null };
   /** The review base of an environment's first run (§5 step 5). */
   reviewBaselineSha: string;
 };
@@ -36,6 +37,8 @@ const MAX_RUN_DEADLINE_SECONDS = 21_600;
 const TARGET = /^([a-z0-9.-]+):([0-9]{1,5})\/([a-z0-9_]+)$/;
 const DECIMAL_ID = /^[0-9]{1,20}$/;
 const SHA = /^[0-9a-f]{40}$/;
+/** The GitHub relay's migration-proxy prefix (services/github-relay), on its fixed address. */
+export const GITHUB_RELAY_URL = 'https://github-relay.kiloapps.io/migration-proxy';
 
 const VarsSchema = z.object({
   MIGRATION_PROXY_ENVIRONMENT: z.enum(['production', 'staging', 'development']),
@@ -49,6 +52,9 @@ const VarsSchema = z.object({
   MIGRATION_PROXY_GITHUB_INSTALLATION_ID: z.string(),
   MIGRATION_REVIEW_BASELINE_SHA: z.string(),
   MIGRATION_PROXY_GITHUB_API_URL: z.url({ protocol: /^https?$/ }).optional(),
+  MIGRATION_PROXY_GITHUB_RELAY_URL: z
+    .union([z.literal(''), z.url({ protocol: /^https?$/ })])
+    .optional(),
 });
 
 /** Reads and checks the vars; the problems name vars and rules, never a value. */
@@ -110,6 +116,11 @@ export function readConfig(vars: Record<string, unknown>): ConfigResult {
   if (apiUrl !== GITHUB_API && environment !== 'development') {
     problems.push('MIGRATION_PROXY_GITHUB_API_URL: only the development stack may set it');
   }
+  // The installation token travels to the relay, so a deployed proxy names only the real one.
+  const relayUrl = v.MIGRATION_PROXY_GITHUB_RELAY_URL || null;
+  if (relayUrl !== null && relayUrl !== GITHUB_RELAY_URL && environment !== 'development') {
+    problems.push(`MIGRATION_PROXY_GITHUB_RELAY_URL: only empty or ${GITHUB_RELAY_URL}`);
+  }
 
   if (problems.length > 0 || target === null) return { ok: false, problems };
   return {
@@ -126,6 +137,7 @@ export function readConfig(vars: Record<string, unknown>): ConfigResult {
         appId: v.MIGRATION_PROXY_GITHUB_APP_ID,
         installationId: v.MIGRATION_PROXY_GITHUB_INSTALLATION_ID,
         apiUrl,
+        relayUrl,
       },
       reviewBaselineSha: v.MIGRATION_REVIEW_BASELINE_SHA,
     },

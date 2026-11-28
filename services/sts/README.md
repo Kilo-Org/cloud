@@ -201,10 +201,12 @@ six public JWK fields of each key, stores it, and answers from it while all of t
   once.
 
 A read that finds no such document rebuilds it and waits; when that rebuild fails, a stale
-document still inside its 5 minutes answers (an isolate copy would have served it as long), and
-otherwise STS answers 503 with `Retry-After: 30`. While reads arrive, the object's alarm rebuilds
+document still inside its 5 minutes answers, and otherwise STS answers 503 with `Retry-After: 30`.
+An answer marked stale (that fallback, or a build during which a shard changed after it answered)
+serves that request only: no isolate keeps it. While reads arrive, the object's alarm rebuilds
 the document 1 minute before it expires, so reads do not wait for the shards; an idle document is
-left to expire. Concurrent reads share one rebuild. Each isolate keeps the answer in memory,
+left to expire; a failed background rebuild retries every 5 s until the document it was meant to
+replace expires. Concurrent reads share one rebuild. Each isolate keeps the answer in memory,
 together with the list it was read under, until 5 minutes after the shard reads that built the
 document, not after its own call, so the object's document and the isolate copy together are
 never older than 5 minutes. Requests of one isolate that find the copy stale at the same moment

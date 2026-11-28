@@ -175,6 +175,41 @@ describe('token key-set object', () => {
     expect(shardReads).toHaveBeenCalledTimes(TOKEN_SIGNER_SHARDS);
   });
 
+  it('marks a build stale when a shard changes after it answered, and no isolate keeps it', async () => {
+    const getJwks = TokenSignerDO.prototype.getJwks;
+    let shard0Answered = false;
+    let changed = false;
+    vi.spyOn(TokenSignerDO.prototype, 'getJwks').mockImplementation(async function (
+      this: TokenSignerDO
+    ) {
+      const jwks = await getJwks.call(this);
+      const { ctx } = this as unknown as { ctx: DurableObjectState };
+      if (ctx.id.equals(shard(0).id)) {
+        shard0Answered = true;
+      } else if (ctx.id.equals(shard(1).id) && !changed) {
+        // Shard 0 changes its ring after its answer reached the build, once.
+        while (!shard0Answered) await scheduler.wait(5);
+        await scheduler.wait(20);
+        changed = true;
+        await keySet().invalidate(0);
+      }
+      return jwks;
+    });
+    const reads = vi.spyOn(TokenKeySetDO.prototype, 'read');
+    const list = [unusedKid()];
+
+    expect((await served(list)).keys).toHaveLength(TOKEN_SIGNER_SHARDS);
+    expect(changed).toBe(true);
+    expect((await storedDocument())?.stale).toBe(true);
+    // The isolate did not keep the stale set: the next request asks the object again, which
+    // rebuilds; that clean set is kept.
+    expect((await served(list)).status).toBe(200);
+    expect(reads).toHaveBeenCalledTimes(2);
+    expect((await storedDocument())?.stale).toBe(false);
+    expect((await served(list)).status).toBe(200);
+    expect(reads).toHaveBeenCalledTimes(2);
+  });
+
   it('shows a publication at the next read', async () => {
     const before = kids(await read());
     // Shard 1's current key is 24 days old: its next key is due for publication.
@@ -213,6 +248,9 @@ describe('token key-set object', () => {
     const list = [unusedKid()];
     const before = await served(list);
     const revoked = before.keys[2].kid;
+    // The shard's change note is lost: the new list alone must rebuild the document.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(TokenKeySetDO.prototype, 'invalidate').mockRejectedValue(new Error('note lost'));
 
     // The deploy that lists the kid restarts shard 2 with the new list: it drops the key and
     // promotes a fresh one.
@@ -291,7 +329,9 @@ describe('token key-set object', () => {
     await keySet().invalidate(0);
     expect((await storedDocument())?.stale).toBe(true);
 
-    expect(kids(await read())).toEqual(before);
+    const fallback = await keySet().read([]);
+    expect(fallback).toMatchObject({ status: 'ok', stale: true });
+    expect(fallback.status === 'ok' ? kids(fallback.keys) : []).toEqual(before);
     vi.spyOn(Date, 'now').mockReturnValue(builtAt + TOKEN_JWKS_CACHE_MS);
     expect(await keySet().read([])).toEqual({ status: 'unavailable' });
     const answer = await served([unusedKid()]);

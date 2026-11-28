@@ -46,8 +46,12 @@ const ShardSchema = z
   .max(TOKEN_SIGNER_SHARDS - 1);
 
 export type TokenKeySetRead =
-  /** Every shard's next, current and retired-in-grace public keys, read at `builtAt` (ms). */
-  | { status: 'ok'; keys: TokenJwk[]; builtAt: number }
+  /**
+   * Every shard's next, current and retired-in-grace public keys, read at `builtAt` (ms). A
+   * `stale` set is the best this object has (a shard changed after it answered, or a rebuild
+   * failed): it is still inside its period, but no isolate may keep it.
+   */
+  | { status: 'ok'; keys: TokenJwk[]; builtAt: number; stale: boolean }
   /** No document fresh enough, and a shard did not answer a rebuild. */
   | { status: 'unavailable' };
 
@@ -66,12 +70,13 @@ export type TokenKeySetRead =
  *   change (publication, activation, removal, emergency removal) and before it answers any call,
  *   which marks the document stale and rebuilds it in the alarm at once.
  *
- * A read that finds no serving document rebuilds it and waits; a stale document within its period
- * still answers if that rebuild fails (an isolate copy would have served it as long). While reads
- * arrive, the alarm rebuilds the document `TOKEN_KEY_SET_REFRESH_AHEAD_MS` before it expires, so
- * reads do not wait for the shards; an idle set is left to expire. The document is stored, so a
- * restarted object answers from storage. Concurrent reads share one rebuild (an object's requests
- * share its context).
+ * A read that finds no serving document rebuilds it and waits; when the result is stale (that
+ * rebuild failed and a stale document within its period is all there is, or a shard changed after
+ * it answered), it answers marked `stale`, and the isolate uses it for that request only. While
+ * reads arrive, the alarm rebuilds the document `TOKEN_KEY_SET_REFRESH_AHEAD_MS` before it
+ * expires, so reads do not wait for the shards; an idle set is left to expire. The document is
+ * stored, so a restarted object answers from storage. Concurrent reads share one rebuild (an
+ * object's requests share its context).
  */
 export class TokenKeySetDO extends DurableObject<Env> {
   readonly #config: StsConfig;
@@ -86,6 +91,11 @@ export class TokenKeySetDO extends DurableObject<Env> {
   #readSinceBuild = false;
   /** The alarm time this instance last read or set (null: none); undefined until first read. */
   #alarmAt: number | null | undefined = undefined;
+  /**
+   * While background rebuilds fail or come back stale, the alarm retries them until this time:
+   * the expiry of the document that first needed one. Then a read rebuilds for itself.
+   */
+  #retryUntil: number | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -112,12 +122,13 @@ export class TokenKeySetDO extends DurableObject<Env> {
       }
     }
     this.#readSinceBuild = true;
-    // A stale document already has its rebuild alarm (set by `invalidate` or a failed rebuild).
+    // A stale document already has its rebuild under way (a read rebuilds it, as above).
     if (!document.stale) await this.#scheduleAlarm(this.#refreshAt(document));
     return {
       status: 'ok',
       keys: document.keys.map(key => ({ ...key })),
       builtAt: document.builtAt,
+      stale: document.stale,
     };
   }
 
@@ -148,9 +159,12 @@ export class TokenKeySetDO extends DurableObject<Env> {
       }
     }
     const rebuilt = await this.#rebuildOnce(document.revokedKids);
-    if (rebuilt === null || rebuilt.stale) {
-      await this.#scheduleAlarm(Date.now() + TOKEN_KEY_SET_RETRY_MS);
-    }
+    if (rebuilt !== null && !rebuilt.stale) return;
+    this.#retryUntil ??= document.builtAt + TOKEN_JWKS_CACHE_MS;
+    const retryAt = Date.now() + TOKEN_KEY_SET_RETRY_MS;
+    if (retryAt < this.#retryUntil) await this.#scheduleAlarm(retryAt);
+    // Given up: a later change note starts a new run of retries; until then reads rebuild.
+    else this.#retryUntil = null;
   }
 
   /** When the alarm rebuilds a document reads still use, ahead of its expiry. */
@@ -193,8 +207,8 @@ export class TokenKeySetDO extends DurableObject<Env> {
   /**
    * Reads every shard, in parallel and bounded like a mint, and stores the document only when all
    * of them answered. Returns null when one did not. A shard that changed after it answered makes
-   * the document stale, so the alarm its `invalidate` set rebuilds again; the document still
-   * answers the reads waiting on it.
+   * the document stale; it still answers the reads waiting on it, marked so, and the next read
+   * (or the alarm that shard's `invalidate` set) rebuilds it.
    */
   async #build(revokedKids: string): Promise<KeySetDocument | null> {
     const builtAt = Date.now();
@@ -225,18 +239,22 @@ export class TokenKeySetDO extends DurableObject<Env> {
         });
         return null;
       }
-      // Only the public fields are copied, each checked by the closed schema.
+      // Only the public fields are copied, each checked by the closed schema; a malformed key
+      // fails the build like a shard that did not answer.
       for (const key of outcome.value.keys) {
-        keys.push(
-          PublicTokenJwkSchema.parse({
-            kty: key.kty,
-            crv: key.crv,
-            x: key.x,
-            kid: key.kid,
-            alg: key.alg,
-            use: key.use,
-          })
-        );
+        const parsed = PublicTokenJwkSchema.safeParse({
+          kty: key.kty,
+          crv: key.crv,
+          x: key.x,
+          kid: key.kid,
+          alg: key.alg,
+          use: key.use,
+        });
+        if (!parsed.success) {
+          console.warn('sts: token key set could not be built', { outcome: 'malformed_key' });
+          return null;
+        }
+        keys.push(parsed.data);
       }
       if (this.#changes[shard] !== changes) stale = true;
     }
@@ -246,9 +264,8 @@ export class TokenKeySetDO extends DurableObject<Env> {
     if (held === null || held.builtAt <= builtAt) {
       this.#document = document;
       this.#readSinceBuild = false;
+      if (!stale) this.#retryUntil = null;
       await this.ctx.storage.put(DOCUMENT_NAME, document);
-      // A shard changed after it answered: rebuild at once, without waiting for a read.
-      if (stale) await this.#scheduleAlarm(Date.now());
     }
     return document;
   }

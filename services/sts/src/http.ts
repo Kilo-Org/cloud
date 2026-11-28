@@ -230,13 +230,15 @@ async function keySet(env: Env, config: StsConfig): Promise<Response> {
  * token signer shard. A request that finds no fresh isolate copy makes ONE call, to the key-set
  * object (`TokenKeySetDO`), which holds the shards' keys as one document; the copy then serves
  * until `TOKEN_JWKS_CACHE_MS` after the shard reads that built that document, not after this
- * call, so the object's document and this copy together are never older than one period.
- * Requests that find the copy stale at the same moment each make the call (no promise is shared
- * across requests). A kid listed in `TOKEN_SIGNING_KIDS_REVOKED` is left out here as well as in
- * the signer, so an emergency removal never waits on an object, and a change of that list
- * rebuilds the copy and the object's document. The answer is `no-store`: a key-set removal is the
- * only recall of an STS token (design Q50), so no HTTP cache may hold the set, nor serve it stale
- * while STS answers 503; only the verifier's own 5-minute copy counts. A scheduled removal (a
+ * call, so the object's document and this copy together are never older than one period. A set
+ * the object marks stale (a shard changed after the build read it, or a rebuild failed) answers
+ * this request only and is not kept. Requests that find the copy stale at the same moment each
+ * make the call (no promise is shared across requests). A kid listed in
+ * `TOKEN_SIGNING_KIDS_REVOKED` is left out here as well as in the signer, so an emergency removal
+ * never waits on an object, and a change of that list rebuilds the copy and the object's
+ * document. The answer is `no-store`: a key-set removal is the only recall of an STS token
+ * (design Q50), so no HTTP cache may hold the set, nor serve it stale while STS answers 503; only
+ * the verifier's own 5-minute copy counts. A scheduled removal (a
  * retired key leaving the ring) can therefore reach verifiers up to 10 minutes later: up to 5
  * minutes from the shard read in the object's document and this copy, then up to 5 in the
  * verifier's. An emergency removal is filtered from every answer, so it reaches them within the
@@ -273,15 +275,18 @@ async function tokenKeySet(env: Env, config: StsConfig): Promise<Response> {
       });
       return unavailableResponse();
     }
-    const { builtAt } = outcome.value;
+    const { builtAt, stale } = outcome.value;
     keys = outcome.value.keys.map(key => ({ ...key }));
-    tokenJwksCache = {
-      environment: config.environment,
-      revokedKids,
-      keys,
-      // On a clock behind the object's, the copy still expires one period after this call at most.
-      expiresAt: Math.min(builtAt, Date.now()) + TOKEN_JWKS_CACHE_MS,
-    };
+    // A stale set answers this request only; whatever copy the isolate holds stays as it is.
+    if (!stale) {
+      tokenJwksCache = {
+        environment: config.environment,
+        revokedKids,
+        keys,
+        // On a clock behind the object's, the copy still expires one period after this call.
+        expiresAt: Math.min(builtAt, Date.now()) + TOKEN_JWKS_CACHE_MS,
+      };
+    }
   }
   return jsonResponse(
     { keys: keys.filter(key => !config.revokedTokenKids.includes(key.kid)) },

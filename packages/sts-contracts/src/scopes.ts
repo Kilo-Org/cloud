@@ -467,7 +467,9 @@ export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
  * Skips Cloud Agent's balance check (`x-skip-balance-check`). The caller asserts that the session
  * does not bill the Kilo balance, an authority separate from the action's own. The scope is not
  * tied to a session or an owner: it names only the calling workload. STS policy decides which
- * workloads can mint it; today `web` and `kilo-code-review-worker`. Under STS (decision M243):
+ * workloads can mint it; today `web` and `kilo-code-review-worker`. Under STS (decisions M243 and
+ * M246), the token grants no new authority: it only replaces the legacy internal key as the proof
+ * where a bypass exists today.
  * - (1) In a request with an STS action token (`session.prepare` or `session.update`), the bypass
  *   token's workload must equal the action token's workload.
  * - (2) In a request with no action token, authenticated by a user Bearer, the header is honoured
@@ -480,10 +482,11 @@ export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
  * - (3) With neither a valid action token nor a user Bearer, it is never honoured.
  * - (4) Each honoured bypass logs the workload and the user subject; each refusal logs a reason;
  *   neither logs token data.
- * - (5) The receiver checks the token at every point that reads the header, all under
- *   `services/cloud-agent-next/src`: `middleware/balance.ts`,
- *   `router/handlers/session-creation-preflight.ts`, and both reads in
- *   `kilo-facade/user-kilo-facade.ts`.
+ * - (5) The proof applies only where a bypass exists today, both under
+ *   `services/cloud-agent-next/src`: `middleware/balance.ts` and the authority preflight in
+ *   `router/handlers/session-creation-preflight.ts`. The two public Kilo prompt mutations in
+ *   `kilo-facade/user-kilo-facade.ts` keep refusing `x-skip-balance-check` with a 400 for every
+ *   caller, a valid bypass token included.
  * Webhook Agent Ingest sends the bypass over a service binding, outside STS.
  */
 export const STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS = {

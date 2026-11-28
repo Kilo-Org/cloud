@@ -8,6 +8,11 @@ import {
   type StsEnvironment,
 } from '@kilocode/sts-contracts';
 import { createVerifier, failureResponse, httpJwksSource, type Verifier } from '@kilocode/verify';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { Context, MiddlewareHandler } from 'hono';
 import { SecretNotConfiguredError, readO11ySecret } from './secrets';
 
@@ -66,6 +71,13 @@ export const ADMIN_ROUTES: Readonly<Record<AdminRoute, AdminRouteContract>> = {
   alertingRead: { scope: STS_O11Y_ALERTING_READ.scope, workloads: ['web'] },
   /** `PUT` and `DELETE /alerting/{config,ttfb-config}`: the web admin pages. */
   alertingWrite: { scope: STS_O11Y_ALERTING_WRITE.scope, workloads: ['web'] },
+};
+
+/** The observation label of each admin route family (design section 9.4, item 9). */
+const ADMIN_ROUTE_LABELS: Readonly<Record<AdminRoute, string>> = {
+  apiMetricsWrite: 'api_metrics_write',
+  alertingRead: 'alerting_read',
+  alertingWrite: 'alerting_write',
 };
 
 /**
@@ -168,7 +180,10 @@ function refusedLog(route: AdminRoute, status: number, reason: string): void {
 }
 
 /** The pre-phase-4 check, unchanged: the shared secret in `X-O11Y-ADMIN-TOKEN`. */
-async function legacyCheck(c: Context<{ Bindings: Env }>): Promise<Response | null> {
+async function legacyCheck(
+  c: Context<{ Bindings: Env }>,
+  route: AdminRoute
+): Promise<Response | null> {
   let secret: string;
   try {
     secret = await readO11ySecret(c.env, 'O11Y_KILO_GATEWAY_CLIENT_SECRET', c.executionCtx);
@@ -178,6 +193,12 @@ async function legacyCheck(c: Context<{ Bindings: Env }>): Promise<Response | nu
   }
   const token = c.req.header('X-O11Y-ADMIN-TOKEN');
   if (!secret || !token || !timingSafeEqual(token, secret)) return unauthorized(c);
+  observeInternalAuth(
+    'o11y',
+    ADMIN_ROUTE_LABELS[route],
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
   return null;
 }
 
@@ -261,6 +282,7 @@ export function createAdminAuth(): AdminAuth {
         }
       );
     }
+    observeInternalAuth('o11y', ADMIN_ROUTE_LABELS[route], 'sts', callerLabel(workload));
     return null;
   }
 
@@ -272,7 +294,7 @@ export function createAdminAuth(): AdminAuth {
         if ('error' in acceptance) return misconfigured(acceptance.error);
         // The default: exactly the pre-phase-4 path. No verifier, key set or new header read.
         if (acceptance.legacy && !acceptance.sts) {
-          return (await legacyCheck(c)) ?? (await next());
+          return (await legacyCheck(c, route)) ?? (await next());
         }
         if (!acceptance.legacy && !acceptance.sts) return unauthorized(c);
 
@@ -280,7 +302,7 @@ export function createAdminAuth(): AdminAuth {
         // header. Without a bearer, `legacy-and-sts` runs the legacy path; `sts-only` never reads
         // the secret.
         if (c.req.header('Authorization') === undefined && acceptance.legacy) {
-          return (await legacyCheck(c)) ?? (await next());
+          return (await legacyCheck(c, route)) ?? (await next());
         }
 
         const config = stsRouteConfig(env);

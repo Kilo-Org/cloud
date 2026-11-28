@@ -41,5 +41,7 @@
     "WORKOS_API_KEY": "sk_test",
     "WORKOS_CLIENT_ID": "client_test",
     "INTERNAL_API_SECRET": "internal-test-secret",
+    // The secret path; the STS test sets `sts` and a fake `STS` binding on `env`.
+    "WEB_INTERNAL_AUTH": "legacy",
   },
 }

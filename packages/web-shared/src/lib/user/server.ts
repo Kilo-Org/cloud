@@ -76,6 +76,13 @@ import {
   isWebSessionCurrent,
   readWebSessionPepper,
 } from '@kilocode/web-shared/lib/web-session-revocation';
+import {
+  SessionCheckUnavailableError,
+  browserSessionCookieNames,
+  cookieValues,
+  isBrowserSessionBindingCurrent,
+  utsBrowserSessionEnvironment,
+} from '@kilocode/web-shared/lib/uts-bff/browser-session-config';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   isCloudAgentAuthorityHttpPathAllowed,
@@ -169,6 +176,143 @@ const COOKIE_VALIDATION_ERROR_MESSAGE = /^(argument|option) \w+ (is invalid|must
 
 function isCookieValidationError(error: unknown): boolean {
   return error instanceof TypeError && COOKIE_VALIDATION_ERROR_MESSAGE.test(error.message);
+}
+
+/** What the app's own pages may learn about a UTS browser session; never a handle, id or token. */
+export type UtsBrowserSessionView = {
+  userId: string;
+  authTime: number;
+  amr: string[];
+  idleExpiresAt: number;
+  expiresAt: number;
+};
+
+type UtsBrowserSessionResolution = {
+  auth: GetAuthResponse;
+  /** Set only for an authorized session. */
+  view: UtsBrowserSessionView | null;
+  /** The cookie names no session here any more (UTS ended it, or the app refuses its binding). */
+  ended: boolean;
+};
+
+/**
+ * The UTS browser session (design 5.5) of a request where `UTS_BROWSER_SESSIONS=on`. Null when
+ * the request carries no UTS session cookie: the NextAuth session then decides, as before.
+ * Otherwise the request belongs to the UTS family and this answer is final. An ended, malformed,
+ * duplicate, unbound or refused UTS cookie is never replaced by a NextAuth session of the same
+ * browser; an outage is 503 with `Retry-After`, never a sign-out; staff requests are refused by
+ * name (design 5.12 is not built for UTS sessions yet). Only a session the app authorized for an
+ * unblocked account moves its idle clock.
+ */
+async function resolveUtsBrowserSession(
+  opts: RequiredPermissions,
+  fromDb: typeof db
+): Promise<UtsBrowserSessionResolution | null> {
+  if (!acceptsBrowserSessions()) return null;
+  const environment = utsBrowserSessionEnvironment();
+  if (environment === null) return null;
+  const cookieHeader = (await headers()).get('cookie');
+  if (cookieValues(cookieHeader, browserSessionCookieNames(environment).session).length === 0) {
+    return null;
+  }
+  const ended = (kiloUserId: string): UtsBrowserSessionResolution => ({
+    auth: authError(401, 'Reauthentication required', kiloUserId, { credentialsRejected: true }),
+    view: null,
+    ended: true,
+  });
+  const refused = (auth: GetAuthResponse): UtsBrowserSessionResolution => ({
+    auth,
+    view: null,
+    ended: false,
+  });
+  if (opts.adminOnly) {
+    return refused(
+      authError(403, 'Access denied (UTS browser session)', '?', { authorizationRefused: true })
+    );
+  }
+  // Loaded only for a request with the cookie where the switch is on, so the AI gateway and a
+  // deployment with the switch off never load the UTS client or its key reader.
+  const bff = await import('@kilocode/web-shared/lib/uts-bff/browser-session');
+  const setup = bff.browserSessionSetup();
+  if (setup === null) return null;
+  const read = await bff.readBrowserSession(setup, cookieHeader);
+  if (read.status === 'unavailable') {
+    warnExceptInTest(`UTS browser session read unavailable: ${read.reason}`);
+    return refused(
+      authError(503, 'Session check unavailable', '?', {
+        sessionCheckUnavailable: { retryAfterSeconds: read.retryAfterSeconds },
+      })
+    );
+  }
+  if (read.status !== 'active') return ended('?');
+  const user = await findUserById(read.session.subject, fromDb);
+  if (!user) return ended(read.session.subject);
+  // As for a NextAuth session, the primary decides whether the pepper rotated.
+  const pepper =
+    fromDb === db ? (user.web_session_pepper ?? null) : await readWebSessionPepper(user.id);
+  if (!isBrowserSessionBindingCurrent(read.binding, pepper)) return ended(user.id);
+  const sso = await bff.browserSessionSsoDecision(user, read.session);
+  if (sso.decision === 'refuse') {
+    return refused(
+      authError(403, `Access denied (${sso.reason})`, user.id, { authorizationRefused: true })
+    );
+  }
+  const auth = await validateUserAuthorization({
+    kiloUserId: user.id,
+    user,
+    opts,
+    isNewUser: false,
+    fromDb,
+    webSession: {
+      id: read.session.session_id,
+      pepper,
+      authenticatedAt: read.session.auth_time,
+      ssoSourceOrganizationId: sso.ssoSourceOrganizationId,
+    },
+  });
+  if (!auth.user) return refused(auth);
+  if (
+    !isBlockedAccount(auth.user) &&
+    !opts.allowRefusedAccountSelfCleanup &&
+    bff.isBrowserSessionTouchDue(read.session) &&
+    (await bff.touchBrowserSession(setup, read.handle)) === 'ended'
+  ) {
+    return ended(user.id);
+  }
+  return {
+    auth: { ...auth, browserSessionFamily: 'uts' },
+    view: {
+      userId: user.id,
+      authTime: read.session.auth_time,
+      amr: read.session.amr,
+      idleExpiresAt: read.session.idle_expires_at,
+      expiresAt: read.session.expires_at,
+    },
+    ended: false,
+  };
+}
+
+export type UtsBrowserSessionStatus =
+  | { status: 'absent' }
+  | { status: 'ended' }
+  | { status: 'refused'; httpStatus: number }
+  | { status: 'unavailable'; retryAfterSeconds: number | null }
+  | { status: 'active'; session: UtsBrowserSessionView };
+
+/** The request's UTS browser session, for the session route; `absent` without a UTS cookie. */
+export async function getUtsBrowserSessionStatus(): Promise<UtsBrowserSessionStatus> {
+  const resolved = await resolveUtsBrowserSession({ adminOnly: false }, db);
+  if (resolved === null) return { status: 'absent' };
+  if (resolved.view !== null) return { status: 'active', session: resolved.view };
+  if (resolved.ended) return { status: 'ended' };
+  const { auth } = resolved;
+  if (auth.sessionCheckUnavailable) {
+    return {
+      status: 'unavailable',
+      retryAfterSeconds: auth.sessionCheckUnavailable.retryAfterSeconds,
+    };
+  }
+  return { status: 'refused', httpStatus: auth.authFailedResponse?.status ?? 403 };
 }
 
 /**
@@ -269,6 +413,12 @@ type GetAuthResponse =
       webSessionPepper?: undefined;
       authenticatedAt?: undefined;
       ssoSourceOrganizationId?: undefined;
+      /**
+       * Set when the request's UTS browser session could not be checked: the request is neither
+       * signed in nor signed out, and the answer is a retryable 503.
+       */
+      sessionCheckUnavailable?: { retryAfterSeconds: number | null };
+      browserSessionFamily?: undefined;
     }
   | {
       user: User;
@@ -302,6 +452,9 @@ type GetAuthResponse =
        * organization the account's domain currently requires.
        */
       ssoSourceOrganizationId?: string;
+      sessionCheckUnavailable?: undefined;
+      /** `uts` when a UTS browser session (`kilo-web`) authenticated the request. */
+      browserSessionFamily?: 'uts';
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
@@ -317,6 +470,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     tokenSource: result.tokenSource ?? null,
     internalApiUse: result.internalApiUse,
     delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    utsBrowserSession: result.browserSessionFamily === 'uts',
   });
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
@@ -573,6 +727,10 @@ function staffRefusalAuthFailure(
       return adminNetworkAuthFailure(admin, refusal.denial);
     case 'reauth':
       return authError(401, 'Reauthentication required', admin.user.id);
+    case 'uts_session':
+      return authError(403, 'Access denied (UTS browser session)', admin.user.id, {
+        authorizationRefused: true,
+      });
     case 'step_up':
       return authError(403, refusal.cause.code, admin.user.id, {
         stepUp: stepUpRefusalPayload(refusal.cause),
@@ -843,6 +1001,10 @@ async function resolveUserFromSession(
   opts: RequiredPermissions,
   fromDb: typeof db
 ): Promise<GetAuthResponse> {
+  // A request with a UTS session cookie belongs to the UTS family; no NextAuth session answers it.
+  const utsBrowserSession = await resolveUtsBrowserSession(opts, fromDb);
+  if (utsBrowserSession !== null) return utsBrowserSession.auth;
+
   const session = await readSession();
   const maybeKiloUserId = session?.kiloUserId;
 
@@ -883,6 +1045,10 @@ async function resolveUserFromSession(
  * page. This is the one place that answers both redirect cases.
  */
 async function userOrRedirect(auth: GetAuthResponse, loggedOutRedirectUrl: string): Promise<User> {
+  if (auth.sessionCheckUnavailable) {
+    // An unchecked UTS session is not a signed-out request: no sign-in redirect.
+    throw new SessionCheckUnavailableError(auth.sessionCheckUnavailable.retryAfterSeconds);
+  }
   if (!auth.user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
@@ -934,14 +1100,21 @@ function authError(
     cloudAgentAuthority?: CloudAgentAuthority;
     stepUp?: StepUpRequirementPayload;
     adminNetworkDenial?: AdminNetworkDenialReason;
+    sessionCheckUnavailable?: { retryAfterSeconds: number | null };
   }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
+  const retryAfterSeconds = options?.sessionCheckUnavailable?.retryAfterSeconds;
   return {
     user: null,
     authFailedResponse: NextResponse.json(
       options?.stepUp ? { ...failureResult(error), stepUp: options.stepUp } : failureResult(error),
-      { status }
+      {
+        status,
+        ...(typeof retryAfterSeconds === 'number' && {
+          headers: { 'Retry-After': String(retryAfterSeconds) },
+        }),
+      }
     ),
     credentialsRejected: options?.credentialsRejected ?? false,
     authorizationRefused: options?.authorizationRefused ?? false,
@@ -952,6 +1125,9 @@ function authError(
     ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
     ...(options?.adminNetworkDenial && { adminNetworkDenial: options.adminNetworkDenial }),
     ...(options?.stepUp && { stepUp: options.stepUp }),
+    ...(options?.sessionCheckUnavailable && {
+      sessionCheckUnavailable: options.sessionCheckUnavailable,
+    }),
   };
 }
 

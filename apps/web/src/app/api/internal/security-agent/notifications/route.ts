@@ -186,7 +186,7 @@ function isNotificationStillEligible(
 }
 
 export async function POST(req: NextRequest) {
-  const unauthorized = await authorizeInternalApiRequest(req);
+  const unauthorized = await authorizeInternalApiRequest(req, 'security_agent_notifications');
   if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);

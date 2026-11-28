@@ -4,19 +4,27 @@ import { experimental_readRawConfig } from 'wrangler';
 import { readAiAttributionSecret } from '../../../ai-attribution/src/secrets';
 import { readAutoRoutingBenchmarkSecret } from '../../../auto-routing-benchmark/src/secrets';
 import { readAutoRoutingSecret } from '../../../auto-routing/src/secrets';
+import { readCodeReviewInfraSecret } from '../../../code-review-infra/src/secrets';
 import { readKiloclawBillingSecret } from '../../../kiloclaw-billing/src/secrets';
 import { readScimSyncSecret } from '../../../scim-sync/src/secrets';
+import { readSessionSyncSecret } from '../../../session-sync/src/secrets';
+import { readUserDataExportSecret } from '../../../user-data-export/src/secrets';
 import { PolicySchema, type Policy } from '../../src/policy/schema';
-import { repoRoot, shippedPolicyDocuments } from './repo';
+import { repoRoot, SHARED_SECRET_NAMES, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
 
+/** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
+const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
+
 /**
- * Names the copier places in `/shared` although only one batch policy grants them: the value is
- * also held outside STS, so it is already a shared Infisical value rather than a Workload one.
- * `BOT_TOKEN_MINT_SECRET` authenticates apps/web's `POST /api/internal/bot-token` mint as well as
- * this Worker. Every other single-holder name resolves from its own `/workloads/<workload>` folder.
+ * Store items whose name is neither the binding's own nor its `_PROD` alias. Listed one row at a
+ * time, keyed by `workload|policy entry`, and the same value `policy-reader-names.test.ts` pins as
+ * its `STORE_SUFFIX_EXCEPTIONS` row: an item named after another app is a deliberate reuse, and a
+ * rename must fail here rather than pass as a prefix match.
  */
-const SHARED_ELSEWHERE: readonly string[] = ['BOT_TOKEN_MINT_SECRET'];
+const STORE_NAME_ALIASES: Readonly<Record<string, string>> = {
+  'kilo-ai-attribution|ADMIN_SECRET': 'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
+};
 
 /** One row of the copier table the PR body publishes. */
 type CopierRow = {
@@ -49,18 +57,39 @@ function shippedPolicies(): Map<string, Policy> {
   );
 }
 
-/** Which shipped policies grant each name: several holders means the value is a shared one. */
-function holdersBySecretName(): Map<string, string[]> {
-  const holders = new Map<string, string[]>();
-  for (const policy of shippedPolicies().values()) {
-    for (const name of policy.secrets) {
-      holders.set(name, [...(holders.get(name) ?? []), policy.workload]);
-    }
-  }
-  return holders;
-}
-
-const HOLDERS = holdersBySecretName();
+/** The published table's path column: where the copier copies each value. */
+const PUBLISHED_PATHS: Record<string, string> = {
+  'session-sync|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'session-sync|SESSION_SYNC_SECRET': '/workloads/session-sync/SESSION_SYNC_SECRET',
+  'session-sync|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'user-data-export|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'user-data-export|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'user-data-export|R2_ACCESS_KEY_ID': '/workloads/user-data-export/R2_ACCESS_KEY_ID',
+  'user-data-export|R2_SECRET_ACCESS_KEY': '/workloads/user-data-export/R2_SECRET_ACCESS_KEY',
+  'kilo-code-review-worker|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'kilo-code-review-worker|CALLBACK_TOKEN_SECRET': '/shared/CALLBACK_TOKEN_SECRET',
+  'kilo-code-review-worker|BACKEND_AUTH_TOKEN':
+    '/workloads/kilo-code-review-worker/BACKEND_AUTH_TOKEN',
+  'kilo-ai-attribution|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'kilo-ai-attribution|ADMIN_SECRET': '/workloads/kilo-ai-attribution/ADMIN_SECRET',
+  'auto-routing|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'auto-routing|OPENROUTER_API_KEY': '/shared/OPENROUTER_API_KEY',
+  'auto-routing|O11Y_CF_AE_API_TOKEN': '/shared/O11Y_CF_AE_API_TOKEN',
+  'auto-routing|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'auto-routing|AUTO_ROUTING_DECISION_SECRET':
+    '/workloads/auto-routing/AUTO_ROUTING_DECISION_SECRET',
+  'auto-routing-benchmark|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'auto-routing-benchmark|BOT_TOKEN_MINT_SECRET': '/shared/BOT_TOKEN_MINT_SECRET',
+  'auto-routing-benchmark|OPENROUTER_API_KEY': '/shared/OPENROUTER_API_KEY',
+  'cloudflare-scim-sync|WORKOS_API_KEY': '/workloads/cloudflare-scim-sync/WORKOS_API_KEY',
+  'cloudflare-scim-sync|WORKOS_CLIENT_ID': '/workloads/cloudflare-scim-sync/WORKOS_CLIENT_ID',
+  'cloudflare-scim-sync|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'kiloclaw-billing|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'kiloclaw-billing|SNOWFLAKE_PRIVATE_KEY_PEM':
+    '/workloads/kiloclaw-billing/SNOWFLAKE_PRIVATE_KEY_PEM',
+  'kiloclaw-billing|SNOWFLAKE_PUBLIC_KEY_FINGERPRINT':
+    '/workloads/kiloclaw-billing/SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+};
 
 /**
  * Proves one Worker's rows against the three sources the copier table claims to agree: the shipped
@@ -76,12 +105,18 @@ async function proveWorker<N extends string>(worker: {
 }): Promise<CopierRow[]> {
   const policy = shippedPolicies().get(worker.workload);
   if (policy === undefined) throw new Error(`no shipped policy for ${worker.workload}`);
+  // Policy ↔ reader: every name the policy grants is a name the reader serves, exactly once.
+  expect([...policy.secrets].sort(), worker.workload).toEqual([...worker.names].sort());
+  for (const name of worker.names) {
+    expect(name, `${worker.workload}: ${name}`).toMatch(/^[A-Z][A-Z0-9_]*$/);
+    expect(name, `${worker.workload}: ${name}`).not.toMatch(ENVIRONMENT_SUFFIX);
+  }
+
   const { config } = readWorkerConfig(worker.configPath);
   const storeEntries = config.secrets_store_secrets ?? [];
   // The binding a reader looks up is either a Secrets Store binding in this manifest or a plain
   // Worker secret; both kinds appear among the policy names, so this candidate set covers it.
   const candidates = [...new Set([...policy.secrets, ...storeEntries.map(entry => entry.binding)])];
-  const holders = HOLDERS;
 
   const rows: CopierRow[] = [];
   for (const name of worker.names) {
@@ -103,17 +138,22 @@ async function proveWorker<N extends string>(worker: {
 
     const entry = storeEntries.find(candidate => candidate.binding === binding);
     // Manifest ↔ store name: a production block binds the live item, never a dev or staging copy.
-    // The item's name is its own (the store carries names such as
-    // `AI_ATTRIBUTION_ADMIN_SECRET_PROD` beside the binding), so the table records it verbatim.
-    if (entry !== undefined) {
-      expect(entry.secret_name, `${worker.workload}: ${name}`).toMatch(/^[A-Z][A-Z0-9_]*$/);
-      expect(entry.secret_name, `${worker.workload}: ${name}`).not.toMatch(
-        /_(DEV|DEVELOPMENT|STAGING)$/
+    // The item's name is the binding's own name or its `_PROD` alias, or the one alias this table
+    // names for it; the table records it verbatim.
+    const alias = STORE_NAME_ALIASES[`${worker.workload}|${name}`];
+    if (entry !== undefined && alias !== undefined) {
+      expect(entry.secret_name, `${worker.workload}: ${name}`).toBe(alias);
+    } else if (entry !== undefined) {
+      expect([binding, `${binding}_PROD`], `${worker.workload}: ${name}`).toContain(
+        entry.secret_name
       );
+    } else {
+      // A plain Worker secret carries the policy name itself: a `_PROD` binding with no store entry
+      // would mean the copier copies a name the deployment does not hold.
+      expect(binding, `${worker.workload}: ${name}`).toBe(name);
     }
-    // Folder: a name several policies grant cannot live in one Workload's folder, and a name only
-    // this Workload grants stays in its own unless the value is shared outside STS.
-    const shared = (holders.get(name)?.length ?? 0) > 1 || SHARED_ELSEWHERE.includes(name);
+    // Folder: a shared value lives in `/shared`, a Workload's own credential in its own folder.
+    const shared = SHARED_SECRET_NAMES.includes(name);
     rows.push({
       workload: worker.workload,
       oldBinding: binding,
@@ -138,6 +178,29 @@ async function proveWorker<N extends string>(worker: {
 describe('the secrets copier table for the Workers that read STS', () => {
   it('maps every policy secret to one binding and one store name in its wrangler manifest', async () => {
     const rows = [
+      ...(await proveWorker({
+        workload: 'session-sync',
+        configPath: 'services/session-sync/wrangler.jsonc',
+        names: ['NEXTAUTH_SECRET', 'SESSION_SYNC_SECRET', 'INTERNAL_API_SECRET'],
+        read: readSessionSyncSecret,
+      })),
+      ...(await proveWorker({
+        workload: 'user-data-export',
+        configPath: 'services/user-data-export/wrangler.jsonc',
+        names: [
+          'INTERNAL_API_SECRET',
+          'NEXTAUTH_SECRET',
+          'R2_ACCESS_KEY_ID',
+          'R2_SECRET_ACCESS_KEY',
+        ],
+        read: readUserDataExportSecret,
+      })),
+      ...(await proveWorker({
+        workload: 'kilo-code-review-worker',
+        configPath: 'services/code-review-infra/wrangler.jsonc',
+        names: ['INTERNAL_API_SECRET', 'CALLBACK_TOKEN_SECRET', 'BACKEND_AUTH_TOKEN'],
+        read: readCodeReviewInfraSecret,
+      })),
       ...(await proveWorker({
         workload: 'kilo-ai-attribution',
         configPath: 'services/ai-attribution/wrangler.jsonc',
@@ -180,89 +243,35 @@ describe('the secrets copier table for the Workers that read STS', () => {
       })),
     ];
 
-    // The published table, row for row: workload, the binding read today, the store item behind
-    // it (`—` for a plain Worker secret) and the folder the copier writes to. Pinning all four
-    // columns is what makes the table the PR body prints a claim this test can fail on.
-    const published: ReadonlyArray<readonly [string, string, string, string]> = [
-      ['kilo-ai-attribution', 'NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared/NEXTAUTH_SECRET'],
-      [
-        'kilo-ai-attribution',
-        'ADMIN_SECRET',
-        'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
-        '/workloads/kilo-ai-attribution/ADMIN_SECRET',
-      ],
-      [
-        'auto-routing',
-        'INTERNAL_API_SECRET_PROD',
-        'INTERNAL_API_SECRET_PROD',
-        '/shared/INTERNAL_API_SECRET',
-      ],
-      ['auto-routing', 'OPENROUTER_API_KEY', 'OPENROUTER_API_KEY', '/shared/OPENROUTER_API_KEY'],
-      [
-        'auto-routing',
-        'O11Y_CF_AE_API_TOKEN',
-        'O11Y_CF_AE_API_TOKEN',
-        '/shared/O11Y_CF_AE_API_TOKEN',
-      ],
-      ['auto-routing', 'NEXTAUTH_SECRET', 'NEXTAUTH_SECRET_PROD', '/shared/NEXTAUTH_SECRET'],
-      [
-        'auto-routing',
-        'AUTO_ROUTING_DECISION_SECRET',
-        'AUTO_ROUTING_DECISION_SECRET_PROD',
-        '/workloads/auto-routing/AUTO_ROUTING_DECISION_SECRET',
-      ],
-      [
-        'auto-routing-benchmark',
-        'INTERNAL_API_SECRET_PROD',
-        'INTERNAL_API_SECRET_PROD',
-        '/shared/INTERNAL_API_SECRET',
-      ],
-      [
-        'auto-routing-benchmark',
-        'BOT_TOKEN_MINT_SECRET',
-        'BOT_TOKEN_MINT_SECRET',
-        '/shared/BOT_TOKEN_MINT_SECRET',
-      ],
-      [
-        'auto-routing-benchmark',
-        'OPENROUTER_API_KEY',
-        'OPENROUTER_API_KEY',
-        '/shared/OPENROUTER_API_KEY',
-      ],
-      [
-        'cloudflare-scim-sync',
-        'WORKOS_API_KEY',
-        'WORKOS_API_KEY',
-        '/workloads/cloudflare-scim-sync/WORKOS_API_KEY',
-      ],
-      [
-        'cloudflare-scim-sync',
-        'WORKOS_CLIENT_ID',
-        'WORKOS_CLIENT_ID',
-        '/workloads/cloudflare-scim-sync/WORKOS_CLIENT_ID',
-      ],
-      [
-        'cloudflare-scim-sync',
-        'INTERNAL_API_SECRET',
-        'INTERNAL_API_SECRET_PROD',
-        '/shared/INTERNAL_API_SECRET',
-      ],
-      ['kiloclaw-billing', 'INTERNAL_API_SECRET', '—', '/shared/INTERNAL_API_SECRET'],
-      [
-        'kiloclaw-billing',
-        'SNOWFLAKE_PRIVATE_KEY_PEM',
-        '—',
-        '/workloads/kiloclaw-billing/SNOWFLAKE_PRIVATE_KEY_PEM',
-      ],
-      [
-        'kiloclaw-billing',
-        'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
-        '—',
-        '/workloads/kiloclaw-billing/SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
-      ],
-    ];
+    // No two rows name the same Worker binding, and every row is a policy entry the workload's
+    // policy grants.
+    const policies = shippedPolicies();
+    expect(rows.map(row => `${row.workload}|${row.oldBinding}`)).toEqual([
+      ...new Set(rows.map(row => `${row.workload}|${row.oldBinding}`)),
+    ]);
+    expect(rows).toHaveLength(3 + 4 + 3 + 2 + 5 + 3 + 3 + 3);
+    for (const row of rows) {
+      expect(policies.get(row.workload)?.secrets, row.workload).toContain(row.policyEntry);
+    }
+    // The published path column, made executable: the copier copies each value into exactly this
+    // folder, so a row whose folder differs from the table is a documentation bug that would
+    // misplace the value.
     expect(
-      rows.map(row => [row.workload, row.oldBinding, row.storeSecretName, row.stsLookup])
-    ).toEqual(published);
+      Object.fromEntries(rows.map(row => [`${row.workload}|${row.policyEntry}`, row.stsLookup]))
+    ).toEqual(PUBLISHED_PATHS);
+    // The plain-Worker-secret rows and the store rows both appear: the table's second column must
+    // not claim a store item for a name the manifest does not bind one to.
+    expect(rows.filter(row => row.storeSecretName === '—').map(row => row.policyEntry)).toEqual([
+      'INTERNAL_API_SECRET',
+      'NEXTAUTH_SECRET',
+      'R2_ACCESS_KEY_ID',
+      'R2_SECRET_ACCESS_KEY',
+      'INTERNAL_API_SECRET',
+      'CALLBACK_TOKEN_SECRET',
+      'BACKEND_AUTH_TOKEN',
+      'INTERNAL_API_SECRET',
+      'SNOWFLAKE_PRIVATE_KEY_PEM',
+      'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+    ]);
   });
 });

@@ -1,4 +1,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
@@ -23,6 +28,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const expected = presented ? await readInternalApiSecret() : '';
   if (!expected || !presented || !timingSafeEqual(presented, expected))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
+  observeInternalAuth(
+    'web',
+    'byoc_connections',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
   const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success)
     return NextResponse.json({ error: 'Invalid request' }, { status: 400, headers });

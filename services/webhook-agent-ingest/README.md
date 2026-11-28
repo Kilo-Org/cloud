@@ -234,6 +234,7 @@ Captured requests go through the following status lifecycle:
 | `ENVIRONMENT` | `production` or `development` |
 | `KILOCODE_BACKEND_BASE_URL` | Backend API URL |
 | `SECRETS_SOURCE` | Where the three secrets below are read; see [Secrets source](#secrets-source) |
+| `SECRETS_COMPARE_ENABLED` | `true` runs the pre-flip STS copy check; see [Secrets source](#secrets-source) |
 
 ## Secrets (via Secrets Store)
 
@@ -250,7 +251,9 @@ Captured requests go through the following status lifecycle:
 - `secrets-store` (default, also when unset): the Secrets Store bindings, as before. `env.dev` sets no value, so it keeps this source.
 - `sts`: the production STS bundle over the `STS` binding (`props.caller` `cloudflare-webhook-agent-ingest`). It never falls back to the Secrets Store. A request without a credential reads no bundle and gets the usual `401`. A failed read answers `/api/*` and `/api/callbacks/execution` with a generic `503` (`Retry-After: 30`, error `Internal key unavailable`) before the body is read. In the queue consumer it fails the delivery with the fixed text `Webhook credentials are temporarily unavailable`, which the consumer retries like any other failure. Each failure logs a fixed event with a fixed reason only.
 
-Any other value refuses every read in the same way. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants no name yet.
+Any other value refuses every read in the same way. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants the three names, each resolved from `/shared` (a name not yet copied there reads as missing).
+
+`SECRETS_COMPARE_ENABLED` (only the exact value `true`) turns on the pre-flip check in `src/secrets-compare.ts`. It runs once per isolate, after the first request that passes the legacy authentication — an `X-Internal-API-Key` check on `/api/*` or an `X-Callback-Token` check on `/api/callbacks/execution` — so it never runs before an authorized request and never on one that is refused. It compares the STS copy of each of the three names with the bytes the Secrets Store serves and logs one `webhook_secrets_compare` event holding only the three names and their booleans. It never changes a response, and a comparison that has not settled within 25 s reports every name `false`. It requires production and `SECRETS_SOURCE` `secrets-store`: with `sts` selected it never runs, and `env.dev` sets neither value. To stop every comparison, set the flag to `false` or unset it.
 
 ## Authentication
 

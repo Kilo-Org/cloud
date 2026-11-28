@@ -57,6 +57,7 @@ export async function matchBotCallbackToken(params: {
     secret: CALLBACK_TOKEN_SECRET,
     scope: BOT_CALLBACK_TOKEN_SCOPE,
     resourceParts: [botRequestId],
+    observation: { receiver: 'web' },
   });
   if (scopedTokenValid) {
     return 'scoped';

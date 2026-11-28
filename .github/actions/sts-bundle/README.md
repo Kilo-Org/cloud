@@ -1,0 +1,92 @@
+# sts-bundle
+
+Reads the job's secret bundle from Kilo STS and sets each requested secret as a step output. It is
+a port of Kilo-Org/kilocode's `.github/actions/kilo-credentials` with this repository's outputs.
+
+**Callers.**
+
+| Workflow | Job | Workload | Keys |
+|---|---|---|---|
+| `.github/workflows/cloud-agent-e2e.yml` | `tests` | `ci-cloud-agent-e2e` | `E2E_ACCESS_CLIENT_ID`, `E2E_ACCESS_CLIENT_SECRET` |
+
+The `ci-cloud-agent-e2e` policy (`services/sts/policy/`) pins `cloud-agent-e2e.yml` at
+`refs/heads/main`, the environment `cloud-agent-e2e` and the event `workflow_dispatch`. Its values
+live in Infisical production `/ci/ci-cloud-agent-e2e`.
+
+## What it does
+
+1. Requests a GitHub OIDC token with the audience `sts-url` (`https://sts.kiloapps.io`).
+2. Sends it as the bearer token in `POST <sts-url>/v1/bundle` with the body `{}`. STS picks the
+   policy from the token's claims and returns that policy's bundle.
+3. Masks every value in the bundle with `::add-mask::`, including keys the job did not request:
+   each line on its own, and each multi-line value as a whole.
+4. Checks that the response is exactly one `ok` bundle result, that its `workload` equals the
+   `workload` input, and that it is not stale.
+5. Sets each requested key as a step output, written to `GITHUB_OUTPUT` with its own random
+   delimiter. Nothing is written to `GITHUB_ENV`.
+
+The action fails on any error and has no fallback to a stored secret. A failure prints one error
+line of at most 300 characters. From an STS refusal it shows only the HTTP status and the short
+`status`, `reason` or `error` words of the response body. It fails on a stale bundle too: STS
+serves its last known copy when the secret manager is unreachable, and that copy may still hold a
+revoked key.
+
+Tokens and values never appear in a command line or in the log. The responses are kept in a
+temporary directory with mode 0700, which the action deletes when it exits. The action needs
+`bash`, `curl` and `jq`, all installed on the Ubuntu runners.
+
+### Retries and timing
+
+At most 3 attempts, each with a new OIDC token. It retries an OIDC 5xx, an STS 503 (waiting for its
+`retryAfterSeconds`, else `Retry-After`, else 5 s, capped at 60 s), and the curl transport errors 7,
+16, 28, 35, 52, 55, 56 and 92 (waiting 5 s). The OIDC request is limited to 30 s and each STS
+request to 60 s, so the worst case before the action fails is about 6.5 minutes. A typical read
+takes about a second.
+
+## Inputs
+
+| Input | Required | Description |
+|---|---|---|
+| `workload` | yes | The STS policy name of the job |
+| `secrets` | yes | One bundle key per line, declared under `outputs` in `action.yml`. A key missing from the bundle fails the job |
+| `sts-url` | no | `https://sts.kiloapps.io` (default) or `https://sts-staging.kiloapps.io`. Any other value fails the job, because that origin would receive the OIDC token |
+
+## Outputs
+
+One output per bundle key that a policy read by this repository's workflows grants. Adding a key
+means adding one output to `action.yml` in the same pull request as the first workflow that
+requests it. Outputs of keys the job did not request are empty strings.
+
+## Rules for a calling job
+
+- It runs in the GitHub environment that its STS policy names, whose deployment branch policy
+  allows `main` only, and it has `permissions: id-token: write`.
+- Its workflow is never callable with `workflow_call`: the OIDC token of a reusable workflow carries
+  that workflow's `job_workflow_ref`, so any workflow allowed to call it would receive its bundle.
+- `secrets:` lists every key the job reads.
+- Each value goes to the step that needs it, with `env:` on that step only, never in the job's
+  `env:` or in `GITHUB_ENV`.
+- Every action used in the job is pinned by its full commit SHA.
+- Every step before this one is trusted: an earlier step can change the `PATH` and the environment
+  this action runs with.
+- No step in the job installs packages or runs lifecycle scripts, and none runs code from a fork or
+  a pull request. With `id-token: write`, any step can request its own OIDC token and read the
+  bundle itself.
+
+**Exception, `cloud-agent-e2e.yml` `tests`.** The e2e driver must send the Access headers on every
+request, so the values have to be in the job that runs it, and the driver runs package code. The
+job therefore installs nothing: the `build` job installs with `--frozen-lockfile --ignore-scripts`,
+has no `id-token`, and hands the installed workspace over as an artifact. The `tests` job reads the
+bundle, downloads that workspace and runs the driver with the package's own `tsx`, without a
+package manager. The exposure left is the runtime code of packages pinned by the lockfile.
+
+## Tests
+
+`scripts/sts-bundle-action.test.mjs` runs the script with stand-in `curl` and `sleep` commands and
+checks the outputs, masking, the workload and stale checks, refusals, retries and that no token or
+value reaches a command line. It runs in the `ci-wiring` job. To run it alone from the repository
+root, with `bash` and `jq` installed:
+
+```sh
+node --test scripts/sts-bundle-action.test.mjs
+```

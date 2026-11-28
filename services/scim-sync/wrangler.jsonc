@@ -48,6 +48,12 @@
     // applied over REST so the app keeps the advisory locks, the depth check,
     // the soft-delete side effects and the removal tombstone in one place.
     "BACKEND_API_URL": "https://app.kilo.ai",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the `/api/internal/scim/*`
+    // calls send `INTERNAL_API_SECRET` as `x-internal-api-key`. `"sts"` sends a
+    // `web:scim.sync` STS service token over the `STS` binding instead; set it
+    // only once the Worker has that binding, STS grants the scope and the
+    // routes accept STS. Removing it is the rollback.
+
     // Seconds between polls. Read on every alarm, so a change takes effect on
     // the first tick after deploy. Clamped in code to 10..3600: a sub-second
     // interval would keep the Durable Object from hibernating and bill
@@ -146,6 +152,8 @@
         "BACKEND_API_URL": "https://staging-app.kilo.ai",
         "SCIM_POLL_INTERVAL_SECONDS": "60",
         "WORKOS_EVENT_CURSOR": "",
+        // Staging binds no STS and its app accepts only the secret.
+        "WEB_INTERNAL_AUTH": "legacy",
       },
       "secrets_store_secrets": [
         {

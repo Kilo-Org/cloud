@@ -1,6 +1,11 @@
 import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { HonoContext } from '../hono-context.js';
 import type { ValidatedSessionAccess } from '../types.js';
 import { logger } from '../logger.js';
@@ -48,7 +53,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function hasValidInternalApiKey(c: Context<HonoContext>): boolean {
   const provided = c.req.header(INTERNAL_API_KEY_HEADER);
   const expected = c.env.INTERNAL_API_SECRET;
-  return Boolean(provided && expected && timingSafeEqual(provided, expected));
+  if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  // Design section 9.4, item 9: the bypass is a shared-secret acceptance on a procedure that the
+  // internal tRPC guard does not cover.
+  observeInternalAuth(
+    'cloud-agent-next',
+    'balance_bypass',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  return true;
 }
 
 /**

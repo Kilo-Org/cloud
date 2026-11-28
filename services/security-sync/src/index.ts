@@ -1,4 +1,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { z } from 'zod';
 import {
   createOrFindSecurityAgentCommandByOperationKey,
@@ -818,6 +823,12 @@ export default {
       if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
+      observeInternalAuth(
+        'security-sync',
+        'manual_sync',
+        'legacy_shared_secret',
+        callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+      );
 
       let payload: unknown;
       try {
@@ -854,6 +865,12 @@ export default {
       if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
+      observeInternalAuth(
+        'security-sync',
+        'dismiss_finding',
+        'legacy_shared_secret',
+        callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+      );
 
       let payload: unknown;
       try {

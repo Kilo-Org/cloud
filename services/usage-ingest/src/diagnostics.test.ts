@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import worker from './index';
 import type { Env } from './publish-usage';
 import { usage, wireUsage } from './usage.test-fixture';
@@ -6,6 +6,21 @@ import { usage, wireUsage } from './usage.test-fixture';
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  delete process.env.INTERNAL_AUTH_OBSERVATION_ENABLED;
+  delete testGlobals[OBSERVATION_SEAM];
+});
+
+// This suite asserts exact enqueue log lines and mocked `Date.now` sequences; the item-9 counter
+// has its own suite (src/publish-auth.test.ts), so it stays off here. The seam is what a Workers
+// test pool honours: `process.env` there is the deployment's own environment.
+// A named handle, not an inline cast: the pool shares `globalThis` with the Worker under test.
+const OBSERVATION_SEAM = '__KILO_INTERNAL_AUTH_OBSERVATION__';
+const testGlobals = globalThis as unknown as Record<string, unknown>;
+
+// Per test, not once at module load: `afterEach` clears it and suites share one process.
+beforeEach(() => {
+  process.env.INTERNAL_AUTH_OBSERVATION_ENABLED = 'false';
+  testGlobals[OBSERVATION_SEAM] = false;
 });
 
 function setup() {
@@ -158,6 +173,8 @@ it('keeps an enqueue failure a safe 503 even when its diagnostic sink throws', a
 
 it('emits the full unavailable enqueue fields without a flag', async () => {
   const { env, send, logs } = setup();
+  // The counter is off for this suite (see the flag at the top of the file), so these are the only
+  // clock reads: the publisher entry, the pre-send stamp and the completion.
   vi.spyOn(Date, 'now')
     .mockReturnValueOnce(1000)
     .mockReturnValueOnce(1000)

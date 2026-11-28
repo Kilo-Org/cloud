@@ -34,6 +34,11 @@
     "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
     "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
     "BACKEND_API_URL": "https://app.kilo.ai",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the notification dispatch to
+    // `/api/internal/security-agent/notifications` sends `INTERNAL_API_SECRET` as
+    // `X-Internal-Secret`. `"sts"` sends a `web:security-notifications.dispatch` STS service token
+    // over the `STS` binding instead; set it only once the Worker has that binding, STS grants the
+    // scope and the route accepts STS. Removing it is the rollback.
     "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
     "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
   },
@@ -100,6 +105,8 @@
         "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
         "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
         "BACKEND_API_URL": "http://localhost:3000",
+        // The local app accepts only the secret.
+        "WEB_INTERNAL_AUTH": "legacy",
         "SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED": "true",
         "SECURITY_NOTIFICATION_DISPATCH_ENABLED": "true",
       },

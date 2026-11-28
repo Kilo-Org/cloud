@@ -1,3 +1,7 @@
+import type { WebInternalAuthEnv } from '@kilocode/worker-utils/web-internal-credential';
+
+/** The same `STS` handle as the web service-token client declares it. */
+type ServiceTokenBinding = NonNullable<WebInternalAuthEnv['STS']>;
 import {
   createWorkerSecrets,
   type BundleBinding,
@@ -36,7 +40,12 @@ type LegacySecretValue = string | { get(): Promise<string> };
  */
 export type AutoRoutingSecretsEnv = Partial<Record<BindingName, LegacySecretValue>> & {
   SECRETS_SOURCE?: string;
-  STS?: BundleBinding;
+  /**
+   * The one `STS` binding: `service: "sts"`, entrypoint `SecretsBroker`. A Worker that also mints
+   * web service tokens types the same handle with that client's RPC surface, so the reader accepts
+   * either shape and narrows to the bundle it reads; both name the same runtime binding.
+   */
+  STS?: BundleBinding | ServiceTokenBinding;
 };
 
 export type SecretsSource = 'secrets-store' | 'sts';
@@ -80,7 +89,7 @@ export async function readAutoRoutingSecret(
   ctx?: SecretsExecutionContext
 ): Promise<string> {
   if (secretsSource(env) === 'sts') {
-    const binding = env.STS;
+    const binding = env.STS as BundleBinding | undefined;
     if (binding === undefined) {
       throw new Error('SECRETS_SOURCE is "sts" but the STS service binding is missing');
     }

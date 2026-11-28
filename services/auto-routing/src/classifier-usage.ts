@@ -7,6 +7,7 @@ import {
 } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
+import { deterministicUuidV7 } from '@kilocode/worker-utils/usage-id';
 import {
   recordLlmUsage,
   type LlmUsageWriteOutcome,
@@ -28,6 +29,7 @@ export type ClassifierUsageIdentity = {
   classifierModel: string;
   contentHash: string;
   kind: ClassifierCallKind;
+  // `<epoch ms>:<performance.now()>`, minted once per decision by `runDecision`.
   requestStart: string;
   // The auto model the request named: a platform router or a custom router model ID.
   requestedModel: string;
@@ -40,6 +42,14 @@ type ClassifierUsageEnv = Pick<
 
 function clean(value: string | null): string | null {
   return value?.replaceAll('\u0000', '') ?? null;
+}
+
+function requestStartMilliseconds(requestStart: string): number {
+  const milliseconds = /^(\d+):/.exec(requestStart)?.[1];
+  if (milliseconds === undefined) {
+    throw new Error('Classifier requestStart must start with epoch milliseconds');
+  }
+  return Number(milliseconds);
 }
 
 export async function buildClassifierUsage(
@@ -58,7 +68,7 @@ export async function buildClassifierUsage(
       identity.requestStart,
     ])
   );
-  const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${((parseInt(hash[16] ?? '0', 16) & 3) | 8).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+  const id = deterministicUuidV7(requestStartMilliseconds(identity.requestStart), hash);
   return UsageRecordRequestSchema.parse({
     core: {
       id,

@@ -35,7 +35,7 @@ const identity: ClassifierUsageIdentity = {
   classifierModel: 'test/classifier',
   contentHash: 'exact-content-hash',
   kind: 'sync',
-  requestStart: 'request-start-1',
+  requestStart: '1767225600123:10.5',
   requestedModel: 'kilo-auto/efficient',
 };
 const createdAt = '2026-01-01T00:00:00.000Z';
@@ -67,13 +67,31 @@ describe('classifier usage identity', () => {
     expect(UsageRecordRequestSchema.safeParse(first).success).toBe(true);
   });
 
+  it('is a UUIDv7 stamped with the request start milliseconds', async () => {
+    const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    expect(usage.core.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(parseInt(usage.core.id.replace(/-/g, '').slice(0, 12), 16)).toBe(1767225600123);
+  });
+
+  it.each(['request-start-1', '', ':10', 'abc:10', '-5:10', '10'])(
+    'rejects a requestStart without leading epoch milliseconds: %j',
+    async requestStart => {
+      await expect(
+        buildClassifierUsage(payload, { ...identity, requestStart }, costUsd, createdAt)
+      ).rejects.toThrow('requestStart');
+    }
+  );
+
   it.each([
     { conversationKey: 'conversation-2' },
     { classifierModel: 'other/classifier' },
     { contentHash: 'other-exact-hash' },
     { kind: 'background' as const },
     { kind: 'speculative' as const },
-    { requestStart: 'request-start-2' },
+    { requestStart: '1767225600124:10.5' },
+    { requestStart: '1767225600123:11.5' },
   ])('separates calls when identity changes: %j', async change => {
     const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     const other = await buildClassifierUsage(

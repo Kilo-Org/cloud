@@ -81,11 +81,16 @@ describe('notifications wrangler.jsonc', () => {
       SECRETS_SOURCE: 'secrets-store',
     });
     expect(boundKinds(production)).toEqual([
+      'analytics_engine_datasets',
       'durable_objects',
       'hyperdrive',
       'queues',
       'secrets_store_secrets',
       'services',
+    ]);
+    // The item-9 counter dataset: exactly one, shared with usage-ingest, read back by o11y.
+    expect(production.analytics_engine_datasets).toEqual([
+      { binding: 'INTERNAL_AUTH_COUNTER', dataset: 'kilo_internal_auth' },
     ]);
     expect(production.hyperdrive).toEqual([
       {
@@ -161,6 +166,7 @@ describe('notifications wrangler.jsonc', () => {
     expect(staging.logpush).toBeUndefined();
 
     expect(boundKinds(staging)).toEqual(['durable_objects', 'hyperdrive']);
+    expect(staging.analytics_engine_datasets).toEqual([]);
     expect(staging.hyperdrive).toEqual([{ binding: 'HYPERDRIVE', id: STAGING_HYPERDRIVE }]);
     expect(staging.durable_objects).toEqual(CHANNEL_DO);
     expect(staging.migrations).toEqual(MIGRATIONS);

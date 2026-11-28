@@ -1347,6 +1347,93 @@ describe('receipt reconciliation', () => {
       countRows('SELECT COUNT(DISTINCT usage_id) AS count FROM paid_attempt_usage')
     );
   });
+
+  describe('receipts credential', () => {
+    function seedOne(): void {
+      seedAdmitted({
+        id: 'w1',
+        usageId: 'aaaa1111-1111-4111-8111-111111111111',
+        assignmentId: 'bbbb2222-2222-4222-8222-222222222222',
+        model: 'vendor/alpha',
+        projectId: benchmarkProjectId({ scope: 'user', slug: 'pool-one', routerId: ROUTER_ID }),
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+    }
+
+    function receiptsFetch(seen: Headers[]): typeof fetch {
+      return async (input, init) => {
+        const request = new Request(input, init);
+        seen.push(request.headers);
+        const body = BenchmarkUsageReceiptRequestSchema.parse(await request.json());
+        return new Response(
+          JSON.stringify({ receipts: body.usageIds.map(id => receipt(id, 'vendor/alpha')) }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      };
+    }
+
+    it('sends the internal secret while WEB_INTERNAL_AUTH is unset', async () => {
+      seedOne();
+      const seen: Headers[] = [];
+      const summary = await reconcilePaidUsageReceipts(paidBindings(db), {
+        fetchImpl: receiptsFetch(seen),
+      });
+      expect(summary.recorded).toBe(1);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.get('x-internal-api-key')).toBe('secret');
+      expect(seen[0]?.has('authorization')).toBe(false);
+    });
+
+    it('sends a web:usage.receipts.read STS token under sts, never the secret', async () => {
+      seedOne();
+      const seen: Headers[] = [];
+      const secret = vi.fn(async () => 'secret');
+      const minted: unknown[] = [];
+      const summary = await reconcilePaidUsageReceipts(
+        {
+          ...paidBindings(db),
+          INTERNAL_API_SECRET_PROD: { get: secret } as unknown as SecretsStoreSecret,
+          WEB_INTERNAL_AUTH: 'sts',
+          STS: {
+            async mintTokens(request) {
+              minted.push(request);
+              return {
+                status: 'ok',
+                tokens: request.tokens.map(({ audience, scope }) => ({
+                  status: 'issued',
+                  audience,
+                  scope,
+                  token: 'sts-receipts-token',
+                  jti: 'jti-receipts',
+                  expiresAt: Math.floor(Date.now() / 1000) + 300,
+                })),
+              };
+            },
+          },
+        },
+        { fetchImpl: receiptsFetch(seen) }
+      );
+      expect(summary.recorded).toBe(1);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.get('authorization')).toBe('Bearer sts-receipts-token');
+      expect(seen[0]?.has('x-internal-api-key')).toBe(false);
+      expect(secret).not.toHaveBeenCalled();
+      expect(minted).toEqual([{ tokens: [{ audience: 'web', scope: 'web:usage.receipts.read' }] }]);
+    });
+
+    it('books nothing and sends nothing when sts has no STS binding', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      seedOne();
+      const seen: Headers[] = [];
+      const summary = await reconcilePaidUsageReceipts(
+        { ...paidBindings(db), WEB_INTERNAL_AUTH: 'sts' },
+        { fetchImpl: receiptsFetch(seen) }
+      );
+      expect(summary.recorded).toBe(0);
+      expect(seen).toHaveLength(0);
+      expect(countRows('SELECT COUNT(*) AS count FROM paid_attempt_usage')).toBe(0);
+    });
+  });
 });
 
 describe('permanent launch refusal', () => {

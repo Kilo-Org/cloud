@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   benchmarkPairKey,
   resolveBenchmarkIdentity,
@@ -187,6 +188,8 @@ export async function syncSubscriptionSnapshot(
     retryUnresolved?: boolean;
     restorePrevious?: boolean;
     catalog?: z.infer<typeof BenchmarkModelCatalogSchema>;
+    /** The invocation that owns this snapshot, handed to every secret read it reaches. */
+    ctx?: SecretsExecutionContext;
   } = {}
 ): Promise<SubscriptionSnapshot> {
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -212,7 +215,9 @@ export async function syncSubscriptionSnapshot(
         (await fetchExecutableBenchmarkModelCatalog(
           env,
           resolveBenchmarkIdentity(config),
-          options.fetchImpl
+          options.fetchImpl,
+          undefined,
+          options.ctx
         )))
       : null;
     const snapshot = resolveSubscriptionSnapshot(
@@ -351,7 +356,12 @@ export type DailyAliasReconcileResult = {
   owners: DailyAliasOwners;
 };
 
-type DailyAliasOptions = { fetchImpl?: typeof fetch; now?: Date };
+type DailyAliasOptions = {
+  fetchImpl?: typeof fetch;
+  now?: Date;
+  /** The invocation that owns this pass, handed to every secret read it reaches. */
+  ctx?: SecretsExecutionContext;
+};
 type OwnerKey = { ownerType: 'user' | 'org'; ownerId: string };
 type DailyAliasProgress = {
   day: string;
@@ -649,7 +659,9 @@ async function reconcileDailyAliases(
     catalog = await fetchExecutableBenchmarkModelCatalog(
       env,
       resolveBenchmarkIdentity(config),
-      options.fetchImpl
+      options.fetchImpl,
+      undefined,
+      options.ctx
     );
   } catch (error) {
     catalogError = error instanceof Error ? error.message : String(error);
@@ -666,7 +678,7 @@ async function reconcileDailyAliases(
           config,
           PLATFORM_SUBSCRIPTION_OWNER,
           config.deciderModels.map(model => ({ model: model.id })),
-          { daily: true, catalog }
+          { daily: true, catalog, ctx: options.ctx }
         );
         progress.platformStatus = 'ok';
         progress.platformError = null;

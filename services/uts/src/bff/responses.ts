@@ -27,6 +27,14 @@ export function invalidSession(): Response {
   return oauthError('invalid_session', 401, 'the session is not live');
 }
 
+/**
+ * Design 5.8: the subject is no active member of `org` in a role the scope allows, or its sign-in
+ * misses the organization's SSO rule.
+ */
+export function orgDenied(): Response {
+  return oauthError('access_denied', 403, 'the account cannot act in this organization');
+}
+
 /** Design 5.11: a step-up lasts 10 minutes, so a scope that needs one asks for that `max_age`. */
 const STEP_UP_SECONDS = 600;
 const STEP_UP_DESCRIPTION = 'this scope needs a passkey check within the last 10 minutes';

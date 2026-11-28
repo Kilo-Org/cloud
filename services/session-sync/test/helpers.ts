@@ -10,7 +10,7 @@ export const testEnv = env as Env;
 
 async function secret(): Promise<string> {
   const binding = testEnv.SESSION_SYNC_SECRET;
-  const value = typeof binding === 'string' ? binding : await binding.get();
+  const value = typeof binding === 'string' ? binding : await binding?.get();
   if (!value) throw new Error('SESSION_SYNC_SECRET is not configured for tests');
   return value;
 }

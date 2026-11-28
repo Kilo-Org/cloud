@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+// Node's URL: `readFileSync` does not accept the Workers runtime's global `URL`.
+import { URL } from 'node:url';
 import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
 import { z } from 'zod';
 import {

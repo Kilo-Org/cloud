@@ -67,16 +67,43 @@ describe('the UTS scope registry', () => {
     for (const scope of [UTS_PATS_MANAGE_SCOPE, UTS_BOT_KEYS_MANAGE_SCOPE]) {
       expect(utsScopeEntry(scope)).toMatchObject({
         audience: UTS_ACCOUNT_AUDIENCE,
+        allowedClients: ['kilo-cli', 'kilo-web'],
         patEligible: false,
         thirdPartySafe: false,
         requiresSession: true,
+        requiresOrgClaim: false,
       });
     }
     expect(utsScopeEntry(UTS_PROBE_READ_SCOPE)).toMatchObject({
       audience: UTS_ACCOUNT_AUDIENCE,
+      allowedClients: ['kilo-cli'],
       patEligible: true,
       requiresSession: false,
     });
+  });
+
+  it('lets the CLI and the web BFF hold the credential-manage scopes, and no other client', () => {
+    for (const scope of [UTS_PATS_MANAGE_SCOPE, UTS_BOT_KEYS_MANAGE_SCOPE]) {
+      for (const client of [
+        { kind: 'first_party', clientId: 'kilo-cli' },
+        { kind: 'confidential_web', clientId: 'kilo-web' },
+      ] as const) {
+        expect(clientScopeRefusal([scope], client, utsScopeEntry)).toBeNull();
+      }
+      for (const client of [
+        { kind: 'first_party', clientId: 'kilo-mobile' },
+        { kind: 'third_party', clientId: 'https://client.example.com/oauth/client.json' },
+      ] as const) {
+        expect(clientScopeRefusal([scope], client, utsScopeEntry)).toBe(scope);
+      }
+    }
+    expect(
+      clientScopeRefusal(
+        [UTS_PROBE_READ_SCOPE],
+        { kind: 'confidential_web', clientId: 'kilo-web' },
+        utsScopeEntry
+      )
+    ).toBe(UTS_PROBE_READ_SCOPE);
   });
 
   it('lists the Kilo API profile scope for the CLI and for PATs, and a PAT may carry it', () => {
@@ -226,6 +253,7 @@ describe('the UTS scope registry', () => {
     ['notifications:badges.write', ['kilo-mobile'], null],
     ['event-service:events.subscribe', ['kilo-web', 'kilo-mobile', 'kilo-cli'], null],
     ['kilo-chat:chat.use', ['kilo-web'], null],
+    ['kilo-api:home-widget.use', ['kilo-mobile'], null],
   ] as const)(
     'lists %s for %j with a session for 10 minutes, org roles %j, no PAT and no delegation',
     (scope, clients, roles) => {
@@ -291,6 +319,7 @@ describe('the UTS scope registry', () => {
       'kilo-api:auto-routing.write',
       'kilo-api:credits.redeem',
       'kilo-api:feedback.write',
+      'kilo-api:home-widget.use',
       'kilo-api:mcp.read',
       'kilo-api:notifications.read',
       'kilo-api:organizations.read',

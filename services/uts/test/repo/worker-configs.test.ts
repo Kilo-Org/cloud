@@ -23,6 +23,7 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { botTokenPolicies } from '../../src/bot-token/policy';
 import { ciPolicies } from '../../src/ci/policy';
 import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
@@ -620,6 +621,27 @@ describe('the UTS configs themselves', () => {
     }
   });
 
+  it('keep the bot-token mint off in production, and every configured bot-token policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.BOT_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    for (const block of [
+      staging,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+    ]) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = botTokenPolicies(
+        { BOT_TOKEN_POLICIES: z.string().parse(value) },
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
+  });
+
   it('leave the login rotation off in every deployed block, and name the configs it switches', () => {
     const raw = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
     const BlockSchema = z.object({
@@ -675,6 +697,29 @@ describe('the UTS configs themselves', () => {
         )
       )
     ).toEqual([expect.stringContaining(`${FEED_CONFIG} (env.staging): STS_URL`)]);
+  });
+
+  it('leave the home-widget exchange off in every mint block, and fail a malformed or production switch', () => {
+    const mint = configAt(MINT_CONFIG).config;
+    expect(mint.vars?.HOME_WIDGET_GRANT_ENABLED).toBeUndefined();
+    expect(mint.env?.staging?.vars?.HOME_WIDGET_GRANT_ENABLED).toBeUndefined();
+    const edited = (top: Record<string, unknown>, staging: Record<string, unknown>) =>
+      mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const stagingVars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        return {
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), ...top },
+          env: { ...env, staging: { ...env.staging, vars: { ...stagingVars, ...staging } } },
+        };
+      });
+    expect(utsConfigProblems(edited({}, { HOME_WIDGET_GRANT_ENABLED: 'true' }))).toEqual([]);
+    expect(utsConfigProblems(edited({}, { HOME_WIDGET_GRANT_ENABLED: 'on' }))).toEqual([
+      expect.stringContaining(`${MINT_CONFIG} (env.staging): HOME_WIDGET_GRANT_ENABLED is "on"`),
+    ]);
+    expect(utsConfigProblems(edited({ HOME_WIDGET_GRANT_ENABLED: 'true' }, {}))).toEqual([
+      expect.stringContaining(`${MINT_CONFIG} (top level): HOME_WIDGET_GRANT_ENABLED stays off`),
+    ]);
   });
 
   it('keep the feed logs at a 5 percent head sample in every block, and fail a larger or missing one', () => {

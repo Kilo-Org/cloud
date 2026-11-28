@@ -57,6 +57,8 @@ const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
 const DEPLOY_WORKFLOW = 'acme/bouncer/.github/workflows/deploy.yml@refs/heads/main';
 const OTHER_WORKFLOW = 'acme/other/.github/workflows/deploy.yml@refs/heads/main';
 const PLAIN_WORKFLOW = 'acme/bouncer/.github/workflows/lint.yml@refs/heads/main';
+/** A workflow whose parallel jobs each get a token: its policy sets maxPerRun. */
+const RUNS_WORKFLOW = 'acme/runs/.github/workflows/deploy.yml@refs/heads/main';
 const ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
 const SCRIPTS_GROUP = 'a'.repeat(32);
 const CONTAINERS_GROUP = 'b'.repeat(32);
@@ -127,6 +129,13 @@ const authority: MintAuthority = {
         '322',
         '654',
       ]),
+      // maxPerRun: up to 3 tokens per run attempt, 1 run attempt holding tokens, 2 per hour.
+      'ci-deploy-runs.yaml': deployPolicy('ci-deploy-runs', 'acme/runs', RUNS_WORKFLOW, [
+        '323',
+        '654',
+      ])
+        .replace('maxActive: 2', 'maxActive: 1')
+        .replace('maxPerHour: 4', 'maxPerHour: 2\n    maxPerRun: 3'),
       'ci-bouncer-lint.yaml': `
 workload: ci-bouncer-lint
 environments: [development]
@@ -443,6 +452,19 @@ const OTHER_CLAIMS = {
   job_workflow_ref: OTHER_WORKFLOW,
   run_id: '7001',
 };
+
+/** A job of the maxPerRun workflow, in run `runId` attempt `runAttempt`. */
+function runsClaims(runId: string, runAttempt = '1'): Record<string, string> {
+  return {
+    ...JOB_CLAIMS,
+    sub: 'repo:acme@654/runs@323:environment:production',
+    repository: 'acme/runs',
+    repository_id: '323',
+    job_workflow_ref: RUNS_WORKFLOW,
+    run_id: runId,
+    run_attempt: runAttempt,
+  };
+}
 
 async function post(path: string, body: string, token?: string): Promise<Response> {
   const ctx = {
@@ -818,6 +840,61 @@ describe('mint', () => {
     expect(cloudflare.creates()).toHaveLength(4);
     const reasons = (await flushedDenials()).map(event => event.data.attributes.reason);
     expect(reasons).toEqual(expect.arrayContaining(['too_many_active', 'rate_limited']));
+  });
+
+  it('counts maxActive and maxPerHour in run attempts under maxPerRun, and caps each attempt', async () => {
+    const cloudflare = installFakes(github);
+    // Three parallel jobs of one run each get a token, though maxActive is 1.
+    const tokens = [];
+    for (let job = 0; job < 3; job += 1)
+      tokens.push(issued((await mint(runsClaims('500'))).result));
+    const fourth = await mint(runsClaims('500'));
+    expect(fourth.status).toBe(429);
+    expect(fourth.result).toMatchObject({ status: 'limited', reason: 'run_limit' });
+    expect(Number(fourth.response.headers.get('retry-after'))).toBeGreaterThan(3000);
+
+    // Another run waits while the first holds an unexpired token, and gets its own once all are
+    // revoked.
+    const other = await mint(runsClaims('501'));
+    expect(other.result).toMatchObject({ status: 'limited', reason: 'too_many_active' });
+    for (const token of tokens) {
+      expect((await revoke(token.tokenId, runsClaims('500'))).status).toBe(200);
+    }
+    const second = issued((await mint(runsClaims('501'))).result);
+    expect((await revoke(second.tokenId, runsClaims('501'))).status).toBe(200);
+
+    // Two run attempts made tokens this hour: a third waits, a re-run attempt counts as a new one,
+    // and a further job of a counted attempt still gets its token.
+    const third = await mint(runsClaims('502'));
+    expect(third.result).toMatchObject({ status: 'limited', reason: 'rate_limited' });
+    const rerun = await mint(runsClaims('500', '2'));
+    expect(rerun.result).toMatchObject({ status: 'limited', reason: 'rate_limited' });
+    const sameRun = issued((await mint(runsClaims('501'))).result);
+    expect((await revoke(sameRun.tokenId, runsClaims('501'))).status).toBe(200);
+    expect(cloudflare.creates()).toHaveLength(5);
+
+    // An hour later the first two attempts left the hour: the re-run attempt gets its token.
+    advanceClock(3600_000 + 1000);
+    issued((await mint(runsClaims('500', '2'))).result);
+    const reasons = (await flushedDenials()).map(event => event.data.attributes.reason);
+    expect(reasons).toEqual(
+      expect.arrayContaining(['run_limit', 'too_many_active', 'rate_limited'])
+    );
+  });
+
+  it('lets a later job of a run that already minted this hour in while another run holds tokens', async () => {
+    installFakes(github);
+    // An ordered path: the first job's token is revoked before the next job of the run starts.
+    const first = issued((await mint(runsClaims('600'))).result);
+    expect((await revoke(first.tokenId, runsClaims('600'))).status).toBe(200);
+    issued((await mint(runsClaims('601'))).result);
+    // Run 601 holds an unexpired token (maxActive 1), yet run 600 was counted this hour.
+    expect((await mint(runsClaims('600'))).result).toMatchObject({ status: 'ok' });
+    // A run attempt that made no token this hour still waits.
+    expect((await mint(runsClaims('602'))).result).toMatchObject({
+      status: 'limited',
+      reason: 'too_many_active',
+    });
   });
 
   it('answers unavailable without the minting credential, and makes no Cloudflare call', async () => {
@@ -2087,6 +2164,23 @@ dynamic:${value.grant}
     ]);
   });
 
+  it('snapshots maxPerRun, and accepts a grant with no intended script', () => {
+    const index = load(
+      policyFile({
+        grant: base.grant
+          .replace('    intendedScripts: [x]\n', '')
+          .replace('maxPerHour: 2', 'maxPerHour: 2\n    maxPerRun: 40'),
+      })
+    );
+    expect(index.get('production', 'ci-deploy-x')?.dynamic[0]).toMatchObject({
+      maxPerRun: 40,
+      intendedScripts: [],
+    });
+    expect(index.snapshot('production')[0].dynamic).toEqual([
+      'cloudflare-deploy:x-deploy:3600:1:2:aaaaaaaa::run40',
+    ]);
+  });
+
   it.each([
     [
       'a worker-binding policy',
@@ -2133,6 +2227,30 @@ dynamic:${value.grant}
       'maxPerHour above 12',
       { grant: base.grant.replace('maxPerHour: 2', 'maxPerHour: 13') },
       'maxPerHour is above 12',
+    ],
+    [
+      'maxPerRun above 64',
+      { grant: base.grant.replace('maxPerHour: 2', 'maxPerHour: 2\n    maxPerRun: 65') },
+      'does not match the policy schema',
+    ],
+    [
+      'maxActive times maxPerRun above the environment share of 100 tokens',
+      {
+        grant: base.grant
+          .replace('maxActive: 1', 'maxActive: 2')
+          .replace('maxPerHour: 2', 'maxPerHour: 2\n    maxPerRun: 51'),
+      },
+      'maxActive times maxPerRun is above 100',
+    ],
+    [
+      'more than 64 intended scripts',
+      {
+        grant: base.grant.replace(
+          'intendedScripts: [x]',
+          `intendedScripts: [${Array.from({ length: 65 }, (_, index) => `w${String(index)}`).join(', ')}]`
+        ),
+      },
+      'does not match the policy schema',
     ],
     [
       'a group that creates API tokens',

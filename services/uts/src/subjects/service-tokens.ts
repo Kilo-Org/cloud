@@ -1,6 +1,8 @@
 /**
  * The workload check of the `/internal/` routes: an STS token (design 6.1) for audience `uts`
- * with the route's one scope. The web app is the only caller (`UTS_INTERNAL_WORKLOADS`).
+ * with the route's one scope. The web app is the only caller of the subject, import, authority and
+ * app-event routes (`UTS_INTERNAL_WORKLOADS`); the bot-token route admits the workloads its
+ * policies name (src/bot-token/policy.ts).
  *
  * * `verified`: the token is valid for this route; `workload` is its subject.
  * * `missing`: no bearer credential. `invalid`: a credential that is not a valid STS token for

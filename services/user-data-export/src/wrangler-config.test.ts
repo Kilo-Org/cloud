@@ -27,17 +27,17 @@ describe('wrangler config', () => {
   });
 
   /**
-   * Traces reached Axiom as nothing but the destination's one-off pre-flight span
-   * because this config enabled logs only. `observability.enabled` does not turn on
-   * tracing while the feature is in beta, and a destination receives spans only from
-   * Workers that name it, so both keys have to survive future edits to this file.
+   * A Worker that binds STS records no traces: a trace keeps outbound URLs, and the STS repo test
+   * rejects the binding otherwise (services/sts/test/repo/worker-configs.ts). The Axiom traces
+   * destination carried only spans, so it went with them; logs stay on.
    */
-  it('enables tracing and names the traces destination', () => {
+  it('keeps traces off while logs stay on', () => {
     const observability = config.slice(config.indexOf('"observability"'));
     const traces = observability.slice(observability.indexOf('"traces"'));
 
-    expect(traces).toMatch(/"enabled":\s*true/);
-    expect(traces).toContain('"axiom-traces"');
+    expect(traces).toMatch(/"enabled":\s*false/);
+    expect(config).not.toContain('"axiom-traces"');
+    expect(config).toContain('"logs"');
   });
 
   it('points local development at the warehouse database, not the primary', () => {

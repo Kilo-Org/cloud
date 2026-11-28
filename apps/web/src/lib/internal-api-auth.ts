@@ -6,7 +6,12 @@ import {
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   type StsEnvironment,
 } from '@kilocode/sts-contracts';
-import { createVerifier, httpJwksSource, type Verifier, type VerifyFailure } from '@kilocode/verify';
+import {
+  createVerifier,
+  httpJwksSource,
+  type Verifier,
+  type VerifyFailure,
+} from '@kilocode/verify';
 import { STS_URL } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL, resolveAppUrl } from '@kilocode/web-shared/lib/constants';
 import {

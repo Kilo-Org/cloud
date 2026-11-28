@@ -27,9 +27,7 @@ import {
 // `usage-record-auth.test.ts` keeps the current registry and shows they are refused until then.
 
 jest.mock('@kilocode/sts-contracts', () => {
-  const actual = jest.requireActual<typeof StsContracts>(
-    '@kilocode/sts-contracts'
-  );
+  const actual = jest.requireActual<typeof StsContracts>('@kilocode/sts-contracts');
   return {
     ...actual,
     STS_SCOPE_REGISTRY: {
@@ -218,14 +216,17 @@ describe('a switch absent, empty or legacy', () => {
 });
 
 describe('an unknown switch value', () => {
-  it.each([['STS'], ['sts-only'], ['bogus']])('refuses every request with 503 (%s)', async value => {
-    process.env.SCIM_SYNC_RECEIVER_AUTH = value;
-    for (const headers of [secret, await bearer(SCIM), {}]) {
-      const outcome = await authorize('scim_sync', headers);
-      await expectRefused(outcome, 503, { error: 'Service unavailable' });
-      expect(outcome.legacyCalls).toBe(0);
+  it.each([['STS'], ['sts-only'], ['bogus']])(
+    'refuses every request with 503 (%s)',
+    async value => {
+      process.env.SCIM_SYNC_RECEIVER_AUTH = value;
+      for (const headers of [secret, await bearer(SCIM), {}]) {
+        const outcome = await authorize('scim_sync', headers);
+        await expectRefused(outcome, 503, { error: 'Service unavailable' });
+        expect(outcome.legacyCalls).toBe(0);
+      }
     }
-  });
+  );
 });
 
 describe('dual', () => {
@@ -245,7 +246,9 @@ describe('dual', () => {
   it('keeps the legacy check for a secret, both header spellings, and for no credential', async () => {
     const apiKey = await authorize('scim_sync', secret);
     expect(apiKey.result).toEqual({ credential: 'legacy' });
-    const internalSecret = await authorize('scim_sync', { 'x-internal-secret': INTERNAL_API_SECRET });
+    const internalSecret = await authorize('scim_sync', {
+      'x-internal-secret': INTERNAL_API_SECRET,
+    });
     expect(internalSecret.result).toEqual({ credential: 'legacy' });
     const wrong = await authorize('scim_sync', { 'x-internal-api-key': 'wrong' });
     await expectRefused(wrong, 401, { error: 'Unauthorized' });
@@ -256,12 +259,27 @@ describe('dual', () => {
 
   it.each([
     ['another workload', { ...SCIM, workload: 'user-data-export' }, 403, 'insufficient_scope'],
-    ['another web scope', { ...SCIM, scope: 'web:user-data-exports.ready' }, 403, 'insufficient_scope'],
+    [
+      'another web scope',
+      { ...SCIM, scope: 'web:user-data-exports.ready' },
+      403,
+      'insufficient_scope',
+    ],
     ['an unregistered scope', { ...SCIM, scope: 'web:not-registered' }, 403, 'insufficient_scope'],
-    ['another audience', { ...SCIM, audience: 'o11y', scope: 'o11y:alerting.read' }, 403, 'insufficient_scope'],
+    [
+      'another audience',
+      { ...SCIM, audience: 'o11y', scope: 'o11y:alerting.read' },
+      403,
+      'insufficient_scope',
+    ],
     ['another environment', { ...SCIM, env: 'production' }, 401, 'invalid_token'],
     ['another issuer', { ...SCIM, issuer: STS_ISSUERS.staging }, 401, 'invalid_token'],
-    ['an expired token', { ...SCIM, issuedAt: Math.floor(Date.now() / 1000) - 1_000 }, 401, 'invalid_token'],
+    [
+      'an expired token',
+      { ...SCIM, issuedAt: Math.floor(Date.now() / 1000) - 1_000 },
+      401,
+      'invalid_token',
+    ],
   ])('refuses %s with no fallback to the secret', async (_name, options, status, error) => {
     const outcome = await authorize('scim_sync', await bearer(options));
     const response = await expectRefused(outcome, status, { error });
@@ -286,7 +304,10 @@ describe('dual', () => {
     ['x-bot-callback-token'],
   ])('refuses an STS bearer beside %s with 400, valid or not', async header => {
     for (const authorization of [await bearer(SCIM), { authorization: 'Bearer not-a-token' }]) {
-      const outcome = await authorize('scim_sync', { ...authorization, [header]: INTERNAL_API_SECRET });
+      const outcome = await authorize('scim_sync', {
+        ...authorization,
+        [header]: INTERNAL_API_SECRET,
+      });
       await expectRefused(outcome, 400, { error: 'invalid_request' });
       expect(outcome.legacyCalls).toBe(0);
     }
@@ -319,12 +340,15 @@ describe('sts', () => {
     ['the correct secret', secret],
     ['x-internal-secret', { 'x-internal-secret': INTERNAL_API_SECRET }],
     ['no credential', {}],
-  ])('refuses %s with 401 and the challenge, never running the legacy check', async (_n, headers) => {
-    const outcome = await authorize('scim_sync', headers);
-    const response = await expectRefused(outcome, 401, { error: 'Unauthorized' });
-    expect(response.headers.get('www-authenticate')).toBe(`Bearer ${CHALLENGE}`);
-    expect(outcome.legacyCalls).toBe(0);
-  });
+  ])(
+    'refuses %s with 401 and the challenge, never running the legacy check',
+    async (_n, headers) => {
+      const outcome = await authorize('scim_sync', headers);
+      const response = await expectRefused(outcome, 401, { error: 'Unauthorized' });
+      expect(response.headers.get('www-authenticate')).toBe(`Bearer ${CHALLENGE}`);
+      expect(outcome.legacyCalls).toBe(0);
+    }
+  );
 
   it('without an STS deployment refuses everything with 503', async () => {
     process.env.VERCEL_ENV = 'production';
@@ -349,9 +373,12 @@ describe('the legacy secret as a bearer (production profile)', () => {
    * the configured secret. `secret` stands in for that configured value.
    */
   async function profile(headers: Record<string, string>, secret: string | Error) {
-    const request = new Request(`${ORIGIN}/api/internal/auto-routing-benchmark/production-profile`, {
-      headers,
-    });
+    const request = new Request(
+      `${ORIGIN}/api/internal/auto-routing-benchmark/production-profile`,
+      {
+        headers,
+      }
+    );
     let legacyCalls = 0;
     const result = await authorizeInternalServiceRequest(
       request,
@@ -483,7 +510,10 @@ describe('per-edge scopes and workloads', () => {
       scope: lifecycle.scope,
     });
     await expectRefused(
-      await authorize('security_notifications', await bearer({ ...dispatch, workload: lifecycle.workload })),
+      await authorize(
+        'security_notifications',
+        await bearer({ ...dispatch, workload: lifecycle.workload })
+      ),
       403
     );
   });
@@ -540,7 +570,12 @@ describe('one verifier for every edge', () => {
         headers: { ...(await bearer(options)), ...extra },
       });
     const results = await Promise.all([
-      shared.authorizeInternalServiceRequest(await request(SCIM), 'scim_sync', 'scim_user', async () => null),
+      shared.authorizeInternalServiceRequest(
+        await request(SCIM),
+        'scim_sync',
+        'scim_user',
+        async () => null
+      ),
       shared.authorizeInternalServiceRequest(
         await request({ workload: 'cloud-agent-next', scope: 'web:byoc-credentials.read' }),
         'byoc_credentials_read',
@@ -574,7 +609,11 @@ describe('the usage record writers (USAGE_RECORD_AUTH=dual)', () => {
       body: 'not json',
     });
     const response = await post(request);
-    return { status: response.status, body: (await response.json()) as unknown, read: request.bodyUsed };
+    return {
+      status: response.status,
+      body: (await response.json()) as unknown,
+      read: request.bodyUsed,
+    };
   }
 
   const admitted = { status: 400, body: { error: 'Invalid body' }, read: true };
@@ -613,7 +652,13 @@ describe('the usage record writers (USAGE_RECORD_AUTH=dual)', () => {
     ['the queue without its source', recordUsage, record, QUEUE, null],
     ['a region handoff on Exa', recordExaUsage, EXA_USAGE_WRITE_PATH, HANDOFF, null],
     ['the classifier on Enkrypt', recordEnkryptUsage, ENKRYPT_USAGE_WRITE_PATH, CLASSIFIER, null],
-    ['the classifier scope from the gateway', recordUsage, record, { ...CLASSIFIER, workload: 'ai-gateway' }, null],
+    [
+      'the classifier scope from the gateway',
+      recordUsage,
+      record,
+      { ...CLASSIFIER, workload: 'ai-gateway' },
+      null,
+    ],
   ] as const)('refuses %s with 403 before the body', async (_name, post, path, options, source) => {
     const headers = await bearer(options);
     if (source !== null) headers['x-usage-write-source'] = source;
@@ -641,8 +686,14 @@ describe('security notifications bind each scope to its body', () => {
     return securityNotification(request);
   }
 
-  const DISPATCH = { workload: 'cloudflare-security-sync', scope: 'web:security-notifications.dispatch' };
-  const LIFECYCLE = { workload: 'security-auto-analysis', scope: 'web:security-notifications.lifecycle' };
+  const DISPATCH = {
+    workload: 'cloudflare-security-sync',
+    scope: 'web:security-notifications.dispatch',
+  };
+  const LIFECYCLE = {
+    workload: 'security-auto-analysis',
+    scope: 'web:security-notifications.lifecycle',
+  };
 
   beforeEach(() => {
     process.env.SECURITY_NOTIFICATIONS_RECEIVER_AUTH = 'dual';

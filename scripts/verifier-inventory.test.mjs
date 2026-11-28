@@ -391,6 +391,12 @@ const EXCEPTIONS = {
     reason: sharedWorker,
     signals: { 'helper-call': 2 },
   },
+  'packages/worker-uts-auth/src/index.ts': {
+    reason:
+      'Shared Worker user-route gate over the phase 2 library for UTS user tokens only (UTS issuer, no STS issuer, no PAT port); each Worker that adopts it is a listed surface',
+    signals: { 'verify-library': 1 },
+    pins: ["'@kilocode/verify'", 'issuer: UTS_ENDPOINTS[configured.environment].issuer'],
+  },
   'services/audit-relay/src/relay/signing.ts': {
     reason: 'Audit relay: Ed25519 signature of its own checkpoints, not a request credential',
     signals: { primitive: 1 },

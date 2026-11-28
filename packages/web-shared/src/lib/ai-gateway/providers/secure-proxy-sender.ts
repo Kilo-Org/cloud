@@ -79,7 +79,7 @@ export type SecureProxySenderFailure =
   | 'proxy_origin_mismatch'
   /** This deployment has no STS environment (`stsEnvironmentOfDeployment` refused it). */
   | 'no_sts_environment'
-  /** No token arrived within the cold-instance wait; the read that minted one runs on. */
+  /** No token arrived within the cold wait; the in-flight mint runs on under `waitUntil`. */
   | 'credential_not_held'
   /** STS refused a token; a policy, identity or registry change fixes it, waiting does not. */
   | 'token_denied'
@@ -105,6 +105,8 @@ export type SecureProxyCredentialOptions = {
   legacySecret: () => string;
   /** The exact proxy destination (`provider.secureProxy.url`); pinned under `sts`. */
   proxyUrl: string;
+  /** The request's abort signal: a client that went away or a spent budget ends the cold wait. */
+  signal?: AbortSignal;
   /** The switch value; `SECURE_PROXY_SENDER_AUTH` by default. */
   auth?: string;
   /** The deployment's runtime variables; `process.env` by default. */
@@ -132,9 +134,9 @@ function unavailable(
 /**
  * The `Authorization` value of one forward through the secure proxy. `sts` reads a held token
  * without waiting, and a cold instance waits at most the mint bound
- * (`SECURE_PROXY_COLD_TOKEN_WAIT_MS` in `secure-proxy-sts.ts`): with no token by then the caller
- * refuses the forward so the retry uses the token that read is minting. No mint runs unbounded on
- * the request path.
+ * (`SECURE_PROXY_COLD_TOKEN_WAIT_MS` in `secure-proxy-sts.ts`), or less when `options.signal`
+ * aborts: with no token by then the caller refuses the forward while the mint it started runs on.
+ * No mint runs unbounded on the request path.
  */
 export async function secureProxyCredential(
   options: SecureProxyCredentialOptions
@@ -162,7 +164,7 @@ export async function secureProxyCredential(
     return unavailable('no_sts_environment');
   }
   const { secureProxyToken } = await import('./secure-proxy-sts');
-  const read = await secureProxyToken(environment);
+  const read = await secureProxyToken(environment, { signal: options.signal });
   switch (read.kind) {
     case 'token':
       return { kind: 'ready', mode, authorization: `Bearer ${read.token}` };

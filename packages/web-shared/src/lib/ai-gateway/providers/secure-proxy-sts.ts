@@ -1,4 +1,5 @@
 import 'server-only';
+import { waitUntil } from '@vercel/functions';
 import { STS_SECURE_PROXY_FORWARD, type StsEnvironment } from '@kilocode/sts-contracts';
 import {
   stsServiceToken,
@@ -31,11 +32,20 @@ type TokenAttempt = { kind: 'token'; token: string } | { kind: 'failed'; error: 
 /**
  * The `ai-gateway-secure-proxy:request.forward` token. A held one resolves from memory in
  * microtasks, so a warm instance never waits; a cold instance waits at most
- * `SECURE_PROXY_COLD_TOKEN_WAIT_MS` for one mint, which `stsServiceToken` hands to `waitUntil` so
- * it keeps running after the wait gives up.
+ * `SECURE_PROXY_COLD_TOKEN_WAIT_MS` for one mint, or less when `signal` aborts (the client went
+ * away or the request's budget ran out). The token client hands its attempt to `waitUntil` only
+ * when its own read settles, up to its attempt timeout later, so a wait that ends early registers
+ * the same in-flight attempt here: a frozen instance then still finishes the mint, and the retry
+ * reads its token.
  */
-export async function secureProxyToken(environment: StsEnvironment): Promise<SecureProxyTokenRead> {
+export async function secureProxyToken(
+  environment: StsEnvironment,
+  options: { signal?: AbortSignal } = {}
+): Promise<SecureProxyTokenRead> {
+  const { signal } = options;
   try {
+    // One read of the client's shared attempt: a concurrent cold call joins the same mint, and this
+    // never starts a second one.
     const attempt: Promise<TokenAttempt> = stsServiceToken(
       environment,
       STS_SECURE_PROXY_FORWARD
@@ -43,16 +53,28 @@ export async function secureProxyToken(environment: StsEnvironment): Promise<Sec
       token => ({ kind: 'token', token }),
       (error: unknown) => ({ kind: 'failed', error })
     );
-    const later = Promise.withResolvers<null>();
-    const timer = setTimeout(() => later.resolve(null), SECURE_PROXY_COLD_TOKEN_WAIT_MS);
-    let now: TokenAttempt | null;
+    const timedOut = Promise.withResolvers<'timeout'>();
+    const timer = setTimeout(() => timedOut.resolve('timeout'), SECURE_PROXY_COLD_TOKEN_WAIT_MS);
+    const aborted = Promise.withResolvers<'aborted'>();
+    const onAbort = () => aborted.resolve('aborted');
+    if (signal?.aborted === true) onAbort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
+    let outcome: TokenAttempt | 'timeout' | 'aborted';
     try {
-      now = await Promise.race([attempt, later.promise]);
+      outcome = await Promise.race([attempt, timedOut.promise, aborted.promise]);
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
     }
-    if (now === null) return { kind: 'not_held' };
-    return now.kind === 'failed' ? { kind: 'failed', failure: stsTokenFailure(now.error) } : now;
+    if (outcome === 'timeout' || outcome === 'aborted') {
+      // The attempt is still the client's one in-flight mint. Keeping it alive is what makes the
+      // retry succeed instead of the instance freezing mid-mint.
+      waitUntil(attempt);
+      return { kind: 'not_held' };
+    }
+    return outcome.kind === 'failed'
+      ? { kind: 'failed', failure: stsTokenFailure(outcome.error) }
+      : outcome;
   } catch (error) {
     return { kind: 'failed', failure: stsTokenFailure(error) };
   }

@@ -488,9 +488,21 @@ async function sendUpstreamFetch({
       const credential = await secureProxyCredential({
         legacySecret: () => provider.apiKey,
         proxyUrl: provider.secureProxy.url,
+        signal: combinedSignal,
       });
       if (credential.kind === 'unavailable') {
         budgetSignal.removeEventListener('abort', onBudgetExceeded);
+        // The wait ends early when the client goes away or the budget runs out, so nothing was
+        // dialled and nothing was billed either way.
+        if (combinedSignal.aborted) {
+          return {
+            type: 'error',
+            response: signal?.aborted
+              ? clientDisconnectResponse(vercelRequestId)
+              : upstreamFetchFailureResponse('request_timeout', vercelRequestId, reasoningEffort),
+            notInvoked: true,
+          };
+        }
         return {
           type: 'error',
           response: secureProxyCredentialResponse(credential.reason, vercelRequestId),
@@ -556,10 +568,11 @@ async function sendUpstreamFetch({
       method,
       headers: outgoing.headers,
       body: outgoing.body,
-      // An STS token never reaches a redirect target: that hop refuses redirects outright, with
-      // the URL policy on or off. The legacy bearer keeps its behaviour (the policy answers a
-      // redirect itself when it is enforced).
-      redirect: credentialMode === 'sts' ? 'error' : enforceUrlPolicy ? 'manual' : 'follow',
+      // The URL policy runs on every built deployment and answers a proxy redirect itself; its
+      // `'manual'` never forwards the token to the redirect target. Without the policy (local
+      // development and tests) an `sts` hop refuses a redirect outright. The legacy bearer keeps
+      // its behaviour.
+      redirect: enforceUrlPolicy ? 'manual' : credentialMode === 'sts' ? 'error' : 'follow',
       duplex: 'half',
       signal: combinedSignal,
       ...(dispatcher ? { dispatcher } : {}),

@@ -5,8 +5,24 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { stsServiceToken } from '@kilocode/web-shared/lib/sts-service-tokens';
 import { buildDirectProvider } from './build-direct-provider';
+import { clearUpstreamConnectionCache } from './upstream-connection';
 import { SECURE_PROXY_COLD_TOKEN_WAIT_MS } from './secure-proxy-sts';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
+import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
+
+const mockResolve4 = jest.fn<Promise<string[]>, [string]>();
+
+// The policy resolves A and AAAA records through c-ares: answer the A query with a public address
+// so an enforced check allows the proxy host and the upstream behind it.
+jest.mock('node:dns/promises', () => ({
+  Resolver: jest.fn(function () {
+    return {
+      resolve4: (hostname: string) => mockResolve4(hostname),
+      resolve6: async () => [],
+      cancel: jest.fn(),
+    };
+  }),
+}));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
@@ -43,6 +59,10 @@ const PROXY_ORIGIN = 'https://secure-proxy.example.com';
 const PRODUCTION = { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' } as const;
 
 const originalFetch = global.fetch;
+const originalNodeEnv = process.env.NODE_ENV;
+// `NODE_ENV` is read-only on `ProcessEnv`; these tests flip the URL policy on through it.
+const env: Record<string, string | undefined> = process.env;
+const PUBLIC_ADDRESS = '104.18.2.115';
 
 function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_id: boolean) {
   return buildDirectProvider(
@@ -72,11 +92,11 @@ function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_i
 async function sendUpstream(
   disable_url_suffix: boolean,
   user_hash_as_mt_user_id = false,
-  prompt_cache_key = 'task-cache-key'
+  prompt_cache_key = 'task-cache-key',
+  signal?: AbortSignal,
+  respond: () => Response = () => new Response('{}')
 ) {
-  const fetchMock = jest.fn(
-    async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}')
-  );
+  const fetchMock = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => respond());
   global.fetch = fetchMock;
   const body = {
     model: 'upstream-model',
@@ -104,6 +124,7 @@ async function sendUpstream(
     body,
     extraHeaders,
     provider,
+    signal,
     reasoningEffort: null,
     durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
@@ -206,6 +227,10 @@ describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
     delete process.env.VERCEL_ENV;
     delete process.env.VERCEL_TARGET_ENV;
     delete process.env.KILO_STS_WORKLOAD;
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
+    clearUpstreamUrlPolicyCache();
+    clearUpstreamConnectionCache();
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
@@ -276,9 +301,59 @@ describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
     if (result.type !== 'error') throw new Error('expected an error result');
     expect(result.notInvoked).toBe(true);
     expect(result.response.status).toBe(503);
-    const body = (await result.response.json()) as { error?: string; error_type?: string };
+    const body = await result.response.json();
     expect(body.error_type).toBe('temporarily_unavailable');
     expect(body.error).toMatch(/retry/i);
+  });
+
+  it('answers a client disconnect during the cold wait with 499 and no fetch', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    useSts();
+    const mint = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(mint.promise);
+    const controller = new AbortController();
+    jest.useFakeTimers();
+
+    const pending = sendUpstream(false, false, 'task-cache-key', controller.signal);
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(100);
+    controller.abort();
+    await jest.advanceTimersByTimeAsync(0);
+
+    const { result, fetchMock } = await pending;
+    expect(fetchMock).not.toHaveBeenCalled();
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.notInvoked).toBe(true);
+    expect(result.response.status).toBe(499);
+    expect((await result.response.json()).error_type).toBe('client_disconnect');
+  });
+
+  it('answers a proxy redirect with the URL policy refusal and resends no token', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    useSts();
+    mintedToken.mockResolvedValue('sts-token');
+    mockResolve4.mockReset().mockResolvedValue([PUBLIC_ADDRESS]);
+    // Every built deployment enforces the policy; the tests otherwise run as `test`.
+    env.NODE_ENV = 'production';
+
+    const { result, fetchMock } = await sendUpstream(
+      false,
+      false,
+      'task-cache-key',
+      undefined,
+      () =>
+        new Response(null, { status: 307, headers: { location: 'https://attacker.example.com/' } })
+    );
+
+    if (result.type !== 'error') throw new Error('expected an error result');
+    const body = await result.response.json();
+    expect(body.error).toContain('responded with a redirect');
+    expect(result.response.status).toBe(502);
+    // One request only: the 3xx is answered by the policy, never followed or re-sent.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init?.redirect).toBe('manual');
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer sts-token');
   });
 
   const refusals: Array<{
@@ -386,7 +461,7 @@ describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
       if (result.type !== 'error') throw new Error('expected an error result');
       expect(result.notInvoked).toBe(true);
       expect(result.response.status).toBe(status);
-      const body = (await result.response.json()) as { error?: string; error_type?: string };
+      const body = await result.response.json();
       expect(body.error_type).toBe(code);
       if (retryable) expect(body.error).toMatch(/retry/i);
       else expect(body.error).not.toMatch(/retry/i);

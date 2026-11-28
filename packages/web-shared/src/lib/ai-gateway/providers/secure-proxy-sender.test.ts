@@ -14,10 +14,15 @@ jest.mock('@kilocode/web-shared/lib/sts-service-tokens', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/sts-service-tokens'),
   stsServiceToken: jest.fn(),
 }));
+jest.mock('@vercel/functions', () => ({
+  ...jest.requireActual<object>('@vercel/functions'),
+  waitUntil: jest.fn(),
+}));
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { ServiceTokenError } from '@kilocode/service-token-client';
 import { STS_SECURE_PROXY_FORWARD } from '@kilocode/sts-contracts';
+import { waitUntil } from '@vercel/functions';
 import { stsServiceToken } from '@kilocode/web-shared/lib/sts-service-tokens';
 import { secureProxyCredential, secureProxySenderAuth } from './secure-proxy-sender';
 import { SECURE_PROXY_COLD_TOKEN_WAIT_MS } from './secure-proxy-sts';
@@ -27,6 +32,7 @@ const mockConfig: { auth: string | undefined; expectedOrigin: string | undefined
   expectedOrigin: undefined,
 };
 const mintedToken = jest.mocked(stsServiceToken);
+const keptAlive = jest.mocked(waitUntil);
 const PROXY_URL = 'https://secure-proxy.example.com/api/proxy';
 const PROXY_ORIGIN = 'https://secure-proxy.example.com';
 const PRODUCTION = { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' } as const;
@@ -40,6 +46,7 @@ beforeEach(() => {
   mockConfig.auth = undefined;
   mockConfig.expectedOrigin = PROXY_ORIGIN;
   mintedToken.mockReset();
+  keptAlive.mockReset();
   // As `apps/ai-gateway/next.config.mjs` inlines it; a `kilocode-app` test deletes it.
   process.env.KILO_STS_WORKLOAD = 'ai-gateway';
 });
@@ -154,6 +161,88 @@ describe('secureProxyCredential', () => {
     await expect(pending).resolves.toEqual({ kind: 'unavailable', reason: 'credential_not_held' });
     expect(mintedToken).toHaveBeenCalledTimes(1);
     expect(legacySecret).not.toHaveBeenCalled();
+  });
+
+  it('keeps the in-flight mint alive when the cold wait times out', async () => {
+    const mint = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(mint.promise);
+    jest.useFakeTimers();
+    const pending = secureProxyCredential({
+      legacySecret: proxySecret(),
+      proxyUrl: PROXY_URL,
+      auth: 'sts',
+      runtime: PRODUCTION,
+    });
+
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(SECURE_PROXY_COLD_TOKEN_WAIT_MS);
+    await expect(pending).resolves.toEqual({ kind: 'unavailable', reason: 'credential_not_held' });
+
+    // The same attempt the client is running, not a second mint, handed to `waitUntil`: a frozen
+    // instance still finishes it, and its answer is the token the retry reads.
+    expect(mintedToken).toHaveBeenCalledTimes(1);
+    expect(keptAlive).toHaveBeenCalledTimes(1);
+    const kept = keptAlive.mock.calls[0][0];
+    mint.resolve('sts-token');
+    await expect(kept).resolves.toEqual({ kind: 'token', token: 'sts-token' });
+  });
+
+  it('ends the cold wait early when the client aborts', async () => {
+    const mint = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(mint.promise);
+    const controller = new AbortController();
+    jest.useFakeTimers();
+    const pending = secureProxyCredential({
+      legacySecret: proxySecret(),
+      proxyUrl: PROXY_URL,
+      auth: 'sts',
+      runtime: PRODUCTION,
+      signal: controller.signal,
+    });
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(100);
+    expect(settled).toBe(false);
+    controller.abort();
+    await expect(pending).resolves.toEqual({ kind: 'unavailable', reason: 'credential_not_held' });
+    expect(keptAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares one cold mint between concurrent calls and keeps it alive for each', async () => {
+    const mint = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(mint.promise);
+    jest.useFakeTimers();
+    const first = secureProxyCredential({
+      legacySecret: proxySecret(),
+      proxyUrl: PROXY_URL,
+      auth: 'sts',
+      runtime: PRODUCTION,
+    });
+    const second = secureProxyCredential({
+      legacySecret: proxySecret(),
+      proxyUrl: PROXY_URL,
+      auth: 'sts',
+      runtime: PRODUCTION,
+    });
+
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(SECURE_PROXY_COLD_TOKEN_WAIT_MS);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { kind: 'unavailable', reason: 'credential_not_held' },
+      { kind: 'unavailable', reason: 'credential_not_held' },
+    ]);
+    // One read per call of the client's single attempt, and no mint started by the timeout.
+    expect(mintedToken).toHaveBeenCalledTimes(2);
+    expect(keptAlive).toHaveBeenCalledTimes(2);
+    mint.resolve('sts-token');
+    await expect(Promise.all(keptAlive.mock.calls.map(([kept]) => kept))).resolves.toEqual([
+      { kind: 'token', token: 'sts-token' },
+      { kind: 'token', token: 'sts-token' },
+    ]);
   });
 
   it.each([

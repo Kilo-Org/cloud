@@ -1,5 +1,6 @@
 import { microdollar_usage, organization_memberships, organizations } from '@kilocode/db/schema';
-import { inArray } from 'drizzle-orm';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
+import { eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
@@ -7,7 +8,7 @@ import { resolveSeedUserId } from '../lib/users';
 
 export const usage = '<owner-email>';
 
-/** Stable ids, so a second run replaces its own rows instead of adding more. */
+/** Stable organization id, so a second run replaces its own rows instead of adding more. */
 const ORGANIZATION_ID = 'a4f1c2d3-0000-4000-8000-9a1b2c3d4e0a';
 const ORGANIZATION_NAME = 'Request log lab org';
 
@@ -22,7 +23,6 @@ const ORGANIZATION_NAME = 'Request log lab org';
  */
 const REQUESTS = [
   {
-    id: 'a4f1c2d3-0000-4000-8000-9a1b2c3d4e11',
     minutesAgo: 42,
     provider: 'openrouter',
     inferenceProvider: 'openrouter',
@@ -32,7 +32,6 @@ const REQUESTS = [
     outputTokens: 2_140,
   },
   {
-    id: 'a4f1c2d3-0000-4000-8000-9a1b2c3d4e12',
     minutesAgo: 18,
     provider: 'openrouter',
     inferenceProvider: 'deepinfra',
@@ -42,7 +41,6 @@ const REQUESTS = [
     outputTokens: 940,
   },
   {
-    id: 'a4f1c2d3-0000-4000-8000-9a1b2c3d4e13',
     minutesAgo: 4,
     provider: 'vercel',
     inferenceProvider: 'anthropic',
@@ -97,12 +95,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       set: { role: 'owner' },
     });
 
-  const requestIds = REQUESTS.map(request => request.id);
-  await db.delete(microdollar_usage).where(inArray(microdollar_usage.id, [...requestIds]));
+  await db.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, ORGANIZATION_ID));
 
   await db.insert(microdollar_usage).values(
     REQUESTS.map(request => ({
-      id: request.id,
+      id: createUsageId(),
       kilo_user_id: ownerUserId,
       organization_id: ORGANIZATION_ID,
       created_at: new Date(now - request.minutesAgo * 60 * 1000).toISOString(),

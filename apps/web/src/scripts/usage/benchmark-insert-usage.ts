@@ -4,6 +4,7 @@ import { Worker } from 'worker_threads';
 import path from 'path';
 import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
 import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { sql } from 'drizzle-orm';
 import type { UsageMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
@@ -60,7 +61,7 @@ function generateRandomRecord(
   stats: Stats,
   uniquePools: UniquePools
 ): { core: MicrodollarUsage; metadata: UsageMetaData } {
-  const id = randomUUID();
+  const id = createUsageId();
   const created_at = new Date().toISOString();
   const usageStats = stats.microdollar_usage;
   const metaStats = stats.microdollar_usage_metadata;

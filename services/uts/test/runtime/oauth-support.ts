@@ -205,9 +205,7 @@ export function oauthDeps(
     sign: signerAccess(env, config),
     scopes: testScopes,
     publish: recordingPublisher().publish,
-    device: { status: 'off' },
     homeWidget: { status: 'off' },
-    signIn: { config, signIn: unexpectedStore, methods: noSignInMethods },
     tickets: { config, tickets: unexpectedStore },
     clients: async () => {
       throw new Error('unexpected client lookup');

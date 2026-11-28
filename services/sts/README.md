@@ -454,11 +454,13 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
 | `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
+| `web` | | `POSTGRES_URL`, `POSTGRES_REPLICA_US_URL`, `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` | staging and production only (`environmentGrants`) |
 | `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
 | `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
+| `ai-gateway` | | `POSTGRES_URL`, `POSTGRES_REPLICA_US_URL`, `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` | staging and production only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
@@ -497,6 +499,17 @@ previews are ever enabled on that project, these grants need a review first.
 `/workloads/web` or `/workloads/ai-gateway` if the name is there, else from `/shared`. The grant is
 in staging and production only: previews read development STS and keep `env`, so no preview build
 can read the key; a preview flip adds a `development` key.
+
+`web` and `ai-gateway` also hold the four database URLs (decision D67): `POSTGRES_URL`, the
+primary (`packages/db/src/database-url.ts`), and `POSTGRES_REPLICA_US_URL`,
+`POSTGRES_REPLICA_EU_URL` and `POSTGRES_REPLICA_EU_URL_2`, the read replicas of
+`packages/web-shared/src/lib/read-replicas.ts` that `packages/web-shared/src/lib/drizzle.ts`
+connects with. They are regular secrets of each workload's own bundle, granted in staging and
+production only for the read under `SECRETS_SOURCE=sts`; that reader change is in the
+secrets-cutover PR, and previews keep `env`. A granted name that comes back `missing` is a
+configuration error for the reader to report: a missing EU replica keeps today's behaviour and
+never routes EU reads to the primary. No other workload holds them: Workers reach the database
+through their Hyperdrive bindings.
 
 Workloads with a policy, all over `worker-binding`:
 

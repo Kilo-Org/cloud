@@ -186,19 +186,21 @@ with `Cache-Control: no-store`: removing a kid from this set is the only recall 
 (design 6.1), so no HTTP cache may hold it or serve it stale while STS answers 503; a verifier
 keeps its own copy for 5 minutes and never serves it longer.
 
-The set is one document, held by the environment's `TokenKeySetDO` (`eu` jurisdiction in
-production and staging), so a cold isolate reads it with one object call instead of one per shard.
-The object builds the document by reading the four shards in parallel (each bounded at 5 s and
-retried like the manager key set; each shard first applies its due ring changes), copies only the
-six public JWK fields of each key, stores it, and answers from it while all of these hold:
+The set is one document per `TOKEN_SIGNING_KIDS_REVOKED` list, held by the environment's
+`TokenKeySetDO` (`eu` jurisdiction in production and staging), so a cold isolate reads it with one
+object call instead of one per shard. The object builds a document by reading the four shards in
+parallel (each bounded at 5 s and retried like the manager key set; each shard first applies its
+due ring changes), copies only the six public JWK fields of each key, stores it under a key derived
+from its list (`token-key-set:<SHA-256 of the list>`), and answers from it while all of these hold:
 
-- it was built under the `TOKEN_SIGNING_KIDS_REVOKED` list the reading isolate passes, so the
-  first read under a new list rebuilds it;
+- it was built under the list the reading isolate passes; the documents of the two most recently
+  stored lists are kept (older ones are deleted), so the first read under a new list builds its
+  own document, and a rollout that mixes the old and new list rebuilds neither;
 - it is younger than 5 minutes, counted from the shard reads that built it;
 - no shard changed its ring since it answered: after every change (publication, activation,
-  removal, emergency removal) and before it answers its next call, a shard tells the object
-  (`invalidate`, bounded at 2 s), which marks the document stale and rebuilds it in its alarm at
-  once.
+  removal, emergency removal) a shard tells the object (`invalidate`, bounded at 2 s) in the
+  background, so a mint never waits for it; the shard's `getJwks` answers only after that call,
+  which marks every document stale and rebuilds them in the object's alarm at once.
 
 A read that finds no such document rebuilds it and waits; when that rebuild fails, a stale
 document still inside its 5 minutes answers, and otherwise STS answers 503 with `Retry-After: 30`.
@@ -243,10 +245,13 @@ runbook below for the rollout of the list itself).
   under the 128 KB queue message limit) or 1 MB decompressed and splits that batch in two, so at
   worst the message counts above double (288 a minute in total at 200,000).
 - **Key set:** a cold isolate, or one whose copy expired, makes one call to the key-set object
-  (no row written); every other request is served from isolate memory. The object reads the four
-  shards when it rebuilds its document: about once per 4 minutes while reads arrive, plus once
-  after each ring change (about 4 times per shard per 30 days), plus once per new revoked-kid
-  list. Each rebuild writes the document (one KV row) and at most one `setAlarm`.
+  (no row written, except one KV row on the first read after each build, which records that the
+  document is read so the refresh survives an eviction); every other request is served from
+  isolate memory. The object reads the four shards when it rebuilds a document: about once per 4
+  minutes per kept list while reads of that list arrive, plus once per kept list after each ring
+  change (about 4 times per shard per 30 days), plus once per new revoked-kid list (at most two
+  lists are kept, so a mixed rollout costs no extra rebuilds). Each rebuild writes the document
+  (one KV row) and at most one `setAlarm`.
 - **Rotation alarm:** each shard wakes for the next ring change (about 4 times per 30 days:
   publish, activate, remove) and for relays and prunes it already runs for its audit rows; each
   change writes the ring (one KV row), one audit row and one `setAlarm`.
@@ -371,11 +376,21 @@ Bindings: `AUDIT_QUEUE` (queue producer), the Hyperdrive bindings `LEASE_REPLICA
 `STS_DEPLOY_TOKEN_DO` (migration `v5`), `STS_TOKEN_KEY_SET_DO` (migration `v6`). Trigger: cron
 `*/5 * * * *` in production and staging, `[]` in the local block.
 
+**Rolling back the key-set object.** Once migration `v6` has run, a plain revert of the change
+that added `TokenKeySetDO` fails to deploy: the class is gone but its migration is applied. Roll
+back by keeping the class exported (and bound) but unused, which is preferred: it needs no
+migration and the change can be re-applied without one. If the class must go, add a `v7`
+migration with `deleted_classes: ["TokenKeySetDO"]`, which deletes only the stored public key-set
+documents.
+
 ## Policy
 
 One file per workload in `policy/`, named `<workload>.yaml`. The schema is strict: an unknown field,
 a non-canonical secret name, or a duplicate identity binding fails the load, and a workload with no
-policy is denied. Example:
+policy is denied. The Worker loads the policies on first use, once per isolate (a key-set read
+never parses them), so a bad file would not fail the Worker's startup; instead every deploy runs
+`predeploy` (`package.json`), which runs `test/repo/policy-files.test.ts` (the same `loadPolicies`
+over the shipped files) before `wrangler deploy`, and a failure stops the deploy. Example:
 
 ```yaml
 workload: o11y

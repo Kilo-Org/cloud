@@ -127,11 +127,29 @@ const sources: Record<PolicyFile, string> = {
   'web.yaml': webPolicy,
 };
 
+let loaded: PolicyIndex | null = null;
+
+function load(): PolicyIndex {
+  loaded ??= loadPolicies(sources);
+  return loaded;
+}
+
 /**
- * Parsed and validated once per isolate; an invalid policy or registration file fails every entry
- * here. A registration adds nothing STS serves (see `PolicyIndex`).
+ * Parsed and validated on first use, once per isolate, so a route that reads no policy (the key
+ * sets) never parses YAML. An invalid policy or registration file fails every call that reads
+ * one; the deploy refuses such a file before upload (`predeploy` in package.json runs
+ * test/repo/policy-files.test.ts). A registration adds nothing STS serves (see `PolicyIndex`).
  */
-export const policyIndex: PolicyIndex = loadPolicies(sources);
+export const policyIndex: PolicyIndex = {
+  all: () => load().all(),
+  forEnvironment: environment => load().forEnvironment(environment),
+  has: workload => load().has(workload),
+  get: (environment, workload) => load().get(environment, workload),
+  snapshot: environment => load().snapshot(environment),
+  hash: environment => load().hash(environment),
+  workloadHash: (environment, workload) => load().workloadHash(environment, workload),
+  registered: () => load().registered(),
+};
 
 export function policyFor(environment: StsEnvironment, workload: string): Policy | null {
   return policyIndex.get(environment, workload);

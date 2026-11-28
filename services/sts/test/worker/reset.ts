@@ -48,10 +48,11 @@ export async function resetTokenSignerObject(stub: DurableObjectStub): Promise<v
   await resetObject(stub, [], ['token-key-ring']);
 }
 
-/** The key-set object has no tables: its document and alarm go, then the instance. */
+/** The key-set object has no tables: its documents and alarm go, then the instance. */
 export async function resetTokenKeySetObject(stub: DurableObjectStub): Promise<void> {
   await runInDurableObject(stub, async (_instance, state) => {
-    await state.storage.delete('token-key-set');
+    const documents = await state.storage.list({ prefix: 'token-key-set:' });
+    await state.storage.delete([...documents.keys()]);
     await state.storage.deleteAlarm();
   });
   await runInDurableObject(stub, (_instance, state) => state.abort('test reset')).catch(

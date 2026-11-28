@@ -6,10 +6,16 @@ import {
   TOKEN_JWKS_CACHE_MS,
   TOKEN_KEY_PUBLISH_AHEAD_MS,
   TOKEN_KEY_SET_REFRESH_AHEAD_MS,
+  TOKEN_KEY_SET_RETRY_MS,
   TOKEN_SIGNER_SHARDS,
 } from '../../src/constants';
 import { getTokenKeySetStub, getTokenSignerStub } from '../../src/dos/stubs';
-import { TokenKeySetDO, type TokenKeySetRead } from '../../src/dos/TokenKeySetDO';
+import {
+  DOCUMENT_PREFIX,
+  TokenKeySetDO,
+  documentName,
+  type TokenKeySetRead,
+} from '../../src/dos/TokenKeySetDO';
 import { TokenSignerDO } from '../../src/dos/TokenSignerDO';
 import { handleRequest } from '../../src/http';
 import type { KeyRing, TokenJwk } from '../../src/tokens/key-ring';
@@ -24,7 +30,13 @@ const keySet = () => getTokenKeySetStub(env, config);
 const shard = (index: number) => getTokenSignerStub(env, config, index);
 const shardIndexes = Array.from({ length: TOKEN_SIGNER_SHARDS }, (_, index) => index);
 
-type StoredDocument = { keys: TokenJwk[]; revokedKids: string; builtAt: number; stale: boolean };
+type StoredDocument = {
+  keys: TokenJwk[];
+  revokedKids: string;
+  builtAt: number;
+  stale: boolean;
+  read: boolean;
+};
 
 beforeEach(async () => {
   stubOfflineNetwork();
@@ -75,10 +87,23 @@ async function read(revoked: readonly string[] = []): Promise<TokenJwk[]> {
 
 const kids = (keys: readonly TokenJwk[]) => keys.map(key => key.kid);
 
-function storedDocument(): Promise<StoredDocument | undefined> {
+async function storedDocument(revoked: readonly string[] = []) {
+  const name = await documentName(revoked.join(','));
   return runInDurableObject(keySet(), (_instance, state) =>
-    state.storage.get<StoredDocument>('token-key-set')
+    state.storage.get<StoredDocument>(name)
   );
+}
+
+function storedLists(): Promise<string[]> {
+  return runInDurableObject(keySet(), async (_instance, state) =>
+    [...(await state.storage.list<StoredDocument>({ prefix: DOCUMENT_PREFIX })).values()].map(
+      document => document.revokedKids
+    )
+  );
+}
+
+function storedAlarm(): Promise<number | null> {
+  return runInDurableObject(keySet(), (_instance, state) => state.storage.getAlarm());
 }
 
 /**
@@ -127,7 +152,7 @@ describe('token key-set object', () => {
       expect(Object.keys(key).sort()).toEqual(PUBLIC_FIELDS);
     }
     // The stored document holds the same public fields and nothing else.
-    const stored = await storedDocument();
+    const stored = await storedDocument([listed]);
     expect(stored?.keys.length).toBeGreaterThan(0);
     for (const key of stored?.keys ?? []) expect(Object.keys(key).sort()).toEqual(PUBLIC_FIELDS);
     expect(JSON.stringify(stored)).not.toMatch(/"d"|pkcs8/);
@@ -200,12 +225,12 @@ describe('token key-set object', () => {
 
     expect((await served(list)).keys).toHaveLength(TOKEN_SIGNER_SHARDS);
     expect(changed).toBe(true);
-    expect((await storedDocument())?.stale).toBe(true);
+    expect((await storedDocument(list))?.stale).toBe(true);
     // The isolate did not keep the stale set: the next request asks the object again, which
     // rebuilds; that clean set is kept.
     expect((await served(list)).status).toBe(200);
     expect(reads).toHaveBeenCalledTimes(2);
-    expect((await storedDocument())?.stale).toBe(false);
+    expect((await storedDocument(list))?.stale).toBe(false);
     expect((await served(list)).status).toBe(200);
     expect(reads).toHaveBeenCalledTimes(2);
   });
@@ -264,8 +289,11 @@ describe('token key-set object', () => {
 
     const after = await served([...list, revoked]);
     expect(after.status).toBe(200);
-    expect(kids(after.keys)).not.toContain(revoked);
     expect(kids(after.keys)).toContain(replacement);
+    // The object's own document for the new list, not just the Worker's filter, lacks the kid.
+    const document = await storedDocument([...list, revoked]);
+    expect(kids(document?.keys ?? [])).toContain(replacement);
+    expect(kids(document?.keys ?? [])).not.toContain(revoked);
   });
 
   it('expires its document one period after the shard reads when a change note is lost', async () => {
@@ -286,7 +314,7 @@ describe('token key-set object', () => {
     const reads = vi.spyOn(TokenKeySetDO.prototype, 'read');
     const list = [unusedKid()];
     await read(list);
-    const builtAt = (await storedDocument())?.builtAt ?? 0;
+    const builtAt = (await storedDocument(list))?.builtAt ?? 0;
     reads.mockClear();
     const clock = vi.spyOn(Date, 'now');
 
@@ -304,12 +332,18 @@ describe('token key-set object', () => {
     expect(reads).toHaveBeenCalledTimes(2);
   });
 
-  it('refreshes ahead while read, and leaves an idle document to expire', async () => {
+  it('schedules the refresh on a read and keeps the read mark across an eviction', async () => {
     await read();
     const builtAt = (await storedDocument())?.builtAt ?? 0;
-    const clock = vi.spyOn(Date, 'now');
     const refreshAt = builtAt + TOKEN_JWKS_CACHE_MS - TOKEN_KEY_SET_REFRESH_AHEAD_MS;
+    expect(await storedAlarm()).toBe(refreshAt);
+    expect((await storedDocument())?.read).toBe(true);
 
+    // Evicted before the alarm: the new instance still refreshes, from the stored mark.
+    await runInDurableObject(keySet(), (_instance, state) => state.abort('evicted')).catch(
+      () => undefined
+    );
+    const clock = vi.spyOn(Date, 'now');
     clock.mockReturnValue(refreshAt);
     await runInDurableObject(keySet(), instance => instance.alarm());
     expect((await storedDocument())?.builtAt).toBe(refreshAt);
@@ -318,6 +352,48 @@ describe('token key-set object', () => {
     clock.mockReturnValue(refreshAt + TOKEN_JWKS_CACHE_MS - TOKEN_KEY_SET_REFRESH_AHEAD_MS);
     await runInDurableObject(keySet(), instance => instance.alarm());
     expect((await storedDocument())?.builtAt).toBe(refreshAt);
+  });
+
+  it('retries a failed background rebuild until the document it replaces expires', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await read();
+    const builtAt = (await storedDocument())?.builtAt ?? 0;
+    // A stale document with no alarm, then every shard down.
+    const name = await documentName('');
+    await runInDurableObject(keySet(), async (_instance, state) => {
+      const document = await state.storage.get<StoredDocument>(name);
+      await state.storage.put(name, { ...document, stale: true });
+      await state.storage.deleteAlarm();
+      state.abort('restart');
+    }).catch(() => undefined);
+    vi.spyOn(TokenSignerDO.prototype, 'getJwks').mockRejectedValue(new Error('shard down'));
+
+    const now = Date.now();
+    await runInDurableObject(keySet(), instance => instance.alarm());
+    expect(await storedAlarm()).toBeGreaterThanOrEqual(now + TOKEN_KEY_SET_RETRY_MS);
+    await runInDurableObject(keySet(), (_instance, state) => state.storage.deleteAlarm());
+
+    // Within one retry of the document's expiry, the alarm gives up.
+    vi.spyOn(Date, 'now').mockReturnValue(builtAt + TOKEN_JWKS_CACHE_MS - 1_000);
+    await runInDurableObject(keySet(), instance => instance.alarm());
+    expect(await storedAlarm()).toBeNull();
+  });
+
+  it('keeps one document per revoked-kid list for the latest two lists', async () => {
+    const [first, second, third] = [[unusedKid()], [unusedKid()], [unusedKid()]];
+    await read(first);
+    await read(second);
+    const shardReads = vi.spyOn(TokenSignerDO.prototype, 'getJwks');
+    // A rollout that alternates two lists rebuilds neither.
+    await read(first);
+    await read(second);
+    await read(first);
+    expect(shardReads).not.toHaveBeenCalled();
+    expect((await storedLists()).sort()).toEqual([first[0], second[0]].sort());
+
+    // A third list drops the oldest.
+    await read(third);
+    expect((await storedLists()).sort()).toEqual([second[0], third[0]].sort());
   });
 
   it('answers a stale document inside its period when a rebuild fails, and nothing after', async () => {

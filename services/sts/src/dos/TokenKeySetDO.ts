@@ -1,4 +1,5 @@
 import { withDORetry } from '@kilocode/worker-utils';
+import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { ACCESS_TOKEN_ALGORITHM } from '@kilocode/sts-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
@@ -15,8 +16,14 @@ import type { TokenJwk } from '../tokens/key-ring';
 import { getTokenKeySetStub, getTokenSignerStub } from './stubs';
 import type { TokenJwks } from './TokenSignerDO';
 
-/** KV storage key of the stored document. */
-const DOCUMENT_NAME = 'token-key-set';
+/** KV storage key prefix of the stored documents: one per revoked-kid list (see `documentName`). */
+export const DOCUMENT_PREFIX = 'token-key-set:';
+
+/**
+ * Documents kept, one per revoked-kid list, newest first: a rollout of a new list mixes two lists
+ * for a while, and each keeps its own document instead of rebuilding on every alternating read.
+ */
+const KEPT_LISTS = 2;
 
 /** Exactly the public fields of one published key; a stored key with any other field fails. */
 const PublicTokenJwkSchema = z.strictObject({
@@ -36,6 +43,8 @@ const KeySetDocumentSchema = z.strictObject({
   builtAt: z.number().int(),
   /** A shard changed its ring after this document was built: it serves only if a rebuild fails. */
   stale: z.boolean(),
+  /** A read was served since the build, so the alarm refreshes it ahead; stored so it survives. */
+  read: z.boolean(),
 });
 type KeySetDocument = z.infer<typeof KeySetDocumentSchema>;
 
@@ -55,47 +64,59 @@ export type TokenKeySetRead =
   /** No document fresh enough, and a shard did not answer a rebuild. */
   | { status: 'unavailable' };
 
+/** The storage key of the document built under `revokedKids`: a list can be longer than a key. */
+export async function documentName(revokedKids: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(revokedKids));
+  return `${DOCUMENT_PREFIX}${bytesToBase64url(new Uint8Array(digest))}`;
+}
+
+/** When the alarm rebuilds a document reads still use, ahead of its expiry. */
+function refreshAt(document: KeySetDocument): number {
+  return document.builtAt + TOKEN_JWKS_CACHE_MS - TOKEN_KEY_SET_REFRESH_AHEAD_MS;
+}
+
 /**
- * The environment's service-token key set as ONE document (design 5.7), so a cold STS isolate
- * reads the set with one object call instead of one per token signer shard. It holds public keys
- * only: the shards' `getJwks` answers, copied field by field through a closed schema.
+ * The environment's service-token key set as ONE document per revoked-kid list (design 5.7), so a
+ * cold STS isolate reads the set with one object call instead of one per token signer shard. It
+ * holds public keys only: the shards' `getJwks` answers, copied field by field through a closed
+ * schema.
  *
- * The document is built by reading every shard (each shard applies its due ring changes before it
+ * A document is built by reading every shard (each shard applies its due ring changes before it
  * answers), and serves while all of these hold:
  * - it was built under the revoked-kid list the caller passes (an emergency removal changes that
- *   list, so the first read after the deploy rebuilds, as the isolate copy did before);
+ *   list, so the first read under the new list builds its own document); the documents of the
+ *   latest `KEPT_LISTS` lists are kept, so a rollout that mixes two lists rebuilds neither;
  * - it is younger than `TOKEN_JWKS_CACHE_MS`, counted from the shard reads (`builtAt`), which the
  *   isolate copy counts from too, so the two layers never add up past one period;
  * - no shard changed its ring since it answered the build: a shard calls `invalidate` after every
- *   change (publication, activation, removal, emergency removal) and before it answers any call,
- *   which marks the document stale and rebuilds it in the alarm at once.
+ *   change (publication, activation, removal, emergency removal), and its `getJwks` waits for that
+ *   call before it answers; `invalidate` marks every document stale and rebuilds them in the alarm.
  *
  * A read that finds no serving document rebuilds it and waits; when the result is stale (that
  * rebuild failed and a stale document within its period is all there is, or a shard changed after
  * it answered), it answers marked `stale`, and the isolate uses it for that request only. While
- * reads arrive, the alarm rebuilds the document `TOKEN_KEY_SET_REFRESH_AHEAD_MS` before it
- * expires, so reads do not wait for the shards; an idle set is left to expire. The document is
- * stored, so a restarted object answers from storage. Concurrent reads share one rebuild (an
- * object's requests share its context).
+ * reads arrive, the alarm rebuilds each document `TOKEN_KEY_SET_REFRESH_AHEAD_MS` before it
+ * expires, so reads do not wait for the shards; an idle document is left to expire. Documents are
+ * stored with their read mark, so a restarted object answers and refreshes from storage.
+ * Concurrent reads of one list share one rebuild (an object's requests share its context).
  */
 export class TokenKeySetDO extends DurableObject<Env> {
   readonly #config: StsConfig;
-  #document: KeySetDocument | null = null;
-  #rebuild: { revokedKids: string; promise: Promise<KeySetDocument | null> } | null = null;
+  /** The kept documents by revoked-kid list. */
+  readonly #documents = new Map<string, KeySetDocument>();
+  readonly #rebuilds = new Map<string, Promise<KeySetDocument | null>>();
   /**
    * `invalidate` calls per shard. A build notes each shard's count when that shard answers; a
    * count that moved by the end means the shard changed after its answer, so the build is stale.
    */
   readonly #changes: number[] = Array.from({ length: TOKEN_SIGNER_SHARDS }, () => 0);
-  /** A read was served since the document was built, so the alarm refreshes it ahead. */
-  #readSinceBuild = false;
   /** The alarm time this instance last read or set (null: none); undefined until first read. */
   #alarmAt: number | null | undefined = undefined;
   /**
-   * While background rebuilds fail or come back stale, the alarm retries them until this time:
-   * the expiry of the document that first needed one. Then a read rebuilds for itself.
+   * Per list, while background rebuilds fail or come back stale, the alarm retries them until
+   * this time: the expiry of the document that first needed one. Then a read rebuilds for itself.
    */
-  #retryUntil: number | null = null;
+  readonly #retryUntil = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -106,24 +127,30 @@ export class TokenKeySetDO extends DurableObject<Env> {
     }
     this.#config = config;
     void ctx.blockConcurrencyWhile(async () => {
-      const stored = KeySetDocumentSchema.safeParse(await ctx.storage.get(DOCUMENT_NAME));
-      if (stored.success) this.#document = stored.data;
+      const stored = await ctx.storage.list({ prefix: DOCUMENT_PREFIX });
+      for (const value of stored.values()) {
+        const parsed = KeySetDocumentSchema.safeParse(value);
+        if (parsed.success) this.#documents.set(parsed.data.revokedKids, parsed.data);
+      }
     });
   }
 
   async read(revokedKidsInput: readonly string[]): Promise<TokenKeySetRead> {
     const revokedKids = RevokedKidsSchema.parse(revokedKidsInput).join(',');
-    let document = this.#document;
-    if (!this.#serves(document, revokedKids, Date.now(), false)) {
+    let document = this.#documents.get(revokedKids);
+    if (!this.#serves(document, Date.now(), false)) {
       // A failed rebuild falls back to a stale document still inside its period.
-      document = (await this.#rebuildOnce(revokedKids)) ?? this.#document;
-      if (!this.#serves(document, revokedKids, Date.now(), true)) {
-        return { status: 'unavailable' };
-      }
+      document = (await this.#rebuildOnce(revokedKids)) ?? this.#documents.get(revokedKids);
+      if (!this.#serves(document, Date.now(), true)) return { status: 'unavailable' };
     }
-    this.#readSinceBuild = true;
-    // A stale document already has its rebuild under way (a read rebuilds it, as above).
-    if (!document.stale) await this.#scheduleAlarm(this.#refreshAt(document));
+    if (!document.stale) {
+      if (!document.read) {
+        // Stored, so an eviction before the refresh alarm does not lose it.
+        document = { ...document, read: true };
+        await this.#store(document);
+      }
+      await this.#scheduleAlarm(refreshAt(document));
+    }
     return {
       status: 'ok',
       keys: document.keys.map(key => ({ ...key })),
@@ -132,75 +159,78 @@ export class TokenKeySetDO extends DurableObject<Env> {
     };
   }
 
-  /** Shard `shard` changed its ring: the document stops serving, and the alarm rebuilds it now. */
+  /** Shard `shard` changed its ring: every document stops serving; the alarm rebuilds them now. */
   async invalidate(shardInput: number): Promise<void> {
     const shard = ShardSchema.parse(shardInput);
     this.#changes[shard] += 1;
-    const document = this.#document;
-    if (document === null || document.stale) return;
-    this.#document = { ...document, stale: true };
-    await this.ctx.storage.put(DOCUMENT_NAME, this.#document);
-    await this.#scheduleAlarm(Date.now());
+    let marked = false;
+    for (const document of [...this.#documents.values()]) {
+      if (document.stale) continue;
+      await this.#store({ ...document, stale: true });
+      marked = true;
+    }
+    if (marked) await this.#scheduleAlarm(Date.now());
   }
 
   async alarm(): Promise<void> {
     // A fired alarm is no longer stored.
     this.#alarmAt = null;
-    const document = this.#document;
+    for (const document of [...this.#documents.values()]) await this.#refresh(document);
+  }
+
+  /** The alarm's work for one document: refresh ahead, rebuild a stale one, retry for a while. */
+  async #refresh(document: KeySetDocument): Promise<void> {
     const now = Date.now();
-    // Nothing held, or nothing a read may still use: the next read rebuilds.
-    if (document === null || now >= document.builtAt + TOKEN_JWKS_CACHE_MS) return;
+    // Nothing a read may still use: the next read rebuilds.
+    if (now >= document.builtAt + TOKEN_JWKS_CACHE_MS) return;
     if (!document.stale) {
-      // An idle set is left to expire.
-      if (!this.#readSinceBuild) return;
-      if (now < this.#refreshAt(document)) {
-        await this.#scheduleAlarm(this.#refreshAt(document));
+      // An idle document is left to expire.
+      if (!document.read) return;
+      if (now < refreshAt(document)) {
+        await this.#scheduleAlarm(refreshAt(document));
         return;
       }
     }
-    const rebuilt = await this.#rebuildOnce(document.revokedKids);
+    const { revokedKids } = document;
+    const rebuilt = await this.#rebuildOnce(revokedKids);
     if (rebuilt !== null && !rebuilt.stale) return;
-    this.#retryUntil ??= document.builtAt + TOKEN_JWKS_CACHE_MS;
+    const until = this.#retryUntil.get(revokedKids) ?? document.builtAt + TOKEN_JWKS_CACHE_MS;
     const retryAt = Date.now() + TOKEN_KEY_SET_RETRY_MS;
-    if (retryAt < this.#retryUntil) await this.#scheduleAlarm(retryAt);
-    // Given up: a later change note starts a new run of retries; until then reads rebuild.
-    else this.#retryUntil = null;
-  }
-
-  /** When the alarm rebuilds a document reads still use, ahead of its expiry. */
-  #refreshAt(document: KeySetDocument): number {
-    return document.builtAt + TOKEN_JWKS_CACHE_MS - TOKEN_KEY_SET_REFRESH_AHEAD_MS;
+    if (retryAt < until) {
+      this.#retryUntil.set(revokedKids, until);
+      await this.#scheduleAlarm(retryAt);
+    } else {
+      // Given up: a later change note starts a new run of retries; until then reads rebuild.
+      this.#retryUntil.delete(revokedKids);
+    }
   }
 
   /**
-   * Whether `document` answers a read under `revokedKids` at `now`: built under that list, inside
-   * its period, and not stale unless `allowStale` (a failed rebuild's fallback).
+   * Whether `document` answers a read at `now`: inside its period, and not stale unless
+   * `allowStale` (a failed rebuild's fallback). The caller looked it up by its list.
    */
   #serves(
-    document: KeySetDocument | null,
-    revokedKids: string,
+    document: KeySetDocument | undefined,
     now: number,
     allowStale: boolean
   ): document is KeySetDocument {
     return (
-      document !== null &&
-      document.revokedKids === revokedKids &&
+      document !== undefined &&
       now < document.builtAt + TOKEN_JWKS_CACHE_MS &&
       (allowStale || !document.stale)
     );
   }
 
-  /** One rebuild per list at a time; concurrent reads wait for the same one. */
+  /** One rebuild per list at a time; concurrent reads of that list wait for the same one. */
   async #rebuildOnce(revokedKids: string): Promise<KeySetDocument | null> {
-    const pending = this.#rebuild;
-    if (pending !== null && pending.revokedKids === revokedKids) return await pending.promise;
+    const pending = this.#rebuilds.get(revokedKids);
+    if (pending !== undefined) return await pending;
     const promise = this.#build(revokedKids);
-    const entry = { revokedKids, promise };
-    this.#rebuild = entry;
+    this.#rebuilds.set(revokedKids, promise);
     try {
       return await promise;
     } finally {
-      if (this.#rebuild === entry) this.#rebuild = null;
+      if (this.#rebuilds.get(revokedKids) === promise) this.#rebuilds.delete(revokedKids);
     }
   }
 
@@ -258,16 +288,32 @@ export class TokenKeySetDO extends DurableObject<Env> {
       }
       if (this.#changes[shard] !== changes) stale = true;
     }
-    const document: KeySetDocument = { keys, revokedKids, builtAt, stale };
-    // A read under another list may have stored a newer document meanwhile; keep the newer one.
-    const held = this.#document;
-    if (held === null || held.builtAt <= builtAt) {
-      this.#document = document;
-      this.#readSinceBuild = false;
-      if (!stale) this.#retryUntil = null;
-      await this.ctx.storage.put(DOCUMENT_NAME, document);
+    const document: KeySetDocument = { keys, revokedKids, builtAt, stale, read: false };
+    // A concurrent build of this list may have stored a newer document meanwhile; keep that one.
+    const held = this.#documents.get(revokedKids);
+    if (held === undefined || held.builtAt <= builtAt) {
+      if (!stale) this.#retryUntil.delete(revokedKids);
+      await this.#store(document);
+      await this.#keepLatestLists();
     }
     return document;
+  }
+
+  /** Stores `document`; the map keeps documents in the order they were last stored. */
+  async #store(document: KeySetDocument): Promise<void> {
+    this.#documents.delete(document.revokedKids);
+    this.#documents.set(document.revokedKids, document);
+    await this.ctx.storage.put(await documentName(document.revokedKids), document);
+  }
+
+  /** Deletes the documents of all but the `KEPT_LISTS` most recently stored lists. */
+  async #keepLatestLists(): Promise<void> {
+    const older = [...this.#documents.values()].slice(0, -KEPT_LISTS);
+    for (const document of older) {
+      this.#documents.delete(document.revokedKids);
+      this.#retryUntil.delete(document.revokedKids);
+      await this.ctx.storage.delete(await documentName(document.revokedKids));
+    }
   }
 
   /** Sets the alarm for `at` unless one is due sooner; the kept time spares a storage read. */

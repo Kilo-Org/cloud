@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --env local",
+    "predeploy": "vitest run --config vitest.node.config.ts test/repo/policy-files.test.ts",
     "test": "vitest run && vitest run --config vitest.node.config.ts",
     "test:workers": "vitest run",
     "typecheck": "tsgo --noEmit && tsgo --noEmit -p proof/vercel-exchange/tsconfig.json",

@@ -125,11 +125,10 @@ export class TokenSignerDO extends DurableObject<Env> {
   readonly #signingKeys = new Map<string, CryptoKey>();
   /** The alarm time this instance last read or set (null: none); undefined until first read. */
   #alarmAt: number | null | undefined = undefined;
-  /**
-   * The ring changed since the key-set object was last told; the next call (or alarm) tells it
-   * before it answers.
-   */
+  /** The ring changed since the key-set object was last told; the next call (or alarm) tells it. */
   #keySetChanged = false;
+  /** The note of the latest change, while it is in flight; `getJwks` answers only after it. */
+  #notifying: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -226,9 +225,14 @@ export class TokenSignerDO extends DurableObject<Env> {
     return { status: 'signed', tokens };
   }
 
-  /** Next, current and retired-in-grace public keys; never private material. */
+  /**
+   * Next, current and retired-in-grace public keys; never private material. Waits for an
+   * in-flight change note first, so the key-set object counts a change of this shard before it
+   * sees an answer that holds it (its build-race check relies on that order).
+   */
   async getJwks(): Promise<TokenJwks> {
     await this.#advanceIfDue(Date.now());
+    await this.#notifying;
     return { keys: publishedKeys(this.#ring) };
   }
 
@@ -273,25 +277,29 @@ export class TokenSignerDO extends DurableObject<Env> {
 
   /**
    * Rotation and emergency removal run one at a time, and only when something is due. A change
-   * (here or at start) is told to the key-set object after the block, before the call answers: a
-   * `getJwks` from the key-set object's own rebuild then answers only after the note arrived, so
-   * that rebuild counts as current.
+   * (here or at start) is told to the key-set object in the background, after the block, so a
+   * mint never waits for it; `getJwks` does (see there).
    */
   async #advanceIfDue(now: number): Promise<void> {
     if (keyRingDueAt(this.#ring, this.#config.revokedTokenKids, now) <= now) {
       await this.ctx.blockConcurrencyWhile(() => this.#advance(Date.now()));
     }
-    await this.#notifyKeySet();
+    if (!this.#keySetChanged) return;
+    this.#keySetChanged = false;
+    const notifying = this.#notifyKeySet().finally(() => {
+      if (this.#notifying === notifying) this.#notifying = null;
+    });
+    this.#notifying = notifying;
+    this.ctx.waitUntil(notifying);
   }
 
   /**
-   * Tells the key-set object the published keys changed, so it rebuilds its document before the
-   * next read instead of serving it to its expiry. A call that fails or runs past its deadline is
-   * only logged: the document then expires on its own, `TOKEN_JWKS_CACHE_MS` after its build.
+   * Tells the key-set object the published keys changed, so it rebuilds its documents before the
+   * next read instead of serving them to their expiry. A call that fails or runs past its deadline
+   * is only logged: the documents then expire on their own, `TOKEN_JWKS_CACHE_MS` after their
+   * build.
    */
   async #notifyKeySet(): Promise<void> {
-    if (!this.#keySetChanged) return;
-    this.#keySetChanged = false;
     const outcome = await callWithDeadline(async () => {
       await getTokenKeySetStub(this.env, this.#config).invalidate(this.#shard);
       return {};

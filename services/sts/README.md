@@ -471,26 +471,38 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `ai-gateway` | `auto-routing`: `auto-routing:decide`; `auto-routing-benchmark`: `auto-routing-benchmark:routing-tables.read` | none | production only (`environmentGrants`) |
 | `notifications` | `web`: `web:glanceable-snapshot.read` | in its file | production |
 | `container-usage-meter` | `web`: `web:compute-balance-alert.send` | in its file | production |
-| `cloudflare-scim-sync` | `web`: `web:scim.sync` | none | production |
-| `user-data-export` | `web`: `web:user-data-exports.ready` | none | production |
-| `security-auto-analysis` | `web`: `web:security-notifications.lifecycle` | none | production |
-| `auto-routing-benchmark` | `web`: `web:auto-routing.pool-pins.write`, `web:usage.receipts.read`, `web:auto-routing.production-profile.read`, `web:usage.benchmark-grader.record` | none | production |
-| `auto-routing` | `web`: `web:usage.classifier.record`; `auto-routing-benchmark`: `auto-routing-benchmark:routing-tables.read` | none | production |
-| `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback`, `security-auto-analysis:remediation.callback` | none | production |
-| `kilo-code-review-worker` | `web`: `web:code-review.status-callback` | none | production |
+| `cloudflare-scim-sync` | `web`: `web:scim.sync` | in its file | production |
+| `user-data-export` | `web`: `web:user-data-exports.ready` | in its file | production |
+| `security-auto-analysis` | `web`: `web:security-notifications.lifecycle` | in its file | production |
+| `auto-routing-benchmark` | `web`: `web:auto-routing.pool-pins.write`, `web:usage.receipts.read`, `web:auto-routing.production-profile.read`, `web:usage.benchmark-grader.record` | in its file | production |
+| `auto-routing` | `web`: `web:usage.classifier.record`; `auto-routing-benchmark`: `auto-routing-benchmark:routing-tables.read` | in its file | production |
+| `cloud-agent-next` | `web`: `web:byoc-credentials.read`, `web:byoc-credentials.write`, `web:hosted-workspace-pull-requests.refresh`, `web:bot-session.callback`, `web:security-analysis.callback`, `web:code-review.agent-callback`; `webhook-agent-ingest`: `webhook-agent-ingest:execution.callback`; `security-auto-analysis`: `security-auto-analysis:analysis.callback`, `security-auto-analysis:remediation.callback` | in its file | production |
+| `kilo-code-review-worker` | `web`: `web:code-review.status-callback` | in its file | production |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
 are production only because Bouncer (`Kilo-Org/bouncer`) runs in production only and accepts only
 production STS tokens. `bouncer:signup.history` is registered for the signup-history import job,
-and no policy grants it yet. The phase 2 C1 grants are production only, and each scope has
-exactly one sender: its docblock in `packages/sts-contracts/src/scopes.ts` names it, and the
-policy tests pin it. The one exception is `auto-routing-benchmark:routing-tables.read`, whose
-docblock names three senders (`web`, `ai-gateway` and `auto-routing`) because all three read the
-same read-only tables and the token's subject names the caller. The two region scopes go to
-`ai-gateway` alone: only the gateway runs in the US region (the web app runs in Frankfurt only),
-and STS refuses the `web` workload its own audience. `session-ingest:session-access.invalidate`
-is an STS scope; UTS's user scopes under the same audience are a separate registry. The `kilo-mcp`
-grant
+and no policy grants it yet. The phase 2 C1 grants are production only. Each scope's docblock in
+`packages/sts-contracts/src/scopes.ts` names its senders, and the policy tests pin them. Every C1
+scope has exactly one sender except `auto-routing-benchmark:routing-tables.read`, which has
+three (`web`, `ai-gateway` and `auto-routing`): all three read the same read-only tables, and the
+token's subject names the caller. The policy tests also fail for a registered C1 scope that no
+policy grants, unless they list it as ungranted with a reason; today that is
+`web:security-notifications.dispatch`, whose sender `cloudflare-security-sync` stays a
+registration until its STS binding lands (#12999). The two region scopes go to `ai-gateway`
+alone: only the gateway runs in the US region (the web app runs in Frankfurt only), and STS
+refuses the `web` workload its own audience. `session-ingest:session-access.invalidate` is an STS
+scope; UTS's user scopes under the same audience are a separate registry.
+
+Cutover prerequisite: the AI gateway also calls the Notifications Worker's `/internal/*` routes,
+for organization low-balance pushes (`dispatchLowBalancePush`, imported at
+`packages/web-shared/src/lib/organizations/organization-usage.ts:30` and reached from
+`packages/web-shared/src/lib/ai-gateway/processUsage.ts:853`). `ai-gateway` holds no
+`notifications:internal.call` grant, and that is deliberate: the receiver admits only `web` for
+that scope. Until this edge gets its own scope and grant, those pushes keep the legacy secret, and
+they stop if the Notifications receiver goes STS-only first.
+
+The `kilo-mcp` grant
 is reserved: its registration file becomes its policy (`worker-binding`, `props.caller`
 `kilo-mcp`, development first) once `services/kilo-mcp/wrangler.jsonc` binds STS, because the
 config check below refuses a `worker-binding` policy that no config here binds. Its local block

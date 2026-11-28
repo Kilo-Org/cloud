@@ -1,3 +1,4 @@
+import { STS_ENVIRONMENTS, STS_RESERVED_SCOPES, STS_SCOPE_REGISTRY } from '@kilocode/sts-contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { policyChangedEvent } from '../../src/audit/events';
@@ -1077,6 +1078,60 @@ describe('phase 2 C1 grants of the shipped policies', () => {
     'cloud-agent-next',
     'kilo-code-review-worker',
   ];
+  /**
+   * Registered scopes outside phase 2 C1, each with its kind: the canary pair, the UTS service
+   * scopes, the phase 4 service scopes and the CI scopes. The reserved scopes
+   * (`STS_RESERVED_SCOPES`) are left out by name.
+   */
+  const NOT_C1: Readonly<Record<string, string>> = {
+    'web:sts.canary': 'canary',
+    'usage-ingest:sts.canary': 'canary',
+    'uts-feed:revocation.read': 'UTS',
+    'uts:subjects.revoke': 'UTS',
+    'uts:browser-sessions.end': 'UTS',
+    'uts:api-credentials.revoke': 'UTS',
+    'uts:token-exchange': 'UTS',
+    'ai-gateway-secure-proxy:request.forward': 'phase 4',
+    'usage-ingest:usage.publish': 'phase 4',
+    'web:usage.record': 'phase 4',
+    'o11y:api-metrics.write': 'phase 4',
+    'o11y:alerting.read': 'phase 4',
+    'o11y:alerting.write': 'phase 4',
+    'bouncer:decide': 'phase 4',
+    'bouncer:usage.write': 'phase 4',
+    'bouncer:signup.decide': 'phase 4',
+    'bouncer:signup.history': 'phase 4',
+    'web:mcp-catalog-token.mint': 'CI',
+    'community-contributions-dashboard:opencode.sync': 'CI',
+  };
+  /** Registered C1 scopes that no policy grants yet, each with the reason and what grants it. */
+  const UNGRANTED: Readonly<Record<string, string>> = {
+    'web:security-notifications.dispatch':
+      'cloudflare-security-sync stays a registration until its STS binding lands (#12999)',
+  };
+
+  it('classifies every registered scope: a C1 grant, an ungranted C1 scope with a reason, or not C1', () => {
+    const registered = Object.values(STS_SCOPE_REGISTRY).flatMap(entry => entry.scopes);
+    const unclassified = registered.filter(
+      scope =>
+        !STS_RESERVED_SCOPES.includes(scope) &&
+        !Object.hasOwn(SENDERS, scope) &&
+        !Object.hasOwn(UNGRANTED, scope) &&
+        !Object.hasOwn(NOT_C1, scope)
+    );
+    expect(unclassified).toEqual([]);
+    const listed = [...Object.keys(SENDERS), ...Object.keys(UNGRANTED), ...Object.keys(NOT_C1)];
+    expect(listed.filter(scope => !registered.includes(scope))).toEqual([]);
+    expect(Object.keys(UNGRANTED).filter(scope => Object.hasOwn(SENDERS, scope))).toEqual([]);
+  });
+
+  it.each(Object.keys(UNGRANTED))('grants the ungranted C1 scope %s to no policy', scope => {
+    for (const environment of STS_ENVIRONMENTS) {
+      expect(
+        policyIndex.forEnvironment(environment).filter(policy => policy.scopes.includes(scope))
+      ).toEqual([]);
+    }
+  });
 
   it.each(Object.entries(SENDERS))(
     'grants %s to %s in production and to no other policy',

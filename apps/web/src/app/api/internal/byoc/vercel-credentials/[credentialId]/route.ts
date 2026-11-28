@@ -13,6 +13,10 @@ import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { applyVercelComputeStatusProjection } from '@/lib/cloud-agent-next/vercel-compute-status';
+import {
+  authorizeInternalServiceRequest,
+  type InternalServiceCaller,
+} from '@/lib/internal-api-auth';
 
 import {
   decodeVercelConnection,
@@ -79,17 +83,28 @@ function unauthorized(): NextResponse {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: responseHeaders() });
 }
 
-async function isAuthorized(request: NextRequest): Promise<boolean> {
+/** The route's legacy credential: the internal API secret in `x-internal-api-key` only. */
+async function authorizeLegacy(request: NextRequest): Promise<NextResponse | null> {
   const presented = request.headers.get('x-internal-api-key');
   const expected = presented ? await readInternalApiSecret() : '';
-  if (!expected || !presented || !timingSafeEqual(presented, expected)) return false;
+  if (!expected || !presented || !timingSafeEqual(presented, expected)) return unauthorized();
   observeInternalAuth(
     'web',
     'byoc_vercel_credentials',
     'legacy_shared_secret',
     callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
   );
-  return true;
+  return null;
+}
+
+/** A read needs `web:byoc-credentials.read`, a status write `web:byoc-credentials.write`. */
+function authorize(
+  request: NextRequest,
+  edge: 'byoc_credentials_read' | 'byoc_credentials_write'
+): Promise<NextResponse | InternalServiceCaller> {
+  return authorizeInternalServiceRequest(request, edge, 'byoc_vercel_credentials', () =>
+    authorizeLegacy(request)
+  );
 }
 
 function toCredentialResponse(row: VercelComputeConnection) {
@@ -132,7 +147,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ credentialId: string }> }
 ): Promise<NextResponse> {
-  if (!(await isAuthorized(request))) return unauthorized();
+  const auth = await authorize(request, 'byoc_credentials_read');
+  if (auth instanceof Response) return auth;
 
   const { credentialId } = await params;
   if (!z.uuid().safeParse(credentialId).success) {
@@ -195,7 +211,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ credentialId: string }> }
 ): Promise<NextResponse> {
-  if (!(await isAuthorized(request))) return unauthorized();
+  const auth = await authorize(request, 'byoc_credentials_write');
+  if (auth instanceof Response) return auth;
 
   const { credentialId } = await params;
   if (!z.uuid().safeParse(credentialId).success) {

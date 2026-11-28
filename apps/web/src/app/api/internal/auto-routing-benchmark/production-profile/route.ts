@@ -10,7 +10,9 @@
  * so uncached input is the difference.
  *
  * Auth: shared internal secret over `Authorization: Bearer <secret>`, the
- * header services/auto-routing-benchmark sends.
+ * header services/auto-routing-benchmark sends, or under
+ * `AUTO_ROUTING_PRODUCTION_PROFILE_RECEIVER_AUTH` its STS
+ * `web:auto-routing.production-profile.read` token in the same header.
  *
  * URL: GET /api/internal/auto-routing-benchmark/production-profile
  */
@@ -32,13 +34,15 @@ import {
 import { eq, sql, and } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { authorizeInternalServiceRequest } from '@/lib/internal-api-auth';
 
 const AUTO_MODEL_ID = 'kilo-auto/efficient';
 // The usage tables are large: a multi-day scan times out on the replica, while
 // six hours aggregates in seconds and still covers thousands of requests.
 const WINDOW_HOURS = 6;
 
-export async function GET(req: NextRequest) {
+/** The route's legacy credential: the internal API secret as the bearer. */
+async function authorizeLegacy(req: NextRequest): Promise<NextResponse | null> {
   const token = extractBearerToken(req.headers.get('authorization'));
   const expected = token ? await readInternalApiSecret() : '';
   if (!expected || !token || !timingSafeEqual(token, expected)) {
@@ -50,6 +54,17 @@ export async function GET(req: NextRequest) {
     'legacy_shared_secret',
     callerLabel(req.headers.get(INTERNAL_CALLER_HEADER))
   );
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await authorizeInternalServiceRequest(
+    req,
+    'auto_routing_production_profile',
+    'auto_routing_benchmark_production_profile',
+    () => authorizeLegacy(req)
+  );
+  if (auth instanceof Response) return auth;
 
   const windowStart = sql`NOW() - make_interval(hours => ${WINDOW_HOURS}::int)`;
   const perSession = db

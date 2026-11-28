@@ -14,29 +14,37 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
 import { decodeVercelConnection } from '@/lib/byoc/vercel-connection';
+import { authorizeInternalServiceRequest } from '@/lib/internal-api-auth';
 
 const responseHeaders = { 'Cache-Control': 'no-store' };
 
-async function isAuthorized(request: NextRequest): Promise<boolean> {
+/** The route's legacy credential: the internal API secret in `x-internal-api-key` only. */
+async function authorizeLegacy(request: NextRequest): Promise<NextResponse | null> {
   const presented = request.headers.get('x-internal-api-key');
   const expected = presented ? await readInternalApiSecret() : '';
-  if (!expected || !presented || !timingSafeEqual(presented, expected)) return false;
+  if (!expected || !presented || !timingSafeEqual(presented, expected)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: responseHeaders });
+  }
   observeInternalAuth(
     'web',
     'byoc_vercel_credentials_organization',
     'legacy_shared_secret',
     callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
   );
-  return true;
+  return null;
 }
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ organizationId: string }> }
 ): Promise<NextResponse> {
-  if (!(await isAuthorized(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: responseHeaders });
-  }
+  const auth = await authorizeInternalServiceRequest(
+    request,
+    'byoc_credentials_read',
+    'byoc_vercel_credentials_organization',
+    () => authorizeLegacy(request)
+  );
+  if (auth instanceof Response) return auth;
 
   const { organizationId } = await params;
   if (!z.uuid().safeParse(organizationId).success) {

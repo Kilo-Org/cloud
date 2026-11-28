@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import { upsertDirectoryUser } from '@/lib/scim/directory-sync';
 import { DirectoryUserUpsertSchema } from '@kilocode/scim-contracts';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
@@ -23,8 +23,8 @@ type RouteParams = { params: Promise<{ externalId: string }> };
  * `users/[externalId]/memberships`.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_user');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_user');
+  if (auth instanceof Response) return auth;
 
   const { externalId } = await params;
   const parsed = DirectoryUserUpsertSchema.safeParse(await request.json().catch(() => null));

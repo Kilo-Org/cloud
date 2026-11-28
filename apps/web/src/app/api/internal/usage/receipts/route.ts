@@ -1,4 +1,8 @@
-import { handleBenchmarkUsageReceipts } from '@kilocode/web-shared/lib/ai-gateway/handlers/benchmark-usage-receipts';
+import {
+  authorizeBenchmarkUsageReceiptsLegacy,
+  handleBenchmarkUsageReceipts,
+} from '@kilocode/web-shared/lib/ai-gateway/handlers/benchmark-usage-receipts';
+import { authorizeInternalServiceRequest } from '@/lib/internal-api-auth';
 
 /**
  * Frankfurt-local read of native usage receipts by `microdollar_usage.id`.
@@ -9,6 +13,16 @@ import { handleBenchmarkUsageReceipts } from '@kilocode/web-shared/lib/ai-gatewa
  */
 export const maxDuration = 30;
 
+async function authorize(request: Request): Promise<Response | null> {
+  const auth = await authorizeInternalServiceRequest(
+    request,
+    'usage_receipts',
+    'benchmark_usage_receipts',
+    () => authorizeBenchmarkUsageReceiptsLegacy(request)
+  );
+  return auth instanceof Response ? auth : null;
+}
+
 export async function POST(request: Request): Promise<Response> {
-  return handleBenchmarkUsageReceipts(request);
+  return handleBenchmarkUsageReceipts(request, authorize);
 }

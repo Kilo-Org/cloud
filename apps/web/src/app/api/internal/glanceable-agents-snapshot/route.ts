@@ -7,6 +7,7 @@ import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-sec
 import { callerLabel, observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
 import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureMemberOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { authorizeInternalServiceRequest } from '@/lib/internal-api-auth';
 
 const SECRET_COMPARE_HMAC_KEY = Buffer.from('glanceable-agents-snapshot-secret-compare');
 
@@ -24,15 +25,8 @@ function secretMatches(provided: string | null, expected: string): boolean {
   return timingSafeEqual(left, right);
 }
 
-/**
- * Internal server-to-server snapshot builder for background glanceable
- * delivery. The notifications worker is the only caller; mobile never calls
- * this route. Requires the internal secret, and — when `organizationId` is a
- * string — re-checks that `userId` is a member of that organization with the
- * same helper the active-sessions router uses, so a compromised worker cannot
- * read another user's org snapshot.
- */
-export async function POST(req: NextRequest) {
+/** The route's legacy credential: the internal API secret in `X-Internal-Secret` only. */
+async function authorizeLegacy(req: NextRequest): Promise<NextResponse | null> {
   const secret = req.headers.get('X-Internal-Secret');
   const expected = secret ? await readInternalApiSecret() : '';
   if (!expected || !secretMatches(secret, expected)) {
@@ -44,6 +38,27 @@ export async function POST(req: NextRequest) {
     'legacy_shared_secret',
     callerLabel(req.headers.get('x-kilo-caller'))
   );
+  return null;
+}
+
+/**
+ * Internal server-to-server snapshot builder for background glanceable
+ * delivery. The notifications worker is the only caller; mobile never calls
+ * this route. Requires the internal secret or, under
+ * `GLANCEABLE_SNAPSHOT_RECEIVER_AUTH`, the notifications workload's STS token,
+ * and — whichever authenticated — when `organizationId` is a string re-checks
+ * that `userId` is a member of that organization with the same helper the
+ * active-sessions router uses, so a compromised worker cannot read another
+ * user's org snapshot.
+ */
+export async function POST(req: NextRequest) {
+  const auth = await authorizeInternalServiceRequest(
+    req,
+    'glanceable_snapshot',
+    'glanceable_agents_snapshot',
+    () => authorizeLegacy(req)
+  );
+  if (auth instanceof Response) return auth;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsedBody = BodySchema.safeParse(rawBody);

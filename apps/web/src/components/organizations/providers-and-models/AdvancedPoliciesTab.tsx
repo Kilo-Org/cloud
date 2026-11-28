@@ -187,7 +187,7 @@ function GatewayPoliciesCard({
           <p id={`${id}-openrouter-help`} className="text-muted-foreground ml-12 text-sm">
             {regionName
               ? 'OpenRouter is off while an inference region is selected, because it cannot keep requests in a region.'
-              : 'When off, requests go through the Vercel AI Gateway. A model the Vercel AI Gateway does not offer returns an error.'}
+              : 'When off, requests with Kilo credits do not go through OpenRouter. Models that require OpenRouter will return an error.'}
           </p>
         </div>
 
@@ -198,9 +198,7 @@ function GatewayPoliciesCard({
               Requests that use your organization&apos;s own API keys (BYOK), including OpenRouter
               and Vercel AI Gateway keys. Your provider contract applies to those.
             </li>
-            <li>
-              Autocomplete and code edit completions, which go directly to their model providers.
-            </li>
+            <li>Autocomplete requests go directly to their model providers.</li>
             <li>
               Which models members see. Model lists stay the same, so a model may appear in the list
               and still return an error under these policies.

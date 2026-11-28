@@ -28,6 +28,7 @@ import type {
   ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
+import type { MintBinding } from '@kilocode/service-token-client';
 import type { BundleBinding, SecretsExecutionContext } from '@kilocode/secrets-client';
 import * as z from 'zod';
 import { Limits } from './schema.js';
@@ -507,8 +508,12 @@ export type Env = {
    * credential fields below directly.
    */
   SECRETS_SOURCE?: string;
-  /** STS SecretsBroker binding; absent until the deployment binds it (services/sts/policy). */
-  STS?: BundleBinding;
+  /**
+   * STS `SecretsBroker` binding (services/sts/policy/cloud-agent-next.yaml): serves the runtime
+   * secret bundle (secrets.ts) and mints the outbound service tokens (web-internal-auth.ts,
+   * callbacks/callback-auth.ts). Absent until the deployment binds it.
+   */
+  STS?: BundleBinding & MintBinding;
   /**
    * Sentry DSN, a client-side public key. Its consumers are synchronous (the Sentry SDK's
    * options callbacks and the egress envelope hostname check), so it stays on `secrets-store` and
@@ -550,6 +555,18 @@ export type Env = {
   WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
   /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
   WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
+  /**
+   * Outbound credential switches (`@kilocode/worker-utils/sts-sender`, ENVIRONMENT.md): unset,
+   * empty or `legacy` sends the shared credential, `sts` only an STS token for the receiver.
+   * `BYOC_LOOKUP_SENDER_AUTH` covers the web BYOC routes, `PR_REFRESH_SENDER_AUTH` the
+   * hosted-workspace pull request refresh, and each `CALLBACK_SENDER_AUTH_*` one callback receiver
+   * (callbacks/callback-auth.ts).
+   */
+  BYOC_LOOKUP_SENDER_AUTH?: string;
+  PR_REFRESH_SENDER_AUTH?: string;
+  CALLBACK_SENDER_AUTH_WEB?: string;
+  CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST?: string;
+  CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;

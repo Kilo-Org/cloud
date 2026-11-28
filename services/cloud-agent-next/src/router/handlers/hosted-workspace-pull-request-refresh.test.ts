@@ -1,6 +1,9 @@
+import type { MintRequest } from '@kilocode/sts-contracts';
+import * as stsSender from '@kilocode/worker-utils/sts-sender';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env, TRPCContext } from '../../types.js';
 import type * as workspacePullRequestModule from '../../session/workspace-pull-request.js';
+import { WEB_HOSTED_WORKSPACE_PR_REFRESH } from '../../web-internal-auth.js';
 import { router } from '../auth.js';
 import { refreshHostedWorkspacePullRequest } from './hosted-workspace-pull-request-refresh.js';
 
@@ -17,6 +20,11 @@ vi.mock('../../session/workspace-pull-request.js', async importOriginal => {
 vi.mock('@kilocode/worker-utils', async importOriginal => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, hasOrganizationAccess: mocks.hasOrganizationAccess };
+});
+// The real token reader, observed for the invocation context it receives.
+vi.mock('@kilocode/worker-utils/sts-sender', async importOriginal => {
+  const actual = await importOriginal<typeof stsSender>();
+  return { ...actual, readStsToken: vi.fn(actual.readStsToken) };
 });
 
 const userId = 'oauth/google:workspace-owner';
@@ -73,6 +81,7 @@ function fixture(
     workspace?: Record<string, unknown> | null;
     summary?: unknown;
     env?: Record<string, unknown>;
+    executionCtx?: { waitUntil(promise: Promise<unknown>): void };
   } = {}
 ) {
   const getCloudAgentWorkspace = vi.fn(async () =>
@@ -93,6 +102,7 @@ function fixture(
     userId,
     authToken: 'authenticated-user-token',
     request: new Request('https://worker.test/trpc/refreshHostedWorkspacePullRequest'),
+    ...(options.executionCtx === undefined ? {} : { executionCtx: options.executionCtx }),
   } satisfies TRPCContext;
 
   mocks.read.mockResolvedValue(
@@ -253,6 +263,129 @@ describe('refreshHostedWorkspacePullRequest', () => {
     expect(result.refresh).toEqual({ status: 'unavailable', retryAt: null });
     expect(result.pullRequest).toMatchObject({ number: 142 });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe('under PR_REFRESH_SENDER_AUTH=sts', () => {
+    const MINTED = 'minted.refresh.token';
+
+    function stsBinding(answer: 'issued' | 'denied') {
+      return {
+        mintTokens: vi.fn(async (request: MintRequest) => ({
+          status: 'ok' as const,
+          tokens: request.tokens.map(({ audience, scope }) =>
+            answer === 'issued'
+              ? {
+                  status: 'issued' as const,
+                  audience,
+                  scope,
+                  token: MINTED,
+                  jti: 'jti-refresh',
+                  expiresAt: Math.floor(Date.now() / 1000) + 300,
+                }
+              : { status: 'denied' as const, audience, scope, reason: 'scope_not_allowed' as const }
+          ),
+        })),
+      };
+    }
+
+    it('presents only the refresh token to the web origin', async () => {
+      fetchMock.mockResolvedValueOnce(backendResponse({ status: 'refreshed', retryAt: null }));
+      const STS = stsBinding('issued');
+      const executionCtx = { waitUntil: vi.fn() };
+      const test = fixture({
+        summary: pullRequest(),
+        env: {
+          PR_REFRESH_SENDER_AUTH: 'sts',
+          STS,
+          KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+        },
+        executionCtx,
+      });
+
+      const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+      expect(result.refresh).toEqual({ status: 'refreshed', retryAt: null });
+      expect(STS.mintTokens).toHaveBeenCalledWith({
+        tokens: [WEB_HOSTED_WORKSPACE_PR_REFRESH],
+      });
+      expect(vi.mocked(stsSender.readStsToken)).toHaveBeenLastCalledWith(
+        STS,
+        WEB_HOSTED_WORKSPACE_PR_REFRESH,
+        executionCtx
+      );
+      expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+        'content-type': 'application/json',
+        authorization: `Bearer ${MINTED}`,
+      });
+    });
+
+    it.each(['', 'legacy'])(
+      'keeps the internal secret and never mints when the switch is %j',
+      async PR_REFRESH_SENDER_AUTH => {
+        fetchMock.mockResolvedValueOnce(backendResponse({ status: 'refreshed', retryAt: null }));
+        const STS = stsBinding('issued');
+        const test = fixture({
+          summary: pullRequest(),
+          env: { PR_REFRESH_SENDER_AUTH, STS, KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai' },
+        });
+
+        await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+        expect(STS.mintTokens).not.toHaveBeenCalled();
+        expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+          'content-type': 'application/json',
+          'x-internal-api-key': 'internal-secret',
+        });
+      }
+    );
+
+    it('never mints for a backend outside the web production origins', async () => {
+      const STS = stsBinding('issued');
+      const test = fixture({
+        summary: pullRequest(),
+        env: { PR_REFRESH_SENDER_AUTH: 'sts', STS },
+      });
+
+      const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+      expect(result.refresh).toEqual({ status: 'unavailable', retryAt: null });
+      expect(STS.mintTokens).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing and never the secret when STS denies the token', async () => {
+      const test = fixture({
+        summary: pullRequest(),
+        env: {
+          PR_REFRESH_SENDER_AUTH: 'sts',
+          STS: stsBinding('denied'),
+          KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
+        },
+      });
+
+      const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+      expect(result.refresh).toEqual({ status: 'unavailable', retryAt: null });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for an unknown switch value', async () => {
+      const STS = stsBinding('issued');
+      const test = fixture({
+        summary: pullRequest(),
+        env: {
+          PR_REFRESH_SENDER_AUTH: 'both',
+          STS,
+          KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
+        },
+      });
+
+      const result = await test.caller.refreshHostedWorkspacePullRequest({ workspaceId });
+
+      expect(result.refresh).toEqual({ status: 'unavailable', retryAt: null });
+      expect(STS.mintTokens).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 
   it('returns not found for an unauthorized or missing workspace', async () => {

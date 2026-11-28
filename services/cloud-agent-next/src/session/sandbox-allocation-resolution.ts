@@ -138,7 +138,7 @@ export async function resolveSavedSandboxAllocation(args: {
   let readiness = args.readiness;
   for (const allocation of allocations) {
     if (getSandboxAllocationProvider(allocation) === 'vercel' && readiness === undefined) {
-      readiness = await resolveVercelSelectionReadiness(env, owner, capability);
+      readiness = await resolveVercelSelectionReadiness(env, owner, capability, args.ctx);
       capabilities = await getSandboxSelectionCapabilities(env, owner, {
         ...selectionOptions,
         ...(readiness.vercelUnavailableReason

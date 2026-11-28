@@ -146,10 +146,11 @@
       "service": "container-usage-meter",
       "entrypoint": "ContainerUsageMeter",
     },
-    // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
-    // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
-    // cloud-agent-next.yaml grants the names. Nothing reads it while SECRETS_SOURCE is
-    // `secrets-store`.
+    // STS serves the runtime secret bundle and mints this Worker's outbound service tokens over
+    // the account-internal binding. `props.caller` is what STS authorizes on and must equal this
+    // Worker's top-level name; services/sts/policy/cloud-agent-next.yaml grants the names, the
+    // audiences and the scopes. Nothing reads the bundle while SECRETS_SOURCE is `secrets-store`,
+    // and nothing mints while every outbound switch (ENVIRONMENT.md) is unset.
     {
       "binding": "STS",
       "service": "sts",

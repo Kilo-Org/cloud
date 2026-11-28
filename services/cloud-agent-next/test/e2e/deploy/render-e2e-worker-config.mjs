@@ -265,10 +265,10 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   }
 
   // The STS broker authorizes on `props.caller`, which must equal the Worker's own name, and this
-  // render renames the Worker. The E2E Worker therefore loses the binding, and `SECRETS_SOURCE` is
-  // pinned below so a production flip to `sts` cannot reach it through the inherited vars. A
-  // rendered config is not covered by services/sts/test/repo/worker-configs.ts, so the render does
-  // this itself.
+  // render renames the Worker. The E2E Worker therefore loses the binding, so it reads no bundle
+  // and mints no service token, and `SECRETS_SOURCE` is pinned below so a production flip to `sts`
+  // cannot reach it through the inherited vars. A rendered config is not covered by
+  // services/sts/test/repo/worker-configs.ts, so the render does this itself.
   config.services = (config.services ?? []).filter(binding => binding.binding !== 'STS');
   if (config.services.length === 0) delete config.services;
 

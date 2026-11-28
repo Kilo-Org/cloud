@@ -13,6 +13,7 @@ import {
   type WorkspacePullRequestSummary,
 } from '../../session/workspace-pull-request.js';
 import type { Env } from '../../types.js';
+import { WEB_HOSTED_WORKSPACE_PR_REFRESH, webInternalCredential } from '../../web-internal-auth.js';
 import { protectedProcedure } from '../auth.js';
 
 const REFRESH_PATH = '/api/internal/cloud-agent-next/hosted-workspace-pull-request/refresh';
@@ -103,22 +104,34 @@ async function requestWorkspacePullRequestRefresh(
   body: { workspaceId: string; userId: string; organizationId: string | null },
   ctx?: SecretsExecutionContext
 ): Promise<RefreshResult> {
-  const secret = await readCloudAgentNextSecret(env, 'INTERNAL_API_SECRET', ctx).catch(() => null);
-  if (!secret) {
-    logger.error('hosted workspace PR refresh unavailable: internal API secret is not configured');
-    return { status: 'unavailable', retryAt: null };
-  }
-
   const backendUrl = (env.KILOCODE_BACKEND_BASE_URL ?? DEFAULT_BACKEND_URL)
     .trim()
     .replace(/\/+$/, '');
+  const url = `${backendUrl}${REFRESH_PATH}`;
+  const credential = await webInternalCredential({
+    auth: env.PR_REFRESH_SENDER_AUTH,
+    sts: env.STS,
+    url,
+    token: WEB_HOSTED_WORKSPACE_PR_REFRESH,
+    legacySecret: () => readCloudAgentNextSecret(env, 'INTERNAL_API_SECRET', ctx),
+    ctx,
+  });
+  if (credential.kind === 'unavailable') {
+    logger
+      .withFields({
+        credentialReason: credential.reason,
+        ...(credential.deniedReason === undefined ? {} : { deniedReason: credential.deniedReason }),
+      })
+      .error('hosted workspace PR refresh unavailable: no credential for the web app');
+    return { status: 'unavailable', retryAt: null };
+  }
 
   try {
-    const response = await fetch(`${backendUrl}${REFRESH_PATH}`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': secret,
+        ...credential.headers,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),

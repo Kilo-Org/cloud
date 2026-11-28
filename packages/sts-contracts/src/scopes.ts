@@ -453,8 +453,10 @@ export const STS_CLOUD_AGENT_NEXT_SESSION_UPDATE = {
 /**
  * Deletes a Cloud Agent session's runtime resources through the internal `cleanupSession` tRPC
  * procedure (`services/cloud-agent-next/src/router/handlers/session-management.ts`). Only the
- * `web` workload may send it: `CloudAgentNextClient.cleanupSession`, after a failed initiate in
- * the security analysis service, the bot's spawn tool and `runSessionToCompletion`.
+ * `web` workload may send it, through `CloudAgentNextClient.cleanupSession` after a failed
+ * initiate: from `apps/web/src/lib/bot/tools/spawn-cloud-agent-session.ts`,
+ * `apps/web/src/lib/cloud-agent-next/run-session.ts` and
+ * `apps/web/src/lib/security-agent/services/analysis-service.ts`.
  */
 export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
   audience: 'cloud-agent-next',
@@ -462,15 +464,27 @@ export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
 } as const;
 
 /**
- * Skips Cloud Agent's balance check (`x-skip-balance-check`): on a balance-required tRPC mutation
- * (`BALANCE_REQUIRED_MUTATIONS`, `services/cloud-agent-next/src/middleware/balance.ts`), and on
- * `prepareSession` under a Cloud Agent authority
- * (`services/cloud-agent-next/src/router/handlers/session-creation-preflight.ts`). The caller
- * asserts that the session does not bill the Kilo balance, an authority separate from the
- * procedure's own. Only the `web` and `kilo-code-review-worker` workloads may send it: the web
- * app's skipped-balance `CloudAgentNextClient` for free and BYOK models, and the
- * `CodeReviewOrchestrator` for a review that does not bill the balance. Webhook Agent Ingest sends
- * the bypass over a service binding, outside STS.
+ * Skips Cloud Agent's balance check (`x-skip-balance-check`). The caller asserts that the session
+ * does not bill the Kilo balance, an authority separate from the action's own. The scope is not
+ * tied to a session or an owner: it names only the calling workload. STS policy decides which
+ * workloads can mint it; today `web` and `kilo-code-review-worker`. Under STS (decision M243):
+ * - (1) In a request with an STS action token (`session.prepare` or `session.update`), the bypass
+ *   token's workload must equal the action token's workload.
+ * - (2) In a request with no action token, authenticated by a user Bearer, the header is honoured
+ *   only when `x-kilo-balance-bypass-authorization` holds a valid STS token: STS key-set
+ *   signature, audience `cloud-agent-next`, this scope, not expired. The user-Bearer callers
+ *   that rely on it are the `CodeReviewOrchestrator`'s `initiateFromKilocodeSessionV2` and
+ *   `sendMessageV2` (`services/code-review-infra/src/code-review-orchestrator.ts`) and the web
+ *   app's skipped-balance `CloudAgentNextClient`
+ *   (`apps/web/src/lib/cloud-agent-next/cloud-agent-client.ts`).
+ * - (3) With neither a valid action token nor a user Bearer, it is never honoured.
+ * - (4) Each honoured bypass logs the workload and the user subject; each refusal logs a reason;
+ *   neither logs token data.
+ * - (5) The receiver checks the token at every point that reads the header, all under
+ *   `services/cloud-agent-next/src`: `middleware/balance.ts`,
+ *   `router/handlers/session-creation-preflight.ts`, and both reads in
+ *   `kilo-facade/user-kilo-facade.ts`.
+ * Webhook Agent Ingest sends the bypass over a service binding, outside STS.
  */
 export const STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS = {
   audience: 'cloud-agent-next',
@@ -488,9 +502,10 @@ export const STS_CLOUD_AGENT_NEXT_CODE_REVIEW_BILLING_READ = {
 } as const;
 
 /**
- * Reads an owner's Cloud Agent container billing mode for one instance size
- * (`GET /internal/containers/billing/{type}/{id}/{instance}`). Only the `web` workload may send
- * it, from `apps/web/src/lib/cloud-agent/compute-billing-mode.ts`.
+ * Reads an owner's Cloud Agent container billing mode for one instance size. The route is
+ * `GET /internal/containers/billing/{type}/{id}/{instance}` and accepts any billing owner type;
+ * the only sender calls `GET /internal/containers/billing/user/{id}/{instance}`. Only the `web`
+ * workload may send it, from `apps/web/src/lib/cloud-agent/compute-billing-mode.ts`.
  */
 export const STS_CLOUD_AGENT_NEXT_CONTAINER_BILLING_READ = {
   audience: 'cloud-agent-next',

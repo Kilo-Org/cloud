@@ -514,6 +514,14 @@ export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
 export const O11Y_API_METRICS_SENDER_AUTH = getEnvVariable('O11Y_API_METRICS_SENDER_AUTH');
 export const O11Y_ALERTING_SENDER_AUTH = getEnvVariable('O11Y_ALERTING_SENDER_AUTH');
+// The credential the AI Gateway presents to the Secure Proxy (providers/secure-proxy-sender.ts):
+// absent, empty or `legacy` sends the custom LLM credential's proxy secret; `sts` an STS service
+// token for `ai-gateway-secure-proxy:request.forward`.
+export const SECURE_PROXY_SENDER_AUTH = getEnvVariable('SECURE_PROXY_SENDER_AUTH');
+// Under `sts`, the only proxy origin that may receive that token: the proxy's own
+// KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN. Unset or another origin refuses the forward before any
+// token read.
+export const SECURE_PROXY_EXPECTED_ORIGIN = getEnvVariable('SECURE_PROXY_EXPECTED_ORIGIN');
 // The credential the AI Gateway's US-region senders present to the web app's own /api/internal/*
 // routes (web-internal-sts.ts): absent, empty or `legacy` sends the internal secret; `sts` an STS
 // service token.

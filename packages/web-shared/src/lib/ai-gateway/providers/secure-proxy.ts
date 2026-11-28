@@ -5,13 +5,14 @@ import {
 
 export function buildSecureProxyRequest({
   proxyUrl,
-  secret,
+  authorization,
   upstreamUrl,
   upstreamHeaders,
   body,
 }: {
   proxyUrl: string;
-  secret: string;
+  /** The complete `Authorization` value, from `secureProxyCredential`. */
+  authorization: string;
   upstreamUrl: string;
   upstreamHeaders: Headers;
   body: object;
@@ -20,7 +21,7 @@ export function buildSecureProxyRequest({
     url: proxyUrl,
     headers: new Headers({
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${secret}`,
+      Authorization: authorization,
     }),
     body: JSON.stringify({
       ...body,

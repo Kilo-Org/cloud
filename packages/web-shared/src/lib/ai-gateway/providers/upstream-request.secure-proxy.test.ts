@@ -1,8 +1,44 @@
 import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
+import { ServiceTokenError } from '@kilocode/service-token-client';
+import { STS_SECURE_PROXY_FORWARD } from '@kilocode/sts-contracts';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { stsServiceToken } from '@kilocode/web-shared/lib/sts-service-tokens';
 import { buildDirectProvider } from './build-direct-provider';
+import { clearUpstreamConnectionCache } from './upstream-connection';
+import { SECURE_PROXY_COLD_TOKEN_WAIT_MS } from './secure-proxy-sts';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
+import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
+
+const mockResolve4 = jest.fn<Promise<string[]>, [string]>();
+
+// The policy resolves A and AAAA records through c-ares: answer the A query with a public address
+// so an enforced check allows the proxy host and the upstream behind it.
+jest.mock('node:dns/promises', () => ({
+  Resolver: jest.fn(function () {
+    return {
+      resolve4: (hostname: string) => mockResolve4(hostname),
+      resolve6: async () => [],
+      cancel: jest.fn(),
+    };
+  }),
+}));
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
+  // Read at each send, so a test sets both through `mockConfig`.
+  get SECURE_PROXY_SENDER_AUTH() {
+    return mockConfig.auth;
+  },
+  get SECURE_PROXY_EXPECTED_ORIGIN() {
+    return mockConfig.expectedOrigin;
+  },
+}));
+
+jest.mock('@kilocode/web-shared/lib/sts-service-tokens', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/sts-service-tokens'),
+  stsServiceToken: jest.fn(),
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -14,7 +50,19 @@ jest.mock('next/server', () => ({
   after: jest.fn(),
 }));
 
+const mockConfig: { auth: string | undefined; expectedOrigin: string | undefined } = {
+  auth: undefined,
+  expectedOrigin: undefined,
+};
+const mintedToken = jest.mocked(stsServiceToken);
+const PROXY_ORIGIN = 'https://secure-proxy.example.com';
+const PRODUCTION = { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' } as const;
+
 const originalFetch = global.fetch;
+const originalNodeEnv = process.env.NODE_ENV;
+// `NODE_ENV` is read-only on `ProcessEnv`; these tests flip the URL policy on through it.
+const env: Record<string, string | undefined> = process.env;
+const PUBLIC_ADDRESS = '104.18.2.115';
 
 function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_id: boolean) {
   return buildDirectProvider(
@@ -41,14 +89,14 @@ function secureProxyProvider(disable_url_suffix: boolean, user_hash_as_mt_user_i
   );
 }
 
-async function sendThroughSecureProxy(
+async function sendUpstream(
   disable_url_suffix: boolean,
   user_hash_as_mt_user_id = false,
-  prompt_cache_key = 'task-cache-key'
+  prompt_cache_key = 'task-cache-key',
+  signal?: AbortSignal,
+  respond: () => Response = () => new Response('{}')
 ) {
-  const fetchMock = jest.fn(
-    async (_input: RequestInfo | URL, _init?: RequestInit) => new Response('{}')
-  );
+  const fetchMock = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => respond());
   global.fetch = fetchMock;
   const body = {
     model: 'upstream-model',
@@ -76,34 +124,55 @@ async function sendThroughSecureProxy(
     body,
     extraHeaders,
     provider,
+    signal,
     reasoningEffort: null,
     durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
+  return { result, fetchMock, sent: body };
+}
 
+async function sendThroughSecureProxy(
+  disable_url_suffix: boolean,
+  user_hash_as_mt_user_id = false,
+  prompt_cache_key = 'task-cache-key'
+) {
+  const { result, fetchMock, sent } = await sendUpstream(
+    disable_url_suffix,
+    user_hash_as_mt_user_id,
+    prompt_cache_key
+  );
   expect(result.type).toBe('success');
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [url, init] = fetchMock.mock.calls[0];
   return {
     url,
+    init,
     headers: new Headers(init?.headers),
     body: SecureProxyRequestBodySchema.parse(JSON.parse(init?.body as string)),
-    sent: body,
+    sent,
   };
 }
 
 describe('upstreamRequest through the secure proxy', () => {
   afterEach(() => {
     global.fetch = originalFetch;
+    mockConfig.auth = undefined;
+    mintedToken.mockReset();
+    delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.KILO_STS_WORKLOAD;
   });
 
   it('sends only the proxy secret to the proxy and moves upstream auth into the body', async () => {
-    const { url, headers, body, sent } = await sendThroughSecureProxy(false);
+    const { url, init, headers, body, sent } = await sendThroughSecureProxy(false);
 
     expect(url).toBe('https://secure-proxy.example.com/api/proxy');
+    expect(init?.redirect).toBe('follow');
     expect(Object.fromEntries(headers)).toEqual({
       'content-type': 'application/json',
       authorization: 'Bearer proxy-secret',
     });
+    expect(mintedToken).not.toHaveBeenCalled();
     expect(body).toEqual({
       ...sent,
       kilo_secure_proxy: {
@@ -147,4 +216,266 @@ describe('upstreamRequest through the secure proxy', () => {
       expect(body.prompt_cache_key).toBe(cacheKey);
     }
   );
+});
+
+describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+    mockConfig.auth = undefined;
+    mockConfig.expectedOrigin = undefined;
+    mintedToken.mockReset();
+    delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.KILO_STS_WORKLOAD;
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
+    clearUpstreamUrlPolicyCache();
+    clearUpstreamConnectionCache();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  function useSts(auth: string = 'sts') {
+    mockConfig.auth = auth;
+    mockConfig.expectedOrigin = PROXY_ORIGIN;
+    Object.assign(process.env, PRODUCTION);
+    process.env.KILO_STS_WORKLOAD = 'ai-gateway';
+  }
+
+  it('sends only a held STS token to the exact proxy, never the stored secret', async () => {
+    useSts();
+    mintedToken.mockResolvedValue('sts-token');
+
+    const { url, init, headers, body, sent } = await sendThroughSecureProxy(false);
+
+    expect(url).toBe('https://secure-proxy.example.com/api/proxy');
+    expect(init?.redirect).toBe('error');
+    expect(Object.fromEntries(headers)).toEqual({
+      'content-type': 'application/json',
+      authorization: 'Bearer sts-token',
+    });
+    expect(JSON.stringify(init)).not.toContain('proxy-secret');
+    expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1/chat/completions?trace=1');
+    expect(sent).not.toHaveProperty('kilo_secure_proxy');
+    expect(mintedToken).toHaveBeenCalledWith('production', STS_SECURE_PROXY_FORWARD);
+  });
+
+  it('sends the request with the token when a cold instance’s mint answers in 100 ms', async () => {
+    useSts();
+    mintedToken.mockImplementation(() => {
+      const { promise, resolve } = Promise.withResolvers<string>();
+      setTimeout(() => resolve('sts-token'), 100);
+      return promise;
+    });
+    jest.useFakeTimers();
+
+    const pending = sendUpstream(false);
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(100);
+    const { result, fetchMock } = await pending;
+
+    expect(result.type).toBe('success');
+    const [, init] = fetchMock.mock.calls[0];
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer sts-token');
+  });
+
+  it('refuses a cold instance’s forward at exactly 2000 ms when the mint never answers, with no fetch', async () => {
+    useSts();
+    const never = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(never.promise);
+    jest.useFakeTimers();
+
+    const pending = sendUpstream(false);
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(SECURE_PROXY_COLD_TOKEN_WAIT_MS - 1);
+    expect(settled).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+
+    const { result, fetchMock } = await pending;
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.type).toBe('error');
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.notInvoked).toBe(true);
+    expect(result.response.status).toBe(503);
+    const body = await result.response.json();
+    expect(body.error_type).toBe('temporarily_unavailable');
+    expect(body.error).toMatch(/retry/i);
+  });
+
+  it('answers a client disconnect during the cold wait with 499 and no fetch', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    useSts();
+    const mint = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(mint.promise);
+    const controller = new AbortController();
+    jest.useFakeTimers();
+
+    const pending = sendUpstream(false, false, 'task-cache-key', controller.signal);
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(100);
+    controller.abort();
+    await jest.advanceTimersByTimeAsync(0);
+
+    const { result, fetchMock } = await pending;
+    expect(fetchMock).not.toHaveBeenCalled();
+    if (result.type !== 'error') throw new Error('expected an error result');
+    expect(result.notInvoked).toBe(true);
+    expect(result.response.status).toBe(499);
+    expect((await result.response.json()).error_type).toBe('client_disconnect');
+  });
+
+  it('answers a proxy redirect with the URL policy refusal and resends no token', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    useSts();
+    mintedToken.mockResolvedValue('sts-token');
+    mockResolve4.mockReset().mockResolvedValue([PUBLIC_ADDRESS]);
+    // Every built deployment enforces the policy; the tests otherwise run as `test`.
+    env.NODE_ENV = 'production';
+
+    const { result, fetchMock } = await sendUpstream(
+      false,
+      false,
+      'task-cache-key',
+      undefined,
+      () =>
+        new Response(null, { status: 307, headers: { location: 'https://attacker.example.com/' } })
+    );
+
+    if (result.type !== 'error') throw new Error('expected an error result');
+    const body = await result.response.json();
+    expect(body.error).toContain('responded with a redirect');
+    expect(result.response.status).toBe(502);
+    // One request only: the 3xx is answered by the policy, never followed or re-sent.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init?.redirect).toBe('manual');
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer sts-token');
+  });
+
+  const refusals: Array<{
+    name: string;
+    setup: () => void;
+    status: number;
+    code: string;
+    retryable: boolean;
+  }> = [
+    {
+      name: 'an unknown switch value',
+      setup: () => {
+        mockConfig.auth = 'dual';
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a build that is not the ai-gateway workload',
+      setup: () => {
+        useSts();
+        delete process.env.KILO_STS_WORKLOAD;
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'an unset expected proxy origin',
+      setup: () => {
+        useSts();
+        mockConfig.expectedOrigin = undefined;
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a proxy origin other than the expected one',
+      setup: () => {
+        useSts();
+        mockConfig.expectedOrigin = 'https://other-proxy.example.com';
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a deployment without an STS environment',
+      setup: () => {
+        useSts();
+        process.env.VERCEL_TARGET_ENV = 'staging';
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a token STS denied',
+      setup: () => {
+        useSts();
+        mintedToken.mockImplementation(() =>
+          Promise.reject(
+            new ServiceTokenError(
+              { reason: 'denied', deniedReason: 'scope_not_allowed' },
+              STS_SECURE_PROXY_FORWARD
+            )
+          )
+        );
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a token STS could not mint in time',
+      setup: () => {
+        useSts();
+        mintedToken.mockImplementation(() =>
+          Promise.reject(
+            new ServiceTokenError(
+              { reason: 'unavailable', retryAfterSeconds: 30 },
+              STS_SECURE_PROXY_FORWARD
+            )
+          )
+        );
+      },
+      status: 503,
+      code: 'temporarily_unavailable',
+      retryable: true,
+    },
+  ];
+
+  it.each(refusals)(
+    'answers $name with $status and $code',
+    async ({ setup, status, code, retryable }) => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      setup();
+
+      const { result, fetchMock } = await sendUpstream(false);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.notInvoked).toBe(true);
+      expect(result.response.status).toBe(status);
+      const body = await result.response.json();
+      expect(body.error_type).toBe(code);
+      if (retryable) expect(body.error).toMatch(/retry/i);
+      else expect(body.error).not.toMatch(/retry/i);
+    }
+  );
+
+  it('never mints for an origin mismatch or a misconfigured switch', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    useSts();
+    mockConfig.expectedOrigin = undefined;
+    await sendUpstream(false);
+    mockConfig.expectedOrigin = PROXY_ORIGIN;
+    mockConfig.auth = 'dual';
+    await sendUpstream(false);
+    expect(mintedToken).not.toHaveBeenCalled();
+  });
 });

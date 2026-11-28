@@ -21,8 +21,8 @@ import {
  *   and `GATEWAY_ROUTING_TABLES_SENDER_AUTH`.
  * A route the installed sender has no switch for sends the internal secret exactly as before. A
  * process that installs none (scripts, tests) sends the secret too while every switch is `legacy`
- * or unset; once any of them reads `sts` it sends nothing, since only a sender can mint and `sts`
- * never falls back to the secret.
+ * or unset; once any of them holds another value (`sts`, or an invalid one) it sends nothing, since
+ * only a sender can mint or judge the value, and nothing falls back to the secret.
  */
 
 /**
@@ -97,16 +97,19 @@ export function installAutoRoutingSender(sender: AutoRoutingSender): void {
   globalThis.__kilocodeAutoRoutingSender = sender;
 }
 
-/** Whether a process without a sender has any switch at `sts`; read once, at module load. */
-const stsWithoutSender = [
+/**
+ * Whether a process without a sender has any switch set to something other than empty or `legacy`:
+ * `sts`, or a value no sender would accept (`STS`, `sts `). Read once, at module load.
+ */
+const switchSetWithoutSender = [
   AUTO_ROUTING_DECIDE_SENDER_AUTH,
   GATEWAY_ROUTING_TABLES_SENDER_AUTH,
   AUTO_ROUTING_ADMIN_SENDER_AUTH,
   AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH,
   WEB_ROUTING_TABLES_SENDER_AUTH,
-].includes('sts');
+].some(value => value !== undefined && value !== '' && value !== 'legacy');
 
-let stsWithoutSenderReported = false;
+let switchSetWithoutSenderReported = false;
 
 /** The credential of one request: the installed sender's, else the rule above. */
 export async function autoRoutingCredential(
@@ -115,11 +118,11 @@ export async function autoRoutingCredential(
 ): Promise<AutoRoutingCredential> {
   const sender = globalThis.__kilocodeAutoRoutingSender;
   if (sender !== undefined) return sender(route, request);
-  if (!stsWithoutSender) return { kind: 'legacy' };
-  if (!stsWithoutSenderReported) {
-    stsWithoutSenderReported = true;
+  if (!switchSetWithoutSender) return { kind: 'legacy' };
+  if (!switchSetWithoutSenderReported) {
+    switchSetWithoutSenderReported = true;
     console.error(
-      '[auto-routing-sender] an auto-routing sender switch is sts but this process installed no sender; requests not sent'
+      '[auto-routing-sender] an auto-routing sender switch is set but this process installed no sender; requests not sent'
     );
   }
   return { kind: 'unavailable', reason: 'misconfigured' };

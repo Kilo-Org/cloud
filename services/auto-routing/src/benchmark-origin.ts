@@ -99,8 +99,10 @@ async function routingTablesAuthorization(
   try {
     const outcome = await Promise.race([attempt, expired.promise]);
     if (outcome !== 'deadline') return `Bearer ${outcome}`;
-    // Still the client's one in-flight mint; keeping it alive serves the next read.
-    ctx?.waitUntil(attempt.catch(() => {}));
+    // Still the client's one in-flight mint; keeping it alive serves the next read. Its failure is
+    // handled here, with or without `ctx`, so an abandoned mint never rejects unhandled.
+    const abandoned = attempt.catch(() => {});
+    ctx?.waitUntil(abandoned);
     throw routingTablesRefused('token_deadline');
   } catch (error) {
     if (!(error instanceof ServiceTokenError)) throw error;

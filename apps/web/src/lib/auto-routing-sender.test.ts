@@ -270,9 +270,22 @@ describe('the web sender', () => {
       const clients = await loadWeb();
 
       await expect(clients.autoRoutingRead()).resolves.toMatchObject({ status: 500 });
+      await expect(clients.autoRoutingWrite()).resolves.toMatchObject({ status: 500 });
       expect(fetchMock).not.toHaveBeenCalled();
+      // Once per switch and reason, not on every request.
+      expect(console.error).toHaveBeenCalledTimes(1);
     } finally {
       mockWorkerUrl.value = 'https://auto-routing.kiloapps.io';
     }
+  });
+
+  it('logs a refused switch once, not on every request', async () => {
+    mockSwitches.AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH = 'STS';
+    const clients = await loadWeb();
+
+    await expect(clients.benchmarkRead()).resolves.toMatchObject({ status: 500 });
+    await expect(clients.benchmarkWrite()).resolves.toMatchObject({ status: 500 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledTimes(1);
   });
 });

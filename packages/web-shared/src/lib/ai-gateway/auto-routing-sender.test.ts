@@ -277,6 +277,31 @@ describe('a process without an installed sender', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['STS', 'sts ', 'dual', 'true'])(
+    'fails closed for the invalid value %j, as for sts',
+    async value => {
+      mockSwitches.WEB_ROUTING_TABLES_SENDER_AUTH = value;
+      const { benchmark, decision } = await loadClients();
+
+      await expect(benchmark.getBenchmarkRoutingTable('efficient')).resolves.toMatchObject({
+        status: 500,
+      });
+      await expect(
+        decision.fetchEfficientAutoDecision(decideParams, { onError: () => {} })
+      ).resolves.toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('treats an empty switch as unset', async () => {
+    mockSwitches.AUTO_ROUTING_DECIDE_SENDER_AUTH = '';
+    const { benchmark } = await loadClients();
+    await benchmark.getBenchmarkConfig('efficient');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('the clients without a token', () => {

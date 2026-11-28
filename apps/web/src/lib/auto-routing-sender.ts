@@ -14,6 +14,7 @@ import { AUTO_ROUTING_SENDER_SCOPES } from '@kilocode/web-shared/lib/ai-gateway/
 import {
   resolveServiceSenderAuth,
   serviceSenderHeaders,
+  serviceSenderRefusalMessage,
   type ServiceSenderAuth,
   type VercelRuntime,
 } from '@kilocode/web-shared/lib/service-sender-auth';
@@ -57,6 +58,19 @@ function aborted(signal: AbortSignal | undefined): Promise<'aborted'> {
   return ended.promise;
 }
 
+/** Refusals already reported: a misconfigured switch logs once per process, not per request. */
+const reported = new Set<string>();
+
+function refusedOnce(variable: WebVariable, reason: string, message: string) {
+  const key = `${variable} ${reason}`;
+  if (!reported.has(key)) {
+    reported.add(key);
+    // The switch and the reason; never a credential.
+    console.error(`auto-routing sender: ${message}; requests refused`, { variable, reason });
+  }
+  return { kind: 'unavailable', reason: 'misconfigured' } as const;
+}
+
 /**
  * The web app's sender. Each switch is resolved once, here, against its configured Worker URL; a
  * request then checks its own destination against the receiver's origin. Under `sts` a request
@@ -87,14 +101,15 @@ export function createWebAutoRoutingSender(
     if (variable === undefined) return { kind: 'legacy' };
     const sender = senders[variable];
     if (sender.kind === 'legacy') return { kind: 'legacy' };
-    if (sender.kind === 'sts' && !isAutoRoutingReceiverOrigin(route, url, sender.environment)) {
-      console.error(
-        'auto-routing sender: destination is not the receiver origin; request refused',
-        {
-          variable,
-        }
+    if (sender.kind === 'refused') {
+      return refusedOnce(
+        variable,
+        sender.reason,
+        serviceSenderRefusalMessage(variable, sender.reason)
       );
-      return { kind: 'unavailable', reason: 'misconfigured' };
+    }
+    if (!isAutoRoutingReceiverOrigin(route, url, sender.environment)) {
+      return refusedOnce(variable, 'origin_mismatch', 'destination is not the receiver origin');
     }
     try {
       const headers = await Promise.race([
@@ -112,11 +127,8 @@ export function createWebAutoRoutingSender(
         ? { kind: 'unavailable', reason: 'token_unavailable' }
         : { kind: 'sts', authorization: headers.Authorization };
     } catch {
-      // `serviceSenderHeaders` logged the refusal or the token failure.
-      return {
-        kind: 'unavailable',
-        reason: sender.kind === 'refused' ? 'misconfigured' : 'token_unavailable',
-      };
+      // `serviceSenderHeaders` logged the token failure.
+      return { kind: 'unavailable', reason: 'token_unavailable' };
     }
   };
 }

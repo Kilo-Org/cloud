@@ -1,6 +1,7 @@
 import { formatError, ttlCached } from '@kilocode/worker-utils';
 import { getWorkerDb, modelStats } from '@kilocode/db';
 import { inArray } from 'drizzle-orm';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { kvReadThrough, type KvReadThroughMetadata } from './kv-read-through';
 import { getRoutingTable } from './routing-table';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from '@kilocode/auto-routing-contracts';
@@ -157,10 +158,11 @@ async function queryModelCapabilities(
   return out;
 }
 
+// `ctx` is the invocation that triggered the load; it reaches the routing-table read.
 const cache = ttlCached<
-  { env: ModelCapabilitiesEnv; router: AutoRouter },
+  { env: ModelCapabilitiesEnv; router: AutoRouter; ctx?: SecretsExecutionContext },
   ModelCapabilitiesCacheValue
->(MODEL_CAPABILITIES_IN_MEMORY_TTL_MS, async ({ env, router }) => loadAll(env, router));
+>(MODEL_CAPABILITIES_IN_MEMORY_TTL_MS, async ({ env, router, ctx }) => loadAll(env, router, ctx));
 
 // Tombstones are deliberately NOT merged: callers must see a tombstoned id
 // exactly as they see an unknown one (`caps === undefined`), which fails
@@ -188,13 +190,14 @@ export function clearModelCapabilitiesCache(): void {
 // (as a plain object so it is JSON-serialisable for the in-memory cache).
 async function loadAll(
   env: ModelCapabilitiesEnv,
-  router: AutoRouter
+  router: AutoRouter,
+  ctx?: SecretsExecutionContext
 ): Promise<ModelCapabilitiesCacheValue> {
   const fromKv = await kvReadThrough<ModelCapabilitiesCacheValue>({
     kv: env.AUTO_ROUTING_CONFIG,
     key: MODEL_CAPABILITIES_KV_KEY,
     ttlSeconds: MODEL_CAPABILITIES_KV_TTL_SECONDS,
-    fetchOrigin: () => queryAllIds(env, router),
+    fetchOrigin: () => queryAllIds(env, router, ctx),
     parse: (raw: string) => {
       try {
         const parsed: unknown = JSON.parse(raw);
@@ -283,9 +286,10 @@ async function writeBack(
 
 async function queryAllIds(
   env: ModelCapabilitiesEnv,
-  router: AutoRouter
+  router: AutoRouter,
+  ctx?: SecretsExecutionContext
 ): Promise<ModelCapabilitiesCacheValue | null> {
-  const routingTable = await getRoutingTable(env, router);
+  const routingTable = await getRoutingTable(env, router, ctx);
   if (!routingTable) {
     return null;
   }
@@ -334,7 +338,8 @@ export async function getModelCapabilities(
     // request resolved; a concurrent request still reads its own, because a
     // pending load belongs to the request that started it.
     const { waitUntil } = options;
-    const routingTable = await getRoutingTable(env, router, waitUntil ? { waitUntil } : undefined);
+    const ctx = waitUntil ? { waitUntil } : undefined;
+    const routingTable = await getRoutingTable(env, router, ctx);
     const ids = new Set<string>();
     if (routingTable) {
       for (const route of Object.values(routingTable.routes)) {
@@ -354,7 +359,7 @@ export async function getModelCapabilities(
     }
 
     const result = new Map<string, ModelCapabilities>();
-    const all = await cache.get({ env, router });
+    const all = await cache.get({ env, router, ctx });
     mergeInto(result, all);
     // The cache stores the union of all ids ever resolved; fill the remainder
     // from the DB and write it back so the next request serves the id from

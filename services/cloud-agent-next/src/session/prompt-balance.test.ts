@@ -38,7 +38,12 @@ describe('the payer balance preflight', () => {
       resolvedPayer: { organizationId: 'org-funded' },
     });
 
-    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith('token', 'org-funded', env);
+    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith(
+      'token',
+      'org-funded',
+      env,
+      undefined
+    );
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
   });
 
@@ -51,7 +56,12 @@ describe('the payer balance preflight', () => {
       resolvedPayer: { organizationId: null },
     });
 
-    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith('token', undefined, env);
+    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith(
+      'token',
+      undefined,
+      env,
+      undefined
+    );
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
   });
 
@@ -73,7 +83,12 @@ describe('the payer balance preflight', () => {
       kiloUserId: 'user_abc',
       cloudAgentSessionId,
     });
-    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith('token', 'org-read', env);
+    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith(
+      'token',
+      'org-read',
+      env,
+      undefined
+    );
   });
 
   it('reads the payer when the caller passes no resolved payer value', async () => {
@@ -91,6 +106,11 @@ describe('the payer balance preflight', () => {
     });
 
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
-    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith('token', 'org-read', env);
+    expect(validateBalanceOnlyMock).toHaveBeenCalledExactlyOnceWith(
+      'token',
+      'org-read',
+      env,
+      undefined
+    );
   });
 });

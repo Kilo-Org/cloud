@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { assertKiloModelAvailable } from '../model-validation.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { modelValidationAudience } from '../model-validation-audience.js';
 import type { CloudAgentSessionState, PersistenceEnv } from '../persistence/types.js';
 import { fetchSessionMetadata } from './metadata.js';
@@ -10,6 +11,8 @@ import { retiredRuntimeMessage } from '../persistence/session-metadata.js';
 
 type StoredSessionPreflightInput = {
   env: PersistenceEnv;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   userId: string;
   cloudAgentSessionId: string;
   procedure: string;
@@ -61,6 +64,7 @@ async function assertModelFromStoredContext(
   }
   await assertKiloModelAvailable({
     env: input.env,
+    ctx: input.ctx,
     submittedModel,
     originalToken: token,
     originalOrganizationId: metadata.identity.orgId,

@@ -1,4 +1,5 @@
-import { resolveSecret } from './auth.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readCloudAgentNextStoreSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
 import { z } from 'zod';
 
 /**
@@ -39,8 +40,12 @@ export function sessionIngestCallerAuth(env: object): SessionIngestCallerAuth {
  * unknown switch value throws before the secret is read, so the hydration fails and sends nothing.
  */
 export async function sessionIngestExportCredential(
-  env: Pick<Cloudflare.Env, 'INTERNAL_API_SECRET_PROD'>
+  env: Pick<Cloudflare.Env, 'INTERNAL_API_SECRET_PROD'> & CloudAgentNextSecretsEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<Record<string, string>> {
   if (sessionIngestCallerAuth(env) === 'binding') return {};
-  return { 'X-Internal-Secret': (await resolveSecret(env.INTERNAL_API_SECRET_PROD)) ?? '' };
+  const secret = await readCloudAgentNextStoreSecret(env, 'INTERNAL_API_SECRET', ctx).catch(
+    () => ''
+  );
+  return { 'X-Internal-Secret': secret ?? '' };
 }

@@ -1,6 +1,7 @@
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
+import { requestContext } from '../request-context.js';
 import type { HonoContext } from '../hono-context.js';
 import {
   environmentBuildEventsSchema,
@@ -40,7 +41,9 @@ async function authenticate(c: RunnerContext): Promise<RunnerAuth | Response> {
   if (!environmentId.success || !buildId.success) return c.json({ error: 'not found' }, 404);
   const token = parseRunnerBearer(c.req.header('authorization') ?? null);
   if (token === null) return c.json({ error: 'unauthorized' }, 401);
-  const secret = await resolveSecret(c.env.NEXTAUTH_SECRET).catch(() => null);
+  const secret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET', requestContext(c)).catch(
+    () => null
+  );
   if (!secret) return c.json({ error: 'temporarily unavailable' }, 503);
   const claims = verifyRunnerCredential(token, secret);
   if (claims === null) return c.json({ error: 'unauthorized' }, 401);

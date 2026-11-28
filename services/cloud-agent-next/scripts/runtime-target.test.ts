@@ -281,6 +281,10 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
   // The runtime bucket is production's publication bucket, so the e2e Worker
   // never binds it.
   expect(output).not.toHaveProperty('r2_buckets');
+  // The E2E Worker is renamed, so it may not keep the broker binding whose props.caller names the
+  // production Worker, and it may not inherit a later flip to the `sts` source.
+  expect(output.services ?? []).not.toContainEqual(expect.objectContaining({ binding: 'STS' }));
+  expect(output.vars).toMatchObject({ SECRETS_SOURCE: 'secrets-store' });
 });
 
 it('rebases only the runtime-free base for local HTTP E2E startup', () => {

@@ -11,6 +11,7 @@ import type { VercelSandboxIdentityContract } from '../scm-broker/vercel-identit
 import type { vercelJwksCache } from '../scm-broker/vercel-jwks.js';
 import type { fetchByocVercelCredential } from '../byoc/vercel-credential-resolver.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   sandboxEgressAdmissionSchema,
   type SandboxEgressAdmission,
@@ -40,6 +41,8 @@ export async function admitVercelEgressForward(
   input: SandboxEgressAdmission,
   deps: {
     env: Env;
+    /** The invocation's context, for a secret read's bundle revalidation. */
+    ctx?: SecretsExecutionContext;
     contract: VercelSandboxIdentityContract | null;
     pin: { egressAllowlist?: readonly string[]; egressAudit?: boolean } | null;
     identities: EgressIdentityCache;

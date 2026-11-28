@@ -37,7 +37,15 @@ function stsEnvironmentOf(runtime: VercelRuntime): ServiceSenderStsEnvironment |
   return null;
 }
 
-export type ServiceSenderRefusal = 'invalid_auth' | 'sts_production_only' | 'insecure_url';
+/**
+ * Why a switch sends nothing. `not_web_workload` is for senders whose scopes STS grants only to the
+ * `web` workload: an `sts` switch in another build (the ai-gateway, `KILO_STS_WORKLOAD`) is refused.
+ */
+export type ServiceSenderRefusal =
+  | 'invalid_auth'
+  | 'sts_production_only'
+  | 'insecure_url'
+  | 'not_web_workload';
 
 export type ServiceSenderAuth =
   | { kind: 'legacy' }
@@ -86,6 +94,8 @@ export function serviceSenderRefusalMessage(
       return `${variable}=sts is for Vercel production and local development only`;
     case 'insecure_url':
       return `${variable}=sts needs an https receiver URL (loopback in local development)`;
+    case 'not_web_workload':
+      return `${variable}=sts is for the web app only; STS grants its scopes only to web`;
   }
 }
 

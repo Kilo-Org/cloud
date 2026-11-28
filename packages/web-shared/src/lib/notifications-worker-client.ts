@@ -12,9 +12,18 @@ import {
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications/schemas';
-import { NOTIFICATIONS_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { STS_NOTIFICATIONS_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  NOTIFICATIONS_SENDER_AUTH,
+  NOTIFICATIONS_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+  type ServiceSenderAuth,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 
 type InternalWorkerEndpointSpec = {
   /** Absolute path of the route on the notifications worker. */
@@ -41,7 +50,29 @@ const GLANCEABLE_REFRESH_ENDPOINT: InternalWorkerEndpointSpec = {
   tag: 'glanceable-refresh',
 };
 
-type InternalWorkerEndpoint = { url: URL; secret: string; failureLabel: string };
+type InternalWorkerEndpoint = {
+  url: URL;
+  credential: Record<string, string>;
+  failureLabel: string;
+};
+
+const resolvedNotificationsSender = resolveServiceSenderAuth({
+  auth: NOTIFICATIONS_SENDER_AUTH,
+  url: NOTIFICATIONS_WORKER_URL,
+  runtime: process.env,
+});
+
+/**
+ * `NOTIFICATIONS_SENDER_AUTH` (`service-sender-auth.ts`), the credential of both internal routes:
+ * `legacy` sends the internal API secret in `X-Internal-Secret`, as before (also when unset);
+ * explicit `sts` sends only a `notifications:internal.call` STS token, never following a redirect.
+ * The Worker admits only the `web` workload, so an ai-gateway build (its low-balance pushes come
+ * through here; `next.config.mjs` inlines `KILO_STS_WORKLOAD`) refuses `sts` and sends nothing.
+ */
+const notificationsSender: ServiceSenderAuth =
+  resolvedNotificationsSender.kind === 'sts' && process.env.KILO_STS_WORKLOAD !== undefined
+    ? { kind: 'refused', reason: 'not_web_workload' }
+    : resolvedNotificationsSender;
 
 type InternalPostResult =
   | { ok: true; response: Response }
@@ -50,10 +81,10 @@ type InternalPostResult =
 /**
  * Resolves one worker endpoint behind its three configuration gates, in the
  * order the worker's logs and tests expect: a configured base URL, a base URL
- * that parses as https or loopback http, then an internal API secret. Returns
- * `null` after logging which gate skipped the call, or after capturing a secret
- * that could not be read, so the caller only has to return its never-rejects
- * value.
+ * that parses as https or loopback http, then its credential. Returns `null`
+ * after logging which gate skipped the call, or after capturing a credential
+ * that could not be read (a rejected secret read, a refused switch, no STS
+ * token), so the caller only has to return its never-rejects value.
  */
 async function resolveInternalWorkerEndpoint(
   spec: InternalWorkerEndpointSpec
@@ -71,22 +102,29 @@ async function resolveInternalWorkerEndpoint(
     );
     return null;
   }
-  let secret: string;
+  let credential: Record<string, string>;
   try {
-    secret = await readInternalApiSecret();
+    credential = await serviceSenderHeaders({
+      sender: notificationsSender,
+      variable: 'NOTIFICATIONS_SENDER_AUTH',
+      label: 'notifications worker client',
+      request: STS_NOTIFICATIONS_INTERNAL_CALL,
+      legacyHeaders: async () => ({ 'X-Internal-Secret': await readInternalApiSecret() }),
+    });
   } catch (error) {
     captureException(error, {
       tags: { source: 'notifications-worker-client', endpoint: spec.tag },
     });
     return null;
   }
-  if (!secret) {
+  // Only the legacy credential carries the header; an empty secret skips the call, as before.
+  if (credential['X-Internal-Secret'] === '') {
     console.error(
       `[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping ${spec.skipSubject}`
     );
     return null;
   }
-  return { url, secret, failureLabel: spec.failureLabel };
+  return { url, credential, failureLabel: spec.failureLabel };
 }
 
 /**
@@ -99,16 +137,19 @@ async function postInternal(
   body: InternalDispatchRequest | GlanceableScopeRefreshRequest,
   { timeoutMs, headers = {} }: { timeoutMs: number; headers?: Record<string, string> }
 ): Promise<InternalPostResult> {
-  const response = await fetch(endpoint.url.toString(), {
+  const init: RequestInit = {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'X-Internal-Secret': endpoint.secret,
+      ...endpoint.credential,
       ...headers,
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
-  });
+  };
+  // An STS token is for this origin only; a redirect never carries it on.
+  if (notificationsSender.kind === 'sts') init.redirect = 'error';
+  const response = await fetch(endpoint.url.toString(), init);
 
   if (response.ok) {
     return { ok: true, response };

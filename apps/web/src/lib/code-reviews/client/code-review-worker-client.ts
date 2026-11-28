@@ -9,7 +9,7 @@ import {
   resolveServiceSenderAuth,
   serviceSenderHeaders,
   type ServiceSenderAuth,
-} from '@/lib/service-sender-auth';
+} from '@kilocode/web-shared/lib/service-sender-auth';
 import * as z from 'zod';
 
 // One deadline per call, in milliseconds: the credential read (a cold STS mint included) and the

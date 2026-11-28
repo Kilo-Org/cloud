@@ -38,6 +38,21 @@ export class ServiceFetchTimeoutError extends Error {
   }
 }
 
+/**
+ * `work` if it settles within `budgetMs`, else a `ServiceFetchTimeoutError`
+ * naming the whole budget: a cold STS mint counts against the same upstream
+ * budget as the fetch it precedes.
+ */
+export async function withinBudget<T>(work: Promise<T>, budgetMs: number): Promise<T> {
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(() => expired.reject(new ServiceFetchTimeoutError(budgetMs)), budgetMs);
+  try {
+    return await Promise.race([work, expired.promise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type FetchWithinBudgetDeps = {
   /** Injectable for tests; defaults to the ambient `fetch`. */
   fetch?: typeof fetch;

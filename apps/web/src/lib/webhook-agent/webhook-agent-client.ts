@@ -1,8 +1,16 @@
 import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import type { WebhookTriggerTarget } from '@kilocode/worker-utils/webhook-trigger-target';
 import 'server-only';
-import { WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
+import { STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  WEBHOOK_AGENT_INGEST_SENDER_AUTH,
+  WEBHOOK_AGENT_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
@@ -175,6 +183,32 @@ export function webhookTriggersUnavailable(): TRPCError {
   });
 }
 
+/**
+ * `WEBHOOK_AGENT_INGEST_SENDER_AUTH` (`service-sender-auth.ts`), the credential of every call to the
+ * worker's `/api/*` routes: `legacy` sends the internal API secret in `x-internal-api-key`, as
+ * before (also when unset); explicit `sts` sends only a `webhook-agent-ingest:internal.call` STS
+ * token.
+ */
+const webhookAgentSender = resolveServiceSenderAuth({
+  auth: WEBHOOK_AGENT_INGEST_SENDER_AUTH,
+  url: WEBHOOK_AGENT_URL,
+  runtime: process.env,
+});
+
+/** An STS token is for the worker's origin only: a redirect fails rather than carry it on. */
+const STS_REQUEST: RequestInit = webhookAgentSender.kind === 'sts' ? { redirect: 'error' } : {};
+
+/** The credential headers of one worker call; throws before anything is sent without one. */
+function workerHeaders(): Promise<Record<string, string>> {
+  return serviceSenderHeaders({
+    sender: webhookAgentSender,
+    variable: 'WEBHOOK_AGENT_INGEST_SENDER_AUTH',
+    label: 'webhook agent client',
+    request: STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
+    legacyHeaders: async () => ({ 'x-internal-api-key': await readInternalApiSecret() }),
+  });
+}
+
 async function workerFetch<T>(path: string, options: RequestInit = {}): Promise<WorkerResponse<T>> {
   if (!isWebhookAgentConfigured()) {
     return { success: false, error: UNCONFIGURED_ERROR, status: 503 };
@@ -183,9 +217,10 @@ async function workerFetch<T>(path: string, options: RequestInit = {}): Promise<
 
   const response = await fetch(url, {
     ...options,
+    ...STS_REQUEST,
     headers: {
       'Content-Type': 'application/json',
-      'x-internal-api-key': await readInternalApiSecret(),
+      ...(await workerHeaders()),
       ...options.headers,
     },
   });
@@ -350,10 +385,9 @@ export async function invokeWorkerScheduledTrigger(
 
   try {
     const response = await fetch(`${WEBHOOK_AGENT_URL}${path}`, {
+      ...STS_REQUEST,
       method: 'POST',
-      headers: {
-        'x-internal-api-key': await readInternalApiSecret(),
-      },
+      headers: await workerHeaders(),
       signal: AbortSignal.timeout(30_000),
     });
 

@@ -2,8 +2,16 @@ import { and, eq, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { STS_SESSION_SYNC_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  SESSION_INGEST_WORKER_URL,
+  SESSION_SYNC_SENDER_AUTH,
+} from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateBoundedInternalServiceToken } from '@/lib/auth/kilo-token-signing';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
@@ -28,6 +36,18 @@ import {
 
 const childSessions = alias(cli_sessions_v2, 'cli_sessions_v2_child');
 const SESSION_SYNC_ERASURE_ACCEPTED = 'session-sync:accepted';
+
+/**
+ * `SESSION_SYNC_SENDER_AUTH` (`service-sender-auth.ts`), the credential of Session Sync's
+ * `POST /internal/users/:userID/erase`: `legacy` sends the internal API secret in
+ * `X-Internal-Secret`, as before (also when unset); explicit `sts` sends only a
+ * `session-sync:internal.call` STS token, never following a redirect.
+ */
+const sessionSyncSender = resolveServiceSenderAuth({
+  auth: SESSION_SYNC_SENDER_AUTH,
+  url: SESSION_SYNC_WORKER_URL,
+  runtime: process.env,
+});
 
 async function loadLeafSessions(userId: string) {
   return db
@@ -155,9 +175,13 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
   if (!SESSION_INGEST_WORKER_URL || !SESSION_SYNC_WORKER_URL) {
     return configurationMissing();
   }
-  const internalApiSecret = await readInternalApiSecret();
-  if (!internalApiSecret) {
-    return configurationMissing();
+  // Under `legacy` the erase call's secret is required up front, as before.
+  let internalApiSecret = '';
+  if (sessionSyncSender.kind === 'legacy') {
+    internalApiSecret = await readInternalApiSecret();
+    if (!internalApiSecret) {
+      return configurationMissing();
+    }
   }
 
   let progress = step.progress_json;
@@ -165,15 +189,20 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
   if (stop) return stop;
 
   if (progress.provider_ref !== SESSION_SYNC_ERASURE_ACCEPTED) {
+    // A refused switch or no token throws before anything is sent; the runner retries the step.
+    const credential = await serviceSenderHeaders({
+      sender: sessionSyncSender,
+      variable: 'SESSION_SYNC_SENDER_AUTH',
+      label: 'session sync user erase',
+      request: STS_SESSION_SYNC_INTERNAL_CALL,
+      legacyHeaders: async () => ({ 'X-Internal-Secret': internalApiSecret }),
+    });
+    const init: RequestInit = { method: 'POST', headers: credential };
+    if (sessionSyncSender.kind === 'sts') init.redirect = 'error';
     const result = await deletionFetch(
       context,
       `${SESSION_SYNC_WORKER_URL}/internal/users/${encodeURIComponent(userId)}/erase`,
-      {
-        method: 'POST',
-        headers: {
-          'X-Internal-Secret': internalApiSecret,
-        },
-      }
+      init
     );
     if ('outcome' in result) return withProgress(result.outcome, progress);
     if (result.response.status !== 202) {

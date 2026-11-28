@@ -1,13 +1,61 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
+import type { ServiceTokenRequest } from '@kilocode/service-token-client';
+import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
+import {
+  SECURITY_AUTO_ANALYSIS_SENDER_AUTH,
+  SECURITY_AUTO_ANALYSIS_WORKER_URL,
+  SECURITY_SYNC_SENDER_AUTH,
+  SECURITY_SYNC_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
+import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+  type ServiceSenderAuth,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
   fetchWithinBudget,
   readJsonWithinBudget,
+  withinBudget,
 } from '@/lib/bounded-service-fetch';
 
 /** Security Worker called through this module; used in the client-facing message. */
 export type SecurityWorkerService = 'sync' | 'dismissal' | 'analysis' | 'remediation';
+
+/** One security Worker's credential switch (`service-sender-auth.ts`), resolved once. */
+export type SecurityWorkerSender = { sender: ServiceSenderAuth; variable: string; label: string };
+
+/**
+ * `SECURITY_SYNC_SENDER_AUTH`: `legacy` (also when unset) sends the internal API secret in
+ * `x-internal-api-key`, as before; explicit `sts` sends only a `security-sync` STS token scoped to
+ * the route (`manual-sync.enqueue`, `dismiss-finding.enqueue`).
+ */
+export const SECURITY_SYNC_WORKER_SENDER: SecurityWorkerSender = {
+  sender: resolveServiceSenderAuth({
+    auth: SECURITY_SYNC_SENDER_AUTH,
+    url: SECURITY_SYNC_WORKER_URL,
+    runtime: process.env,
+  }),
+  variable: 'SECURITY_SYNC_SENDER_AUTH',
+  label: 'security sync worker client',
+};
+
+/**
+ * `SECURITY_AUTO_ANALYSIS_SENDER_AUTH`: `legacy` (also when unset) sends the internal API secret in
+ * `x-internal-api-key`, as before; explicit `sts` sends only a
+ * `security-auto-analysis:internal.call` STS token.
+ */
+export const SECURITY_AUTO_ANALYSIS_WORKER_SENDER: SecurityWorkerSender = {
+  sender: resolveServiceSenderAuth({
+    auth: SECURITY_AUTO_ANALYSIS_SENDER_AUTH,
+    url: SECURITY_AUTO_ANALYSIS_WORKER_URL,
+    runtime: process.env,
+  }),
+  variable: 'SECURITY_AUTO_ANALYSIS_SENDER_AUTH',
+  label: 'security auto-analysis worker client',
+};
 
 /**
  * Stable marker for a Worker this process provably never reached. Mobile maps
@@ -121,27 +169,59 @@ export function isDefinitiveSecurityWorkerRejection(params: {
  * clients map onto "the service is unavailable, try again". The caller's ledger
  * settles the intent `failed`, and the retry is a fresh intent.
  *
+ * The credential comes first, inside the same budget: the Worker's switch picks the internal API
+ * secret or an STS token for `scope`. Legacy without the secret is the not-configured
+ * precondition, as before; a refused switch, no token, or a mint past the budget throws before
+ * anything is sent. An STS token is for the Worker's origin only, so a redirect is an error.
+ *
  * The URL, the internal-service token, the request body and the response body
  * are never attached to the error.
  */
 export async function postSecurityWorkerJson(params: {
   url: string;
   service: SecurityWorkerService;
-  /** The caller read and checked it before deciding the Worker is configured. */
-  internalApiSecret: string;
+  worker: SecurityWorkerSender;
+  /** The route's STS scope; read only under `sts`. */
+  scope: ServiceTokenRequest;
   body: Record<string, unknown>;
 }): Promise<{ response: Response; body: unknown }> {
   const startedAt = Date.now();
-  try {
-    // The shared internal-service budget, one implementation for every caller
-    // (`fetchWithinBudget` defaults to `CONTROL_PLANE_UPSTREAM_BUDGET_MS`).
-    const response = await fetchWithinBudget(params.url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-internal-api-key': params.internalApiSecret,
+  const { sender, variable, label } = params.worker;
+  const credential = await withinBudget(
+    serviceSenderHeaders({
+      sender,
+      variable,
+      label,
+      request: params.scope,
+      legacyHeaders: async () => {
+        const internalApiSecret = await readInternalApiSecret();
+        if (!internalApiSecret) {
+          // Mirrored by the mobile security mutation classifier: a stable
+          // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
+          // classifier treats as retryable transport. The sentence is the shared
+          // SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE, which the mobile ledger maps
+          // by exact match (stable-error-messages).
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+          });
+        }
+        return { 'x-internal-api-key': internalApiSecret };
       },
-      body: JSON.stringify(params.body),
+    }),
+    CONTROL_PLANE_UPSTREAM_BUDGET_MS
+  );
+  const init: RequestInit = {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...credential },
+    body: JSON.stringify(params.body),
+  };
+  if (sender.kind === 'sts') init.redirect = 'error';
+  try {
+    // The shared internal-service budget, one implementation for every caller,
+    // less what the credential read spent.
+    const response = await fetchWithinBudget(params.url, init, {
+      budgetMs: CONTROL_PLANE_UPSTREAM_BUDGET_MS - (Date.now() - startedAt),
     });
     const body: unknown = await readJsonWithinBudget(
       response,

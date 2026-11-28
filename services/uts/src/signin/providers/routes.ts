@@ -9,13 +9,14 @@ import {
   refusalPage,
   returnPathOf,
 } from '../flows';
-import { messagePage } from '../pages';
+import { messagePage, unavailablePage } from '../pages';
 import { logMisconfigured } from './config';
 import { authorizationUrl, providerIdentity } from './exchange';
 
 /**
  * `GET /signin/oauth/<provider>/start` and the provider's callback (design 5.1). A provider that is
- * not configured is not served (404); a misconfigured one answers 500.
+ * not configured is not served (404); a misconfigured one answers 500; one whose secret STS cannot
+ * deliver now answers 503 with `Retry-After`.
  *
  * The callback is a GET with `code` and `state`, except for Apple, whose `form_post` callback is a
  * cross-site POST; the state and the binder protect it, so it needs no `Origin` check.
@@ -33,6 +34,7 @@ export async function handleProviderRequest(
   if (!provider.success) return null;
   const settings = methods.settings.providers[provider.data];
   if (settings.status === 'off') return null;
+  if (settings.status === 'unavailable') return unavailablePage(true);
   if (settings.status === 'misconfigured') {
     logMisconfigured(provider.data, settings.missing);
     return messagePage('Sign in to Kilo', 'This sign-in method is not available.', 500, null);

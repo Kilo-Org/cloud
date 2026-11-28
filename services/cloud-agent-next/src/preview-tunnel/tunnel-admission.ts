@@ -3,6 +3,7 @@ import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { PREVIEW_TUNNEL_CONNECT_HEADER } from '../shared/preview-headers.js';
 import { previewTunnelName } from '../shared/preview-tunnel-protocol.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 /**
  * Admits the wrapper's preview tunnel socket. The Worker checks the signed
@@ -14,9 +15,10 @@ import type { Env } from '../types.js';
 export async function admitPreviewTunnelUpgrade(
   request: Request,
   env: Pick<Env, 'NEXTAUTH_SECRET' | 'SANDBOX_CONTROL' | 'PREVIEW_TUNNEL'>,
-  sandboxId: string
+  sandboxId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const verdict = await verifyWrapperLaunch(request, env, sandboxId);
+  const verdict = await verifyWrapperLaunch(request, env, sandboxId, ctx);
   if (!verdict.ok) {
     return verdict.refusal === 'rejected'
       ? new Response('Preview tunnel refused', { status: 403 })

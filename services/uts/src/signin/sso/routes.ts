@@ -9,7 +9,7 @@ import {
   returnPathOf,
 } from '../flows';
 import { isSameOriginPost } from '../requests';
-import { messagePage } from '../pages';
+import { messagePage, unavailablePage } from '../pages';
 import { logMisconfigured } from '../providers/config';
 import { normalizeEmail, workosIdentity } from '../providers/exchange';
 
@@ -23,6 +23,8 @@ import { normalizeEmail, workosIdentity } from '../providers/exchange';
  * * `GET /signin/sso/callback` buys the profile with the code and the API key; the identity store
  *   accepts it only when the profile names the flow's connection and its address lies in a domain
  *   that connection's org verified. SSO never links to an existing account by email.
+ *
+ * With the WorkOS client id set and no usable STS bundle, both routes answer 503 with `Retry-After`.
  */
 export async function handleSsoRequest(
   request: Request,
@@ -32,6 +34,7 @@ export async function handleSsoRequest(
   if (pathname !== UTS_SSO_START_PATH && pathname !== UTS_SSO_CALLBACK_PATH) return null;
   const sso = methods.settings.sso;
   if (sso.status === 'off') return null;
+  if (sso.status === 'unavailable') return unavailablePage(true);
   if (sso.status === 'misconfigured') {
     logMisconfigured('workos', sso.missing);
     return messagePage('Sign in to Kilo', 'Single sign-on is not available.', 500, null);

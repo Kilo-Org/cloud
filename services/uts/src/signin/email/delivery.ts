@@ -20,7 +20,8 @@ import { type TurnstileCheck, turnstileCheck } from './turnstile';
  *   sends nothing, so it needs no Turnstile check. Only an entry that passes a recording mailer
  *   gets it, and the mail settings win when they are set.
  *
- * Without a sender the email sign-in is `off`: not offered, and its routes answer 404.
+ * Without a sender the email sign-in is `off`: not offered, and its routes answer 404. With its
+ * vars set and no usable STS bundle it is `unavailable`: not offered, and its routes answer 503.
  */
 export type EmailDelivery =
   | {
@@ -35,6 +36,7 @@ export type EmailDelivery =
 export type EmailSignIn =
   | { status: 'off' }
   | { status: 'misconfigured'; missing: readonly string[] }
+  | { status: 'unavailable' }
   | { status: 'on'; hashKey: Uint8Array; delivery: EmailDelivery };
 
 /** The platform `fetch`, called through a closure as the runtime expects. */
@@ -113,6 +115,7 @@ export function emailSignIn(
   if (mail.status === 'misconfigured') {
     return { status: 'misconfigured', missing: [...hashMissing, ...mail.missing] };
   }
+  if (mail.status === 'unavailable') return { status: 'unavailable' };
   if (mail.status === 'on') {
     if (hash.status !== 'on') {
       return { status: 'misconfigured', missing: ['SIGNIN_EMAIL_HASH_KEY'] };
@@ -141,6 +144,7 @@ export function emailSignIn(
   // switches nothing on.
   if (recordingMailer === null || hash.status === 'off') return { status: 'off' };
   if (hash.status === 'misconfigured') return { status: 'misconfigured', missing: hashMissing };
+  if (hash.status === 'unavailable') return { status: 'unavailable' };
   return {
     status: 'on',
     hashKey: hash.hashKey,

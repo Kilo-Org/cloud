@@ -327,9 +327,9 @@ key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant
 secret>`), so the endpoint knows the grant and its signer before the statement. One call mints one
 access token per scope, up to 8, each with one audience; one `signMany` call to the signer the
 grant id picks signs all of them, and `issued_tokens` lists them. The claims are exactly
-`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
-(`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
-failure no retry fixes gives 500.
+`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`, plus `bot_user` on a
+bot token only (`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with
+`Retry-After`; a failure no retry fixes gives 500.
 
 The tokens are signed after the statement commits. When signing fails (or the response is lost),
 a first-party client sends the same code exchange again with a new DPoP proof. While the code's
@@ -372,7 +372,9 @@ Attest and Android Play Integrity (`src/attest/`, migration 0017). The client is
 where the environment's attestation config is complete (`src/attest/config.ts`); anything less
 refuses it at `/authorize` with `unauthorized_client` and logs `uts.attestation.misconfigured`
 with the names (never the values) of what is missing. Development with no attestation value at
-all serves it without attestation, for the local tests.
+all serves it without attestation, for the local tests. With a var set and no usable STS bundle
+(Deploys, "Runtime secrets") the client is still sent to sign in and its code exchange answers 503
+with `Retry-After` until the key can be read.
 
 | Name | Kind | Value |
 |---|---|---|
@@ -380,7 +382,7 @@ all serves it without attestation, for the local tests.
 | `ATTEST_APPLE_BUNDLE_ID` | var | the iOS bundle id; with the team id it is the App ID whose SHA-256 is the RP ID hash |
 | `ATTEST_PLAY_INTEGRITY_PACKAGE_NAME` | var | the Android package name |
 | `ATTEST_PLAY_INTEGRITY_CERT_DIGESTS` | var | comma-separated SHA-256 digests of the accepted app signing certificates (Play Console hex, with or without colons, or base64url) |
-| `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` | secret | the JSON key of a Google service account allowed to call `decodeIntegrityToken` in the Cloud project linked to the app |
+| `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` | runtime secret | the JSON key of a Google service account allowed to call `decodeIntegrityToken` in the Cloud project linked to the app |
 | `ATTEST_DEV_ENDPOINTS` | development only | a stand-in App Attest root and Play Integrity origin on loopback; set anywhere else it refuses the client |
 
 The Apple App Attestation Root CA is pinned in code (`APPLE_APP_ATTEST_ROOT`, checked by its
@@ -688,6 +690,75 @@ jobs:
 
 The token lives for the policy's lifetime and cannot be refreshed; a longer job runs the step again
 for a fresh OIDC token and a new CI token.
+
+## Bot-token mint
+
+A workload that runs as an internal bot account (`bot-internal-<slug>`), such as the bouncer watch
+or the auto-routing benchmark, gets one short-lived UTS access token for that account at
+`POST /internal/bot-tokens` (`src/bot-token/`; design 5.3 and 6.5). It replaces the web app's
+`/api/internal/bot-token` and its shared `BOT_TOKEN_MINT_SECRET`. The wire contract is
+`bot-token.ts` in `@kilocode/uts-contracts`.
+
+- **Switch and allow-list.** The policies are the Worker var `BOT_TOKEN_POLICIES`, a JSON array
+  per environment in `wrangler.jsonc`. Absent or `[]`: the route answers `404 not_found`. A value
+  that breaks a load rule keeps it off and logs `uts.bot_token.misconfigured` with the rules it
+  breaks. The workloads the policies name are the route's whole caller allow-list. Production sets
+  none, and `test/repo/worker-configs.test.ts` keeps it that way and checks every configured list.
+- **Policy.** One entry per workload and bot account:
+
+  ```json
+  {
+    "workload": "bouncer-watch",
+    "account": "bot-internal-bouncer-watch",
+    "org": "<organization id the bot acts in>",
+    "scopes": ["kilo-gateway:inference", "kilo-api:organizations.read"],
+    "lifetimeSeconds": 3600
+  }
+  ```
+
+  Load rules (`src/bot-token/policy.ts`): every scope is registered, minted from a grant, needs no
+  session (a bot token has no `sid`), no step-up, is not privileged, changes no credential, belongs
+  to no staff list and is not a `uts` scope; at most 8 scopes and 1 hour.
+- **Caller.** `Authorization: Bearer <STS token>` for audience `uts` and the one STS scope
+  `uts:bot-token.mint`, checked by `@kilocode/verify` against the environment's STS key set
+  (`botTokenCallers` in `src/sts-callers.ts`). A valid token from a workload with no policy gets a
+  bare `403 insufficient_scope`. The development entry takes the stand-in bearer
+  `uts-dev-sts:<workload>:uts:bot-token.mint`.
+- **Request.** JSON `{ "account": "bot-internal-…", "audience": "kilo-gateway",
+  "scope": "kilo-gateway:inference" }`: one audience and one scope of it per call. A workload that
+  calls two services mints one token per audience.
+- **Answer.** `200 { access_token, token_type: "Bearer", expires_in, audience, scope }`, no refresh
+  token. The token carries `sub` (the bot account), `client_id` and `req` (the workload), `org`
+  (the policy's organization), `scope`, `aud`, `env`, `jti` and `bot_user: true`; no `sid`,
+  `auth_time`, `amr` or `act`. It lives the policy's lifetime for a PAT-eligible scope (a PAT
+  holds such a scope for up to a year) and at most the scope's registered maximum (10 minutes or
+  less) for any other.
+- **Refusals.** `400 invalid_request` (body), `400 invalid_target` (audience is not the scope's),
+  `400 invalid_scope` (the policy does not grant it), `401 invalid_token`, `403 insufficient_scope`,
+  `403 access_denied` with `error_description` `unknown_account`, `account_inactive` or
+  `membership_denied`, `404 not_found` (off), `503 temporarily_unavailable` with `Retry-After`
+  (STS key set, identity store or signer), `500 server_error`. Retry only on 503.
+- **Stopping bot tokens.** Block the bot account (subject operation `revoke`, reason
+  `access_block`): the statement then refuses every mint, and the block puts `subject` and
+  `blocked_account` entries on the revocation feed for 70 minutes, past the longest bot token. A
+  verifier refuses an issued token once its feed copy holds them (about 41 seconds in the worst
+  case), and answers 503 rather than accept a token whose lifetime is over 10 minutes once the head
+  is over 60 seconds old. Removing the policy stops new tokens only.
+  `test/runtime/bot-token.test.ts` proves the refusal with `@kilocode/verify`;
+  `test/db/bot-token.test.ts` proves the block's entries.
+- **Audit and cost.** Refusals before the statement (caller, body, account, scope) write a
+  `uts.bot_token.refused` or `uts.internal.workload_refused` log line and cost no statement.
+  Otherwise one statement, `uts.mint_bot_token` (migration 0026), reads the account and its
+  membership (two primary-key probes) and writes `ai.kilo.uts.bot_token.issued` (with the token
+  id, organization, role, scope and lifetime) or `ai.kilo.uts.bot_token.denied`
+  (`account_inactive`, or `membership_denied` for anything but an active `owner` or `member`), with
+  the calling workload as actor; then one `signMany` call signs the token in the signer its `jti`
+  picks. The bot account and its membership must be in the identity store (import through
+  `/internal/accounts/import` and the membership sync); no SSO rule applies, since a bot never
+  signs in.
+- **STS side.** `uts:bot-token.mint` must be registered under audience `uts` in the STS scope
+  registry and granted to each minting workload's STS policy; STS and its policy files are owned
+  outside this service.
 
 ## Account API, PATs and org bot keys
 
@@ -1036,7 +1107,9 @@ Open items before deploy:
 ### Configuration
 
 A method is offered only when every value it needs is set; with some set and others missing it is
-not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only).
+not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only). The secrets
+come from the source `SECRETS_SOURCE` names (Deploys, "Runtime secrets"); with a method's vars set
+and no usable STS bundle it is not offered and its routes answer 503 with `Retry-After`.
 
 | Method | Vars | Secrets |
 |---|---|---|
@@ -1055,11 +1128,11 @@ sender must sit on the sending domain (SPF and DKIM alignment), and Mailgun is c
 host. `UTS_MAIL_ALLOWED_RECIPIENTS` is a comma-separated list of exact addresses
 (`tester@example.com`) and whole domains (`@example.com`, no subdomains); staging and development
 must set it, and production must not (either mistake makes the mail settings misconfigured). The
-three vars are the switch: the secrets alone turn nothing on, so set `SIGNIN_EMAIL_HASH_KEY`,
-`UTS_MAILGUN_SENDING_KEY` and `UTS_TURNSTILE_SECRET_KEY` with `wrangler secret put` first, then
-deploy the vars in `wrangler.jsonc`; vars without both secrets make the routes answer 500. The
-Turnstile widget lists the issuer host (`uts-staging.kiloapps.io`, `uts.kiloapps.io`) as its
-hostname.
+three vars are the switch: the secrets alone turn nothing on, so put `SIGNIN_EMAIL_HASH_KEY`,
+`UTS_MAILGUN_SENDING_KEY` and `UTS_TURNSTILE_SECRET_KEY` in the selected source first (Deploys,
+"Runtime secrets"), then deploy the vars in `wrangler.jsonc`; vars without both secrets make the
+routes answer 500. The Turnstile widget lists the issuer host (`uts-staging.kiloapps.io`,
+`uts.kiloapps.io`) as its hostname.
 
 `SIGNIN_DEV_ENDPOINTS` (development only, loopback URLs only) points providers at local
 stand-ins. Each registration lists the callback of its environment's issuer:
@@ -1320,7 +1393,9 @@ feed object answers, terminal deletion, the user-created event and the audit row
   restarts, no head without a good backfill, refused names), the publisher and the `FeedReads`
   caller check, the PAT and bot key format against fixed vectors, every account route against a
   recording account store with tokens from the real signers, the probe route, the PAT lookup and
-  its entrypoint over real service bindings; unit tests cover feed entries, list serialization and
+  its entrypoint over real service bindings, and the runtime secrets of both sources (a stand-in
+  STS binding: delivered, missing, refused, unavailable and stale bundles, and the routes that must
+  not wait for it); unit tests cover feed entries, list serialization and
   the feed ledger.
 - `pnpm test:repo`: the repository config check and the scope registry check (`test/repo`), with
   no database.
@@ -1431,6 +1506,85 @@ The deployed entry checks STS tokens with `@kilocode/verify` against the environ
 each environment admits on the broker exchange and the `/internal/` routes; production lists none.
 An unreadable STS key set answers 503, never an admission.
 
+### Runtime secrets
+
+The 15 runtime secrets (`UTS_SECRET_NAMES` in `src/secrets.ts`: `DEVICE_USER_CODE_KEY`,
+`SIGNIN_EMAIL_HASH_KEY`, `SIGNIN_<PROVIDER>_CLIENT_SECRET` for Google, OpenAI, Anaconda, GitHub,
+GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY`,
+`SIGNIN_WORKOS_API_KEY`, `UTS_MAILGUN_SENDING_KEY`, `UTS_TURNSTILE_SECRET_KEY` and
+`ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY`) come from one source per environment, the var
+`SECRETS_SOURCE`:
+
+- `sts`: the UTS STS bundle, `/workloads/uts` of the environment, over the `STS` binding
+  (`SecretsBroker`, caller `uts`, policy `services/sts/policy/uts.yaml`). It never falls back to
+  the Worker secrets. `@kilocode/secrets-client` keeps one bundle per isolate, revalidates it in
+  the background after 4 minutes, waits for STS only on a cold isolate or past the 5-minute cache
+  life, and serves the held copy for up to 24 hours while STS fails.
+- `worker`: the Worker secrets of the same names, read once per isolate. `secrets-store`, the
+  legacy value other services use, means the same here (it logs `source` `worker`), so the
+  standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
+
+Both environments read `worker` until their flips (below). Staging and production refuse to start
+without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
+or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set under
+either source, so a rollback is the var alone. The `worker` source is removed in the same change
+that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret;
+the rotation job always reads it from the bundle ("Login rotation").
+
+Under `sts` the client holds the whole bundle in every request isolate that reads it. Once the
+policy grants `UTS_HYPERDRIVE_SWITCH_TOKEN`, that token, which can edit every Hyperdrive config in
+the account, sits in the memory of those isolates too, not only in the rotation object's. So the
+`uts` policy grants it only in the change that turns the rotation job on.
+
+Only the routes that use a secret read them, once per request: the sign-in pages and their calls,
+the provider, SSO and email routes, `/authorize`, the device pages, the issuer metadata, a
+`device_code` or `kilo-mobile` code exchange at `/token`, and, only where a mail var is set, a
+created credential's notice email (after the answer) and the minute cron's notice step. A refresh,
+`/revoke`, `/introspect`, `/tickets`, the browser-session API, the account API and the PAT routes
+never wait for STS. What a read finds:
+
+| Bundle state | Methods with their vars set | Methods without vars |
+|---|---|---|
+| Delivered, name present | `on` | `off` |
+| Delivered, name missing (policy grants it, the manager holds no value, or the value is empty) | `misconfigured`: not offered, routes answer 500 | `off` |
+| STS refuses the `uts` workload, or `STS` is not bound (`uts.secrets.unavailable` with `reason` `denied` or `not_bound`) | as a delivered bundle without the name: `misconfigured` | `off` |
+| No usable bundle: none yet on a cold isolate, or the held copy is 24 hours old (`uts.secrets.unavailable`, `reason` `unavailable`) | `unavailable`: not offered, routes answer 503 with `Retry-After` | `off` |
+
+With no usable bundle, the device grant answers 503 (`temporarily_unavailable` on
+`/device_authorization` and at `/token`) and the issuer metadata leaves it out with
+`Cache-Control: no-store`; `kilo-mobile` is still sent to sign in, and its code exchange answers 503
+until the bundle is back; the cron's notice step only runs retention, so pending notices wait.
+
+Each isolate logs one `uts.secrets.read` line when it first reads, and again for each new bundle
+version: `source` (`worker` or `sts`), `absent` (names the source holds no value for), `empty`
+(names it holds an empty value for, a manager placeholder; the readers treat both as unset), and
+for `sts` the bundle's `stale` and `fetched_at`. Names only, never a value. Zero legacy reads over
+a window is a logs query for `event = "uts.secrets.read"` with `source = "worker"` that finds
+nothing.
+
+The secrets client caches a denial per isolate: once STS refuses the `uts` workload, an isolate
+keeps refusing until it is replaced. After fixing a denial (`uts.secrets.unavailable` with
+`reason` `denied`), redeploy UTS, or roll the var back to `worker`.
+
+**Flip, per environment** (staging first, production only after the staging flip held), with the
+environment's `uts` policy live in STS:
+
+1. **Parity.** Every name in the environment's `/workloads/uts` holds the Worker secret's value,
+   compared by fingerprint, never printed, and the environment's read lines list no name under
+   `empty` that is set as a Worker secret. `DEVICE_USER_CODE_KEY` and `SIGNIN_EMAIL_HASH_KEY` key
+   hashes that the identity store holds (pending user codes, email codes and links), so a
+   different value breaks those flows.
+2. **Deploy** `SECRETS_SOURCE` `sts` for that environment, in a quiet window for production.
+3. **Watch** for one hour: `uts.secrets.read` lines only with `source` `sts` and an `absent` and
+   `empty` list that matches the environment's unset methods; no `uts.secrets.unavailable`; no new
+   `uts.signin.misconfigured`; the issuer metadata still lists `device_authorization_endpoint`
+   where the device grant was served; the sign-in proofs of that environment pass; and STS audit
+   rows for the `uts` deliveries.
+4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker` (or the standard `secrets-store`, read as
+   `worker`), after re-running the parity check of step 1 the other way: a value changed in the
+   bundle while on `sts` (a rotated provider secret) must reach the Worker secret first, or the
+   rollback serves the old one.
+
 ### Provisioning per environment
 
 | Setting | Kind | Value |
@@ -1440,9 +1594,11 @@ An unreadable STS key set answers 503, never an admission.
 | `IDENTITY_STORE_REPLICA` | Hyperdrive binding | The read-replica config (logins `uts_reader_a`, `uts_reader_b`) for the account views |
 | `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
-| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
+| `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
 | `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations; staging sets all five, production sets none, so production offers none of these providers (Sign-in providers, "Configuration") |
-| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | Worker secret | The client secrets of those registrations, set only where the matching client id is set. Copy each from the environment's `/workloads/uts` folder in the secrets manager with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
+| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips |
+| `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ## Identity store
 
@@ -1631,10 +1787,9 @@ rotated that login.
 4. **The origins.** Pin the environment's direct host, port and database for each pool in
    `ORIGIN_PINS`.
 
-**Open item:** STS has no `uts` workload policy yet (phase 2 adds it), so `wrangler.jsonc` binds no
-`STS` for now and the job, which is off, would report `misconfigured` (`missing STS`). With that
-policy, add the binding to the top level and to `env.staging`: `{ "binding": "STS", "service":
-"sts" (`"sts-staging"` in staging), "entrypoint": "SecretsBroker", "props": { "caller": "uts" } }`.
+The job reads the switch token through the `STS` binding that `wrangler.jsonc` sets in both
+environments (Deploys, "Runtime secrets"); until `services/sts/policy/uts.yaml` lists the token,
+STS refuses the read and a run reports it.
 
 `pnpm exec tsx scripts/rotation-e2e.ts` runs the full a -> b -> a rotation locally: the mint Worker
 under `wrangler dev`, a stand-in manager and Cloudflare API on loopback (`UTS_E2E_PORT`, default

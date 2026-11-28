@@ -4,6 +4,9 @@
 #
 # CONTAINER_BILLING_CLOUD_AGENT_USER_IDS stays a plain Worker secret read from `secrets-store`: it is a payer
 # allowlist (configuration), not a credential, and its readers are synchronous.
+#
+# It asks the web app to send an organization's compute balance alert with a
+# web:compute-balance-alert.send token over the same binding (WEB_INTERNAL_AUTH=sts). Production only.
 workload: container-usage-meter
 environments:
   - production
@@ -11,3 +14,7 @@ identity:
   kind: worker-binding
 secrets:
   - INTERNAL_API_SECRET
+audiences:
+  - web
+scopes:
+  - web:compute-balance-alert.send

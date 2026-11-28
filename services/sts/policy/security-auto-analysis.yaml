@@ -1,8 +1,10 @@
-# The security-auto-analysis Worker (services/security-auto-analysis/wrangler.jsonc). It reads its
-# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets
-# Store bindings) until secrets-cutover flips it. All three names resolve from /shared:
-# INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET. The `dev` block binds no STS and
-# reads the _DEV store names.
+# The security-auto-analysis Worker (services/security-auto-analysis/wrangler.jsonc). Production
+# only: the `dev` block binds no STS and reads the _DEV store names. It pushes a finding's lifecycle
+# event to the web app's /api/internal/security-agent/notifications with a
+# web:security-notifications.lifecycle token over its `STS` SecretsBroker binding
+# (WEB_INTERNAL_AUTH=sts). It reads its runtime secrets over the same binding; SECRETS_SOURCE stays
+# `secrets-store` (the Secrets Store bindings) until secrets-cutover flips it. All three names
+# resolve from /shared: INTERNAL_API_SECRET, CALLBACK_TOKEN_SECRET and NEXTAUTH_SECRET.
 workload: security-auto-analysis
 environments:
   - production
@@ -12,3 +14,7 @@ secrets:
   - INTERNAL_API_SECRET
   - CALLBACK_TOKEN_SECRET
   - NEXTAUTH_SECRET
+audiences:
+  - web
+scopes:
+  - web:security-notifications.lifecycle

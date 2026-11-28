@@ -4,6 +4,7 @@ import {
   UTS_ACCOUNT_IMPORT_SCOPE,
   UTS_APP_EVENTS_SCOPE,
   UTS_AUTHORITY_SCOPE,
+  UTS_BOT_TOKEN_MINT_SCOPE,
   UTS_INTERNAL_WORKLOADS,
   UTS_SUBJECT_OPERATIONS,
   UTS_TOKEN_EXCHANGE_ACTOR,
@@ -42,6 +43,7 @@ const UTS_STS_SCOPES = [
     UTS_ACCOUNT_IMPORT_SCOPE,
     UTS_AUTHORITY_SCOPE,
     UTS_APP_EVENTS_SCOPE,
+    UTS_BOT_TOKEN_MINT_SCOPE,
   ]),
 ];
 
@@ -113,16 +115,22 @@ function retryAfterOf(failure: VerifyFailure): number {
  * The deployed STS checks: `@kilocode/verify` against this environment's STS issuer and key set,
  * audience `uts`, one route scope, and the environment's workload allow-lists. An unreadable key
  * set fails closed: `unavailable`, never admitted. `stsCallers` is null where no workload may
- * call the exchange.
+ * call the exchange. `botTokenCallers` admits any service workload: the bot-token policies
+ * (`BOT_TOKEN_POLICIES`, src/bot-token/policy.ts) are that route's allow-list.
  */
 export function deployedStsCallers(
   config: UtsConfig,
   ctx: ExecutionContext,
   jwks: (issuer: string) => JwksSource = httpJwksSource
-): { serviceTokens: ServiceTokenVerifier; stsCallers: StsCallerVerifier | null } {
+): {
+  serviceTokens: ServiceTokenVerifier;
+  botTokenCallers: ServiceTokenVerifier;
+  stsCallers: StsCallerVerifier | null;
+} {
   const workloads = STS_CALLER_WORKLOADS[config.environment];
-  return {
-    serviceTokens: async (authorization, scope) => {
+  const serviceTokenCheck =
+    (admits: (workload: string) => boolean): ServiceTokenVerifier =>
+    async (authorization, scope) => {
       if (authorization === null) return { status: 'missing' };
       const result = await verifyBearer(config, ctx, jwks, authorization, scope);
       if (!result.ok) {
@@ -133,11 +141,14 @@ export function deployedStsCallers(
         return { status: result.status === 403 ? 'insufficient_scope' : 'invalid' };
       }
       if (result.caller.kind !== 'service') return { status: 'workload_refused', workload: null };
-      if (!workloads.internal.includes(result.caller.workload)) {
+      if (!admits(result.caller.workload)) {
         return { status: 'workload_refused', workload: result.caller.workload };
       }
       return { status: 'verified', workload: result.caller.workload };
-    },
+    };
+  return {
+    serviceTokens: serviceTokenCheck(workload => workloads.internal.includes(workload)),
+    botTokenCallers: serviceTokenCheck(() => true),
     // An environment that admits no exchange caller does not offer the exchange
     // (`unsupported_grant_type`, and no `token-exchange` in its metadata).
     stsCallers:

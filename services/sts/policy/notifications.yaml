@@ -1,7 +1,8 @@
 # The notifications Worker (services/notifications/wrangler.jsonc). Production only: the live
 # notifications-staging deployment shares production resources and has no supported config, so it
 # gets no policy. The two NOTIFICATIONS_ names live in /workloads/notifications; NEXTAUTH_SECRET
-# and INTERNAL_API_SECRET resolve from /shared.
+# and INTERNAL_API_SECRET resolve from /shared. It reads the web app's glanceable agents snapshot
+# with a web:glanceable-snapshot.read token.
 workload: notifications
 environments:
   - production
@@ -12,3 +13,7 @@ secrets:
   - NOTIFICATIONS_EXPO_ACCESS_TOKEN
   - NEXTAUTH_SECRET
   - INTERNAL_API_SECRET
+audiences:
+  - web
+scopes:
+  - web:glanceable-snapshot.read

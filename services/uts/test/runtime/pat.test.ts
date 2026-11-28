@@ -111,6 +111,7 @@ describe('the PAT lookup', () => {
           ? {}
           : { WEBAUTHN_RP_ID: 'app.kilo.ai', WEBAUTHN_ORIGINS: 'https://uts.kiloapps.io' }),
         PAT_LOOKUP_CONNECTIONS: connections,
+        SECRETS_SOURCE: 'worker',
       };
       expect(patLookupsInFlight(target)).toBe(cap);
       const limiter = lookupLimiter();
@@ -178,6 +179,7 @@ describe('the PAT lookup', () => {
         UTS_ENVIRONMENT: environment,
         DO_JURISDICTION: 'eu',
         PAT_LOOKUP_CONNECTIONS: undefined,
+        SECRETS_SOURCE: 'worker',
       };
       expect(() => readConfig(missing)).toThrow(/PAT_LOOKUP_CONNECTIONS/);
       for (const invalid of ['0', '-3', '12.5', 'twelve', '']) {

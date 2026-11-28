@@ -1,7 +1,9 @@
-# The user-data-export Worker (services/user-data-export/wrangler.jsonc). It reads its runtime
-# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the plain
-# Worker secrets) until it is set to `sts`. INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve
-# from /shared; the R2 key pair resolves from /workloads/user-data-export.
+# The user-data-export Worker (services/user-data-export/wrangler.jsonc). Production only. It tells
+# the web app that an export is ready with a web:user-data-exports.ready token over its `STS`
+# SecretsBroker binding (WEB_INTERNAL_AUTH=sts). It reads its runtime secrets over the same
+# binding; SECRETS_SOURCE stays `secrets-store` (the plain Worker secrets) until it is set to `sts`.
+# INTERNAL_API_SECRET and NEXTAUTH_SECRET resolve from /shared; the R2 key pair resolves from
+# /workloads/user-data-export.
 workload: user-data-export
 environments:
   - production
@@ -12,3 +14,7 @@ secrets:
   - NEXTAUTH_SECRET
   - R2_ACCESS_KEY_ID
   - R2_SECRET_ACCESS_KEY
+audiences:
+  - web
+scopes:
+  - web:user-data-exports.ready

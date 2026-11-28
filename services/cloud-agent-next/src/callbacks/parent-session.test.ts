@@ -206,7 +206,7 @@ describe('workspace session callback delivery', () => {
   it('routes the queue job through the workspace session delivery path', async () => {
     const ack = vi.fn();
     const retry = vi.fn();
-    await createCallbackQueueConsumer(env)({
+    await createCallbackQueueConsumer(env, { waitUntil: vi.fn() })({
       messages: [{ body: job, attempts: 1, ack, retry }],
     } as unknown as MessageBatch<CallbackJob>);
     expect(ack).toHaveBeenCalledTimes(1);
@@ -270,7 +270,7 @@ describe('callback fallbacks', () => {
     job.target = { url: 'https://example.com/callback', headers: { 'X-Callback': 'fixture' } };
     delete job.parentSession;
     try {
-      await createCallbackQueueConsumer(env)({
+      await createCallbackQueueConsumer(env, { waitUntil: vi.fn() })({
         messages: [{ body: job, attempts: 1, ack, retry }],
       } as unknown as MessageBatch<CallbackJob>);
       expect(ack).toHaveBeenCalledOnce();

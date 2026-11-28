@@ -279,6 +279,20 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
   // The runtime bucket is production's publication bucket, so the e2e Worker
   // never binds it.
   expect(output).not.toHaveProperty('r2_buckets');
+  // The E2E Worker is renamed, so it may not keep the broker binding whose props.caller names the
+  // production Worker, and it may not inherit a later flip to the `sts` source.
+  expect(output.services ?? []).not.toContainEqual(expect.objectContaining({ binding: 'STS' }));
+  expect(output.vars).toMatchObject({ SECRETS_SOURCE: 'secrets-store' });
+  // No outbound credential switch is set, so every edge keeps its shared credential.
+  for (const name of [
+    'BYOC_LOOKUP_SENDER_AUTH',
+    'PR_REFRESH_SENDER_AUTH',
+    'CALLBACK_SENDER_AUTH_WEB',
+    'CALLBACK_SENDER_AUTH_WEBHOOK_AGENT_INGEST',
+    'CALLBACK_SENDER_AUTH_SECURITY_AUTO_ANALYSIS',
+  ]) {
+    expect(output.vars).not.toHaveProperty(name);
+  }
 });
 
 it('rebases only the runtime-free base for local HTTP E2E startup', () => {

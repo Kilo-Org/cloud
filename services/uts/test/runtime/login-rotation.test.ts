@@ -65,6 +65,7 @@ describe('the login rotation switch', () => {
       PAT_LOOKUP_CONNECTIONS: '32',
       WEBAUTHN_RP_ID: 'app.kilo.ai',
       WEBAUTHN_ORIGINS: 'https://uts.kiloapps.io',
+      SECRETS_SOURCE: 'worker',
       LOGIN_ROTATION: 'on',
       IDENTITY_STORE_REPLICA: hyperdrive,
     };

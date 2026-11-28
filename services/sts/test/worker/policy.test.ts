@@ -1,3 +1,4 @@
+import { STS_ENVIRONMENTS, STS_RESERVED_SCOPES, STS_SCOPE_REGISTRY } from '@kilocode/sts-contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { policyChangedEvent } from '../../src/audit/events';
@@ -25,6 +26,66 @@ const GATEWAY_BASE_SCOPES = [
   'usage-ingest:usage.publish',
   'o11y:api-metrics.write',
   'ai-gateway-secure-proxy:request.forward',
+];
+
+/** The shipped web policy's audiences and scopes in production: Bouncer, then its phase 2 C1 calls. */
+const WEB_PRODUCTION_AUDIENCES = [
+  'usage-ingest',
+  'o11y',
+  'bouncer',
+  'code-review',
+  'session-ingest',
+  'security-sync',
+  'security-auto-analysis',
+  'model-eval-ingest',
+  'webhook-agent-ingest',
+  'session-sync',
+  'notifications',
+  'auto-routing',
+  'auto-routing-benchmark',
+];
+const WEB_PRODUCTION_SCOPES = [
+  ...WEB_BASE_SCOPES,
+  'bouncer:decide',
+  'bouncer:usage.write',
+  'bouncer:signup.decide',
+  'code-review:review.dispatch',
+  'code-review:review.status-read',
+  'code-review:review.cancel',
+  'code-review:review.retry-fresh',
+  'session-ingest:session-access.invalidate',
+  'security-sync:manual-sync.enqueue',
+  'security-sync:dismiss-finding.enqueue',
+  'security-auto-analysis:internal.call',
+  'model-eval-ingest:internal.call',
+  'webhook-agent-ingest:internal.call',
+  'session-sync:internal.call',
+  'notifications:internal.call',
+  'auto-routing:admin.read',
+  'auto-routing:admin.write',
+  'auto-routing-benchmark:admin.read',
+  'auto-routing-benchmark:admin.write',
+  'auto-routing-benchmark:routing-tables.read',
+];
+
+/** The shipped ai-gateway policy's audiences and scopes in production: Bouncer, then its C1 calls. */
+const GATEWAY_PRODUCTION_AUDIENCES = [
+  'usage-ingest',
+  'o11y',
+  'ai-gateway-secure-proxy',
+  'bouncer',
+  'web',
+  'auto-routing',
+  'auto-routing-benchmark',
+];
+const GATEWAY_PRODUCTION_SCOPES = [
+  ...GATEWAY_BASE_SCOPES,
+  'bouncer:decide',
+  'bouncer:usage.write',
+  'web:usage.region-handoff.record',
+  'web:claude-billing.payer-state.read',
+  'auto-routing:decide',
+  'auto-routing-benchmark:routing-tables.read',
 ];
 
 function withGrants(grants: string): string {
@@ -102,13 +163,8 @@ describe('policy token grants', () => {
     ).toThrow('audience canary is reserved and no policy may grant it');
     // The shipped web policy, which sends the probe, grants neither.
     expect(policyIndex.get('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'o11y', 'bouncer'],
-      scopes: [
-        ...WEB_BASE_SCOPES,
-        'bouncer:decide',
-        'bouncer:usage.write',
-        'bouncer:signup.decide',
-      ],
+      audiences: WEB_PRODUCTION_AUDIENCES,
+      scopes: WEB_PRODUCTION_SCOPES,
     });
   });
 
@@ -874,7 +930,7 @@ secrets: [APP_TWO_SECRET]
     expect(policyFor('production', 'not-a-workload')).toBeNull();
   });
 
-  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key outside it, and two Bouncer scopes in production only', () => {
+  it('binds ai-gateway to kilocode-ai-gateway production, staging and previews, with the UTS feed in development only, the internal key outside it, and its Bouncer and web scopes in production only', () => {
     const gateway = policyFor('production', 'ai-gateway');
     expect(gateway?.identity).toEqual({
       kind: 'vercel-oidc',
@@ -898,8 +954,8 @@ secrets: [APP_TWO_SECRET]
     });
     expect(policyFor('production', 'ai-gateway')).toMatchObject({
       environments: ['development', 'staging', 'production'],
-      audiences: ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy', 'bouncer'],
-      scopes: [...GATEWAY_BASE_SCOPES, 'bouncer:decide', 'bouncer:usage.write'],
+      audiences: GATEWAY_PRODUCTION_AUDIENCES,
+      scopes: GATEWAY_PRODUCTION_SCOPES,
       secrets: ['INTERNAL_API_SECRET'],
       dynamic: [],
       environmentGrants: {},
@@ -940,37 +996,186 @@ describe('dual-accept grants of the shipped policies', () => {
   );
 
   it.each(['staging', 'production'] as const)(
-    'grants the callers only these scopes and audiences in %s, beside the production Bouncer grants',
+    'grants the callers only these scopes and audiences in %s, beside the production Bouncer and phase 2 C1 grants',
     environment => {
-      const bouncer = environment === 'production';
+      const production = environment === 'production';
       expect(policyFor(environment, 'usage-ingest')).toMatchObject({
         audiences: ['web'],
         scopes: ['web:sts.canary', 'web:usage.record'],
         secrets: [],
       });
       expect(policyFor(environment, 'web')).toMatchObject({
-        audiences: ['usage-ingest', 'o11y', ...(bouncer ? ['bouncer'] : [])],
-        scopes: [
-          ...WEB_BASE_SCOPES,
-          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write', 'bouncer:signup.decide'] : []),
-        ],
+        audiences: production ? WEB_PRODUCTION_AUDIENCES : ['usage-ingest', 'o11y'],
+        scopes: production ? WEB_PRODUCTION_SCOPES : WEB_BASE_SCOPES,
         secrets: ['INTERNAL_API_SECRET'],
       });
       expect(policyFor(environment, 'ai-gateway')).toMatchObject({
-        audiences: [
-          'usage-ingest',
-          'o11y',
-          'ai-gateway-secure-proxy',
-          ...(bouncer ? ['bouncer'] : []),
-        ],
-        scopes: [
-          ...GATEWAY_BASE_SCOPES,
-          ...(bouncer ? ['bouncer:decide', 'bouncer:usage.write'] : []),
-        ],
+        audiences: production
+          ? GATEWAY_PRODUCTION_AUDIENCES
+          : ['usage-ingest', 'o11y', 'ai-gateway-secure-proxy'],
+        scopes: production ? GATEWAY_PRODUCTION_SCOPES : GATEWAY_BASE_SCOPES,
         secrets: ['INTERNAL_API_SECRET'],
       });
     }
   );
+});
+
+describe('phase 2 C1 grants of the shipped policies', () => {
+  /**
+   * Each phase 2 C1 scope and its senders (its docblock in scopes.ts), production only. Every scope
+   * has one sender except auto-routing-benchmark:routing-tables.read, whose docblock names three.
+   */
+  const SENDERS: Readonly<Record<string, readonly string[]>> = {
+    'web:compute-balance-alert.send': ['container-usage-meter'],
+    'web:scim.sync': ['cloudflare-scim-sync'],
+    'web:user-data-exports.ready': ['user-data-export'],
+    'web:security-notifications.lifecycle': ['security-auto-analysis'],
+    'web:auto-routing.pool-pins.write': ['auto-routing-benchmark'],
+    'web:usage.receipts.read': ['auto-routing-benchmark'],
+    'web:auto-routing.production-profile.read': ['auto-routing-benchmark'],
+    'web:usage.benchmark-grader.record': ['auto-routing-benchmark'],
+    'web:usage.classifier.record': ['auto-routing'],
+    'web:usage.region-handoff.record': ['ai-gateway'],
+    'web:claude-billing.payer-state.read': ['ai-gateway'],
+    'web:glanceable-snapshot.read': ['notifications'],
+    'web:byoc-credentials.read': ['cloud-agent-next'],
+    'web:byoc-credentials.write': ['cloud-agent-next'],
+    'web:hosted-workspace-pull-requests.refresh': ['cloud-agent-next'],
+    'web:bot-session.callback': ['cloud-agent-next'],
+    'web:security-analysis.callback': ['cloud-agent-next'],
+    'web:code-review.agent-callback': ['cloud-agent-next'],
+    'webhook-agent-ingest:execution.callback': ['cloud-agent-next'],
+    'security-auto-analysis:analysis.callback': ['cloud-agent-next'],
+    'security-auto-analysis:remediation.callback': ['cloud-agent-next'],
+    'web:code-review.status-callback': ['kilo-code-review-worker'],
+    'code-review:review.dispatch': ['web'],
+    'code-review:review.status-read': ['web'],
+    'code-review:review.cancel': ['web'],
+    'code-review:review.retry-fresh': ['web'],
+    'session-ingest:session-access.invalidate': ['web'],
+    'security-sync:manual-sync.enqueue': ['web'],
+    'security-sync:dismiss-finding.enqueue': ['web'],
+    'security-auto-analysis:internal.call': ['web'],
+    'model-eval-ingest:internal.call': ['web'],
+    'webhook-agent-ingest:internal.call': ['web'],
+    'session-sync:internal.call': ['web'],
+    'notifications:internal.call': ['web'],
+    'auto-routing:admin.read': ['web'],
+    'auto-routing:admin.write': ['web'],
+    'auto-routing:decide': ['ai-gateway'],
+    'auto-routing-benchmark:admin.read': ['web'],
+    'auto-routing-benchmark:admin.write': ['web'],
+    'auto-routing-benchmark:routing-tables.read': ['ai-gateway', 'auto-routing', 'web'],
+  };
+  /** The Workers that send C1 tokens over a production-only worker binding and hold no other grant. */
+  const ACTIVATED = [
+    'container-usage-meter',
+    'cloudflare-scim-sync',
+    'user-data-export',
+    'security-auto-analysis',
+    'auto-routing-benchmark',
+    'auto-routing',
+    'cloud-agent-next',
+    'kilo-code-review-worker',
+  ];
+  /**
+   * Registered scopes outside phase 2 C1, each with its kind: the canary pair, the UTS service
+   * scopes, the phase 4 service scopes and the CI scopes. The reserved scopes
+   * (`STS_RESERVED_SCOPES`) are left out by name.
+   */
+  const NOT_C1: Readonly<Record<string, string>> = {
+    'web:sts.canary': 'canary',
+    'usage-ingest:sts.canary': 'canary',
+    'uts-feed:revocation.read': 'UTS',
+    'uts:subjects.revoke': 'UTS',
+    'uts:browser-sessions.end': 'UTS',
+    'uts:api-credentials.revoke': 'UTS',
+    'uts:token-exchange': 'UTS',
+    'ai-gateway-secure-proxy:request.forward': 'phase 4',
+    'usage-ingest:usage.publish': 'phase 4',
+    'web:usage.record': 'phase 4',
+    'o11y:api-metrics.write': 'phase 4',
+    'o11y:alerting.read': 'phase 4',
+    'o11y:alerting.write': 'phase 4',
+    'bouncer:decide': 'phase 4',
+    'bouncer:usage.write': 'phase 4',
+    'bouncer:signup.decide': 'phase 4',
+    'bouncer:signup.history': 'phase 4',
+    'web:mcp-catalog-token.mint': 'CI',
+    'community-contributions-dashboard:opencode.sync': 'CI',
+  };
+  /** Registered C1 scopes that no policy grants yet, each with the reason and what grants it. */
+  const UNGRANTED: Readonly<Record<string, string>> = {
+    'web:security-notifications.dispatch':
+      'cloudflare-security-sync stays a registration until its STS binding lands (#12999)',
+  };
+
+  it('classifies every registered scope: a C1 grant, an ungranted C1 scope with a reason, or not C1', () => {
+    const registered = Object.values(STS_SCOPE_REGISTRY).flatMap(entry => entry.scopes);
+    const unclassified = registered.filter(
+      scope =>
+        !STS_RESERVED_SCOPES.includes(scope) &&
+        !Object.hasOwn(SENDERS, scope) &&
+        !Object.hasOwn(UNGRANTED, scope) &&
+        !Object.hasOwn(NOT_C1, scope)
+    );
+    expect(unclassified).toEqual([]);
+    const listed = [...Object.keys(SENDERS), ...Object.keys(UNGRANTED), ...Object.keys(NOT_C1)];
+    expect(listed.filter(scope => !registered.includes(scope))).toEqual([]);
+    expect(Object.keys(UNGRANTED).filter(scope => Object.hasOwn(SENDERS, scope))).toEqual([]);
+  });
+
+  it.each(Object.keys(UNGRANTED))('grants the ungranted C1 scope %s to no policy', scope => {
+    for (const environment of STS_ENVIRONMENTS) {
+      expect(
+        policyIndex.forEnvironment(environment).filter(policy => policy.scopes.includes(scope))
+      ).toEqual([]);
+    }
+  });
+
+  it.each(Object.entries(SENDERS))(
+    'grants %s to %s in production and to no other policy',
+    (scope, senders) => {
+      for (const sender of senders) {
+        expect(policyFor('production', sender)).toMatchObject({
+          audiences: expect.arrayContaining([scope.slice(0, scope.indexOf(':'))]),
+          scopes: expect.arrayContaining([scope]),
+        });
+      }
+      expect(
+        policyIndex
+          .forEnvironment('production')
+          .filter(policy => policy.scopes.includes(scope))
+          .map(policy => policy.workload)
+          .sort()
+      ).toEqual(senders);
+    }
+  );
+
+  it.each(['development', 'staging'] as const)('grants no phase 2 C1 scope in %s', environment => {
+    for (const policy of policyIndex.forEnvironment(environment)) {
+      expect(policy.scopes.filter(scope => Object.hasOwn(SENDERS, scope))).toEqual([]);
+    }
+  });
+
+  it.each(ACTIVATED)('serves %s as a production-only worker binding', workload => {
+    expect(policyIndex.registered()).not.toContain(workload);
+    expect(policyFor('production', workload)).toMatchObject({
+      environments: ['production'],
+      identity: { kind: 'worker-binding' },
+    });
+    expect(policyFor('staging', workload)).toBeNull();
+    expect(policyFor('development', workload)).toBeNull();
+  });
+
+  it('grants each activated Worker only its own C1 scopes', () => {
+    for (const workload of ACTIVATED) {
+      const own = Object.entries(SENDERS)
+        .filter(([, senders]) => senders.includes(workload))
+        .map(([scope]) => scope);
+      expect(policyFor('production', workload)?.scopes).toEqual(own);
+    }
+  });
 });
 
 describe('policy registrations', () => {
@@ -1323,7 +1528,7 @@ scopes: ['gateway:models.read']
     ).toBe(true);
   });
 
-  it('grants web its UTS audiences, scopes and client keys in development only, the internal key in staging and production only, and the Bouncer scopes in production only', () => {
+  it('grants web its UTS audiences, scopes and client keys in development only, the internal key in staging and production only, and its Bouncer and phase 2 C1 scopes in production only', () => {
     const development = policyFor('development', 'web');
     expect(development).toMatchObject({
       audiences: ['usage-ingest', 'o11y', 'uts-feed', 'uts'],
@@ -1342,13 +1547,8 @@ scopes: ['gateway:models.read']
       secrets: ['INTERNAL_API_SECRET'],
     });
     expect(policyFor('production', 'web')).toMatchObject({
-      audiences: ['usage-ingest', 'o11y', 'bouncer'],
-      scopes: [
-        ...WEB_BASE_SCOPES,
-        'bouncer:decide',
-        'bouncer:usage.write',
-        'bouncer:signup.decide',
-      ],
+      audiences: WEB_PRODUCTION_AUDIENCES,
+      scopes: WEB_PRODUCTION_SCOPES,
       secrets: ['INTERNAL_API_SECRET'],
     });
   });

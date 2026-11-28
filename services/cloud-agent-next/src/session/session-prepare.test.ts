@@ -3834,7 +3834,11 @@ describe('createSessionWithLedger admission ladder', () => {
       },
       ctx.env
     );
-    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(ctx.env, organizationId);
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(
+      ctx.env,
+      organizationId,
+      ctx.executionCtx
+    );
     expect(selectControlPlaneSandboxMock).toHaveBeenCalledWith({
       env: ctx.env,
       sessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
@@ -3916,7 +3920,11 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
 
-    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(ctx.env, USER_ID);
+    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(
+      ctx.env,
+      USER_ID,
+      ctx.executionCtx
+    );
     expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
     expect(recordOperationProgressMock).toHaveBeenCalledWith(
       expect.anything(),

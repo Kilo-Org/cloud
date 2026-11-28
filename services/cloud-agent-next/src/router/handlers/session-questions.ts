@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import type { SessionId, Env } from '../../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { fetchSessionMetadata } from '../../session/metadata.js';
 import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
@@ -30,7 +31,8 @@ async function answerControlPlane(
   sessionId: SessionId,
   reply: ControlPlaneAnswerReply,
   /** The payer the mutation's own access gate already resolved. */
-  resolvedPayer: ResolvedPayer
+  resolvedPayer: ResolvedPayer,
+  ctx?: SecretsExecutionContext
 ): Promise<{ success: boolean }> {
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
@@ -38,6 +40,7 @@ async function answerControlPlane(
   }
   const outcome = await answerWithAdmission({
     env,
+    ctx,
     userId,
     ...(authToken === undefined ? {} : { authToken }),
     cloudAgentSessionId: sessionId,
@@ -122,7 +125,8 @@ export function createSessionQuestionHandlers() {
                 questionId: input.questionId,
                 answers: input.answers,
               },
-              { organizationId: access.organizationId }
+              { organizationId: access.organizationId },
+              ctx.executionCtx
             );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
@@ -169,7 +173,8 @@ export function createSessionQuestionHandlers() {
                 action: 'reject',
                 questionId: input.questionId,
               },
-              { organizationId: access.organizationId }
+              { organizationId: access.organizationId },
+              ctx.executionCtx
             );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
@@ -218,7 +223,8 @@ export function createSessionQuestionHandlers() {
                 permissionId: input.permissionId,
                 response: input.response,
               },
-              { organizationId: access.organizationId }
+              { organizationId: access.organizationId },
+              ctx.executionCtx
             );
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })

@@ -79,7 +79,12 @@ export const buildEnvironment = protectedProcedure
   .mutation(async ({ input, ctx }) => {
     const reference = await authorize(ctx, input, 'manage');
     // A manual build fails fast with a specific, recoverable billing reason.
-    const balance = await validateBalanceOnly(ctx.authToken, input.kilocodeOrganizationId, ctx.env);
+    const balance = await validateBalanceOnly(
+      ctx.authToken,
+      input.kilocodeOrganizationId,
+      ctx.env,
+      ctx.executionCtx
+    );
     if (!balance.success && balance.status === 402) {
       return { status: 'rejected' as const, reason: 'billing_blocked' as const };
     }

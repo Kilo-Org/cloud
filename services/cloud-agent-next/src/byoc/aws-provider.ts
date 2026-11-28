@@ -4,9 +4,12 @@ import type { ByocSource } from './owner.js';
 import { awsRuntimeAccess, resolveAwsByocConfiguration } from './aws-credential-resolver.js';
 import { createAwsProviderAdapter } from '../sandbox-control/aws-provider.js';
 import type { AwsOperationStorage } from '../sandbox-control/aws-operation.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 export function createByocAwsProviderAdapter(deps: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   source: ByocSource;
   sandboxId: string;
   storage: AwsOperationStorage;
@@ -18,7 +21,7 @@ export function createByocAwsProviderAdapter(deps: {
     sandboxId: deps.sandboxId,
     storage: deps.storage,
     async resolveRuntime(pinned?: AwsByocConfiguration) {
-      const config = pinned ?? (await resolveAwsByocConfiguration(deps.env, deps.source));
+      const config = pinned ?? (await resolveAwsByocConfiguration(deps.env, deps.source, deps.ctx));
       const key = JSON.stringify(config);
       if (
         cached &&

@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { type ClientCredentials, readSignInConfig } from '../../src/signin/providers/config';
+import { signInInput } from '../secrets-support';
 import {
   authorizationUrl,
   normalizeEmail,
@@ -113,13 +114,13 @@ describe('flow values', () => {
 describe('configuration', () => {
   it('offers a provider only when every value is set, and flags a partial one', () => {
     const settings = readSignInConfig(
-      {
+      signInInput({
         SIGNIN_GOOGLE_CLIENT_ID: 'google-client',
         SIGNIN_GOOGLE_CLIENT_SECRET: 'google-secret',
         SIGNIN_GITHUB_CLIENT_ID: 'github-client',
         SIGNIN_APPLE_CLIENT_ID: 'apple-client',
         SIGNIN_APPLE_TEAM_ID: 'TEAM',
-      },
+      }),
       config
     );
     expect(settings.providers.google).toMatchObject({
@@ -152,14 +153,18 @@ describe('configuration', () => {
       SIGNIN_GITHUB_CLIENT_SECRET: 's',
       SIGNIN_DEV_ENDPOINTS,
     };
-    expect(readSignInConfig(env, config).providers.github).toMatchObject({
+    expect(readSignInConfig(signInInput(env), config).providers.github).toMatchObject({
       spec: { endpoints: { api: 'http://127.0.0.1:9003/api' } },
     });
     // Outside development, or with a remote endpoint, every provider and SSO is misconfigured;
     // the rest of the Worker keeps working.
     const misconfigured = { status: 'misconfigured', missing: ['SIGNIN_DEV_ENDPOINTS'] };
     const staging = readSignInConfig(
-      { ...env, SIGNIN_WORKOS_CLIENT_ID: 'client_1', SIGNIN_WORKOS_API_KEY: 'sk_test' },
+      signInInput({
+        ...env,
+        SIGNIN_WORKOS_CLIENT_ID: 'client_1',
+        SIGNIN_WORKOS_API_KEY: 'sk_test',
+      }),
       { ...config, environment: 'staging' }
     );
     expect(staging.providers.github).toEqual(misconfigured);
@@ -172,7 +177,8 @@ describe('configuration', () => {
       },
     });
     expect(
-      readSignInConfig({ ...env, SIGNIN_DEV_ENDPOINTS: remote }, config).providers.github
+      readSignInConfig(signInInput({ ...env, SIGNIN_DEV_ENDPOINTS: remote }), config).providers
+        .github
     ).toEqual(misconfigured);
   });
 });

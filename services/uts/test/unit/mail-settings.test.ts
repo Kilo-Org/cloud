@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { UtsConfig } from '../../src/env';
 import { signInEmailText } from '../../src/signin/email/delivery';
 import { readSignInConfig, recipientAllowed } from '../../src/signin/providers/config';
+import { signInInput } from '../secrets-support';
 
 /** The recipient rule, the sender check and the sign-in email text, without any network call. */
 
@@ -10,6 +11,7 @@ const config: UtsConfig = {
   environment: 'staging',
   endpoints: UTS_ENDPOINTS.staging,
   jurisdiction: 'eu',
+  secretsSource: 'worker',
   relyingParty: { rpId: 'staging-app.kilo.ai', origins: ['https://uts-staging.kiloapps.io'] },
   managerBaseUrl: null,
   loginRotation: { status: 'off' },
@@ -24,7 +26,10 @@ const vars = {
 };
 
 function rule(allowList: string) {
-  const mail = readSignInConfig({ ...vars, UTS_MAIL_ALLOWED_RECIPIENTS: allowList }, config).mail;
+  const mail = readSignInConfig(
+    signInInput({ ...vars, UTS_MAIL_ALLOWED_RECIPIENTS: allowList }),
+    config
+  ).mail;
   if (mail.status !== 'on') throw new Error(`mail settings ${mail.status}`);
   return mail.recipients;
 }
@@ -44,7 +49,8 @@ describe('recipient rule', () => {
     'refuses the allow-list %j',
     allowList => {
       expect(
-        readSignInConfig({ ...vars, UTS_MAIL_ALLOWED_RECIPIENTS: allowList }, config).mail
+        readSignInConfig(signInInput({ ...vars, UTS_MAIL_ALLOWED_RECIPIENTS: allowList }), config)
+          .mail
       ).toEqual({ status: 'misconfigured', missing: ['UTS_MAIL_ALLOWED_RECIPIENTS'] });
     }
   );
@@ -58,7 +64,7 @@ describe('sender', () => {
   it('takes a bare address or a display name on the sending domain', () => {
     for (const from of ['security@mail.example.com', "Kilo O'Brien <hi@mail.example.com>"]) {
       const mail = readSignInConfig(
-        { ...vars, UTS_MAIL_FROM: from, UTS_MAIL_ALLOWED_RECIPIENTS: '@example.com' },
+        signInInput({ ...vars, UTS_MAIL_FROM: from, UTS_MAIL_ALLOWED_RECIPIENTS: '@example.com' }),
         config
       ).mail;
       expect(mail.status).toBe('on');

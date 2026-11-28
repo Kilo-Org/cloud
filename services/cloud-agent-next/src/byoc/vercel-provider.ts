@@ -1,5 +1,6 @@
 import type { ByocVercelOwner } from './vercel-owner.js';
 import type { Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import type { ProviderAdapter } from '../sandbox-control/provider.js';
 import { ProviderSnapshotCreationError } from '../sandbox-control/provider.js';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
@@ -39,6 +40,8 @@ export class ByocVercelProviderError extends Error {
 /** Resolve customer credentials for each operation. Never persist a decrypted token. */
 export function createByocVercelProviderAdapter(deps: {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   source: ByocVercelSource;
   sandboxName: string;
   resources?: VercelSandboxResources;
@@ -49,7 +52,7 @@ export function createByocVercelProviderAdapter(deps: {
   restrictedEgress?: VercelRestrictedEgress;
 }): ProviderAdapter {
   async function accessAdapter() {
-    const config = await resolveByocVercelAccessConfig(deps.env, deps.source);
+    const config = await resolveByocVercelAccessConfig(deps.env, deps.source, deps.ctx);
     return createVercelProviderAdapter({
       ...deps,
       config: { ...config, ...deps.locator, resources: deps.resources },
@@ -62,9 +65,14 @@ export function createByocVercelProviderAdapter(deps: {
     async create(intent) {
       let snapshot: ByocVercelRuntimeSnapshot | undefined;
       try {
-        const config = await resolveByocVercelRuntimeConfig(deps.env, deps.source, value => {
-          snapshot = value;
-        });
+        const config = await resolveByocVercelRuntimeConfig(
+          deps.env,
+          deps.source,
+          value => {
+            snapshot = value;
+          },
+          deps.ctx
+        );
         await deps.persistRuntimeLocator?.({
           teamId: config.teamId,
           projectId: config.projectId,
@@ -107,7 +115,7 @@ export function createByocVercelProviderAdapter(deps: {
             throw new ByocVercelProviderError('byoc_vercel_forbidden');
           if (error.status === 429) throw new ByocVercelProviderError('byoc_vercel_capacity');
           if ((error.status === 404 || error.status === 410) && snapshot) {
-            await projectByocVercelSnapshotMissing(deps.env, snapshot);
+            await projectByocVercelSnapshotMissing(deps.env, snapshot, deps.ctx);
             throw new ByocVercelProviderError('byoc_vercel_snapshot_missing');
           }
         }

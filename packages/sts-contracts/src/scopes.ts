@@ -470,8 +470,10 @@ export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
  * workloads can mint it; today `web` and `kilo-code-review-worker`. Under STS (decisions M243 and
  * M246), the token grants no new authority: it only replaces the legacy internal key as the proof
  * where a bypass exists today.
- * - (1) In a request with an STS action token (`session.prepare` or `session.update`), the bypass
- *   token's workload must equal the action token's workload.
+ * - (1) In a request with an STS action token, which today means only `session.prepare` through
+ *   the authority preflight, the bypass token's workload must equal the action token's workload.
+ *   `updateSession` never reads `x-skip-balance-check`, so a bypass sent with `session.update`
+ *   (as the code-review worker does today) has no effect.
  * - (2) In a request with no action token, authenticated by a user Bearer, the header is honoured
  *   only when `x-kilo-balance-bypass-authorization` holds a valid STS token: STS key-set
  *   signature, audience `cloud-agent-next`, this scope, not expired. The user-Bearer callers

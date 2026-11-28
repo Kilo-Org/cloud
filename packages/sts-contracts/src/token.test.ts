@@ -25,6 +25,12 @@ import {
   STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
   STS_SESSION_SYNC_INTERNAL_CALL,
   STS_NOTIFICATIONS_INTERNAL_CALL,
+  STS_AUTO_ROUTING_ADMIN_READ,
+  STS_AUTO_ROUTING_ADMIN_WRITE,
+  STS_AUTO_ROUTING_DECIDE,
+  STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ,
+  STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ,
+  STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
   STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK,
@@ -273,6 +279,16 @@ describe('STS scope registry', () => {
       'model-eval-ingest': { scopes: ['model-eval-ingest:internal.call'] },
       'session-sync': { scopes: ['session-sync:internal.call'] },
       notifications: { scopes: ['notifications:internal.call'] },
+      'auto-routing': {
+        scopes: ['auto-routing:admin.read', 'auto-routing:admin.write', 'auto-routing:decide'],
+      },
+      'auto-routing-benchmark': {
+        scopes: [
+          'auto-routing-benchmark:routing-tables.read',
+          'auto-routing-benchmark:admin.read',
+          'auto-routing-benchmark:admin.write',
+        ],
+      },
       'community-contributions-dashboard': {
         scopes: ['community-contributions-dashboard:opencode.sync'],
       },
@@ -389,6 +405,24 @@ describe('STS scope registry', () => {
     ],
     ['session-sync:internal.call', 'session-sync', STS_SESSION_SYNC_INTERNAL_CALL],
     ['notifications:internal.call', 'notifications', STS_NOTIFICATIONS_INTERNAL_CALL],
+    ['auto-routing:admin.read', 'auto-routing', STS_AUTO_ROUTING_ADMIN_READ],
+    ['auto-routing:admin.write', 'auto-routing', STS_AUTO_ROUTING_ADMIN_WRITE],
+    ['auto-routing:decide', 'auto-routing', STS_AUTO_ROUTING_DECIDE],
+    [
+      'auto-routing-benchmark:routing-tables.read',
+      'auto-routing-benchmark',
+      STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ,
+    ],
+    [
+      'auto-routing-benchmark:admin.read',
+      'auto-routing-benchmark',
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ,
+    ],
+    [
+      'auto-routing-benchmark:admin.write',
+      'auto-routing-benchmark',
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE,
+    ],
     ['web:mcp-catalog-token.mint', 'web', STS_WEB_MCP_CATALOG_TOKEN_MINT],
     [
       'community-contributions-dashboard:opencode.sync',

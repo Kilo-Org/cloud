@@ -374,6 +374,48 @@ export const STS_NOTIFICATIONS_INTERNAL_CALL = {
   scope: 'notifications:internal.call',
 } as const;
 
+/** The web app reads Auto Routing's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_ADMIN_READ = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:admin.read',
+} as const;
+
+/** The web app writes through Auto Routing's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_ADMIN_WRITE = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:admin.write',
+} as const;
+
+/** The AI Gateway asks Auto Routing for a routing decision. Only the `ai-gateway` workload may send it. */
+export const STS_AUTO_ROUTING_DECIDE = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:decide',
+} as const;
+
+/**
+ * The web app, the AI Gateway and Auto Routing read the Auto Routing Benchmark's routing tables.
+ * Only the `web`, `ai-gateway` and `auto-routing` workloads may send it.
+ */
+export const STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:routing-tables.read',
+} as const;
+
+/** The web app reads the Auto Routing Benchmark's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:admin.read',
+} as const;
+
+/**
+ * The web app writes through the Auto Routing Benchmark's admin routes. Only the `web` workload
+ * may send it.
+ */
+export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:admin.write',
+} as const;
+
 /**
  * A GitHub Actions job asks the web app to mint the one-hour catalog API token
  * (`POST /api/internal/mcp-catalog/token`): the MCP catalog dump and the kilo-app changelog jobs.
@@ -499,6 +541,20 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   [STS_SESSION_SYNC_INTERNAL_CALL.audience]: { scopes: [STS_SESSION_SYNC_INTERNAL_CALL.scope] },
   [STS_NOTIFICATIONS_INTERNAL_CALL.audience]: { scopes: [STS_NOTIFICATIONS_INTERNAL_CALL.scope] },
+  [STS_AUTO_ROUTING_DECIDE.audience]: {
+    scopes: [
+      STS_AUTO_ROUTING_ADMIN_READ.scope,
+      STS_AUTO_ROUTING_ADMIN_WRITE.scope,
+      STS_AUTO_ROUTING_DECIDE.scope,
+    ],
+  },
+  [STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.audience]: {
+    scopes: [
+      STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.scope,
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.scope,
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE.scope,
+    ],
+  },
   'community-contributions-dashboard': {
     scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],
   },

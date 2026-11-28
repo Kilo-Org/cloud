@@ -29,7 +29,9 @@ describe('createWorkerAdminFetch', () => {
   test('sends an admin request to an https worker endpoint', async () => {
     const fetchAdmin = configuredFetch('https://worker.example.com');
 
-    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+    await expect(
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+    ).resolves.toEqual({
       status: 200,
       body: { ok: true },
     });
@@ -44,7 +46,9 @@ describe('createWorkerAdminFetch', () => {
   test('sends an admin request to an https worker endpoint with a trailing slash', async () => {
     const fetchAdmin = configuredFetch('https://worker.example.com/');
 
-    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+    await expect(
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+    ).resolves.toEqual({
       status: 200,
       body: { ok: true },
     });
@@ -59,7 +63,9 @@ describe('createWorkerAdminFetch', () => {
   test('sends an admin request to a loopback http worker endpoint', async () => {
     const fetchAdmin = configuredFetch('http://127.0.0.1:8799');
 
-    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+    await expect(
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+    ).resolves.toEqual({
       status: 200,
       body: { ok: true },
     });
@@ -76,7 +82,9 @@ describe('createWorkerAdminFetch', () => {
     async workerUrl => {
       const fetchAdmin = configuredFetch(workerUrl);
 
-      await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+      await expect(
+        fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+      ).resolves.toEqual({
         status: 500,
         body: { error: unconfiguredError },
       });
@@ -89,7 +97,7 @@ describe('createWorkerAdminFetch', () => {
     const fetchAdmin = configuredFetch('https://worker.example.com');
     const signal = new AbortController().signal;
 
-    await fetchAdmin('/admin/x', { method: 'GET', signal }, responseSchema);
+    await fetchAdmin('adminRead', '/admin/x', { method: 'GET', signal }, responseSchema);
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://worker.example.com/admin/x',
@@ -106,7 +114,9 @@ describe('createWorkerAdminFetch', () => {
     );
     const fetchAdmin = configuredFetch('https://worker.example.com');
 
-    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+    await expect(
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+    ).resolves.toEqual({
       status: 500,
       body: { error: 'Internal server error', message: 'D1 DB is overloaded' },
     });
@@ -116,7 +126,9 @@ describe('createWorkerAdminFetch', () => {
     mockFetch.mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 502 }));
     const fetchAdmin = configuredFetch('https://worker.example.com');
 
-    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+    await expect(
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+    ).resolves.toEqual({
       status: 502,
       body: { error: 'Request failed: 502' },
     });
@@ -128,7 +140,9 @@ describe('createWorkerAdminFetch', () => {
     mockFetch.mockRejectedValue(expired.reason);
     const fetchAdmin = configuredFetch('https://worker.example.com');
 
-    await expect(fetchAdmin('/admin/x', { method: 'GET' }, responseSchema)).resolves.toEqual({
+    await expect(
+      fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema)
+    ).resolves.toEqual({
       status: 504,
       body: { error: 'Worker request timed out' },
     });
@@ -153,7 +167,7 @@ describe('createWorkerAdminFetch', () => {
       mockFetch.mockResolvedValue(new Response(body, { status }));
       const fetchAdmin = configuredFetch('https://worker.example.com');
 
-      const result = fetchAdmin('/admin/x', { method: 'GET' }, responseSchema);
+      const result = fetchAdmin('adminRead', '/admin/x', { method: 'GET' }, responseSchema);
       await reading.promise;
       deadline.abort(new DOMException('The operation timed out.', 'TimeoutError'));
 
@@ -172,7 +186,12 @@ describe('createWorkerAdminFetch', () => {
     const fetchAdmin = configuredFetch('https://worker.example.com');
 
     await expect(
-      fetchAdmin('/admin/x', { method: 'GET', signal: controller.signal }, responseSchema)
+      fetchAdmin(
+        'adminRead',
+        '/admin/x',
+        { method: 'GET', signal: controller.signal },
+        responseSchema
+      )
     ).rejects.toBe(controller.signal.reason);
   });
 });

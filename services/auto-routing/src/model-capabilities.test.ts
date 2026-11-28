@@ -163,7 +163,8 @@ describe('getModelCapabilities', () => {
     const result = await getModelCapabilities(env, { router: 'frontier' });
     expect(result.get('frontier/image-model')?.inputModalities.has('image')).toBe(true);
     expect(result.get('frontier/image-model')?.inputModalities.has('file')).toBe(true);
-    expect(mockGetRoutingTable).toHaveBeenLastCalledWith(env, 'frontier');
+    // No `waitUntil` was passed, so the read carries no invocation context.
+    expect(mockGetRoutingTable).toHaveBeenLastCalledWith(env, 'frontier', undefined);
     expect(dbWhere).toHaveBeenCalledTimes(2);
   });
 

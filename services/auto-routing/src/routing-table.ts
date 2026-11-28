@@ -6,23 +6,24 @@ import {
   type RoutingTable,
   type AutoRouter,
 } from '@kilocode/auto-routing-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { kvReadThrough } from './kv-read-through';
-import { fetchRoutingTableFromOrigin } from './benchmark-origin';
+import { fetchRoutingTableFromOrigin, type BenchmarkEnv } from './benchmark-origin';
 
 const ROUTING_TABLE_CACHE_TTL_MS = 60_000;
 
-type RoutingTableEnv = Pick<
-  Env,
-  'AUTO_ROUTING_CONFIG' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
->;
+type RoutingTableEnv = Pick<Env, 'AUTO_ROUTING_CONFIG'> & BenchmarkEnv;
+
+/** The cache loader's input: the env and the invocation that triggered the load. */
+type RoutingTableLoad = { env: RoutingTableEnv; ctx?: SecretsExecutionContext };
 
 function createRoutingTableCache(router: AutoRouter) {
-  return ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: RoutingTableEnv) => {
+  return ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async ({ env, ctx }: RoutingTableLoad) => {
     const table = await kvReadThrough({
       kv: env.AUTO_ROUTING_CONFIG,
       key: routingTableKvKey(router),
       ttlSeconds: 3600,
-      fetchOrigin: () => fetchRoutingTableFromOrigin(env, router),
+      fetchOrigin: () => fetchRoutingTableFromOrigin(env, router, ctx),
       parse: raw => {
         try {
           const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
@@ -57,12 +58,17 @@ export function clearRoutingTableCache(): void {
   for (const cache of Object.values(routingTableCaches)) cache.clear();
 }
 
+/**
+ * `ctx` is the invocation reading the table: an origin load it triggers runs its token renewal
+ * under the invocation's `waitUntil`.
+ */
 export function getRoutingTable(
   env: RoutingTableEnv,
-  router: AutoRouter = DEFAULT_AUTO_ROUTER
+  router: AutoRouter = DEFAULT_AUTO_ROUTER,
+  ctx?: SecretsExecutionContext
 ): Promise<RoutingTable | null> {
   const cache = routingTableCaches[router];
-  return cache.get(env).catch((error: unknown) => {
+  return cache.get({ env, ctx }).catch((error: unknown) => {
     console.warn(
       JSON.stringify({ event: 'auto_routing_table_read_failed', ...formatError(error) })
     );

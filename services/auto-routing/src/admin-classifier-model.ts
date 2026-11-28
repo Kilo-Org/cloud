@@ -7,6 +7,7 @@ import { DEFAULT_CLASSIFIER_MODEL } from '@kilocode/auto-routing-contracts/class
 import { getClassifierModelInfo, setClassifierModel } from './classifier-config';
 import type { ClassifierModelInfo } from './classifier-config';
 import type { HonoEnv } from './hono-env';
+import { requestContext } from './secrets';
 
 function classifierModelResponse(info: ClassifierModelInfo): AutoRoutingClassifierModelResponse {
   return {
@@ -18,7 +19,7 @@ function classifierModelResponse(info: ClassifierModelInfo): AutoRoutingClassifi
 }
 
 export const getClassifierModelHandler: Handler<HonoEnv> = async c => {
-  const info = await getClassifierModelInfo(c.env);
+  const info = await getClassifierModelInfo(c.env, requestContext(c));
   return c.json(classifierModelResponse(info));
 };
 
@@ -35,7 +36,7 @@ export const putClassifierModelHandler: Handler<HonoEnv> = async c => {
     return c.json({ error: 'Invalid classifier model' }, 400);
   }
 
-  const info = await setClassifierModel(c.env, parsed.data.model);
+  const info = await setClassifierModel(c.env, parsed.data.model, requestContext(c));
   if (!info) {
     return c.json({ error: 'Invalid classifier model' }, 400);
   }

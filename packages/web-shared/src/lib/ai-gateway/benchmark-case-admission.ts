@@ -134,6 +134,9 @@ export async function verifyBenchmarkAssignment(
  *
  * An unreachable callback is `admission_unavailable`: nothing was sent upstream, but the
  * Worker's admit may have committed, so the request must be fenced rather than replayed.
+ *
+ * Not an STS sender: `/internal/case-admit` is outside the benchmark Worker's `GOVERNED_ROUTES`,
+ * so this callback keeps the internal secret in every mode (ENVIRONMENT.md).
  */
 export async function requestBenchmarkAdmission(
   assignment: BenchmarkGatewayAssignment,

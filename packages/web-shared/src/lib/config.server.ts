@@ -505,6 +505,21 @@ export const AUTO_ROUTING_BENCHMARK_WORKER_URL = resolveProductionDefaultedUrl(
   'https://auto-routing-benchmark.kiloapps.io',
   deploymentEnvironment
 );
+// The credential switches of the auto-routing and benchmark Worker senders
+// (ai-gateway/auto-routing-sender.ts), one per sender app and edge: absent, empty or `legacy`
+// sends the internal secret; `sts` an STS service token. `kilocode-ai-gateway` reads only
+// AUTO_ROUTING_DECIDE_SENDER_AUTH and GATEWAY_ROUTING_TABLES_SENDER_AUTH
+// (ai-gateway/auto-routing-gateway-sender.ts); `kilocode-app` only the other three
+// (apps/web/src/lib/auto-routing-sender.ts).
+export const AUTO_ROUTING_DECIDE_SENDER_AUTH = getEnvVariable('AUTO_ROUTING_DECIDE_SENDER_AUTH');
+export const GATEWAY_ROUTING_TABLES_SENDER_AUTH = getEnvVariable(
+  'GATEWAY_ROUTING_TABLES_SENDER_AUTH'
+);
+export const AUTO_ROUTING_ADMIN_SENDER_AUTH = getEnvVariable('AUTO_ROUTING_ADMIN_SENDER_AUTH');
+export const AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH = getEnvVariable(
+  'AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH'
+);
+export const WEB_ROUTING_TABLES_SENDER_AUTH = getEnvVariable('WEB_ROUTING_TABLES_SENDER_AUTH');
 
 // Security Agent sync Worker command ingress
 export const SECURITY_SYNC_WORKER_URL = getEnvVariable('SECURITY_SYNC_WORKER_URL') || '';

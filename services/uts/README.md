@@ -327,9 +327,9 @@ key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant
 secret>`), so the endpoint knows the grant and its signer before the statement. One call mints one
 access token per scope, up to 8, each with one audience; one `signMany` call to the signer the
 grant id picks signs all of them, and `issued_tokens` lists them. The claims are exactly
-`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
-(`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
-failure no retry fixes gives 500.
+`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`, plus `bot_user` on a
+bot token only (`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with
+`Retry-After`; a failure no retry fixes gives 500.
 
 The tokens are signed after the statement commits. When signing fails (or the response is lost),
 a first-party client sends the same code exchange again with a new DPoP proof. While the code's
@@ -688,6 +688,75 @@ jobs:
 
 The token lives for the policy's lifetime and cannot be refreshed; a longer job runs the step again
 for a fresh OIDC token and a new CI token.
+
+## Bot-token mint
+
+A workload that runs as an internal bot account (`bot-internal-<slug>`), such as the bouncer watch
+or the auto-routing benchmark, gets one short-lived UTS access token for that account at
+`POST /internal/bot-tokens` (`src/bot-token/`; design 5.3 and 6.5). It replaces the web app's
+`/api/internal/bot-token` and its shared `BOT_TOKEN_MINT_SECRET`. The wire contract is
+`bot-token.ts` in `@kilocode/uts-contracts`.
+
+- **Switch and allow-list.** The policies are the Worker var `BOT_TOKEN_POLICIES`, a JSON array
+  per environment in `wrangler.jsonc`. Absent or `[]`: the route answers `404 not_found`. A value
+  that breaks a load rule keeps it off and logs `uts.bot_token.misconfigured` with the rules it
+  breaks. The workloads the policies name are the route's whole caller allow-list. Production sets
+  none, and `test/repo/worker-configs.test.ts` keeps it that way and checks every configured list.
+- **Policy.** One entry per workload and bot account:
+
+  ```json
+  {
+    "workload": "bouncer-watch",
+    "account": "bot-internal-bouncer-watch",
+    "org": "<organization id the bot acts in>",
+    "scopes": ["kilo-gateway:inference", "kilo-api:organizations.read"],
+    "lifetimeSeconds": 3600
+  }
+  ```
+
+  Load rules (`src/bot-token/policy.ts`): every scope is registered, minted from a grant, needs no
+  session (a bot token has no `sid`), no step-up, is not privileged, changes no credential, belongs
+  to no staff list and is not a `uts` scope; at most 8 scopes and 1 hour.
+- **Caller.** `Authorization: Bearer <STS token>` for audience `uts` and the one STS scope
+  `uts:bot-token.mint`, checked by `@kilocode/verify` against the environment's STS key set
+  (`botTokenCallers` in `src/sts-callers.ts`). A valid token from a workload with no policy gets a
+  bare `403 insufficient_scope`. The development entry takes the stand-in bearer
+  `uts-dev-sts:<workload>:uts:bot-token.mint`.
+- **Request.** JSON `{ "account": "bot-internal-…", "audience": "kilo-gateway",
+  "scope": "kilo-gateway:inference" }`: one audience and one scope of it per call. A workload that
+  calls two services mints one token per audience.
+- **Answer.** `200 { access_token, token_type: "Bearer", expires_in, audience, scope }`, no refresh
+  token. The token carries `sub` (the bot account), `client_id` and `req` (the workload), `org`
+  (the policy's organization), `scope`, `aud`, `env`, `jti` and `bot_user: true`; no `sid`,
+  `auth_time`, `amr` or `act`. It lives the policy's lifetime for a PAT-eligible scope (a PAT
+  holds such a scope for up to a year) and at most the scope's registered maximum (10 minutes or
+  less) for any other.
+- **Refusals.** `400 invalid_request` (body), `400 invalid_target` (audience is not the scope's),
+  `400 invalid_scope` (the policy does not grant it), `401 invalid_token`, `403 insufficient_scope`,
+  `403 access_denied` with `error_description` `unknown_account`, `account_inactive` or
+  `membership_denied`, `404 not_found` (off), `503 temporarily_unavailable` with `Retry-After`
+  (STS key set, identity store or signer), `500 server_error`. Retry only on 503.
+- **Stopping bot tokens.** Block the bot account (subject operation `revoke`, reason
+  `access_block`): the statement then refuses every mint, and the block puts `subject` and
+  `blocked_account` entries on the revocation feed for 70 minutes, past the longest bot token. A
+  verifier refuses an issued token once its feed copy holds them (about 41 seconds in the worst
+  case), and answers 503 rather than accept a token whose lifetime is over 10 minutes once the head
+  is over 60 seconds old. Removing the policy stops new tokens only.
+  `test/runtime/bot-token.test.ts` proves the refusal with `@kilocode/verify`;
+  `test/db/bot-token.test.ts` proves the block's entries.
+- **Audit and cost.** Refusals before the statement (caller, body, account, scope) write a
+  `uts.bot_token.refused` or `uts.internal.workload_refused` log line and cost no statement.
+  Otherwise one statement, `uts.mint_bot_token` (migration 0026), reads the account and its
+  membership (two primary-key probes) and writes `ai.kilo.uts.bot_token.issued` (with the token
+  id, organization, role, scope and lifetime) or `ai.kilo.uts.bot_token.denied`
+  (`account_inactive`, or `membership_denied` for anything but an active `owner` or `member`), with
+  the calling workload as actor; then one `signMany` call signs the token in the signer its `jti`
+  picks. The bot account and its membership must be in the identity store (import through
+  `/internal/accounts/import` and the membership sync); no SSO rule applies, since a bot never
+  signs in.
+- **STS side.** `uts:bot-token.mint` must be registered under audience `uts` in the STS scope
+  registry and granted to each minting workload's STS policy; STS and its policy files are owned
+  outside this service.
 
 ## Account API, PATs and org bot keys
 

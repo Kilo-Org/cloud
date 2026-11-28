@@ -529,6 +529,107 @@ The local run is `scripts/clients-e2e.ts`. Start the mint Worker with
 and set `track_functions = 'all'` on the local server, so the run can count the exchange
 statements. The run serves the metadata document and the fake STS key set itself.
 
+## CI token exchange
+
+A GitHub Actions job trades its GitHub OIDC token for one UTS access token at `POST /token`
+(`src/ci/`; design 5.3, 5.5 and 6.2; RFC 8693). It replaces a long-lived Kilo API key in
+repository secrets. The wire contract is `ci.ts` in `@kilocode/uts-contracts`.
+
+- **Switch.** The trust policies are the Worker var `CI_TOKEN_POLICIES`, a JSON array per
+  environment in `wrangler.jsonc`. Absent or `[]`: the exchange answers `unsupported_grant_type`
+  and the metadata does not list the token exchange for it. A value that breaks a load rule keeps
+  it off and logs `uts.ci_token.misconfigured` with the rules it breaks. Production sets none, and
+  `test/repo/worker-configs.test.ts` keeps it that way and checks every configured list.
+- **Policy.** One entry per repository id, GitHub environment and workflow file:
+
+  ```json
+  {
+    "name": "ci-kilocode-smoke-test",
+    "repository": "Kilo-Org/kilocode",
+    "repositoryId": "946087422",
+    "repositoryOwnerId": "201822503",
+    "environment": "smoke-test",
+    "refs": ["refs/heads/main"],
+    "jobWorkflowRefs": ["Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main"],
+    "events": ["workflow_dispatch"],
+    "legacySubject": true,
+    "subject": "<UTS account id of the dedicated CI account>",
+    "scopes": ["kilo-gateway:inference"],
+    "lifetimeSeconds": 3600
+  }
+  ```
+
+  The load rules (`src/ci/policy.ts`) follow the STS GitHub rules (design 6.3): `ci-<job>` names;
+  workflow entries of the policy's own repository, each on a listed ref; events from `push`,
+  `schedule`, `workflow_dispatch` and `workflow_run` only, `workflow_run` alone and never in
+  production; production accepts only `refs/heads/main`; `legacySubject` only for
+  Kilo-Org/kilocode (decision Q62a). Every scope must be registered, PAT-eligible and need no
+  organization claim, so a CI token never holds more than a PAT of the same account could.
+- **Subject.** Each policy names one UTS account, a dedicated CI account for that job, not an org
+  bot key. The token then has the claim profile of any user token, so a verifier needs no new
+  subject kind. The token carries `sub`, `client_id` (the policy name), `scope`, `aud`, `env`,
+  `jti` and the policy's lifetime (at most 1 hour), and no `sid`, `org`, `act` or refresh token.
+- **Stopping CI tokens.** Removing a policy stops new CI tokens only: tokens already issued live
+  until their expiry, up to 1 hour. The emergency stop is an access block of the CI account
+  (subject operation `revoke`, reason `access_block`): its statement refuses every later exchange
+  and puts a `subject` entry (with `revoked_before`) and a `blocked_account` entry on the
+  revocation feed for 70 minutes, past the longest CI token issued before it. A verifier refuses
+  such a token once its feed copy holds the entries, not at once (design 3, 5.6, 7): the first
+  request 10 seconds after its last fetch refreshes the copy in the background, a request waits
+  for a refresh once the signed head is over 30 seconds old (about 41 seconds in the worst case),
+  and, for a policy lifetime over 10 minutes, the verifier answers 503 rather than accept it once
+  the head is over 60 seconds old (10 minutes for a shorter lifetime).
+  `test/runtime/ci-token.test.ts` proves both with `@kilocode/verify`; `test/db/ci-token.test.ts`
+  proves the block's feed entries.
+- **Checks.** The OIDC token is `RS256` under GitHub's key set, issuer
+  `https://token.actions.githubusercontent.com`, exactly the environment's UTS issuer URL as its
+  one audience, `exp` with 60 seconds of skew and no future `iat`. The repository and owner ids,
+  GitHub environment and workflow entry select the policy; its immutable subject (or the default
+  subject on a `legacySubject` policy), ref, event and the entry's pin to the token's own ref must
+  match. Refusals: `invalid_request`, `invalid_scope`, `invalid_target`, `invalid_grant`, and 503
+  `temporarily_unavailable` with `Retry-After` when GitHub's key set or the identity store fails.
+- **GitHub key set** (`github-keys.ts`). One plain-data copy per isolate, used for at most 5
+  minutes; an unknown `kid` refreshes it at most once per 5 minutes; a failed fetch is not
+  retried for 10 seconds. The URL is pinned, redirects are not followed, the fetch gives up after
+  5 seconds and reads at most 64 KB.
+- **Audit and cost.** A token that matches no policy costs no statement. Otherwise one statement,
+  `uts.exchange_ci_token` (migration 0023), checks that the account is active and writes
+  `ai.kilo.uts.ci_token.issued` (with the token id, policy and run) or
+  `ai.kilo.uts.ci_token.denied`, then one `signMany` call signs the token in the signer its `jti`
+  picks. A token that names a policy's workflow but breaks a binding, or asks for a scope the
+  policy lacks, writes a denied row at most once per policy and reason per minute in each isolate.
+
+A job uses it like this (production issuer shown; staging uses `https://uts-staging.kiloapps.io`
+for both the audience and the URL):
+
+```yaml
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    environment: smoke-test # the policy's `environment`
+    permissions:
+      contents: read
+      id-token: write # lets the job request its OIDC token
+    steps:
+      - name: Get a Kilo CI token
+        run: |
+          set -euo pipefail
+          oidc=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https%3A%2F%2Futs.kiloapps.io" | jq -r .value)
+          echo "::add-mask::$oidc"
+          token=$(curl -sS --fail-with-body https://uts.kiloapps.io/token \
+            --data-urlencode grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+            --data-urlencode subject_token_type=urn:ietf:params:oauth:token-type:id_token \
+            --data-urlencode "subject_token=$oidc" \
+            --data-urlencode scope=kilo-gateway:inference \
+            --data-urlencode resource=urn:kilo:service:kilo-gateway | jq -r .access_token)
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+```
+
+The token lives for the policy's lifetime and cannot be refreshed; a longer job runs the step again
+for a fresh OIDC token and a new CI token.
+
 ## Account API, PATs and org bot keys
 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a
@@ -1337,7 +1438,7 @@ environment's `uts` policy live in STS:
 
 1. **Parity.** Every name in the environment's `/workloads/uts` that is set as a Worker secret
    holds the Worker secret's value, compared by fingerprint, never printed; a name without a Worker
-   secret (in production, the three sign-in client secrets) is not compared. The environment's
+   secret (in production, the four sign-in client secrets) is not compared. The environment's
    read lines list no name under `empty` that is set as a Worker secret. `DEVICE_USER_CODE_KEY`
    and `SIGNIN_EMAIL_HASH_KEY` key hashes that the identity store holds (pending user codes, email
    codes and links), so a different value breaks those flows.
@@ -1363,15 +1464,15 @@ environment's `uts` policy live in STS:
 | `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
-| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations of the environment. Staging sets all five; production sets GitHub, Google and GitLab, and only under `SECRETS_SOURCE` `sts`, which `test/repo` holds (Production sign-in providers) |
-| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set, in the environment's `/workloads/uts` folder in the secrets manager, before the deploy that adds the client id. Staging also copies each to the Worker secret with `wrangler secret put <name> --env staging` reading standard input; production keeps its three only in the folder, so it reads them only under `sts` |
+| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations of the environment. Staging sets all five; production sets GitHub, Google, GitLab and LinkedIn, and only under `SECRETS_SOURCE` `sts`, which `test/repo` holds (Production sign-in providers); it sets no Discord client id until that registration and its secret exist |
+| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set, in the environment's `/workloads/uts` folder in the secrets manager, before the deploy that adds the client id. Staging also copies each to the Worker secret with `wrangler secret put <name> --env staging` reading standard input; production keeps its four only in the folder, so it reads them only under `sts` |
 | `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips, and production `sts` before its sign-in client ids deploy |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ### Production sign-in providers (runbook)
 
-Production offers GitHub, Google and GitLab sign-in through the three client id vars in the top
-level of `wrangler.jsonc`. Their client secrets exist only in production's `/workloads/uts` folder,
+Production offers GitHub, Google, GitLab and LinkedIn sign-in through the four client id vars in
+the top level of `wrangler.jsonc`. Their client secrets exist only in production's `/workloads/uts` folder,
 never as Worker secrets, so the providers work only under `SECRETS_SOURCE` `sts`. `test/repo`
 refuses a production block that sets any `SIGNIN_<PROVIDER>_CLIENT_ID` under another source. The
 client id change never changes `SECRETS_SOURCE`: until the flip of step 2 is on the base branch,
@@ -1379,21 +1480,22 @@ that change fails `test/repo` in CI, so it cannot merge before the flip, and a r
 the client ids before the source goes back. Enable, in this order:
 
 1. **Prerequisites merged and deployed:** the `uts` STS policy (`services/sts/policy/uts.yaml`,
-   which grants `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET` and
-   `SIGNIN_GITLAB_CLIENT_SECRET` in production) and the `SECRETS_SOURCE` reader (`src/secrets.ts`).
+   which grants `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`,
+   `SIGNIN_GITLAB_CLIENT_SECRET` and `SIGNIN_LINKEDIN_CLIENT_SECRET` in production) and the
+   `SECRETS_SOURCE` reader (`src/secrets.ts`).
 2. **Flip production to `sts`** in its own change, with the parity check, deploy and one-hour
    watch of "Runtime secrets" above. Parity compares only the names that have a Worker secret, so
-   the three sign-in client secrets are not part of it. In the watch, production's
-   `uts.secrets.read` lines with `source` `sts` must name none of the three client secrets under
+   the four sign-in client secrets are not part of it. In the watch, production's
+   `uts.secrets.read` lines with `source` `sts` must name none of the four client secrets under
    `absent` or `empty`: the bundle then holds a value for each before any client id needs it.
 3. **Merge the base branch into the client id change** after the flip has merged. Its `test/repo`
-   check then passes in CI, and its diff adds only the three client ids. Merge it; the deploy
+   check then passes in CI, and its diff adds only the four client ids. Merge it; the deploy
    workflow deploys it.
 4. **Prove it** against production with the client ids from `wrangler.jsonc`:
 
    ```sh
    UTS_PROOF_ISSUER=https://uts.kiloapps.io \
-   UTS_PROOF_PROVIDERS=github=<client id>,google=<client id>,gitlab=<client id> \
+   UTS_PROOF_PROVIDERS=github=<client id>,google=<client id>,gitlab=<client id>,linkedin=<client id> \
    pnpm exec tsx scripts/provider-signin-proof.ts
    ```
 
@@ -1404,7 +1506,7 @@ the client ids before the source goes back. Enable, in this order:
    `uts.secrets.unavailable` line and no provider failure in the callback logs.
 
 **Rollback**, in this order: revert the client id change and let it deploy, so production offers
-none of the three providers (the proof with `UTS_PROOF_PROVIDERS` empty passes); then, only if the
+none of the four providers (the proof with `UTS_PROOF_PROVIDERS` empty passes); then, only if the
 source itself must go back, deploy `SECRETS_SOURCE` `worker` as in step 4 of "Runtime secrets".
 `test/repo` refuses the reverse order, because under `worker` production holds no client secret.
 Accounts created through these providers keep their other methods only: production has no email

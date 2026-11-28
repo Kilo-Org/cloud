@@ -1553,7 +1553,7 @@ describe('workspace DO history and mutation cursors', () => {
         kiloSessionId: child,
         rootKiloSessionId: kiloSessionId,
         userId: USER_ID,
-        internalSecret: 'internal-test-secret',
+        ingestCredential: { 'X-Internal-Secret': 'internal-test-secret' },
         isCurrent: () => true,
         broadcast: vi.fn(),
       };

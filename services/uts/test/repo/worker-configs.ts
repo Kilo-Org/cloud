@@ -12,7 +12,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
-import { FEED_DEPLOYMENTS } from '../../src/env';
+import { FEED_DEPLOYMENTS, SECRETS_SOURCE_VALUES } from '../../src/env';
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -566,9 +566,9 @@ function secretsSourceProblems(
 ): string[] {
   const problems: string[] = [];
   const source = bindings.vars?.SECRETS_SOURCE;
-  if (source !== 'worker' && source !== 'secrets-store' && source !== 'sts') {
+  if (!SECRETS_SOURCE_VALUES.some(value => value === source)) {
     problems.push(
-      `${where}: SECRETS_SOURCE resolves to ${String(source)}; it must be worker, secrets-store or sts`
+      `${where}: SECRETS_SOURCE resolves to ${String(source)}; it must be one of ${SECRETS_SOURCE_VALUES.join(', ')}`
     );
   }
   const bound = (bindings.services ?? [])

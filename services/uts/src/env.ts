@@ -29,6 +29,9 @@ const OriginSchema = z.string().refine(value => {
   }
 }, 'an origin');
 
+/** The values `SECRETS_SOURCE` takes; `test/repo` checks each deployed block against this list. */
+export const SECRETS_SOURCE_VALUES = ['worker', 'secrets-store', 'sts'] as const;
+
 /**
  * Production and staging keep every UTS Durable Object in the `eu` jurisdiction (design 5.7).
  * workerd enforces no residency, so `wrangler dev` and the test pool run unscoped.
@@ -66,7 +69,7 @@ const EnvVarsSchema = z
       .transform(seconds => Number(seconds) * 1000)
       .optional(),
     SECRETS_SOURCE: z
-      .enum(['worker', 'secrets-store', 'sts'])
+      .enum(SECRETS_SOURCE_VALUES)
       .transform(source => (source === 'sts' ? 'sts' : 'worker'))
       .optional(),
   })
@@ -165,7 +168,10 @@ export type Env = {
    * (src/rotation/secrets.ts).
    */
   STS?: BundleBinding;
-  /** `worker` or `sts`; required in staging and production (`EnvVarsSchema`). */
+  /**
+   * `worker`, `secrets-store` (read as `worker`) or `sts`; required in staging and production
+   * (`EnvVarsSchema`).
+   */
   SECRETS_SOURCE?: string;
   /** Development only: JSON with the switch token a local run uses instead of STS. */
   UTS_LOCAL_SECRETS?: string;
@@ -207,6 +213,11 @@ export type Env = {
   KILO_WEB_BRIDGE_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
+  /**
+   * The CI token exchange's trust policies (src/ci/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the exchange off; a value that breaks a rule keeps it off and is logged.
+   */
+  CI_TOKEN_POLICIES?: string;
 } & SignInEnv &
   AttestEnv &
   SecretsEnv;

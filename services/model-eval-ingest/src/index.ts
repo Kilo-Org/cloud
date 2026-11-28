@@ -6,7 +6,13 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import * as z from 'zod';
+import { readModelEvalIngestSecret } from './secrets';
 import { createPromotionStore, syncPromotionsFromBench } from './sync.js';
 
 const SyncRequestSchema = z.object({ promotionName: z.string().min(1).optional() }).optional();
@@ -16,15 +22,15 @@ async function runSync(env: CloudflareEnv, promotionName?: string) {
   return syncPromotionsFromBench(env.BENCH_DASHBOARD, createPromotionStore(db), { promotionName });
 }
 
-async function getInternalApiSecret(secret: SecretBinding | string): Promise<string> {
-  return typeof secret === 'string' ? secret : secret.get();
-}
-
 function scheduledEnvironment(env: CloudflareEnv): string | undefined {
   return 'ENVIRONMENT' in env && typeof env.ENVIRONMENT === 'string' ? env.ENVIRONMENT : undefined;
 }
 
-async function handleFetch(request: Request, env: CloudflareEnv): Promise<Response> {
+async function handleFetch(
+  request: Request,
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
+): Promise<Response> {
   const url = new URL(request.url);
 
   if (request.method === 'GET' && url.pathname === '/health') {
@@ -39,11 +45,22 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
     return Response.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const internalSecret = await getInternalApiSecret(env.INTERNAL_API_SECRET);
+  // Read the secret only for a request that presents a key: the Worker is reachable on its
+  // workers.dev host, so a keyless request costs no bundle load under `sts`.
   const authHeader = request.headers.get('x-internal-api-key');
-  if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
+  if (!authHeader) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const internalSecret = await readModelEvalIngestSecret(env, 'INTERNAL_API_SECRET', ctx);
+  if (!internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  observeInternalAuth(
+    'model-eval-ingest',
+    'sync',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   const rawBody = await request.text();
   let requestBody: unknown;
@@ -66,8 +83,8 @@ async function handleFetch(request: Request, env: CloudflareEnv): Promise<Respon
 }
 
 export default {
-  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
-    return handleFetch(request, env);
+  async fetch(request: Request, env: CloudflareEnv, ctx?: ExecutionContext): Promise<Response> {
+    return handleFetch(request, env, ctx);
   },
 
   async scheduled(controller: ScheduledController, env: CloudflareEnv): Promise<void> {

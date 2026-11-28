@@ -116,7 +116,7 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
         authorization = reloaded;
       }
 
-      const token = this.decryptCredential(authorization, 'access');
+      const token = await this.decryptCredential(authorization, 'access');
       const repoParts = params.githubRepo.split('/');
       // Same base override the PR-review client honors (apps/web), so a dev
       // stub serving api.github.com is probed through the stub instead of
@@ -272,8 +272,10 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
     return this.toConnectedResult(authorization);
   }
 
-  private toConnectedResult(authorization: AuthorizationRow): GitHubUserAccessTokenResult {
-    const token = this.decryptCredential(authorization, 'access');
+  private async toConnectedResult(
+    authorization: AuthorizationRow
+  ): Promise<GitHubUserAccessTokenResult> {
+    const token = await this.decryptCredential(authorization, 'access');
     return {
       connected: true,
       token,
@@ -308,7 +310,7 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
       if (
         !accessTokenExpired &&
         (await this.revokeAuthorizationOnGitHub(
-          this.decryptCredential(authorization, 'access')
+          await this.decryptCredential(authorization, 'access')
         )) === 'revoked'
       ) {
         await this.deleteCurrentAuthorization(tx, authorization);
@@ -338,7 +340,7 @@ export class GitHubUserAuthorizationService extends GitHubAppCredentialLifecycle
       if (!authorization) throw new GitHubIdentityConflictError();
       if (
         (await this.revokeAuthorizationOnGitHub(
-          this.decryptCredential(authorization, 'access')
+          await this.decryptCredential(authorization, 'access')
         )) !== 'revoked'
       ) {
         throw new Error('GitHub authorization grant could not be revoked');

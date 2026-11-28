@@ -1,17 +1,41 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 
+const mockConfig = { WEBHOOK_AGENT_URL: 'https://webhook-agent.test' };
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-secret',
-  WEBHOOK_AGENT_URL: 'https://webhook-agent.test',
+  get WEBHOOK_AGENT_URL() {
+    return mockConfig.WEBHOOK_AGENT_URL;
+  },
 }));
 
-import {
-  createWorkerTrigger,
-  getWorkerTrigger,
-  getWorkerRequest,
-  invokeWorkerScheduledTrigger,
-  updateWorkerTrigger,
-} from './webhook-agent-client';
+import type * as WebhookAgentClient from './webhook-agent-client';
+
+type Client = typeof WebhookAgentClient;
+let buildInboundUrl!: Client['buildInboundUrl'];
+let createWorkerTrigger!: Client['createWorkerTrigger'];
+let deleteWorkerTrigger!: Client['deleteWorkerTrigger'];
+let getWorkerTrigger!: Client['getWorkerTrigger'];
+let getWorkerRequest!: Client['getWorkerRequest'];
+let invokeWorkerScheduledTrigger!: Client['invokeWorkerScheduledTrigger'];
+let isWebhookAgentConfigured!: Client['isWebhookAgentConfigured'];
+let listWorkerRequests!: Client['listWorkerRequests'];
+let updateWorkerTrigger!: Client['updateWorkerTrigger'];
+
+// `jest` comes from '@jest/globals', so the mock above is not hoisted above a static import.
+// Loading the client here makes it read the mocked config instead of the real one.
+beforeAll(async () => {
+  ({
+    buildInboundUrl,
+    createWorkerTrigger,
+    deleteWorkerTrigger,
+    getWorkerTrigger,
+    getWorkerRequest,
+    invokeWorkerScheduledTrigger,
+    isWebhookAgentConfigured,
+    listWorkerRequests,
+    updateWorkerTrigger,
+  } = await import('./webhook-agent-client'));
+});
 
 describe('webhook agent client variant forwarding', () => {
   afterEach(() => {
@@ -393,5 +417,74 @@ describe('scheduled trigger invocation', () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('unconfigured webhook agent worker', () => {
+  afterEach(() => {
+    mockConfig.WEBHOOK_AGENT_URL = 'https://webhook-agent.test';
+    jest.restoreAllMocks();
+  });
+
+  // '' is what config.server resolves outside production when the URL is unset or production.
+  it.each(['', 'http://webhook-agent.test', '/relative'])(
+    'sends nothing and builds no URL for %j',
+    async value => {
+      mockConfig.WEBHOOK_AGENT_URL = value;
+      const fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('no network'));
+      const unavailable = {
+        success: false,
+        error: 'Webhook agent worker is not configured',
+        status: 503,
+      };
+
+      expect(isWebhookAgentConfigured()).toBe(false);
+      await expect(
+        createWorkerTrigger('user-1', undefined, 'trigger', {
+          targetType: 'cloud_agent',
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'model',
+          promptTemplate: 'Run task',
+        })
+      ).resolves.toEqual({ ...unavailable, isConflict: false });
+      // Not 404: callers delete their PostgreSQL row on a confirmed missing trigger.
+      await expect(getWorkerTrigger('user-1', undefined, 'trigger')).resolves.toEqual({
+        found: 'error',
+        error: unavailable.error,
+        status: 503,
+      });
+      await expect(
+        updateWorkerTrigger('user-1', undefined, 'trigger', { isActive: false })
+      ).resolves.toEqual({ ...unavailable, isNotFound: false });
+      await expect(deleteWorkerTrigger('user-1', undefined, 'trigger')).resolves.toEqual({
+        success: false,
+        error: unavailable.error,
+      });
+      await expect(listWorkerRequests('user-1', undefined, 'trigger')).resolves.toEqual({
+        ...unavailable,
+        isNotFound: false,
+      });
+      await expect(getWorkerRequest('user-1', undefined, 'trigger', 'request')).resolves.toEqual(
+        unavailable
+      );
+      await expect(invokeWorkerScheduledTrigger('user-1', undefined, 'trigger')).resolves.toEqual(
+        unavailable
+      );
+      expect(() => buildInboundUrl('user-1', undefined, 'trigger')).toThrow(
+        expect.objectContaining({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Webhook triggers are unavailable',
+        })
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    }
+  );
+
+  it('builds inbound URLs from a configured nonproduction origin', () => {
+    mockConfig.WEBHOOK_AGENT_URL = 'http://localhost:8793';
+    expect(buildInboundUrl(undefined, 'org-id', 'trigger')).toBe(
+      'http://localhost:8793/inbound/org/org-id/trigger'
+    );
   });
 });

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { STS_ISSUERS } from '@kilocode/sts-contracts';
-import { UTS_MINT_DEPLOYMENTS } from '@kilocode/uts-contracts';
+import { UTS_MINT_DEPLOYMENTS, type UtsEnvironment, utsScopeEntry } from '@kilocode/uts-contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { experimental_readRawConfig } from 'wrangler';
@@ -23,6 +23,7 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { ciPolicies } from '../../src/ci/policy';
 import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
 /**
@@ -423,15 +424,18 @@ describe('the UTS configs themselves', () => {
   describe('production sign-in client ids', () => {
     const productionVars = (edit: (vars: Record<string, unknown>) => Record<string, unknown>) =>
       mintWith(raw => ({ ...raw, vars: edit(z.record(z.string(), z.unknown()).parse(raw.vars)) }));
-    const CLIENT_IDS = 'SIGNIN_GITHUB_CLIENT_ID, SIGNIN_GITLAB_CLIENT_ID, SIGNIN_GOOGLE_CLIENT_ID';
+    const CLIENT_IDS =
+      'SIGNIN_GITHUB_CLIENT_ID, SIGNIN_GITLAB_CLIENT_ID, SIGNIN_LINKEDIN_CLIENT_ID, SIGNIN_GOOGLE_CLIENT_ID';
 
-    it('set GitHub, Google and GitLab in production, accepted once SECRETS_SOURCE reads sts', () => {
+    it('set GitHub, Google, GitLab and LinkedIn in production, accepted once SECRETS_SOURCE reads sts', () => {
       const vars = z.record(z.string(), z.unknown()).parse(configAt(MINT_CONFIG).config.vars);
       expect(vars).toMatchObject({
         SIGNIN_GITHUB_CLIENT_ID: expect.any(String),
         SIGNIN_GOOGLE_CLIENT_ID: expect.any(String),
         SIGNIN_GITLAB_CLIENT_ID: expect.any(String),
+        SIGNIN_LINKEDIN_CLIENT_ID: expect.any(String),
       });
+      expect(vars).not.toHaveProperty('SIGNIN_DISCORD_CLIENT_ID');
       expect(
         utsConfigProblems(productionVars(current => ({ ...current, SECRETS_SOURCE: 'sts' })))
       ).toEqual([]);
@@ -491,6 +495,22 @@ describe('the UTS configs themselves', () => {
       });
       expect(utsConfigProblems(staging)).toEqual([]);
     });
+  });
+
+  it('accept secrets-store, the shared rollback value, and fail an unknown source', () => {
+    const withSource = (source: string) =>
+      utsConfigProblems(
+        mintWith(raw => ({
+          ...raw,
+          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), SECRETS_SOURCE: source },
+        }))
+      );
+    expect(withSource('secrets-store')).toEqual([]);
+    expect(withSource('foo')).toEqual([
+      expect.stringContaining(
+        '(top level): SECRETS_SOURCE resolves to foo; it must be one of worker, secrets-store, sts'
+      ),
+    ]);
   });
 
   it('fail the development entry in any config but the development config', () => {
@@ -693,6 +713,35 @@ describe('the UTS configs themselves', () => {
       enabled: 'true',
       sts: STS_ISSUERS.development,
     });
+  });
+
+  it('keep the CI token exchange off in production, and every configured CI trust policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.CI_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    const blocks: [unknown, UtsEnvironment][] = [
+      [staging, 'staging'],
+      [
+        experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+        'development',
+      ],
+      [
+        experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+        'development',
+      ],
+    ];
+    for (const [block, environment] of blocks) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = ciPolicies(
+        { CI_TOKEN_POLICIES: z.string().parse(value) },
+        environment,
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
   });
 
   it('leave the login rotation off in every deployed block, and name the configs it switches', () => {

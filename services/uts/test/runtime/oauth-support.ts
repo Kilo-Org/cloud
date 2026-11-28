@@ -210,6 +210,7 @@ export function oauthDeps(
     },
     thirdParty: unexpectedStore,
     exchange: null,
+    ci: { status: 'off' },
     secretDeps: async () => secretDeps,
     web: {
       config,

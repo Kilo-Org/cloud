@@ -80,6 +80,9 @@ import { requireScenarioApi, resolveProfile } from './run.js';
 import type { ApiVersion } from './client.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+// The package's own tsx, run directly: the CI test job holds STS credentials and
+// runs no package manager, so no install or lifecycle script can start there.
+const TSX_BIN = path.join(SERVICE_PACKAGE_DIR, 'node_modules', '.bin', 'tsx');
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_PARALLEL = 4;
@@ -245,7 +248,7 @@ export function scopeFor(job: Job, nonce: string): string {
   return `${label.slice(0, 64 - nonce.length - 1)}-${nonce}`;
 }
 
-/** Kill the child's process group so `pnpm` and its `tsx`/`node` tree all stop. */
+/** Kill the child's process group so `tsx` and its `node` tree all stop. */
 function killTree(child: ChildProcess): void {
   const pid = child.pid;
   if (pid === undefined) return;
@@ -363,8 +366,6 @@ export function runScenario(
   return new Promise(resolve => {
     const startedAt = Date.now();
     const args = [
-      'exec',
-      'tsx',
       'test/e2e/run.ts',
       `--api=${job.api}`,
       ...(job.timeoutMs === undefined ? [] : [`--timeout-ms=${job.timeoutMs}`]),
@@ -374,11 +375,11 @@ export function runScenario(
     console.log(
       `\n=== [${index + 1}/${total}] ${job.label} start (scope=${scope}, api=${job.api}) ===`
     );
-    const child = spawn('pnpm', args, {
+    const child = spawn(TSX_BIN, args, {
       cwd: SERVICE_PACKAGE_DIR,
       env: { ...process.env, E2E_PROFILE: profile, E2E_FAKE_SCOPE: scope },
       stdio: ['ignore', 'pipe', 'pipe'],
-      // Own process group so the watchdog can kill the whole `pnpm`/`tsx` tree.
+      // Own process group so the watchdog can kill the whole `tsx`/`node` tree.
       detached: true,
     });
 

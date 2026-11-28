@@ -7,6 +7,7 @@ import { INTERNAL_CALLER_HEADER } from '@kilocode/worker-utils/internal-auth-obs
 import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
 import { expectedSecret, secretUnavailableResponse } from '../secrets';
+import { compareSecretsOnce } from '../secrets-compare';
 
 const callbacks = new Hono<HonoContext>();
 
@@ -62,6 +63,9 @@ callbacks.post('/execution', async c => {
     logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
     return c.json(resError('Unauthorized'), 401);
   }
+  // Pre-flip STS copy check, off unless enabled (src/secrets-compare.ts). It runs in the
+  // background and never changes this answer.
+  compareSecretsOnce(c.env, () => c.executionCtx);
 
   let payload: z.infer<typeof ExecutionCallbackPayloadSchema>;
   try {

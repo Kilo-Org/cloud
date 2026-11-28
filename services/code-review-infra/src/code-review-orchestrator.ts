@@ -25,6 +25,7 @@ import type {
 } from './types';
 import { InternalStatusResponseSchema } from './types';
 import { doNameForAttempt } from './do-name';
+import { readCodeReviewInfraSecret } from './secrets';
 import { derivedCallbackHeaders, statusCallbackCredential } from './status-callback-auth';
 import {
   buildGitHubCloudReviewSkillCue,
@@ -1372,7 +1373,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // Build common headers for prepareSession (internalApiProtectedProcedure)
       const internalHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
-        'x-internal-api-key': this.env.INTERNAL_API_SECRET,
+        'x-internal-api-key': await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        ),
       };
       if (this.state.skipBalanceCheck) {
         internalHeaders['x-skip-balance-check'] = 'true';
@@ -1383,7 +1388,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.API_URL,
         this.state.reviewId,
         this.state.attemptId,
-        this.env.CALLBACK_TOKEN_SECRET
+        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
       );
 
       const sessionInput = this.state.sessionInput;
@@ -1464,7 +1469,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
-        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
+        userHeaders['x-internal-api-key'] = await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        );
       }
 
       console.log('[CodeReviewOrchestrator] Calling initiateFromKilocodeSessionV2', {
@@ -1585,7 +1594,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
-        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
+        userHeaders['x-internal-api-key'] = await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        );
       }
 
       let health: CloudAgentSessionHealthOutput;
@@ -1623,7 +1636,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // Build internal headers (internalApiProtectedProcedure — API key + Bearer token)
       const internalHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
-        'x-internal-api-key': this.env.INTERNAL_API_SECRET,
+        'x-internal-api-key': await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        ),
       };
       if (this.state.skipBalanceCheck) {
         internalHeaders['x-skip-balance-check'] = 'true';
@@ -1636,7 +1653,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.API_URL,
         this.state.reviewId,
         this.state.attemptId,
-        this.env.CALLBACK_TOKEN_SECRET
+        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
       );
 
       await client.updateSession(internalHeaders, {

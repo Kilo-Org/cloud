@@ -26,6 +26,12 @@
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
     // that call apps/web internal endpoints use app.kilo.ai.
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the pool-pins, usage-receipts,
+    // production-profile and grader usage-record calls to the web app's `/api/internal/*` routes
+    // send `INTERNAL_API_SECRET_PROD` as before. `"sts"` sends an STS service token instead, one
+    // scope per route, over the `STS` binding; set it only once the Worker has that binding, STS
+    // grants the scopes and the routes accept STS. Removing it is the rollback. The
+    // `/api/internal/bot-token` mint keeps its own secret.
     // Gateway base URL injected into the benchmark container as the kilo
     // CLI's KILO_API_URL. Local dev overrides both vars via .dev.vars (see
     // .dev.vars.example) so the decider benchmark runs fully locally.

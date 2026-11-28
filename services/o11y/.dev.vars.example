@@ -1,3 +1,8 @@
 # Local backend URL used by o11y when it needs to call the Kilo API.
 # @url nextjs
 O11Y_API_BASE_URL=http://localhost:3000
+
+# Secrets are not set here: `pnpm dev` runs `wrangler dev --env local --name o11y`, whose STS
+# binding targets sts-local, so every secret read goes to the local STS broker and never to
+# production. Start it with `pnpm --filter cloudflare-sts dev` (services/sts/README.md, "Local
+# development").

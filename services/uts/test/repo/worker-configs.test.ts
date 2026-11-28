@@ -23,6 +23,7 @@ import {
   workerConfigProblems,
   type WorkerConfig,
 } from './worker-configs';
+import { botTokenPolicies } from '../../src/bot-token/policy';
 import { ciPolicies } from '../../src/ci/policy';
 import { HYPERDRIVE_CONFIG_IDS } from '../../src/rotation/config';
 
@@ -614,6 +615,27 @@ describe('the UTS configs themselves', () => {
       const loaded = ciPolicies(
         { CI_TOKEN_POLICIES: z.string().parse(value) },
         environment,
+        utsScopeEntry
+      );
+      expect(loaded.status).not.toBe('misconfigured');
+    }
+  });
+
+  it('keep the bot-token mint off in production, and every configured bot-token policy list valid', () => {
+    const VarsSchema = z.object({ vars: z.record(z.string(), z.unknown()).optional() }).loose();
+    const policiesOf = (block: unknown) => VarsSchema.parse(block).vars?.BOT_TOKEN_POLICIES;
+    const mint = experimental_readRawConfig({ config: join(repoRoot, MINT_CONFIG) }).rawConfig;
+    expect(policiesOf(mint)).toBeUndefined();
+    const staging = z.object({ env: z.object({ staging: z.unknown() }) }).parse(mint).env.staging;
+    for (const block of [
+      staging,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_DEV_CONFIG) }).rawConfig,
+      experimental_readRawConfig({ config: join(repoRoot, MINT_TEST_CONFIG) }).rawConfig,
+    ]) {
+      const value = policiesOf(block);
+      if (value === undefined) continue;
+      const loaded = botTokenPolicies(
+        { BOT_TOKEN_POLICIES: z.string().parse(value) },
         utsScopeEntry
       );
       expect(loaded.status).not.toBe('misconfigured');

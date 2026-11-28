@@ -1,5 +1,6 @@
 export * from './account';
 export * from './attestation';
+export * from './bot-token';
 export * from './browser-sessions';
 export * from './ci';
 export * from './clients';

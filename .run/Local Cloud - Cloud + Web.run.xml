@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Local Cloud - Cloud + Web" type="CompoundRunConfigurationType" factoryName="Compound">
+    <toRun name="Local Cloud - Cloud" type="ShConfigurationType" />
+    <toRun name="Local Cloud - Web" type="ShConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>

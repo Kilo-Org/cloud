@@ -106,6 +106,15 @@ export const UTS_PROBE_READ_SCOPE = 'uts:probe.read';
  * reads). It does not cover `/api/user`, which stays on the legacy credential.
  */
 export const KILO_API_PROFILE_READ_SCOPE = 'kilo-api:profile.read';
+/**
+ * The mobile home-screen widget's two Kilo API routes: read the widget snapshot
+ * (`GET /api/mobile/widgets`) and register or remove the widget's own push token
+ * (`POST /api/mobile/widgets/push-token`). The mobile app's grant lists it so that the app can
+ * exchange that grant for a widget grant that holds only this scope (`home-widget.ts`); the
+ * widget never holds the app's grant. The token's `org` claim, when present, is the organization
+ * the widget shows; without one the widget is personal.
+ */
+export const KILO_API_HOME_WIDGET_SCOPE = 'kilo-api:home-widget.use';
 /** The user's security view on the web app: sessions, devices, sign-in methods, audit events. */
 export const UTS_SECURITY_READ_SCOPE = 'uts:security.read';
 /**
@@ -149,11 +158,15 @@ export const UTS_CREDENTIAL_SCOPES: readonly string[] = [
   UTS_BOT_KEYS_MANAGE_SCOPE,
 ];
 
-/** The account API acts on the caller's session: every action reads the grant its `sid` names. */
+/**
+ * The account API acts on the caller's session: every action reads the session its `sid` names, a
+ * CLI grant or the web BFF's browser session. The BFF manages PATs and bot keys for its signed-in
+ * user (design 5.5), always as the subject of that session.
+ */
 const ACCOUNT_API = {
   audience: UTS_ACCOUNT_AUDIENCE,
   maxLifetimeSeconds: UTS_ACCESS_TOKEN_LIFETIME_SECONDS,
-  allowedClients: [CLI],
+  allowedClients: [CLI, BFF],
   subjects: { kind: 'any_user' },
   thirdPartySafe: false,
   stepUp: false,
@@ -206,7 +219,13 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
   [UTS_PATS_MANAGE_SCOPE]: ACCOUNT_API,
   // The routes check that the caller is an owner or admin of the organization in the path.
   [UTS_BOT_KEYS_MANAGE_SCOPE]: ACCOUNT_API,
-  [UTS_PROBE_READ_SCOPE]: { ...ACCOUNT_API, patEligible: true, requiresSession: false },
+  // A PAT carries it; of the grant clients, only the CLI may hold it.
+  [UTS_PROBE_READ_SCOPE]: {
+    ...ACCOUNT_API,
+    allowedClients: [CLI],
+    patEligible: true,
+    requiresSession: false,
+  },
   [UTS_SECURITY_READ_SCOPE]: firstPartyScope(UTS_ACCOUNT_AUDIENCE, [BFF], {
     requiresSession: true,
   }),
@@ -303,6 +322,11 @@ export const UTS_SCOPE_REGISTRY: Readonly<Record<string, UtsScopeEntry>> = {
     requiresSession: true,
   }),
   'notifications:badges.write': firstPartyScope('notifications', [MOBILE], {
+    requiresSession: true,
+  }),
+  // The home-screen widget (`home-widget.ts`): any user, personal or for one organization; the
+  // token names its widget grant in `sid`, so revoking that grant or the app's grant ends it.
+  [KILO_API_HOME_WIDGET_SCOPE]: firstPartyScope(KILO_API_AUDIENCE, [MOBILE], {
     requiresSession: true,
   }),
   'event-service:events.subscribe': firstPartyScope('event-service', [BFF, MOBILE, CLI], {

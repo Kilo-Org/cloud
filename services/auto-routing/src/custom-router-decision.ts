@@ -18,6 +18,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   customRouterBenchmarkContext,
   fetchCustomRouterEpoch,
@@ -224,11 +225,12 @@ function cacheEntry(key: string, entry: CachedTableEntry): void {
 async function loadCustomRouterTable(
   env: Env,
   router: CustomRouterDefinition,
-  waitUntil: (promise: Promise<unknown>) => void
+  waitUntil: (promise: Promise<unknown>) => void,
+  ctx?: SecretsExecutionContext
 ): Promise<CustomRouterTableLoad> {
   const context = customRouterBenchmarkContext(router);
   const key = JSON.stringify(context);
-  const epoch = await fetchCustomRouterEpoch(env, router.baseRouter);
+  const epoch = await fetchCustomRouterEpoch(env, router.baseRouter, ctx);
   const cached = tableCache.get(key);
   const cacheTtl =
     cached && (cached.load.servingPins.size > 0 || cached.load.servingFallback.size > 0)
@@ -241,7 +243,7 @@ async function loadCustomRouterTable(
     // The router's registry moved. Only this pool's own ready set decides whether it rebuilds, and
     // the record of that check must not extend `builtAt`: the hard TTL still has to expire so
     // catalogue and pricing changes refresh.
-    prefetchedVersion = await fetchCustomRouterTableVersion(env, context);
+    prefetchedVersion = await fetchCustomRouterTableVersion(env, context, ctx);
     if (prefetchedVersion !== null && prefetchedVersion === cached.version) {
       if (cached.epoch === null || epoch > cached.epoch) {
         cacheEntry(key, { ...cached, epoch });
@@ -256,8 +258,8 @@ async function loadCustomRouterTable(
   const build = (async (): Promise<CustomRouterTableLoad> => {
     // Fingerprint before the table: a change landing after it advances the epoch again, so the next
     // request re-checks instead of trusting this build.
-    const version = prefetchedVersion ?? (await fetchCustomRouterTableVersion(env, context));
-    const load = await fetchCustomRouterTable(env, context);
+    const version = prefetchedVersion ?? (await fetchCustomRouterTableVersion(env, context, ctx));
+    const load = await fetchCustomRouterTable(env, context, ctx);
     cacheEntry(key, { load, epoch, version, builtAt: startedAt, sequence });
     return load;
   })();
@@ -320,7 +322,8 @@ export function customRouterTarget(
   env: Env,
   waitUntil: (promise: Promise<unknown>) => void,
   routing: CustomRouting,
-  requestedModel = customRouterModelId(routing.router.ownerType, routing.router.slug)
+  requestedModel = customRouterModelId(routing.router.ownerType, routing.router.slug),
+  ctx?: SecretsExecutionContext
 ): DecisionTarget {
   const { router } = routing;
   return {
@@ -329,7 +332,7 @@ export function customRouterTarget(
     deniedModelIds: routing.deniedModelIds,
     loadRouting: async timings => {
       const tableStartedAt = performance.now();
-      const loaded = await loadCustomRouterTable(env, router, waitUntil);
+      const loaded = await loadCustomRouterTable(env, router, waitUntil, ctx);
       // The benchmark worker is the authority on which pins still have a usable measurement.
       routing.usablePins = new Map(loaded.servingPins);
       routing.servingFallback = new Set(loaded.servingFallback);

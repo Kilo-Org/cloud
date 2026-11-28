@@ -919,10 +919,12 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
    *
    * When `KILOCLAW_INSTANCE_URL_TEMPLATE` is configured and the instance
    * is on `controllerCapabilitiesVersion >= 2`, this is the per-instance
-   * virtual host (e.g. `https://i-<hex>.kiloclaw.ai`). Otherwise it falls
-   * back to `KILOCLAW_API_URL` (production: `https://claw.kilo.ai`).
+   * virtual host (e.g. `https://i-<hex>.kiloclaw.ai`). Otherwise it is the
+   * resolved legacy host, `KILOCLAW_LEGACY_WORKER_URL` (production default:
+   * `https://claw.kilo.ai`). Null when no legacy host is configured for this
+   * deployment; the dashboard then shows no Open link.
    */
-  workerUrl: string;
+  workerUrl: string | null;
   name: string | null;
   /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
   instanceId: string | null;

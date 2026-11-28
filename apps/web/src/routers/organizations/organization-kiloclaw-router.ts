@@ -30,7 +30,7 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import {
-  KILOCLAW_API_URL,
+  KILOCLAW_LEGACY_WORKER_URL,
   KILOCLAW_INSTANCE_URL_TEMPLATE,
 } from '@kilocode/web-shared/lib/config.server';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
@@ -374,7 +374,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const legacyWorkerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+    // Null outside production unless a non-production legacy host is configured.
+    const legacyWorkerUrl = KILOCLAW_LEGACY_WORKER_URL || null;
 
     // No org instance → return a "no instance" sentinel so the frontend
     // renders setup entry points. Without this guard, workerInstanceId(null)

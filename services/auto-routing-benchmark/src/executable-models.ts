@@ -1,6 +1,7 @@
 import type { BenchmarkIdentity } from '@kilocode/auto-routing-contracts';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type * as z from 'zod';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { fetchBenchmarkUserToken } from './benchmark-token';
 import { BenchmarkModelCatalogSchema, catalogModelSupportsTools } from './platform-models';
 
@@ -11,7 +12,8 @@ export async function fetchExecutableBenchmarkModelCatalog(
   identity: BenchmarkIdentity,
   fetchImpl: typeof fetch = fetch,
   /** A `kilo-api` token the caller already minted, so one queue message mints it once. */
-  mintedApiToken?: string
+  mintedApiToken?: string,
+  ctx?: SecretsExecutionContext
 ): Promise<z.infer<typeof BenchmarkModelCatalogSchema>> {
   const { benchmarkUserId, benchmarkOrgId } = identity;
   const token =
@@ -21,7 +23,8 @@ export async function fetchExecutableBenchmarkModelCatalog(
       benchmarkUserId,
       benchmarkOrgId,
       KILO_API_AUDIENCE,
-      fetchImpl
+      fetchImpl,
+      ctx
     ));
   const path = `/api/organizations/${encodeURIComponent(benchmarkOrgId)}/models`;
   const response = await fetchImpl(new URL(path, env.KILO_CLI_API_URL), {

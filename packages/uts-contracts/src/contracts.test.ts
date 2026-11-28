@@ -64,8 +64,20 @@ import {
   type FeedKeysEntry,
   type SignerKeysEntry,
 } from './signer-keys';
+import { UTS_ACCESS_TOKEN_TYPE_URN } from './exchange';
+import {
+  HomeWidgetGrantResponseSchema,
+  UTS_HOME_WIDGET_GRANTS_PER_HOUR,
+  UTS_REFRESH_TOKEN_TYPE_URN,
+} from './home-widget';
 import { audienceOfResource, resourceOriginOf } from './oauth';
-import { KILO_GATEWAY_AUDIENCE, KILO_GATEWAY_INFERENCE_SCOPE, utsScopeEntry } from './scopes';
+import {
+  KILO_API_AUDIENCE,
+  KILO_API_HOME_WIDGET_SCOPE,
+  KILO_GATEWAY_AUDIENCE,
+  KILO_GATEWAY_INFERENCE_SCOPE,
+  utsScopeEntry,
+} from './scopes';
 
 const THUMBPRINT = 'A'.repeat(43);
 
@@ -741,5 +753,61 @@ describe('subject operation contracts', () => {
         account: { id: 'oauth/google:1', primary_email: 'new@example.com' },
       }).success
     ).toBe(false);
+  });
+});
+
+describe('the home-widget exchange', () => {
+  const issued = {
+    access_token: 'eyJ.widget.token',
+    token_type: 'Bearer',
+    expires_in: 600,
+    audience: KILO_API_AUDIENCE,
+    scope: KILO_API_HOME_WIDGET_SCOPE,
+  } as const;
+  const answer = {
+    access_token: issued.access_token,
+    issued_token_type: UTS_ACCESS_TOKEN_TYPE_URN,
+    token_type: 'Bearer',
+    expires_in: 600,
+    scope: KILO_API_HOME_WIDGET_SCOPE,
+    issued_tokens: [issued],
+    refresh_token: `kilo_rt_${'A'.repeat(65)}`,
+    refresh_token_expires_in: 86_400,
+  };
+
+  it('registers the widget scope for the mobile app only, session-bound, any user', () => {
+    expect(KILO_API_HOME_WIDGET_SCOPE).toBe('kilo-api:home-widget.use');
+    expect(utsScopeEntry(KILO_API_HOME_WIDGET_SCOPE)).toMatchObject({
+      audience: KILO_API_AUDIENCE,
+      maxLifetimeSeconds: 600,
+      allowedClients: ['kilo-mobile'],
+      subjects: { kind: 'any_user' },
+      patEligible: false,
+      requiresSession: true,
+      requiresOrgClaim: false,
+      delegable: false,
+      issuance: 'grant',
+    });
+    expect(UTS_REFRESH_TOKEN_TYPE_URN).toBe('urn:ietf:params:oauth:token-type:refresh_token');
+    expect(UTS_HOME_WIDGET_GRANTS_PER_HOUR).toBe(10);
+  });
+
+  it('accepts one widget token with its widget grant refresh token', () => {
+    expect(HomeWidgetGrantResponseSchema.parse(answer)).toEqual(answer);
+  });
+
+  it('refuses another scope, a second token, a missing refresh token or a mismatched first token', () => {
+    const refused = [
+      { ...answer, scope: 'kilo-api:profile.read' },
+      { ...answer, issued_tokens: [issued, issued] },
+      { ...answer, refresh_token: undefined },
+      { ...answer, refresh_token: 'not-a-grant' },
+      { ...answer, access_token: 'eyJ.other.token' },
+      { ...answer, issued_token_type: UTS_REFRESH_TOKEN_TYPE_URN },
+      { ...answer, expires_in: 601 },
+    ];
+    for (const body of refused) {
+      expect(HomeWidgetGrantResponseSchema.safeParse(body).success).toBe(false);
+    }
   });
 });

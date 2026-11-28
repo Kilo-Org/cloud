@@ -28,6 +28,7 @@ const SAMPLE_OVERRIDES: Record<string, unknown> = {
   'audit_events.event': auditEvent(),
   'subject_operations.feed_entries': '[]',
   'app_account_events.event_type': 'user.created',
+  'refresh_grants.audit_environment': 'development',
 };
 
 const SCALAR_SAMPLES: Record<string, string> = {

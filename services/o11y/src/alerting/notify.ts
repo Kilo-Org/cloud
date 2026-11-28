@@ -4,12 +4,7 @@
 
 import type { AlertSeverity } from './slo-config';
 import type { ContainerAllocations } from './container-allocations';
-import { readO11ySecret } from '../secrets';
-
-type NotifyEnv = {
-  O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
-  O11Y_SLACK_WEBHOOK_TICKET: SecretsStoreSecret;
-};
+import { readO11ySecret, type O11ySecretsEnv } from '../secrets';
 
 // ── Discriminated union payload types ───────────────────────────────────────
 
@@ -273,7 +268,10 @@ export function buildSlackMessage(alert: AlertPayload): object {
 
 // ── Notification delivery ───────────────────────────────────────────────────
 
-export async function sendAlertNotification(alert: AlertPayload, env: NotifyEnv): Promise<void> {
+export async function sendAlertNotification(
+  alert: AlertPayload,
+  env: O11ySecretsEnv
+): Promise<void> {
   const webhookUrl = await readO11ySecret(
     env,
     alert.severity === 'page' ? 'O11Y_SLACK_WEBHOOK_PAGE' : 'O11Y_SLACK_WEBHOOK_TICKET'

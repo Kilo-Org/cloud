@@ -40,7 +40,7 @@ jest.mock('@/lib/internal-api-auth', () => {
   return {
     authorizeInternalApiRequest: (request: Request) => {
       mockSecretChecks.push(request);
-      return actual.authorizeInternalApiRequest(request);
+      return actual.authorizeInternalApiRequest(request, 'usage_record');
     },
   };
 });

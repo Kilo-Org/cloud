@@ -55,7 +55,7 @@
     // and route after a refused one. Only `true` turns it on, and only in
     // production; it never changes a response or the source. `env.dev` does
     // not set it.
-    "SECRETS_COMPARE_ENABLED": "true",
+    "SECRETS_COMPARE_ENABLED": "false",
   },
   // PRODUCTION service binding to Cloud Agent Next
   "services": [

@@ -25,7 +25,9 @@ import {
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   extractVercelInferenceProviderIdsFromModel,
+  extractVercelInferenceRegionsByProvider,
   getCachedVercelInferenceProviderIdsForModel,
+  getCachedVercelInferenceRegionsForModel,
   getOpenRouterChatModelIds,
   getOpenRouterModelsMetadataFromDatabase,
   getSystemOneModelIds,
@@ -229,6 +231,77 @@ describe('extractVercelInferenceProviderIdsFromModel', () => {
     };
 
     expect(extractVercelInferenceProviderIdsFromModel(model)).toEqual(['anthropic', 'bedrock']);
+  });
+});
+
+describe('extractVercelInferenceRegionsByProvider', () => {
+  it('lists the pinnable regions of each inference provider separately', () => {
+    const model = gatewayModel({
+      id: 'vendor/regional',
+      endpoints: [
+        {
+          provider_name: 'openai',
+          inference_regions: [{ geo_region: 'eu' }, { geo_region: 'us' }],
+        },
+        { provider_name: 'bedrock', inference_regions: [{ geo_region: 'us' }] },
+      ],
+    });
+
+    expect(extractVercelInferenceRegionsByProvider(model)).toEqual(
+      new Map([
+        ['openai', new Set(['eu', 'us'])],
+        ['bedrock', new Set(['us'])],
+      ])
+    );
+  });
+
+  it('unions the endpoints of one provider', () => {
+    const model = gatewayModel({
+      id: 'vendor/regional',
+      endpoints: [
+        { provider_name: 'vertex', inference_regions: [{ geo_region: 'eu' }] },
+        { provider_name: 'vertex', inference_regions: [{ geo_region: 'jp' }] },
+      ],
+    });
+
+    expect(extractVercelInferenceRegionsByProvider(model)).toEqual(
+      new Map([['vertex', new Set(['eu', 'jp'])]])
+    );
+  });
+
+  it('ignores unknown and missing geo regions, and skips endpoints without a provider', () => {
+    const model = gatewayModel({
+      id: 'vendor/regional',
+      endpoints: [
+        {
+          provider_name: 'bedrock',
+          inference_regions: [
+            {},
+            { geo_region: 'mars' },
+            { geo_region: 'au' },
+            { geo_region: 'EU' },
+          ],
+        },
+        { provider_name: 'vertex', inference_regions: [] },
+        { provider_name: 'anthropic' },
+        { tag: 'fallback-without-provider-name', inference_regions: [{ geo_region: 'eu' }] },
+      ],
+    });
+
+    expect(extractVercelInferenceRegionsByProvider(model)).toEqual(
+      new Map([
+        ['bedrock', new Set(['au'])],
+        ['vertex', new Set()],
+        ['anthropic', new Set()],
+      ])
+    );
+  });
+
+  it('returns an empty map for a model without endpoints', () => {
+    expect(
+      extractVercelInferenceRegionsByProvider(gatewayModel({ id: 'vendor/none', endpoints: [] }))
+        .size
+    ).toBe(0);
   });
 });
 
@@ -639,6 +712,87 @@ describe('isValidOpenRouterModelId', () => {
     await expect(
       getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.5')
     ).resolves.toEqual(['anthropic', 'bedrock']);
+  });
+
+  it('reads Vercel inference regions per provider of language models from the database catalog', async () => {
+    await storeVercelModels([
+      gatewayModel({
+        id: 'anthropic/claude-sonnet-4.5',
+        type: 'language',
+        endpoints: [
+          { provider_name: 'anthropic', inference_regions: [{ geo_region: 'us' }] },
+          { provider_name: 'bedrock', inference_regions: [{ geo_region: 'eu' }, {}] },
+        ],
+      }),
+      gatewayModel({
+        id: 'vendor/embedding',
+        type: 'embedding',
+        endpoints: [{ provider_name: 'test', inference_regions: [{ geo_region: 'us' }] }],
+      }),
+      gatewayModel({ id: 'vendor/unpinnable', type: 'language' }),
+    ]);
+
+    await expect(
+      getCachedVercelInferenceRegionsForModel('anthropic/claude-sonnet-4.5')
+    ).resolves.toEqual(
+      new Map([
+        ['anthropic', new Set(['us'])],
+        ['bedrock', new Set(['eu'])],
+      ])
+    );
+    await expect(getCachedVercelInferenceRegionsForModel('vendor/unpinnable')).resolves.toEqual(
+      new Map([['test', new Set()]])
+    );
+    await expect(getCachedVercelInferenceRegionsForModel('vendor/embedding')).resolves.toBeNull();
+    await expect(getCachedVercelInferenceRegionsForModel('vendor/unlisted')).resolves.toBeNull();
+  });
+
+  describe('Vercel inference regions follow the metadata snapshot', () => {
+    const regional = (region: 'eu' | 'us') =>
+      gatewayModel({
+        id: 'vendor/regional',
+        type: 'language',
+        endpoints: [{ provider_name: 'openai', inference_regions: [{ geo_region: region }] }],
+      });
+
+    it('projects each snapshot once', async () => {
+      await storeVercelModels([regional('eu')]);
+
+      const first = await getCachedVercelInferenceRegionsForModel('vendor/regional');
+      const second = await getCachedVercelInferenceRegionsForModel('vendor/regional');
+
+      expect(first).toBe(second);
+    });
+
+    it('serves a new snapshot as soon as the metadata refreshes, not after a cache window of its own', async () => {
+      await storeVercelModels([regional('eu')]);
+      await getVercelModelsMetadataFromDatabase();
+      // A region lookup half a window later starts no cache of its own that could outlive the metadata.
+      clockOffsetMs += CACHE_TTL_MS / 2;
+      await expect(getCachedVercelInferenceRegionsForModel('vendor/regional')).resolves.toEqual(
+        new Map([['openai', new Set(['eu'])]])
+      );
+      await storeVercelModels([regional('us')]);
+      clockOffsetMs += CACHE_TTL_MS / 2 + 1;
+
+      await expect(getCachedVercelInferenceRegionsForModel('vendor/regional')).resolves.toEqual(
+        new Map([['openai', new Set(['us'])]])
+      );
+    });
+
+    it('replaces the empty fallback of a failed cold read once the metadata recovers', async () => {
+      const coldCache = await loadColdGatewayModelsCache();
+      await expect(
+        coldCache.getCachedVercelInferenceRegionsForModel('vendor/regional')
+      ).resolves.toBeNull();
+
+      await storeVercelModels([regional('eu')]);
+      startNextCacheWindow();
+
+      await expect(
+        coldCache.getCachedVercelInferenceRegionsForModel('vendor/regional')
+      ).resolves.toEqual(new Map([['openai', new Set(['eu'])]]));
+    });
   });
 
   it('answers every queried id from one catalog snapshot per window', async () => {

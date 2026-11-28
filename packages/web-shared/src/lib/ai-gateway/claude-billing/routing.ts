@@ -15,7 +15,11 @@ import {
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import type { ClaudeBillingOwner } from './store';
+import {
+  claudeBillingEffectiveConnection,
+  getGrantedClaudeBillingConnection,
+  type ClaudeBillingOwner,
+} from './store';
 import { resolveConnectionConnector } from '../connector';
 import {
   getAuthoritativeClaudeBillingState,
@@ -93,7 +97,9 @@ export type ClaudeBillingRoutingResult =
  * connection and never the requester's personal one. A personal request uses
  * only the personal connection.
  */
-function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner | null {
+function ownerCandidates(
+  input: Pick<ClaudeBillingRoutingInput, 'userId' | 'organizationId'>
+): ClaudeBillingOwner | null {
   if (!input.userId) return null;
   return input.organizationId
     ? { kind: 'organization', organizationId: input.organizationId }
@@ -134,6 +140,25 @@ export async function resolveClaudeBillingModel(requestedModel: string): Promise
   const model = (await resolveOpenRouterModelAlias(requestedModel.trim())).trim();
   if (!ANTHROPIC_MODEL_PREFIX.test(model) || !isClaudeModel(model)) return null;
   return model.replace(ANTHROPIC_MODEL_PREFIX, '').replace(/(\d)\.(\d)/g, '$1-$2');
+}
+
+/**
+ * Whether the owner's Claude link takes requests for Claude models, read from the replica: a
+ * connected link serves them and a link that cannot bill fails them, so neither lets another payer
+ * serve them. Routing reads the authoritative state; this suits checks made before routing.
+ */
+export async function claudeBillingLinkTakesRequests(
+  input: Pick<ClaudeBillingRoutingInput, 'userId' | 'organizationId'>
+): Promise<boolean> {
+  const owner = ownerCandidates(input);
+  if (!owner) return false;
+  const granted = await getGrantedClaudeBillingConnection(owner, readDb);
+  if (!granted) return false;
+  const { status } = claudeBillingEffectiveConnection(granted);
+  return (
+    status === ClaudeBillingConnectionStatus.Connected ||
+    status === ClaudeBillingConnectionStatus.BillingUnavailable
+  );
 }
 
 /**

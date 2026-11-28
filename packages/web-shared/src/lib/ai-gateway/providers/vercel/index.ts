@@ -27,6 +27,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
+  getCachedVercelInferenceRegionsForModel,
   getOpenRouterModelsMetadataFromDatabase,
   getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
@@ -252,6 +253,32 @@ async function resolveVercelModel(requestedModel: string): Promise<{
 export async function isVercelModel(requestedModel: string) {
   const { vercelModels, vercelModelId } = await resolveVercelModel(requestedModel);
   return vercelModels.has(vercelModelId);
+}
+
+/**
+ * Whether Vercel can serve the model pinned to the inference region under the provider routing
+ * settings: some inference provider that the settings admit must serve it in that region, since
+ * Vercel fails a pinned request rather than leave the region.
+ */
+export async function canRouteToVercelInRegion(
+  requestedModel: string,
+  provider: OpenRouterProviderConfig | undefined,
+  region: OrganizationDataRegion
+): Promise<boolean> {
+  const regionsByProvider = await getCachedVercelInferenceRegionsForModel(
+    await mapModelIdToVercel(requestedModel)
+  );
+  if (!regionsByProvider) return false;
+  const providersInRegion = [...regionsByProvider]
+    .filter(([, regions]) => regions.has(region))
+    .map(([providerId]) => providerId);
+  return (
+    getVercelInferenceProvidersExcludingIgnored(
+      provider?.ignore ?? [],
+      provider?.only,
+      providersInRegion
+    ).length > 0
+  );
 }
 
 /**

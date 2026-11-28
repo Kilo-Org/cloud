@@ -1,3 +1,7 @@
+import {
+  OrganizationDataRegionSchema,
+  type OrganizationDataRegion,
+} from '@kilocode/db/schema-types';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -157,6 +161,52 @@ export async function getCachedVercelInferenceProviderIdsForModel(
     vercelInferenceProviderIdsByModel.set(models, inferenceProviderIdsByModel);
   }
   return inferenceProviderIdsByModel.get(modelId) ?? null;
+}
+
+/** Per inference provider, the regions Vercel can pin the model's endpoints at that provider to. */
+export function extractVercelInferenceRegionsByProvider(
+  model: GatewayModelWithEndpoints
+): ReadonlyMap<string, ReadonlySet<OrganizationDataRegion>> {
+  const regionsByProvider = new Map<string, Set<OrganizationDataRegion>>();
+  for (const endpoint of model.endpoints) {
+    if (endpoint.provider_name === undefined) continue;
+    const regions = regionsByProvider.get(endpoint.provider_name) ?? new Set();
+    for (const { geo_region } of endpoint.inference_regions ?? []) {
+      const region = OrganizationDataRegionSchema.safeParse(geo_region);
+      if (region.success) regions.add(region.data);
+    }
+    regionsByProvider.set(endpoint.provider_name, regions);
+  }
+  return regionsByProvider;
+}
+
+type InferenceRegionsByProvider = ReadonlyMap<string, ReadonlySet<OrganizationDataRegion>>;
+
+// Memoized on the metadata snapshot like `vercelInferenceProviderIdsByModel`, so a cold-read
+// failure's empty fallback is replaced as soon as the metadata cache recovers.
+const vercelInferenceRegionsByModel = new WeakMap<
+  GatewayModelMap,
+  ReadonlyMap<string, InferenceRegionsByProvider>
+>();
+
+/**
+ * Per inference provider, the regions Vercel can pin the language model to, or null when Vercel
+ * does not list it.
+ */
+export async function getCachedVercelInferenceRegionsForModel(
+  vercelModelId: string
+): Promise<InferenceRegionsByProvider | null> {
+  const models = await getVercelModelsMetadataFromDatabase();
+  let regionsByModel = vercelInferenceRegionsByModel.get(models);
+  if (regionsByModel === undefined) {
+    regionsByModel = new Map(
+      Object.values(models)
+        .filter(model => model.type === 'language')
+        .map(model => [model.id, extractVercelInferenceRegionsByProvider(model)])
+    );
+    vercelInferenceRegionsByModel.set(models, regionsByModel);
+  }
+  return regionsByModel.get(vercelModelId) ?? null;
 }
 
 function createModelIdsFetcher(

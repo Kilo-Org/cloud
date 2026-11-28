@@ -3,8 +3,20 @@ import {
   type AutoRouter,
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
+import { organizations } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  byokOwner,
+  getStoredByokKeys,
+  type StoredByokKeys,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
+import { gatewaySettingsIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { getOrganizationGatewaySettings } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -164,13 +176,56 @@ export async function deniedAutoRoutingModelIdsForMember(
     fromDb: readDb,
   });
   const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
-  const [deniedByPolicy, deniedByPrivacy] = await Promise.all([
+  const [deniedByPolicy, deniedByPrivacy, deniedByGatewaySettings] = await Promise.all([
     deniedAutoRoutingCandidates(policy, candidateIds),
     isDataCollectionExplicitlyDisallowed(
       getEffectiveProviderPrivacy(undefined, policy.dataCollection)
     )
       ? dataCollectionRequiredAutoRoutingCandidates(candidateIds)
       : [],
+    gatewaySettingsDeniedCandidatesForMember(request, policy, candidateIds),
   ]);
-  return [...new Set([...deniedByPolicy, ...deniedByPrivacy])];
+  return [...new Set([...deniedByPolicy, ...deniedByPrivacy, ...deniedByGatewaySettings])];
+}
+
+async function gatewaySettingsDeniedCandidatesForMember(
+  request: AutoRoutingDeniedModelsRequest,
+  policy: EffectiveOrganizationModelPolicy,
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  const [organization] = await readDb
+    .select({ plan: organizations.plan, settings: organizations.settings })
+    .from(organizations)
+    .where(and(eq(organizations.id, request.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!organization) return [];
+  const { openRouterDisabled, dataRegion } = getOrganizationGatewaySettings(
+    await getRuntimeOrganizationFeatures(),
+    { id: request.organizationId, plan: organization.plan, settings: organization.settings }
+  );
+  // An inference region always turns OpenRouter off.
+  if (!openRouterDisabled) return [];
+  const owner = byokOwner(request.userId, request.organizationId);
+  let storedKeys: Promise<StoredByokKeys> | undefined;
+  let isNonTrialEnterprise: Promise<boolean> | undefined;
+  return gatewaySettingsIneligibleCandidates(
+    {
+      region: dataRegion,
+      // A CLI decision names its candidates before the request, so its API is not known yet.
+      apiKind: null,
+      policy,
+      settings: organization.settings,
+      requestProvider: undefined,
+      effectivePrivacy: getEffectiveProviderPrivacy(undefined, policy.dataCollection),
+      isNonTrialEnterprise: () =>
+        (isNonTrialEnterprise ??=
+          organization.plan === 'enterprise'
+            ? isNonTrialEnterpriseOrganization(request.organizationId, readDb)
+            : Promise.resolve(false)),
+      caller: { userId: request.userId, organizationId: request.organizationId },
+      loadStoredByokKeys: () => (storedKeys ??= getStoredByokKeys(readDb, owner)),
+    },
+    // An alias runs as its pin or stored target, which are candidates of their own.
+    candidateIds.filter(id => !isLatestAliasId(id))
+  );
 }

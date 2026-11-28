@@ -3,6 +3,7 @@ import {
   AUTO_DECISION_HEADER,
   customRouterModelId,
   isCustomRouterModelId,
+  isVirtualAutoModelId,
   type AutoRouter,
   type CustomRouterErrorCode,
   type CustomRouterReference,
@@ -29,18 +30,30 @@ import {
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
+  candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
   dataCollectionRequiredAutoRoutingCandidates,
   deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import {
+  gatewaySettingsIneligibleCandidates,
+  type GatewaySettingsRouting,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-settings-candidates';
+import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   createDirectByokReferenceResolver,
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  enabledStoredByokKeys,
+  type StoredByokKeys,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -55,9 +68,10 @@ import {
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
-import type {
-  GatewayCaller,
-  gatewayUsageContextBase,
+import {
+  resolveOrganizationGatewaySettings,
+  type GatewayCaller,
+  type gatewayUsageContextBase,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import type { BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
@@ -117,6 +131,8 @@ type ModelResolutionContext = {
   callerPromise: Promise<GatewayCaller>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
+  /** The caller's stored keys, read at most once per request and shared with provider selection. */
+  loadStoredByokKeys: () => Promise<StoredByokKeys>;
 };
 
 type RoutingCaller = { userId: string; organizationId: string | null };
@@ -141,19 +157,65 @@ async function authenticatedRoutingCaller(
   return { caller: { userId: caller.user.id, organizationId: caller.organizationId ?? null } };
 }
 
+/**
+ * How the request routes under the organization's gateway settings, or null when they leave
+ * OpenRouter on, so every Kilo route stays open.
+ */
+async function resolveGatewaySettingsRouting(
+  ctx: ModelResolutionContext
+): Promise<GatewaySettingsRouting | null> {
+  const caller = await ctx.callerPromise;
+  if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
+  const organizationId = caller.organizationId;
+  const { plan, settings } = await ctx.balanceAndSettingsPromise;
+  const { openRouterDisabled, dataRegion } = await resolveOrganizationGatewaySettings({
+    organizationId,
+    plan,
+    settings,
+  });
+  // An inference region always turns OpenRouter off.
+  if (!openRouterDisabled) return null;
+  let isNonTrialEnterprise: Promise<boolean> | undefined;
+  return {
+    region: dataRegion,
+    apiKind: ctx.request.kind,
+    policy: await ctx.organizationGroupPolicyPromise,
+    settings,
+    requestProvider: ctx.request.body.provider,
+    effectivePrivacy: ctx.effectivePrivacy,
+    isNonTrialEnterprise: () =>
+      (isNonTrialEnterprise ??=
+        plan === 'enterprise'
+          ? isNonTrialEnterpriseOrganization(organizationId, readDb)
+          : Promise.resolve(false)),
+    caller: { userId: caller.user.id, organizationId, botId: caller.botId },
+    loadStoredByokKeys: ctx.loadStoredByokKeys,
+  };
+}
+
 async function autoRoutingDenials(
   ctx: ModelResolutionContext,
   fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-  fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>
+  fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>,
+  fromGatewaySettings: {
+    routing: () => Promise<GatewaySettingsRouting | null>;
+    candidateIds: () => Promise<ReadonlyArray<string>>;
+  }
 ): Promise<string[]> {
+  const gatewaySettingsDenials = async () => {
+    const routing = await fromGatewaySettings.routing();
+    if (!routing) return [];
+    return gatewaySettingsIneligibleCandidates(routing, await fromGatewaySettings.candidateIds());
+  };
   const groupPolicy = await ctx.organizationGroupPolicyPromise;
-  const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+  const [deniedFromPolicy, deniedFromPrivacy, deniedFromGatewaySettings] = await Promise.all([
     groupPolicy ? fromPolicy(groupPolicy) : [],
     isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy)
       ? fromPrivacy({ zdr: ctx.effectivePrivacy.zdr === true })
       : [],
+    gatewaySettingsDenials(),
   ]);
-  return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy])];
+  return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy, ...deniedFromGatewaySettings])];
 }
 
 function decisionRequest(ctx: ModelResolutionContext, caller: RoutingCaller) {
@@ -216,6 +278,9 @@ async function resolveAutoModelId(
     autoModel === KILO_AUTO_EFFICIENT_MODEL.id || autoModel === KILO_AUTO_BALANCED_MODEL.id;
   // Set by whichever decision runs; resolution only sees the decision itself.
   let classifierCostUsd = 0;
+  let gatewaySettingsRouting: Promise<GatewaySettingsRouting | null> | undefined;
+  const getGatewaySettingsRouting = () =>
+    (gatewaySettingsRouting ??= resolveGatewaySettingsRouting(ctx));
 
   const decisionForRouter = async (router: AutoRouter) => {
     const caller = await ctx.callerPromise;
@@ -226,7 +291,11 @@ async function resolveAutoModelId(
     const deniedModelIds = await autoRoutingDenials(
       ctx,
       policy => collectDeniedAutoRoutingModelIds(policy, router),
-      options => collectDataCollectionRequiredAutoRoutingModelIds(router, options)
+      options => collectDataCollectionRequiredAutoRoutingModelIds(router, options),
+      {
+        routing: getGatewaySettingsRouting,
+        candidateIds: async () => candidateModelIdsFromTable(await getCachedRoutingTable(router)),
+      }
     );
     const result = await fetchEfficientAutoDecision({
       ...decisionRequest(ctx, owner),
@@ -235,7 +304,15 @@ async function resolveAutoModelId(
       deniedModelIds,
     });
     classifierCostUsd = result?.costUsd ?? 0;
-    return result?.decision ?? null;
+    const decision = result?.decision ?? null;
+    if (!decision || isVirtualAutoModelId(decision.model)) return decision;
+    // The worker can pick from a newer routing table than the gateway's cached copy, or from
+    // any table when the gateway's is unavailable, so the denials above may not cover its pick.
+    const routing = await getGatewaySettingsRouting();
+    if (routing && (await gatewaySettingsIneligibleCandidates(routing, [decision.model])).length) {
+      return null;
+    }
+    return decision;
   };
   const customRouterDecision = async (reference: CustomRouterReference) => {
     const auth = await authenticatedRoutingCaller(ctx.callerPromise);
@@ -254,7 +331,14 @@ async function resolveAutoModelId(
         autoRoutingDenials(
           ctx,
           policy => deniedAutoRoutingCandidates(policy, candidateIds),
-          options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options)
+          options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options),
+          {
+            routing: getGatewaySettingsRouting,
+            // The gateway settings apply to the model that runs: an alias runs as its pin or
+            // stored target, which are candidates of their own, so denying the alias would also
+            // block a servable pin.
+            candidateIds: async () => candidateIds.filter(id => !isLatestAliasId(id)),
+          }
         ),
       decide: async (router, deniedModelIds, aliasTargets) => {
         const outcome = await fetchCustomRouterDecision({
@@ -300,8 +384,20 @@ async function resolveAutoModelId(
         })
       ),
       isAutoFreeCandidateAllowed: async modelId => {
-        const policy = await ctx.organizationGroupPolicyPromise;
-        return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
+        const [policy, routing] = await Promise.all([
+          ctx.organizationGroupPolicyPromise,
+          getGatewaySettingsRouting(),
+        ]);
+        if (policy && !(await getEffectiveModelDecision(policy, modelId)).allowed) return false;
+        // Free models are served on Kilo's own accounts, so BYOK keys are not considered.
+        return (
+          !routing ||
+          (
+            await gatewaySettingsIneligibleCandidates({ ...routing, loadStoredByokKeys: null }, [
+              modelId,
+            ])
+          ).length === 0
+        );
       },
     },
     ctx.request,
@@ -343,14 +439,14 @@ async function resolveAutoModelId(
  */
 async function catalogModeModelForRoutedModel(
   model: string,
-  callerPromise: ModelResolutionContext['callerPromise']
+  ctx: ModelResolutionContext
 ): Promise<string | null> {
   const directByok = await getDirectByokModel(model.toLowerCase());
   if (!directByok || !supportsCatalogMode(directByok.provider.id)) return null;
-  const caller = await callerPromise;
+  const caller = await ctx.callerPromise;
   if (caller.kind !== 'signed-in') return null;
-  const resolveReference = await createDirectByokReferenceResolver(
-    byokOwner(caller.user.id, caller.organizationId)
+  const resolveReference = createDirectByokReferenceResolver(
+    enabledStoredByokKeys(await ctx.loadStoredByokKeys())
   );
   const resolved = await resolveReference(model);
   return resolved === model ? null : resolved;
@@ -371,10 +467,7 @@ export async function resolveModel(ctx: ModelResolutionContext): Promise<ModelRe
   if (resolution.kind === 'routed') {
     // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
     // the catalog id then goes through the organization policy check.
-    const catalogModelId = await catalogModeModelForRoutedModel(
-      ctx.request.body.model,
-      ctx.callerPromise
-    );
+    const catalogModelId = await catalogModeModelForRoutedModel(ctx.request.body.model, ctx);
     if (catalogModelId) ctx.request.body.model = catalogModelId;
   }
   return resolution;

@@ -45,6 +45,12 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  byokOwner,
+  getStoredByokKeys,
+  NO_STORED_BYOK_KEYS,
+  type StoredByokKeys,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { evaluateEffectiveModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
@@ -245,6 +251,14 @@ export async function handleLlmProxyRequest(
   const organizationGroupPolicyPromise = organizationGroupContextPromise.then(
     context => context && evaluateEffectiveModelAccessPolicy(context)
   );
+  // Model resolution and provider selection both consult the caller's keys; read them once, lazily.
+  let storedByokKeys: Promise<StoredByokKeys> | undefined;
+  const loadStoredByokKeys = () =>
+    (storedByokKeys ??= callerPromise.then(caller =>
+      caller.kind === 'signed-in'
+        ? getStoredByokKeys(readDb, byokOwner(caller.user.id, caller.organizationId))
+        : NO_STORED_BYOK_KEYS
+    ));
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
@@ -331,6 +345,7 @@ export async function handleLlmProxyRequest(
     callerPromise,
     balanceAndSettingsPromise,
     organizationGroupPolicyPromise,
+    loadStoredByokKeys,
   });
   // An unavailable router yields to the caller's auth failure and still owes classifier cost, so
   // it is answered after admission.
@@ -454,6 +469,7 @@ export async function handleLlmProxyRequest(
     markPayerRefusal: benchmark
       ? (reason: 'payment_refused' | 'payer_unavailable') => benchmarkRefusalResponse(reason, false)
       : undefined,
+    loadStoredByokKeys,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
   const { route, failoverRoutes, isNonTrialEnterprise, dataRegion } = providerPolicy;

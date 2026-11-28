@@ -69,6 +69,7 @@ import {
   buildOpenAiChatGptProvider,
   checkOpenAiChatGptByok,
   getOpenAiChatGptByokModelIds,
+  openAiChatGptOwnerCandidates,
   OPENAI_ON_BEHALF_OF_TOKEN_HEADER,
   tagOpenAiChatGptByokModels,
   type OpenAiChatGptRoutingInput,
@@ -252,6 +253,42 @@ describe('getOpenAiChatGptByokModelIds', () => {
       new Set()
     );
     expect(isOpenAiModelServed).not.toHaveBeenCalled();
+  });
+});
+
+describe('openAiChatGptOwnerCandidates', () => {
+  it('lists the organization’s shared connection before the user’s own for a service run', () => {
+    expect(
+      openAiChatGptOwnerCandidates({ userId: 'user-1', organizationId: 'org-1', botId: 'bot-1' })
+    ).toEqual([
+      { organizationId: 'org-1', scope: 'shared_services' },
+      { kiloUserId: 'user-1', organizationId: 'org-1' },
+    ]);
+  });
+
+  it('lists only the user’s own connection without a bot', () => {
+    expect(openAiChatGptOwnerCandidates({ userId: 'user-1', organizationId: 'org-1' })).toEqual([
+      { kiloUserId: 'user-1', organizationId: 'org-1' },
+    ]);
+  });
+
+  it('keeps a personal owner for a user outside any organization', () => {
+    expect(openAiChatGptOwnerCandidates({ userId: 'user-1', organizationId: undefined })).toEqual([
+      { kiloUserId: 'user-1', organizationId: null },
+    ]);
+  });
+
+  it('has no shared connection to use outside an organization, even for a bot', () => {
+    expect(
+      openAiChatGptOwnerCandidates({ userId: 'user-1', organizationId: undefined, botId: 'bot-1' })
+    ).toEqual([{ kiloUserId: 'user-1', organizationId: null }]);
+  });
+
+  it('lists no owner without a user or a bot organization', () => {
+    expect(openAiChatGptOwnerCandidates({ userId: null, organizationId: undefined })).toEqual([]);
+    expect(
+      openAiChatGptOwnerCandidates({ userId: null, organizationId: 'org-1', botId: 'bot-1' })
+    ).toEqual([{ organizationId: 'org-1', scope: 'shared_services' }]);
   });
 });
 

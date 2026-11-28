@@ -21,6 +21,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import {
   byokOwner,
+  enabledStoredByokKeys,
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
@@ -29,9 +30,11 @@ import {
   getOrganizationByokProviderIds,
   getStoredByokKeys,
   getUserByokProviderIds,
+  NO_STORED_BYOK_KEYS,
   parseByokSettings,
   servesCatalogModels,
   type ByokOwner,
+  type StoredByokKeys,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -316,6 +319,67 @@ describe('getEnabledByokProviders', () => {
     await expect(getEnabledByokProviders(db, organizationOwner)).resolves.toEqual([
       { providerId: 'zai', serveCatalogModels: false },
     ]);
+  });
+});
+
+describe('enabledStoredByokKeys', () => {
+  function stored(keys: StoredByokKeys['keys']): StoredByokKeys {
+    return { keys, decrypt: async () => Promise.reject(new Error('not used')) };
+  }
+
+  test('keeps the enabled keys in stored order and drops the disabled ones', () => {
+    expect(
+      enabledStoredByokKeys(
+        stored([
+          { providerId: 'zai', serveCatalogModels: false, isEnabled: true, priority: 2 },
+          { providerId: 'openai', serveCatalogModels: true, isEnabled: false },
+          { providerId: 'anthropic', serveCatalogModels: true, isEnabled: true, priority: 0 },
+          { providerId: 'minimax', serveCatalogModels: false, isEnabled: false },
+          { providerId: 'moonshotai', serveCatalogModels: false, isEnabled: true },
+        ])
+      )
+    ).toEqual([
+      { providerId: 'zai', serveCatalogModels: false },
+      { providerId: 'anthropic', serveCatalogModels: true },
+      { providerId: 'moonshotai', serveCatalogModels: false },
+    ]);
+  });
+
+  test('returns nothing without keys or with only disabled keys', () => {
+    expect(enabledStoredByokKeys(stored([]))).toEqual([]);
+    expect(
+      enabledStoredByokKeys(
+        stored([{ providerId: 'openai', serveCatalogModels: false, isEnabled: false }])
+      )
+    ).toEqual([]);
+  });
+
+  test('lists what getEnabledByokProviders lists, from the one stored read', async () => {
+    const user = await createUser();
+    const owner = byokOwner(user.id, null);
+    await insertByokKey(owner, user.id, 'anthropic', '2026-01-01T00:00:00.000Z', {
+      settings: { serve_catalog_models: true, priority: 1 },
+    });
+    await insertByokKey(owner, user.id, 'minimax', '2026-01-02T00:00:00.000Z', {
+      settings: { priority: 0 },
+    });
+    await insertByokKey(owner, user.id, 'openai', '2026-01-03T00:00:00.000Z', {
+      isEnabled: false,
+    });
+
+    const enabled = enabledStoredByokKeys(await getStoredByokKeys(db, owner));
+
+    expect(enabled).toEqual(await getEnabledByokProviders(db, owner));
+    expect(enabled.map(key => key.providerId)).toEqual(['minimax', 'anthropic']);
+  });
+});
+
+describe('NO_STORED_BYOK_KEYS', () => {
+  test('holds no keys and decrypts none', async () => {
+    expect(enabledStoredByokKeys(NO_STORED_BYOK_KEYS)).toEqual([]);
+    await expect(NO_STORED_BYOK_KEYS.decrypt('openai')).rejects.toThrow(
+      'No enabled BYOK key for openai'
+    );
   });
 });
 

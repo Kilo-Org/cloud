@@ -293,8 +293,8 @@ export type DirectByokCatalogServingCheck = (
 
 const allowEveryCatalogProvider: DirectByokCatalogServingCheck = async () => true;
 
-async function getCatalogModeModelIds(
-  keys: EnabledByokProvider[],
+export async function getCatalogModeModelIds(
+  keys: readonly EnabledByokProvider[],
   isServingAllowed: DirectByokCatalogServingCheck
 ): Promise<ReadonlySet<string>> {
   const providersByModelId: CatalogModeProviders = new Map();
@@ -333,17 +333,15 @@ export async function getDirectByokCatalogModelIds(
 }
 
 /**
- * Resolves a stored model reference, such as a custom router entry, for the owner's
+ * Resolves a stored model reference, such as a custom router entry, for the owner's enabled
  * keys: a bespoke id of a catalog-mode key becomes its catalog id, or null when it has none. Any
  * other id is returned unchanged.
  */
-export async function createDirectByokReferenceResolver(
-  owner: ByokOwner
-): Promise<(modelId: string) => Promise<string | null>> {
+export function createDirectByokReferenceResolver(
+  enabledKeys: readonly EnabledByokProvider[]
+): (modelId: string) => Promise<string | null> {
   const catalogModeProviderIds = new Set(
-    (await getEnabledByokProviders(readDb, owner))
-      .filter(isCatalogModeKey)
-      .map(key => key.providerId)
+    enabledKeys.filter(isCatalogModeKey).map(key => key.providerId)
   );
   return async modelId => {
     if (catalogModeProviderIds.size === 0) return modelId;

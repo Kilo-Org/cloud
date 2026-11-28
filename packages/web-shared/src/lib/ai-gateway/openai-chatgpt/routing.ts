@@ -190,7 +190,9 @@ export async function getOpenAiChatGptCandidateModel(
  * connection falls back to the caller's own connection, which is the behavior
  * every existing caller has today.
  */
-function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwner[] {
+export function openAiChatGptOwnerCandidates(
+  input: Pick<OpenAiChatGptRoutingInput, 'userId' | 'organizationId' | 'botId'>
+): OpenAiChatGptOwner[] {
   const owners: OpenAiChatGptOwner[] = [];
   if (input.botId && input.organizationId) {
     owners.push(openAiChatGptSharedServicesOwner(input.organizationId));

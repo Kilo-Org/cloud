@@ -418,15 +418,100 @@ describe('the UTS configs themselves', () => {
       expect.stringContaining(
         '(top level): binds STS as sts-staging/SecretsBroker/uts; expected sts/SecretsBroker/uts'
       ),
+      expect.stringContaining('(top level): sets SIGNIN_GITHUB_CLIENT_ID'),
     ]);
   });
 
+  describe('production sign-in client ids', () => {
+    const productionVars = (edit: (vars: Record<string, unknown>) => Record<string, unknown>) =>
+      mintWith(raw => ({ ...raw, vars: edit(z.record(z.string(), z.unknown()).parse(raw.vars)) }));
+    const CLIENT_IDS =
+      'SIGNIN_GITHUB_CLIENT_ID, SIGNIN_GITLAB_CLIENT_ID, SIGNIN_GOOGLE_CLIENT_ID, SIGNIN_LINKEDIN_CLIENT_ID';
+
+    it('set GitHub, Google, GitLab and LinkedIn in production, accepted once SECRETS_SOURCE reads sts', () => {
+      const vars = z.record(z.string(), z.unknown()).parse(configAt(MINT_CONFIG).config.vars);
+      expect(vars).toMatchObject({
+        SIGNIN_GITHUB_CLIENT_ID: expect.any(String),
+        SIGNIN_GOOGLE_CLIENT_ID: expect.any(String),
+        SIGNIN_GITLAB_CLIENT_ID: expect.any(String),
+        SIGNIN_LINKEDIN_CLIENT_ID: expect.any(String),
+      });
+      expect(vars).not.toHaveProperty('SIGNIN_DISCORD_CLIENT_ID');
+      expect(
+        utsConfigProblems(productionVars(current => ({ ...current, SECRETS_SOURCE: 'sts' })))
+      ).toEqual([]);
+    });
+
+    it('fail a production client id under the worker source, which holds no client secret there', () => {
+      for (const source of ['worker', 'secrets-store']) {
+        expect(
+          utsConfigProblems(productionVars(vars => ({ ...vars, SECRETS_SOURCE: source })))
+        ).toEqual([
+          `${MINT_CONFIG} (top level): sets ${CLIENT_IDS} with SECRETS_SOURCE ${source}; production holds the client secrets only in its STS bundle, so it sets a sign-in client id only under sts`,
+        ]);
+      }
+      expect(
+        utsConfigProblems(
+          productionVars(vars => ({
+            UTS_ENVIRONMENT: vars.UTS_ENVIRONMENT,
+            DO_JURISDICTION: vars.DO_JURISDICTION,
+            PAT_LOOKUP_CONNECTIONS: vars.PAT_LOOKUP_CONNECTIONS,
+            SECRETS_SOURCE: 'worker',
+            SIGNIN_WORKOS_CLIENT_ID: 'client',
+          }))
+        )
+      ).toEqual([
+        expect.stringContaining(
+          '(top level): sets SIGNIN_WORKOS_CLIENT_ID with SECRETS_SOURCE worker'
+        ),
+      ]);
+    });
+
+    it('accept the worker source in production once the client ids are gone, the rollback order', () => {
+      const withoutClientIds = productionVars(vars => ({
+        ...Object.fromEntries(
+          Object.entries(vars).filter(([name]) => !name.endsWith('_CLIENT_ID'))
+        ),
+        SECRETS_SOURCE: 'worker',
+      }));
+      expect(utsConfigProblems(withoutClientIds)).toEqual([]);
+    });
+
+    it('leave staging client ids on the worker source, where the Worker secrets are set', () => {
+      const staging = mintWith(raw => {
+        const env = z.record(z.string(), z.record(z.string(), z.unknown())).parse(raw.env);
+        const vars = z.record(z.string(), z.unknown()).parse(env.staging?.vars);
+        const production = z.record(z.string(), z.unknown()).parse(raw.vars);
+        return {
+          ...raw,
+          vars: { ...production, SECRETS_SOURCE: 'sts' },
+          env: {
+            ...env,
+            staging: {
+              ...env.staging,
+              vars: { ...vars, SECRETS_SOURCE: 'worker', SIGNIN_ANACONDA_CLIENT_ID: 'client' },
+            },
+          },
+        };
+      });
+      expect(utsConfigProblems(staging)).toEqual([]);
+    });
+  });
+
   it('accept secrets-store, the shared rollback value, and fail an unknown source', () => {
+    // Production sets no sign-in client id here, so the source is the only thing the rule reads.
     const withSource = (source: string) =>
       utsConfigProblems(
         mintWith(raw => ({
           ...raw,
-          vars: { ...z.record(z.string(), z.unknown()).parse(raw.vars), SECRETS_SOURCE: source },
+          vars: {
+            ...Object.fromEntries(
+              Object.entries(z.record(z.string(), z.unknown()).parse(raw.vars)).filter(
+                ([name]) => !name.endsWith('_CLIENT_ID')
+              )
+            ),
+            SECRETS_SOURCE: source,
+          },
         }))
       );
     expect(withSource('secrets-store')).toEqual([]);

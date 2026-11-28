@@ -13,7 +13,7 @@ export default defineConfig({
       },
       {
         // The sign-in pages' browser script, run in a fresh JavaScript context (node:vm), which
-        // the Workers runtime does not offer.
+        // the Workers runtime does not offer, and the checks of the provider sign-in proof.
         test: {
           name: 'script',
           environment: 'node',

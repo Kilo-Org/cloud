@@ -1148,6 +1148,28 @@ GitHub-style, WorkOS-style): sign-in
 -> code -> token for each, Apple's `form_post`, the email lock, the linking refusals, and a check
 that no audit row names a token, a code or an address.
 
+`scripts/provider-signin-proof.ts` checks a deployed issuer without credentials: its
+`/signin/passkeys` page offers exactly the expected providers, and each
+`/signin/oauth/<provider>/start` answers 303 to the provider's authorization endpoint of
+`src/signin/providers/specs.ts` with the expected `client_id`, the issuer's callback as
+`redirect_uri`, the provider's scope, a `state`, PKCE S256 where the provider offers it, a `nonce`
+for OpenID Connect, and the flow's binder cookie. It prints public values only and exits 1 on any
+failure (a network error, 429 or 5xx is marked retryable):
+
+```sh
+UTS_PROOF_ISSUER=https://uts-staging.kiloapps.io \
+UTS_PROOF_PROVIDERS=github=Ov23liHukmJusfuEp36F,google=798264175281-uqim60mc4mnbbecouob37hacetigcaoe.apps.googleusercontent.com,gitlab=60f8aae12a39406cbd5501701e5cf61caef6e9888d9ad71394d1c6c40717694a,discord=1575877341895196733,linkedin=78mnagua76hqnx \
+pnpm exec tsx scripts/provider-signin-proof.ts
+```
+
+`UTS_PROOF_PROVIDERS` lists every provider the issuer must offer, with the client id from that
+environment's block in `wrangler.jsonc` (above: the five of the staging block); leave it empty for
+an issuer that offers none. Each start stores one flow row, which expires unused after 10 minutes,
+and takes one anonymous sign-in write slot. The proof never completes a sign-in, so it shows only
+what UTS sends, the authorization URL it builds from the client id, not what the provider accepts;
+the completed sign-ins per provider after the deploy ("Production sign-in providers") prove the
+provider side.
+
 ## Security notices
 
 Design 5.13 and 8.4; migration `0010_notices.sql`, code in `src/notices/`.
@@ -1402,7 +1424,8 @@ feed object answers, terminal deletion, the user-created event and the audit row
 - `pnpm test:repo`: the repository config check and the scope registry check (`test/repo`), with
   no database.
 - `pnpm test:script`: the sign-in pages' browser script (`test/script`), run against the rendered
-  pages in a fresh `node:vm` context with stand-ins for the DOM, `fetch` and WebAuthn.
+  pages in a fresh `node:vm` context with stand-ins for the DOM, `fetch` and WebAuthn, and the
+  checks of the provider sign-in proof on synthetic answers.
 - `pnpm test` runs all three; none needs Postgres. `pnpm test:postgres` runs the identity store
   tests (`test/db`, see "Local database and tests"), the OAuth grant functions, the DPoP `jti`
   check and the account functions (gates, PATs, bot keys, member removal) included.
@@ -1526,12 +1549,15 @@ GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSE
   legacy value other services use, means the same here (it logs `source` `worker`), so the
   standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
 
-Staging reads `sts` and production reads `worker` until its flip (below). Staging and production
-refuse to start without the var (`src/env.ts`), and `test/repo` fails a deployed block that does
-not name a source or does not bind its own environment's STS as caller `uts`. The Worker secrets
-stay set under either source, so a rollback is the var alone. The `worker` source is removed in
-the same change that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has
-no Worker secret; the rotation job always reads it from the bundle ("Login rotation").
+Both environments read `sts`. Staging flipped first; production flipped before its sign-in client ids
+deployed (Production sign-in providers). Staging and production refuse to start without the var
+(`src/env.ts`), and `test/repo` fails a deployed block that does not name a source or does not bind
+its own environment's STS as caller `uts`. The Worker secrets set before the flip stay set under
+either source, so a rollback is the var alone, except in production while it sets sign-in client ids,
+whose client secrets have no Worker secret. The `worker` source is removed in the same change that
+deletes the Worker secrets, never before.
+`UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret; the rotation job always reads it from the
+bundle ("Login rotation").
 
 Under `sts` the client holds the whole bundle in every request isolate that reads it. Once the
 policy grants `UTS_HYPERDRIVE_SWITCH_TOKEN`, that token, which can edit every Hyperdrive config in
@@ -1571,14 +1597,15 @@ The secrets client caches a denial per isolate: once STS refuses the `uts` workl
 keeps refusing until it is replaced. After fixing a denial (`uts.secrets.unavailable` with
 `reason` `denied`), redeploy UTS, or roll the var back to `worker`.
 
-**Flip, per environment** (staging first, then production after the staging flip held), with the
-environment's `uts` policy live in STS:
+**Flip, per environment** (done for staging, then for production once the staging flip held), with
+the environment's `uts` policy live in STS:
 
-1. **Parity.** Every name in the environment's `/workloads/uts` holds the Worker secret's value,
-   compared by fingerprint, never printed, and the environment's read lines list no name under
-   `empty` that is set as a Worker secret. `DEVICE_USER_CODE_KEY` and `SIGNIN_EMAIL_HASH_KEY` key
-   hashes that the identity store holds (pending user codes, email codes and links), so a
-   different value breaks those flows.
+1. **Parity.** Every name in the environment's `/workloads/uts` that is set as a Worker secret
+   holds the Worker secret's value, compared by fingerprint, never printed; a name without a Worker
+   secret (in production, the four sign-in client secrets) is not compared. The environment's
+   read lines list no name under `empty` that is set as a Worker secret. `DEVICE_USER_CODE_KEY`
+   and `SIGNIN_EMAIL_HASH_KEY` key hashes that the identity store holds (pending user codes, email
+   codes and links), so a different value breaks those flows.
 2. **Deploy** `SECRETS_SOURCE` `sts` for that environment, in a quiet window for production.
 3. **Watch** for one hour: `uts.secrets.read` lines only with `source` `sts` and an `absent` and
    `empty` list that matches the environment's unset methods; no `uts.secrets.unavailable`; no new
@@ -1586,9 +1613,10 @@ environment's `uts` policy live in STS:
    where the device grant was served; the sign-in proofs of that environment pass; and STS audit
    rows for the `uts` deliveries.
 4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker` (or the standard `secrets-store`, read as
-   `worker`), after re-running the parity check of step 1 the other way: a value changed in the
-   bundle while on `sts` (a rotated provider secret) must reach the Worker secret first, or the
-   rollback serves the old one.
+   `worker`), after re-running the parity check of step 1 the other way, over the same names: a
+   value changed in the bundle while on `sts` (a rotated provider secret) must reach the Worker
+   secret first, or the rollback serves the old one. In production, the sign-in client ids are
+   removed first, since their client secrets have no Worker secret (Production sign-in providers).
 
 ### Provisioning per environment
 
@@ -1600,10 +1628,62 @@ environment's `uts` policy live in STS:
 | `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
-| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations; staging sets all five, production sets none, so production offers none of these providers (Sign-in providers, "Configuration") |
-| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
-| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); staging `sts`, production `worker` until its flip |
+| `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations of the environment. Staging sets all five; production sets GitHub, Google, GitLab and LinkedIn, and only under `SECRETS_SOURCE` `sts`, which `test/repo` holds (Production sign-in providers); it sets no Discord client id until that registration and its secret exist |
+| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set, in the environment's `/workloads/uts` folder in the secrets manager, before the deploy that adds the client id. Staging also copies each to the Worker secret with `wrangler secret put <name> --env staging` reading standard input; production keeps its four only in the folder, so it reads them only under `sts` |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `sts`, and a rollback is this one var back to `worker`, in production only after its client ids are removed (Production sign-in providers) |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
+
+### Production sign-in providers (runbook)
+
+Production offers GitHub, Google, GitLab and LinkedIn sign-in through the four client id vars in
+the top level of `wrangler.jsonc`. Their client secrets exist only in production's
+`/workloads/uts` folder, never as Worker secrets, so the providers work only under
+`SECRETS_SOURCE` `sts`. `test/repo` refuses a production block that sets any
+`SIGNIN_<PROVIDER>_CLIENT_ID` under another source, which keeps a future re-add of a client id
+from merging while production reads `worker`. The client id change never changes `SECRETS_SOURCE`.
+In this order:
+
+1. **Prerequisites merged and deployed:** the `uts` STS policy (`services/sts/policy/uts.yaml`,
+   which grants `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`,
+   `SIGNIN_GITLAB_CLIENT_SECRET` and `SIGNIN_LINKEDIN_CLIENT_SECRET` in production) and the
+   `SECRETS_SOURCE` reader (`src/secrets.ts`).
+2. **Production flipped to `sts`** in its own change, with the parity check, deploy and one-hour
+   watch of "Runtime secrets" above. Parity compares only the names that have a Worker secret, so
+   the four sign-in client secrets are not part of it. The watch required production's
+   `uts.secrets.read` lines with `source` `sts` to name none of the four client secrets under
+   `absent` or `empty`, so the bundle held a value for each before any client id needed it.
+3. **The client id change merged** after the flip was on the base branch, so its `test/repo` check
+   passed in CI; the deploy workflow deploys it on merge.
+4. **Prove it** against production with the client ids from `wrangler.jsonc`:
+
+   ```sh
+   UTS_PROOF_ISSUER=https://uts.kiloapps.io \
+   UTS_PROOF_PROVIDERS=github=<client id>,google=<client id>,gitlab=<client id>,linkedin=<client id> \
+   pnpm exec tsx scripts/provider-signin-proof.ts
+   ```
+
+   Every check must pass. The proof does not use a client secret, so then complete one sign-in
+   per provider with a team member's own account, and one Google sign-in with an account outside
+   the organization, which proves the Google consent screen is published for external users.
+   Check the hour after the deploy for no new `uts.signin.misconfigured` or
+   `uts.secrets.unavailable` line and no provider failure in the callback logs, and count that
+   hour's LinkedIn refusals and new accounts: `uts.signin.outcome` lines with `provider` `linkedin`
+   and `outcome` `link_required` or `email_unverified`, and `ai.kilo.uts.account.created` audit
+   rows whose `attributes` name `provider` `linkedin`. The new production LinkedIn app gives
+   imported users a new member id, so they link only through a proven email, and a different
+   LinkedIn email creates a separate account (design decision M161): these counts bound how many
+   link attempts were refused (attempts, not users) and how many may have got a separate account
+   (new LinkedIn accounts, which also include first-time users).
+
+**Rollback**, in this order: remove the four `SIGNIN_<PROVIDER>_CLIENT_ID` vars from the top level
+of `wrangler.jsonc` and let that deploy, so production offers none of the four providers (the proof
+with `UTS_PROOF_PROVIDERS` empty passes; reverting the change instead would also delete the proof
+script, the `test/repo` rule and this runbook); then, only if the source itself must go back,
+deploy `SECRETS_SOURCE` `worker` as in step 4 of "Runtime secrets". `test/repo` refuses the reverse
+order, because under `worker` production holds no client secret.
+Accounts created through these providers keep their other methods only: production has no email
+sign-in, so an account whose only other method is a passkey signs in with the passkey alone until
+the providers return, and an account with no passkey cannot sign in until then.
 
 ## Identity store
 

@@ -32,6 +32,11 @@
     // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
     // value refuses every read. The `sts` source never falls back to the Secrets Store.
     "SECRETS_SOURCE": "secrets-store",
+    // Background check that the other source holds the INTERNAL_API_SECRET bytes an accepted sync
+    // key matched (src/secrets-compare.ts), once per isolate; a refused key starts none. Only
+    // `true` turns it on, and only with ENVIRONMENT `production`; it never changes a response or
+    // the source. `env.dev` does not set it.
+    "SECRETS_COMPARE_ENABLED": "true",
   },
   "triggers": {
     "crons": ["*/15 * * * *"],
@@ -45,8 +50,8 @@
   ],
   // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
   // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
-  // model-eval-ingest.yaml grants INTERNAL_API_SECRET. Nothing reads it while SECRETS_SOURCE is
-  // `secrets-store`.
+  // model-eval-ingest.yaml grants INTERNAL_API_SECRET. While SECRETS_SOURCE is `secrets-store`,
+  // only the source comparison reads it, never to answer a request.
   "services": [
     {
       "binding": "BENCH_DASHBOARD",

@@ -13,6 +13,7 @@ import {
 } from '@kilocode/worker-utils/internal-auth-observation';
 import * as z from 'zod';
 import { readModelEvalIngestSecret } from './secrets';
+import { secretsComparison } from './secrets-compare';
 import { createPromotionStore, syncPromotionsFromBench } from './sync.js';
 
 const SyncRequestSchema = z.object({ promotionName: z.string().min(1).optional() }).optional();
@@ -61,6 +62,10 @@ async function handleFetch(
     'legacy_shared_secret',
     callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
   );
+  // Background source comparison (src/secrets-compare.ts): off unless enabled in production, at
+  // most once per isolate after an accepted key, against the value that key matched. A refused
+  // key starts none. It never changes this answer.
+  secretsComparison.admitted(env, ctx, internalSecret);
 
   const rawBody = await request.text();
   let requestBody: unknown;

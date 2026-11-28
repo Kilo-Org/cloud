@@ -5,11 +5,14 @@ import type { DrizzleDatabase } from '@kilocode/web-shared/lib/drizzle';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
- * How long after an hour ends before it is built. Usage-ingest queue retries
- * can write a row ~20 minutes after its `created_at`, so building earlier would
- * publish an hour that is visibly short. Rows later than this are not counted.
+ * How long after an hour ends before it is built. This must stay longer than
+ * the usage-ingest queue's whole retry window (`max_retries` in
+ * `services/usage-ingest/wrangler.jsonc` with the backoff in
+ * `services/usage-ingest/src/retry-policy.ts`, about 2h15m worst case), or the
+ * hour is built before its retried rows land. Rows later than that, such as
+ * dead-letter-queue replays, are still not counted.
  */
-export const HOUR_SETTLE_MS = 60 * 60 * 1000;
+export const HOUR_SETTLE_MS = 3 * 60 * 60 * 1000;
 
 /**
  * Only hours that ended this recently are built. Recent usage is still in
@@ -17,7 +20,7 @@ export const HOUR_SETTLE_MS = 60 * 60 * 1000;
  * cost a random read each. An hour missed for this long is left unbuilt, and
  * its day stays off the leaderboard.
  */
-export const HOUR_LOOKBACK_MS = 4 * 60 * 60 * 1000;
+export const HOUR_LOOKBACK_MS = 6 * 60 * 60 * 1000;
 
 const HOUR_MS = 60 * 60 * 1000;
 const INSERT_BATCH_SIZE = 1_000;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   claudeBillingEffectiveConnection,
@@ -12,8 +12,12 @@ import {
 
 // The web app runs only in Frankfurt, next to the primary database.
 export async function POST(request: Request) {
-  const unauthorized = await authorizeInternalApiRequest(request, 'claude_billing_payer_state');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(
+    request,
+    'claude_billing_payer_state',
+    'claude_billing_payer_state'
+  );
+  if (auth instanceof Response) return auth;
   const owner = ClaudeBillingOwnerSchema.safeParse(await request.json().catch(() => null));
   if (!owner.success) return NextResponse.json({ error: 'Invalid owner' }, { status: 400 });
   const granted = await getGrantedClaudeBillingConnection(owner.data, db);

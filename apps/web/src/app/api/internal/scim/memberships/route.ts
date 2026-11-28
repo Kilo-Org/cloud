@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import { addDirectoryMembership, removeDirectoryMembership } from '@/lib/scim/directory-sync';
 import { DirectoryMembershipSchema } from '@kilocode/scim-contracts';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
@@ -19,8 +19,8 @@ export const preferredRegion = 'fra1';
  * happened.
  */
 export async function PUT(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_memberships');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_memberships');
+  if (auth instanceof Response) return auth;
 
   const parsed = DirectoryMembershipSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -54,8 +54,8 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
  * encoding two WorkOS identifiers into a path segment.
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_memberships');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_memberships');
+  if (auth instanceof Response) return auth;
 
   const parsed = DirectoryMembershipSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

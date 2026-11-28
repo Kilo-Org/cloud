@@ -18,7 +18,7 @@ import { POST as recordUsage } from '@/app/api/internal/usage/record/route';
 import { POST as recordEnkryptUsage } from '@/app/api/internal/enkrypt-usage/record/route';
 import { POST as recordExaUsage } from '@/app/api/internal/exa-usage/record/route';
 import { GET as resourceMetadata } from '@/app/.well-known/oauth-protected-resource/api/internal/[product]/record/route';
-import type { authorizeInternalApiRequest as AuthorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import type * as InternalApiSecret from '@kilocode/web-shared/lib/internal-api-secret';
 import type { authorizeUsageRecordRequest as AuthorizeUsageRecordRequest } from './usage-record-auth';
 
 // The three record routes and the metadata route against a real verifier. Only the STS key-set
@@ -31,16 +31,20 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   STS_URL: 'http://localhost:8825',
 }));
 
-// Counts every internal API secret check, so `sts` can show it never compares the secret.
-const mockSecretChecks: Request[] = [];
-jest.mock('@/lib/internal-api-auth', () => {
-  const actual = jest.requireActual<{
-    authorizeInternalApiRequest: typeof AuthorizeInternalApiRequest;
-  }>('@/lib/internal-api-auth');
+// Counts every read of the internal API secret, so `sts` can show it never compares the secret.
+// The legacy check reads it exactly when a secret header is present. This wraps the secret read,
+// not `@/lib/internal-api-auth`, so each isolated module instance below loads that module, and
+// with it the shared verifier and its key-set cache, fresh.
+const mockSecretChecks: unknown[] = [];
+jest.mock('@kilocode/web-shared/lib/internal-api-secret', () => {
+  const actual = jest.requireActual<typeof InternalApiSecret>(
+    '@kilocode/web-shared/lib/internal-api-secret'
+  );
   return {
-    authorizeInternalApiRequest: (request: Request) => {
-      mockSecretChecks.push(request);
-      return actual.authorizeInternalApiRequest(request, 'usage_record');
+    ...actual,
+    readInternalApiSecret: () => {
+      mockSecretChecks.push(true);
+      return actual.readInternalApiSecret();
     },
   };
 });
@@ -299,6 +303,21 @@ describe.each(ROUTES)('%s with USAGE_RECORD_AUTH=dual', (path, post) => {
     expect(malformed.response.headers.get('www-authenticate')).toContain(challenge);
   });
 
+  it('refuses the other writers scopes while STS_SCOPE_REGISTRY does not list them', async () => {
+    for (const [workload, scope] of [
+      ['auto-routing', 'web:usage.classifier.record'],
+      ['auto-routing-benchmark', 'web:usage.benchmark-grader.record'],
+      ['ai-gateway', 'web:usage.region-handoff.record'],
+    ]) {
+      const result = await send(path, post, await bearer({ workload, scope }));
+      expectRefusedEarly(result, 403);
+      expect((await result.response.json()) as unknown).toMatchObject({
+        error: 'insufficient_scope',
+      });
+      expect(mockSecretChecks).toEqual([]);
+    }
+  });
+
   it('refuses both credential families on one request', async () => {
     for (const authorization of [await bearer(), { authorization: 'Bearer not-a-token' }]) {
       const result = await send(path, post, { ...authorization, ...secret, ...queue });
@@ -533,6 +552,16 @@ describe('protected-resource metadata', () => {
       new Request(`${ORIGIN}/.well-known/oauth-protected-resource/api/internal/${product}/record`),
       { params: Promise.resolve({ product }) }
     );
+  const SCOPES_SUPPORTED: Record<string, string[]> = {
+    '/api/internal/usage/record': [
+      STS_USAGE_RECORD.scope,
+      'web:usage.region-handoff.record',
+      'web:usage.classifier.record',
+      'web:usage.benchmark-grader.record',
+    ],
+    [ENKRYPT_USAGE_WRITE_PATH]: [STS_USAGE_RECORD.scope, 'web:usage.region-handoff.record'],
+    [EXA_USAGE_WRITE_PATH]: [STS_USAGE_RECORD.scope],
+  };
 
   it('is a 404 unless USAGE_RECORD_AUTH is dual or sts', async () => {
     expect((await metadata('usage')).status).toBe(404);
@@ -556,7 +585,7 @@ describe('protected-resource metadata', () => {
     expect(await response.json()).toEqual({
       resource: `${ORIGIN}${path}`,
       authorization_servers: [STS_ISSUERS.development],
-      scopes_supported: [STS_USAGE_RECORD.scope],
+      scopes_supported: SCOPES_SUPPORTED[path],
       bearer_methods_supported: ['header'],
     });
   });

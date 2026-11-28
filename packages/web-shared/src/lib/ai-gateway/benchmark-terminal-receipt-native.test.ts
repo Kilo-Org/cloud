@@ -20,17 +20,19 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'benchmark-terminal-receipt-native-secret',
 }));
 
-import type * as ReceiptRoute from './handlers/benchmark-usage-receipts';
 import type * as UsageWriter from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type * as TerminalReceipt from '@kilocode/web-shared/lib/ai-gateway/terminal-no-charge-receipt';
 
-let handleBenchmarkUsageReceipts: typeof ReceiptRoute.handleBenchmarkUsageReceipts;
+/** The handler as the web route serves it under its legacy credential. */
+let handleBenchmarkUsageReceipts: (request: Request) => Promise<Response>;
 let insertUsageRecord: typeof UsageWriter.insertUsageRecord;
 let recordTerminalNoChargeReceipt: typeof TerminalReceipt.recordTerminalNoChargeReceipt;
 
 beforeAll(async () => {
   jest.resetModules();
-  ({ handleBenchmarkUsageReceipts } = await import('./handlers/benchmark-usage-receipts'));
+  const receipts = await import('./handlers/benchmark-usage-receipts');
+  handleBenchmarkUsageReceipts = request =>
+    receipts.handleBenchmarkUsageReceipts(request, receipts.authorizeBenchmarkUsageReceiptsLegacy);
   ({ insertUsageRecord } = await import('@kilocode/web-shared/lib/ai-gateway/processUsage'));
   ({ recordTerminalNoChargeReceipt } =
     await import('@kilocode/web-shared/lib/ai-gateway/terminal-no-charge-receipt'));

@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import {
   deleteDirectorySubOrganization,
   upsertDirectorySubOrganization,
@@ -19,8 +19,8 @@ type RouteParams = { params: Promise<{ directoryGroupId: string }> };
  * that owns the directory. Idempotent, and applies renames on repeat.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_sub_organizations');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_sub_organizations');
+  if (auth instanceof Response) return auth;
 
   const { directoryGroupId } = await params;
   const parsed = DirectorySubOrganizationUpsertSchema.safeParse(
@@ -39,8 +39,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
 /** Soft-deletes the sub-organization bound to a directory group. Idempotent. */
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_sub_organizations');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_sub_organizations');
+  if (auth instanceof Response) return auth;
 
   const { directoryGroupId } = await params;
   if (directoryGroupId === '') {

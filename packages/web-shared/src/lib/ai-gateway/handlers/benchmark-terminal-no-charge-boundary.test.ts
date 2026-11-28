@@ -36,7 +36,6 @@ jest.mock('next/server', () => {
 import type * as ProxyModule from './llm-proxy';
 import type * as UpstreamRequest from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import type * as TerminalReceipt from '@kilocode/web-shared/lib/ai-gateway/terminal-no-charge-receipt';
-import type * as ReceiptRoute from './benchmark-usage-receipts';
 import type * as ProcessUsage from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 
 const SECRET = 'benchmark-terminal-receipt-secret';
@@ -44,7 +43,8 @@ const ROUTER_ID = '6f1c2f3a-1111-4a2b-8c3d-4e5f60718293';
 const PROJECT = benchmarkProjectId({ scope: 'user', slug: 'paid-pool', routerId: ROUTER_ID });
 
 let benchmarkTerminalNoChargeStatus: typeof ProxyModule.benchmarkTerminalNoChargeStatus;
-let handleBenchmarkUsageReceipts: typeof ReceiptRoute.handleBenchmarkUsageReceipts;
+/** The handler as the web route serves it under its legacy credential. */
+let handleBenchmarkUsageReceipts: (request: Request) => Promise<Response>;
 let recordTerminalNoChargeReceipt: typeof TerminalReceipt.recordTerminalNoChargeReceipt;
 let insertUsageRecord: typeof ProcessUsage.insertUsageRecord;
 let fetchUpstream: typeof UpstreamRequest.fetchUpstream;
@@ -52,7 +52,9 @@ let fetchUpstream: typeof UpstreamRequest.fetchUpstream;
 beforeAll(async () => {
   jest.resetModules();
   ({ benchmarkTerminalNoChargeStatus } = await import('./llm-proxy'));
-  ({ handleBenchmarkUsageReceipts } = await import('./benchmark-usage-receipts'));
+  const receipts = await import('./benchmark-usage-receipts');
+  handleBenchmarkUsageReceipts = request =>
+    receipts.handleBenchmarkUsageReceipts(request, receipts.authorizeBenchmarkUsageReceiptsLegacy);
   ({ recordTerminalNoChargeReceipt } =
     await import('@kilocode/web-shared/lib/ai-gateway/terminal-no-charge-receipt'));
   ({ insertUsageRecord } = await import('@kilocode/web-shared/lib/ai-gateway/processUsage'));

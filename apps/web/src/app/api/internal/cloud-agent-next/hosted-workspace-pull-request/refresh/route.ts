@@ -7,7 +7,7 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import { rootRouter } from '@/routers/root-router';
 
 export const maxDuration = 120;
@@ -39,8 +39,12 @@ type RefreshResult = { status: RefreshStatus; retryAt: string | null };
 const createCaller = createCallerFactory(rootRouter);
 
 export async function POST(request: Request) {
-  const unauthorized = await authorizeInternalApiRequest(request, 'hosted_workspace_refresh');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(
+    request,
+    'hosted_workspace_refresh',
+    'hosted_workspace_refresh'
+  );
+  if (auth instanceof Response) return auth;
 
   let body: unknown;
   try {

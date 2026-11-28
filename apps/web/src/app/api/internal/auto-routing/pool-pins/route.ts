@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { CustomRouterPoolPinsRequestSchema } from '@kilocode/auto-routing-contracts';
 import { PoolPinsRouterNotFoundError, applyServingPins } from '@/lib/auto-routing-pool-pins';
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 
 /**
  * Serving-pin settlement callback for the auto-routing benchmark worker. The worker confirmed a
@@ -9,8 +9,12 @@ import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
  * the web writes each pin into the pool's JSONB entries. Internal secret only, never a user call.
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'auto_routing_pool_pins');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(
+    request,
+    'auto_routing_pool_pins',
+    'auto_routing_pool_pins'
+  );
+  if (auth instanceof Response) return auth;
 
   let body: unknown;
   try {

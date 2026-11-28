@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import {
   deleteDirectoryOrganization,
   upsertDirectoryOrganization,
@@ -16,8 +16,8 @@ type RouteParams = { params: Promise<{ directoryId: string }> };
 
 /** Binds a WorkOS directory to a parent organization. Idempotent. */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_organizations');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_organizations');
+  if (auth instanceof Response) return auth;
 
   const { directoryId } = await params;
   const parsed = DirectoryOrganizationUpsertSchema.safeParse(
@@ -36,8 +36,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
 
 /** Soft-deletes the organization bound to a directory. Idempotent. */
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_organizations');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_organizations');
+  if (auth instanceof Response) return auth;
 
   const { directoryId } = await params;
   if (directoryId === '') {

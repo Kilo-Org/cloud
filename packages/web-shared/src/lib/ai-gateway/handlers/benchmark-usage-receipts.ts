@@ -29,8 +29,14 @@ import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-sec
  * path wrote: the project must be the platform value or a canonical pool id. Any other row is
  * reported `pending` without its cost, payer or project, so the endpoint cannot be used to read
  * unrelated usage and cannot become a second billing path.
+ *
+ * `authorize` is the route's authentication: it runs first, before the body is read, and any
+ * response it returns is sent as is. There is no default.
  */
-export async function handleBenchmarkUsageReceipts(request: Request): Promise<Response> {
+export async function handleBenchmarkUsageReceipts(
+  request: Request,
+  authorize: (request: Request) => Promise<Response | null>
+): Promise<Response> {
   const unauthorized = await authorize(request);
   if (unauthorized) return unauthorized;
 
@@ -92,7 +98,13 @@ export async function handleBenchmarkUsageReceipts(request: Request): Promise<Re
   return Response.json({ receipts });
 }
 
-async function authorize(request: Request): Promise<Response | null> {
+/**
+ * The receipts route's legacy credential: the internal API secret in `x-internal-api-key` or
+ * `x-internal-secret`.
+ */
+export async function authorizeBenchmarkUsageReceiptsLegacy(
+  request: Request
+): Promise<Response | null> {
   const presented =
     request.headers.get('x-internal-api-key') ?? request.headers.get('x-internal-secret');
   const expected = presented ? await readInternalApiSecret() : '';

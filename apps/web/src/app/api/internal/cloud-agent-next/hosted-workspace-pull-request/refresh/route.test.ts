@@ -23,8 +23,10 @@ const mockFrom = jest.fn(() => ({ innerJoin: mockInnerJoin }));
 const mockSelect = jest.fn(() => ({ from: mockFrom }));
 
 jest.mock('@/lib/internal-api-auth', () => ({
-  authorizeInternalApiRequest: () =>
-    authorized ? null : new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
+  authorizeInternalRouteRequest: () =>
+    authorized
+      ? { credential: 'legacy' }
+      : new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }),
 }));
 
 jest.mock('@/routers/root-router', () => ({ rootRouter: {} }));

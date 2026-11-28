@@ -5,13 +5,17 @@ import { organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sendOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 
 const bodySchema = z.object({ organizationId: z.uuid() }).strict();
 
 export async function POST(request: NextRequest) {
-  const unauthorized = await authorizeInternalApiRequest(request, 'compute_balance_alert');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(
+    request,
+    'compute_balance_alert',
+    'compute_balance_alert'
+  );
+  if (auth instanceof Response) return auth;
   const body = bodySchema.safeParse(await request.json().catch(() => null));
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   const [organization] = await db

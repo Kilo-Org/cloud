@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, jest } from '@jest/globals';
 import type * as ServerConfig from '@kilocode/web-shared/lib/config.server';
 import type * as AdminClient from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import type * as ReceiptHandler from './benchmark-usage-receipts';
 import type { PaidBenchmarkWorkerResult } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import { insertUsageRecord } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -27,7 +26,8 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 let internalApiSecret: string;
 let pausePoolBenchmark: typeof AdminClient.pausePoolBenchmark;
-let handleBenchmarkUsageReceipts: typeof ReceiptHandler.handleBenchmarkUsageReceipts;
+/** The handler as the web route serves it under its legacy credential. */
+let handleBenchmarkUsageReceipts: (request: Request) => Promise<Response>;
 
 beforeAll(async () => {
   jest.resetModules();
@@ -35,7 +35,9 @@ beforeAll(async () => {
     await import('@kilocode/web-shared/lib/config.server'));
   ({ pausePoolBenchmark } =
     await import('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client'));
-  ({ handleBenchmarkUsageReceipts } = await import('./benchmark-usage-receipts'));
+  const receipts = await import('./benchmark-usage-receipts');
+  handleBenchmarkUsageReceipts = request =>
+    receipts.handleBenchmarkUsageReceipts(request, receipts.authorizeBenchmarkUsageReceiptsLegacy);
 });
 
 const ROUTER_ID = '6f1c2f3a-1111-4a2b-8c3d-4e5f60718293';

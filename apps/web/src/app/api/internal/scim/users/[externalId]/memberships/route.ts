@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import { revokeAllDirectoryMemberships } from '@/lib/scim/directory-sync';
 import { directorySyncErrorResponse } from '@/lib/scim/directory-sync-response';
 import { DirectoryUserRevokeAllSchema } from '@kilocode/scim-contracts';
@@ -38,8 +38,8 @@ type RouteParams = { params: Promise<{ externalId: string }> };
  * single membership DELETE does, so a replay is a no-op.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'scim_user_memberships');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(request, 'scim_sync', 'scim_user_memberships');
+  if (auth instanceof Response) return auth;
 
   const { externalId } = await params;
   const parsed = DirectoryUserRevokeAllSchema.safeParse(await request.json().catch(() => null));

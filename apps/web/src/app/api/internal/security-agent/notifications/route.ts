@@ -1,4 +1,7 @@
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import {
+  SECURITY_NOTIFICATIONS_SCOPES,
+  authorizeInternalRouteRequest,
+} from '@/lib/internal-api-auth';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
@@ -186,13 +189,41 @@ function isNotificationStillEligible(
 }
 
 export async function POST(req: NextRequest) {
-  const unauthorized = await authorizeInternalApiRequest(req, 'security_agent_notifications');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(
+    req,
+    'security_notifications',
+    'security_agent_notifications'
+  );
+  if (auth instanceof Response) return auth;
 
   const rawBody: unknown = await req.json().catch(() => null);
   const parsedBody = BodySchema.safeParse(rawBody);
   if (!parsedBody.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+
+  // An STS token authorizes only its own sender's shape: Security Sync's dispatch scope a
+  // `{ notificationId }` dispatch, Security Auto Analysis's lifecycle scope a lifecycle event.
+  if (auth.credential === 'sts') {
+    const required =
+      'notificationId' in parsedBody.data
+        ? SECURITY_NOTIFICATIONS_SCOPES.dispatch
+        : SECURITY_NOTIFICATIONS_SCOPES.lifecycle;
+    if (auth.scope !== required) {
+      console.warn(
+        JSON.stringify({
+          event: 'internal_service_auth_refused',
+          route: 'security_agent_notifications',
+          status: 403,
+          error: 'insufficient_scope',
+          reason: 'body_kind',
+        })
+      );
+      return NextResponse.json(
+        { error: 'insufficient_scope', scope: required },
+        { status: 403, headers: { 'cache-control': 'no-store' } }
+      );
+    }
   }
 
   // Lifecycle events have no persisted `security_finding_notifications` row,

@@ -1,4 +1,4 @@
-import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
+import { authorizeInternalRouteRequest } from '@/lib/internal-api-auth';
 import { sql } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -19,8 +19,12 @@ type ClaimedExport = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const unauthorized = await authorizeInternalApiRequest(request, 'user_data_exports_ready');
-  if (unauthorized) return unauthorized;
+  const auth = await authorizeInternalRouteRequest(
+    request,
+    'user_data_exports_ready',
+    'user_data_exports_ready'
+  );
+  if (auth instanceof Response) return auth;
 
   const body: unknown = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(body);

@@ -11,6 +11,7 @@ import { and, eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { authorizeInternalServiceRequest } from '@/lib/internal-api-auth';
 
 const querySchema = z
   .object({ provider: z.literal('aws'), credentialId: z.uuid().optional() })
@@ -22,8 +23,8 @@ const querySchema = z
   );
 const headers = { 'Cache-Control': 'no-store' };
 
-/** The Worker receives only the selected owner's encrypted connection. */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+/** The route's legacy credential: the internal API secret in `x-internal-api-key` only. */
+async function authorizeLegacy(request: NextRequest): Promise<NextResponse | null> {
   const presented = request.headers.get('x-internal-api-key');
   const expected = presented ? await readInternalApiSecret() : '';
   if (!expected || !presented || !timingSafeEqual(presented, expected))
@@ -34,6 +35,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     'legacy_shared_secret',
     callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
   );
+  return null;
+}
+
+/** The Worker receives only the selected owner's encrypted connection. */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const auth = await authorizeInternalServiceRequest(
+    request,
+    'byoc_credentials_read',
+    'byoc_connections',
+    () => authorizeLegacy(request)
+  );
+  if (auth instanceof Response) return auth;
   const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success)
     return NextResponse.json({ error: 'Invalid request' }, { status: 400, headers });

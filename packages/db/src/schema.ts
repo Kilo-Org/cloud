@@ -2774,7 +2774,9 @@ export const payment_methods = pgTable(
     index('IDX_payment_methods_organization_id').on(table.organization_id),
   ]
 );
-export type MicrodollarUsage = typeof microdollar_usage.$inferSelect;
+// `inserted_at` is set only by the database, so the record that app code builds
+// and sends over the usage wire contract does not carry it.
+export type MicrodollarUsage = Omit<typeof microdollar_usage.$inferSelect, 'inserted_at'>;
 // Storage parameters that Drizzle cannot declare: migration 0384 sets
 // `autovacuum_vacuum_insert_scale_factor = 0` and
 // `autovacuum_vacuum_insert_threshold = 500000`, so insert-triggered vacuum
@@ -2793,7 +2795,21 @@ export const microdollar_usage = pgTable(
     output_tokens: bigint({ mode: 'number' }).notNull(),
     cache_write_tokens: bigint({ mode: 'number' }).notNull(),
     cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    // When the gateway finished the request and built the usage record
+    // (`toInsertableDbUsageRecord`), from the gateway's clock. The gateway always
+    // supplies it, and the queue writer keeps it unchanged, so it is the same
+    // however late the row is written. Seeds, mock data, and the sales demo set
+    // their own (possibly backdated) values. Usage queries, indexes, and the
+    // daily rollups use it.
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    // When PostgreSQL inserted the row: the start of the inserting transaction,
+    // from the database clock. Only the column default sets it; app code must
+    // never supply it. It trails `created_at` by queue and write delay, up to
+    // clock skew between the gateway and the database, so the difference can be
+    // slightly negative. It is the transaction start, not the commit, so it is
+    // not commit-ordered and is unsafe as a watermark for incremental reads. It
+    // is not indexed. NULL for rows inserted before migration 0391.
+    inserted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
     provider: text(),
     model: text(),
     requested_model: text(),

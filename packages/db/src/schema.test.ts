@@ -323,6 +323,22 @@ it('migration 0384 keeps insert-triggered autovacuum frequent on microdollar_usa
   );
 });
 
+it('migration 0391 leaves existing microdollar_usage rows without an inserted_at', async () => {
+  // The generated `ADD COLUMN ... DEFAULT now()` would store the migration time as a missing
+  // value for every existing row. The column must default to now() for new rows only.
+  const result = await schemaTestDb.db.execute<{ atthasmissing: boolean; default: string | null }>(
+    sql`
+      SELECT a.atthasmissing, pg_get_expr(d.adbin, d.adrelid) AS default
+      FROM pg_attribute a
+      LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+      WHERE a.attrelid = to_regclass('public.microdollar_usage')
+        AND a.attname = 'inserted_at'
+        AND NOT a.attisdropped
+    `
+  );
+  expect(result.rows).toEqual([{ atthasmissing: false, default: 'now()' }]);
+});
+
 it('migration 0345 backfills old owners and folders to activity and copies built-in agent overrides', async () => {
   const migration = fs.readFileSync(
     path.join(__dirname, 'migrations/0345_cloud_agent_stacked_workspaces.sql'),

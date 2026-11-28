@@ -17,22 +17,25 @@ import { GOOGLE_PLAY_INTEGRITY_ENDPOINTS } from '../../src/attest/play-integrity
 type Settings = AttestEnv & { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY?: string };
 
 let complete: Settings;
+/** The service account key file, as the bundle delivers it. */
+let serviceAccountKey: string;
 
 beforeAll(async () => {
   const { privateKey } = await generateKeyPair('RS256', { extractable: true });
+  serviceAccountKey = JSON.stringify({
+    type: 'service_account',
+    project_id: 'example-project',
+    private_key_id: 'b'.repeat(40),
+    private_key: await exportPKCS8(privateKey),
+    client_email: 'uts-play-integrity@example-project.iam.gserviceaccount.com',
+    token_uri: 'https://oauth2.googleapis.com/token',
+  });
   complete = {
     ATTEST_APPLE_TEAM_ID: 'ABCDE12345',
     ATTEST_APPLE_BUNDLE_ID: 'com.example.kilo',
     ATTEST_PLAY_INTEGRITY_PACKAGE_NAME: 'com.example.kilo',
     ATTEST_PLAY_INTEGRITY_CERT_DIGESTS: `${'AB:'.repeat(31)}AB,${Buffer.alloc(32, 1).toString('base64url')}`,
-    ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: JSON.stringify({
-      type: 'service_account',
-      project_id: 'example-project',
-      private_key_id: 'b'.repeat(40),
-      private_key: await exportPKCS8(privateKey),
-      client_email: 'uts-play-integrity@example-project.iam.gserviceaccount.com',
-      token_uri: 'https://oauth2.googleapis.com/token',
-    }),
+    ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: serviceAccountKey,
   };
 });
 
@@ -157,6 +160,14 @@ describe('attestation policy', () => {
     const unavailable: UtsSecrets = { status: 'unavailable' };
     expect(policy({}, 'production', unavailable)).toEqual({ kind: 'refused', problems: [] });
     expect(policy({}, 'development', unavailable)).toEqual({ kind: 'unattested_development' });
+  });
+
+  it('keeps attestation off while none of its vars is set, whatever the bundle holds', () => {
+    // The bundle delivers the key while no var is set: the vars are the switch, so attestation
+    // stays off and the client is not refused for a method this environment has not turned on.
+    const delivered = { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: serviceAccountKey };
+    expect(policy(delivered, 'staging')).toEqual({ kind: 'refused', problems: [] });
+    expect(policy(delivered, 'development')).toEqual({ kind: 'unattested_development' });
   });
 
   it('reads the key from the secrets, never from the vars', () => {

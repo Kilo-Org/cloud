@@ -16,10 +16,11 @@ import {
  * Attestation configuration from the Worker's vars and one runtime secret (names only here; README
  * "Mobile attestation" gives where each value comes from). `kilo-mobile` is served only where every
  * value is set and valid. Anything less refuses the client: in staging and production whatever is
- * set, and in development as soon as one value is set. Development with no value at all serves the
- * client without attestation, for the local tests (decision Q67). With a var set and no usable STS
- * bundle the config is `unavailable`: the client is still sent to sign in, and its code exchange
- * answers 503 until the bundle comes back.
+ * set, and in development as soon as one var is set. The vars are the switch: development with
+ * none of them set serves the client without attestation, for the local tests (decision Q67),
+ * whatever the secret holds. With a var set and no usable STS bundle the config is `unavailable`:
+ * the client is still sent to sign in, and its code exchange answers 503 until the bundle comes
+ * back.
  *
  * Vars (plain): `ATTEST_APPLE_TEAM_ID`, `ATTEST_APPLE_BUNDLE_ID`,
  * `ATTEST_PLAY_INTEGRITY_PACKAGE_NAME`, `ATTEST_PLAY_INTEGRITY_CERT_DIGESTS` (comma-separated
@@ -159,7 +160,9 @@ export function readAttestationConfig(
   const varSet = REQUIRED_VAR_NAMES.some(present) || present(DEV_ENDPOINTS_VAR);
   // The key as the read holds it; null when STS gave no usable bundle.
   const rawKey = secrets.status === 'read' ? (secrets.values[KEY_SECRET] ?? '').trim() : null;
-  if (!varSet && (rawKey === null || rawKey === '')) return { status: 'off' };
+  // The vars are the switch: with none of them set attestation is off, whatever the secret holds,
+  // so a bundle that delivers the key cannot make an environment without attestation refuse.
+  if (!varSet) return { status: 'off' };
   if (rawKey === null) return { status: 'unavailable' };
 
   const problems: AttestProblem[] = [];

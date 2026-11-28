@@ -371,10 +371,10 @@ no audit row; the operator action that blocks or unblocks the client writes it.
 Attest and Android Play Integrity (`src/attest/`, migration 0017). The client is served only
 where the environment's attestation config is complete (`src/attest/config.ts`); anything less
 refuses it at `/authorize` with `unauthorized_client` and logs `uts.attestation.misconfigured`
-with the names (never the values) of what is missing. Development with no attestation value at
-all serves it without attestation, for the local tests. With a var set and no usable STS bundle
-(Deploys, "Runtime secrets") the client is still sent to sign in and its code exchange answers 503
-with `Retry-After` until the key can be read.
+with the names (never the values) of what is missing. The vars are the switch: development with
+none of them set serves it without attestation, for the local tests, whatever the bundle holds.
+With a var set and no usable STS bundle (Deploys, "Runtime secrets") the client is still sent to
+sign in and its code exchange answers 503 with `Retry-After` until the key can be read.
 
 | Name | Kind | Value |
 |---|---|---|
@@ -1107,9 +1107,11 @@ Open items before deploy:
 ### Configuration
 
 A method is offered only when every value it needs is set; with some set and others missing it is
-not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only). The secrets
-come from the source `SECRETS_SOURCE` names (Deploys, "Runtime secrets"); with a method's vars set
-and no usable STS bundle it is not offered and its routes answer 503 with `Retry-After`.
+not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only). A method
+with none of its plain vars set is `off`, whatever the secret source holds: the vars are the switch.
+The secrets come from the source `SECRETS_SOURCE` names (Deploys, "Runtime secrets"); with a
+method's vars set and no usable STS bundle it is not offered and its routes answer 503 with
+`Retry-After`.
 
 | Method | Vars | Secrets |
 |---|---|---|
@@ -1545,7 +1547,7 @@ never wait for STS. What a read finds:
 
 | Bundle state | Methods with their vars set | Methods without vars |
 |---|---|---|
-| Delivered, name present | `on` | `off` when the method has no vars at all; a provider or WorkOS with its secret delivered but its client id unset is `misconfigured` (500) |
+| Delivered, name present | `on` | `off` |
 | Delivered, name missing (policy grants it, the manager holds no value, or the value is empty) | `misconfigured`: not offered, routes answer 500 | `off` |
 | STS refuses the `uts` workload, or `STS` is not bound (`uts.secrets.unavailable` with `reason` `denied` or `not_bound`) | as a delivered bundle without the name: `misconfigured` | `off` |
 | No usable bundle: none yet on a cold isolate, or the held copy is 24 hours old (`uts.secrets.unavailable`, `reason` `unavailable`) | `unavailable`: not offered, routes answer 503 with `Retry-After` | `off` |

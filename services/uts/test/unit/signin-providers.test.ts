@@ -140,6 +140,73 @@ describe('configuration', () => {
     expect(settings.emailHashKey).toEqual({ status: 'off' });
   });
 
+  it('keeps a method off while all of its plain vars are unset, whatever the bundle holds', () => {
+    // STS delivers every secret the policy grants, including those of methods this environment
+    // has not turned on: the vars are the switch, so the method stays off, not misconfigured.
+    const delivered = readSignInConfig(
+      signInInput({
+        SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY: 'private-key',
+        SIGNIN_GITHUB_CLIENT_SECRET: 'github-secret',
+        SIGNIN_WORKOS_API_KEY: 'workos-key',
+      }),
+      config
+    );
+    expect(delivered.providers.anthropic).toEqual({ status: 'off' });
+    expect(delivered.providers.github).toEqual({ status: 'off' });
+    expect(delivered.sso).toEqual({ status: 'off' });
+    // No usable bundle: off at once, without waiting for STS to say which secrets exist.
+    expect(
+      readSignInConfig({ vars: {}, secrets: { status: 'unavailable' } }, config).providers.anthropic
+    ).toEqual({ status: 'off' });
+  });
+
+  it('turns a method on once its vars are set and its secret is delivered', () => {
+    expect(
+      readSignInConfig(
+        signInInput({
+          SIGNIN_GITHUB_CLIENT_ID: 'github-client',
+          SIGNIN_GITHUB_CLIENT_SECRET: 'github-secret',
+        }),
+        config
+      ).providers.github
+    ).toMatchObject({
+      status: 'on',
+      credentials: { kind: 'secret', clientId: 'github-client', clientSecret: 'github-secret' },
+    });
+  });
+
+  it('stays misconfigured when the vars are set and the secret is missing or empty', () => {
+    const missing = { status: 'misconfigured', missing: ['SIGNIN_GITHUB_CLIENT_SECRET'] };
+    for (const secret of [{ SIGNIN_GITHUB_CLIENT_SECRET: '' }, {}]) {
+      expect(
+        readSignInConfig(
+          signInInput({ SIGNIN_GITHUB_CLIENT_ID: 'github-client', ...secret }),
+          config
+        ).providers.github
+      ).toEqual(missing);
+    }
+  });
+
+  it('stays misconfigured when only some plain vars of a method are set', () => {
+    expect(
+      readSignInConfig(
+        signInInput({
+          SIGNIN_ANTHROPIC_CLIENT_ID: 'anthropic-client',
+          SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY: 'private-key',
+        }),
+        config
+      ).providers.anthropic
+    ).toEqual({
+      status: 'misconfigured',
+      missing: [
+        'SIGNIN_ANTHROPIC_ASSERTION_AUDIENCE',
+        'SIGNIN_ANTHROPIC_ASSERTION_ISSUER',
+        'SIGNIN_ANTHROPIC_ASSERTION_SUBJECT',
+        'SIGNIN_ANTHROPIC_ASSERTION_KEY_ID',
+      ],
+    });
+  });
+
   it('accepts local stand-in endpoints in development only', () => {
     const SIGNIN_DEV_ENDPOINTS = JSON.stringify({
       github: {

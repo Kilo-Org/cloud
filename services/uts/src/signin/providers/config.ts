@@ -100,9 +100,10 @@ export type ClientCredentials =
     };
 
 /**
- * `off`: none of the method's vars is set. `on`: every value is set and valid. `misconfigured`:
- * the names of the values that are missing or invalid (never a value). `unavailable`: the method's
- * vars are set, or it needs only secrets, and STS gave no usable bundle.
+ * `off`: none of the method's plain vars is set, whatever its secrets hold. `on`: every value is
+ * set and valid. `misconfigured`: the names of the values that are missing or invalid (never a
+ * value). `unavailable`: the method's vars are set, or it needs only secrets, and STS gave no
+ * usable bundle.
  */
 export type Configured<Value> =
   | { status: 'off' }
@@ -169,9 +170,12 @@ function rawValue(input: SignInInput, name: SignInName): string | undefined | ty
 }
 
 /**
- * `on` when every name has a value, `off` when none has, else `misconfigured`. With the secrets
- * unread: `misconfigured` when the vars alone already disagree, `off` when none of the vars is set,
- * else `unavailable`.
+ * `off` when every plain var of the method is unset, whatever the secrets hold: the vars are the
+ * switch, so a bundle that delivers every granted secret cannot make a method the environment has
+ * not turned on `misconfigured` (README "Runtime secrets", "Methods without vars: off"). A method
+ * with only secrets (the email hash key) has no such switch. Otherwise `on` when every name has a
+ * value, else `misconfigured`. With the secrets unread: `misconfigured` when the read names alone
+ * already disagree, `off` when none of them is set, else `unavailable`.
  */
 function configured<Names extends string, Value>(
   input: SignInInput,
@@ -181,16 +185,23 @@ function configured<Names extends string, Value>(
   const values: Partial<Record<Names, string>> = {};
   const missing: string[] = [];
   let unread = 0;
+  let plainVars = 0;
+  let plainSet = 0;
   for (const name of names) {
+    const secret = isUtsSecretName(name);
+    if (!secret) plainVars += 1;
     const raw = rawValue(input, name);
     if (raw === UNREAD) {
       unread += 1;
       continue;
     }
     const value = ValueSchema.safeParse(raw);
-    if (value.success) values[name] = value.data;
-    else missing.push(name);
+    if (value.success) {
+      values[name] = value.data;
+      if (!secret) plainSet += 1;
+    } else missing.push(name);
   }
+  if (plainVars > 0 && plainSet === 0) return { status: 'off' };
   const read = names.length - unread;
   if (missing.length > 0 && missing.length < read) return { status: 'misconfigured', missing };
   if (unread > 0) return read > 0 && missing.length === read ? { status: 'off' } : UNAVAILABLE;

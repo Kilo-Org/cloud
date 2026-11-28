@@ -1,8 +1,9 @@
-# The kilo-code-review-worker Worker (services/code-review-infra/wrangler.jsonc). It reads its
-# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the
-# plain Worker secrets) until it is set to `sts`. INTERNAL_API_SECRET and
-# CALLBACK_TOKEN_SECRET resolve from /shared; BACKEND_AUTH_TOKEN resolves from
-# /workloads/kilo-code-review-worker.
+# The kilo-code-review-worker Worker (services/code-review-infra/wrangler.jsonc). Production only.
+# It writes a review's status to the web app's /api/internal/code-review-status/{reviewId} with a
+# web:code-review.status-callback token over its `STS` SecretsBroker binding. It reads its runtime
+# secrets over the same binding; SECRETS_SOURCE stays `secrets-store` (the plain Worker secrets)
+# until it is set to `sts`. INTERNAL_API_SECRET and CALLBACK_TOKEN_SECRET resolve from /shared;
+# BACKEND_AUTH_TOKEN resolves from /workloads/kilo-code-review-worker.
 workload: kilo-code-review-worker
 environments:
   - production
@@ -12,3 +13,7 @@ secrets:
   - INTERNAL_API_SECRET
   - CALLBACK_TOKEN_SECRET
   - BACKEND_AUTH_TOKEN
+audiences:
+  - web
+scopes:
+  - web:code-review.status-callback

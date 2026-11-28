@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -1487,7 +1487,11 @@ test('GitHub client: a missing rollout workflow is unreadable, never zero; run l
     return new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), { status: 200 });
   };
   const gh = github({ token: 'synthetic', fetchImpl });
-  await assert.rejects(activeRollouts(gh), e => e.reason === 'rollout_workflow_unreadable');
+  await assert.rejects(activeRollouts(gh), e => {
+    assert.equal(e.reason, 'rollout_workflow_unreadable');
+    assert.deepEqual(e.detail, { workflow: 'deploy-staging.yml', cause: 'not_found' });
+    return true;
+  });
   assert.deepEqual(await gh.runsCreated('deploy-production.yml', 'A', 'B'), {
     total: 1,
     runs: [
@@ -1504,6 +1508,51 @@ test('GitHub client: a missing rollout workflow is unreadable, never zero; run l
   assert.equal(listed.searchParams.get('created'), 'A..B');
   assert.equal(listed.searchParams.get('per_page'), '20');
   assert.equal(await rolloutRunsDuring(gh, T0, T0 + 60_000), 'unreadable');
+});
+
+test('every rollout workflow exists in .github/workflows', () => {
+  const files = new Set(
+    readdirSync(new URL('../../../.github/workflows/', import.meta.url)).filter(f =>
+      /\.ya?ml$/.test(f)
+    )
+  );
+  for (const workflow of ROLLOUT_WORKFLOWS) assert.ok(files.has(workflow), workflow);
+});
+
+test('GitHub client: any non-200 rollout read fails closed and names the workflow', async t => {
+  for (const [name, respond, detail] of [
+    ['403', () => new Response('{}', { status: 403 }), { cause: 'github_unreadable', status: 403 }],
+    ['500', () => new Response('{}', { status: 500 }), { cause: 'github_unreadable', status: 500 }],
+    ['404', () => new Response('{}', { status: 404 }), { cause: 'not_found' }],
+    [
+      'unparsable 200',
+      () => new Response('not json', { status: 200 }),
+      { cause: 'github_unreadable', status: 200 },
+    ],
+    ['malformed 200', () => new Response('{}', { status: 200 }), { cause: 'malformed' }],
+    [
+      'transport',
+      () => {
+        throw new TypeError('synthetic network failure');
+      },
+      { cause: 'github_transport' },
+    ],
+  ]) {
+    await t.test(name, async () => {
+      const fetchImpl = async url =>
+        new URL(url).pathname.endsWith('/cloud-agent-e2e.yml/runs')
+          ? respond()
+          : new Response(JSON.stringify({ total_count: 0, workflow_runs: [] }), { status: 200 });
+      const world = makeWorld();
+      world.gh = github({ token: 'synthetic-github-token', fetchImpl });
+      const report = await run({ ...ioOf(world, {}, baseEnv()), log: () => {} });
+      assert.equal(report.status, 'stopped');
+      assert.equal(report.stopReason, 'rollout_workflow_unreadable');
+      assert.deepEqual(report.stopDetail, { workflow: 'cloud-agent-e2e.yml', ...detail });
+      assert.equal(world.calls.filter(c => c[0] === 'cf' || c[0] === 'wrangler').length, 0);
+      assert.equal(report.cleanup.note, 'not_created');
+    });
+  }
 });
 
 test('GitHub client: reads only Actions workflow runs, never environment settings', async () => {

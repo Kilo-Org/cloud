@@ -97,14 +97,18 @@ export const OPERATOR_META = 'M65_OPERATOR_PREFLIGHT';
 export const OPERATOR_SCHEMA = 'm84-operator-preflight/2';
 export const CF_API = 'https://api.cloudflare.com/client/v4';
 export const ENVIRONMENT = 'notifications-runtime-copy';
-/** Workflows that deploy Workers into this account; none may be queued or running beside the copy. */
+/**
+ * Workflows that deploy Workers into this account; none may be queued or running beside the copy.
+ * Each must exist in .github/workflows: a missing file stops the run (the test checks the list).
+ */
 export const ROLLOUT_WORKFLOWS = Object.freeze([
   'deploy-production.yml',
   'deploy-staging.yml',
   // Counts only its direct workflow_dispatch runs: its workflow_call runs are listed under the
   // calling deploy-production/deploy-staging run, which is already guarded above.
   'deploy-workers.yml',
-  'cloud-agent-e2e-deploy.yml',
+  // Deploys the closed e2e stack (the e2e and fake-LLM Workers) into this account.
+  'cloud-agent-e2e.yml',
 ]);
 const ACTIVE_RUN_STATUSES = Object.freeze([
   'queued',
@@ -147,9 +151,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MINUTE = 60_000;
 
 export class StopError extends Error {
-  constructor(reason) {
+  /** `detail`: names, ids and status codes only; reported beside the reason. */
+  constructor(reason, detail) {
     super(reason);
     this.reason = reason;
+    if (detail !== undefined) this.detail = detail;
   }
 }
 
@@ -501,18 +507,34 @@ export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fet
       throw new StopError('github_transport');
     }
     if (res.status === 404) return null;
-    if (res.status !== 200) throw new StopError('github_unreadable');
+    if (res.status !== 200) throw new StopError('github_unreadable', { status: res.status });
     try {
       return await res.json();
     } catch {
-      throw new StopError('github_unreadable');
+      throw new StopError('github_unreadable', { status: res.status });
     }
   }
-  /** A named rollout workflow that is missing or unreadable is never counted as zero runs. */
+  /**
+   * A named rollout workflow that is missing or unreadable is never counted as zero runs: it
+   * stops the run as `rollout_workflow_unreadable`, naming the workflow and the cause.
+   */
   async function workflowRuns(workflow, query) {
-    const body = await get(`/actions/workflows/${workflow}/runs?${query}`);
+    let body;
+    try {
+      body = await get(`/actions/workflows/${workflow}/runs?${query}`);
+    } catch (err) {
+      if (!(err instanceof StopError)) throw err;
+      throw new StopError('rollout_workflow_unreadable', {
+        workflow,
+        cause: err.reason,
+        ...err.detail,
+      });
+    }
+    if (body === null) {
+      throw new StopError('rollout_workflow_unreadable', { workflow, cause: 'not_found' });
+    }
     if (!isRecord(body) || !Number.isInteger(body.total_count)) {
-      throw new StopError('rollout_workflow_unreadable');
+      throw new StopError('rollout_workflow_unreadable', { workflow, cause: 'malformed' });
     }
     return body;
   }
@@ -532,7 +554,7 @@ export function github({ token, repository = REPOSITORY, apiUrl, fetchImpl = fet
         `created=${created}&per_page=${TIMING.rolloutRunsPerWorkflow}`
       );
       if (!Array.isArray(body.workflow_runs) || !body.workflow_runs.every(isRecord)) {
-        throw new StopError('rollout_workflow_unreadable');
+        throw new StopError('rollout_workflow_unreadable', { workflow, cause: 'malformed' });
       }
       return {
         total: body.total_count,
@@ -1201,6 +1223,7 @@ export async function run(io) {
   } catch (err) {
     report.status = 'stopped';
     report.stopReason = err instanceof StopError ? err.reason : 'internal';
+    if (err instanceof StopError && err.detail) report.stopDetail = err.detail;
     if (err?.codes?.length) report.errorCodes = err.codes;
   } finally {
     try {

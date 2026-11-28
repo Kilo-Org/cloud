@@ -23,6 +23,7 @@ import {
   CLOUDFLARE_ACCOUNT_SHARED_ACROSS_ENVIRONMENTS,
   CLOUDFLARE_DEPLOY_PINS,
   type CloudflareDeployPins,
+  DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING,
   MINTING_FOLDER,
   MINTING_SECRET_NAMES,
 } from '../constants';
@@ -320,6 +321,34 @@ export const CLOUDFLARE_DEPLOY_GRANT = 'cloudflare-deploy';
 export const CLOUDFLARE_DEPLOY_MAX_ACTIVE_CEILING = 3;
 export const CLOUDFLARE_DEPLOY_MAX_PER_HOUR_CEILING = 12;
 
+/**
+ * The most mint requests one GitHub run attempt may make in an hour under a grant with
+ * `maxPerRun`. Kilo-Org/cloud's deploy-workers.yml runs one job per changed Worker (31 today) in
+ * parallel, each with its own token.
+ */
+export const CLOUDFLARE_DEPLOY_MAX_PER_RUN_CEILING = 64;
+
+/**
+ * Q71 carve-out for Cloudflare deploy grants (Q71b, decided by Igor 2026-11-27).
+ * The workflow files whose deploy-only policies may accept `workflow_run` together with
+ * `schedule` and `workflow_dispatch`, and grant production. Q71 refuses that elsewhere because
+ * STS cannot see the upstream run. Here the deploy job already receives the stored
+ * `CLOUDFLARE_API_TOKEN` on the same `workflow_run` trigger, runs main's workflow code and deploys
+ * the commit that `check-deployment-changes.yml` (or the runtime publisher's admission) picked from
+ * main, so a 1-hour token is no stronger than the stored token it replaces (Q65). A policy uses
+ * the carve-out only when it is a Kilo-Org/cloud policy (ids below), binds a GitHub environment,
+ * names only these files and holds nothing but its `cloudflare-deploy` grant.
+ */
+export const Q71_CLOUDFLARE_DEPLOY_CARVE_OUT = {
+  repository: 'Kilo-Org/cloud',
+  repositoryId: '1145038391',
+  repositoryOwnerId: '201822503',
+  jobWorkflowRefs: [
+    'Kilo-Org/cloud/.github/workflows/deploy-workers.yml@refs/heads/main',
+    'Kilo-Org/cloud/.github/workflows/cloud-agent-runtime-publish.yml@refs/heads/main',
+  ],
+} as const;
+
 /** A Cloudflare account, zone or permission-group id: 32 lowercase hexadecimal characters. */
 export const CloudflareIdSchema = z.string().regex(/^[0-9a-f]{32}$/);
 
@@ -349,9 +378,10 @@ const CloudflarePermissionGroupSchema = z.strictObject({
 /**
  * One Cloudflare deploy-token grant (design 4.5, 6.3 `dynamic`): the permission set a GitHub
  * deploy job's token carries, its lifetime, and the workload's limits. `intendedScripts` names the
- * Workers the job deploys and `intendedRoutes` the zone route patterns it may add or change, for
- * audit and review only: Cloudflare's API cannot limit an API token to named Workers or routes, so
- * the token can change every Worker and route its permission groups reach in the account.
+ * Workers the job deploys (empty for a job that deploys none) and `intendedRoutes` the zone route
+ * patterns it may add or change, for audit and review only: Cloudflare's API cannot limit an API
+ * token to named Workers or routes, so the token can change every Worker and route its permission
+ * groups reach in the account.
  */
 export const CloudflareDeployGrantSchema = z.strictObject({
   grant: z.literal(CLOUDFLARE_DEPLOY_GRANT),
@@ -360,8 +390,8 @@ export const CloudflareDeployGrantSchema = z.strictObject({
   zones: z.array(CloudflareIdSchema).max(4).default([]),
   intendedScripts: z
     .array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/))
-    .min(1)
-    .max(16),
+    .max(64)
+    .default([]),
   intendedRoutes: z.array(z.string().min(1).max(256)).max(16).default([]),
   ttlSeconds: z
     .number()
@@ -371,6 +401,12 @@ export const CloudflareDeployGrantSchema = z.strictObject({
     .default(CLOUDFLARE_DEPLOY_MAX_TTL_SECONDS),
   maxActive: z.number().int().min(1),
   maxPerHour: z.number().int().min(1),
+  /**
+   * Counts `maxActive` and `maxPerHour` in GitHub run attempts (run id and attempt) instead of
+   * tokens, and allows each run attempt this many mint requests per hour (`run_limit` beyond).
+   * For a workflow whose parallel jobs each deploy with their own token; absent: one token each.
+   */
+  maxPerRun: z.number().int().min(1).max(CLOUDFLARE_DEPLOY_MAX_PER_RUN_CEILING).optional(),
 });
 
 export type CloudflareDeployGrant = z.infer<typeof CloudflareDeployGrantSchema>;
@@ -625,6 +661,16 @@ function cloudflareDeployProblems(
   if (entry.maxPerHour < entry.maxActive) {
     problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxPerHour is below maxActive`);
   }
+  // Under maxPerRun every active run may hold maxPerRun tokens at once; together they must fit in
+  // this environment's share of the account's tokens.
+  if (
+    entry.maxPerRun !== undefined &&
+    entry.maxActive * entry.maxPerRun > DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING
+  ) {
+    problems.push(
+      `dynamic ${CLOUDFLARE_DEPLOY_GRANT}: maxActive times maxPerRun is above ${DEPLOY_TOKEN_ACCOUNT_MAX_OUTSTANDING}`
+    );
+  }
   if (hasDuplicates(entry.permissionGroups.map(group => group.id))) {
     problems.push(`dynamic ${CLOUDFLARE_DEPLOY_GRANT}: permissionGroups lists a group twice`);
   }
@@ -714,6 +760,31 @@ function grantProblems(policy: Policy, registry: StsScopeRegistry): string[] {
   return problems;
 }
 
+/**
+ * True for a policy inside `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b): a Kilo-Org/cloud
+ * policy, by its ids, bound to a GitHub environment, naming only the carved-out workflow files,
+ * accepting nothing beyond `workflow_run`, `schedule` and `workflow_dispatch`, and holding its
+ * `cloudflare-deploy` grant and nothing else.
+ */
+function usesCloudflareDeployCarveOut(policy: Policy, identity: GithubIdentity): boolean {
+  const carveOut = Q71_CLOUDFLARE_DEPLOY_CARVE_OUT;
+  const files: readonly string[] = carveOut.jobWorkflowRefs;
+  return (
+    identity.repository === carveOut.repository &&
+    identity.repositoryId === carveOut.repositoryId &&
+    identity.repositoryOwnerId === carveOut.repositoryOwnerId &&
+    identity.environment !== undefined &&
+    identity.jobWorkflowRefs.every(entry => files.includes(entry)) &&
+    identity.events.every(event => event !== 'push') &&
+    policy.dynamic.length === 1 &&
+    cloudflareDeployGrant(policy) !== undefined &&
+    policy.secrets.length === 0 &&
+    policy.audiences.length === 0 &&
+    policy.scopes.length === 0 &&
+    Object.keys(policy.environmentGrants).length === 0
+  );
+}
+
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
 
 function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
@@ -742,7 +813,11 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   // job only asks the migration proxy to apply what is on `main`, which the proxy checks itself
   // (design Q64a). So it may list workflow_run with other events and grant production.
   // D53/M112: the secret-bundle policies of D53_M112_CI_BUNDLE_CARVE_OUT may too.
-  const carvedOut = holdsMigrationRun(policy) || usesCiBundleCarveOut(policy, identity);
+  // Q71b (Igor, 2026-11-27): the deploy-only policies of Q71_CLOUDFLARE_DEPLOY_CARVE_OUT may too.
+  const carvedOut =
+    holdsMigrationRun(policy) ||
+    usesCiBundleCarveOut(policy, identity) ||
+    usesCloudflareDeployCarveOut(policy, identity);
   if (!carvedOut && identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }

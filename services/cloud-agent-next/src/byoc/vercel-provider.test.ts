@@ -306,7 +306,11 @@ describe('BYOC Vercel provider on the current control plane', () => {
       await expect(adapter().create(intent)).rejects.toMatchObject({
         reason: 'byoc_vercel_snapshot_missing',
       });
-      expect(projectByocVercelSnapshotMissing).toHaveBeenCalledWith(expect.anything(), snapshot);
+      expect(projectByocVercelSnapshotMissing).toHaveBeenCalledWith(
+        expect.anything(),
+        snapshot,
+        undefined
+      );
     }
   );
 

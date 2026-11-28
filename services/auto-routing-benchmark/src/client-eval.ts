@@ -60,6 +60,8 @@ import { buildGraderUsage, writeGraderUsage } from './grader-usage';
 import { gradeDeciderOutput, type DeciderJudge } from './grading';
 import type { HonoEnv } from './hono-env';
 import { createSystemOneClient } from './openrouter';
+import { requestContext } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { currentProfileContextFromConfig } from './profiles';
 import type { DeciderCase } from './datasets/decider-cases';
 import { isProbeCase } from './datasets/probe-cases';
@@ -426,7 +428,7 @@ export function registerClientEvalRoutes(app: Hono<HonoEnv>): void {
   const route = <S extends z.ZodType, R>(
     path: string,
     schema: S,
-    handle: (env: Env, request: z.infer<S>) => Promise<R> | R
+    handle: (env: Env, request: z.infer<S>, ctx?: SecretsExecutionContext) => Promise<R> | R
   ) =>
     app.post(path, async c => {
       const parsed = schema.safeParse(await c.req.json().catch(() => null));
@@ -434,7 +436,7 @@ export function registerClientEvalRoutes(app: Hono<HonoEnv>): void {
         return c.json(errorBody('invalid_request', 'Invalid client eval request'), 400);
       }
       try {
-        return c.json(await handle(c.env, parsed.data));
+        return c.json(await handle(c.env, parsed.data, requestContext(c)));
       } catch (error) {
         if (error instanceof ClientEvalError) {
           return c.json(
@@ -458,7 +460,7 @@ export function registerClientEvalRoutes(app: Hono<HonoEnv>): void {
   route(
     CUSTOM_ROUTER_EVAL_RESULT_PATH,
     InternalClientEvalResultRequestSchema,
-    async (env, request) =>
+    async (env, request, ctx) =>
       gradeClientEvalResult(
         env.BENCH_DB,
         await requireConfig(env.BENCH_DB, request.baseRouter),
@@ -466,7 +468,7 @@ export function registerClientEvalRoutes(app: Hono<HonoEnv>): void {
         {
           source: { catalogEnv: env },
           createJudge: async () => createDeciderJudge(await createSystemOneClient(env)),
-          writeUsage: usage => writeGraderUsage(env, usage),
+          writeUsage: usage => writeGraderUsage(env, usage, ctx),
         }
       )
   );

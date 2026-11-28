@@ -4,6 +4,7 @@ import {
   INTERNAL_AUTH_OBSERVATION_FLAG,
   INTERNAL_CALLERS,
   callerLabel,
+  internalAuthAnalyticsSink,
   isInternalAuthObservationEnabled,
   observeInternalAuth,
   resetInternalAuthObservation,
@@ -137,6 +138,61 @@ describe('internal auth observation', () => {
       // The receiver is a plain string at every call site; this proves the guard, not a real input.
       observeInternalAuth(circular as unknown as string, 'usage_record', 'sts')
     ).not.toThrow();
+  });
+});
+
+describe('sink and Analytics Engine delivery', () => {
+  it('gives every written line to the sink', () => {
+    const seen: unknown[] = [];
+    const sink = (line: unknown) => seen.push(line);
+
+    observeInternalAuth(
+      'usage-ingest',
+      'usage_publish',
+      'legacy_shared_secret',
+      'ai-gateway',
+      sink
+    );
+    vi.setSystemTime(new Date(START.getTime() + 60_000));
+    observeInternalAuth(
+      'usage-ingest',
+      'usage_publish',
+      'legacy_shared_secret',
+      'ai-gateway',
+      sink
+    );
+
+    // The eager line and the remainder, identical to what the console got.
+    expect(seen).toEqual(lines());
+  });
+
+  it('never breaks the counter when a sink throws', () => {
+    const sink = () => {
+      throw new Error('analytics down');
+    };
+
+    expect(() =>
+      observeInternalAuth('usage-ingest', 'usage_publish', 'sts', 'ai-gateway', sink)
+    ).not.toThrow();
+    expect(totalCount()).toBe(1);
+  });
+
+  it('turns one line into one Analytics Engine data point', () => {
+    const writeDataPoint = vi.fn();
+    const sink = internalAuthAnalyticsSink({ writeDataPoint });
+
+    observeInternalAuth('notifications', 'dispatch', 'legacy_shared_secret', 'web', sink);
+
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      blobs: ['notifications', 'dispatch', 'legacy_shared_secret', 'web'],
+      doubles: [1],
+      indexes: [String(START_MINUTE)],
+    });
+  });
+
+  it('writes no data points without the binding', () => {
+    expect(internalAuthAnalyticsSink(undefined)).toBeUndefined();
   });
 });
 

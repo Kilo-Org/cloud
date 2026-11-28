@@ -55,6 +55,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/notifications": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",

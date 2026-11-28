@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { authorize, authorizeTranscript, exchange, type Principal } from './auth';
+import { requestContext } from './request-context';
 import { authorizeCloudAgentUpload } from './cloud-agent-upload';
 import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
@@ -187,15 +188,15 @@ app.use('/v1/*', (c: C, next: Next) =>
 
 app.route('/internal', internal);
 
-app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env));
+app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env, requestContext(c)));
 app.route('/v1', live);
 app.route('/v1', notifications);
 
 app.use('/v1/sessions/*', async (c, next) => {
   const principal =
-    (await authorizeTranscript(c.req.raw, c.env)) ??
+    (await authorizeTranscript(c.req.raw, c.env, requestContext(c))) ??
     (await authorizeCloudAgentUpload(c.req.raw, c.env)) ??
-    (await authorize(c.req.raw, c.env));
+    (await authorize(c.req.raw, c.env, requestContext(c)));
   if (principal instanceof Response) return principal;
   c.set('principal', principal);
   const metrics = requestMetrics(c.req.raw);

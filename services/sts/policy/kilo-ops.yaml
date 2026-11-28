@@ -1,4 +1,22 @@
-# Registration only: services/kilo-ops/wrangler.jsonc. No environment, identity or grant.
+# The kilo-ops Worker (services/kilo-ops/wrangler.jsonc). Once secrets-cutover flips it, it reads its
+# runtime secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the
+# Secrets Store bindings) until then.
+#
+# `O11Y_CF_AE_API_TOKEN` is the shared Cloudflare analytics token (bound as `CF_ANALYTICS_API_KEY`)
+# and resolves from /shared; `GF_SECRET_KEY` is this Worker's own Grafana key in
+# /workloads/kilo-ops.
+#
+# Before `wrangler deploy --env dev` works, the Secrets Store needs `GF_SECRET_KEY_DEV` (a new
+# random Grafana key); the dev block reads that name because a non-production block of a config that
+# binds STS may not read a production-named store secret. Never copy the production value. The dev
+# block binds no Analytics Engine token (none has been minted for dev), so it runs that proxy off:
+# src/worker.ts answers "not configured" there, and a `_DEV` entry plus its dev binding turns the
+# proxy back on with no code change.
 workload: kilo-ops
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - O11Y_CF_AE_API_TOKEN
+  - GF_SECRET_KEY

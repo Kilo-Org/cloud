@@ -64,12 +64,17 @@ jobs:
           SOURCE_SHA: ${{ steps.admit.outputs.source_sha }}
         run: node services/cloud-agent-next/scripts/runtime-publication-need.mjs
 
+  # The repository variable DEPLOY_TOKEN_SOURCE picks `publish` (unset or `secret`: the stored
+  # CLOUDFLARE_API_TOKEN and CLOUD_AGENT_RUNTIME_R2_* secrets) or `publish-sts` (`sts`: a token STS
+  # mints for the job over GitHub OIDC, policy ci-deploy-cloud-runtime, and temporary R2
+  # credentials from it). scripts/deployment-workflows.test.mjs holds the twin to this job.
   publish:
     needs: admit
     # Automatic runs need a downloaded catalog target; manual runs are explicit operator actions.
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' || needs.admit.outputs.needed == 'true')
+      (github.event_name == 'workflow_dispatch' || needs.admit.outputs.needed == 'true') &&
+      vars.DEPLOY_TOKEN_SOURCE != 'sts'
     environment: cloud-agent-runtime-publication
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 45
@@ -105,3 +110,86 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm runtime:publish --bucket "$RUNTIME_R2_BUCKET" --source-sha "$SOURCE_SHA"
+
+  publish-sts:
+    needs: admit
+    # Automatic runs need a downloaded catalog target; manual runs are explicit operator actions.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || needs.admit.outputs.needed == 'true') &&
+      vars.DEPLOY_TOKEN_SOURCE == 'sts'
+    environment: cloud-agent-runtime-publication
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: cloud-agent-runtime-publisher-${{ needs.admit.outputs.source_sha }}
+      cancel-in-progress: false
+    steps:
+      # Exactly `sts`: job conditions compare without case, so `STS` passes them and stops here.
+      - name: Check DEPLOY_TOKEN_SOURCE
+        env:
+          DEPLOY_TOKEN_SOURCE: ${{ vars.DEPLOY_TOKEN_SOURCE }}
+        run: |
+          if [[ $DEPLOY_TOKEN_SOURCE != sts ]]; then
+            echo "::error::DEPLOY_TOKEN_SOURCE must be unset, secret or sts"
+            exit 1
+          fi
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
+        with:
+          ref: ${{ needs.admit.outputs.source_sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version-file: '.nvmrc'
+          # The GitHub cache, not the shared sticky disk: this job publishes a
+          # production artifact, and deploy workflows keep the same isolation.
+          cache: 'pnpm'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+      # Only the publisher and wrapper dependency graphs; the full workspace install pulls
+      # thousands of unrelated packages and fails publication when the registry is slow.
+      - run: pnpm install --frozen-lockfile --filter 'cloud-agent-next...' --filter '@kilocode/cloud-agent-wrapper...'
+      # Masks the token and hands it on only as a step output. A refusal fails the job: it never
+      # falls back to the secret; rolling back means setting DEPLOY_TOKEN_SOURCE to `secret`.
+      - name: Get a deploy token from STS
+        id: sts
+        env:
+          STS_ENVIRONMENT: production
+        run: bash scripts/ci/sts-deploy-token.sh mint
+      # Temporary R2 credentials for the runtime bucket, from the deploy token: this job never
+      # reads the stored CLOUD_AGENT_RUNTIME_R2_* keys.
+      - name: Get temporary R2 credentials
+        id: r2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_PARENT_ACCESS_KEY_ID: ${{ vars.CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID }}
+          # The publisher writes the release and the exact-SHA handoff.
+          RUNTIME_R2_PERMISSION: object-read-write
+        run: bash scripts/ci/r2-temp-credentials.sh
+      - name: Publish verified runtime and exact-SHA handoff
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ steps.r2.outputs.access_key_id }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ steps.r2.outputs.secret_access_key }}
+          RUNTIME_R2_SESSION_TOKEN: ${{ steps.r2.outputs.session_token }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.sts.outputs.token }}
+        run: pnpm runtime:publish --bucket "$RUNTIME_R2_BUCKET" --source-sha "$SOURCE_SHA"
+      # Also after a failed or cancelled publication, with a fresh OIDC token. A token that is not
+      # revoked stays valid until STS deletes it at its expiry.
+      - name: Revoke the deploy token
+        if: always() && steps.sts.outputs.token_id != ''
+        env:
+          STS_ENVIRONMENT: production
+          TOKEN_ID: ${{ steps.sts.outputs.token_id }}
+        run: bash scripts/ci/sts-deploy-token.sh revoke "$TOKEN_ID"

@@ -2,6 +2,7 @@
  * Shared types for code review worker
  */
 
+import type { BundleBinding } from '@kilocode/secrets-client';
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
 import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
 import type {
@@ -9,6 +10,7 @@ import type {
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import type { MintBinding } from '@kilocode/service-token-client';
 import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
@@ -167,10 +169,22 @@ export interface Env {
 
   // Environment variables
   API_URL: string;
-  INTERNAL_API_SECRET: string;
-  CALLBACK_TOKEN_SECRET: string;
   CLOUD_AGENT_NEXT_URL: string;
-  BACKEND_AUTH_TOKEN: string;
+
+  // Runtime secrets, read only through `src/secrets.ts`, which selects the source with
+  // `SECRETS_SOURCE`. They are optional so a direct `this.env.<secret>` read fails type-checking
+  // instead of silently skipping the flag.
+  INTERNAL_API_SECRET?: string;
+  CALLBACK_TOKEN_SECRET?: string;
+  BACKEND_AUTH_TOKEN?: string;
+  SECRETS_SOURCE?: string;
+  /**
+   * STS `SecretsBroker`, `props.caller` `kilo-code-review-worker`: one binding serves both entry
+   * points, the bundle read (`BundleBinding`) and the status-write token mint (`MintBinding`).
+   */
+  STS?: BundleBinding & MintBinding;
+  /** `legacy` (default) or `sts`: the credential of this Worker's own status writes. */
+  CODE_REVIEW_STATUS_CALLBACK_AUTH?: string;
 
   // Optional Sentry
   SENTRY_DSN?: string;

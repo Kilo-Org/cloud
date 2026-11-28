@@ -31,6 +31,10 @@ export type ExportSpan = {
  * do: attributes are exported to the traces destination. Identifiers that describe the
  * job (export id, generation, source name) are fine; user ids, row contents, SQL text,
  * and cursor values are not.
+ *
+ * This deployment sets `observability.traces.enabled: false` (the STS secret-holder rule),
+ * so these spans record nothing today. They are kept because the stage boundaries are the
+ * only way to attribute a slow export, and enabling traces is a config change.
  */
 export function withSpan<T>(
   name: string,

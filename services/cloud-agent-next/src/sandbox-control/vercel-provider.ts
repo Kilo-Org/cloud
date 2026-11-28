@@ -9,6 +9,7 @@ import {
   type VercelSandboxSession,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
 import type { SecretBinding } from '../auth.js';
@@ -164,6 +165,8 @@ function buildSandboxNetworkPolicy(
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
   env?: { WORKER_URL?: string; NEXTAUTH_SECRET?: SecretBinding };
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   restrictedEgress?: VercelRestrictedEgress;
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
@@ -208,7 +211,9 @@ export function createVercelProviderAdapter(deps: {
   const controlNetworkPolicy = async (grants: readonly SessionCredentialGrant[]) => {
     const sandboxId = grants[0]?.sandboxId;
     const originProof =
-      sandboxId === undefined ? null : await runtimeProxyOriginProof(deps.env ?? {}, sandboxId);
+      sandboxId === undefined
+        ? null
+        : await runtimeProxyOriginProof(deps.env ?? {}, sandboxId, deps.ctx);
     return buildSandboxNetworkPolicy(
       grants,
       await deps.readAcceptedRuntimeProxyHandles?.(),

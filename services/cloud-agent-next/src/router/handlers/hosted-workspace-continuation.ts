@@ -598,7 +598,13 @@ async function runContinuationEffects(args: {
   try {
     first = await createSessionWithLedger(
       buildChildRequest(plan, input, 0, firstKey),
-      { env: ctx.env, userId: ctx.userId, authToken: ctx.authToken, botId: ctx.botId },
+      {
+        env: ctx.env,
+        executionCtx: ctx.executionCtx,
+        userId: ctx.userId,
+        authToken: ctx.authToken,
+        botId: ctx.botId,
+      },
       {
         billingOrigin: 'agent-manager',
         operationKey: firstKey,
@@ -761,7 +767,8 @@ const continueHostedWorkspaceHandler = protectedProcedure
       const balance = await validateBalanceOnly(
         ctx.authToken,
         organizationId ?? undefined,
-        ctx.env
+        ctx.env,
+        ctx.executionCtx
       );
       if (!balance.success) {
         throw balance.status === 402

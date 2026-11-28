@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { HonoContext } from '../hono-context.js';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
+import { requestContext } from '../request-context.js';
 import {
   controlLogIdentitySchema,
   type ControlLogIdentity,
@@ -83,7 +84,9 @@ export async function authorizeTransfer(
   const identity = routeIdentity(c);
   if (!identity.success) return c.text('Invalid transfer identity', 400);
   const authorization = c.req.header('Authorization') ?? null;
-  const secret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(c.env, 'NEXTAUTH_SECRET', requestContext(c)).catch(
+    () => null
+  );
   const grant = validateSandboxTransferGrant(authorization, secret);
   if (grant) {
     if (!matchesIdentity(grant.identity, identity.data)) {

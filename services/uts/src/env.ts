@@ -193,10 +193,20 @@ export type Env = {
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
   /**
+   * `true` offers the home-widget exchange at the token endpoint (src/home-widget/exchange.ts);
+   * absent keeps it off, and any other value keeps it off and is logged.
+   */
+  HOME_WIDGET_GRANT_ENABLED?: string;
+  /**
    * The CI token exchange's trust policies (src/ci/policy.ts): a JSON array per environment. Absent
    * or empty keeps the exchange off; a value that breaks a rule keeps it off and is logged.
    */
   CI_TOKEN_POLICIES?: string;
+  /**
+   * The bot-token mint's policies (src/bot-token/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the mint off; a value that breaks a rule keeps it off and is logged.
+   */
+  BOT_TOKEN_POLICIES?: string;
 } & SignInEnv &
   AttestEnv;
 

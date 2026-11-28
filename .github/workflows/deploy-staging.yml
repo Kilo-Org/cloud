@@ -142,8 +142,9 @@ jobs:
     needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
-    # GitHub checks every job of the called workflow against this ceiling,
-    # including the Cloud Agent source map upload a detection call skips.
+    # Ceiling of the called workflow: GitHub checks every job in it, and its `-sts` deploy
+    # jobs and Cloud Agent source map upload request id-token (a detection call skips them
+    # and runs only detect-changes).
     permissions:
       contents: read
       actions: read
@@ -162,8 +163,10 @@ jobs:
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
     # workflow inherits repo secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
-    # Ceiling for the called workflow, which GitHub checks for every job in it;
-    # its Cloud Agent source map upload reads the STS bundle.
+    # The ceiling of the called jobs: only its `-sts` deploy jobs and its Cloud Agent source
+    # map upload request id-token; the deploy tokens name deploy-workers.yml, so they match
+    # the ci-deploy-cloud-staging policy and the upload's ci-cloud-agent-sentry-staging,
+    # never this workflow's trigger-only ci-db-migrate-staging.
     permissions:
       contents: read
       actions: read

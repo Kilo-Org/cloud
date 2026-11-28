@@ -46,7 +46,7 @@ export class SessionSyncAuthorization extends WorkerEntrypoint<Env> {
     if (!parsed.success) return null;
     const { handle, sessionID } = parsed.data;
     const originProof = parseRuntimeProxyOriginProof(parsed.data.originProof);
-    const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle, this.ctx);
     if (!claims) return null;
     const credential = await withDORetry(
       () => getSandboxSessionStub(this.env, claims.userId, claims.sessionId),

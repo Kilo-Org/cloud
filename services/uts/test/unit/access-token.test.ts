@@ -13,6 +13,7 @@ const config: UtsConfig = {
   environment: 'production',
   endpoints: UTS_ENDPOINTS.production,
   jurisdiction: 'eu',
+  secretsSource: 'worker',
   relyingParty: { rpId: 'app.kilo.ai', origins: ['https://uts.kiloapps.io'] },
   managerBaseUrl: null,
   loginRotation: { status: 'off' },

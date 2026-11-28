@@ -12,7 +12,7 @@ import {
   type UtsEnvironment,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
-import { FEED_DEPLOYMENTS } from '../../src/env';
+import { FEED_DEPLOYMENTS, SECRETS_SOURCE_VALUES } from '../../src/env';
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -551,6 +551,40 @@ function hyperdriveProblems(
     : [`${where}: binds Hyperdrive ${bound || 'nothing'}; expected ${expected}`];
 }
 
+/** The STS deployment whose bundle each deployed mint block reads. */
+const STS_SERVICES = { production: 'sts', staging: 'sts-staging' } as const;
+
+/**
+ * A deployed mint block names its secrets source (`src/env.ts` refuses to start without one) and
+ * binds its own environment's STS exactly once as caller `uts`, so flipping `SECRETS_SOURCE` to
+ * `sts`, or back, changes one var and no binding.
+ */
+function secretsSourceProblems(
+  where: string,
+  bindings: Bindings,
+  environment: 'production' | 'staging'
+): string[] {
+  const problems: string[] = [];
+  const source = bindings.vars?.SECRETS_SOURCE;
+  if (!SECRETS_SOURCE_VALUES.some(value => value === source)) {
+    problems.push(
+      `${where}: SECRETS_SOURCE resolves to ${String(source)}; it must be one of ${SECRETS_SOURCE_VALUES.join(', ')}`
+    );
+  }
+  const bound = (bindings.services ?? [])
+    .filter(binding => binding.binding === 'STS')
+    .map(
+      binding =>
+        `${binding.service}/${binding.entrypoint ?? '(default)'}/${String(binding.props?.caller)}`
+    )
+    .join(', ');
+  const expected = `${STS_SERVICES[environment]}/SecretsBroker/uts`;
+  if (bound !== expected) {
+    problems.push(`${where}: binds STS as ${bound || 'nothing'}; expected ${expected}`);
+  }
+  return problems;
+}
+
 /** Problems with the development config; `utsConfigProblems` lists its rules. */
 function devConfigProblems(dev: WorkerConfig): string[] {
   const { config } = dev;
@@ -687,9 +721,10 @@ export const FEED_MAX_LOG_SAMPLING_RATE = 0.05;
  * Problems inside the UTS Workers' own configs: each deployed config deploys exactly its names
  * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
- * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store, and
- * keeps query strings (a provider callback's authorization code) out of its logs, and offers the
- * home-widget exchange only with `HOME_WIDGET_GRANT_ENABLED` exactly `true`, never in production;
+ * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store,
+ * keeps query strings (a provider callback's authorization code) out of its logs, names its
+ * secrets source and binds its own environment's STS as caller `uts`, and offers the home-widget
+ * exchange only with `HOME_WIDGET_GRANT_ENABLED` exactly `true`, never in production;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
  * without placement, binds no Durable Object, binds each mint entrypoint once, keeps at most a
@@ -730,6 +765,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
         problems.push(...auditQueueProblems(block.where, block.bindings, environment));
         if (environment === 'production' || environment === 'staging') {
           problems.push(...hyperdriveProblems(block.where, block.bindings, environment));
+          problems.push(...secretsSourceProblems(block.where, block.bindings, environment));
         }
       }
       const main = block.block?.main ?? mint.config.main;

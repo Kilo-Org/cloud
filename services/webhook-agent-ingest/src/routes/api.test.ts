@@ -203,6 +203,7 @@ function createRouteHarness(initialConfig: StoredConfig | null) {
     invokeScheduled,
   };
   const env = {
+    ENVIRONMENT: 'development',
     INTERNAL_API_SECRET: { get: vi.fn(async () => INTERNAL_API_SECRET) },
     TRIGGER_DO: {
       idFromName,

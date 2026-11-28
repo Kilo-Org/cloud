@@ -42,6 +42,7 @@ function createRouteHarness(cloudAgentSessionId = CLOUD_AGENT_SESSION_ID) {
   const updateRequest = vi.fn(async () => undefined);
   const stub = { getRequest, updateRequest };
   const env = {
+    ENVIRONMENT: 'development',
     CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => CALLBACK_SECRET) },
     TRIGGER_DO: {
       idFromName: vi.fn((name: string) => name),
@@ -251,17 +252,21 @@ function bundleWith(secrets: Record<string, string>): BundleResult {
 
 /** A fresh STS binding per call: the reader keeps one bundle per binding for the isolate. */
 function sourceHarness(
-  source: string | undefined,
-  bundle: BundleResult = bundleWith({ CALLBACK_TOKEN_SECRET: BUNDLE_CALLBACK_SECRET })
+  environment: string | undefined,
+  bundle: BundleResult | 'no-binding' = bundleWith({
+    CALLBACK_TOKEN_SECRET: BUNDLE_CALLBACK_SECRET,
+  })
 ) {
   const { env: base, getRequest, updateRequest } = createRouteHarness();
-  const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
+  const getBundle = vi.fn<BundleBinding['getBundle']>(async () =>
+    bundle === 'no-binding' ? bundleWith({}) : bundle
+  );
   const storeGet = vi.fn(async () => STORE_CALLBACK_SECRET);
   const env = {
     ...base,
-    ...(source === undefined ? {} : { SECRETS_SOURCE: source }),
+    ENVIRONMENT: environment,
     CALLBACK_TOKEN_SECRET: { get: storeGet },
-    STS: { getBundle },
+    STS: bundle === 'no-binding' ? undefined : { getBundle },
   } as unknown as Env;
   return { env, getBundle, storeGet, getRequest, updateRequest };
 }
@@ -280,23 +285,21 @@ describe('webhook execution callback secrets source', () => {
     vi.restoreAllMocks();
   });
 
-  it.each([undefined, 'secrets-store'])(
-    'accepts only a token from the Secrets Store value and reads no bundle (%j)',
-    async source => {
-      const { env, getBundle, storeGet } = sourceHarness(source);
+  it('accepts only a token from the Secrets Store value and reads no bundle in development', async () => {
+    const { env, getBundle, storeGet } = sourceHarness('development');
 
-      const fromBundle = await tokenFor(BUNDLE_CALLBACK_SECRET);
-      expect((await requestCallback(env, { callbackToken: fromBundle })).status).toBe(401);
-      expect((await requestCallback(env, {})).status).toBe(401);
-      const fromStore = await tokenFor(STORE_CALLBACK_SECRET);
-      expect((await requestCallback(env, { callbackToken: fromStore })).status).toBe(200);
-      expect(storeGet).toHaveBeenCalledTimes(3);
-      expect(getBundle).not.toHaveBeenCalled();
-    }
-  );
+    const fromBundle = await tokenFor(BUNDLE_CALLBACK_SECRET);
+    expect((await requestCallback(env, { callbackToken: fromBundle })).status).toBe(401);
+    expect((await requestCallback(env, {})).status).toBe(401);
+    const fromStore = await tokenFor(STORE_CALLBACK_SECRET);
+    expect((await requestCallback(env, { callbackToken: fromStore })).status).toBe(200);
+    expect(storeGet).toHaveBeenCalledTimes(3);
+    expect(getBundle).not.toHaveBeenCalled();
+  });
 
-  it('accepts only a bundle-value token under sts and never reads the Secrets Store', async () => {
-    const { env, getBundle, storeGet, updateRequest } = sourceHarness('sts');
+  it('accepts only a bundle-value token in production and never reads the Secrets Store', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const { env, getBundle, storeGet, updateRequest } = sourceHarness('production');
 
     expect((await requestCallback(env, {})).status).toBe(401);
     // A tokenless callback loads no bundle.
@@ -313,17 +316,26 @@ describe('webhook execution callback secrets source', () => {
     );
     expect(getBundle).toHaveBeenCalledOnce();
     expect(storeGet).not.toHaveBeenCalled();
+    const refusal = (reason: string) => [
+      'Callback authentication failed',
+      { route: 'execution-callback', secret: 'CALLBACK_TOKEN_SECRET', source: 'sts', reason },
+    ];
+    expect(
+      warn.mock.calls.filter(([message]) => message === 'Callback authentication failed')
+    ).toEqual([refusal('missing'), refusal('invalid')]);
   });
 
-  it.each<[string, string, BundleResult, string]>([
-    ['no grant', 'sts', bundleWith({}), 'not_granted'],
-    ['an STS denial', 'sts', { status: 'denied', reason: 'unknown_workload' }, 'denied'],
-    ['a malformed SECRETS_SOURCE', 'STS', bundleWith({}), 'invalid_source'],
+  it.each<[string, string | undefined, BundleResult | 'no-binding', string]>([
+    ['no grant', 'production', bundleWith({}), 'not_granted'],
+    ['an STS denial', 'production', { status: 'denied', reason: 'unknown_workload' }, 'denied'],
+    ['no STS binding in production', 'production', 'no-binding', 'binding_missing'],
+    ['a staging ENVIRONMENT', 'staging', bundleWith({}), 'unsupported_environment'],
+    ['no ENVIRONMENT', undefined, bundleWith({}), 'unsupported_environment'],
   ])(
     'answers a generic 503 on %s before any Durable Object call, with no fallback',
-    async (_case, source, bundle, reason) => {
+    async (_case, environment, bundle, reason) => {
       const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-      const { env, storeGet, getRequest } = sourceHarness(source, bundle);
+      const { env, getBundle, storeGet, getRequest } = sourceHarness(environment, bundle);
       const callbackToken = await tokenFor(STORE_CALLBACK_SECRET);
 
       const response = await requestCallback(env, { callbackToken });
@@ -341,6 +353,7 @@ describe('webhook execution callback secrets source', () => {
       });
       expect(storeGet).not.toHaveBeenCalled();
       expect(getRequest).not.toHaveBeenCalled();
+      if (environment !== 'production') expect(getBundle).not.toHaveBeenCalled();
     }
   );
 });

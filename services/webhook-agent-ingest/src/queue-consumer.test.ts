@@ -107,6 +107,7 @@ function makeTriggerConfig(overrides: Record<string, unknown> = {}) {
 
 function makeEnv() {
   return {
+    ENVIRONMENT: 'development',
     HYPERDRIVE: { connectionString: 'postgres://test' },
     KILO_CHAT: {} as unknown,
   } as unknown as Env;
@@ -325,6 +326,7 @@ describe('creator Cloud Agent dispatch', () => {
         : Response.json({ result: { data: { status: 'running' } } });
     });
     const env = {
+      ENVIRONMENT: 'development',
       WEBHOOK_AGENT_URL: 'https://hooks.test',
       WEBHOOK_TOKEN_CACHE: cache,
       INTERNAL_API_SECRET: 'internal-secret',
@@ -620,6 +622,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
       updateRequest: vi.fn(async () => ({ success: true })),
     };
     const env = {
+      ENVIRONMENT: 'development',
       WEBHOOK_AGENT_URL: 'https://hooks.test',
       WEBHOOK_TOKEN_CACHE: {
         get: vi.fn(async () => 'api-token'),
@@ -700,6 +703,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
         updateRequest: vi.fn(async () => ({ success: true })),
       };
       const env = {
+        ENVIRONMENT: 'development',
         WEBHOOK_AGENT_URL: 'https://hooks.test',
         SHARED_RESOURCE_TOKENS_ENABLED: sharedResourceTokensEnabled,
         WEBHOOK_TOKEN_CACHE: { get: getCachedToken, put: vi.fn() },
@@ -784,6 +788,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
         updateRequest: vi.fn(async () => ({ success: true })),
       };
       const env = {
+        ENVIRONMENT: 'development',
         WEBHOOK_AGENT_URL: 'https://hooks.test',
         WEBHOOK_TOKEN_CACHE: {
           get: vi.fn(async () => 'api-token'),
@@ -871,6 +876,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
         updateRequest: vi.fn(async () => ({ success: true })),
       };
       const env = {
+        ENVIRONMENT: 'development',
         WEBHOOK_AGENT_URL: 'https://hooks.test',
         WEBHOOK_TOKEN_CACHE: {
           get: vi.fn(async () => 'api-token'),
@@ -1018,7 +1024,7 @@ describe('queue consumer secrets source', () => {
   /** One message for a trigger of `targetType`; a fresh STS binding per harness. */
   function harness(
     targetType: 'cloud_agent' | 'cloud_agent_chat',
-    source: string | undefined,
+    environment: string | undefined,
     bundle: BundleResult = FULL_BUNDLE
   ) {
     const config = makeTriggerConfig({
@@ -1059,7 +1065,7 @@ describe('queue consumer secrets source', () => {
     const callbackGet = vi.fn(async () => STORE_CALLBACK);
     const env = {
       ...makeEnv(),
-      ...(source === undefined ? {} : { SECRETS_SOURCE: source }),
+      ENVIRONMENT: environment,
       WEBHOOK_AGENT_URL: 'https://hooks.test',
       WEBHOOK_TOKEN_CACHE: { get: vi.fn(async () => 'cached-token'), put: vi.fn() },
       INTERNAL_API_SECRET: { get: internalGet },
@@ -1090,27 +1096,24 @@ describe('queue consumer secrets source', () => {
     });
   }
 
-  it.each([undefined, 'secrets-store'])(
-    'dispatches with the Secrets Store values and reads no bundle (%j)',
-    async source => {
-      const h = harness('cloud_agent', source);
+  it('dispatches with the Secrets Store values and reads no bundle in development', async () => {
+    const h = harness('cloud_agent', 'development');
 
-      await h.deliver();
+    await h.deliver();
 
-      const prepare = h.calls[0];
-      expect(prepare?.headers.get('x-internal-api-key')).toBe(STORE_INTERNAL);
-      expect(await prepare?.json()).toMatchObject({
-        callbackTarget: {
-          headers: { 'X-Callback-Token': await expectedCallbackToken(STORE_CALLBACK) },
-        },
-      });
-      expect(h.getBundle).not.toHaveBeenCalled();
-      expect(h.ack).toHaveBeenCalledOnce();
-    }
-  );
+    const prepare = h.calls[0];
+    expect(prepare?.headers.get('x-internal-api-key')).toBe(STORE_INTERNAL);
+    expect(await prepare?.json()).toMatchObject({
+      callbackTarget: {
+        headers: { 'X-Callback-Token': await expectedCallbackToken(STORE_CALLBACK) },
+      },
+    });
+    expect(h.getBundle).not.toHaveBeenCalled();
+    expect(h.ack).toHaveBeenCalledOnce();
+  });
 
-  it('dispatches with the bundle values under sts and never reads the Secrets Store', async () => {
-    const h = harness('cloud_agent', 'sts');
+  it('dispatches with the bundle values in production and never reads the Secrets Store', async () => {
+    const h = harness('cloud_agent', 'production');
 
     await h.deliver();
 
@@ -1128,8 +1131,8 @@ describe('queue consumer secrets source', () => {
     expect(h.ack).toHaveBeenCalledOnce();
   });
 
-  it('sends an existing-chat message with the bundle key under sts', async () => {
-    const h = harness('cloud_agent_chat', 'sts');
+  it('sends an existing-chat message with the bundle key in production', async () => {
+    const h = harness('cloud_agent_chat', 'production');
 
     await h.deliver();
 
@@ -1139,17 +1142,19 @@ describe('queue consumer secrets source', () => {
     expect(h.ack).toHaveBeenCalledOnce();
   });
 
-  it.each<[string, 'cloud_agent' | 'cloud_agent_chat', string, BundleResult]>([
-    ['a missing grant', 'cloud_agent', 'sts', stsBundle({})],
-    ['a malformed SECRETS_SOURCE', 'cloud_agent', 'STS', FULL_BUNDLE],
-    ['a missing grant', 'cloud_agent_chat', 'sts', stsBundle({})],
-    ['a malformed SECRETS_SOURCE', 'cloud_agent_chat', 'STS', FULL_BUNDLE],
+  it.each<[string, 'cloud_agent' | 'cloud_agent_chat', string | undefined, BundleResult]>([
+    ['a missing grant', 'cloud_agent', 'production', stsBundle({})],
+    ['a staging ENVIRONMENT', 'cloud_agent', 'staging', FULL_BUNDLE],
+    ['no ENVIRONMENT', 'cloud_agent', undefined, FULL_BUNDLE],
+    ['a missing grant', 'cloud_agent_chat', 'production', stsBundle({})],
+    ['a staging ENVIRONMENT', 'cloud_agent_chat', 'staging', FULL_BUNDLE],
+    ['no ENVIRONMENT', 'cloud_agent_chat', undefined, FULL_BUNDLE],
   ])(
     'retries %s on a %s trigger with a fixed message, sends nothing and never falls back',
-    async (_case, targetType, source, bundle) => {
+    async (_case, targetType, environment, bundle) => {
       const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
       try {
-        const h = harness(targetType, source, bundle);
+        const h = harness(targetType, environment, bundle);
 
         await h.deliver(1);
         expect(h.retry).toHaveBeenCalledOnce();
@@ -1167,6 +1172,7 @@ describe('queue consumer secrets source', () => {
         expect(h.calls).toHaveLength(0);
         expect(h.internalGet).not.toHaveBeenCalled();
         expect(h.callbackGet).not.toHaveBeenCalled();
+        if (environment !== 'production') expect(h.getBundle).not.toHaveBeenCalled();
         expect(h.ack).toHaveBeenCalledOnce();
       } finally {
         log.mockRestore();

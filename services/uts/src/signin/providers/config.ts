@@ -172,10 +172,12 @@ function rawValue(input: SignInInput, name: SignInName): string | undefined | ty
 /**
  * `off` when every plain var of the method is unset, whatever the secrets hold: the vars are the
  * switch, so a bundle that delivers every granted secret cannot make a method the environment has
- * not turned on `misconfigured` (README "Runtime secrets", "Methods without vars: off"). A method
- * with only secrets (the email hash key) has no such switch. Otherwise `on` when every name has a
- * value, else `misconfigured`. With the secrets unread: `misconfigured` when the read names alone
- * already disagree, `off` when none of them is set, else `unavailable`.
+ * not turned on `misconfigured` (README "Runtime secrets", "Methods with none of their vars set").
+ * A method with only secrets (the email hash key) has no such switch: it follows its secret, `on`
+ * when the read delivers it, `off` when the read holds no value for it. Otherwise `on` when every
+ * name has a value, else `misconfigured`. With the secrets unread: `misconfigured` when the read
+ * names alone already disagree, `off` when none of the method's plain vars is set, else
+ * `unavailable`.
  */
 function configured<Names extends string, Value>(
   input: SignInInput,
@@ -204,7 +206,7 @@ function configured<Names extends string, Value>(
   if (plainVars > 0 && plainSet === 0) return { status: 'off' };
   const read = names.length - unread;
   if (missing.length > 0 && missing.length < read) return { status: 'misconfigured', missing };
-  if (unread > 0) return read > 0 && missing.length === read ? { status: 'off' } : UNAVAILABLE;
+  if (unread > 0) return UNAVAILABLE;
   if (missing.length === names.length) return { status: 'off' };
   // Every name was checked above, so `values` holds each of them.
   return { status: 'on', ...build(values as Record<Names, string>) };

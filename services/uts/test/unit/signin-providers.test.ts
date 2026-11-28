@@ -160,6 +160,30 @@ describe('configuration', () => {
     ).toEqual({ status: 'off' });
   });
 
+  it('counts a plain var that holds only whitespace as unset', () => {
+    const blank = readSignInConfig(
+      signInInput({
+        SIGNIN_GITHUB_CLIENT_ID: '   ',
+        SIGNIN_GITHUB_CLIENT_SECRET: 'github-secret',
+      }),
+      config
+    );
+    expect(blank.providers.github).toEqual({ status: 'off' });
+    const partial = readSignInConfig(
+      signInInput({
+        SIGNIN_APPLE_CLIENT_ID: 'apple-client',
+        SIGNIN_APPLE_TEAM_ID: '  ',
+        SIGNIN_APPLE_KEY_ID: 'KEY',
+        SIGNIN_APPLE_PRIVATE_KEY: 'private-key',
+      }),
+      config
+    );
+    expect(partial.providers.apple).toEqual({
+      status: 'misconfigured',
+      missing: ['SIGNIN_APPLE_TEAM_ID'],
+    });
+  });
+
   it('turns a method on once its vars are set and its secret is delivered', () => {
     expect(
       readSignInConfig(

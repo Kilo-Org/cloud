@@ -60,7 +60,7 @@ export type AttestationSettings = {
 };
 
 /**
- * `on`: every value is valid. `off`: none is set. `misconfigured`: the names of the values that
+ * `on`: every value is valid. `off`: no var is set. `misconfigured`: the names of the values that
  * are missing or invalid (never a value). `unavailable`: a var is set and STS gave no usable
  * bundle, so the key is unknown.
  */
@@ -73,7 +73,7 @@ export type AttestationConfig =
 /**
  * What the endpoints do for a client that needs attestation. `verified`: serve it and verify every
  * code exchange. `unattested_development`: development with no attestation config. `refused`: do
- * not serve it; `problems` names the values to fix, empty when none is set. `unavailable`: serve
+ * not serve it; `problems` names the values to fix, empty when no var is set. `unavailable`: serve
  * it, and answer its code exchange with a retryable 503 until the key can be read.
  */
 export type AttestationPolicy =

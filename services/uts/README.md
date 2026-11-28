@@ -1545,12 +1545,15 @@ created credential's notice email (after the answer) and the minute cron's notic
 `/revoke`, `/introspect`, `/tickets`, the browser-session API, the account API and the PAT routes
 never wait for STS. What a read finds:
 
-| Bundle state | Methods with their vars set | Methods without vars |
+| Bundle state | Methods with their vars set | Methods with none of their vars set |
 |---|---|---|
 | Delivered, name present | `on` | `off` |
 | Delivered, name missing (policy grants it, the manager holds no value, or the value is empty) | `misconfigured`: not offered, routes answer 500 | `off` |
 | STS refuses the `uts` workload, or `STS` is not bound (`uts.secrets.unavailable` with `reason` `denied` or `not_bound`) | as a delivered bundle without the name: `misconfigured` | `off` |
 | No usable bundle: none yet on a cold isolate, or the held copy is 24 hours old (`uts.secrets.unavailable`, `reason` `unavailable`) | `unavailable`: not offered, routes answer 503 with `Retry-After` | `off` |
+
+A method that needs only a secret (the email hash key) follows the secret: `on` when the bundle
+delivers it, `off` when the bundle holds no value for it, and `unavailable` with no usable bundle.
 
 With no usable bundle, the device grant answers 503 (`temporarily_unavailable` on
 `/device_authorization` and at `/token`) and the issuer metadata leaves it out with

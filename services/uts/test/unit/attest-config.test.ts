@@ -10,7 +10,7 @@ import { GOOGLE_PLAY_INTEGRITY_ENDPOINTS } from '../../src/attest/play-integrity
 
 /**
  * Refuse by default: `kilo-mobile` is served only where every attestation value is set and valid,
- * and development without any value is the one place it is served without attestation.
+ * and development without any var set is the one place it is served without attestation.
  */
 
 /** The attestation vars and the key, in one record. */
@@ -141,7 +141,7 @@ describe('attestation policy', () => {
     });
   });
 
-  it('refuses the client in development as soon as any value is set', () => {
+  it('refuses the client in development as soon as any var is set', () => {
     expect(policy({ ATTEST_APPLE_TEAM_ID: 'ABCDE12345' }, 'development')).toMatchObject({
       kind: 'refused',
     });
@@ -164,7 +164,8 @@ describe('attestation policy', () => {
 
   it('keeps attestation off while none of its vars is set, whatever the bundle holds', () => {
     // The bundle delivers the key while no var is set: the vars are the switch, so attestation
-    // stays off and the client is not refused for a method this environment has not turned on.
+    // stays off. Development then serves the client without attestation; staging and production
+    // refuse it there, because the environment has not turned the method on.
     const delivered = { ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: serviceAccountKey };
     expect(policy(delivered, 'staging')).toEqual({ kind: 'refused', problems: [] });
     expect(policy(delivered, 'development')).toEqual({ kind: 'unattested_development' });

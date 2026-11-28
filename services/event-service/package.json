@@ -25,6 +25,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "@kilocode/worker-uts-auth": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "workers-tagged-logger": "catalog:",

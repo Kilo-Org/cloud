@@ -2949,6 +2949,9 @@ importers:
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
+      '@kilocode/worker-uts-auth':
+        specifier: workspace:*
+        version: link:../../packages/worker-uts-auth
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.17(expo@58.0.25)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(kysely@0.29.2)(pg@8.23.1)

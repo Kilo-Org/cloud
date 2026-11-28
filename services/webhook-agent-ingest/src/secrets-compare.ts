@@ -4,8 +4,8 @@ import { getSecretValue } from './util/secret';
 
 /**
  * The comparison runs only in production, only while `SECRETS_SOURCE` is explicitly
- * `secrets-store`, and only when `SECRETS_COMPARE_ENABLED` is exactly `'true'`. Production sets the
- * flag in wrangler.jsonc; `env.dev` does not.
+ * `secrets-store`, and only when `SECRETS_COMPARE_ENABLED` is exactly `'true'`. The production
+ * config leaves comparison off after the source switch.
  */
 export type SecretsCompareEnv = WebhookSecretsEnv<WebhookSecretName> & {
   ENVIRONMENT?: string;

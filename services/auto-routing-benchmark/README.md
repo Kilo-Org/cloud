@@ -146,6 +146,16 @@ curl -s -X PUT "$WORKER_URL/admin/scheduler-config" \
   -H 'x-updated-by: you@kilocode.ai' -d '{"modelConcurrency":12}'
 ```
 
+Once `ADMIN_CREDENTIAL_ACCEPT` admits STS (see [Admin endpoints](#admin-endpoints)), a workload
+with an STS sender sends its service token in the same header instead of the secret, here of
+scope `auto-routing-benchmark:admin.write`. Never send both.
+
+```sh
+curl -s -X PUT "$WORKER_URL/admin/scheduler-config" \
+  -H "Authorization: Bearer $STS_SERVICE_TOKEN" -H 'content-type: application/json' \
+  -H 'x-updated-by: you@kilocode.ai' -d '{"modelConcurrency":12}'
+```
+
 Claims carry fencing tokens, and stale tokens cannot release newer ownership. A same-token
 redelivery resumes its executing claim instead of being dropped: the Workers runtime can
 cancel an in-flight queue invocation mid-case, so none of its error handling runs, and Queues
@@ -1088,8 +1098,39 @@ on resume because their actual spend may be unknown; they are not discarded.
 A report with indeterminate grader spend cannot resume safely.
 ## Admin endpoints
 
-All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
-(the gateway's admin panel proxies these with the internal secret):
+All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>` (the gateway's
+admin panel proxies these with the internal secret), or by an STS service token once the switch
+below admits one.
+
+`ADMIN_CREDENTIAL_ACCEPT` (`src/auth.ts`) chooses the credential of every `/admin` route:
+
+| Value | `/admin` accepts |
+|---|---|
+| unset, empty or `legacy-only` | only the secret, exactly as before; no key set is fetched |
+| `legacy-and-sts` | the secret, or an STS token of the route's scope |
+| `sts-only` | only an STS token; the secret is never read |
+| `disabled` | nothing (401) |
+
+Any other value answers 500. An STS mode also needs `STS_ENVIRONMENT` (`production` in the
+production deployment), or an STS token answers 500. Rollback is a redeploy with the switch unset or
+`legacy-only`. Routes outside `/admin` (`/health`, the client eval routes) keep the secret in every
+mode. While the switch admits STS, `GET /.well-known/oauth-protected-resource` serves the RFC 9728
+metadata that every STS challenge names; otherwise that path stays behind the secret.
+
+Each route takes one scope, and the route also checks the token's workload:
+`auto-routing-benchmark:routing-tables.read` (routing table, classifier winner, custom router
+table, table version and epoch: `web`, `ai-gateway`, `auto-routing`),
+`auto-routing-benchmark:admin.read` (the other reads: `web`) and
+`auto-routing-benchmark:admin.write` (every mutation: `web`). `GOVERNED_ROUTES` in `src/auth.ts`
+maps each route; a new `/admin` route needs its entry there. Both credentials travel in
+`Authorization`, so a repeated or comma-joined header is refused with 400, and a refused STS token
+is never retried as the secret.
+
+Before `legacy-and-sts`, confirm the secret contains no dots or commas: a bearer shaped like a
+compact JWS goes to STS, and a comma reads as two credentials. Before `sts-only`, every caller
+needs an STS sender first: the web admin clients, the gateway's routing-table reads, the
+auto-routing Worker's binding calls, and the operator steps in this README
+(`scripts/legacy-cancel.mjs` and the curl examples), which today hold only the secret.
 
 GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
 or query. Omission selects efficient. Registry, custom router and paid-request endpoints accept

@@ -392,6 +392,25 @@ describe('STS token checks', () => {
   );
 });
 
+describe('switch values', () => {
+  it('refuses everything under disabled and a value outside the set', async () => {
+    for (const [mode, status] of [
+      ['disabled', 401],
+      ['dual', 500],
+    ] as const) {
+      const { env } = makeEnv({ ADMIN_CREDENTIAL_ACCEPT: mode });
+      const response = await call(testApp(), 'adminWrite', env, bearer(LEGACY_SECRET));
+      expect(response.status).toBe(status);
+    }
+  });
+
+  it('answers 500 for an STS token while STS_ENVIRONMENT is unset', async () => {
+    const { env } = makeEnv({ ADMIN_CREDENTIAL_ACCEPT: 'legacy-and-sts' });
+    const response = await call(testApp(), 'adminWrite', env, bearer(await token('adminWrite')));
+    expect(response.status).toBe(500);
+  });
+});
+
 describe('route table', () => {
   it('names every registered /admin route of the worker, and nothing else', () => {
     // Hono lists one entry per handler, so a route with a validator appears twice.

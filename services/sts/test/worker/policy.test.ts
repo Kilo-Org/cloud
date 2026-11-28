@@ -1105,9 +1105,23 @@ describe('phase 2 C1 grants of the shipped policies', () => {
     'community-contributions-dashboard:opencode.sync': 'CI',
   };
   /** Registered C1 scopes that no policy grants yet, each with the reason and what grants it. */
+  const CLOUD_AGENT_NEXT_UNGRANTED =
+    'registered for C1 rows 36/47; the web and kilo-code-review-worker grants land with the cloud-agent-next receiver (p4) and senders (p2); binding callers stay under held row 34';
   const UNGRANTED: Readonly<Record<string, string>> = {
     'web:security-notifications.dispatch':
       'cloudflare-security-sync stays a registration until its STS binding lands (#12999)',
+    'cloud-agent-next:session.prepare': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:session.update': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:session.cleanup': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:balance.bypass': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:code-review-billing.read': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:container-billing.read': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:byoc-enrollment.read': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:byoc-runtime-identity.read': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:byoc-snapshot-build.start': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:byoc-snapshot-build.cleanup': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:streams.close': CLOUD_AGENT_NEXT_UNGRANTED,
+    'cloud-agent-next:widget-approval-key.read': CLOUD_AGENT_NEXT_UNGRANTED,
   };
 
   it('classifies every registered scope: a C1 grant, an ungranted C1 scope with a reason, or not C1', () => {

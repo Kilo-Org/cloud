@@ -10,6 +10,18 @@ import {
   STS_BOUNCER_SIGNUP_DECIDE,
   STS_BOUNCER_SIGNUP_HISTORY,
   STS_BOUNCER_USAGE_WRITE,
+  STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS,
+  STS_CLOUD_AGENT_NEXT_BYOC_ENROLLMENT_READ,
+  STS_CLOUD_AGENT_NEXT_BYOC_RUNTIME_IDENTITY_READ,
+  STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_CLEANUP,
+  STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_START,
+  STS_CLOUD_AGENT_NEXT_CODE_REVIEW_BILLING_READ,
+  STS_CLOUD_AGENT_NEXT_CONTAINER_BILLING_READ,
+  STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP,
+  STS_CLOUD_AGENT_NEXT_SESSION_PREPARE,
+  STS_CLOUD_AGENT_NEXT_SESSION_UPDATE,
+  STS_CLOUD_AGENT_NEXT_STREAMS_CLOSE,
+  STS_CLOUD_AGENT_NEXT_WIDGET_APPROVAL_KEY_READ,
   STS_CODE_REVIEW_CANCEL,
   STS_CODE_REVIEW_DISPATCH,
   STS_CODE_REVIEW_RETRY_FRESH,
@@ -289,6 +301,22 @@ describe('STS scope registry', () => {
           'auto-routing-benchmark:admin.write',
         ],
       },
+      'cloud-agent-next': {
+        scopes: [
+          'cloud-agent-next:session.prepare',
+          'cloud-agent-next:session.update',
+          'cloud-agent-next:session.cleanup',
+          'cloud-agent-next:balance.bypass',
+          'cloud-agent-next:code-review-billing.read',
+          'cloud-agent-next:container-billing.read',
+          'cloud-agent-next:byoc-enrollment.read',
+          'cloud-agent-next:byoc-runtime-identity.read',
+          'cloud-agent-next:byoc-snapshot-build.start',
+          'cloud-agent-next:byoc-snapshot-build.cleanup',
+          'cloud-agent-next:streams.close',
+          'cloud-agent-next:widget-approval-key.read',
+        ],
+      },
       'community-contributions-dashboard': {
         scopes: ['community-contributions-dashboard:opencode.sync'],
       },
@@ -317,6 +345,10 @@ describe('STS scope registry', () => {
     expect(
       isRegisteredStsScope('community-contributions-dashboard', 'web:mcp-catalog-token.mint')
     ).toBe(false);
+    expect(isRegisteredStsScope('web', 'cloud-agent-next:session.prepare')).toBe(false);
+    expect(isRegisteredStsScope('cloud-agent-next', 'web:byoc-credentials.read')).toBe(false);
+    // One scope per action: no catch-all internal scope under the Cloud Agent audience.
+    expect(isRegisteredStsScope('cloud-agent-next', 'cloud-agent-next:internal.call')).toBe(false);
   });
 
   it('lists each shipped scope under its own audience', () => {
@@ -428,6 +460,46 @@ describe('STS scope registry', () => {
       'community-contributions-dashboard:opencode.sync',
       'community-contributions-dashboard',
       STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
+    ],
+    ['cloud-agent-next:session.prepare', 'cloud-agent-next', STS_CLOUD_AGENT_NEXT_SESSION_PREPARE],
+    ['cloud-agent-next:session.update', 'cloud-agent-next', STS_CLOUD_AGENT_NEXT_SESSION_UPDATE],
+    ['cloud-agent-next:session.cleanup', 'cloud-agent-next', STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP],
+    ['cloud-agent-next:balance.bypass', 'cloud-agent-next', STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS],
+    [
+      'cloud-agent-next:code-review-billing.read',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_CODE_REVIEW_BILLING_READ,
+    ],
+    [
+      'cloud-agent-next:container-billing.read',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_CONTAINER_BILLING_READ,
+    ],
+    [
+      'cloud-agent-next:byoc-enrollment.read',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_BYOC_ENROLLMENT_READ,
+    ],
+    [
+      'cloud-agent-next:byoc-runtime-identity.read',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_BYOC_RUNTIME_IDENTITY_READ,
+    ],
+    [
+      'cloud-agent-next:byoc-snapshot-build.start',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_START,
+    ],
+    [
+      'cloud-agent-next:byoc-snapshot-build.cleanup',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_CLEANUP,
+    ],
+    ['cloud-agent-next:streams.close', 'cloud-agent-next', STS_CLOUD_AGENT_NEXT_STREAMS_CLOSE],
+    [
+      'cloud-agent-next:widget-approval-key.read',
+      'cloud-agent-next',
+      STS_CLOUD_AGENT_NEXT_WIDGET_APPROVAL_KEY_READ,
     ],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });

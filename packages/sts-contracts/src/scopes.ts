@@ -424,6 +424,162 @@ export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE = {
 } as const;
 
 /**
+ * Prepares a Cloud Agent session through the internal `prepareSession` tRPC procedure
+ * (`services/cloud-agent-next/src/router/handlers/session-prepare.ts`). Only the `web` and
+ * `kilo-code-review-worker` workloads may send it: the web app's `CloudAgentNextClient`
+ * (`apps/web/src/lib/cloud-agent-next/cloud-agent-client.ts`) and the Code Review Worker's
+ * `CodeReviewOrchestrator` (`services/code-review-infra/src/code-review-orchestrator.ts`).
+ * Security Auto Analysis and Webhook Agent Ingest reach the procedure over a service binding,
+ * outside STS.
+ */
+export const STS_CLOUD_AGENT_NEXT_SESSION_PREPARE = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:session.prepare',
+} as const;
+
+/**
+ * Points an existing Cloud Agent session at a new callback target through the internal
+ * `updateSession` tRPC procedure
+ * (`services/cloud-agent-next/src/router/handlers/session-prepare.ts`). Only the
+ * `kilo-code-review-worker` workload may send it, from the `CodeReviewOrchestrator` follow-up
+ * review (`services/code-review-infra/src/code-review-orchestrator.ts`). The web app's
+ * `CloudAgentNextClient.updateSession` has no caller, so `web` is not a sender.
+ */
+export const STS_CLOUD_AGENT_NEXT_SESSION_UPDATE = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:session.update',
+} as const;
+
+/**
+ * Deletes a Cloud Agent session's runtime resources through the internal `cleanupSession` tRPC
+ * procedure (`services/cloud-agent-next/src/router/handlers/session-management.ts`). Only the
+ * `web` workload may send it, through `CloudAgentNextClient.cleanupSession` after a failed
+ * initiate: from `apps/web/src/lib/bot/tools/spawn-cloud-agent-session.ts`,
+ * `apps/web/src/lib/cloud-agent-next/run-session.ts` and
+ * `apps/web/src/lib/security-agent/services/analysis-service.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:session.cleanup',
+} as const;
+
+/**
+ * Skips Cloud Agent's balance check (`x-skip-balance-check`). The caller asserts that the session
+ * does not bill the Kilo balance, an authority separate from the action's own. The scope is not
+ * tied to a session or an owner: it names only the calling workload. STS policy decides which
+ * workloads can mint it; today `web` and `kilo-code-review-worker`. Under STS (decisions M243 and
+ * M246), the token grants no new authority: it only replaces the legacy internal key as the proof
+ * where a bypass exists today.
+ * - (1) In a request with an STS action token, which today means only `session.prepare` through
+ *   the authority preflight, the bypass token's workload must equal the action token's workload.
+ *   `updateSession` never reads `x-skip-balance-check`, so a bypass sent with `session.update`
+ *   (as the code-review worker does today) has no effect.
+ * - (2) In a request with no action token, authenticated by a user Bearer, the header is honoured
+ *   only when `x-kilo-balance-bypass-authorization` holds a valid STS token: STS key-set
+ *   signature, audience `cloud-agent-next`, this scope, not expired. The user-Bearer callers
+ *   that rely on it are the `CodeReviewOrchestrator`'s `initiateFromKilocodeSessionV2` and
+ *   `sendMessageV2` (`services/code-review-infra/src/code-review-orchestrator.ts`) and the web
+ *   app's skipped-balance `CloudAgentNextClient`
+ *   (`apps/web/src/lib/cloud-agent-next/cloud-agent-client.ts`).
+ * - (3) With neither a valid action token nor a user Bearer, it is never honoured.
+ * - (4) Each honoured bypass logs the workload and the user subject; each refusal logs a reason;
+ *   neither logs token data.
+ * - (5) The token is honoured only where a bypass exists today, both under
+ *   `services/cloud-agent-next/src`: `middleware/balance.ts` and the authority preflight in
+ *   `router/handlers/session-creation-preflight.ts`. The two public Kilo prompt mutations in
+ *   `kilo-facade/user-kilo-facade.ts` always refuse `x-skip-balance-check` with a 400 (M246), for
+ *   every caller, a valid bypass token included; they are not token-check points.
+ * Webhook Agent Ingest sends the bypass over a service binding, outside STS.
+ */
+export const STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:balance.bypass',
+} as const;
+
+/**
+ * Reads whether code review compute billing is on for a user or organization
+ * (`GET /internal/code-review/billing/{type}/{id}`). Only the `web` workload may send it, from
+ * `apps/web/src/lib/code-reviews/compute-billing.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_CODE_REVIEW_BILLING_READ = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:code-review-billing.read',
+} as const;
+
+/**
+ * Reads an owner's Cloud Agent container billing mode for one instance size. The route is
+ * `GET /internal/containers/billing/{type}/{id}/{instance}` and accepts any billing owner type;
+ * the only sender calls `GET /internal/containers/billing/user/{id}/{instance}`. Only the `web`
+ * workload may send it, from `apps/web/src/lib/cloud-agent/compute-billing-mode.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_CONTAINER_BILLING_READ = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:container-billing.read',
+} as const;
+
+/**
+ * Reads whether an organization or a user is enrolled in Vercel compute
+ * (`GET /internal/byoc/vercel-enrollment/{organizationId}` and
+ * `GET /internal/byoc/vercel-enrollment/user/{userId}`). Only the `web` workload may send it, from
+ * `apps/web/src/lib/cloud-agent-next/cloud-agent-internal-api.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_BYOC_ENROLLMENT_READ = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:byoc-enrollment.read',
+} as const;
+
+/**
+ * Reads the current Vercel runtime wrapper identity: version, release date and digest
+ * (`GET /internal/byoc/vercel-runtime-identity`). Only the `web` workload may send it, from
+ * `apps/web/src/lib/cloud-agent-next/cloud-agent-internal-api.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_BYOC_RUNTIME_IDENTITY_READ = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:byoc-runtime-identity.read',
+} as const;
+
+/**
+ * Starts a BYOC Vercel snapshot build for an enrolled owner
+ * (`POST /internal/byoc/vercel-snapshot-build/start`). Only the `web` workload may send it, from
+ * `apps/web/src/lib/cloud-agent-next/cloud-agent-internal-api.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_START = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:byoc-snapshot-build.start',
+} as const;
+
+/**
+ * Cleans up a BYOC Vercel snapshot build's resources
+ * (`POST /internal/byoc/vercel-snapshot-build/cleanup`). Only the `web` workload may send it, from
+ * `apps/web/src/lib/cloud-agent-next/cloud-agent-internal-api.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_CLEANUP = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:byoc-snapshot-build.cleanup',
+} as const;
+
+/**
+ * Closes a removed organization member's live Cloud Agent streams
+ * (`POST /internal/streams/close`). Only the `web` workload may send it, from organization member
+ * removal through `apps/web/src/lib/cloud-agent-next/cloud-agent-internal-api.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_STREAMS_CLOSE = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:streams.close',
+} as const;
+
+/**
+ * Reads the approval binding and command of the oldest pending permission on an owned session for
+ * the home widget (`POST /internal/widgets/approval-key`). Only the `web` workload may send it,
+ * from the glanceable agents snapshot through
+ * `apps/web/src/lib/cloud-agent-next/cloud-agent-internal-api.ts`.
+ */
+export const STS_CLOUD_AGENT_NEXT_WIDGET_APPROVAL_KEY_READ = {
+  audience: 'cloud-agent-next',
+  scope: 'cloud-agent-next:widget-approval-key.read',
+} as const;
+
+/**
  * A GitHub Actions job asks the web app to mint the one-hour catalog API token
  * (`POST /api/internal/mcp-catalog/token`): the MCP catalog dump and the kilo-app changelog jobs.
  */
@@ -459,6 +615,8 @@ export const STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC = {
  * Cloud Agent's callbacks to Webhook Agent Ingest and Security Auto Analysis, the web app's calls
  * to the Code Review Worker (`STS_CODE_REVIEW_*`), its session access invalidation at Session
  * Ingest, and its calls to other Workers' web-called `/internal/*` routes (`STS_*_INTERNAL_CALL`).
+ * The Cloud Agent scopes (`STS_CLOUD_AGENT_NEXT_*`) are the web app's and the Code Review
+ * Worker's calls to Cloud Agent's internal routes and procedures, one scope per action.
  * STS mints each one only where a policy grants it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
@@ -562,6 +720,22 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.scope,
       STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.scope,
       STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE.scope,
+    ],
+  },
+  'cloud-agent-next': {
+    scopes: [
+      STS_CLOUD_AGENT_NEXT_SESSION_PREPARE.scope,
+      STS_CLOUD_AGENT_NEXT_SESSION_UPDATE.scope,
+      STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP.scope,
+      STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS.scope,
+      STS_CLOUD_AGENT_NEXT_CODE_REVIEW_BILLING_READ.scope,
+      STS_CLOUD_AGENT_NEXT_CONTAINER_BILLING_READ.scope,
+      STS_CLOUD_AGENT_NEXT_BYOC_ENROLLMENT_READ.scope,
+      STS_CLOUD_AGENT_NEXT_BYOC_RUNTIME_IDENTITY_READ.scope,
+      STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_START.scope,
+      STS_CLOUD_AGENT_NEXT_BYOC_SNAPSHOT_BUILD_CLEANUP.scope,
+      STS_CLOUD_AGENT_NEXT_STREAMS_CLOSE.scope,
+      STS_CLOUD_AGENT_NEXT_WIDGET_APPROVAL_KEY_READ.scope,
     ],
   },
   'community-contributions-dashboard': {

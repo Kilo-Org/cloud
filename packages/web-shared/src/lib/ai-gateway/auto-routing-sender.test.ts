@@ -195,7 +195,11 @@ describe('every admin call names the route family its receiver governs', () => {
       () => benchmark.getBenchmarkConfig('efficient'),
       () => benchmark.updateBenchmarkConfig({ router: 'efficient' } as never, 'a@kilocode.ai'),
       () => benchmark.getBenchmarkSchedulerConfig(),
-      () => benchmark.updateBenchmarkSchedulerConfig({}, 'a@kilocode.ai'),
+      () =>
+        benchmark.updateBenchmarkSchedulerConfig(
+          { modelConcurrency: null, slots: null },
+          'a@kilocode.ai'
+        ),
       () => benchmark.listBenchmarkRuns(),
       () => benchmark.getBenchmarkRunSummaries('run-1'),
       () => benchmark.startBenchmarkRun('classifier', false, 'all' as never),
@@ -249,9 +253,7 @@ describe('a process without an installed sender', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     for (const [, init] of fetchMock.mock.calls) {
-      expect(new Headers(init?.headers).get('authorization')).toBe(
-        'Bearer legacy-internal-secret'
-      );
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer legacy-internal-secret');
     }
   });
 
@@ -353,11 +355,11 @@ describe('the clients without a token', () => {
 
   it('answers a profile registration 503, or throws past its deadline', async () => {
     const request = {
-      router: 'efficient',
-      ownerType: 'org',
+      router: 'efficient' as const,
+      ownerType: 'org' as const,
       ownerId: 'org-1',
       entries: [],
-    } as const;
+    };
     const { benchmark, adminFetch } = await loadClients(tokenUnavailable);
 
     await expect(
@@ -378,7 +380,9 @@ describe('the clients without a token', () => {
     const onError = jest.fn();
     const { decision } = await loadClients(tokenUnavailable);
 
-    await expect(decision.fetchEfficientAutoDecision(decideParams, { onError })).resolves.toBeNull();
+    await expect(
+      decision.fetchEfficientAutoDecision(decideParams, { onError })
+    ).resolves.toBeNull();
     await expect(
       decision.fetchCustomRouterDecision(
         { ...decideParams, customRouter: { ownerType: 'org', slug: 'team' } as never },

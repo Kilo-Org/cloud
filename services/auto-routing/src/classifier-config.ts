@@ -53,34 +53,34 @@ type ClassifierModelLoad = { env: ClassifierConfigEnv; ctx?: SecretsExecutionCon
 const classifierModelCache = ttlCached(
   CONFIG_CACHE_TTL_MS,
   async ({ env, ctx }: ClassifierModelLoad) => {
-  const [configuredModel, winner] = await Promise.all([
-    env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY),
-    kvReadThrough<ClassifierWinner>({
-      kv: env.AUTO_ROUTING_CONFIG,
-      key: CLASSIFIER_WINNER_KV_KEY,
-      ttlSeconds: 3600,
-      fetchOrigin: () => fetchClassifierWinnerFromOrigin(env, ctx),
-      parse: parseClassifierWinner,
-    }).catch((error: unknown) => {
-      // A benchmark-origin failure must not reject the whole load: that would
-      // discard a healthy admin override and fail closed to the default.
-      console.warn(
-        JSON.stringify({
-          event: 'auto_routing_config_read_failed',
-          key: CLASSIFIER_WINNER_KV_KEY,
-          ...formatError(error),
-        })
-      );
-      return null;
-    }),
-  ]);
-  const override = configuredModel?.trim() || null;
-  const benchmarkWinner = winner?.model ?? null;
-  return {
-    model: override ?? benchmarkWinner ?? DEFAULT_CLASSIFIER_MODEL,
-    override,
-    benchmarkWinner,
-  } satisfies ClassifierModelInfo;
+    const [configuredModel, winner] = await Promise.all([
+      env.AUTO_ROUTING_CONFIG.get(CLASSIFIER_MODEL_CONFIG_KEY),
+      kvReadThrough<ClassifierWinner>({
+        kv: env.AUTO_ROUTING_CONFIG,
+        key: CLASSIFIER_WINNER_KV_KEY,
+        ttlSeconds: 3600,
+        fetchOrigin: () => fetchClassifierWinnerFromOrigin(env, ctx),
+        parse: parseClassifierWinner,
+      }).catch((error: unknown) => {
+        // A benchmark-origin failure must not reject the whole load: that would
+        // discard a healthy admin override and fail closed to the default.
+        console.warn(
+          JSON.stringify({
+            event: 'auto_routing_config_read_failed',
+            key: CLASSIFIER_WINNER_KV_KEY,
+            ...formatError(error),
+          })
+        );
+        return null;
+      }),
+    ]);
+    const override = configuredModel?.trim() || null;
+    const benchmarkWinner = winner?.model ?? null;
+    return {
+      model: override ?? benchmarkWinner ?? DEFAULT_CLASSIFIER_MODEL,
+      override,
+      benchmarkWinner,
+    } satisfies ClassifierModelInfo;
   }
 );
 

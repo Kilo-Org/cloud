@@ -200,7 +200,8 @@ describe('routing-table reads over BENCHMARK_SERVICE', () => {
     await origin.fetchRoutingTableFromOrigin(env, 'efficient', ctx);
 
     expect(performance.now() - startedAt).toBeLessThan(origin.ROUTING_TABLES_TOKEN_WAIT_MS);
-    expect(sts.mintTokens).toHaveBeenCalledTimes(2);
+    // The renewal starts behind the read, under `waitUntil`, and never answers.
+    await vi.waitFor(() => expect(sts.mintTokens).toHaveBeenCalledTimes(2));
     expect(ctx.waitUntil).toHaveBeenCalled();
     expect(sentAuthorization(fetch, 1)).toBe('Bearer minted-token-1');
   });

@@ -63,11 +63,16 @@ function aborted(signal: AbortSignal | undefined): Promise<'aborted'> {
  * waits for one mint at most until its own deadline (`signal`), as the code review and session
  * ingest senders do; without a token it is not sent.
  */
-export function createWebAutoRoutingSender(runtime: VercelRuntime = process.env): AutoRoutingSender {
+export function createWebAutoRoutingSender(
+  runtime: VercelRuntime = process.env
+): AutoRoutingSender {
   const resolve = (auth: string | undefined, url: string) =>
     resolveServiceSenderAuth({ auth, url, runtime });
   const senders: Record<WebVariable, ServiceSenderAuth> = {
-    AUTO_ROUTING_ADMIN_SENDER_AUTH: resolve(AUTO_ROUTING_ADMIN_SENDER_AUTH, AUTO_ROUTING_WORKER_URL),
+    AUTO_ROUTING_ADMIN_SENDER_AUTH: resolve(
+      AUTO_ROUTING_ADMIN_SENDER_AUTH,
+      AUTO_ROUTING_WORKER_URL
+    ),
     AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH: resolve(
       AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH,
       AUTO_ROUTING_BENCHMARK_WORKER_URL
@@ -83,9 +88,12 @@ export function createWebAutoRoutingSender(runtime: VercelRuntime = process.env)
     const sender = senders[variable];
     if (sender.kind === 'legacy') return { kind: 'legacy' };
     if (sender.kind === 'sts' && !isAutoRoutingReceiverOrigin(route, url, sender.environment)) {
-      console.error('auto-routing sender: destination is not the receiver origin; request refused', {
-        variable,
-      });
+      console.error(
+        'auto-routing sender: destination is not the receiver origin; request refused',
+        {
+          variable,
+        }
+      );
       return { kind: 'unavailable', reason: 'misconfigured' };
     }
     try {

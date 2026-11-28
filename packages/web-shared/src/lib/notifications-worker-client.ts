@@ -34,6 +34,8 @@ type InternalWorkerEndpointSpec = {
   failureLabel: string;
   /** The Sentry `endpoint` tag value. */
   tag: string;
+  /** One attempt's timeout; the first attempt shares it with the credential read. */
+  timeoutMs: number;
 };
 
 const DISPATCH_ENDPOINT: InternalWorkerEndpointSpec = {
@@ -41,19 +43,28 @@ const DISPATCH_ENDPOINT: InternalWorkerEndpointSpec = {
   skipSubject: 'push dispatch',
   failureLabel: 'Notifications worker dispatch failed',
   tag: 'dispatch',
+  timeoutMs: 30_000,
 };
 
+// The registration mutation awaits a refresh. The worker's refresh is one
+// snapshot fetch plus parallel APNs sends, so 10s is generous; past it the
+// retired row is still superseded and the next refresh ends the card, and the
+// shorter bound keeps a hung worker from holding the caller's token-mutation
+// queue.
 const GLANCEABLE_REFRESH_ENDPOINT: InternalWorkerEndpointSpec = {
   path: '/internal/v1/glanceable-refresh',
   skipSubject: 'glanceable refresh',
   failureLabel: 'Notifications worker glanceable refresh failed',
   tag: 'glanceable-refresh',
+  timeoutMs: 10_000,
 };
 
 type InternalWorkerEndpoint = {
   url: URL;
   credential: Record<string, string>;
   failureLabel: string;
+  /** What the credential read left of the spec's timeout, for the first attempt. */
+  firstAttemptTimeoutMs: number;
 };
 
 const resolvedNotificationsSender = resolveServiceSenderAuth({
@@ -102,20 +113,33 @@ async function resolveInternalWorkerEndpoint(
     );
     return null;
   }
+  // The credential read counts against the first attempt's timeout, so a cold STS mint cannot
+  // add to it. A read past it ends the call like any other credential failure.
+  const startedAt = Date.now();
+  const expired = Promise.withResolvers<never>();
+  const timer = setTimeout(
+    () => expired.reject(new Error(`No credential within ${spec.timeoutMs}ms`)),
+    spec.timeoutMs
+  );
   let credential: Record<string, string>;
   try {
-    credential = await serviceSenderHeaders({
-      sender: notificationsSender,
-      variable: 'NOTIFICATIONS_SENDER_AUTH',
-      label: 'notifications worker client',
-      request: STS_NOTIFICATIONS_INTERNAL_CALL,
-      legacyHeaders: async () => ({ 'X-Internal-Secret': await readInternalApiSecret() }),
-    });
+    credential = await Promise.race([
+      serviceSenderHeaders({
+        sender: notificationsSender,
+        variable: 'NOTIFICATIONS_SENDER_AUTH',
+        label: 'notifications worker client',
+        request: STS_NOTIFICATIONS_INTERNAL_CALL,
+        legacyHeaders: async () => ({ 'X-Internal-Secret': await readInternalApiSecret() }),
+      }),
+      expired.promise,
+    ]);
   } catch (error) {
     captureException(error, {
       tags: { source: 'notifications-worker-client', endpoint: spec.tag },
     });
     return null;
+  } finally {
+    clearTimeout(timer);
   }
   // Only the legacy credential carries the header; an empty secret skips the call, as before.
   if (credential['X-Internal-Secret'] === '') {
@@ -124,7 +148,12 @@ async function resolveInternalWorkerEndpoint(
     );
     return null;
   }
-  return { url, credential, failureLabel: spec.failureLabel };
+  return {
+    url,
+    credential,
+    failureLabel: spec.failureLabel,
+    firstAttemptTimeoutMs: Math.max(1, spec.timeoutMs - (Date.now() - startedAt)),
+  };
 }
 
 /**
@@ -219,7 +248,7 @@ async function dispatchInternal(body: InternalDispatchRequest): Promise<boolean>
   try {
     for (let attempt = 0; ; attempt++) {
       const result = await postInternal(endpoint, body, {
-        timeoutMs: 30_000,
+        timeoutMs: attempt === 0 ? endpoint.firstAttemptTimeoutMs : DISPATCH_ENDPOINT.timeoutMs,
         headers: { 'X-Dispatch-Id': dispatchId },
       });
 
@@ -395,12 +424,9 @@ export async function refreshGlanceableScope(input: GlanceableScopeRefreshReques
     endpoint: GLANCEABLE_REFRESH_ENDPOINT.tag,
   };
   try {
-    // The registration mutation awaits this. The worker's refresh is one
-    // snapshot fetch plus parallel APNs sends, so 10s is generous; past it
-    // the retired row is still superseded and the next refresh ends the card,
-    // and the shorter bound keeps a hung worker from holding the caller's
-    // token-mutation queue.
-    const result = await postInternal(endpoint, input, { timeoutMs: 10_000 });
+    const result = await postInternal(endpoint, input, {
+      timeoutMs: endpoint.firstAttemptTimeoutMs,
+    });
     if (!result.ok) {
       captureException(result.error, {
         tags,

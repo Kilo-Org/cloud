@@ -43,10 +43,14 @@ describe('notifications-worker-client internal dispatch', () => {
     jest.clearAllMocks();
     global.fetch = fetchMock as unknown as typeof fetch;
     // Run the retry backoff synchronously; the schedule itself is covered by
-    // the attempt counts asserted below.
+    // the attempt counts asserted below. Other timers (the credential deadline)
+    // keep the real clock.
+    const realSetTimeout = globalThis.setTimeout;
     jest.spyOn(globalThis, 'setTimeout').mockImplementation(((
-      handler: (...args: never[]) => void
+      handler: (...args: never[]) => void,
+      delayMs?: number
     ) => {
+      if (delayMs !== 1_000 && delayMs !== 4_000) return realSetTimeout(handler, delayMs);
       handler();
       return 0;
     }) as unknown as typeof setTimeout);

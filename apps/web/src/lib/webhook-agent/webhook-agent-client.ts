@@ -16,6 +16,7 @@ import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS, withinBudget } from '@/lib/bounded-service-fetch';
 
 /**
  * Response type for trigger config from the worker.
@@ -198,16 +199,25 @@ const webhookAgentSender = resolveServiceSenderAuth({
 /** An STS token is for the worker's origin only: a redirect fails rather than carry it on. */
 const STS_REQUEST: RequestInit = webhookAgentSender.kind === 'sts' ? { redirect: 'error' } : {};
 
-/** The credential headers of one worker call; throws before anything is sent without one. */
-function workerHeaders(): Promise<Record<string, string>> {
-  return serviceSenderHeaders({
-    sender: webhookAgentSender,
-    variable: 'WEBHOOK_AGENT_INGEST_SENDER_AUTH',
-    label: 'webhook agent client',
-    request: STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
-    legacyHeaders: async () => ({ 'x-internal-api-key': await readInternalApiSecret() }),
-  });
+/**
+ * The credential headers of one worker call. Throws before anything is sent without one: a
+ * refused switch, or no token within `budgetMs`, so a cold mint cannot hold the call open.
+ */
+function workerHeaders(budgetMs: number): Promise<Record<string, string>> {
+  return withinBudget(
+    serviceSenderHeaders({
+      sender: webhookAgentSender,
+      variable: 'WEBHOOK_AGENT_INGEST_SENDER_AUTH',
+      label: 'webhook agent client',
+      request: STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
+      legacyHeaders: async () => ({ 'x-internal-api-key': await readInternalApiSecret() }),
+    }),
+    budgetMs
+  );
 }
+
+/** The scheduled-trigger invocation's one deadline: credential and request share it. */
+const INVOKE_TIMEOUT_MS = 30_000;
 
 async function workerFetch<T>(path: string, options: RequestInit = {}): Promise<WorkerResponse<T>> {
   if (!isWebhookAgentConfigured()) {
@@ -220,7 +230,7 @@ async function workerFetch<T>(path: string, options: RequestInit = {}): Promise<
     ...STS_REQUEST,
     headers: {
       'Content-Type': 'application/json',
-      ...(await workerHeaders()),
+      ...(await workerHeaders(CONTROL_PLANE_UPSTREAM_BUDGET_MS)),
       ...options.headers,
     },
   });
@@ -384,11 +394,13 @@ export async function invokeWorkerScheduledTrigger(
   }
 
   try {
+    const startedAt = Date.now();
+    const headers = await workerHeaders(INVOKE_TIMEOUT_MS);
     const response = await fetch(`${WEBHOOK_AGENT_URL}${path}`, {
       ...STS_REQUEST,
       method: 'POST',
-      headers: await workerHeaders(),
-      signal: AbortSignal.timeout(30_000),
+      headers,
+      signal: AbortSignal.timeout(Math.max(1, INVOKE_TIMEOUT_MS - (Date.now() - startedAt))),
     });
 
     if (response.status !== 202) {

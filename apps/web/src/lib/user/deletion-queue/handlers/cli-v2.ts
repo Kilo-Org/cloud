@@ -175,6 +175,14 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
   if (!SESSION_INGEST_WORKER_URL || !SESSION_SYNC_WORKER_URL) {
     return configurationMissing();
   }
+  // A refused switch is a configuration fault like a missing secret, not a transient one: the step
+  // needs attention rather than retries.
+  if (sessionSyncSender.kind === 'refused') {
+    console.error('session sync user erase: invalid sender configuration; request refused', {
+      reason: sessionSyncSender.reason,
+    });
+    return configurationMissing();
+  }
   // Under `legacy` the erase call's secret is required up front, as before.
   let internalApiSecret = '';
   if (sessionSyncSender.kind === 'legacy') {
@@ -189,7 +197,7 @@ export const handleCliV2Sessions: DeletionHandler = async ({ request, step, cont
   if (stop) return stop;
 
   if (progress.provider_ref !== SESSION_SYNC_ERASURE_ACCEPTED) {
-    // A refused switch or no token throws before anything is sent; the runner retries the step.
+    // No token throws before anything is sent; the runner retries the step.
     const credential = await serviceSenderHeaders({
       sender: sessionSyncSender,
       variable: 'SESSION_SYNC_SENDER_AUTH',

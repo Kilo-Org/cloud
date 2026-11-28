@@ -330,8 +330,10 @@ export const STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE = {
 } as const;
 
 /**
- * The web app calls Security Auto Analysis's web-called `/internal/*` routes. Only the `web`
- * workload may send it.
+ * The web app calls Security Auto Analysis's web-called `/internal/*` routes, except the Cloud
+ * Agent callbacks (`/internal/security-analysis-callback/*` and
+ * `/internal/security-remediation-callback/*`), which accept only their own callback scopes. Only
+ * the `web` workload may send it.
  */
 export const STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL = {
   audience: 'security-auto-analysis',
@@ -372,6 +374,53 @@ export const STS_SESSION_SYNC_INTERNAL_CALL = {
 export const STS_NOTIFICATIONS_INTERNAL_CALL = {
   audience: 'notifications',
   scope: 'notifications:internal.call',
+} as const;
+
+/** The web app reads Auto Routing's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_ADMIN_READ = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:admin.read',
+} as const;
+
+/** The web app writes through Auto Routing's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_ADMIN_WRITE = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:admin.write',
+} as const;
+
+/** The AI Gateway asks Auto Routing for a routing decision. Only the `ai-gateway` workload may send it. */
+export const STS_AUTO_ROUTING_DECIDE = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:decide',
+} as const;
+
+/**
+ * Reads the Auto Routing Benchmark's routing tables. Only the `web`, `ai-gateway` and
+ * `auto-routing` workloads may send it: Auto Routing from
+ * `services/auto-routing/src/benchmark-origin.ts`; the AI Gateway through web-shared's
+ * `auto-routing-table-cache.ts` and `auto-routing-benchmark-admin-client.ts`
+ * (`/admin/routing-table`); the web app from the admin `benchmark-routing-table` route,
+ * `models-router` and `custom-router-benchmarks-router`. One shared scope fits because all three
+ * read the same read-only data, and the token's subject names the caller.
+ */
+export const STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:routing-tables.read',
+} as const;
+
+/** The web app reads the Auto Routing Benchmark's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:admin.read',
+} as const;
+
+/**
+ * The web app writes through the Auto Routing Benchmark's admin routes. Only the `web` workload
+ * may send it.
+ */
+export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:admin.write',
 } as const;
 
 /**
@@ -470,20 +519,20 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       STS_BOUNCER_SIGNUP_HISTORY.scope,
     ],
   },
-  [STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK.audience]: {
+  'webhook-agent-ingest': {
     scopes: [
       STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK.scope,
       STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL.scope,
     ],
   },
-  [STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.audience]: {
+  'security-auto-analysis': {
     scopes: [
       STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.scope,
       STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK.scope,
       STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL.scope,
     ],
   },
-  [STS_CODE_REVIEW_DISPATCH.audience]: {
+  'code-review': {
     scopes: [
       STS_CODE_REVIEW_DISPATCH.scope,
       STS_CODE_REVIEW_STATUS_READ.scope,
@@ -491,14 +540,30 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       STS_CODE_REVIEW_RETRY_FRESH.scope,
     ],
   },
-  [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.audience]: {
+  'session-ingest': {
     scopes: [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.scope],
   },
-  [STS_MODEL_EVAL_INGEST_INTERNAL_CALL.audience]: {
+  'model-eval-ingest': {
     scopes: [STS_MODEL_EVAL_INGEST_INTERNAL_CALL.scope],
   },
-  [STS_SESSION_SYNC_INTERNAL_CALL.audience]: { scopes: [STS_SESSION_SYNC_INTERNAL_CALL.scope] },
-  [STS_NOTIFICATIONS_INTERNAL_CALL.audience]: { scopes: [STS_NOTIFICATIONS_INTERNAL_CALL.scope] },
+  'session-sync': { scopes: [STS_SESSION_SYNC_INTERNAL_CALL.scope] },
+  notifications: { scopes: [STS_NOTIFICATIONS_INTERNAL_CALL.scope] },
+  'auto-routing': {
+    scopes: [
+      STS_AUTO_ROUTING_ADMIN_READ.scope,
+      STS_AUTO_ROUTING_ADMIN_WRITE.scope,
+      STS_AUTO_ROUTING_DECIDE.scope,
+    ],
+  },
+  // `auto-routing-benchmark:case-inference` and `:gateway-assignment` live in
+  // packages/auto-routing-contracts/src/benchmark-inference.ts.
+  'auto-routing-benchmark': {
+    scopes: [
+      STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.scope,
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.scope,
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE.scope,
+    ],
+  },
   'community-contributions-dashboard': {
     scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],
   },

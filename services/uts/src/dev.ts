@@ -235,6 +235,7 @@ export async function handleDevRequest(
       scopes: developmentScopes,
       recordingMailer,
       serviceTokens: developmentServiceTokens,
+      botTokenCallers: developmentServiceTokens,
       metadataFetcher: devMetadataFetcher(env) ?? ((url, init) => fetch(url, init)),
       stsCallers: devStsCallers(env),
     });

@@ -64,6 +64,14 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   value exists. Receivers answer a failed read with their generic unavailable status and do
   not log it; the shared reader's `sts_secret_read_failed` line, limited per reason on a best
   effort basis, is the one signal.
+- `src/instrumentation.ts` also installs the shared Bouncer auth
+  (`installBouncerAuth('kilocode-ai-gateway')`, `packages/web-shared/src/lib/bouncer/sts-auth.ts`):
+  every Bouncer call names this app in `x-kilo-caller`, and `BOUNCER_CLIENT_AUTH` on the
+  `kilocode-ai-gateway` project picks the credentials (`ENVIRONMENT.md`): unset or `legacy` sends
+  `x-internal-api-key` alone, `dual` adds an STS token for `bouncer:decide` or
+  `bouncer:usage.write`, `sts` sends the token alone. The scopes come from `BOUNCER_APP_SCOPES`,
+  which a test keeps equal to the production grant of `services/sts/policy/ai-gateway.yaml`. Only a
+  Vercel production deployment calls Bouncer at all.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

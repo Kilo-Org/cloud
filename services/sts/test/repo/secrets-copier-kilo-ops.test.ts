@@ -125,7 +125,7 @@ async function serving<N extends string>(
 
 /**
  * The bundle key STS reads: the names whose value is one value across Workloads live in `/shared`
- * (`SHARED_SECRET_NAMES`, the one list both copier tables import), every other name in this
+ * (`SHARED_SECRET_NAMES`, the one list every copier table imports), every other name in this
  * workload's own `/workloads/kilo-ops` folder (src/policy/schema.ts `bundleFolder`). EXPECTED_ROWS
  * pins the result, so a wrong folder fails.
  */

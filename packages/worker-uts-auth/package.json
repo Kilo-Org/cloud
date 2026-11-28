@@ -1,0 +1,26 @@
+{
+  "name": "@kilocode/worker-uts-auth",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-uts-auth/src packages/worker-uts-auth/test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kilocode/uts-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:vitest5"
+  }
+}

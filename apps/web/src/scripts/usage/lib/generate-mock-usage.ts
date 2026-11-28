@@ -15,6 +15,7 @@
  * (DBT_BACKEND_SANDBOX for local dev); no rollup step is needed.
  */
 import { randomUUID } from 'node:crypto';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   microdollar_usage,
@@ -281,7 +282,7 @@ function generateOneRecord(
   const autoModelValue =
     Math.random() < 0.2 ? MOCK_AUTO_MODELS[randomInt(0, MOCK_AUTO_MODELS.length - 1)] : null;
 
-  const id = randomUUID();
+  const id = createUsageId();
   const createdAtIso = createdAt.toISOString();
 
   const core: MicrodollarUsage = {

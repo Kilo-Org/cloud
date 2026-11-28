@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   feature,
@@ -160,7 +161,7 @@ export function buildSalesDemoUsagePlan(
     const inputCost = Math.floor((inputTokens / 1000) * model.inputPer1k);
     const outputCost = Math.floor((outputTokens / 1000) * model.outputPer1k);
     const cost = inputCost + outputCost;
-    const id = randomUUID();
+    const id = createUsageId();
     const featureValue = pick(rand, FEATURES);
     const modeValue = pick(rand, MODES);
     const projectId = rand() < 0.9 ? pick(rand, PROJECT_IDS) : null;

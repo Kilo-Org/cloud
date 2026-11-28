@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { randomUUID } from 'node:crypto';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import { localDb } from '@/scripts/lib/local-database';
 import {
   microdollar_usage,
@@ -43,7 +44,7 @@ function generateRandomUsage(
   const outputCost = Math.floor((outputTokens / 1000) * model.outputCost);
   const totalCost = inputCost + outputCost;
 
-  const id = randomUUID();
+  const id = createUsageId();
   const messageId = randomUUID();
 
   const core: MicrodollarUsage = {

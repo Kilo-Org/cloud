@@ -7,7 +7,9 @@ import {
   formatDate,
   formatLargeNumber,
   isDateOnlyString,
+  isValidUUID,
 } from './utils';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import * as z from 'zod';
 
 describe('assertNotNull', () => {
@@ -304,5 +306,37 @@ describe('formatLargeNumber', () => {
   it('uses the short magnitude units when shortened', () => {
     expect(formatLargeNumber(1_811_400, true)).toBe('1.8M');
     expect(formatLargeNumber(2_500_000_000, true)).toBe('2.5B');
+  });
+});
+
+describe('isValidUUID', () => {
+  it.each([
+    ['v1', '6ba7b810-9dad-11d1-80b4-00c04fd430c8'],
+    ['v4', '550e8400-e29b-41d4-a716-446655440000'],
+    ['v5', '886313e1-3b8a-5372-9b90-0c9aee199e5d'],
+    ['v6', '1ef21d2f-1207-6660-8c4f-419efbd44d48'],
+    ['v7', '018f4b3a-7c1e-7a5b-9d2e-3f4a5b6c7d8e'],
+    ['v8', '320c3d4d-cc00-875b-8ec9-32d5f69181c0'],
+  ])('accepts a %s id', (_version, id) => {
+    expect(isValidUUID(id)).toBe(true);
+  });
+
+  it('accepts an id minted by createUsageId', () => {
+    expect(isValidUUID(createUsageId())).toBe(true);
+  });
+
+  it('accepts uppercase ids', () => {
+    expect(isValidUUID('018F4B3A-7C1E-7A5B-9D2E-3F4A5B6C7D8E')).toBe(true);
+  });
+
+  it.each([
+    ['version 0', '018f4b3a-7c1e-0a5b-9d2e-3f4a5b6c7d8e'],
+    ['version 9', '018f4b3a-7c1e-9a5b-9d2e-3f4a5b6c7d8e'],
+    ['an invalid variant', '018f4b3a-7c1e-7a5b-1d2e-3f4a5b6c7d8e'],
+    ['a short id', '018f4b3a-7c1e-7a5b-9d2e'],
+    ['a non-hex id', '018f4b3a-7c1e-7a5b-9d2e-3f4a5b6c7dzz'],
+    ['a name', 'Acme Corp'],
+  ])('rejects %s', (_label, id) => {
+    expect(isValidUUID(id)).toBe(false);
   });
 });

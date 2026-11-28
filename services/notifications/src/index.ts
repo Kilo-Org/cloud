@@ -62,20 +62,23 @@ import {
 } from './lib/notification-history-prune';
 import { skipProviderPush } from './lib/push-gate';
 import { queue } from './queue-consumer';
-import { readNotificationsSecret, secretsSource } from './secrets';
-import { createSecretsComparison } from './secrets-compare';
+import {
+  logCredentialRefused,
+  logSecretUnavailable,
+  readNotificationsSecret,
+  secretRefusal,
+  secretsSource,
+  secretsSourceLabel,
+  type GuardRoute,
+  type NotificationsSecretsSource,
+} from './secrets';
+import { secretsComparison } from './secrets-compare';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
 const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
-
-// Pre-flip STS copy check, off unless `SECRETS_COMPARE_ENABLED` is `'true'`. It runs once per
-// isolate, from the first request that reaches it — an authenticated badge list, or a dispatch
-// past its secret and body checks — under that request's `waitUntil`; the response never waits
-// for it and its result never changes the response.
-const compareSecretsOnce = createSecretsComparison();
 
 // ── Structured logging context ──────────────────────────────────────────
 // Establishes AsyncLocalStorage context so all downstream logs (including
@@ -97,7 +100,12 @@ app.use('/v1/*', authMiddleware);
 
 app.get('/v1/badges', async c => {
   const userId = c.get('callerId');
-  compareSecretsOnce(c.env, c.executionCtx);
+  // Background STS copy check (src/secrets-compare.ts): off unless enabled in production, at most
+  // once per isolate across the admitting routes, and it never changes this answer.
+  secretsComparison.admitted(c.env, () => c.executionCtx, {
+    route: 'badges',
+    source: secretsSource(c.env),
+  });
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
   const buckets = await stub.listNonZeroBuckets();
   const response = { buckets } satisfies ListBadgesResponse;
@@ -111,6 +119,10 @@ app.post('/v1/badges/mark-read', async c => {
   if (!parsedBody.success) {
     return c.json({ error: 'badgeBucket required' }, 400);
   }
+  secretsComparison.admitted(c.env, () => c.executionCtx, {
+    route: 'badges_mark_read',
+    source: secretsSource(c.env),
+  });
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
   const badgeCount = await stub.markBucketRead(parsedBody.data.badgeBucket);
   const response = { badgeCount } satisfies MarkBadgeReadResponse;
@@ -124,16 +136,50 @@ async function hasValidInternalSecret(
     env: Env & { INTERNAL_AUTH_COUNTER?: InternalAuthAnalyticsBinding };
     executionCtx: SecretsExecutionContext;
   },
-  route: string
+  route: Extract<GuardRoute, 'dispatch' | 'glanceable_refresh'>
 ): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
+  const labels = {
+    route,
+    secret: 'INTERNAL_API_SECRET',
+    source: secretsSourceLabel(c.env),
+  } as const;
   // A deployment that binds no internal secret (the closed staging environment)
   // has no caller to authorize: refuse it as unauthorized, not as a failed read.
-  if (secretsSource(c.env) === 'secrets-store' && c.env.INTERNAL_API_SECRET === undefined) {
+  if (labels.source === 'secrets-store' && c.env.INTERNAL_API_SECRET === undefined) {
+    logSecretUnavailable({ ...labels, reason: 'binding_missing' });
     return false;
   }
-  const expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
-  if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  let source: NotificationsSecretsSource;
+  let expected: string;
+  try {
+    source = secretsSource(c.env);
+    expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
+  } catch (error) {
+    // Fixed labels only, then the same failure as before reaches the route.
+    logSecretUnavailable({ ...labels, reason: secretRefusal(c.env, 'INTERNAL_API_SECRET', error) });
+    throw error;
+  }
+  if (!expected) {
+    logSecretUnavailable({ ...labels, reason: 'empty' });
+    return false;
+  }
+  if (!provided) {
+    logCredentialRefused({ ...labels, reason: 'missing' });
+    return false;
+  }
+  if (!timingSafeEqual(provided, expected)) {
+    logCredentialRefused({ ...labels, reason: 'invalid' });
+    // At most one background check of this name per isolate and route when enabled, against the
+    // value just read, never the presented one (src/secrets-compare.ts).
+    secretsComparison.refused(c.env, () => c.executionCtx, {
+      route,
+      source,
+      secret: 'INTERNAL_API_SECRET',
+      selected: expected,
+    });
+    return false;
+  }
   // No Logpush here, so each counter line also becomes one Analytics Engine data point that o11y
   // reads back into Axiom (design section 9.4, item 9).
   const counter = c.env.INTERNAL_AUTH_COUNTER;
@@ -165,9 +211,12 @@ app.post('/internal/v1/dispatch', async c => {
     return c.json({ error: 'Invalid body' }, 400);
   }
 
-  // Only a request that passed both checks above reaches the pre-flip check, and the latch keeps
-  // it to one comparison per isolate whichever eligible route runs first.
-  compareSecretsOnce(c.env, c.executionCtx);
+  // Only a request that passed both checks above reaches the comparison, and the latch keeps it to
+  // one comparison per isolate whichever admitting route runs first.
+  secretsComparison.admitted(c.env, () => c.executionCtx, {
+    route: 'dispatch',
+    source: secretsSource(c.env),
+  });
 
   // Staging push gate (`lib/push-gate.ts`): no database client and no
   // preference read. Each recipient still takes the shared dedupe and result
@@ -213,6 +262,10 @@ app.post('/internal/v1/glanceable-refresh', async c => {
   if (!parsed.success) {
     return c.json({ error: 'Invalid body' }, 400);
   }
+  secretsComparison.admitted(c.env, () => c.executionCtx, {
+    route: 'glanceable_refresh',
+    source: secretsSource(c.env),
+  });
 
   const { userId, organizationId } = parsed.data;
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));

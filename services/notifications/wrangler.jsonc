@@ -38,10 +38,12 @@
     // absent value means `secrets-store`; any other value refuses every read.
     // The `sts` source never falls back to the Secrets Store.
     "SECRETS_SOURCE": "secrets-store",
-    // One pre-flip check per isolate that the STS copy of the APNs key, the
-    // signer and the internal secret equals the Secrets Store value served
-    // above (src/secrets-compare.ts). Only `true` turns it on; it never changes
-    // the source. Production only: staging does not set it.
+    // Background check that the STS bundle and the Secrets Store hold the same
+    // bytes, under either source (src/secrets-compare.ts): once per isolate
+    // for the APNs key, the signer and the internal secret after an admitted
+    // request, with Expo on its own line, and once per isolate and route for a
+    // refused credential's own name. Only `true` turns it on, and only when
+    // WORKER_ENV is `production`; it never changes the source or an answer.
     "SECRETS_COMPARE_ENABLED": "true",
   },
 
@@ -97,8 +99,8 @@
     // top-level name. This config deploys only production, so it binds the
     // production `sts`; services/sts/policy/notifications.yaml grants the four
     // names. While SECRETS_SOURCE is `secrets-store`, every request is served
-    // from the Secrets Store; the only reader here is the one background
-    // compare per isolate that SECRETS_COMPARE_ENABLED turns on.
+    // from the Secrets Store; the only readers here are the background
+    // comparisons that SECRETS_COMPARE_ENABLED turns on.
     {
       "binding": "STS",
       "service": "sts",

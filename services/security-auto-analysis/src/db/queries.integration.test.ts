@@ -460,7 +460,11 @@ describe('security analysis durable database invariants', () => {
           owner: { type: 'user', id: testUserId },
           commandId,
         })
-      ).resolves.toEqual({ status: 'ready', claimToken: randomToken, oldCloudAgentSessionId: null });
+      ).resolves.toEqual({
+        status: 'ready',
+        claimToken: randomToken,
+        oldCloudAgentSessionId: null,
+      });
       expect(await queueRow(findingId)).toEqual({
         status: 'pending',
         claimToken: randomToken,

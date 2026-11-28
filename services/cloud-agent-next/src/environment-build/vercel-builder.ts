@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   VercelSandboxRestClient,
   VercelSandboxRestError,
@@ -162,7 +163,8 @@ function createExpiryBound(session: { requestedAt: number; timeout: number }): {
 export async function openVercelBuilder(
   env: Env,
   allocation: VercelBuilderAllocation,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<OpenedVercelBuilder> {
   const owner =
     allocation.owner.type === 'organization'
@@ -170,10 +172,14 @@ export async function openVercelBuilder(
       : { userId: allocation.owner.id };
   let config;
   try {
-    config = await resolveByocVercelAccessConfig(env, {
-      ...owner,
-      credentialId: allocation.target.credentialId,
-    });
+    config = await resolveByocVercelAccessConfig(
+      env,
+      {
+        ...owner,
+        credentialId: allocation.target.credentialId,
+      },
+      ctx
+    );
   } catch (error) {
     if (error instanceof ByocCredentialResolverError) {
       // Resolver/network/configuration failures are transient, but a deleted

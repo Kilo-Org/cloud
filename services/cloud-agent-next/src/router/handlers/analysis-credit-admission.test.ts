@@ -69,7 +69,12 @@ describe('getAnalysisCreditAdmission', () => {
 
     await callerFor().getAnalysisCreditAdmission({ organizationId: ORGANIZATION_ID });
 
-    expect(validateBalanceOnly).toHaveBeenCalledWith('control-token', ORGANIZATION_ID, env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith(
+      'control-token',
+      ORGANIZATION_ID,
+      env,
+      undefined
+    );
   });
 
   it('checks the personal balance when no organization is named', async () => {
@@ -77,6 +82,6 @@ describe('getAnalysisCreditAdmission', () => {
 
     await callerFor().getAnalysisCreditAdmission({});
 
-    expect(validateBalanceOnly).toHaveBeenCalledWith('control-token', undefined, env);
+    expect(validateBalanceOnly).toHaveBeenCalledWith('control-token', undefined, env, undefined);
   });
 });

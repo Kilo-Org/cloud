@@ -38,6 +38,7 @@ export const getSandboxSelectionOptions = protectedProcedure
     const capabilities = await getSandboxSelectionCapabilities(ctx.env, owner, {
       ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
       ...readiness,
+      ...(ctx.executionCtx === undefined ? {} : { ctx: ctx.executionCtx }),
     });
     if (!capabilities.enabled || !input.repositoryType) return capabilities;
 
@@ -45,6 +46,7 @@ export const getSandboxSelectionOptions = protectedProcedure
     const saved = await resolveSavedSandboxAllocation({
       db: getPgDb(ctx.env),
       env: ctx.env,
+      ...(ctx.executionCtx === undefined ? {} : { ctx: ctx.executionCtx }),
       owner,
       repositoryType,
       readiness,

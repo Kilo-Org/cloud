@@ -199,7 +199,13 @@ const createHostedWorkspaceHandler = protectedProcedure
     );
     const registration = await createSessionWithLedger(
       request,
-      { env: ctx.env, userId: ctx.userId, authToken: ctx.authToken, botId: ctx.botId },
+      {
+        env: ctx.env,
+        executionCtx: ctx.executionCtx,
+        userId: ctx.userId,
+        authToken: ctx.authToken,
+        botId: ctx.botId,
+      },
       {
         billingOrigin: AGENT_MANAGER_ORIGIN,
         operationKey: input.operationKey,

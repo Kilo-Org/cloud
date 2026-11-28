@@ -9,6 +9,7 @@ import {
 import { vercelRuntimeBaseDigest } from './byoc/vercel-runtime-base.js';
 import { TRPCError } from '@trpc/server';
 import { billingModeSchema, type BillingMode } from '@kilocode/container-usage';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { withTimeout } from '@kilocode/worker-utils';
 import {
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
@@ -134,6 +135,8 @@ export async function getSandboxSelectionCapabilities(
     repositoryType?: SessionRepositoryType;
     capability?: SandboxAllocationCapability;
     vercelUnavailableReason?: string;
+    /** The invocation's context, for a secret read's bundle revalidation. */
+    ctx?: SecretsExecutionContext;
   }
 ): Promise<SandboxSelectionCapabilities> {
   const selectionAllowed =
@@ -162,7 +165,9 @@ export async function getSandboxSelectionCapabilities(
         try {
           const connection = await fetchAwsByocConnection(
             env,
-            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId }
+            owner.orgId !== undefined ? { organizationId: owner.orgId } : { userId: owner.userId },
+            undefined,
+            options?.ctx
           );
           if (connection.setupStatus !== 'ready')
             unavailableReason = 'AWS compute setup is not ready';
@@ -256,7 +261,8 @@ export async function assertSandboxAllocationAvailable(
   owner: SelectionOwner,
   allocation: SandboxAllocation,
   repositoryType?: SessionRepositoryType,
-  capability?: SandboxAllocationCapability
+  capability?: SandboxAllocationCapability,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   // Retired explicit choices are rejected with a specific reason; a saved value
   // is skipped before this check and falls through to the default.
@@ -266,6 +272,7 @@ export async function assertSandboxAllocationAvailable(
   const capabilities = await getSandboxSelectionCapabilities(env, owner, {
     ...(repositoryType ? { repositoryType } : {}),
     ...(capability ? { capability } : {}),
+    ...(ctx === undefined ? {} : { ctx }),
   });
   if (!capabilities.enabled) {
     throw new TRPCError({

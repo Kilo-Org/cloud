@@ -129,7 +129,7 @@ export type CoordinatorDeps = {
     claims: { environmentId: string; buildId: string; allocationId: string },
     credential: string
   ): Promise<boolean>;
-  decryptSecrets(encrypted: Record<string, unknown>): Record<string, string>;
+  decryptSecrets(encrypted: Record<string, unknown>): Promise<Record<string, string>>;
   billingInput(input: {
     owner: EnvironmentReference['owner'];
     actorUserId: string;
@@ -750,7 +750,7 @@ export class EnvironmentBuildCoordinator {
       secrets =
         build.encrypted_secrets === null
           ? {}
-          : this.deps.decryptSecrets(
+          : await this.deps.decryptSecrets(
               JSON.parse(build.encrypted_secrets) as Record<string, unknown>
             );
       networkEnv = buildNetworkSecretEnvironment(build);

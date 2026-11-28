@@ -35,7 +35,8 @@ import {
   RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
-import { resolveSecret } from '../auth.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
@@ -128,6 +129,8 @@ export type QueueMessageInput = {
 
 export type QueueMessageContext = {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  executionCtx?: SecretsExecutionContext;
   userId: string;
   botId?: string;
   authToken?: string;
@@ -145,6 +148,7 @@ export async function preflightRuntimeAuthorizationRecovery(
   const workspaceSessionId = await preflightChatRuntimeAuthorization(cloudAgentSessionId, ctx);
   await renewWorkspaceAuthorityForUserSend({
     env: ctx.env,
+    ctx: ctx.executionCtx,
     userId: ctx.userId,
     authToken: ctx.authToken,
     workspaceSessionId,
@@ -191,7 +195,9 @@ async function preflightChatRuntimeAuthorization(
   const expectedOldId = state.id;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, cloudAgentSessionId);
   if (!metadata || metadata.identity.userId !== ctx.userId) return state.workspaceSessionId;
-  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(ctx.env, 'NEXTAUTH_SECRET', ctx.executionCtx).catch(
+    () => null
+  );
   if (!secret)
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
   const created = await createRuntimeAuthorization({
@@ -265,6 +271,7 @@ export async function preflightAndAdmitPromptMessage<T>(
 ): Promise<T> {
   await preflightSessionRuntime({
     env: ctx.env,
+    ctx: ctx.executionCtx,
     userId: ctx.userId,
     cloudAgentSessionId: input.cloudAgentSessionId,
     procedure,
@@ -272,6 +279,7 @@ export async function preflightAndAdmitPromptMessage<T>(
   await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
   await preflightExistingPromptModel({
     env: ctx.env,
+    ctx: ctx.executionCtx,
     userId: ctx.userId,
     cloudAgentSessionId: input.cloudAgentSessionId,
     requestedModel: input.agent?.model,
@@ -307,6 +315,7 @@ async function queueControlPlaneMessage(
   try {
     payload = await buildControlPlaneMessagePayload({
       env: ctx.env,
+      ctx: ctx.executionCtx,
       userId: ctx.userId,
       sessionId,
       metadata,

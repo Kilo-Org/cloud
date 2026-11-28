@@ -2701,6 +2701,9 @@ importers:
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts

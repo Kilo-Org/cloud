@@ -20,6 +20,7 @@ import { getSandboxControlStub } from '../../sandbox-control/stub.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import type { Env } from '../../types.js';
+import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from '../../secrets.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
@@ -27,11 +28,9 @@ import { sessionIdSchema } from '../schemas.js';
 type SandboxControlStub = ReturnType<typeof getSandboxControlStub>;
 type SandboxTransferEnv = Pick<
   Env,
-  | 'R2_ENDPOINT'
-  | 'WORKSPACE_ARTIFACTS_BUCKET_NAME'
-  | 'R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID'
-  | 'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY'
->;
+  'R2_ENDPOINT' | 'WORKSPACE_ARTIFACTS_BUCKET_NAME' | 'R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID'
+> &
+  CloudAgentNextSecretsEnv;
 
 const ListWorkspaceArtifactsInput = workspaceArtifactSessionInputSchema.extend({
   cloudAgentSessionId: sessionIdSchema,
@@ -102,7 +101,10 @@ function workspaceArtifactsFor<T>(
   return withDORetry(() => getSandboxControlStub(env, sandboxId), operation, 'workspaceArtifacts');
 }
 
-function requireDownloadConfig(env: SandboxTransferEnv): {
+function requireDownloadConfig(
+  env: SandboxTransferEnv,
+  secretAccessKey: string | undefined
+): {
   bucketName: string;
   accessKeyId: string;
   secretAccessKey: string;
@@ -110,7 +112,6 @@ function requireDownloadConfig(env: SandboxTransferEnv): {
 } {
   const bucketName = env.WORKSPACE_ARTIFACTS_BUCKET_NAME;
   const accessKeyId = env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID;
-  const secretAccessKey = env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY;
   const endpoint = env.R2_ENDPOINT;
 
   if (!bucketName || !accessKeyId || !secretAccessKey || !endpoint) {
@@ -190,7 +191,14 @@ export function createSessionWorkspaceArtifactsHandlers() {
             sandboxId,
           });
 
-          const config = requireDownloadConfig(ctx.env);
+          const config = requireDownloadConfig(
+            ctx.env,
+            await readCloudAgentNextSecret(
+              ctx.env,
+              'R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY',
+              ctx.executionCtx
+            ).catch(() => undefined)
+          );
           const artifact = await workspaceArtifactsFor(ctx.env, sandboxId, stub =>
             stub.getWorkspaceArtifact(input.relativePath)
           );

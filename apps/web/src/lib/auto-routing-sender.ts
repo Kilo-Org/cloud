@@ -16,11 +16,12 @@ import {
   serviceSenderHeaders,
   type ServiceSenderAuth,
   type VercelRuntime,
-} from '@/lib/service-sender-auth';
+} from '@kilocode/web-shared/lib/service-sender-auth';
 
 /**
  * The web app's auto-routing sender (`auto-routing-sender.ts` in web-shared), installed by
- * `src/instrumentation.ts`. Its switches (`service-sender-auth.ts`), set on `kilocode-app`:
+ * `src/instrumentation.ts`. Its switches (`packages/web-shared/src/lib/service-sender-auth.ts`),
+ * set on `kilocode-app`:
  * - `AUTO_ROUTING_ADMIN_SENDER_AUTH`: auto-routing `/admin/*`, `auto-routing:admin.read` (GET) or
  *   `auto-routing:admin.write` (PUT);
  * - `AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH`: the benchmark `/admin/*` routes outside the

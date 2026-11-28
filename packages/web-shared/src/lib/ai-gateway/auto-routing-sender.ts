@@ -14,7 +14,7 @@ import {
  *
  * The clients run in two apps, so the app chooses the credential, never the request: each app's
  * `instrumentation.ts` installs its own sender, which reads only that app's switches.
- * - `apps/web` installs `apps/web/src/lib/auto-routing-sender.ts` (`service-sender-auth.ts`):
+ * - `apps/web` installs `apps/web/src/lib/auto-routing-sender.ts` (`../service-sender-auth.ts`):
  *   `AUTO_ROUTING_ADMIN_SENDER_AUTH`, `AUTO_ROUTING_BENCHMARK_ADMIN_SENDER_AUTH` and
  *   `WEB_ROUTING_TABLES_SENDER_AUTH`.
  * - `apps/ai-gateway` installs `auto-routing-gateway-sender.ts`: `AUTO_ROUTING_DECIDE_SENDER_AUTH`

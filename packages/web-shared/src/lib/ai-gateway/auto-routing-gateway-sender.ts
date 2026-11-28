@@ -1,9 +1,15 @@
 import {
+  AUTO_ROUTING_BENCHMARK_WORKER_URL,
   AUTO_ROUTING_DECIDE_SENDER_AUTH,
+  AUTO_ROUTING_WORKER_URL,
   GATEWAY_ROUTING_TABLES_SENDER_AUTH,
 } from '@kilocode/web-shared/lib/config.server';
+import {
+  resolveServiceSenderAuth,
+  type ServiceSenderRefusal,
+  type VercelRuntime,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 import type { StsTokenFailure } from '@kilocode/web-shared/lib/sts-service-tokens';
-import { z } from 'zod';
 import {
   isAutoRoutingReceiverOrigin,
   type AutoRoutingCredential,
@@ -33,12 +39,8 @@ import {
  *
  * This module imports no STS code, so a `legacy` deployment never loads the token client or the
  * Vercel OIDC exchange; `auto-routing-sender-sts.ts` holds them and is imported only for an STS send.
+ * The switch values, the STS environment and the URL rule are `service-sender-auth.ts`'s.
  */
-const SenderAuthSchema = z.preprocess(
-  value => (value === '' ? undefined : value),
-  z.enum(['legacy', 'sts']).default('legacy')
-);
-
 type GatewayVariable = 'AUTO_ROUTING_DECIDE_SENDER_AUTH' | 'GATEWAY_ROUTING_TABLES_SENDER_AUTH';
 
 const GATEWAY_SWITCHES: Partial<Record<AutoRoutingSenderRoute, GatewayVariable>> = {
@@ -46,30 +48,11 @@ const GATEWAY_SWITCHES: Partial<Record<AutoRoutingSenderRoute, GatewayVariable>>
   benchmarkRoutingTablesRead: 'GATEWAY_ROUTING_TABLES_SENDER_AUTH',
 };
 
-/** The deployment's runtime variables; `process.env` itself in production. */
-export type VercelRuntime = Readonly<Record<string, string | undefined>> & {
-  VERCEL_ENV?: string;
-  VERCEL_TARGET_ENV?: string;
-};
-
-/**
- * Vercel production mints from production STS, and a process outside Vercel (local development)
- * from development STS. Every other deployment has none: neither Worker has one there.
- */
-function receiverEnvironment(runtime: VercelRuntime): AutoRoutingReceiverEnvironment | null {
-  const { VERCEL_ENV: environment, VERCEL_TARGET_ENV: target } = runtime;
-  if (environment === 'production' && target === 'production') return 'production';
-  if (environment === undefined && target === undefined) return 'development';
-  return null;
-}
-
 export type GatewaySenderFailure =
-  /** The switch holds a value other than `legacy` or `sts`. */
-  | 'invalid_auth'
+  /** The switch value, the deployment or the configured Worker URL refuses `sts`. */
+  | ServiceSenderRefusal
   /** `sts` outside the `ai-gateway` build, which alone holds these scopes. */
   | 'not_ai_gateway'
-  /** `sts` on a deployment neither Worker serves (staging, previews). */
-  | 'sts_production_only'
   /** The request URL is not the receiver's origin in this deployment's STS environment. */
   | 'origin_mismatch'
   /** The request's deadline ended before a token arrived; the mint runs on under `waitUntil`. */
@@ -85,19 +68,15 @@ type GatewayEdge =
   | { kind: 'sts'; environment: AutoRoutingReceiverEnvironment }
   | { kind: 'refused'; reason: GatewaySenderFailure };
 
-function resolveEdge(auth: string | undefined, runtime: VercelRuntime): GatewayEdge {
-  const parsed = SenderAuthSchema.safeParse(auth);
-  if (!parsed.success) return { kind: 'refused', reason: 'invalid_auth' };
-  if (parsed.data === 'legacy') return { kind: 'legacy' };
+function resolveEdge(auth: string | undefined, url: string, runtime: VercelRuntime): GatewayEdge {
+  const sender = resolveServiceSenderAuth({ auth, url, runtime });
+  if (sender.kind !== 'sts') return sender;
   // Literal `process.env` access, so Next inlines the value `apps/ai-gateway/next.config.mjs`
   // sets at build time (`web-internal-sts.ts` does the same).
   if (process.env.KILO_STS_WORKLOAD !== 'ai-gateway') {
     return { kind: 'refused', reason: 'not_ai_gateway' };
   }
-  const environment = receiverEnvironment(runtime);
-  return environment === null
-    ? { kind: 'refused', reason: 'sts_production_only' }
-    : { kind: 'sts', environment };
+  return sender;
 }
 
 /** Reported once per switch and reason per process: decide and the table reads are hot paths. */
@@ -134,8 +113,16 @@ export function createGatewayAutoRoutingSender(
   runtime: VercelRuntime = process.env
 ): AutoRoutingSender {
   const edges: Record<GatewayVariable, GatewayEdge> = {
-    AUTO_ROUTING_DECIDE_SENDER_AUTH: resolveEdge(AUTO_ROUTING_DECIDE_SENDER_AUTH, runtime),
-    GATEWAY_ROUTING_TABLES_SENDER_AUTH: resolveEdge(GATEWAY_ROUTING_TABLES_SENDER_AUTH, runtime),
+    AUTO_ROUTING_DECIDE_SENDER_AUTH: resolveEdge(
+      AUTO_ROUTING_DECIDE_SENDER_AUTH,
+      AUTO_ROUTING_WORKER_URL,
+      runtime
+    ),
+    GATEWAY_ROUTING_TABLES_SENDER_AUTH: resolveEdge(
+      GATEWAY_ROUTING_TABLES_SENDER_AUTH,
+      AUTO_ROUTING_BENCHMARK_WORKER_URL,
+      runtime
+    ),
   };
   return async (route, { url, signal }) => {
     const variable = GATEWAY_SWITCHES[route];

@@ -1,4 +1,5 @@
-// The web app's auto-routing edges through the real shared clients, `service-sender-auth.ts` and
+// The web app's auto-routing edges through the real shared clients, web-shared's
+// `service-sender-auth.ts` and
 // the real token client: only the network (the STS mint and the Worker call) and the Vercel
 // identity are faked. Do not import `jest` from '@jest/globals': the SWC transform hoists these
 // `jest.mock` calls only with the global `jest`.

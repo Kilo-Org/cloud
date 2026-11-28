@@ -229,7 +229,9 @@ export class SessionPresenceDO extends DurableObject<Env> {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
     const token = socketTicket(request);
-    const ticket = token ? await verifyTicket(token, this.env, 'session-presence') : undefined;
+    const ticket = token
+      ? await verifyTicket(token, this.env, 'session-presence', this.ctx)
+      : undefined;
     if (
       !ticket ||
       ticket.sessionID !== undefined ||
@@ -360,7 +362,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
     }
     const frame = parsed.data;
     if (frame.type === 'reauth') {
-      const ticket = await verifyTicket(frame.ticket, this.env, 'session-presence');
+      const ticket = await verifyTicket(frame.ticket, this.env, 'session-presence', this.ctx);
       state = this.attachment(ws);
       if (!state || state.closed) return;
       if (
@@ -508,7 +510,7 @@ export class SessionPresenceDO extends DurableObject<Env> {
   }
 
   async command(input: { ticket: string; command: unknown }): Promise<Response> {
-    const ticket = await verifyTicket(input.ticket, this.env, 'session-presence');
+    const ticket = await verifyTicket(input.ticket, this.env, 'session-presence', this.ctx);
     if (
       !ticket ||
       ticket.role !== 'controller' ||

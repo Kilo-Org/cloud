@@ -242,9 +242,9 @@
       "path": "/api/cron/prune-spend-alert-hourly",
       "requestMethod": "GET"
     },
-    "leaderboard-usage-rollup": {
-      "schedule": "20 * * * *",
-      "path": "/api/cron/leaderboard-usage-rollup",
+    "leaderboard-usage-hourly-rollup": {
+      "schedule": "*/15 * * * *",
+      "path": "/api/cron/leaderboard-usage-hourly-rollup",
       "requestMethod": "GET"
     },
     "code-review-outcome-aggregate": {

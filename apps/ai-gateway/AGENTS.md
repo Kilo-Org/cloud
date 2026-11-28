@@ -34,6 +34,10 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   `NEXTAUTH_SECRET` must stay set on the `kilocode-ai-gateway` project: it
   verifies HS256 bearer tokens. It is no longer checked at boot, so a missing
   value shows up as every bearer token being refused.
+- `next.config.mjs` also inlines `KILO_STS_WORKLOAD=ai-gateway`: the US-region
+  usage handoffs and the Claude payer-state read send an STS token under
+  `WEB_INTERNAL_SENDER_AUTH=sts` only from this build. STS refuses `kilocode-app`
+  a token for its own `web` audience.
 - Requests only arrive here under `/api/v1`. The LLM proxy's path validation
   accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`
@@ -60,6 +64,14 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   value exists. Receivers answer a failed read with their generic unavailable status and do
   not log it; the shared reader's `sts_secret_read_failed` line, limited per reason on a best
   effort basis, is the one signal.
+- `src/instrumentation.ts` also installs the shared Bouncer auth
+  (`installBouncerAuth('kilocode-ai-gateway')`, `packages/web-shared/src/lib/bouncer/sts-auth.ts`):
+  every Bouncer call names this app in `x-kilo-caller`, and `BOUNCER_CLIENT_AUTH` on the
+  `kilocode-ai-gateway` project picks the credentials (`ENVIRONMENT.md`): unset or `legacy` sends
+  `x-internal-api-key` alone, `dual` adds an STS token for `bouncer:decide` or
+  `bouncer:usage.write`, `sts` sends the token alone. The scopes come from `BOUNCER_APP_SCOPES`,
+  which a test keeps equal to the production grant of `services/sts/policy/ai-gateway.yaml`. Only a
+  Vercel production deployment calls Bouncer at all.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

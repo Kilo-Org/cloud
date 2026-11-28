@@ -10,13 +10,16 @@ import type { IdentityStore } from '../db/client';
 import { type FeedEntry, StatementFeedEntriesSchema } from '../revocation/entries';
 
 /**
- * The account API statements (migration `0005_pats_bot_keys_gates.sql`). Each call is one SQL
- * statement: a SECURITY DEFINER function that checks the caller's session, runs the gate where the
- * action has one, and writes the credential, the gate pass, the notice and the audit row together.
- * Results arrive as one row whose `outcome` column picks the shape.
+ * The account API statements (migrations 0005 and 0025). Each call is one SQL statement: a
+ * SECURITY DEFINER function that checks the caller's session, runs the gate where the action has
+ * one, and writes the credential, the gate pass, the notice and the audit row together. Results
+ * arrive as one row whose `outcome` column picks the shape.
  */
 
-/** The caller: the access token's subject and the grant its `sid` names. */
+/**
+ * The caller: the access token's subject, and the session its `sid` names (a CLI grant, or a
+ * `kilo-web` browser session), which the statements match to that subject.
+ */
 export type AccountSession = { accountId: string; grantId: string };
 
 export type CreatePatInput = AccountSession & {

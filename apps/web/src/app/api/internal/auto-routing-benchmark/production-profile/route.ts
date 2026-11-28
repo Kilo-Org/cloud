@@ -24,6 +24,11 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { eq, sql, and } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -39,6 +44,12 @@ export async function GET(req: NextRequest) {
   if (!expected || !token || !timingSafeEqual(token, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'web',
+    'auto_routing_benchmark_production_profile',
+    'legacy_shared_secret',
+    callerLabel(req.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   const windowStart = sql`NOW() - make_interval(hours => ${WINDOW_HOURS}::int)`;
   const perSession = db

@@ -81,6 +81,49 @@ export const STS_GITHUB_RELAY_MIGRATION_PROXY_READ = {
 } as const;
 
 /**
+ * The web app and the AI gateway call Bouncer (repo Kilo-Org/bouncer) for verdicts: `decide`,
+ * `charge-decide` and `release`. Bouncer's `ROUTE_SCOPES` (`src/api-auth.ts`) names the scope of
+ * each route; the four Bouncer pairs here match it.
+ */
+export const STS_BOUNCER_DECIDE = { audience: 'bouncer', scope: 'bouncer:decide' } as const;
+
+/** The web app and the AI gateway report usage and credit events to Bouncer. */
+export const STS_BOUNCER_USAGE_WRITE = {
+  audience: 'bouncer',
+  scope: 'bouncer:usage.write',
+} as const;
+
+/** The web app asks Bouncer whether a signup may proceed. */
+export const STS_BOUNCER_SIGNUP_DECIDE = {
+  audience: 'bouncer',
+  scope: 'bouncer:signup.decide',
+} as const;
+
+/** The signup-history import job writes signup history to Bouncer; no app holds this scope. */
+export const STS_BOUNCER_SIGNUP_HISTORY = {
+  audience: 'bouncer',
+  scope: 'bouncer:signup.history',
+} as const;
+
+/**
+ * A GitHub Actions job asks the web app to mint the one-hour catalog API token
+ * (`POST /api/internal/mcp-catalog/token`): the MCP catalog dump and the kilo-app changelog jobs.
+ */
+export const STS_WEB_MCP_CATALOG_TOKEN_MINT = {
+  audience: 'web',
+  scope: 'web:mcp-catalog-token.mint',
+} as const;
+
+/**
+ * Kilo-Org/kilocode's watch-opencode-releases job asks the community contributions dashboard to
+ * sync a new upstream opencode release (`POST /api/opencode/sync`).
+ */
+export const STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC = {
+  audience: 'community-contributions-dashboard',
+  scope: 'community-contributions-dashboard:opencode.sync',
+} as const;
+
+/**
  * The pilot pair (decision D6c): usage-ingest's canary calls the web app and the web app calls
  * usage-ingest back, each with a token of the other's canary scope. `canary` holds only the
  * reserved denied probe. The UTS scopes are those UTS and its feed accept from a service: the web
@@ -90,9 +133,12 @@ export const STS_GITHUB_RELAY_MIGRATION_PROXY_READ = {
  * Ingest (`STS_USAGE_PUBLISH`), the usage record at the web app (`STS_USAGE_RECORD`), O11y's
  * API-metrics write and alerting read and write (`STS_O11Y_*`), Security Sync's manual sync and
  * finding dismissal (`STS_SECURITY_SYNC_*`), the web app's security notification dispatch
- * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`) and the migration proxy's reads through the GitHub
- * relay (`STS_GITHUB_RELAY_MIGRATION_PROXY_READ`). STS mints each one only where a policy grants
- * it (default deny).
+ * (`STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH`), the Bouncer scopes (`STS_BOUNCER_*`) and the
+ * migration proxy's reads through the GitHub relay (`STS_GITHUB_RELAY_MIGRATION_PROXY_READ`). The
+ * CI scopes are the web app's catalog token mint (`STS_WEB_MCP_CATALOG_TOKEN_MINT`) and the
+ * community contributions dashboard's opencode sync
+ * (`STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC`). STS mints each one only where a policy
+ * grants it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   web: {
@@ -100,6 +146,7 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
       'web:sts.canary',
       STS_USAGE_RECORD.scope,
       STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH.scope,
+      STS_WEB_MCP_CATALOG_TOKEN_MINT.scope,
     ],
   },
   'usage-ingest': { scopes: ['usage-ingest:sts.canary', STS_USAGE_PUBLISH.scope] },
@@ -126,6 +173,17 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   [STS_GITHUB_RELAY_MIGRATION_PROXY_READ.audience]: {
     scopes: [STS_GITHUB_RELAY_MIGRATION_PROXY_READ.scope],
+  },
+  [STS_BOUNCER_DECIDE.audience]: {
+    scopes: [
+      STS_BOUNCER_DECIDE.scope,
+      STS_BOUNCER_USAGE_WRITE.scope,
+      STS_BOUNCER_SIGNUP_DECIDE.scope,
+      STS_BOUNCER_SIGNUP_HISTORY.scope,
+    ],
+  },
+  'community-contributions-dashboard': {
+    scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],
   },
 };
 

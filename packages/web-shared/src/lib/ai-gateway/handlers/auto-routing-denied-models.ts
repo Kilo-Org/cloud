@@ -4,6 +4,11 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { deniedAutoRoutingModelIdsForMember } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
@@ -28,6 +33,12 @@ export async function handleAutoRoutingDeniedModelsRequest(
   if (!expected || !timingSafeEqual(token, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'ai-gateway',
+    'auto_routing_denied_models',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
   const parsed = AutoRoutingDeniedModelsRequestSchema.safeParse(
     await request.json().catch(() => undefined)
   );

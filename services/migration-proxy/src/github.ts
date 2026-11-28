@@ -108,6 +108,10 @@ const ContentsSchema = z.union([
   z.array(z.unknown()),
 ]);
 const TokenSchema = z.object({ token: z.string().min(1), expires_at: z.iso.datetime() });
+const ErrorBodySchema = z.object({
+  message: z.string().optional(),
+  documentation_url: z.string().optional(),
+});
 
 function base64url(bytes: Uint8Array | string): string {
   const raw = typeof bytes === 'string' ? new TextEncoder().encode(bytes) : bytes;
@@ -195,13 +199,72 @@ function segments(path: string): string {
 /** Each GitHub call, body included, gets this long before it counts as a network failure. */
 export const GITHUB_REQUEST_TIMEOUT_MS = 30_000;
 
+type GithubOp =
+  | 'token'
+  | 'compare'
+  | 'tree'
+  | 'blob'
+  | 'commits'
+  | 'pulls'
+  | 'reviews'
+  | 'contents';
+
+/** What GitHub said about a failed call. Never a header that carries a credential. */
+type GithubFailure = {
+  status: number | null;
+  githubMessage: string | null;
+  documentationUrl: string | null;
+  retryAfter: string | null;
+  rateLimitRemaining: string | null;
+  timedOut: boolean;
+};
+
+const NO_ANSWER: GithubFailure = {
+  status: null,
+  githubMessage: null,
+  documentationUrl: null,
+  retryAfter: null,
+  rateLimitRemaining: null,
+  timedOut: false,
+};
+const LOGGED_TEXT_LIMIT = 300;
+
+async function failureOf(response: Response): Promise<GithubFailure> {
+  let errorBody: z.infer<typeof ErrorBodySchema> = {};
+  try {
+    const parsed = ErrorBodySchema.safeParse(await response.json());
+    if (parsed.success) errorBody = parsed.data;
+  } catch {
+    // Not JSON, or cut off by the timeout: the status and headers still say what happened.
+  }
+  return {
+    status: response.status,
+    githubMessage: errorBody.message?.slice(0, LOGGED_TEXT_LIMIT) ?? null,
+    documentationUrl: errorBody.documentation_url?.slice(0, LOGGED_TEXT_LIMIT) ?? null,
+    retryAfter: response.headers.get('retry-after'),
+    rateLimitRemaining: response.headers.get('x-ratelimit-remaining'),
+    timedOut: false,
+  };
+}
+
+/** Logs one `github_call_failed` line, so Workers Logs shows why GitHub counts as unavailable. */
+function unavailable(
+  op: GithubOp,
+  reason: string,
+  failure: GithubFailure = NO_ANSWER,
+  retryAt: number | null = null
+): GithubUnavailableError {
+  console.warn({ event: 'github_call_failed', op, reason, ...failure });
+  return new GithubUnavailableError(reason, retryAt);
+}
+
 /**
  * A GitHub answer in the shape GitHub documents, else GitHub counts as unavailable: a malformed
  * tree, blob, review or compare body stalls the step like a 5xx, and is never a server error.
  */
-function answer<T>(schema: z.ZodType<T>, value: unknown): T {
+function answer<T>(op: GithubOp, schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new GithubUnavailableError('malformed answer');
+  if (!parsed.success) throw unavailable(op, 'malformed answer');
   return parsed.data;
 }
 
@@ -223,24 +286,28 @@ export function createGithubClient(
     'X-GitHub-Api-Version': '2022-11-28',
   });
 
-  const send = async (url: string, init: RequestInit): Promise<Response> => {
+  const send = async (op: GithubOp, url: string, init: RequestInit): Promise<Response> => {
     let response: Response;
     try {
       response = await fetcher(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-    } catch {
-      throw new GithubUnavailableError('network');
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === 'TimeoutError';
+      throw unavailable(op, 'network', { ...NO_ANSWER, timedOut });
     }
     const limited = rateLimitedUntil(response, now());
-    if (limited !== null) throw new GithubUnavailableError('rate limited', limited);
+    if (limited !== null) {
+      throw unavailable(op, 'rate limited', await failureOf(response), limited);
+    }
     return response;
   };
 
   /** The JSON body; a body cut off by the timeout is a network failure too. */
-  const body = async (response: Response): Promise<unknown> => {
+  const body = async (op: GithubOp, response: Response): Promise<unknown> => {
     try {
       return await response.json();
-    } catch {
-      throw new GithubUnavailableError('network');
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === 'TimeoutError';
+      throw unavailable(op, 'network', { ...NO_ANSWER, status: response.status, timedOut });
     }
   };
 
@@ -250,10 +317,11 @@ export function createGithubClient(
     try {
       pem = await credentials.privateKey();
     } catch {
-      throw new GithubUnavailableError('app key unavailable');
+      throw unavailable('token', 'app key unavailable');
     }
     const jwt = await appJwt(credentials.appId, pem, now());
     const response = await send(
+      'token',
       `${API}/app/installations/${credentials.installationId}/access_tokens`,
       {
         method: 'POST',
@@ -265,61 +333,71 @@ export function createGithubClient(
         }),
       }
     );
-    if (response.status !== 201) throw new GithubUnavailableError(`token ${response.status}`);
-    const parsed = answer(TokenSchema, await body(response));
+    if (response.status !== 201) {
+      throw unavailable('token', `token ${response.status}`, await failureOf(response));
+    }
+    const parsed = answer('token', TokenSchema, await body('token', response));
     cached = { token: parsed.token, expiresAt: Date.parse(parsed.expires_at) };
     return parsed.token;
   };
 
   /** The relay's header with its STS token; none when the reads go straight to GitHub. */
-  const relayHeaders = async (): Promise<Record<string, string>> => {
+  const relayHeaders = async (op: GithubOp): Promise<Record<string, string>> => {
     if (relay === undefined) return {};
     try {
       return { [RELAY_AUTHORIZATION_HEADER]: `Bearer ${await relay.token()}` };
     } catch {
-      throw new GithubUnavailableError('relay token unavailable');
+      throw unavailable(op, 'relay token unavailable');
     }
   };
 
   /** GET with the installation token; null on 404 (and on 422 where GitHub means "no such ref"). */
-  const get = async (url: string, notFound: readonly number[] = [404]): Promise<unknown> => {
-    const response = await send(url, {
-      headers: { ...headers(`token ${await token()}`), ...(await relayHeaders()) },
+  const get = async (
+    op: GithubOp,
+    url: string,
+    notFound: readonly number[] = [404]
+  ): Promise<unknown> => {
+    const response = await send(op, url, {
+      headers: { ...headers(`token ${await token()}`), ...(await relayHeaders(op)) },
     });
     if (notFound.includes(response.status)) return null;
     if (!response.ok) {
       if (response.status === 401) cached = null;
-      throw new GithubUnavailableError(`GET ${response.status}`);
+      throw unavailable(op, `GET ${response.status}`, await failureOf(response));
     }
-    return await body(response);
+    return await body(op, response);
   };
 
   return {
     async compare(base, head) {
-      const body = await get(`${REPO}/compare/${base}...${head}?per_page=1`, [404, 422]);
-      return body === null ? 'not_found' : answer(CompareSchema, body).status;
+      const body = await get('compare', `${REPO}/compare/${base}...${head}?per_page=1`, [404, 422]);
+      return body === null ? 'not_found' : answer('compare', CompareSchema, body).status;
     },
     async tree(sha) {
-      const body = await get(`${REPO}/git/trees/${sha}`, [404, 422]);
+      const body = await get('tree', `${REPO}/git/trees/${sha}`, [404, 422]);
       if (body === null) return null;
-      const parsed = answer(TreeSchema, body);
-      if (parsed.truncated) throw new GithubUnavailableError('tree truncated');
+      const parsed = answer('tree', TreeSchema, body);
+      if (parsed.truncated) throw unavailable('tree', 'tree truncated');
       return parsed.tree.map(entry => ({ name: entry.path, type: entry.type, sha: entry.sha }));
     },
     async blob(sha) {
-      const body = await get(`${REPO}/git/blobs/${sha}`, []);
-      const parsed = answer(BlobSchema, body);
+      const body = await get('blob', `${REPO}/git/blobs/${sha}`, []);
+      const parsed = answer('blob', BlobSchema, body);
       return Uint8Array.from(atob(parsed.content.replace(/\s+/g, '')), char => char.charCodeAt(0));
     },
     async lastCommitTouching(sha, path) {
       const query = new URLSearchParams({ sha, path, per_page: '1' });
-      const body = await get(`${REPO}/commits?${query.toString()}`, [404, 422]);
-      return body === null ? null : (answer(CommitListSchema, body)[0]?.sha ?? null);
+      const body = await get('commits', `${REPO}/commits?${query.toString()}`, [404, 422]);
+      return body === null ? null : (answer('commits', CommitListSchema, body)[0]?.sha ?? null);
     },
     async pullsOfCommit(commit) {
-      const body = await get(`${REPO}/commits/${commit}/pulls?per_page=${PAGE_SIZE}`, [404, 422]);
+      const body = await get(
+        'pulls',
+        `${REPO}/commits/${commit}/pulls?per_page=${PAGE_SIZE}`,
+        [404, 422]
+      );
       if (body === null) return [];
-      return answer(PullListSchema, body).map(pull => ({
+      return answer('pulls', PullListSchema, body).map(pull => ({
         number: pull.number,
         mergedAt: pull.merged_at,
         baseRef: pull.base.ref,
@@ -330,22 +408,23 @@ export function createGithubClient(
       const reviews: Review[] = [];
       for (let page = 1; page <= MAX_REVIEW_PAGES; page += 1) {
         const body = await get(
+          'reviews',
           `${REPO}/pulls/${pr}/reviews?per_page=${PAGE_SIZE}&page=${page}`,
           []
         );
-        const batch = answer(ReviewListSchema, body);
+        const batch = answer('reviews', ReviewListSchema, body);
         for (const review of batch) {
           if (review.user === null) continue;
           reviews.push({ userId: review.user.id, state: review.state, commitId: review.commit_id });
         }
         if (batch.length < PAGE_SIZE) return reviews;
       }
-      throw new GithubUnavailableError('too many review pages');
+      throw unavailable('reviews', 'too many review pages');
     },
     async blobAt(ref, path) {
-      const body = await get(`${REPO}/contents/${segments(path)}?ref=${ref}`);
+      const body = await get('contents', `${REPO}/contents/${segments(path)}?ref=${ref}`);
       if (body === null) return null;
-      const parsed = answer(ContentsSchema, body);
+      const parsed = answer('contents', ContentsSchema, body);
       return Array.isArray(parsed) || parsed.type !== 'file' ? null : parsed.sha;
     },
   };

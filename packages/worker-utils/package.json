@@ -16,6 +16,7 @@
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
     "./kilo-token-admission-observation": "./src/kilo-token-admission-observation.ts",
+    "./internal-auth-observation": "./src/internal-auth-observation.ts",
     "./kilo-token-pepper": "./src/kilo-token-pepper.ts",
     "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
     "./cloud-agent-attachments": "./src/cloud-agent-attachments.ts",
@@ -76,6 +77,7 @@
     "./github-authorization": "./src/github-authorization.ts",
     "./pr-observations": "./src/pr-observations.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
+    "./usage-id": "./src/usage-id.ts",
     "./usage-writer-client": "./src/usage-writer-client.ts",
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
@@ -84,7 +86,8 @@
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
-    "./environment-setup-authority": "./src/environment-setup-authority.ts"
+    "./environment-setup-authority": "./src/environment-setup-authority.ts",
+    "./web-internal-credential": "./src/web-internal-credential.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -97,16 +100,19 @@
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
+    "uuid": "11.1.1",
     "zod": "catalog:",
     "@cfworker/json-schema": "catalog:"
   },
   "devDependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

@@ -139,6 +139,11 @@ function retryAfterSeconds(ms: number): number {
   return Math.min(3600, Math.max(1, Math.ceil(ms / 1000)));
 }
 
+/** One GitHub run attempt, for `maxPerRun` counting; a token without an attempt is attempt 1. */
+function runKey(runId: string, runAttempt: string | null | undefined): string {
+  return `${runId}:${runAttempt ?? '1'}`;
+}
+
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
 }
@@ -280,7 +285,8 @@ class WindowCheckFailure extends Error {
  * audit stream. A token is returned only with its `deploy_token.minted` row committed; one STS
  * cannot hand over is deleted at once. A deletion Cloudflare cannot take is audited and retried by
  * the alarm until it succeeds, because an expired token still counts against the account's
- * 500-token cap. The minting credential lives in memory only. Deploys are few (tens a day), so one
+ * 500-token cap. The minting credential lives in memory only. Deploys are a few hundred a day
+ * (Kilo-Org/cloud's Worker deploys mint one token per job), so one
  * object serves the environment. A stub can call every prototype method, so everything but `mint`,
  * `revoke` and `alarm` is ECMAScript-private: no caller reaches the minting credential or creates a
  * token past `mint`'s limits.
@@ -396,7 +402,10 @@ export class DeployTokenDO extends DurableObject<Env> {
       return UNAVAILABLE;
     }
     const limited =
-      this.#accountLimit(callStartedAt) ?? this.#limitFor(caller.workload, grant, callStartedAt);
+      this.#accountLimit(callStartedAt) ??
+      (grant.maxPerRun === undefined
+        ? this.#limitFor(caller.workload, grant, callStartedAt)
+        : this.#runLimitFor(caller, grant.maxPerRun, grant, callStartedAt));
     if (limited !== null) return limited;
 
     const { slot } = this.#db
@@ -844,6 +853,90 @@ export class DeployTokenDO extends DurableObject<Env> {
         status: 'limited',
         reason: 'rate_limited',
         retryAfterSeconds: retryAfterSeconds(freeing.createdAt + HOUR_MS - now),
+      };
+    }
+    return null;
+  }
+
+  /**
+   * The refusal for a workload at its limits under `maxPerRun`: `maxActive` and `maxPerHour`
+   * count GitHub run attempts (run id and attempt), not tokens, so the parallel jobs of one run
+   * each get their own token. The caller's own run attempt never counts against those two; it may
+   * make `maxPerRun` creations in the last hour, whatever their outcome (`run_limit` beyond).
+   */
+  #runLimitFor(
+    caller: DeployTokenAuditCaller,
+    maxPerRun: number,
+    grant: CloudflareDeployGrant,
+    now: number
+  ): DeployTokenMintResult | null {
+    const ownKey = runKey(caller.run.runId, caller.run.runAttempt);
+    const rows = this.#db
+      .select({
+        runId: schema.deployToken.runId,
+        runAttempt: sql<
+          string | null
+        >`json_extract(${schema.deployToken.caller}, '$.run.runAttempt')`,
+        state: schema.deployToken.state,
+        createdAt: schema.deployToken.createdAt,
+        expiresAt: schema.deployToken.expiresAt,
+      })
+      .from(schema.deployToken)
+      .where(
+        and(
+          eq(schema.deployToken.workload, caller.workload),
+          or(
+            gt(schema.deployToken.createdAt, now - HOUR_MS),
+            and(
+              inArray(schema.deployToken.state, ['pending', 'active']),
+              gt(schema.deployToken.expiresAt, now)
+            )
+          )
+        )
+      )
+      .orderBy(asc(schema.deployToken.createdAt))
+      .all();
+    const own = rows.filter(
+      row => runKey(row.runId, row.runAttempt) === ownKey && row.createdAt > now - HOUR_MS
+    );
+    if (own.length >= maxPerRun) {
+      const freeing = own[own.length - maxPerRun];
+      return {
+        status: 'limited',
+        reason: 'run_limit',
+        retryAfterSeconds: retryAfterSeconds(freeing.createdAt + HOUR_MS - now),
+      };
+    }
+    // Each other run attempt: when its last unexpired token expires, and its last creation.
+    const activeUntil = new Map<string, number>();
+    const lastCreated = new Map<string, number>();
+    for (const row of rows) {
+      const key = runKey(row.runId, row.runAttempt);
+      if (key === ownKey) continue;
+      if ((row.state === 'pending' || row.state === 'active') && row.expiresAt > now) {
+        activeUntil.set(key, Math.max(activeUntil.get(key) ?? 0, row.expiresAt));
+      }
+      if (row.createdAt > now - HOUR_MS) lastCreated.set(key, row.createdAt);
+    }
+    // A run attempt that made a token in the last hour is already counted, as for the hourly cap,
+    // so an ordered later job of the same run (one that starts after the earlier jobs revoked
+    // theirs) is never refused while another run holds tokens. Every token lives at most an hour.
+    if (own.length === 0 && activeUntil.size >= grant.maxActive) {
+      const soonest = Math.min(...activeUntil.values());
+      return {
+        status: 'limited',
+        reason: 'too_many_active',
+        retryAfterSeconds: retryAfterSeconds(soonest - now),
+      };
+    }
+    if (own.length === 0 && lastCreated.size >= grant.maxPerHour) {
+      // A run attempt leaves the hour with its last creation; a slot opens when enough have left.
+      const leaving = [...lastCreated.values()].sort((left, right) => left - right);
+      const freeing = leaving[leaving.length - grant.maxPerHour];
+      return {
+        status: 'limited',
+        reason: 'rate_limited',
+        retryAfterSeconds: retryAfterSeconds(freeing + HOUR_MS - now),
       };
     }
     return null;

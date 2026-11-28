@@ -178,6 +178,33 @@ export type DelegatedExchangeResult =
   | { outcome: 'issued'; tokenId: string }
   | { outcome: 'invalid_grant' | 'invalid_scope' };
 
+/**
+ * The store step of the home-widget exchange (migration 0024), after the Worker verified the DPoP
+ * proof and the form. `parentTokenHash` and `parentGrantId` name the mobile app's grant;
+ * `widgetGrantId` and `widgetTokenHash` the new widget grant; `orgId` the organization the
+ * request names, null when it names none.
+ */
+export type HomeWidgetExchangeInput = {
+  environment: UtsEnvironment;
+  parentTokenHash: Uint8Array;
+  parentGrantId: string;
+  clientId: string;
+  proof: ProofBinding;
+  widgetGrantId: string;
+  widgetTokenHash: Uint8Array;
+  scope: string;
+  orgId: string | null;
+};
+
+/**
+ * `issued` carries the feed entry of the widget grant it replaced (empty when there was none),
+ * which the caller publishes. No other outcome wrote anything but at most one denied audit row.
+ */
+export type HomeWidgetExchangeResult =
+  | ({ outcome: 'issued'; refreshExpiresAt: Date; feedEntries: FeedEntry[] } & Minted)
+  | { outcome: 'invalid_grant' | 'invalid_scope' | 'dpop_mismatch' | 'dpop_replay' | 'org_denied' }
+  | { outcome: 'rate_limited'; retryAfterSeconds: number };
+
 export type GrantStore = {
   issueCode(input: IssueCodeInput): Promise<IssueCodeResult>;
   exchangeCode(input: ExchangeCodeInput): Promise<ExchangeResult>;
@@ -186,6 +213,7 @@ export type GrantStore = {
   revoke(input: RevokeInput): Promise<RevokeResult>;
   introspect(input: IntrospectInput): Promise<IntrospectResult>;
   exchangeDelegated(input: DelegatedExchangeInput): Promise<DelegatedExchangeResult>;
+  exchangeHomeWidget(input: HomeWidgetExchangeInput): Promise<HomeWidgetExchangeResult>;
 };
 
 /** Runs `work` with the grant store of one request's identity-store connection. */
@@ -286,6 +314,25 @@ const IntrospectRowSchema = z.discriminatedUnion('outcome', [
 const DelegatedExchangeRowSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('issued'), token_id: z.uuid() }),
   failure(['invalid_grant', 'invalid_scope']),
+]);
+
+/**
+ * The home-widget exchange's row: an `issued` row selects the feed entries its statement wrote
+ * (the replaced widget grant's); no other outcome revokes anything.
+ */
+const HomeWidgetExchangeRowSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('issued'),
+    ...MintedColumns,
+    ...OrgRoleColumn,
+    refresh_expires_at: z.date(),
+    feed_entries: StatementFeedEntriesSchema,
+  }),
+  z.object({
+    outcome: z.literal('rate_limited'),
+    retry_after_seconds: z.number().int().positive(),
+  }),
+  failure(['invalid_grant', 'invalid_scope', 'dpop_mismatch', 'dpop_replay', 'org_denied']),
 ]);
 
 /** Every grant statement over one identity-store connection. */
@@ -459,6 +506,37 @@ export function identityStoreGrants(store: IdentityStore): GrantStore {
       return row.outcome === 'issued'
         ? { outcome: 'issued', tokenId: row.token_id }
         : { outcome: row.outcome };
+    },
+
+    async exchangeHomeWidget(input) {
+      const row = await one(
+        `SELECT result.*, CASE WHEN result.outcome = 'issued'
+           THEN uts.feed_entries_of_statement() ELSE '[]'::jsonb END AS feed_entries
+         FROM uts.exchange_home_widget_grant($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) AS result`,
+        [
+          input.environment,
+          input.parentTokenHash,
+          input.parentGrantId,
+          input.clientId,
+          input.proof.jkt,
+          input.proof.jti,
+          input.widgetGrantId,
+          input.widgetTokenHash,
+          input.scope,
+          input.orgId,
+        ],
+        HomeWidgetExchangeRowSchema
+      );
+      if (row.outcome === 'rate_limited') {
+        return { outcome: 'rate_limited', retryAfterSeconds: row.retry_after_seconds };
+      }
+      if (row.outcome !== 'issued') return { outcome: row.outcome };
+      return {
+        outcome: 'issued',
+        refreshExpiresAt: row.refresh_expires_at,
+        feedEntries: row.feed_entries,
+        ...minted(row, row.org_role),
+      };
     },
   };
 }

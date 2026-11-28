@@ -1,4 +1,16 @@
-# Registration only: services/auto-routing/wrangler.jsonc. No environment, identity or grant.
+# The auto-routing Worker (services/auto-routing/wrangler.jsonc). It reads its runtime secrets
+# over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets Store
+# bindings) until secrets-cutover flips it. INTERNAL_API_SECRET, NEXTAUTH_SECRET,
+# OPENROUTER_API_KEY and O11Y_CF_AE_API_TOKEN resolve from /shared;
+# AUTO_ROUTING_DECISION_SECRET from /workloads/auto-routing.
 workload: auto-routing
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - AUTO_ROUTING_DECISION_SECRET
+  - INTERNAL_API_SECRET
+  - NEXTAUTH_SECRET
+  - O11Y_CF_AE_API_TOKEN
+  - OPENROUTER_API_KEY

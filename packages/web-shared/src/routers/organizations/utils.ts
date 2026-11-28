@@ -4,7 +4,10 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { requireSupportWriteUseStepUp } from '@kilocode/web-shared/lib/admin/support-step-up';
+import {
+  requireSupportWriteUseStepUp,
+  supportStepUpCredential,
+} from '@kilocode/web-shared/lib/admin/support-step-up';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
@@ -594,7 +597,7 @@ async function resolveAccess(
         upstreamStepUpDecision: staff.decision ?? undefined,
         claimStore: ctx.stepUpClaims,
         claimKey: `${organizationId}:${surface}:${key ?? ''}`,
-        credential: ctx.credential,
+        credential: supportStepUpCredential(ctx.credential),
         webSessionId: ctx.webSessionId ?? null,
         route: ctx.trpcPath ?? null,
         method: ctx.trpcType ?? null,

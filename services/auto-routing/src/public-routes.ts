@@ -29,6 +29,7 @@ import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader'
 import type { Context, Handler } from 'hono';
 import type * as z from 'zod';
 import { customRouterBenchmarkContext, forwardClientEval } from './benchmark-origin';
+import { readAutoRoutingSecret, requestContext } from './secrets';
 import {
   authenticateCaller,
   CustomRouterError,
@@ -171,7 +172,7 @@ async function loadServingRouter(
 }
 
 export const publicDecideHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, requestContext(c));
   await requireCallerPaidUsageBalance(caller);
   const { byteLength, json } = await readJson(c, MAX_DECIDE_REQUEST_BODY_BYTES);
   const request = parseBody(CustomRouterDecideRequestSchema, json);
@@ -204,11 +205,15 @@ export const publicDecideHandler = publicHandler(async c => {
   const policyDeniedModelIds =
     caller.organizationId === null
       ? []
-      : await deniedOrganizationModelIds(c.env, {
-          userId: caller.userId,
-          organizationId: caller.organizationId,
-          modelIds: gatewayModelIds,
-        });
+      : await deniedOrganizationModelIds(
+          c.env,
+          {
+            userId: caller.userId,
+            organizationId: caller.organizationId,
+            modelIds: gatewayModelIds,
+          },
+          requestContext(c)
+        );
   // An unreadable policy admits no gateway entry. The listed client entries can still serve;
   // without one the request is retryable, not a permanently unavailable router.
   if (
@@ -266,7 +271,13 @@ export const publicDecideHandler = publicHandler(async c => {
   const run = await runDecision(
     c,
     payload,
-    customRouterTarget(c.env, promise => c.executionCtx.waitUntil(promise), routing)
+    customRouterTarget(
+      c.env,
+      promise => c.executionCtx.waitUntil(promise),
+      routing,
+      undefined,
+      requestContext(c)
+    )
   );
   const decision = publicCustomRouterDecision(customRouterDecision(routing, run));
   // The verifier re-reads this pool on the primary and compares the signed dispatch with the
@@ -329,7 +340,14 @@ export const publicDecideHandler = publicHandler(async c => {
           }
         : {}),
     },
-    await getCachedSecret(c.env.AUTO_ROUTING_DECISION_SECRET, 'AUTO_ROUTING_DECISION_SECRET')
+    // A lazy binding, not an eager read: `getCachedSecret` keeps the resolved value for the
+    // isolate, so one read serves every later request whichever source `SECRETS_SOURCE` selects.
+    await getCachedSecret(
+      {
+        get: () => readAutoRoutingSecret(c.env, 'AUTO_ROUTING_DECISION_SECRET', requestContext(c)),
+      },
+      'AUTO_ROUTING_DECISION_SECRET'
+    )
   );
   return c.json({ decision, decisionId } satisfies CustomRouterDecideResponse);
 });
@@ -368,7 +386,7 @@ async function loadEditableRouter(
 }
 
 export const evalPlanHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, requestContext(c));
   await requireEvalPayerPaidUsageBalance(caller);
   const request = parseBody(
     ClientEvalPlanRequestSchema,
@@ -381,12 +399,13 @@ export const evalPlanHandler = publicHandler(async c => {
     parseBody(InternalClientEvalPlanRequestSchema, {
       ...request,
       ...customRouterBenchmarkContext(router),
-    })
+    }),
+    requestContext(c)
   );
 });
 
 export const evalCaseHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, requestContext(c));
   await requireEvalPayerPaidUsageBalance(caller);
   const request = parseBody(
     ClientEvalCaseRequestSchema,
@@ -396,12 +415,13 @@ export const evalCaseHandler = publicHandler(async c => {
   return forwardClientEval(
     c.env,
     CUSTOM_ROUTER_EVAL_CASE_PATH,
-    parseBody(InternalClientEvalCaseRequestSchema, { ...request, baseRouter: router.baseRouter })
+    parseBody(InternalClientEvalCaseRequestSchema, { ...request, baseRouter: router.baseRouter }),
+    requestContext(c)
   );
 });
 
 export const evalResultHandler = publicHandler(async c => {
-  const caller = await authenticateCaller(c.env, c.req.raw.headers);
+  const caller = await authenticateCaller(c.env, c.req.raw.headers, requestContext(c));
   await requireEvalPayerPaidUsageBalance(caller);
   const upload = parseBody(
     ClientEvalResultUploadSchema,
@@ -418,6 +438,7 @@ export const evalResultHandler = publicHandler(async c => {
         userId: caller.userId,
         organizationId: router.ownerType === 'org' ? router.ownerId : null,
       },
-    })
+    }),
+    requestContext(c)
   );
 });

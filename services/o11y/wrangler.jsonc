@@ -71,8 +71,9 @@
   /**
    * Service bindings
    * STS serves the runtime secret bundle over the account-internal binding; props.caller is
-   * what STS authorizes on and must equal this Worker's top-level name. o11y deploys only to
-   * production, so it binds the production `sts`; `env.local` binds `sts-local`.
+   * what STS authorizes on and must equal this Worker's top-level name. Every secret read goes
+   * through it. o11y deploys only to production, so it binds the production `sts`; `env.local`
+   * binds `sts-local`.
    */
   "services": [
     {
@@ -89,40 +90,34 @@
     "bindings": [{ "name": "ALERT_CONFIG_DO", "class_name": "AlertConfigDO" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AlertConfigDO"] }],
+  /**
+   * `ADMIN_CREDENTIAL_ACCEPT` is unset here, which means `legacy-only`: the admin routes accept
+   * only X-O11Y-ADMIN-TOKEN, exactly as before (src/admin-middleware.ts). Accepting STS service
+   * tokens needs the `o11y` scopes registered and granted, then a separate change that sets it
+   * and STS_ENVIRONMENT. Rollback is a redeploy with it unset or `legacy-only`.
+   * `API_METRICS_CREDENTIAL_ACCEPT`, also unset, takes the same values for
+   * POST /ingest/api-metrics alone and otherwise follows ADMIN_CREDENTIAL_ACCEPT; the alerting
+   * routes never read it. Any STS mode on either needs STS_ENVIRONMENT `production` here.
+   */
   "vars": {
     "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "O11Y_API_BASE_URL": "https://api.kilo.ai",
-    /**
-     * Where every secret read goes: `secrets-store` (the Secrets Store bindings below) or `sts`
-     * (the STS bundle over the service binding above). Production reads through STS; any other
-     * value refuses every secret read. The dev stack runs this top-level config without `sts`,
-     * so the `dev` and `start` scripts pass `--var SECRETS_SOURCE:secrets-store`.
-     * Rollback is a redeploy with this set back to `secrets-store`. After a rollback,
-     * O11Y_SLACK_WEBHOOK_TICKET and O11Y_CF_CONTAINERS_API_TOKEN read their pre-import copies in
-     * the Secrets Store: the old ticket webhook (not #kilo-o11y-alerts) and the old token.
-     */
-    "SECRETS_SOURCE": "sts",
-    /**
-     * ADMIN_CREDENTIAL_ACCEPT is unset here, which means `legacy-only`: the admin routes accept
-     * only X-O11Y-ADMIN-TOKEN, exactly as before (src/admin-middleware.ts). Accepting STS service
-     * tokens needs the `o11y` scopes registered and granted, then a separate change that sets it
-     * and STS_ENVIRONMENT. Rollback is a redeploy with it unset or `legacy-only`; it does not
-     * touch SECRETS_SOURCE.
-     */
   },
   /**
    * Alert deployment requirements:
    * - O11Y_CF_AE_API_TOKEN needs account Analytics Read access.
-   * - O11Y_SLACK_WEBHOOK_TICKET must deliver to #kilo-o11y-alerts. The STS value does; the
-   *   Secrets Store copy is the old webhook, which a rollback brings back.
+   * - O11Y_SLACK_WEBHOOK_TICKET must deliver to #kilo-o11y-alerts. The STS value does. Keep the
+   *   old Secrets Store webhook for a deliberate return to the legacy source only.
    */
   /**
    * Secrets Store
    * https://developers.cloudflare.com/workers/configuration/secrets/#secrets-store
-   * Production no longer reads these; they stay bound so rollback is one redeploy with
-   * `SECRETS_SOURCE` set to `secrets-store`. o11y drops these bindings 7 days after its STS reads
-   * show no errors. A store secret itself goes only once its last consumer reads it through STS
-   * (design C.5): other Workers also bind O11Y_CF_AE_API_TOKEN, and the web app also reads
+   * Every secret read goes through STS. Keep these bindings and values for rollback until
+   * separately approved cleanup. Reverting this change restores the reader with
+   * SECRETS_SOURCE=sts. Setting it to secrets-store in the reverted reader restores the older
+   * ticket webhook and containers token.
+   * A store secret itself goes only once its last consumer reads it through STS (design C.5):
+   * other Workers also bind O11Y_CF_AE_API_TOKEN, and the web app also reads
    * O11Y_KILO_GATEWAY_CLIENT_SECRET.
    */
   "secrets_store_secrets": [
@@ -153,11 +148,16 @@
     },
   ],
   "env": {
-    // Local development only (`wrangler dev --env local`); no deploy workflow targets this name.
-    // Bindings are not inherited, so the block repeats each one; the STS binding targets sts-local.
-    // Every resource id is a local placeholder that `wrangler dev` simulates, and the cron is
-    // emptied, so a stray `wrangler deploy --env local` reaches no production schedule, data or
-    // secret.
+    // Local development only: the `dev` and `start` scripts run
+    // `wrangler dev --env local --name o11y`; no deploy workflow targets this name. Bindings are
+    // not inherited, so the block repeats each one, and its STS binding targets sts-local, so a
+    // local run reads the local broker and never the production one.
+    // `pnpm --filter cloudflare-sts dev` serves that broker (services/sts/README.md, "Local
+    // development"). `--name o11y` only names the dev session: its registry entry keeps the name
+    // the documented session-ingest -> o11y local binding resolves, while this block's own name
+    // stays `o11y-local` so a stray `wrangler deploy --env local` cannot target the production
+    // Worker. Every resource id is a local placeholder that `wrangler dev` simulates, and the cron
+    // is emptied, so such a deploy reaches no production schedule, data or secret.
     "local": {
       "name": "o11y-local",
       "workers_dev": false,
@@ -187,9 +187,9 @@
       "vars": {
         "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
         "O11Y_API_BASE_URL": "https://api.kilo.ai",
-        "SECRETS_SOURCE": "secrets-store",
       },
-      // Canonical secret names (design 4.7) in a local placeholder store, never the production one.
+      // Canonical secret names (design 4.7) in a local placeholder store, never the production
+      // one. Nothing reads them: the local run reads sts-local. `pnpm dev:env` still seeds them.
       "secrets_store_secrets": [
         {
           "binding": "O11Y_KILO_GATEWAY_CLIENT_SECRET",

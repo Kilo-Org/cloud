@@ -3,6 +3,9 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from './env';
+import { readSessionIngestSecret } from './secrets';
+import { requestContext } from './request-context';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
@@ -13,6 +16,11 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { withDORetry } from '@kilocode/worker-utils';
 
 const invalidateSessionAccessSchema = z.object({
@@ -20,15 +28,23 @@ const invalidateSessionAccessSchema = z.object({
   organizationId: z.uuid(),
 });
 
-async function hasValidInternalSecret(c: {
-  req: { header(name: string): string | undefined };
-  env: Env;
-}): Promise<boolean> {
+async function hasValidInternalSecret(
+  c: {
+    req: { header(name: string): string | undefined };
+    env: Env;
+  },
+  ctx?: SecretsExecutionContext
+): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
-  const expected = await c.env.INTERNAL_API_SECRET_PROD.get();
-  if (!provided || !expected) return false;
-
-  return timingSafeEqual(provided, expected);
+  const expected = await readSessionIngestSecret(c.env, 'INTERNAL_API_SECRET', ctx);
+  if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  observeInternalAuth(
+    'session-ingest',
+    'cloud_agent_internal',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  return true;
 }
 
 const requireValidInternalSecret = createMiddleware<{
@@ -37,7 +53,7 @@ const requireValidInternalSecret = createMiddleware<{
 }>(async (c, next) => {
   let isValid: boolean;
   try {
-    isValid = await hasValidInternalSecret(c);
+    isValid = await hasValidInternalSecret(c, requestContext(c));
   } catch (error) {
     console.error('Auth infrastructure failure', {
       operation: 'internal-api-secret-get',
@@ -73,7 +89,12 @@ app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 // Public session endpoint: resolve the purpose-bound share token, then return
 // the public transcript for the current session generation.
 app.get('/session/:shareToken', async c => {
-  const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
+  const sharedSession = await resolveSessionShareToken(
+    c.env,
+    c.req.param('shareToken'),
+    undefined,
+    requestContext(c)
+  );
   if (!sharedSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404, {
       'cache-control': 'no-store',
@@ -103,7 +124,12 @@ app.get('/session/:shareToken', async c => {
 });
 
 app.get('/session/:shareToken/metadata', async c => {
-  const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
+  const sharedSession = await resolveSessionShareToken(
+    c.env,
+    c.req.param('shareToken'),
+    undefined,
+    requestContext(c)
+  );
   if (!sharedSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404, {
       'cache-control': 'no-store',

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
+  STS_BOUNCER_DECIDE,
+  STS_BOUNCER_SIGNUP_DECIDE,
+  STS_BOUNCER_SIGNUP_HISTORY,
+  STS_BOUNCER_USAGE_WRITE,
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
+  STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
+  STS_GITHUB_RELAY_MIGRATION_PROXY_READ,
   STS_O11Y_ALERTING_READ,
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
@@ -11,6 +16,7 @@ import {
   STS_SECURITY_SYNC_MANUAL_SYNC,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
+  STS_WEB_MCP_CATALOG_TOKEN_MINT,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
   isRegisteredStsScope,
   stsScopeRegistryProblems,
@@ -161,10 +167,15 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes and the GitHub relay scope, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes, the GitHub relay scope and the CI scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: {
-        scopes: ['web:sts.canary', 'web:usage.record', 'web:security-notifications.dispatch'],
+        scopes: [
+          'web:sts.canary',
+          'web:usage.record',
+          'web:security-notifications.dispatch',
+          'web:mcp-catalog-token.mint',
+        ],
       },
       'usage-ingest': { scopes: ['usage-ingest:sts.canary', 'usage-ingest:usage.publish'] },
       canary: { scopes: ['canary:denied-probe'] },
@@ -183,6 +194,17 @@ describe('STS scope registry', () => {
         scopes: ['security-sync:manual-sync.enqueue', 'security-sync:dismiss-finding.enqueue'],
       },
       'github-relay': { scopes: ['github-relay:migration-proxy.read'] },
+      bouncer: {
+        scopes: [
+          'bouncer:decide',
+          'bouncer:usage.write',
+          'bouncer:signup.decide',
+          'bouncer:signup.history',
+        ],
+      },
+      'community-contributions-dashboard': {
+        scopes: ['community-contributions-dashboard:opencode.sync'],
+      },
     });
     expect(STS_RESERVED_SCOPES).toEqual(['canary:denied-probe']);
     expect(isRegisteredStsScope('web', 'web:sts.canary')).toBe(true);
@@ -196,6 +218,14 @@ describe('STS scope registry', () => {
     expect(isRegisteredStsScope('security-sync', 'web:security-notifications.dispatch')).toBe(
       false
     );
+    expect(isRegisteredStsScope('bouncer', 'bouncer:admin')).toBe(false);
+    expect(isRegisteredStsScope('web', 'bouncer:decide')).toBe(false);
+    expect(isRegisteredStsScope('web', 'community-contributions-dashboard:opencode.sync')).toBe(
+      false
+    );
+    expect(
+      isRegisteredStsScope('community-contributions-dashboard', 'web:mcp-catalog-token.mint')
+    ).toBe(false);
   });
 
   it('lists each shipped scope under its own audience', () => {
@@ -217,6 +247,16 @@ describe('STS scope registry', () => {
     ['security-sync:dismiss-finding.enqueue', 'security-sync', STS_SECURITY_SYNC_DISMISS_FINDING],
     ['web:security-notifications.dispatch', 'web', STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH],
     ['github-relay:migration-proxy.read', 'github-relay', STS_GITHUB_RELAY_MIGRATION_PROXY_READ],
+    ['bouncer:decide', 'bouncer', STS_BOUNCER_DECIDE],
+    ['bouncer:usage.write', 'bouncer', STS_BOUNCER_USAGE_WRITE],
+    ['bouncer:signup.decide', 'bouncer', STS_BOUNCER_SIGNUP_DECIDE],
+    ['bouncer:signup.history', 'bouncer', STS_BOUNCER_SIGNUP_HISTORY],
+    ['web:mcp-catalog-token.mint', 'web', STS_WEB_MCP_CATALOG_TOKEN_MINT],
+    [
+      'community-contributions-dashboard:opencode.sync',
+      'community-contributions-dashboard',
+      STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
+    ],
   ])('registers %s under its own audience %s', (scope, audience, pair) => {
     expect(pair).toEqual({ audience, scope });
     expect(scopeAudience(pair.scope)).toBe(pair.audience);

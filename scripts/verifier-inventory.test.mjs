@@ -335,6 +335,30 @@ const EXCEPTIONS = {
     reason: sharedWeb,
     signals: { 'helper-call': 6, 'helper-import': 3, 'auth-library-import': 1 },
   },
+  'packages/web-shared/src/lib/uts-bff/browser-session-config.ts': {
+    reason: `${sharedWeb}: the kilo-web BFF compares its own session cookie's pepper binding with the account's current pepper in constant time; no inbound token`,
+    signals: { primitive: 1 },
+    pins: [
+      'export function isBrowserSessionBindingCurrent(',
+      'const right = Buffer.from(browserSessionPepperBinding(pepper));',
+    ],
+  },
+  'packages/web-shared/src/lib/uts-bff/browser-session.ts': {
+    reason: `${sharedWeb}: the kilo-web BFF compares the callback's OAuth state with its own transaction cookie, and a prior session handle with the new one, in constant time; UTS checks the code`,
+    signals: { primitive: 1 },
+    pins: [
+      'function sameValue(received: string, expected: string): boolean {',
+      "if (state === null || !sameValue(state, transaction.state)) return restart('state_mismatch');",
+    ],
+  },
+  'packages/web-shared/src/lib/uts-bff/kilo-web-key.ts': {
+    reason: `${sharedWeb}: the kilo-web BFF proves its own configured signing key by verifying a fixed probe with that key's public half; no inbound token`,
+    signals: { primitive: 1 },
+    pins: [
+      "const PROBE = new TextEncoder().encode('kilo-web signing key check');",
+      'await crypto.subtle.verify(algorithm, publicKey, signature, PROBE)',
+    ],
+  },
   'packages/worker-utils/src/backend-auth-middleware.ts': {
     reason: sharedWorker,
     signals: { 'helper-call': 1, primitive: 1 },
@@ -449,6 +473,12 @@ const EXCEPTIONS = {
       'UTS, the issuer (design section 5): its deployed entry admits STS service tokens for the uts audience on the broker exchange and the /internal/ routes, through the phase 2 library under per-environment workload allow-lists; not a phase 4 surface',
     signals: { 'verify-library': 1 },
     pins: ['audience: UTS_ACCOUNT_AUDIENCE', 'export const STS_CALLER_WORKLOADS'],
+  },
+  'services/uts/src/ci/exchange.ts': {
+    reason:
+      'Third party: the UTS CI token exchange (design section 5.3) checks a GitHub Actions OIDC ID token under the GitHub key set (src/ci/github-keys.ts) and issuer, for the UTS issuer as its one audience; not a Kilo credential',
+    signals: { primitive: 1, 'auth-library-import': 1 },
+    pins: ['issuer: GITHUB_ACTIONS_ISSUER', 'if (payload.aud !== audience)'],
   },
   'services/uts/src/attest/app-attest.ts': {
     reason:

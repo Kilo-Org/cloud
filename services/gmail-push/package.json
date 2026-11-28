@@ -10,6 +10,7 @@
     "cf-typegen": "wrangler types --env-file /dev/null"
   },
   "dependencies": {
+    "@kilocode/secrets-client": "workspace:*",
     "hono": "catalog:",
     "jose": "catalog:",
     "zod": "catalog:"

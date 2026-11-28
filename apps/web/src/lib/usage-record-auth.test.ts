@@ -18,6 +18,7 @@ import { POST as recordUsage } from '@/app/api/internal/usage/record/route';
 import { POST as recordEnkryptUsage } from '@/app/api/internal/enkrypt-usage/record/route';
 import { POST as recordExaUsage } from '@/app/api/internal/exa-usage/record/route';
 import { GET as resourceMetadata } from '@/app/.well-known/oauth-protected-resource/api/internal/[product]/record/route';
+import type { authorizeInternalApiRequest as AuthorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { authorizeUsageRecordRequest as AuthorizeUsageRecordRequest } from './usage-record-auth';
 
 // The three record routes and the metadata route against a real verifier. Only the STS key-set
@@ -29,6 +30,20 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   // STS_ISSUERS.development: outside Vercel this process's STS environment is development.
   STS_URL: 'http://localhost:8825',
 }));
+
+// Counts every internal API secret check, so `sts` can show it never compares the secret.
+const mockSecretChecks: Request[] = [];
+jest.mock('@/lib/internal-api-auth', () => {
+  const actual = jest.requireActual<{
+    authorizeInternalApiRequest: typeof AuthorizeInternalApiRequest;
+  }>('@/lib/internal-api-auth');
+  return {
+    authorizeInternalApiRequest: (request: Request) => {
+      mockSecretChecks.push(request);
+      return actual.authorizeInternalApiRequest(request, 'usage_record');
+    },
+  };
+});
 
 const KID = 'usage-record-test';
 const ORIGIN = new URL(APP_URL).origin;
@@ -75,6 +90,7 @@ let taggedAcquire: jest.SpiedFunction<typeof taggedWriterAdmission.acquire>;
 
 beforeEach(() => {
   for (const name of ENV_NAMES) delete process.env[name];
+  mockSecretChecks.length = 0;
   queueAcquire = jest.spyOn(queueWriterAdmission, 'acquire');
   taggedAcquire = jest.spyOn(taggedWriterAdmission, 'acquire');
 });
@@ -198,6 +214,7 @@ describe.each(ROUTES)('%s with USAGE_RECORD_AUTH=dual', (path, post) => {
       await send(path, post, { ...secret, 'x-usage-write-source': 'region_handoff' })
     );
     await expectAdmitted(await send(path, post, { 'x-internal-secret': INTERNAL_API_SECRET }));
+    expect(mockSecretChecks).toHaveLength(4);
   });
 
   it('answers no credential with the legacy 401 and the route challenge', async () => {
@@ -302,9 +319,92 @@ describe.each(ROUTES)('%s with USAGE_RECORD_AUTH=dual', (path, post) => {
   });
 });
 
-describe.each(ROUTES)('%s with an unknown USAGE_RECORD_AUTH', (path, post) => {
-  it('refuses every request with 503 before the body', async () => {
+describe.each(ROUTES)('%s with USAGE_RECORD_AUTH=sts', (path, post) => {
+  const challenge = `resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource${path}"`;
+
+  beforeEach(() => {
     process.env.USAGE_RECORD_AUTH = 'sts';
+  });
+
+  afterEach(() => {
+    // No `sts` request ever reaches the secret comparison.
+    expect(mockSecretChecks).toEqual([]);
+  });
+
+  it('accepts a usage-ingest web:usage.record token on a queue write', async () => {
+    await expectAdmitted(await send(path, post, { ...(await bearer()), ...queue }));
+  });
+
+  it.each([
+    ['the correct secret', secret],
+    ['the correct secret with the queue source', { ...secret, ...queue }],
+    ['the region handoff', { ...secret, 'x-usage-write-source': 'region_handoff' }],
+    ['x-internal-secret', { 'x-internal-secret': INTERNAL_API_SECRET }],
+    ['a wrong secret', { 'x-internal-api-key': `${INTERNAL_API_SECRET}-wrong`, ...queue }],
+    ['no credential', queue],
+  ])('refuses %s with the 401 and the route challenge', async (_name, headers) => {
+    const fetchesBefore = keySetFetches.length;
+    const result = await send(path, post, headers);
+    expectRefusedEarly(result, 401);
+    expect(await result.response.json()).toEqual({ error: 'Unauthorized' });
+    expect(result.response.headers.get('www-authenticate')).toBe(`Bearer ${challenge}`);
+    expect(result.response.headers.get('cache-control')).toBe('no-store');
+    expect(keySetFetches).toHaveLength(fetchesBefore);
+  });
+
+  it.each([
+    ['another workload', { workload: 'ai-gateway' }, 403, 'insufficient_scope'],
+    [
+      'another audience',
+      { audience: STS_USAGE_PUBLISH.audience, scope: STS_USAGE_PUBLISH.scope },
+      403,
+      'insufficient_scope',
+    ],
+    ['another web scope', { scope: 'web:sts.canary' }, 403, 'insufficient_scope'],
+    ['another issuer', { issuer: STS_ISSUERS.staging }, 401, 'invalid_token'],
+    ['another environment', { env: 'staging' }, 401, 'invalid_token'],
+    ['a forged token', { key: otherKey }, 401, 'invalid_token'],
+  ])('refuses %s with no fallback to the secret', async (_name, options, status, error) => {
+    // `otherKey` is assigned in beforeAll, after `it.each` captured this table.
+    const resolved = 'key' in options ? { key: otherKey } : options;
+    const result = await send(path, post, { ...(await bearer(resolved)), ...secret, ...queue });
+    expectRefusedEarly(result, 400);
+    const alone = await send(path, post, { ...(await bearer(resolved)), ...queue });
+    expectRefusedEarly(alone, status);
+    expect((await alone.response.json()) as unknown).toMatchObject({ error });
+    expect(alone.response.headers.get('www-authenticate')).toContain(challenge);
+  });
+
+  it('refuses a valid token without the queue source', async () => {
+    for (const source of ['region_handoff', 'queue_vercel', null]) {
+      const headers = await bearer();
+      if (source !== null) headers['x-usage-write-source'] = source;
+      const result = await send(path, post, headers);
+      expectRefusedEarly(result, 403);
+    }
+  });
+
+  it('refuses both credential families on one request', async () => {
+    const result = await send(path, post, { ...(await bearer()), ...secret, ...queue });
+    expectRefusedEarly(result, 400);
+    expect(await result.response.json()).toEqual({ error: 'invalid_request' });
+  });
+
+  it('without an STS deployment refuses everything with 503, the secret included', async () => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.VERCEL_TARGET_ENV = 'production';
+    for (const headers of [{ ...(await bearer()), ...queue }, { ...secret, ...queue }, queue]) {
+      const result = await send(path, post, headers);
+      expectRefusedEarly(result, 503);
+      expect(await result.response.json()).toEqual({ error: 'Service unavailable' });
+      expect(result.response.headers.get('www-authenticate')).toBeNull();
+    }
+  });
+});
+
+describe.each(ROUTES)('%s with an unknown USAGE_RECORD_AUTH', (path, post) => {
+  it.each([['STS'], ['sts-only'], ['bogus']])('refuses every request with 503 (%p)', async mode => {
+    process.env.USAGE_RECORD_AUTH = mode;
     for (const headers of [secret, { ...(await bearer()), ...queue }]) {
       const result = await send(path, post, headers);
       expectRefusedEarly(result, 503);
@@ -313,9 +413,9 @@ describe.each(ROUTES)('%s with an unknown USAGE_RECORD_AUTH', (path, post) => {
   });
 });
 
-describe('an unreachable STS key set', () => {
-  it('answers STS tokens 503 and keeps admitting the secret', async () => {
-    process.env.USAGE_RECORD_AUTH = 'dual';
+describe.each([['dual'], ['sts']])('an unreachable STS key set under %s', mode => {
+  it('answers STS tokens 503 with Retry-After; only dual admits the secret', async () => {
+    process.env.USAGE_RECORD_AUTH = mode;
     keySetUp = false;
     try {
       let authorize: typeof AuthorizeUsageRecordRequest | undefined;
@@ -333,7 +433,13 @@ describe('an unreachable STS key set', () => {
       expect(refused?.status).toBe(503);
       expect(refused?.headers.get('retry-after')).not.toBeNull();
       expect(await refused?.json()).toEqual({ error: 'temporarily_unavailable' });
-      expect(await authorize(request({ ...secret, ...queue }), EXA_USAGE_WRITE_PATH)).toBeNull();
+      const viaSecret = await authorize(request({ ...secret, ...queue }), EXA_USAGE_WRITE_PATH);
+      if (mode === 'dual') {
+        expect(viaSecret).toBeNull();
+      } else {
+        expect(viaSecret?.status).toBe(401);
+        expect(mockSecretChecks).toEqual([]);
+      }
     } finally {
       keySetUp = true;
     }
@@ -428,14 +534,21 @@ describe('protected-resource metadata', () => {
       { params: Promise.resolve({ product }) }
     );
 
-  it('is a 404 unless USAGE_RECORD_AUTH is dual', async () => {
+  it('is a 404 unless USAGE_RECORD_AUTH is dual or sts', async () => {
     expect((await metadata('usage')).status).toBe(404);
-    process.env.USAGE_RECORD_AUTH = 'sts';
+    process.env.USAGE_RECORD_AUTH = 'legacy';
+    expect((await metadata('usage')).status).toBe(404);
+    process.env.USAGE_RECORD_AUTH = 'bogus';
     expect((await metadata('usage')).status).toBe(404);
   });
 
-  it.each(ROUTES.map(([path]) => [path]))('describes %s under dual', async path => {
-    process.env.USAGE_RECORD_AUTH = 'dual';
+  it.each(
+    ROUTES.flatMap(([path]) => [
+      [path, 'dual'],
+      [path, 'sts'],
+    ])
+  )('describes %s under %s', async (path, mode) => {
+    process.env.USAGE_RECORD_AUTH = mode;
     const product = path.split('/')[3];
     const response = await metadata(product);
     expect(response.status).toBe(200);

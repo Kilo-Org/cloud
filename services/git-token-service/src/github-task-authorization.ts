@@ -2,6 +2,7 @@ import type { GitHubTaskDecision, GitHubTaskGrant } from '@kilocode/worker-utils
 import type { GetCloudAgentAuthForRepoSuccess } from './index.js';
 import type { GitHubTokenService } from './github-token-service.js';
 import { GitHubTaskResources } from './github-task-resources.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 type ResourceEnv = ConstructorParameters<typeof GitHubTaskResources>[1];
 
@@ -11,7 +12,8 @@ export async function authorizeGitHubTaskCredential(
   auth: GetCloudAgentAuthForRepoSuccess,
   grant: GitHubTaskGrant,
   decision: Extract<GitHubTaskDecision, { allowed: true }>,
-  requestUrl: string
+  requestUrl: string,
+  ctx?: SecretsExecutionContext
 ): Promise<string | null> {
   const ownerRead =
     decision.operation === 'read' &&
@@ -25,7 +27,7 @@ export async function authorizeGitHubTaskCredential(
     auth.source === 'installation' && ownerRead
       ? await tokens.getToken(auth.installationId, auth.appType)
       : auth.githubToken;
-  const resources = new GitHubTaskResources(lookupToken, env);
+  const resources = new GitHubTaskResources(lookupToken, env, ctx);
   const scope = await resources.verify(grant, decision.checks);
   if (
     decision.operation === 'read' &&

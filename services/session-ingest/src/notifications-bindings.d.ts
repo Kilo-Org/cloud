@@ -6,7 +6,6 @@
 // global `Env` those modules expect: this package's bindings plus the
 // notifications-only ones they touch.
 import type { NotificationChannelDO } from '../../notifications/src/index';
-import type { NotificationsSecretsEnv } from '../../notifications/src/secrets';
 
 declare global {
   interface Env extends CloudflareBindings {
@@ -15,8 +14,10 @@ declare global {
     NEXTAUTH_SECRET: SecretsStoreSecret;
     INTERNAL_API_SECRET: SecretsStoreSecret;
     EXPO_ACCESS_TOKEN: SecretsStoreSecret;
-    // Absent here, so notifications reads the Secrets Store bindings above.
-    SECRETS_SOURCE?: NotificationsSecretsEnv['SECRETS_SOURCE'];
+    // session-ingest's own config sets this to `secrets-store`, so the notifications modules
+    // compiled here read the Secrets Store bindings above. Declared as the flag's two values,
+    // which is what `services/notifications/src/secrets.ts` accepts.
+    SECRETS_SOURCE?: 'secrets-store' | 'sts';
     RECEIPTS_QUEUE: Queue;
     NOTIFICATION_CHANNEL_DO: DurableObjectNamespace<NotificationChannelDO>;
     EVENT_SERVICE: Fetcher & {

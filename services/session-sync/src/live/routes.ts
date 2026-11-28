@@ -14,6 +14,7 @@ import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader'
 import { LIVE_LIMITS, socketTicket } from './protocol';
 import { mintTicket, verifyTicket } from './ticket';
 import { phase } from '../metrics';
+import { requestContext } from '../request-context';
 
 type C = Context<{ Bindings: Env }>;
 export const live = new Hono<{ Bindings: Env }>();
@@ -25,7 +26,7 @@ function error(code: string, message: string, status = 400): Response {
   return json({ error: { code, message } }, status);
 }
 async function principal(c: C): Promise<Principal | Response> {
-  const auth = await authorize(c.req.raw, c.env);
+  const auth = await authorize(c.req.raw, c.env, requestContext(c));
   if (auth instanceof Response) return auth;
   return (await rateLimit(c.env.USER_REQUEST_LIMITER, auth.userID)) ?? auth;
 }
@@ -77,14 +78,17 @@ live.post('/sessions/:id/live-ticket', async c => {
       auth.principal,
       'session-relay',
       parsed.data.role,
-      auth.sessionID
+      auth.sessionID,
+      requestContext(c)
     )
   );
 });
 
 live.get('/sessions/:id/live', async c => {
   const token = socketTicket(c.req.raw);
-  const ticket = token ? await verifyTicket(token, c.env, 'session-relay') : undefined;
+  const ticket = token
+    ? await verifyTicket(token, c.env, 'session-relay', requestContext(c))
+    : undefined;
   if (!ticket || !ticket.sessionID || ticket.sessionID !== c.req.param('id'))
     return error('invalid_ticket', 'A valid session ticket is required', 401);
   const sessionID = ticket.sessionID;
@@ -108,7 +112,8 @@ live.post('/sessions/:id/commands', async c => {
     auth.principal,
     'session-relay',
     'controller',
-    auth.sessionID
+    auth.sessionID,
+    requestContext(c)
   );
   return getRelayStub(c.env, auth.principal.tenant, auth.sessionID).command({
     ticket: ticket.ticket,
@@ -127,7 +132,8 @@ live.get('/sessions/:id/commands/:commandID', async c => {
     auth.principal,
     'session-relay',
     'controller',
-    auth.sessionID
+    auth.sessionID,
+    requestContext(c)
   );
   return getRelayStub(c.env, auth.principal.tenant, auth.sessionID).commandStatus({
     ticket: ticket.ticket,
@@ -145,12 +151,24 @@ live.post('/presence/ticket', async c => {
     .safeParse(input);
   if (!parsed.success)
     return error('invalid_request', 'A presence viewer, runner, or controller role is required');
-  return json(await mintTicket(c.req.raw, c.env, auth, 'session-presence', parsed.data.role));
+  return json(
+    await mintTicket(
+      c.req.raw,
+      c.env,
+      auth,
+      'session-presence',
+      parsed.data.role,
+      undefined,
+      requestContext(c)
+    )
+  );
 });
 
 live.get('/presence', async c => {
   const token = socketTicket(c.req.raw);
-  const ticket = token ? await verifyTicket(token, c.env, 'session-presence') : undefined;
+  const ticket = token
+    ? await verifyTicket(token, c.env, 'session-presence', requestContext(c))
+    : undefined;
   if (!ticket) return error('invalid_ticket', 'A valid presence ticket is required', 401);
   return phase(
     c.env,
@@ -183,7 +201,15 @@ live.post('/presence/instances/:instanceID/commands', async c => {
   ) {
     return error('invalid_request', 'Invalid instance command');
   }
-  const ticket = await mintTicket(c.req.raw, c.env, auth, 'session-presence', 'controller');
+  const ticket = await mintTicket(
+    c.req.raw,
+    c.env,
+    auth,
+    'session-presence',
+    'controller',
+    undefined,
+    requestContext(c)
+  );
   try {
     return await getPresenceStub(c.env, auth.userID).command({
       ticket: ticket.ticket,

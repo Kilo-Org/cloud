@@ -1926,6 +1926,10 @@ const OrganizationSettingsSchema = z.object({
   // lets members of that domain link sign-in methods other than SSO. Absent
   // means members can not link them.
   allow_non_sso_sign_in_methods: z.boolean().optional(),
+  // Enterprise-only advanced policy, independent of `gateway_settings`. When true, the provider
+  // sync adds models that become newly available to the organization to `model_deny_list` and
+  // records them in the audit log. See `apps/web/src/lib/organizations/auto-model-change-log.ts`.
+  disable_new_models: z.boolean().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

@@ -35,6 +35,11 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { and, eq } from 'drizzle-orm';
 import { resolveBenchmarkIdentity } from '@kilocode/auto-routing-contracts';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
@@ -98,6 +103,12 @@ export async function POST(req: NextRequest) {
   if (!MCP_CATALOG_TOKEN_SECRET || !secret || !timingSafeEqual(secret, MCP_CATALOG_TOKEN_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'web',
+    'mcp_catalog_token',
+    'legacy_shared_secret',
+    callerLabel(req.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   const account = await resolveCatalogServiceAccount();
   if (!account.ok) {

@@ -4,6 +4,7 @@ import {
   consumeExportBatch,
   closeReplicaDatabase,
   deletePendingObjects,
+  dispatchReadyNotifications,
   exportHeader,
   exportTrailer,
   nextReadableAdapter,
@@ -862,5 +863,151 @@ describe('source advance', () => {
     const list = [withReader('a'), withReader('b')];
 
     expect(nextReadableAdapter(list, list[1]!)).toBeNull();
+  });
+});
+
+describe('dispatchReadyNotifications', () => {
+  const pending = { pendingNotifications: async () => [{ id: 'export-1' }, { id: 'export-2' }] };
+  const sts = (minted: unknown[]) => ({
+    async mintTokens(request: { tokens: { audience: string; scope: string }[] }) {
+      minted.push(request);
+      return {
+        status: 'ok' as const,
+        tokens: request.tokens.map(({ audience, scope }) => ({
+          status: 'issued' as const,
+          audience,
+          scope,
+          token: 'sts-ready-token',
+          jti: 'jti-ready',
+          expiresAt: Math.floor(Date.now() / 1000) + 300,
+        })),
+      };
+    },
+    // One real binding serves both entry points. The sweeps below send with a minted token or with
+    // the plain secret, never with a bundle, so a bundle read here is a bug in the test.
+    async getBundle(): Promise<never> {
+      throw new Error('dispatchReadyNotifications tests never read a bundle');
+    },
+  });
+
+  it('sends each ready callback with a web:user-data-exports.ready STS token under sts', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const minted: unknown[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'sts',
+        STS: sts(minted),
+      },
+      pending
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(url instanceof URL ? url.href : url).toBe(
+        'https://api.kilo.ai/api/internal/user-data-exports/ready'
+      );
+      const headers = new Headers(init?.headers);
+      expect(headers.get('authorization')).toBe('Bearer sts-ready-token');
+      expect(headers.has('x-internal-api-key')).toBe(false);
+      expect(init?.redirect).toBe('manual');
+    }
+    expect(minted).toEqual([
+      { tokens: [{ audience: 'web', scope: 'web:user-data-exports.ready' }] },
+    ]);
+  });
+
+  it('sends the internal secret, and mints nothing, while WEB_INTERNAL_AUTH is unset', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const minted: unknown[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+    const get = vi.fn(async () => 'shared-secret');
+
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: { get },
+        STS: sts(minted),
+      },
+      pending
+    );
+
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('x-internal-api-key')).toBe('shared-secret');
+    expect(headers.has('authorization')).toBe(false);
+    expect(minted).toEqual([]);
+    // One read for the whole sweep, however many items it sends.
+    expect(get).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the sweep for the next run when no credential can be built', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    // The shared key is missing and the source cannot serve it: a credential failure, reported like
+    // the unavailable path, not a rejected sweep.
+    await expect(
+      dispatchReadyNotifications({ USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai' }, pending)
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing, leaving every item leased, when no token can be had', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        INTERNAL_API_SECRET: 'shared-secret',
+        WEB_INTERNAL_AUTH: 'sts',
+      },
+      pending
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends with a minted token and never reads the shared key', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const minted: unknown[] = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+    const state = { pendingNotifications: vi.fn(async () => [{ id: 'export-1' }]) };
+
+    // No INTERNAL_API_SECRET at all: the token path must not need it, or a cutover that drops the
+    // shared key would fail the sweep.
+    await dispatchReadyNotifications(
+      {
+        USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai',
+        WEB_INTERNAL_AUTH: 'sts',
+        STS: sts(minted),
+      },
+      state
+    );
+
+    expect(state.pendingNotifications).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get('authorization')).toBe('Bearer sts-ready-token');
+    expect(headers.has('x-internal-api-key')).toBe(false);
+    expect(minted).toHaveLength(1);
+  });
+
+  it('does not read any secret when nothing is pending', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+
+    // `sts` without the binding: a read here would throw, so resolving proves none happened.
+    await expect(
+      dispatchReadyNotifications(
+        { USER_DATA_EXPORT_WEB_URL: 'https://api.kilo.ai', SECRETS_SOURCE: 'sts' },
+        { pendingNotifications: async () => [] }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

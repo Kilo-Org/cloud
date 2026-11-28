@@ -362,7 +362,15 @@ export function createGithubClient(
     });
     if (notFound.includes(response.status)) return null;
     if (!response.ok) {
-      if (response.status === 401) cached = null;
+      if (response.status === 401) {
+        // The relay refusing its STS token carries an RFC 9728 `resource_metadata` challenge;
+        // GitHub's 401 never does. Only GitHub's means the installation token is bad: mint anew.
+        const challenge = response.headers.get('www-authenticate') ?? '';
+        if (relay !== undefined && challenge.includes('resource_metadata=')) {
+          throw unavailable(op, 'relay 401', await failureOf(response));
+        }
+        cached = null;
+      }
       throw unavailable(op, `GET ${response.status}`, await failureOf(response));
     }
     return await body(op, response);

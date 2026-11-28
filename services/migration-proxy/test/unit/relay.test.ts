@@ -118,4 +118,27 @@ describe('reads through the GitHub relay', () => {
     expect(error.message).toBe('github unavailable: relay token unavailable');
     expect(calls.filter(call => call.url.startsWith(GITHUB_RELAY_URL))).toEqual([]);
   });
+
+  it('keeps the installation token on a relay 401, and mints a new one on a GitHub 401', async () => {
+    const challenge =
+      'Bearer error="invalid_token", resource_metadata="https://github-relay.kiloapps.io/.well-known/oauth-protected-resource"';
+    const relayed = github(async () =>
+      Response.json(
+        { error: 'invalid_token' },
+        { status: 401, headers: { 'www-authenticate': challenge } }
+      )
+    );
+    const throughRelay = client(relayed.fetcher);
+    expect((await failure(throughRelay.tree(SHA_A))).message).toBe('github unavailable: relay 401');
+    await failure(throughRelay.tree(SHA_A));
+    expect(relayed.calls.filter(call => call.url.endsWith('/access_tokens'))).toHaveLength(1);
+
+    const refused = github(async () =>
+      Response.json({ message: 'Bad credentials' }, { status: 401 })
+    );
+    const fromGithub = client(refused.fetcher);
+    expect((await failure(fromGithub.tree(SHA_A))).message).toBe('github unavailable: GET 401');
+    await failure(fromGithub.tree(SHA_A));
+    expect(refused.calls.filter(call => call.url.endsWith('/access_tokens'))).toHaveLength(2);
+  });
 });

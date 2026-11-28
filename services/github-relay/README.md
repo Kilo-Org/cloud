@@ -98,15 +98,29 @@ root.
 2. **DNS.** A DNS-only (grey cloud) record `github-relay.kiloapps.io A 136.119.16.41` in the
    `kiloapps.io` Cloudflare zone. Workers cannot fetch an IP literal, so the relay needs a name;
    DNS-only, so Caddy holds the certificate and no Cloudflare proxy sits in front of it.
-3. **The VM.** The project's existing `default-allow-https` rule opens TCP 443 to the
-   `https-server` tag (Let's Encrypt validates on 443 too); `default-allow-ssh` allows SSH from
-   the IAP range.
+3. **Firewall.** The VM's own tag `github-relay` gets HTTPS from anywhere (the Worker egress is
+   Cloudflare-wide, and Let's Encrypt validates on 443 too), SSH from the IAP range only, and
+   nothing else: the deny rule outranks the project's default rules, `default-allow-ssh` included.
+
+   ```sh
+   gcloud compute firewall-rules create github-relay-allow-https --project=kilocode \
+     --network=default --direction=INGRESS --priority=800 --action=ALLOW --rules=tcp:443 \
+     --source-ranges=0.0.0.0/0 --target-tags=github-relay
+   gcloud compute firewall-rules create github-relay-allow-iap-ssh --project=kilocode \
+     --network=default --direction=INGRESS --priority=800 --action=ALLOW --rules=tcp:22 \
+     --source-ranges=35.235.240.0/20 --target-tags=github-relay
+   gcloud compute firewall-rules create github-relay-deny-ingress --project=kilocode \
+     --network=default --direction=INGRESS --priority=900 --action=DENY --rules=all \
+     --source-ranges=0.0.0.0/0 --target-tags=github-relay
+   ```
+
+4. **The VM.**
 
    ```sh
    gcloud compute instances create github-relay --project=kilocode --zone=us-central1-a \
      --machine-type=e2-micro --image-family=debian-12 --image-project=debian-cloud \
      --boot-disk-size=10GB --boot-disk-type=pd-standard \
-     --address=136.119.16.41 --network-tier=PREMIUM --tags=https-server \
+     --address=136.119.16.41 --network-tier=PREMIUM --tags=github-relay \
      --no-service-account --no-scopes \
      --shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
      --metadata=enable-oslogin=TRUE \
@@ -115,26 +129,35 @@ root.
 
    The startup script installs Caddy (Debian) and Node (nodejs.org, pinned version and SHA-256)
    on every boot if missing, and starts the relay once its files are in place.
-4. **The relay.** Build, copy, install, start:
+5. **The relay.** Build and record the SHA-256 of the three files; copy them into a fresh
+   directory only the deployer can write; check the sums there before anything is installed:
 
    ```sh
    pnpm --filter github-relay build
+   SUMS=$(cd services/github-relay && shasum -a 256 dist/server.mjs deploy/Caddyfile \
+     deploy/github-relay.service | sed 's#  .*/#  #')
+   printf '%s\n' "$SUMS"   # keep with the deploy record
+   gcloud compute ssh github-relay --project=kilocode --zone=us-central1-a --tunnel-through-iap \
+     --command='rm -rf ~/github-relay-deploy && mkdir -m 0700 ~/github-relay-deploy'
    gcloud compute scp --project=kilocode --zone=us-central1-a --tunnel-through-iap \
      services/github-relay/dist/server.mjs services/github-relay/deploy/Caddyfile \
-     services/github-relay/deploy/github-relay.service github-relay:/tmp/
+     services/github-relay/deploy/github-relay.service github-relay:github-relay-deploy/
    gcloud compute ssh github-relay --project=kilocode --zone=us-central1-a --tunnel-through-iap \
-     --command='set -e
-       sudo install -m 0644 /tmp/Caddyfile /etc/caddy/Caddyfile
-       sudo install -m 0644 /tmp/github-relay.service /etc/systemd/system/github-relay.service
+     --command="set -e
+       cd ~/github-relay-deploy
+       printf '%s\n' '$SUMS' | sha256sum --check --strict
+       sudo install -m 0644 Caddyfile /etc/caddy/Caddyfile
+       sudo install -m 0644 github-relay.service /etc/systemd/system/github-relay.service
        if [ -f /opt/github-relay/server.mjs ]; then sudo cp /opt/github-relay/server.mjs /opt/github-relay/server.mjs.previous; fi
-       sudo install -m 0644 /tmp/server.mjs /opt/github-relay/server.mjs
+       sudo install -m 0644 server.mjs /opt/github-relay/server.mjs
        sudo systemctl daemon-reload
        sudo systemctl enable github-relay
        sudo systemctl restart github-relay
-       sudo systemctl reload caddy'
+       sudo systemctl reload caddy
+       rm -rf ~/github-relay-deploy"
    ```
 
-5. **Check.** TLS and the process, then the refusals, from any machine:
+6. **Check.** TLS and the process, then the refusals, from any machine:
 
    ```sh
    curl -fsS https://github-relay.kiloapps.io/healthz                     # ok
@@ -143,7 +166,7 @@ root.
    curl -s -o /dev/null -w '%{http_code}\n' https://github-relay.kiloapps.io/repos/Kilo-Org/cloud   # 403
    ```
 
-6. **Uptime check and alert.** One HTTPS check of `/healthz`, then an alert policy on it:
+7. **Uptime check and alert.** One HTTPS check of `/healthz`, then an alert policy on it:
 
    ```sh
    gcloud monitoring uptime create github-relay-healthz --project=kilocode \
@@ -154,7 +177,7 @@ root.
 
    In Cloud Monitoring, Uptime checks, `github-relay-healthz`, Create alert: notify the team's
    channel when the check fails for 5 minutes. A failed certificate renewal fails the check too.
-7. **Staging.** Merge the STS policy grant and the proxy change; set
+8. **Staging.** Merge the STS policy grant and the proxy change; set
    `MIGRATION_PROXY_GITHUB_RELAY_URL` to `https://github-relay.kiloapps.io/migration-proxy` in the
    proxy's staging vars and deploy it; run one staging migration end to end.
 
@@ -162,7 +185,7 @@ root.
 
 After the staging run passes: add a `production` grant of `github-relay` /
 `github-relay:migration-proxy.read` to `services/sts/policy/migration-proxy.yaml`, set
-`RELAY_STS_ENVIRONMENTS=staging,production` in the unit and redeploy it (step 4), then set the
+`RELAY_STS_ENVIRONMENTS=staging,production` in the unit and redeploy it (step 5), then set the
 proxy's production `MIGRATION_PROXY_GITHUB_RELAY_URL`.
 
 ## Rotation
@@ -175,11 +198,20 @@ proxy's production `MIGRATION_PROXY_GITHUB_RELAY_URL`.
 - **The address:** to move to a new address, reserve it, add it to the allow list first, attach it
   to the VM, change the DNS record, wait for the old record's TTL, then remove the old allow-list
   entry and release the old address.
-- **Node and Caddy:** Debian security updates install themselves (`unattended-upgrades`). For a
-  new Node release, change `NODE_VERSION` and `NODE_SHA256` in `deploy/startup.sh` with `.nvmrc`,
-  update the instance metadata
-  (`gcloud compute instances add-metadata github-relay --zone=us-central1-a --metadata-from-file=startup-script=services/github-relay/deploy/startup.sh`)
-  and rerun it (`sudo google_metadata_script_runner startup`).
+- **Caddy:** Debian security updates install themselves (`unattended-upgrades`), Caddy included.
+  Debian 12 ships Caddy 2.6; if a newer Caddy is ever needed, Caddy's official apt repository
+  (`https://dl.cloudsmith.io/public/caddy/stable/`, signed) replaces the Debian package, and
+  `startup.sh` then names that repository and its key.
+- **Node:** a new release (security or `.nvmrc` bump) is one change and one redeploy:
+  1. set `NODE_VERSION` to the `.nvmrc` release and `NODE_SHA256` to the
+     `node-v<version>-linux-x64.tar.xz` line of that release's `SHASUMS256.txt` (whose signature
+     the Node release keys verify);
+  2. run the relay's checks on that Node release;
+  3. update the instance metadata
+     (`gcloud compute instances add-metadata github-relay --zone=us-central1-a --metadata-from-file=startup-script=services/github-relay/deploy/startup.sh`)
+     and rerun it on the VM (`sudo google_metadata_script_runner startup`); it replaces `/opt/node`
+     only after the checksum matches;
+  4. `sudo systemctl restart github-relay`, then the checks of step 6.
 
 ## Rollback
 
@@ -189,8 +221,8 @@ proxy's production `MIGRATION_PROXY_GITHUB_RELAY_URL`.
   environment's migration path to the proxy, so CI migrates the old way again. Emptying
   `MIGRATION_PROXY_GITHUB_RELAY_URL` is not a rollback: the proxy's reads then go straight to
   GitHub, which the allow list refuses.
-- **Remove the relay:** first take every caller off it (above), then delete the VM, the DNS record
-  and the allow-list entry, release the address
+- **Remove the relay:** first take every caller off it (above), then delete the VM, its three
+  firewall rules, the DNS record and the allow-list entry, release the address
   (`gcloud compute addresses delete migration-proxy-github-relay --region=us-central1`), and
   remove the STS grant.
 

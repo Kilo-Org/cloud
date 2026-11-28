@@ -77,6 +77,14 @@ type StsReadResult = { ok: true; value: string } | { ok: false; reason: SecretRe
 
 const INVALID_SOURCE: StsReadResult = { ok: false, reason: 'invalid_source' };
 
+let stsReadLogged = false;
+
+function logStsReadOnce(value: string): void {
+  if (stsReadLogged || value === '') return;
+  stsReadLogged = true;
+  logger.info('Webhook secret source read succeeded', { source: 'sts' });
+}
+
 /**
  * Reads one name from the STS bundle and returns it as delivered, empty included, so each caller
  * keeps its own empty-value handling. It never throws and never reads the Secrets Store: a failure
@@ -143,7 +151,10 @@ export async function readSecret<N extends WebhookSecretName>(
   const bindings: Record<N, SecretsStoreSecret | string> = env;
   if (source === 'secrets-store') return getSecretValue(bindings[name]);
   const read = source === 'sts' ? await readStsSecret(env, name) : INVALID_SOURCE;
-  if (read.ok) return read.value;
+  if (read.ok) {
+    logStsReadOnce(read.value);
+    return read.value;
+  }
   logger.error('Webhook secret unavailable', { secret: name, reason: read.reason });
   throw new SecretSourceUnavailableError(name, read.reason);
 }
@@ -177,6 +188,7 @@ export async function expectedSecret<N extends WebhookSecretName>(
   if (source === undefined) return { status: 'refused', reason: 'invalid_source' };
   if (!presented) return { status: 'keyless', source };
   const read = await readStsSecret(env, name);
+  if (read.ok) logStsReadOnce(read.value);
   return read.ok
     ? { status: 'read', source, secret: read.value }
     : { status: 'refused', reason: read.reason };

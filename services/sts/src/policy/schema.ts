@@ -248,6 +248,53 @@ function hasDuplicates(values: readonly string[]): boolean {
 }
 
 /**
+ * D53/M112 (manager ruling M112, 2026-11-27, extending Igor's D53): the Kilo-Org/cloud workflow
+ * files whose secret-bundle policies may accept `workflow_run`, alone or with `schedule` and
+ * `workflow_dispatch`, and grant production. D53 admits those triggers for trigger-only and
+ * deploy-grant policies; these three jobs already receive the same values as stored GitHub secrets
+ * on the same triggers, run main's workflow code in a GitHub environment that admits main alone,
+ * and read no input from the upstream run beyond what their own guards check. A policy uses the
+ * carve-out only when it is a Kilo-Org/cloud policy (ids below) on `refs/heads/main`, binds a
+ * GitHub environment, names exactly one of these files, accepts no event beyond the three, holds
+ * at least one secret, and grants no token, dynamic grant or environment grant. Removing a file
+ * here makes its policy fail to load.
+ */
+export const D53_M112_CI_BUNDLE_CARVE_OUT = {
+  repository: 'Kilo-Org/cloud',
+  repositoryId: '1145038391',
+  repositoryOwnerId: '201822503',
+  jobWorkflowRefs: [
+    'Kilo-Org/cloud/.github/workflows/stage-vercel-deployment.yml@refs/heads/main',
+    'Kilo-Org/cloud/.github/workflows/promote-vercel-deployment.yml@refs/heads/main',
+    'Kilo-Org/cloud/.github/workflows/cloud-agent-sentry-sourcemaps.yml@refs/heads/main',
+  ],
+} as const;
+
+const CARVE_OUT_EVENTS: readonly string[] = ['workflow_run', 'schedule', 'workflow_dispatch'];
+
+/** True for a secret-bundle policy inside `D53_M112_CI_BUNDLE_CARVE_OUT`. */
+function usesCiBundleCarveOut(policy: Policy, identity: GithubIdentity): boolean {
+  const carveOut = D53_M112_CI_BUNDLE_CARVE_OUT;
+  const files: readonly string[] = carveOut.jobWorkflowRefs;
+  return (
+    identity.repository === carveOut.repository &&
+    identity.repositoryId === carveOut.repositoryId &&
+    identity.repositoryOwnerId === carveOut.repositoryOwnerId &&
+    identity.environment !== undefined &&
+    identity.refs.length === 1 &&
+    identity.refs[0] === GITHUB_PRODUCTION_REF &&
+    identity.jobWorkflowRefs.length === 1 &&
+    files.includes(identity.jobWorkflowRefs[0] ?? '') &&
+    identity.events.every(event => CARVE_OUT_EVENTS.includes(event)) &&
+    policy.secrets.length > 0 &&
+    policy.audiences.length === 0 &&
+    policy.scopes.length === 0 &&
+    policy.dynamic.length === 0 &&
+    Object.keys(policy.environmentGrants).length === 0
+  );
+}
+
+/**
  * The most active leases a policy may allow per grant: `replica-read` covers bouncer-watch's hourly
  * and daily runs, which overlap.
  */
@@ -766,7 +813,11 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   // job only asks the migration proxy to apply what is on `main`, which the proxy checks itself
   // (design Q64a). So it alone may list workflow_run with other events and grant production.
   // Q71b (Igor, 2026-11-27): the deploy-only policies of Q71_CLOUDFLARE_DEPLOY_CARVE_OUT may too.
-  const carvedOut = holdsMigrationRun(policy) || usesCloudflareDeployCarveOut(policy, identity);
+  // D53/M112: the secret-bundle policies of D53_M112_CI_BUNDLE_CARVE_OUT may too.
+  const carvedOut =
+    holdsMigrationRun(policy) ||
+    usesCloudflareDeployCarveOut(policy, identity) ||
+    usesCiBundleCarveOut(policy, identity);
   if (!carvedOut && identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }

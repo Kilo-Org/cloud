@@ -154,6 +154,99 @@ describe('readSecret', () => {
   );
 });
 
+describe('STS success log', () => {
+  async function freshLog() {
+    vi.resetModules();
+    const { logger: freshLogger } = await import('./util/logger');
+    vi.spyOn(freshLogger, 'error').mockImplementation(() => undefined);
+    return vi.spyOn(freshLogger, 'info').mockImplementation(() => undefined);
+  }
+
+  it('logs one fixed event on the first successful read, not on a refused read before it', async () => {
+    const info = await freshLog();
+    const secrets = await import('./secrets');
+    const refused = sourceEnv('sts', { status: 'denied', reason: 'unknown_workload' });
+
+    await expect(secrets.readSecret(refused.env, 'INTERNAL_API_SECRET')).rejects.toBeInstanceOf(
+      secrets.SecretSourceUnavailableError
+    );
+    expect(info).not.toHaveBeenCalled();
+
+    const { env } = sourceEnv('sts');
+
+    expect(await secrets.readSecret(env, 'INTERNAL_API_SECRET')).toBe(
+      BUNDLE_VALUES.INTERNAL_API_SECRET
+    );
+    expect(info).toHaveBeenCalledOnce();
+    expect(info).toHaveBeenCalledWith('Webhook secret source read succeeded', { source: 'sts' });
+    expect(JSON.stringify(info.mock.calls)).not.toContain('INTERNAL_API_SECRET');
+    expect(JSON.stringify(info.mock.calls)).not.toContain(BUNDLE_VALUES.INTERNAL_API_SECRET);
+  });
+
+  it('does not repeat the event for later successful reads', async () => {
+    const info = await freshLog();
+    const { readSecret } = await import('./secrets');
+    const { env } = sourceEnv('sts');
+
+    expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(BUNDLE_VALUES.INTERNAL_API_SECRET);
+    expect(await readSecret(env, 'CALLBACK_TOKEN_SECRET')).toBe(
+      BUNDLE_VALUES.CALLBACK_TOKEN_SECRET
+    );
+    expect(await readSecret(env, 'NEXTAUTH_SECRET')).toBe(BUNDLE_VALUES.NEXTAUTH_SECRET);
+    expect(info).toHaveBeenCalledOnce();
+  });
+
+  it('logs nothing for a raw bundle read or a Secrets Store read', async () => {
+    const info = await freshLog();
+    const { readStsSecret, readSecret } = await import('./secrets');
+    const { env: stsEnv } = sourceEnv('sts');
+    const { env: storeEnv } = sourceEnv(undefined);
+
+    expect(await readStsSecret(stsEnv, 'INTERNAL_API_SECRET')).toEqual({
+      ok: true,
+      value: BUNDLE_VALUES.INTERNAL_API_SECRET,
+    });
+    expect(await readSecret(storeEnv, 'INTERNAL_API_SECRET')).toBe(STORE_VALUE);
+    expect(info).not.toHaveBeenCalled();
+
+    expect(await readSecret(stsEnv, 'INTERNAL_API_SECRET')).toBe(BUNDLE_VALUES.INTERNAL_API_SECRET);
+    expect(info).toHaveBeenCalledOnce();
+  });
+
+  it('logs for a selected credential read and not for a keyless request', async () => {
+    const info = await freshLog();
+    const { expectedSecret } = await import('./secrets');
+    const { env } = sourceEnv('sts');
+
+    expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', null)).toEqual({
+      status: 'keyless',
+      source: 'sts',
+    });
+    expect(info).not.toHaveBeenCalled();
+
+    expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', 'presented')).toEqual({
+      status: 'read',
+      source: 'sts',
+      secret: BUNDLE_VALUES.CALLBACK_TOKEN_SECRET,
+    });
+    expect(info).toHaveBeenCalledOnce();
+  });
+
+  it('logs nothing for an empty delivered value', async () => {
+    const info = await freshLog();
+    const { readSecret } = await import('./secrets');
+    const empty = sourceEnv('sts', okBundle({ INTERNAL_API_SECRET: '' }));
+
+    expect(await readSecret(empty.env, 'INTERNAL_API_SECRET')).toBe('');
+    expect(info).not.toHaveBeenCalled();
+
+    const { env } = sourceEnv('sts');
+
+    expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(BUNDLE_VALUES.INTERNAL_API_SECRET);
+    expect(info).toHaveBeenCalledOnce();
+  });
+});
+
 describe('expectedSecret', () => {
   it('reads the Secrets Store for a keyless request under secrets-store, as before', async () => {
     const { env, getBundle, storeGet } = sourceEnv(undefined);

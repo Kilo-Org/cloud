@@ -46,3 +46,8 @@ test('the build inlines the bearer-only authentication setting', async () => {
   const { default: nextConfig } = await import('./next.config.mjs');
   assert.equal(nextConfig.env?.KILO_BROWSER_SESSIONS, 'disabled');
 });
+
+test('the build inlines the STS workload of its Vercel identity', async () => {
+  const { default: nextConfig } = await import('./next.config.mjs');
+  assert.equal(nextConfig.env?.KILO_STS_WORKLOAD, 'ai-gateway');
+});

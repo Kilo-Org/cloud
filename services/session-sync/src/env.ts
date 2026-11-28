@@ -1,4 +1,4 @@
-import type { AuthEnv, SecretBinding } from './auth';
+import type { AuthEnv } from './auth';
 import type { SessionSyncDO } from './dos/SessionSyncDO';
 import type { SessionSyncTenantDO } from './dos/SessionSyncTenantDO';
 import type { SessionRelayDO } from './dos/SessionRelayDO';
@@ -11,7 +11,6 @@ export type Env = AuthEnv & {
   SESSION_RELAY_DO: DurableObjectNamespace<SessionRelayDO>;
   SESSION_PRESENCE_DO: DurableObjectNamespace<SessionPresenceDO>;
   SESSION_NOTIFICATIONS_DO: DurableObjectNamespace<SessionNotificationsDO>;
-  INTERNAL_API_SECRET_PROD: SecretBinding;
   USER_REQUEST_LIMITER: RateLimit;
   USER_DATA_BLOCK_LIMITER: RateLimit;
   USER_BLOB_LIMITER: RateLimit;

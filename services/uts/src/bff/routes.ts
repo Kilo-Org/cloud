@@ -23,6 +23,7 @@ import { handleRetryAfter } from './limits';
 import {
   invalidClient,
   invalidSession,
+  orgDenied,
   sessionFields,
   slowDown,
   stepUpRequired,
@@ -37,7 +38,8 @@ import type { HandleInput } from './store';
  * which also records the assertion's `jti`. A handle is counted against its per-isolate allowance
  * before the statement (src/bff/limits.ts). The revoking calls answer 200 only once a feed object
  * that vouches for its list took the entries, else 503 with `Retry-After`; a repeat returns the
- * entries still in the feed, so the retry publishes them.
+ * entries still in the feed, so the retry publishes them. `token` binds its token to the `org` it
+ * names only when the minting statement finds the subject an active member there (design 5.8).
  */
 
 const BROWSER_SESSION_PATHS = [
@@ -67,11 +69,15 @@ async function afterPublish(
 }
 
 const SidSchema = z.uuid();
+const OrgSchema = z.uuid();
 
 /** The answer to a statement that refused the call. */
-function refusal(outcome: 'assertion_replay' | 'invalid_session' | 'step_up_required'): Response {
+function refusal(
+  outcome: 'assertion_replay' | 'invalid_session' | 'org_denied' | 'step_up_required'
+): Response {
   if (outcome === 'assertion_replay') return invalidClient();
   if (outcome === 'invalid_session') return invalidSession();
+  if (outcome === 'org_denied') return orgDenied();
   return stepUpRequired();
 }
 
@@ -85,17 +91,25 @@ async function mintSessionToken(
   if (scopeParam.status !== 'present' || resourceParam.status !== 'present') {
     return oauthError('invalid_request', 400, 'scope and resource are required once');
   }
+  const orgParam = params.one('org');
+  const org = orgParam.status === 'present' ? OrgSchema.safeParse(orgParam.value) : null;
+  if (orgParam.status === 'repeated' || (org !== null && !org.success)) {
+    return oauthError('invalid_request', 400, 'org must be one organization id');
+  }
+  const orgId = org?.data ?? null;
   const scope = UtsScopeSchema.safeParse(scopeParam.value);
   const client = WEB_MINT_CLIENT;
   const entry = scope.success ? deps.scopes(scope.data) : null;
   if (
     !scope.success ||
     entry === null ||
-    clientScopeRefusal([scope.data], client, deps.scopes) !== null ||
-    // A browser session names no organization, so no scope that needs one can be minted from it.
-    entry.requiresOrgClaim
+    clientScopeRefusal([scope.data], client, deps.scopes) !== null
   ) {
     return oauthError('invalid_scope', 400, 'the scope is not registered for this client');
+  }
+  // Without an organization no scope that needs one can pass (design 5.8).
+  if (entry.requiresOrgClaim && orgId === null) {
+    return oauthError('invalid_scope', 400, 'this scope needs an organization');
   }
   const origins = UTS_RESOURCE_ORIGINS[deps.config.environment];
   if (
@@ -105,7 +119,7 @@ async function mintSessionToken(
     return oauthError('invalid_target', 400, "resource must be the scope's service origin");
   }
   const result = await deps.sessions(sessions =>
-    sessions.mint({ ...input, scope: scope.data, stepUp: entry.stepUp })
+    sessions.mint({ ...input, scope: scope.data, stepUp: entry.stepUp, orgId })
   );
   if (result.outcome !== 'issued') return refusal(result.outcome);
   const signed = await signMinted(deps, client, result.sessionId, result);

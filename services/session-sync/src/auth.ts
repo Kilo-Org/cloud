@@ -1,5 +1,6 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { device_sessions, kilocode_users } from '@kilocode/db/schema';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
@@ -26,21 +27,23 @@ import {
 } from './protocol';
 import { rateLimit } from './rate-limit';
 import { jsonResponse, requestMetrics, timed } from './metrics';
+import { readSessionSyncSecret, type SessionSyncSecretsEnv } from './secrets';
 import { exchangeCloudAgentUpload, type CloudAgentUploadEnv } from './cloud-agent-upload';
 
 export type { Principal };
 
-/** A Secrets Store binding in deployment, or a plain string from local vars. */
-export type SecretBinding = string | { get(): Promise<string | null> };
-
-export type AuthEnv = CloudAgentUploadEnv & {
-  NEXTAUTH_SECRET: SecretBinding;
-  SESSION_SYNC_SECRET: SecretBinding;
-  HYPERDRIVE: Hyperdrive;
-  ENVIRONMENT?: string;
-  EXCHANGE_IP_LIMITER?: RateLimit;
-  EXCHANGE_ACCOUNT_LIMITER?: RateLimit;
-};
+/**
+ * The runtime secrets are read only through `src/secrets.ts`, which selects the source with
+ * `SECRETS_SOURCE`; `SessionSyncSecretsEnv` types them all as optional so a direct read fails
+ * type-checking instead of silently skipping the flag.
+ */
+export type AuthEnv = CloudAgentUploadEnv &
+  SessionSyncSecretsEnv & {
+    HYPERDRIVE: Hyperdrive;
+    ENVIRONMENT?: string;
+    EXCHANGE_IP_LIMITER?: RateLimit;
+    EXCHANGE_ACCOUNT_LIMITER?: RateLimit;
+  };
 
 const GRANT_ISSUER = 'session-sync';
 const GRANT_AUDIENCE = 'session-sync';
@@ -109,26 +112,24 @@ type Credential = {
   deviceSessionID: string | undefined;
 };
 
-// Holds resolved values only. A pending get() belongs to the request that
-// started it and is never shared with another request.
-const resolvedSecrets = new WeakMap<object, string>();
-
-async function resolveSecret(binding: SecretBinding, minBytes: number): Promise<string> {
-  const value =
-    typeof binding === 'string' ? binding : (resolvedSecrets.get(binding) ?? (await binding.get()));
+/** Refuses a secret that is missing or shorter than the minimum this Worker requires. */
+function requireSecret(value: string, minBytes: number): string {
   if (!value || new TextEncoder().encode(value).byteLength < minBytes) {
     throw new Error('Secret is not configured');
   }
-  if (typeof binding !== 'string') resolvedSecrets.set(binding, value);
   return value;
 }
 
 /** Shared signing key; ticket audiences remain distinct from sync grants. */
 export async function syncSigningKey(
-  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET'>
+  env: Pick<AuthEnv, 'SESSION_SYNC_SECRET' | 'SECRETS_SOURCE' | 'STS'>,
+  ctx?: SecretsExecutionContext
 ): Promise<Uint8Array> {
   return new TextEncoder().encode(
-    await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES)
+    requireSecret(
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
+      MIN_GRANT_SECRET_BYTES
+    )
   );
 }
 
@@ -293,7 +294,11 @@ async function checkAccount(
 }
 
 /** Handles `POST /v1/auth/exchange`. */
-export async function exchange(request: Request, env: AuthEnv): Promise<Response> {
+export async function exchange(
+  request: Request,
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
+): Promise<Response> {
   if (request.method !== 'POST') {
     return failure(405, 'method_not_allowed', 'Use POST for credential exchange');
   }
@@ -315,8 +320,14 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (hosted) return hosted;
 
   try {
-    const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
-    const grantSecret = await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES);
+    const nextAuthSecret = requireSecret(
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
+      MIN_GRANT_SECRET_BYTES
+    );
+    const grantSecret = requireSecret(
+      await readSessionSyncSecret(env, 'SESSION_SYNC_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
+      MIN_GRANT_SECRET_BYTES
+    );
     const credential = await verifyCredential(token, nextAuthSecret, environment);
     if (credential instanceof Response) return credential;
     const accountDenied = await rateLimit(env.EXCHANGE_ACCOUNT_LIMITER, credential.userID);
@@ -368,9 +379,10 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
 /** Validates a grant and exposes its deadline without accepting raw Kilo credentials. */
 export async function verifyGrant(
   token: string,
-  env: AuthEnv
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<{ principal: Principal; expiresAt: number } | undefined> {
-  const key = await syncSigningKey(env);
+  const key = await syncSigningKey(env, ctx);
   let payload: unknown;
   try {
     ({ payload } = await jwtVerify(token, key, {
@@ -395,11 +407,15 @@ export async function verifyGrant(
 }
 
 /** Verifies a sync grant. Raw Kilo credentials are never accepted here. */
-export async function authorize(request: Request, env: AuthEnv): Promise<Principal | Response> {
+export async function authorize(
+  request: Request,
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
+): Promise<Principal | Response> {
   const token = extractBearerToken(request.headers.get('Authorization'));
   if (!token) return failure(401, 'unauthenticated', 'A sync grant is required');
   try {
-    const verified = await verifyGrant(token, env);
+    const verified = await verifyGrant(token, env, ctx);
     return (
       verified?.principal ?? failure(401, 'invalid_grant', 'The sync grant is invalid or expired')
     );
@@ -417,7 +433,11 @@ const transcriptClaims = z.object({
   exp: numericDate,
 });
 
-export async function authorizeTranscript(request: Request, env: AuthEnv) {
+export async function authorizeTranscript(
+  request: Request,
+  env: AuthEnv,
+  ctx?: SecretsExecutionContext
+) {
   const prefix = `${SESSION_TRANSCRIPT_TOKEN_SCHEME} `;
   const authorization = request.headers.get('Authorization');
   if (!authorization?.startsWith(prefix)) return undefined;
@@ -430,7 +450,10 @@ export async function authorizeTranscript(request: Request, env: AuthEnv) {
 
   let secret: string;
   try {
-    secret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
+    secret = requireSecret(
+      await readSessionSyncSecret(env, 'NEXTAUTH_SECRET', ctx, MIN_GRANT_SECRET_BYTES),
+      MIN_GRANT_SECRET_BYTES
+    );
   } catch (error) {
     return unavailable('authorize', error);
   }

@@ -1,4 +1,13 @@
-# Registration only: services/kiloclaw-billing/wrangler.jsonc. No environment, identity or grant.
+# The kiloclaw-billing Worker (services/kiloclaw-billing/wrangler.jsonc). It reads its runtime
+# secrets over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the plain
+# Worker secrets) until secrets-cutover flips it. INTERNAL_API_SECRET resolves from /shared;
+# SNOWFLAKE_PRIVATE_KEY_PEM and SNOWFLAKE_PUBLIC_KEY_FINGERPRINT from /workloads/kiloclaw-billing.
 workload: kiloclaw-billing
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - INTERNAL_API_SECRET
+  - SNOWFLAKE_PRIVATE_KEY_PEM
+  - SNOWFLAKE_PUBLIC_KEY_FINGERPRINT

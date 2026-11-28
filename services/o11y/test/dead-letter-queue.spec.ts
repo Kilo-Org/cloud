@@ -8,6 +8,7 @@ import { queryDeadLetterQueue } from '../src/alerting/dead-letter-queue-query';
 import { evaluateDeadLetterQueueAlert } from '../src/alerting/dead-letter-queue-evaluate';
 import { buildSlackMessage, type AlertPayload } from '../src/alerting/notify';
 import type { QueueBacklogMetrics } from '../src/alerting/queue-backlog';
+import { stsBundle } from './sts-bundle-fixture';
 
 const ACCOUNT_ID = 'test-account-123';
 const API_TOKEN = 'synthetic-queues-read-token';
@@ -15,10 +16,6 @@ const DLQ_ID = 'a'.repeat(32);
 const BASE = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/queues`;
 const MARK_KEY = `o11y:dead_letter_queue:${DEAD_LETTER_QUEUE_NAME}`;
 const COOLDOWN_KEY = `o11y:alert:ticket:dead_letter_queue:cloudflare:${DEAD_LETTER_QUEUE_NAME}:queues`;
-
-function makeSecret(value: string | null): SecretsStoreSecret {
-  return { get: async () => value } as unknown as SecretsStoreSecret;
-}
 
 function makeKv() {
   const store = new Map<string, string>();
@@ -35,9 +32,11 @@ function makeEnv(kv: KVNamespace = makeKv(), token: string | null = API_TOKEN) {
   return {
     O11Y_ALERT_STATE: kv,
     O11Y_CF_ACCOUNT_ID: ACCOUNT_ID,
-    O11Y_CF_CONTAINERS_API_TOKEN: makeSecret(token),
-    O11Y_SLACK_WEBHOOK_PAGE: makeSecret('https://hooks.slack.com/page'),
-    O11Y_SLACK_WEBHOOK_TICKET: makeSecret('https://hooks.slack.com/ticket'),
+    STS: stsBundle({
+      O11Y_CF_CONTAINERS_API_TOKEN: token ?? '',
+      O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/page',
+      O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/ticket',
+    }),
   };
 }
 

@@ -1,11 +1,10 @@
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { z } from 'zod';
 import { MONITORED_QUEUE_ID, type QueueBacklogMetrics } from './queue-backlog';
-import { readO11ySecret } from '../secrets';
+import { readO11ySecret, type O11ySecretsEnv } from '../secrets';
 
-type QueryEnv = {
+type QueryEnv = O11ySecretsEnv & {
   O11Y_CF_ACCOUNT_ID: string;
-  O11Y_CF_CONTAINERS_API_TOKEN: SecretsStoreSecret;
 };
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;

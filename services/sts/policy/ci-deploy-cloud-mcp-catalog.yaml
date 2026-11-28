@@ -1,0 +1,26 @@
+# Kilo-Org/cloud's kilo-mcp catalog index: the catalog-index-sts job of kilo-mcp-catalog.yml on a
+# main push, in GitHub environment production, when the repository variable DEPLOY_TOKEN_SOURCE is
+# `sts` (README "Cloudflare deploy tokens"). It deploys no Worker: it embeds the catalog with
+# Workers AI and upserts the kilo-mcp-catalog Vectorize index.
+workload: ci-deploy-cloud-mcp-catalog
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: production
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/kilo-mcp-catalog.yml@refs/heads/main]
+  events: [push]
+secrets: []
+dynamic:
+  - grant: cloudflare-deploy
+    permissionSet: kilo-mcp-catalog-index
+    permissionGroups:
+      - { id: 64156ba5be47441096c83c7fc17c488b, name: Vectorize Write, scope: account }
+      - { id: a92d2450e05d4e7bb7d0a64968f83d11, name: Workers AI Read, scope: account }
+    intendedScripts: []
+    ttlSeconds: 900
+    maxActive: 1
+    maxPerHour: 12

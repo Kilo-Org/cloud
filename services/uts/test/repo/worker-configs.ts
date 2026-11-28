@@ -660,6 +660,23 @@ function feedHttpsProblems(block: Block): string[] {
 }
 
 /**
+ * The home-widget exchange's switch in one mint block: `HOME_WIDGET_GRANT_ENABLED` is absent (off)
+ * or exactly `true`, and production keeps it off until the widget moves to UTS (phase 4).
+ */
+function homeWidgetSwitchProblems(block: Block, environment: UtsEnvironment | undefined): string[] {
+  const enabled = block.bindings.vars?.HOME_WIDGET_GRANT_ENABLED;
+  if (enabled === undefined) return [];
+  if (enabled !== 'true') {
+    return [
+      `${block.where}: HOME_WIDGET_GRANT_ENABLED is ${JSON.stringify(enabled)}; it is exactly "true" or absent (off)`,
+    ];
+  }
+  return environment === 'production'
+    ? [`${block.where}: HOME_WIDGET_GRANT_ENABLED stays off in production`]
+    : [];
+}
+
+/**
  * The configs that run the jose verification path: every mint Worker config, and the feed
  * Worker's, which verifies STS tokens for its HTTPS feed (`@kilocode/verify`). The rule below
  * covers only these: asserted repo-wide it would fail Workers that reach jose through a package
@@ -727,9 +744,10 @@ export const FEED_MAX_LOG_SAMPLING_RATE = 0.05;
  * with matching `UTS_ENVIRONMENT`; traces stay off in every block, since the signer and feed
  * objects hold private keys; every mint block of `wrangler.jsonc` runs the deployed entry, keeps
  * its objects in the `eu` jurisdiction, places its fetch handler next to the identity store,
- * keeps query strings (a provider callback's authorization code) out of its logs, names its
- * secrets source and binds its own environment's STS as caller `uts`, and in production sets a
- * sign-in client id only under `SECRETS_SOURCE` `sts`;
+ * keeps query strings (a provider callback's authorization code) out of its logs, offers the
+ * home-widget exchange only with `HOME_WIDGET_GRANT_ENABLED` exactly `true`, never in production,
+ * names its secrets source and binds its own environment's STS as caller `uts`, and in production
+ * sets a sign-in client id only under `SECRETS_SOURCE` `sts`;
  * the development config is one block that runs the development entry under the development name,
  * unrouted, behind the build command that fails every command but `dev`; the feed Worker runs
  * without placement, binds no Durable Object, binds each mint entrypoint once, keeps at most a
@@ -798,6 +816,7 @@ export function utsConfigProblems(configs: readonly WorkerConfig[]): string[] {
           `${block.where}: observability.redact_query_string resolves to ${String(redacted)}; it must be true`
         );
       }
+      problems.push(...homeWidgetSwitchProblems(block, environment));
     }
   }
   const dev = byPath.get(MINT_DEV_CONFIG);

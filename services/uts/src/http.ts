@@ -1,5 +1,6 @@
 import {
   UTS_AUTHORIZATION_SERVER_METADATA_PATH,
+  UTS_BOT_TOKEN_PATH,
   UTS_PAT_PROBE_PATH,
   UTS_PROTECTED_RESOURCE_METADATA_PATH,
   utsScopeEntry,
@@ -31,22 +32,25 @@ import { subjectDeps } from './subjects/deps';
 import { handleInternalRequest } from './subjects/routes';
 import type { ServiceTokenVerifier } from './subjects/service-tokens';
 import type { MetadataFetcher } from './third-party/metadata';
-import type { SignerAccess } from './token/mint';
+import { type SignerAccess, signerAccess } from './token/mint';
 import type { StsCallerVerifier } from './exchange/endpoint';
 import { MANAGER_JWKS_PATH } from './manager/config';
 import { managerKeySet } from './manager/key-set';
 import { deployedStsCallers } from './sts-callers';
+import { botTokenPolicies } from './bot-token/policy';
+import { type BotTokenDeps, handleBotTokenRequest } from './bot-token/route';
+import { botTokenAccess } from './bot-token/store';
 
 /**
  * What only the development entry adds: a choice of the synthetic sign-in hand-off, a failing
  * signer for the local end-to-end run, the development fixture scopes on top of the scope
  * registry, a recording mail port for the email sign-in, a metadata fetch that serves the local
  * end-to-end run's client documents, a stand-in STS token verifier of the broker exchange and a
- * stand-in STS token check for the `/internal/` routes (src/dev.ts). The deployed options are the
- * sign-in pages, the grant's signer, the registry alone, no recording mail port (mail goes through
- * Mailgun where the mail settings are on, src/signin/email/delivery.ts), the platform `fetch`, and
- * the STS checks of `@kilocode/verify` with this environment's caller allow-lists
- * (src/sts-callers.ts).
+ * stand-in STS token check for the `/internal/` routes, the bot-token route's included
+ * (src/dev.ts). The deployed options are the sign-in pages, the grant's signer, the registry
+ * alone, no recording mail port (mail goes through Mailgun where the mail settings are on,
+ * src/signin/email/delivery.ts), the platform `fetch`, and the STS checks of `@kilocode/verify`
+ * with this environment's caller allow-lists (src/sts-callers.ts).
  */
 export type MintOptions = {
   authorizationHandoff: HandoffChoice | null;
@@ -54,12 +58,13 @@ export type MintOptions = {
   scopes: ScopeRegistry;
   recordingMailer: SignInMailer | null;
   serviceTokens: ServiceTokenVerifier;
+  botTokenCallers: ServiceTokenVerifier;
   metadataFetcher: MetadataFetcher;
   stsCallers: StsCallerVerifier | null;
 };
 
 /** The deployed options; the STS checks need the request's context (`deployedStsCallers`). */
-const DEPLOYED: Omit<MintOptions, 'serviceTokens' | 'stsCallers'> = {
+const DEPLOYED: Omit<MintOptions, 'serviceTokens' | 'botTokenCallers' | 'stsCallers'> = {
   authorizationHandoff: null,
   signer: null,
   scopes: utsScopeEntry,
@@ -69,6 +74,36 @@ const DEPLOYED: Omit<MintOptions, 'serviceTokens' | 'stsCallers'> = {
 
 /** The probe route's per-address lookup windows, per isolate (src/pat/address-limit.ts). */
 const probeWindows: AddressWindows = new Map();
+
+/**
+ * The bot-token mint of this environment's `BOT_TOKEN_POLICIES` (src/bot-token/). Its store
+ * waits for the identity store's primary config; until then a call from a listed workload
+ * answers 503.
+ */
+function botTokenDeps(
+  env: Env,
+  ctx: ExecutionContext,
+  config: UtsConfig,
+  mint: MintOptions
+): BotTokenDeps {
+  const policies = botTokenPolicies(env, mint.scopes);
+  const binding = identityStoreBinding(env);
+  return {
+    config,
+    callers: mint.botTokenCallers,
+    scopes: mint.scopes,
+    sign: mint.signer ?? signerAccess(env, config),
+    mint:
+      policies.status === 'on'
+        ? {
+            status: 'on',
+            policies: policies.policies,
+            store: binding.kind === 'ready' ? botTokenAccess(binding.connectionString, ctx) : null,
+          }
+        : policies,
+    nowSeconds: () => Math.floor(Date.now() / 1000),
+  };
+}
 
 /**
  * The account API is served once the identity store's primary config is bound. A created
@@ -124,7 +159,8 @@ function probeDeps(env: Env, ctx: ExecutionContext, config: UtsConfig): PatProbe
  * applies to fetch handlers only, not to RPC methods or named entrypoints (design 5.2). It serves
  * the issuer metadata; the OAuth endpoints, the sign-in pages, the device grant and the tickets
  * once the identity store is bound (src/oauth/routes.ts); the `/internal/` routes of the web app's
- * outbox (src/subjects/routes.ts), which answer 503 until the identity store exists; and the
+ * outbox (src/subjects/routes.ts), which answer 503 until the identity store exists; the bot-token
+ * mint (src/bot-token/route.ts), off unless `BOT_TOKEN_POLICIES` lists policies; and the
  * account API (src/account/routes.ts) and the PAT probe route
  * (src/pat/probe.ts) once their identity-store configs are bound. Signer keys are served by the
  * `SignerKeys` entrypoint (src/signer-keys.ts), PAT lookups for verifiers by the `PatLookup`
@@ -187,6 +223,9 @@ export async function handleRequest(
     subjects: subjectDeps(env, ctx, config),
   });
   if (internal !== null) return internal;
+  if (pathname === UTS_BOT_TOKEN_PATH) {
+    return await handleBotTokenRequest(request, botTokenDeps(env, ctx, config, mint));
+  }
   if (account !== null) {
     const response = await handleAccountRequest(request, pathname, account);
     if (response !== null) return response;

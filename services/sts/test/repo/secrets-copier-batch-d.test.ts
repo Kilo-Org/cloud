@@ -6,19 +6,8 @@ import { readKiloChatSecret } from '../../../kilo-chat/src/secrets';
 import { readSecurityAutoAnalysisSecret } from '../../../security-auto-analysis/src/secrets';
 import { readSessionIngestSecret } from '../../../session-ingest/src/secrets';
 import { PolicySchema, type Policy } from '../../src/policy/schema';
-import { repoRoot, shippedPolicyDocuments } from './repo';
+import { repoRoot, SHARED_SECRET_NAMES, shippedPolicyDocuments } from './repo';
 import { parseWorkerConfig } from './worker-configs';
-
-/**
- * The three names STS serves from `/shared`; every other name resolves from the Worker's own
- * `/workloads/<workload>` folder (src/policy/schema.ts `bundleFolder`). A copier row's STS lookup
- * name is therefore the canonical name itself, placed in the folder this list selects.
- */
-const SHARED_NAMES: readonly string[] = [
-  'INTERNAL_API_SECRET',
-  'NEXTAUTH_SECRET',
-  'CALLBACK_TOKEN_SECRET',
-];
 
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
@@ -115,7 +104,7 @@ async function proveWorker<N extends string>(worker: WorkerUnderTest<N>): Promis
       workload: worker.workload,
       oldBinding: binding,
       storeSecretName: entry?.secret_name ?? '—',
-      stsLookup: SHARED_NAMES.includes(name)
+      stsLookup: SHARED_SECRET_NAMES.includes(name)
         ? `/shared/${name}`
         : `/workloads/${worker.workload}/${name}`,
       policyEntry: name,

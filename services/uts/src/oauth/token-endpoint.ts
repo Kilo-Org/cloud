@@ -2,6 +2,7 @@ import {
   UTS_GRANT_TYPES,
   UTS_ID_TOKEN_TYPE_URN,
   UTS_MAX_TOKENS_PER_CALL,
+  UTS_REFRESH_TOKEN_TYPE_URN,
   UTS_TOKEN_PATH,
   type UtsAccessTokenClaims,
 } from '@kilocode/uts-contracts';
@@ -38,8 +39,9 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 /**
  * POST /token (design 5.3 and 5.4). Grants: `authorization_code` (DPoP-bound for a first-party
  * client), `refresh_token` (DPoP-bound first-party grant, or third-party rotation with reuse
- * detection) and the RFC 8628 device grant through its hook. The RFC 8693 token exchange goes to
- * the CI exchange (src/ci/exchange.ts) when its subject is a GitHub OIDC token, and otherwise to
+ * detection), the RFC 8628 device grant through its hook, and the RFC 8693 token exchange, told
+ * apart by `subject_token_type`: a GitHub OIDC token goes to the CI exchange (src/ci/exchange.ts),
+ * a refresh token to the home-widget exchange (src/home-widget/exchange.ts), and anything else to
  * the broker exchange (src/exchange/endpoint.ts). `client_credentials` is not offered.
  *
  * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
@@ -76,6 +78,9 @@ export type WebClientGrant = (
   params: Params
 ) => Promise<Response | null>;
 
+/** The home-widget exchange, which src/home-widget/exchange.ts provides. */
+export type HomeWidgetGrant = (request: Request, params: Params) => Promise<Response>;
+
 export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
@@ -94,6 +99,11 @@ export type TokenDeps = {
    * wired, and the grant is then not offered.
    */
   exchange: ExchangeService | null;
+  /**
+   * The home-widget exchange (a `subject_token_type` of refresh token); null where
+   * `HOME_WIDGET_GRANT_ENABLED` is not `true`, and the exchange is then not offered.
+   */
+  homeWidgetGrant: HomeWidgetGrant | null;
   /**
    * The CI token exchange (src/ci/exchange.ts): a token exchange whose subject is a GitHub OIDC
    * token. Off unless the environment configures trust policies.
@@ -442,10 +452,17 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
         return oauthError('unsupported_grant_type', 400);
       }
       case UTS_GRANT_TYPES.tokenExchange: {
-        // A GitHub OIDC token is the CI exchange's subject; a UTS access token the broker's.
+        // A GitHub OIDC token is the CI exchange's subject, the mobile app's refresh token the
+        // home-widget exchange's, and a UTS access token the broker's.
         const subjectType = form.params.one('subject_token_type');
         if (subjectType.status === 'present' && subjectType.value === UTS_ID_TOKEN_TYPE_URN) {
           return await handleCiTokenExchange(form.params, deps);
+        }
+        if (subjectType.status === 'present' && subjectType.value === UTS_REFRESH_TOKEN_TYPE_URN) {
+          if (deps.homeWidgetGrant === null) {
+            return oauthError('invalid_request', 400, 'a refresh token is not exchanged here');
+          }
+          return await deps.homeWidgetGrant(request, form.params);
         }
         if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
         return await handleTokenExchange(request, form.params, {

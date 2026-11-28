@@ -288,10 +288,17 @@ export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBA
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
 
-// Bouncer: configurable signup and inference admission, plus payment and usage evidence.
+// Bouncer: configurable signup and inference admission, plus payment and usage evidence. Bouncer
+// runs in production only, so a Vercel production deployment defaults to it and a Vercel preview
+// (previews and the `staging` custom environment, both `VERCEL_ENV=preview`) does not; the Bouncer
+// client also ignores a set `BOUNCER_URL` there (`bouncerEnabledForDeployment`). Outside Vercel the
+// default follows NODE_ENV as before.
 export const BOUNCER_URL =
   getEnvVariable('BOUNCER_URL') ||
-  (process.env.NODE_ENV === 'production' ? 'https://bouncer.kiloapps.io' : null);
+  (process.env.VERCEL_ENV === 'production' ||
+  (process.env.VERCEL_ENV !== 'preview' && process.env.NODE_ENV === 'production')
+    ? 'https://bouncer.kiloapps.io'
+    : null);
 
 /**
  * RSA public key used for encrypting agent environment profile secrets.
@@ -514,6 +521,10 @@ export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
 export const O11Y_API_METRICS_SENDER_AUTH = getEnvVariable('O11Y_API_METRICS_SENDER_AUTH');
 export const O11Y_ALERTING_SENDER_AUTH = getEnvVariable('O11Y_ALERTING_SENDER_AUTH');
+// The credential the AI Gateway's US-region senders present to the web app's own /api/internal/*
+// routes (web-internal-sts.ts): absent, empty or `legacy` sends the internal secret; `sts` an STS
+// service token.
+export const WEB_INTERNAL_SENDER_AUTH = getEnvVariable('WEB_INTERNAL_SENDER_AUTH');
 
 // Pylon chat widget (support chat on Code Reviewer pages).
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign

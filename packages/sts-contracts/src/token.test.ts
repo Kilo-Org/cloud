@@ -4,6 +4,10 @@ import {
   STS_BOUNCER_SIGNUP_DECIDE,
   STS_BOUNCER_SIGNUP_HISTORY,
   STS_BOUNCER_USAGE_WRITE,
+  STS_CODE_REVIEW_CANCEL,
+  STS_CODE_REVIEW_DISPATCH,
+  STS_CODE_REVIEW_RETRY_FRESH,
+  STS_CODE_REVIEW_STATUS_READ,
   STS_RESERVED_SCOPES,
   STS_SCOPE_REGISTRY,
   STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC,
@@ -11,12 +15,40 @@ import {
   STS_O11Y_ALERTING_WRITE,
   STS_O11Y_API_METRICS_WRITE,
   STS_SECURE_PROXY_FORWARD,
+  STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK,
+  STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK,
   STS_SECURITY_SYNC_DISMISS_FINDING,
   STS_SECURITY_SYNC_MANUAL_SYNC,
+  STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
+  STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
+  STS_MODEL_EVAL_INGEST_INTERNAL_CALL,
+  STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
+  STS_SESSION_SYNC_INTERNAL_CALL,
+  STS_NOTIFICATIONS_INTERNAL_CALL,
   STS_USAGE_PUBLISH,
   STS_USAGE_RECORD,
+  STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK,
+  STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE,
+  STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+  STS_WEB_BOT_SESSION_CALLBACK,
+  STS_WEB_BYOC_CREDENTIALS_READ,
+  STS_WEB_BYOC_CREDENTIALS_WRITE,
+  STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ,
+  STS_WEB_CODE_REVIEW_AGENT_CALLBACK,
+  STS_WEB_CODE_REVIEW_STATUS_CALLBACK,
+  STS_WEB_COMPUTE_BALANCE_ALERT,
+  STS_WEB_GLANCEABLE_SNAPSHOT_READ,
+  STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH,
+  STS_WEB_SCIM_SYNC,
+  STS_WEB_SECURITY_ANALYSIS_CALLBACK,
   STS_WEB_MCP_CATALOG_TOKEN_MINT,
   STS_WEB_SECURITY_NOTIFICATIONS_DISPATCH,
+  STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE,
+  STS_WEB_USAGE_RECEIPTS_READ,
+  STS_WEB_USAGE_RECORD_BENCHMARK_GRADER,
+  STS_WEB_USAGE_RECORD_CLASSIFIER,
+  STS_WEB_USAGE_RECORD_REGION_HANDOFF,
+  STS_WEB_USER_DATA_EXPORT_READY,
   isRegisteredStsScope,
   stsScopeRegistryProblems,
   type StsScopeRegistry,
@@ -166,13 +198,32 @@ describe('scope strings', () => {
 });
 
 describe('STS scope registry', () => {
-  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes and the CI scopes, so every other scope is denied', () => {
+  it('lists only the pilot scopes, the reserved probe, the UTS scopes, the phase 4 service scopes, the Bouncer scopes, the CI scopes and the phase 2 C1 scopes, so every other scope is denied', () => {
     expect(STS_SCOPE_REGISTRY).toEqual({
       web: {
         scopes: [
           'web:sts.canary',
           'web:usage.record',
           'web:security-notifications.dispatch',
+          'web:security-notifications.lifecycle',
+          'web:compute-balance-alert.send',
+          'web:scim.sync',
+          'web:user-data-exports.ready',
+          'web:auto-routing.pool-pins.write',
+          'web:usage.receipts.read',
+          'web:auto-routing.production-profile.read',
+          'web:usage.benchmark-grader.record',
+          'web:usage.classifier.record',
+          'web:usage.region-handoff.record',
+          'web:claude-billing.payer-state.read',
+          'web:glanceable-snapshot.read',
+          'web:byoc-credentials.read',
+          'web:byoc-credentials.write',
+          'web:hosted-workspace-pull-requests.refresh',
+          'web:bot-session.callback',
+          'web:security-analysis.callback',
+          'web:code-review.agent-callback',
+          'web:code-review.status-callback',
           'web:mcp-catalog-token.mint',
         ],
       },
@@ -200,6 +251,28 @@ describe('STS scope registry', () => {
           'bouncer:signup.history',
         ],
       },
+      'webhook-agent-ingest': {
+        scopes: ['webhook-agent-ingest:execution.callback', 'webhook-agent-ingest:internal.call'],
+      },
+      'security-auto-analysis': {
+        scopes: [
+          'security-auto-analysis:analysis.callback',
+          'security-auto-analysis:remediation.callback',
+          'security-auto-analysis:internal.call',
+        ],
+      },
+      'code-review': {
+        scopes: [
+          'code-review:review.dispatch',
+          'code-review:review.status-read',
+          'code-review:review.cancel',
+          'code-review:review.retry-fresh',
+        ],
+      },
+      'session-ingest': { scopes: ['session-ingest:session-access.invalidate'] },
+      'model-eval-ingest': { scopes: ['model-eval-ingest:internal.call'] },
+      'session-sync': { scopes: ['session-sync:internal.call'] },
+      notifications: { scopes: ['notifications:internal.call'] },
       'community-contributions-dashboard': {
         scopes: ['community-contributions-dashboard:opencode.sync'],
       },
@@ -218,6 +291,10 @@ describe('STS scope registry', () => {
     );
     expect(isRegisteredStsScope('bouncer', 'bouncer:admin')).toBe(false);
     expect(isRegisteredStsScope('web', 'bouncer:decide')).toBe(false);
+    expect(isRegisteredStsScope('web', 'code-review:review.dispatch')).toBe(false);
+    expect(isRegisteredStsScope('code-review', 'web:code-review.status-callback')).toBe(false);
+    // UTS's user scopes under the session-ingest audience are not STS scopes.
+    expect(isRegisteredStsScope('session-ingest', 'session-ingest:sessions.read')).toBe(false);
     expect(isRegisteredStsScope('web', 'community-contributions-dashboard:opencode.sync')).toBe(
       false
     );
@@ -248,6 +325,70 @@ describe('STS scope registry', () => {
     ['bouncer:usage.write', 'bouncer', STS_BOUNCER_USAGE_WRITE],
     ['bouncer:signup.decide', 'bouncer', STS_BOUNCER_SIGNUP_DECIDE],
     ['bouncer:signup.history', 'bouncer', STS_BOUNCER_SIGNUP_HISTORY],
+    ['web:security-notifications.lifecycle', 'web', STS_WEB_SECURITY_NOTIFICATIONS_LIFECYCLE],
+    ['web:compute-balance-alert.send', 'web', STS_WEB_COMPUTE_BALANCE_ALERT],
+    ['web:scim.sync', 'web', STS_WEB_SCIM_SYNC],
+    ['web:user-data-exports.ready', 'web', STS_WEB_USER_DATA_EXPORT_READY],
+    ['web:auto-routing.pool-pins.write', 'web', STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE],
+    ['web:usage.receipts.read', 'web', STS_WEB_USAGE_RECEIPTS_READ],
+    [
+      'web:auto-routing.production-profile.read',
+      'web',
+      STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
+    ],
+    ['web:usage.benchmark-grader.record', 'web', STS_WEB_USAGE_RECORD_BENCHMARK_GRADER],
+    ['web:usage.classifier.record', 'web', STS_WEB_USAGE_RECORD_CLASSIFIER],
+    ['web:usage.region-handoff.record', 'web', STS_WEB_USAGE_RECORD_REGION_HANDOFF],
+    ['web:claude-billing.payer-state.read', 'web', STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ],
+    ['web:glanceable-snapshot.read', 'web', STS_WEB_GLANCEABLE_SNAPSHOT_READ],
+    ['web:byoc-credentials.read', 'web', STS_WEB_BYOC_CREDENTIALS_READ],
+    ['web:byoc-credentials.write', 'web', STS_WEB_BYOC_CREDENTIALS_WRITE],
+    [
+      'web:hosted-workspace-pull-requests.refresh',
+      'web',
+      STS_WEB_HOSTED_WORKSPACE_PULL_REQUESTS_REFRESH,
+    ],
+    ['web:bot-session.callback', 'web', STS_WEB_BOT_SESSION_CALLBACK],
+    ['web:security-analysis.callback', 'web', STS_WEB_SECURITY_ANALYSIS_CALLBACK],
+    ['web:code-review.agent-callback', 'web', STS_WEB_CODE_REVIEW_AGENT_CALLBACK],
+    ['web:code-review.status-callback', 'web', STS_WEB_CODE_REVIEW_STATUS_CALLBACK],
+    [
+      'webhook-agent-ingest:execution.callback',
+      'webhook-agent-ingest',
+      STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK,
+    ],
+    [
+      'security-auto-analysis:analysis.callback',
+      'security-auto-analysis',
+      STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK,
+    ],
+    [
+      'security-auto-analysis:remediation.callback',
+      'security-auto-analysis',
+      STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK,
+    ],
+    ['code-review:review.dispatch', 'code-review', STS_CODE_REVIEW_DISPATCH],
+    ['code-review:review.status-read', 'code-review', STS_CODE_REVIEW_STATUS_READ],
+    ['code-review:review.cancel', 'code-review', STS_CODE_REVIEW_CANCEL],
+    ['code-review:review.retry-fresh', 'code-review', STS_CODE_REVIEW_RETRY_FRESH],
+    [
+      'session-ingest:session-access.invalidate',
+      'session-ingest',
+      STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
+    ],
+    [
+      'security-auto-analysis:internal.call',
+      'security-auto-analysis',
+      STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
+    ],
+    ['model-eval-ingest:internal.call', 'model-eval-ingest', STS_MODEL_EVAL_INGEST_INTERNAL_CALL],
+    [
+      'webhook-agent-ingest:internal.call',
+      'webhook-agent-ingest',
+      STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL,
+    ],
+    ['session-sync:internal.call', 'session-sync', STS_SESSION_SYNC_INTERNAL_CALL],
+    ['notifications:internal.call', 'notifications', STS_NOTIFICATIONS_INTERNAL_CALL],
     ['web:mcp-catalog-token.mint', 'web', STS_WEB_MCP_CATALOG_TOKEN_MINT],
     [
       'community-contributions-dashboard:opencode.sync',

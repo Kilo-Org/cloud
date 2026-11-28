@@ -1,9 +1,12 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import {
+  STS_CODE_REVIEW_CANCEL,
+  STS_CODE_REVIEW_DISPATCH,
+  STS_CODE_REVIEW_RETRY_FRESH,
+  STS_CODE_REVIEW_STATUS_READ,
   STS_ISSUERS,
   StsEnvironmentSchema,
   type StsEnvironment,
-  type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import {
   createVerifier,
@@ -56,23 +59,8 @@ export function backendCredentialAcceptance(mode: string | undefined): Acceptanc
   return isAcceptMode(mode) ? ACCEPTANCE[mode] : null;
 }
 
-// --- Pending registration in @kilocode/sts-contracts --------------------------------------------
-// The registry-and-grants change adds these scopes to `STS_SCOPE_REGISTRY` and grants them to the
-// `web` workload only; web's sender names the same strings (apps/web/src/lib/code-reviews/client/
-// code-review-worker-client.ts). Until then STS mints no token for them, so the local registry
-// below admits nothing STS has not signed. Once registered, use the contract constants and the
-// default registry instead, and delete this block.
-export const CODE_REVIEW_STS_AUDIENCE = 'code-review';
-const CODE_REVIEW_STS_SCOPES = {
-  dispatch: 'code-review:review.dispatch',
-  statusRead: 'code-review:review.status-read',
-  cancel: 'code-review:review.cancel',
-  retryFresh: 'code-review:review.retry-fresh',
-} as const;
-const CODE_REVIEW_STS_SCOPE_REGISTRY: StsScopeRegistry = {
-  [CODE_REVIEW_STS_AUDIENCE]: { scopes: Object.values(CODE_REVIEW_STS_SCOPES) },
-};
-// --- End of pending registration -------------------------------------------------------------
+/** The STS audience of this Worker; all four review scopes belong to it. */
+export const CODE_REVIEW_STS_AUDIENCE = STS_CODE_REVIEW_DISPATCH.audience;
 
 /** The one workload that sends to the review routes; STS grants their scopes to it alone. */
 export const REVIEW_SENDER = 'web';
@@ -80,8 +68,8 @@ export const REVIEW_SENDER = 'web';
 const REVIEW_ROUTE_NAMES = ['dispatch', 'statusRead', 'cancel', 'retryFresh'] as const;
 export type ReviewRouteName = (typeof REVIEW_ROUTE_NAMES)[number];
 
-/** One review route: as registered with Hono, its one STS scope and its counter label. */
-type ReviewRoute = { method: 'GET' | 'POST'; path: string; scope: string; label: string };
+/** One review route: as registered with Hono, and its one STS scope. */
+type ReviewRoute = { method: 'GET' | 'POST'; path: string; scope: string };
 
 /**
  * Each review route and its contract. `index.ts` registers each route under this method and path,
@@ -92,35 +80,31 @@ export const REVIEW_ROUTES: Readonly<Record<ReviewRouteName, ReviewRoute>> = {
   dispatch: {
     method: 'POST',
     path: '/review',
-    scope: CODE_REVIEW_STS_SCOPES.dispatch,
-    label: 'review_dispatch',
+    scope: STS_CODE_REVIEW_DISPATCH.scope,
   },
   statusRead: {
     method: 'GET',
     path: '/reviews/:reviewId/status',
-    scope: CODE_REVIEW_STS_SCOPES.statusRead,
-    label: 'review_status_read',
+    scope: STS_CODE_REVIEW_STATUS_READ.scope,
   },
   cancel: {
     method: 'POST',
     path: '/reviews/:reviewId/cancel',
-    scope: CODE_REVIEW_STS_SCOPES.cancel,
-    label: 'review_cancel',
+    scope: STS_CODE_REVIEW_CANCEL.scope,
   },
   retryFresh: {
     method: 'POST',
     path: '/reviews/:reviewId/retry-fresh',
-    scope: CODE_REVIEW_STS_SCOPES.retryFresh,
-    label: 'review_retry_fresh',
+    scope: STS_CODE_REVIEW_RETRY_FRESH.scope,
   },
 };
 
+/**
+ * The counter's receiver and label (design section 9.4, item 9), as before this switch: every path
+ * counts under `review`, which saved queries and dashboards read. Refusal lines name the route.
+ */
 const RECEIVER = 'code-review-infra';
-
-/** The counter label of `route`; `/health` and unmatched paths, never switched, are `other`. */
-function routeLabel(route: ReviewRouteName | null): string {
-  return route === null ? 'other' : REVIEW_ROUTES[route].label;
-}
+const COUNTER_ROUTE = 'review';
 
 /**
  * This Worker's origin in each STS environment: the RFC 9728 `resource` and the base of the
@@ -184,11 +168,9 @@ function misconfigured(reason: string): Response {
   return Response.json({ error: 'server_misconfigured' }, { status: 500, headers: NO_STORE });
 }
 
-function refusedLog(label: string, status: number, reason: string): void {
+function refusedLog(route: ReviewRouteName, status: number, reason: string): void {
   // Never the credential: the route, the status and the rule only.
-  console.warn(
-    JSON.stringify({ event: 'code_review_backend_sts_refused', route: label, status, reason })
-  );
+  console.warn(JSON.stringify({ event: 'code_review_backend_sts_refused', route, status, reason }));
 }
 
 /** The review route Hono matched for this request, or null for every other path. */
@@ -216,10 +198,10 @@ type MaybePromise<T> = T | Promise<T>;
 export function createBackendAuth<E extends { Bindings: BackendCredentialEnv }>(
   getSecret: (c: Context<E>) => MaybePromise<string | undefined>
 ): MiddlewareHandler<E> {
-  // The original check, counted per route.
+  // The original check and counter label.
   const legacyOnly = backendAuthMiddleware<E>(getSecret, {
     receiver: RECEIVER,
-    route: c => routeLabel(reviewRouteOf(c)),
+    route: COUNTER_ROUTE,
   });
   const verifiers = new Map<StsEnvironment, Verifier<false>>();
 
@@ -232,7 +214,8 @@ export function createBackendAuth<E extends { Bindings: BackendCredentialEnv }>(
       audience: CODE_REVIEW_STS_AUDIENCE,
       environment,
       resourceMetadataUrl: `${origin}${RESOURCE_METADATA_PATH}`,
-      sts: { issuer, jwks: httpJwksSource(issuer), scopeRegistry: CODE_REVIEW_STS_SCOPE_REGISTRY },
+      // The registry is the default `STS_SCOPE_REGISTRY`, where the four review scopes live.
+      sts: { issuer, jwks: httpJwksSource(issuer) },
     });
     verifiers.set(environment, verifier);
     return verifier;
@@ -258,19 +241,18 @@ export function createBackendAuth<E extends { Bindings: BackendCredentialEnv }>(
     config: StsRouteConfig
   ): Promise<Response | null> {
     const { scope } = REVIEW_ROUTES[route];
-    const label = routeLabel(route);
     const result = await verifierFor(config).verify(
       authorization,
       { issuer: 'sts', scope },
       { waitUntil: waitUntilOf(c) }
     );
     if (!result.ok) {
-      refusedLog(label, result.status, result.reason);
+      refusedLog(route, result.status, result.reason);
       return failureResponse(result);
     }
     const workload = result.caller.kind === 'service' ? result.caller.workload : null;
     if (workload !== REVIEW_SENDER) {
-      refusedLog(label, 403, 'workload_not_allowed');
+      refusedLog(route, 403, 'workload_not_allowed');
       return Response.json(
         { error: 'insufficient_scope', scope },
         {
@@ -282,7 +264,7 @@ export function createBackendAuth<E extends { Bindings: BackendCredentialEnv }>(
         }
       );
     }
-    observeInternalAuth(RECEIVER, label, 'sts', callerLabel(workload));
+    observeInternalAuth(RECEIVER, COUNTER_ROUTE, 'sts', callerLabel(workload));
     return null;
   }
 
@@ -303,7 +285,7 @@ export function createBackendAuth<E extends { Bindings: BackendCredentialEnv }>(
     if (acceptance.legacy && (await isSharedSecret(c, authorization))) {
       observeInternalAuth(
         RECEIVER,
-        routeLabel(route),
+        COUNTER_ROUTE,
         'legacy_shared_secret',
         callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
       );

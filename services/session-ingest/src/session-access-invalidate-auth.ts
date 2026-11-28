@@ -1,8 +1,8 @@
 import {
   STS_ISSUERS,
+  STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE,
   StsEnvironmentSchema,
   type StsEnvironment,
-  type StsScopeRegistry,
 } from '@kilocode/sts-contracts';
 import {
   createVerifier,
@@ -50,25 +50,22 @@ export function invalidateCredentialAcceptance(mode: string | undefined): Accept
   return isAcceptMode(mode) ? ACCEPTANCE[mode] : null;
 }
 
-// --- Pending registration in @kilocode/sts-contracts --------------------------------------------
-// The registry-and-grants change adds this scope to `STS_SCOPE_REGISTRY` and grants it to the `web`
-// workload only; web's sender names the same pair (apps/web/src/lib/session-ingest-client.ts,
-// `SESSION_INGEST_INVALIDATE_SCOPE`). Until then STS mints no token for it, so the local registry
-// below admits nothing STS has not signed. Once registered, use the contract constant and the
-// default registry instead, and delete this block. The UTS user scopes under the same audience
-// (`session-ingest:sessions.*`) are a separate registry and never verify here.
-export const SESSION_INGEST_STS_AUDIENCE = 'session-ingest';
-export const SESSION_ACCESS_INVALIDATE_SCOPE = 'session-ingest:session-access.invalidate';
-const SESSION_INGEST_STS_SCOPE_REGISTRY: StsScopeRegistry = {
-  [SESSION_INGEST_STS_AUDIENCE]: { scopes: [SESSION_ACCESS_INVALIDATE_SCOPE] },
-};
-// --- End of pending registration -------------------------------------------------------------
+/**
+ * The STS audience and scope of this route, granted to `web` only. The UTS user scopes under the
+ * same audience (`session-ingest:sessions.*`) are a separate registry and never verify here.
+ */
+export const SESSION_INGEST_STS_AUDIENCE = STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.audience;
+export const SESSION_ACCESS_INVALIDATE_SCOPE = STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.scope;
 
 /** The one workload that sends to this route; STS grants its scope to it alone. */
 export const INVALIDATE_SENDER = 'web';
 
-/** The counter label of this route, for both credentials (design section 9.4, item 9). */
-export const INVALIDATE_ROUTE_LABEL = 'session_access_invalidate';
+/**
+ * The counter label of this route for both credentials (design section 9.4, item 9): the label the
+ * internal routes have always counted under, which saved queries and dashboards read. Only this
+ * route admits STS, so an `sts` row under it is always this route.
+ */
+const INVALIDATE_ROUTE_LABEL = 'cloud_agent_internal';
 
 /**
  * This Worker's origin in each STS environment: the RFC 9728 `resource` and the base of the
@@ -159,11 +156,8 @@ export function createInvalidateAuth<E extends { Bindings: InvalidateCredentialE
       audience: SESSION_INGEST_STS_AUDIENCE,
       environment,
       resourceMetadataUrl: `${origin}${RESOURCE_METADATA_PATH}`,
-      sts: {
-        issuer,
-        jwks: httpJwksSource(issuer),
-        scopeRegistry: SESSION_INGEST_STS_SCOPE_REGISTRY,
-      },
+      // The registry is the default `STS_SCOPE_REGISTRY`, where the invalidation scope lives.
+      sts: { issuer, jwks: httpJwksSource(issuer) },
     });
     verifiers.set(environment, verifier);
     return verifier;

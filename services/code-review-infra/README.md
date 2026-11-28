@@ -72,9 +72,10 @@ no staging deployment):
 `/health` and unmatched paths keep the `BACKEND_AUTH_TOKEN` check in every mode. In an STS mode,
 `GET /.well-known/oauth-protected-resource` serves the RFC 9728 document that every STS challenge
 names. Admissions are counted in `kilo_internal_auth` lines (`@kilocode/worker-utils`, aggregated
-per minute; the first admission of a bucket is written at once) by route, `auth`
-(`legacy_shared_secret` or `sts`) and `caller`, which for `sts` is the verified workload; a refusal
-logs `code_review_backend_sts_refused` with the route, status and rule. Neither carries a credential.
+per minute; the first admission of a bucket is written at once) under route `review`, as before,
+with `auth` `legacy_shared_secret` or `sts` and `caller`, which for `sts` is the verified workload;
+a refusal logs `code_review_backend_sts_refused` with the route name, status and rule. Neither
+carries a credential.
 
 Production leaves `BACKEND_CREDENTIAL_ACCEPT` unset until the scopes are registered and granted to
 `web`. The flip order is `legacy-and-sts` here, then `sts` on web, then `sts-only` here; rollback is

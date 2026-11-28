@@ -158,7 +158,7 @@ describe('the review route contract', () => {
 describe.each([undefined, '', 'legacy-only'])('mode %j (the default)', mode => {
   const vars = { BACKEND_CREDENTIAL_ACCEPT: mode, STS_ENVIRONMENT: 'production' };
 
-  it.each(ROUTE_NAMES)('admits the shared secret on %s, counted per route', async route => {
+  it.each(ROUTE_NAMES)('admits the shared secret on %s under the review label', async route => {
     const fetches = stubFetch();
     const log = vi.spyOn(console, 'log');
     const { env: testEnv } = makeEnv(vars);
@@ -171,7 +171,7 @@ describe.each([undefined, '', 'legacy-only'])('mode %j (the default)', mode => {
     expect(authLines(log)).toEqual([
       expect.objectContaining({
         receiver: 'code-review-infra',
-        route: REVIEW_ROUTES[route].label,
+        route: 'review',
         auth: 'legacy_shared_secret',
         caller: 'web',
       }),
@@ -262,7 +262,7 @@ describe.each(['legacy-and-sts', 'sts-only'])('mode %s', mode => {
           event: 'kilo_internal_auth',
           v: 1,
           receiver: 'code-review-infra',
-          route: REVIEW_ROUTES[route].label,
+          route: 'review',
           auth: 'sts',
           caller: 'web',
           count: 1,
@@ -429,7 +429,7 @@ describe('legacy-and-sts', () => {
     expect(fetches).toEqual([]);
     expect(authLines(log)).toEqual([
       expect.objectContaining({
-        route: REVIEW_ROUTES[route].label,
+        route: 'review',
         auth: 'legacy_shared_secret',
       }),
     ]);

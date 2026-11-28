@@ -38,10 +38,11 @@ The STS token must carry audience `session-ingest`, scope
 mode, `GET /.well-known/oauth-protected-resource` serves the RFC 9728 document that every STS
 challenge names. Admissions are counted in `kilo_internal_auth` lines (`@kilocode/worker-utils`,
 aggregated per minute; the first admission of a bucket is written at once) under route
-`session_access_invalidate`, with `auth` `legacy_shared_secret` or `sts` and `caller`, which for
-`sts` is the verified workload; a refusal logs `session_access_invalidate_sts_refused` with the
-status and rule. Neither carries a credential. The other internal routes keep `X-Internal-Secret`
-and count under `cloud_agent_internal`.
+`cloud_agent_internal`, as before and as the other internal routes, with `auth`
+`legacy_shared_secret` or `sts` and `caller`, which for `sts` is the verified workload. Only this
+route admits STS, so an `sts` row is always this route. A refusal logs
+`session_access_invalidate_sts_refused` with the status and rule. Neither carries a credential. The
+other internal routes keep `X-Internal-Secret`.
 
 Production leaves the switch unset until the scope is registered and granted to `web`. The flip
 order is `legacy-and-sts` here, then `sts` on web, then `sts-only` here; rollback is `legacy-only`.

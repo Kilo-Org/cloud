@@ -23,7 +23,6 @@ import {
 } from '@kilocode/worker-utils/internal-auth-observation';
 import { withDORetry } from '@kilocode/worker-utils';
 import {
-  INVALIDATE_ROUTE_LABEL,
   RESOURCE_METADATA_PATH,
   createInvalidateAuth,
   protectedResourceMetadata,
@@ -39,7 +38,6 @@ async function hasValidInternalSecret(
     req: { header(name: string): string | undefined };
     env: Env;
   },
-  route: string,
   ctx?: SecretsExecutionContext
 ): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
@@ -47,7 +45,7 @@ async function hasValidInternalSecret(
   if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
   observeInternalAuth(
     'session-ingest',
-    route,
+    'cloud_agent_internal',
     'legacy_shared_secret',
     callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
   );
@@ -59,37 +57,30 @@ type AppEnv = {
   Variables: { user_id: string; deletionAudience?: boolean };
 };
 
-/** The `X-Internal-Secret` check, counted under `route`. */
-function internalSecretMiddleware(route: string) {
-  return createMiddleware<AppEnv>(async (c, next) => {
-    let isValid: boolean;
-    try {
-      isValid = await hasValidInternalSecret(c, route, requestContext(c));
-    } catch (error) {
-      console.error('Auth infrastructure failure', {
-        operation: 'internal-api-secret-get',
-        errorClass: error instanceof Error ? error.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
-      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
-    }
-    if (!isValid) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
-    return next();
-  });
-}
-
-const requireValidInternalSecret = internalSecretMiddleware('cloud_agent_internal');
+const requireValidInternalSecret = createMiddleware<AppEnv>(async (c, next) => {
+  let isValid: boolean;
+  try {
+    isValid = await hasValidInternalSecret(c, requestContext(c));
+  } catch (error) {
+    console.error('Auth infrastructure failure', {
+      operation: 'internal-api-secret-get',
+      errorClass: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+  }
+  if (!isValid) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+  return next();
+});
 
 /**
  * The invalidation route's guard: the shared secret, or under
  * `SESSION_ACCESS_INVALIDATE_CREDENTIAL_ACCEPT` web's STS token
  * (`session-access-invalidate-auth.ts`). The other internal routes keep the shared secret.
  */
-const requireSessionAccessInvalidate = createInvalidateAuth<AppEnv>(
-  internalSecretMiddleware(INVALIDATE_ROUTE_LABEL)
-);
+const requireSessionAccessInvalidate = createInvalidateAuth<AppEnv>(requireValidInternalSecret);
 
 export const app = new Hono<AppEnv>();
 

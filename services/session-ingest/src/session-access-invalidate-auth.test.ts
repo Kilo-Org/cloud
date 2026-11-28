@@ -164,7 +164,7 @@ describe.each([undefined, '', 'legacy-only'])('mode %j (the default)', mode => {
     expect(authLines(log)).toEqual([
       expect.objectContaining({
         receiver: 'session-ingest',
-        route: 'session_access_invalidate',
+        route: 'cloud_agent_internal',
         auth: 'legacy_shared_secret',
         caller: 'web',
       }),
@@ -253,7 +253,7 @@ describe.each(['legacy-and-sts', 'sts-only'])('mode %s', mode => {
         event: 'kilo_internal_auth',
         v: 1,
         receiver: 'session-ingest',
-        route: 'session_access_invalidate',
+        route: 'cloud_agent_internal',
         auth: 'sts',
         caller: 'web',
         count: 1,
@@ -414,7 +414,7 @@ describe('legacy-and-sts', () => {
     expect(fetches).toEqual([]);
     expect(authLines(log)).toEqual([
       expect.objectContaining({
-        route: 'session_access_invalidate',
+        route: 'cloud_agent_internal',
         auth: 'legacy_shared_secret',
       }),
     ]);

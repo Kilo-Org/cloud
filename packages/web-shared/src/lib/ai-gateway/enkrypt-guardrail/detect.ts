@@ -19,6 +19,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { DEFAULT_ENKRYPT_LIMITS } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 'ready' }>;
@@ -31,18 +32,19 @@ const MAX_ERROR_BODY_BYTES = 64 * 1024;
 const ERROR_BODY_TIMEOUT_MS = 1_000;
 
 /**
- * The most text one Enkrypt call scans. Longer request text is split into several calls; a scan is
- * never truncated, since the model would still read the unscanned remainder, which is where an
- * injected instruction in a large file read would sit.
+ * The default of the most text one Enkrypt call scans, which admins can change in the gateway
+ * configuration. Longer request text is split into several calls; a scan is never truncated, since
+ * the model would still read the unscanned remainder, which is where an injected instruction in a
+ * large file read would sit.
  */
-export const ENKRYPT_MAX_SCAN_CHARACTERS = 100_000;
+export const ENKRYPT_MAX_SCAN_CHARACTERS = DEFAULT_ENKRYPT_LIMITS.max_scan_characters;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
 
-const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US');
-
 /** Request text is split into scans; only a segment whose header is too long to split is too large. */
-export const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail splits long requests into scans of at most ${MAX_SCAN_CHARACTERS_LABEL} characters, but this request has a name or label, such as a tool or file name, too long to split, so it was not sent. Shorten that name, then retry. Retrying the unchanged request will not help.`;
+export function requestTooLargeMessage(maxScanCharacters: number): string {
+  return `Your organization's Enkrypt AI guardrail splits long requests into scans of at most ${maxScanCharacters.toLocaleString('en-US')} characters, but this request has a name or label, such as a tool or file name, too long to split, so it was not sent. Shorten that name, then retry. Retrying the unchanged request will not help.`;
+}
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -137,6 +139,13 @@ export type EnkryptDetectDependencies = {
   /** A deadline shared with other scans of the request. */
   deadline?: AbortSignal;
   signal: AbortSignal;
+  /** The most text one call scans; longer text is rejected without a call. */
+  maxScanCharacters: number;
+  /**
+   * Whether the rate limit lets a call start now, counting it when it does. A call it refuses is
+   * not made, and fails like a failure of Enkrypt. Without it, calls are not rate limited.
+   */
+  admitCall?: () => boolean;
   requestLog?: {
     guardrail: EnkryptRequestLog['guardrail'];
     capture: (entry: Promise<EnkryptRequestLog>) => void;
@@ -152,7 +161,12 @@ type DetectError =
   | `http_${number}`
   | `detector_error:${string}`;
 
-type ScanError = DetectError | 'invalid_config' | 'missing_api_key' | 'request_too_large';
+type ScanError =
+  | DetectError
+  | 'rate_limited'
+  | 'invalid_config'
+  | 'missing_api_key'
+  | 'request_too_large';
 
 /**
  * `detected`: Enkrypt answered. Some detectors may still have failed inside Enkrypt; `error` then
@@ -445,11 +459,14 @@ export async function scanRequest(
     return failedVerdict([], noTextSent(scope), { error: 'client_aborted', latencyMs: 0 });
   }
 
-  if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
+  if (text.length > deps.maxScanCharacters) {
     return failedVerdict([], noTextSent(scope), {
       error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
+      closedVerdict: {
+        action: 'block',
+        message: requestTooLargeMessage(deps.maxScanCharacters),
+      },
     });
   }
 
@@ -475,6 +492,15 @@ export async function scanRequest(
     // debug level rather than adding a warning for every unit of a long conversation.
     const quiet = notStarted === 'timeout' && warnedTimeout(deps.deadline);
     return failedVerdict([], noTextSent(scope), { error: notStarted, latencyMs: 0, quiet });
+  }
+  if (deps.admitCall && !deps.admitCall()) {
+    // The rate limiter warns once a minute when it starts refusing calls, so each refused call
+    // logs at debug level.
+    return failedVerdict([], noTextSent(scope), {
+      error: 'rate_limited',
+      latencyMs: 0,
+      quiet: true,
+    });
   }
   const startedAt = performance.now();
   const requestLog: EnkryptRequestLog | undefined = deps.requestLog
@@ -676,7 +702,7 @@ function failureDecision(kind: EnkryptScanKind, error: ScanError): EnkryptScanRe
 
 /**
  * A blocking scan that Enkrypt fails, by an error response, a timeout, or a network failure, fails
- * open: the content goes through unscanned. This is a deliberate tradeoff. Failing closed rejects
+ * open, as does a call the Enkrypt rate limit refuses: the content goes through unscanned. This is a deliberate tradeoff. Failing closed rejects
  * every request of every member of the organization for as long as Enkrypt is degraded, which is
  * unreasonable disruption for legitimate use. The failed content's verdict is cached as an allow
  * for only `ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS`, so it is rescanned soon anyway, without every

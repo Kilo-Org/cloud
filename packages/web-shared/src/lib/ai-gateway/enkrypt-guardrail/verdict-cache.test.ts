@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import {
   ENKRYPT_MAX_SCAN_CHARACTERS,
   guardrailBlockMessage,
-  REQUEST_TOO_LARGE_MESSAGE,
+  requestTooLargeMessage,
   type EnkryptDetectDependencies,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
@@ -34,6 +34,8 @@ import {
   type EnkryptVerdictCacheEntry,
   type EnkryptVerdictCacheStore,
 } from './verdict-cache';
+
+const REQUEST_TOO_LARGE_MESSAGE = requestTooLargeMessage(ENKRYPT_MAX_SCAN_CHARACTERS);
 
 const mockedWarnExceptInTest = jest.fn();
 
@@ -168,6 +170,7 @@ function deps(
     ) as unknown as typeof fetch,
     timeoutMs: 1_000,
     signal: new AbortController().signal,
+    maxScanCharacters: ENKRYPT_MAX_SCAN_CHARACTERS,
     store,
   };
 }

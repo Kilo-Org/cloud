@@ -1157,6 +1157,7 @@ export const AdminActionAuditAction = z.enum([
   'gateway_config.set',
   'gateway_config.organization_features.set',
   'gateway_config.anthropic_user_profiles.set',
+  'gateway_config.enkrypt_limits.set',
   'gateway_model_lists.set',
   'preferred_provider_order.set',
   'model_eval.promotions.sync',

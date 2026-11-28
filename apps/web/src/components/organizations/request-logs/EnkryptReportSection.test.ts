@@ -130,3 +130,61 @@ describe('EnkryptReportSection scan card', () => {
     expect(text).toContain("Timed out. All of the request's calls share one 60 s deadline.");
   });
 });
+
+describe('EnkryptReportSection rate limit', () => {
+  const rateLimitedScan: EnkryptInputScanReport = {
+    ...timedOutScan,
+    scan: 'blocking',
+    detectors_blocking: ['injection_attack'],
+    decision: 'error_fail_open',
+    error: 'rate_limited',
+    failed_calls_cached: 9,
+    calls_cached: 8,
+    call_outcomes: { allowed: 8, flagged: 0, blocked: 0, failed: 0, not_sent: 9 },
+  };
+
+  function sectionText(guardrailReport: EnkryptGuardrailReport): string {
+    const markup = renderToStaticMarkup(
+      createElement(EnkryptReportSection, { report: guardrailReport })
+    );
+    const { document } = parseHTML(`<!doctype html><html><body>${markup}</body></html>`);
+    return (document.body.textContent ?? '').replace(/\s+/g, ' ');
+  }
+
+  it('says that calls were not sent because of the rate limit', () => {
+    const text = scanCardText(report(rateLimitedScan, ['block']));
+
+    expect(text).toContain(
+      "Rate limited: 9 calls were not sent. Kilo's limit on calls to Enkrypt, shared by all requests, was reached for this minute."
+    );
+    expect(text).not.toContain('Timed out');
+  });
+
+  it('names the rate limit as why the request failed open', () => {
+    const text = sectionText({
+      ...report(
+        {
+          ...rateLimitedScan,
+          call_outcomes: { ...rateLimitedScan.call_outcomes!, allowed: 0, not_sent: 17 },
+        },
+        ['block']
+      ),
+      verdict: 'fail_open',
+    });
+
+    expect(text).toContain('Rate limited, allowed unscanned');
+    expect(text).toContain(
+      "Kilo's limit on calls to Enkrypt was reached, so the guardrail failed open: the request was sent without a complete scan."
+    );
+    expect(text).not.toContain('Enkrypt failed');
+  });
+
+  it('keeps naming an Enkrypt failure when the request was not rate limited', () => {
+    const text = sectionText({
+      ...report({ ...rateLimitedScan, error: 'http_503' }, ['block']),
+      verdict: 'fail_open',
+    });
+
+    expect(text).toContain('Enkrypt failed, so the guardrail failed open');
+  });
+});

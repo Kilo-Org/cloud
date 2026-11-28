@@ -57,6 +57,13 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { mget: jest.fn(), set: jest.fn() },
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/limits', () => ({
+  getRuntimeEnkryptLimits: jest.fn(async () => ({
+    calls_per_minute: 1_000,
+    timeout_ms: 60_000,
+    max_scan_characters: 100_000,
+  })),
+}));
 
 const mockedAfter = jest.mocked(after);
 const mockedRecordUsage = jest.mocked(recordEnkryptUsage);
@@ -787,6 +794,7 @@ describe('startEnkryptInputGuardrail', () => {
       verdict: 'allow',
       unavailable_reason: null,
       added_latency_ms: 237,
+      deadline_ms: 60_000,
       scans: [
         {
           ...scanReport,
@@ -877,6 +885,7 @@ describe('startEnkryptInputGuardrail', () => {
       verdict: 'skip',
       unavailable_reason: null,
       added_latency_ms: null,
+      deadline_ms: 60_000,
       scans: [],
     });
   });

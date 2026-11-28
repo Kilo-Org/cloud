@@ -132,6 +132,49 @@ export const OrganizationFeaturesCompatibleInputSchema = OrganizationFeaturesInp
   org_permission_policy: organizationIdsInput.optional(),
 });
 
+/**
+ * Bounds of the Enkrypt guardrail limits. A scan must hold a split segment's longest header, which
+ * is at most `MAX_SPLIT_HEADER_CHARACTERS` (10,000), plus `ENKRYPT_SLICE_OVERLAP_CHARACTERS`
+ * (4,000), with room left for its body, so the scan size has a floor well above both.
+ */
+export const ENKRYPT_LIMIT_BOUNDS = {
+  calls_per_minute: { min: 1, max: 1_000_000 },
+  timeout_ms: { min: 1_000, max: 300_000 },
+  max_scan_characters: { min: 20_000, max: 1_000_000 },
+} as const;
+
+const enkryptLimit = (bounds: { min: number; max: number }) =>
+  z.number().int().min(bounds.min).max(bounds.max);
+
+/**
+ * Limits on the gateway's calls to Enkrypt, stored under `enkrypt` in the gateway configuration.
+ * `calls_per_minute` caps the calls of all gateway instances together, coarsely; `timeout_ms` is
+ * the deadline shared by the Enkrypt calls of one guardrail; `max_scan_characters` is the most text
+ * one call scans. A missing or invalid value reads as its default, so a bad save never breaks the
+ * gateway's hot path.
+ */
+export const EnkryptLimitsSchema = z.object({
+  calls_per_minute: enkryptLimit(ENKRYPT_LIMIT_BOUNDS.calls_per_minute).catch(1_000),
+  timeout_ms: enkryptLimit(ENKRYPT_LIMIT_BOUNDS.timeout_ms).catch(60_000),
+  max_scan_characters: enkryptLimit(ENKRYPT_LIMIT_BOUNDS.max_scan_characters).catch(100_000),
+});
+
+export type EnkryptLimits = z.infer<typeof EnkryptLimitsSchema>;
+
+export const DEFAULT_ENKRYPT_LIMITS: EnkryptLimits = EnkryptLimitsSchema.parse({});
+
+/** Reads the Enkrypt limits from a stored gateway configuration. */
+export const GatewayEnkryptLimitsConfigSchema = z.object({
+  enkrypt: EnkryptLimitsSchema.catch(DEFAULT_ENKRYPT_LIMITS),
+});
+
+/** Schema for the admin Enkrypt limits mutation input. */
+export const EnkryptLimitsInputSchema = z.object({
+  calls_per_minute: enkryptLimit(ENKRYPT_LIMIT_BOUNDS.calls_per_minute),
+  timeout_ms: enkryptLimit(ENKRYPT_LIMIT_BOUNDS.timeout_ms),
+  max_scan_characters: enkryptLimit(ENKRYPT_LIMIT_BOUNDS.max_scan_characters),
+}) satisfies z.ZodType<EnkryptLimits, unknown>;
+
 export const ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT = 1000;
 
 const storedIds = z.array(z.string()).default([]);

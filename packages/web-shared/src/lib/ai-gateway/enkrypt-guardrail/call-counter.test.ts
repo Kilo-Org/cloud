@@ -1,11 +1,14 @@
 import {
   countEnkryptCalls,
+  createEnkryptCallRateLimiter,
   ENKRYPT_CALL_COUNT_TTL_SECONDS,
+  ENKRYPT_CALL_RATE_REFRESH_MS,
   ENKRYPT_CALL_COUNT_WINDOW_MINUTES,
   getEnkryptCallCounts,
   recordEnkryptCalls,
   type EnkryptCallCountStore,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
+import { enkryptCallsMinuteRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 
 jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {}, deferredRedisClient: {} }));
 
@@ -138,5 +141,113 @@ describe('Enkrypt call counter', () => {
       currentStart - MINUTE,
     ]);
     expect(counts.calls).toEqual([0, 4, 0, 1]);
+  });
+});
+
+describe('Enkrypt call rate limiter', () => {
+  const flushPromises = () => new Promise(resolve => setImmediate(resolve));
+
+  function rateStore(values: Record<string, string | null> = {}) {
+    const get = jest.fn(async (key: string) => values[key] ?? null);
+    return { store: { get }, get, values };
+  }
+
+  it('admits calls up to the limit within a minute, counting its own', async () => {
+    let now = NOW;
+    const { store } = rateStore();
+    const limiter = createEnkryptCallRateLimiter(store, () => now);
+
+    expect([1, 2, 3].map(() => limiter.tryAcquire(2))).toEqual([true, true, false]);
+    await flushPromises();
+    now += 1_000;
+    expect(limiter.tryAcquire(2)).toBe(false);
+  });
+
+  it('adds the shared count of the minute, read in the background from Redis', async () => {
+    let now = NOW;
+    const key = enkryptCallsMinuteRedisKey(Math.floor(NOW / MINUTE));
+    const { store, get, values } = rateStore({ [key]: '8' });
+    const limiter = createEnkryptCallRateLimiter(store, () => now);
+
+    // The first decision does not wait for the read.
+    expect(limiter.tryAcquire(10)).toBe(true);
+    await flushPromises();
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith(key);
+
+    // 8 shared calls, which do not yet include this instance's flushed call, plus its own one.
+    expect(limiter.tryAcquire(10)).toBe(true);
+    expect(limiter.tryAcquire(10)).toBe(false);
+    expect(get).toHaveBeenCalledTimes(1);
+
+    // Once this instance's calls are flushed, a later read counts them only once.
+    values[key] = '10';
+    now += ENKRYPT_CALL_RATE_REFRESH_MS;
+    limiter.tryAcquire(20);
+    await flushPromises();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(() => limiter.tryAcquire(20))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it('starts every minute afresh', async () => {
+    let now = NOW;
+    const key = enkryptCallsMinuteRedisKey(Math.floor(NOW / MINUTE));
+    const { store, get } = rateStore({ [key]: '100' });
+    const limiter = createEnkryptCallRateLimiter(store, () => now);
+    limiter.tryAcquire(5);
+    await flushPromises();
+    expect(limiter.tryAcquire(5)).toBe(false);
+
+    now += MINUTE;
+    expect(limiter.tryAcquire(5)).toBe(true);
+    await flushPromises();
+    expect(get).toHaveBeenLastCalledWith(enkryptCallsMinuteRedisKey(Math.floor(now / MINUTE)));
+  });
+
+  it('keeps admitting by its own count when Redis fails', async () => {
+    const store = {
+      get: jest.fn(async () => {
+        throw new Error('redis down');
+      }),
+    };
+    const limiter = createEnkryptCallRateLimiter(store, () => NOW);
+
+    expect(limiter.tryAcquire(2)).toBe(true);
+    await flushPromises();
+    expect(limiter.tryAcquire(2)).toBe(true);
+    expect(limiter.tryAcquire(2)).toBe(false);
+  });
+
+  it('ignores a read that finishes after its minute ended', async () => {
+    let now = NOW;
+    const key = enkryptCallsMinuteRedisKey(Math.floor(NOW / MINUTE));
+    let resolve: (value: string) => void = () => {};
+    const store = {
+      get: jest.fn(
+        (requested: string) =>
+          new Promise<string | null>(done => {
+            if (requested === key) resolve = done;
+            else done(null);
+          })
+      ),
+    };
+    const limiter = createEnkryptCallRateLimiter(store, () => now);
+    limiter.tryAcquire(5);
+    now += MINUTE;
+    resolve('100');
+    await flushPromises();
+
+    expect(limiter.tryAcquire(5)).toBe(true);
   });
 });

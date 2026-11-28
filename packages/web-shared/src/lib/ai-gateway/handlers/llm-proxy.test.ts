@@ -6950,6 +6950,7 @@ describe('Enkrypt input guardrail', () => {
       verdict: 'block',
       unavailable_reason: null,
       added_latency_ms: expect.any(Number),
+      deadline_ms: 60_000,
       scans: [
         expect.objectContaining({
           scan: 'blocking',

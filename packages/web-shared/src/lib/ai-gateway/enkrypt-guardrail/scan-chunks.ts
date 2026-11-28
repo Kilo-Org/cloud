@@ -53,24 +53,27 @@ export const ENKRYPT_SLICE_OVERLAP_CHARACTERS = 4_000;
 
 /**
  * The units of one segment: the whole segment when it fits in one Enkrypt call, and otherwise
- * slices of its body, each at most `ENKRYPT_MAX_SCAN_CHARACTERS` long, its header marking the
+ * slices of its body, each at most `maxScanCharacters` long, its header marking the
  * beginning or end left out. Cuts fall at fixed positions from the start of the body, so a slice's
  * text, and its cache key, stay the same however the request around it changes. Each slice after
  * the first also repeats the last `ENKRYPT_SLICE_OVERLAP_CHARACTERS` of the text before its cut.
  * No slice starts or ends between the two halves of a surrogate pair.
  */
-function segmentUnits(segment: RequestSegment): Omit<ScanUnit, 'segment'>[] {
+function segmentUnits(
+  segment: RequestSegment,
+  maxScanCharacters: number
+): Omit<ScanUnit, 'segment'>[] {
   const whole = renderSegment(segment);
   const { header, body } = segment;
   if (
-    whole.length <= ENKRYPT_MAX_SCAN_CHARACTERS ||
+    whole.length <= maxScanCharacters ||
     body === null ||
     header.length > MAX_SPLIT_HEADER_CHARACTERS
   ) {
     return [{ text: whole }];
   }
   const longestHeader = sliceHeader(header, true, true).length;
-  const step = ENKRYPT_MAX_SCAN_CHARACTERS - longestHeader - 1 - ENKRYPT_SLICE_OVERLAP_CHARACTERS;
+  const step = maxScanCharacters - longestHeader - 1 - ENKRYPT_SLICE_OVERLAP_CHARACTERS;
   const units: Omit<ScanUnit, 'segment'>[] = [];
   for (let cut = 0; cut < body.length; cut += step) {
     const overlapStart = Math.max(0, cut - ENKRYPT_SLICE_OVERLAP_CHARACTERS);
@@ -88,8 +91,14 @@ function segmentUnits(segment: RequestSegment): Omit<ScanUnit, 'segment'>[] {
  * for a segment too long for one Enkrypt call. Enkrypt splits its input into chunks and judges each
  * on its own, so a unit's verdict does not depend on the text around it.
  */
-export function scanUnits(segments: RequestSegment[]): ScanUnit[] {
+export function scanUnits(
+  segments: RequestSegment[],
+  maxScanCharacters: number = ENKRYPT_MAX_SCAN_CHARACTERS
+): ScanUnit[] {
   return segments.flatMap((segment, index) =>
-    segmentUnits(segment).map(unit => ({ ...unit, segment: index }))
+    segmentUnits(segment, maxScanCharacters).map(unit => ({
+      ...unit,
+      segment: index,
+    }))
   );
 }

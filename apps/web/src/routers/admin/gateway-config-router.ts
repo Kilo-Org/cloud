@@ -6,13 +6,16 @@ import {
   OrganizationFeaturesCompatibleInputSchema,
   AnthropicUserProfilesSettingsInputSchema,
   GatewayAnthropicUserProfilesConfigSchema,
+  EnkryptLimitsInputSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type {
   AnthropicUserProfilesSettings,
+  EnkryptLimits,
   GatewayConfig,
   OrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { readEnkryptLimits } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/limits';
 import { readAnthropicUserProfilesSettings } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/settings';
 import {
   ai_gateway_config,
@@ -110,6 +113,19 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       };
       await mergeIntoConfig({ organization_features });
       return organization_features;
+    }),
+
+  getEnkryptLimits: adminProcedure.query(async () => {
+    return readEnkryptLimits(db);
+  }),
+
+  setEnkryptLimits: adminProcedure
+    .meta({ adminAudit: { kind: 'declarative', action: 'gateway_config.enkrypt_limits.set' } })
+    .input(EnkryptLimitsInputSchema)
+    .mutation(async ({ input }) => {
+      const enkrypt: EnkryptLimits = input;
+      await mergeIntoConfig({ enkrypt });
+      return enkrypt;
     }),
 
   getAnthropicUserProfiles: adminProcedure.query(async () => {

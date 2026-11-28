@@ -7,6 +7,8 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import {
+  DEFAULT_ENKRYPT_LIMITS,
+  ENKRYPT_LIMIT_BOUNDS,
   ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT,
   VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
@@ -311,6 +313,80 @@ describe('adminGatewayConfigRouter', () => {
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+  });
+
+  describe('Enkrypt limits', () => {
+    const limits = { calls_per_minute: 250, timeout_ms: 45_000, max_scan_characters: 50_000 };
+
+    it('returns the defaults when nothing is stored', async () => {
+      const caller = await createSessionCallerForUser(admin.id);
+
+      await expect(caller.admin.gatewayConfig.getEnkryptLimits()).resolves.toEqual(
+        DEFAULT_ENKRYPT_LIMITS
+      );
+    });
+
+    it('stores the limits and reads them back', async () => {
+      const caller = await createSessionCallerForUser(admin.id);
+
+      await expect(caller.admin.gatewayConfig.setEnkryptLimits(limits)).resolves.toEqual(limits);
+      await expect(caller.admin.gatewayConfig.getEnkryptLimits()).resolves.toEqual(limits);
+      const [row] = await db.select().from(ai_gateway_config);
+      expect(row.config).toMatchObject({ enkrypt: limits });
+    });
+
+    it('keeps the other configuration keys when saved, and when they are saved', async () => {
+      const caller = await createSessionCallerForUser(admin.id);
+      const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
+      await caller.admin.gatewayConfig.set(input);
+      await caller.admin.gatewayConfig.setOrganizationFeatures({
+        experimental_byok: [],
+        enkrypt_output_guardrail: [],
+        gateway_settings: [organizationId],
+        org_permission_policy: [],
+      });
+      await caller.admin.gatewayConfig.setEnkryptLimits(limits);
+
+      await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
+        vercel_routing_opt_out_models: normalizedOptOutModels,
+      });
+      await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toMatchObject({
+        gateway_settings: [organizationId],
+      });
+
+      await caller.admin.gatewayConfig.set({ ...input, note: 'Updated' });
+      await expect(caller.admin.gatewayConfig.getEnkryptLimits()).resolves.toEqual(limits);
+    });
+
+    it.each([
+      { calls_per_minute: 0 },
+      { calls_per_minute: ENKRYPT_LIMIT_BOUNDS.calls_per_minute.max + 1 },
+      { timeout_ms: ENKRYPT_LIMIT_BOUNDS.timeout_ms.min - 1 },
+      { timeout_ms: ENKRYPT_LIMIT_BOUNDS.timeout_ms.max + 1 },
+      { max_scan_characters: ENKRYPT_LIMIT_BOUNDS.max_scan_characters.min - 1 },
+      { max_scan_characters: ENKRYPT_LIMIT_BOUNDS.max_scan_characters.max + 1 },
+      { calls_per_minute: 1.5 },
+    ])('rejects out-of-range input %o without writing', async override => {
+      const caller = await createSessionCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setEnkryptLimits({ ...limits, ...override })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    });
+
+    it('rejects non-admin users', async () => {
+      const user = await insertTestUser();
+      const caller = await createSessionCallerForUser(user.id);
+
+      await expect(caller.admin.gatewayConfig.setEnkryptLimits(limits)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      await expect(caller.admin.gatewayConfig.getEnkryptLimits()).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
     });
   });
 

@@ -959,6 +959,7 @@ async function runStep(step: Step, key: string, dir: string): Promise<Summary> {
         timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
         deadline,
         signal,
+        maxScanCharacters: ENKRYPT_MAX_SCAN_CHARACTERS,
         store: step.store,
         requestLog: { guardrail: 'input', capture: entry => logs.push(entry) },
       }

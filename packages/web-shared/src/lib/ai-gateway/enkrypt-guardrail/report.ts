@@ -8,7 +8,7 @@ import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 
 /**
- * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
+ * The default bound of a scan, which admins can change in the gateway configuration. The input guardrail starts one deadline for all Enkrypt calls of a request, which
  * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
  * The gateway awaits the blocking scans just before the upstream request, so this is the most
  * latency an enabled organization's request can gain. The log-only scans, which the request does
@@ -273,6 +273,11 @@ export const EnkryptGuardrailReportSchema = z.object({
    * about 0 ms.
    */
   added_latency_ms: z.number().nullable(),
+  /**
+   * The deadline the request's calls shared, from the gateway configuration's Enkrypt limits. Absent
+   * from reports written before it was configurable, when it was always `ENKRYPT_GUARDRAIL_TIMEOUT_MS`.
+   */
+  deadline_ms: z.number().optional(),
   scans: z.array(EnkryptInputScanReportSchema),
 });
 

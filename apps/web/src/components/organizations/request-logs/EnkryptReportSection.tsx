@@ -340,7 +340,7 @@ function legacyCallItems(scan: EnkryptInputScanReport): DetailItem[] {
       ? [
           {
             label: 'Calls not sent',
-            hint: 'No time was left before the deadline, or the client disconnected.',
+            hint: "No time was left before the deadline, Kilo's limit on calls to Enkrypt was reached, or the client disconnected.",
             value: formatCount(notSent),
           },
         ]
@@ -358,8 +358,12 @@ function pluralCalls(count: number, singular: string, plural: string): string {
 }
 
 /** What a timed-out input scan ran out of, and why its calls stopped. */
-function timeoutMessage(scan: EnkryptInputScanReport, sharedWithBlocking: boolean): string {
-  const deadline = `All of the request's calls share one ${ENKRYPT_GUARDRAIL_TIMEOUT_MS / 1_000} s deadline${
+function timeoutMessage(
+  scan: EnkryptInputScanReport,
+  sharedWithBlocking: boolean,
+  deadlineMs: number
+): string {
+  const deadline = `All of the request's calls share one ${deadlineMs / 1_000} s deadline${
     sharedWithBlocking ? ', and the blocking scan runs first.' : '.'
   }`;
   const outcomes = scan.call_outcomes;
@@ -373,9 +377,20 @@ function timeoutMessage(scan: EnkryptInputScanReport, sharedWithBlocking: boolea
   return `Timed out: ${stopped}. ${deadline}`;
 }
 
-function scanError(scan: Scan, sharedWithBlocking: boolean): string | null {
+const RATE_LIMITED_REASON =
+  "Kilo's limit on calls to Enkrypt, shared by all requests, was reached for this minute.";
+
+/** What a rate-limited scan did not send, and why. */
+function rateLimitedMessage(scan: Scan): string {
+  const notSent = scan.part === 'response' ? 0 : (scan.call_outcomes?.not_sent ?? 0);
+  if (notSent === 0) return `Rate limited: the call was not sent. ${RATE_LIMITED_REASON}`;
+  return `Rate limited: ${pluralCalls(notSent, 'call was not sent', 'calls were not sent')}. ${RATE_LIMITED_REASON}`;
+}
+
+function scanError(scan: Scan, sharedWithBlocking: boolean, deadlineMs: number): string | null {
+  if (scan.error === 'rate_limited') return rateLimitedMessage(scan);
   if (scan.error !== 'timeout' || scan.part === 'response') return scan.error;
-  return timeoutMessage(scan, sharedWithBlocking && scan.scan === 'log_only');
+  return timeoutMessage(scan, sharedWithBlocking && scan.scan === 'log_only', deadlineMs);
 }
 
 /** Hidden when no segment was split into slices, so it would repeat the units cached. */
@@ -445,8 +460,20 @@ function scanItems(scan: Scan): DetailItem[] {
   }
 }
 
+const RATE_LIMITED_FAIL_OPEN = {
+  label: 'Rate limited, allowed unscanned',
+  tone: 'deferred',
+} as const;
+
 function scanDecision(scan: Scan): { label: string; tone: StepTone } {
   if (isSkipped(scan)) return SKIPPED;
+  if (
+    scan.error === 'rate_limited' &&
+    scan.decision === 'error_fail_open' &&
+    !isPartlyFailed(scan)
+  ) {
+    return RATE_LIMITED_FAIL_OPEN;
+  }
   return (
     (isPartlyFailed(scan) && PARTLY_FAILED_DECISIONS[scan.decision]) || DECISIONS[scan.decision]
   );
@@ -460,13 +487,15 @@ function ScanCard({
   scan,
   failedOpen,
   sharedWithBlocking,
+  deadlineMs,
 }: {
   scan: Scan;
   failedOpen: boolean;
   sharedWithBlocking: boolean;
+  deadlineMs: number;
 }) {
   const decision = scanDecision(scan);
-  const error = scanError(scan, sharedWithBlocking);
+  const error = scanError(scan, sharedWithBlocking, deadlineMs);
   const part = PART_LABELS[scan.part];
   const stored = scan.part === 'response' || failedOpen ? null : storedDespiteError(scan);
   const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
@@ -525,7 +554,10 @@ type GuardrailReportBodyProps = {
   report: EnkryptGuardrailReport | EnkryptOutputGuardrailReport;
   items?: DetailItem[];
   notice?: ReactNode;
-  /** Shown when Enkrypt failed and the guardrail let the content through unscanned. */
+  /**
+   * Shown when the guardrail let the content through unscanned, after the reason: what failing open
+   * did to the request or the response.
+   */
   failOpenNotice: string;
 };
 
@@ -538,7 +570,11 @@ function GuardrailReportBody({
   failOpenNotice,
 }: GuardrailReportBodyProps) {
   const { settings, scans } = report;
-  const verdictDetails = VERDICTS[report.verdict];
+  const rateLimited = scans.some(scan => scan.error === 'rate_limited');
+  const verdictDetails =
+    report.verdict === 'fail_open' && rateLimited
+      ? RATE_LIMITED_FAIL_OPEN
+      : VERDICTS[report.verdict];
   return (
     <DetailSection title={title} description={description}>
       <DetailGrid
@@ -561,7 +597,10 @@ function GuardrailReportBody({
         ]}
       />
       {report.verdict === 'fail_open' && report.added_latency_ms !== null && (
-        <p className="text-status-warning text-xs">{failOpenNotice}</p>
+        <p className="text-status-warning text-xs">
+          {rateLimited ? "Kilo's limit on calls to Enkrypt was reached" : 'Enkrypt failed'}, so the
+          guardrail failed open: {failOpenNotice}
+        </p>
       )}
       {notice}
       {settings && settings.detectors.length > 0 && (
@@ -591,6 +630,10 @@ function GuardrailReportBody({
               scan={scan}
               failedOpen={report.verdict === 'fail_open'}
               sharedWithBlocking={!!settings?.detectors.some(each => each.action === 'block')}
+              deadlineMs={
+                ('deadline_ms' in report ? report.deadline_ms : undefined) ??
+                ENKRYPT_GUARDRAIL_TIMEOUT_MS
+              }
             />
           ))}
         </ol>
@@ -605,7 +648,7 @@ export function EnkryptReportSection({ report }: { report: EnkryptGuardrailRepor
       title="Enkrypt input guardrail"
       description="How the organization's Enkrypt guardrail scanned this request."
       report={report}
-      failOpenNotice="Enkrypt failed, so the guardrail failed open: the request was sent without a complete scan. The content that failed is treated as allowed for 5 minutes, then scanned again."
+      failOpenNotice="the request was sent without a complete scan. The content that failed is treated as allowed for 5 minutes, then scanned again."
       notice={
         report.settings === null && (
           <p className="text-status-destructive text-xs">
@@ -623,7 +666,7 @@ export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGu
       title="Enkrypt output guardrail"
       description="How the organization's Enkrypt guardrail scanned the response."
       report={report}
-      failOpenNotice="Enkrypt failed, so the guardrail failed open: the response was released without being scanned."
+      failOpenNotice="the response was released without being scanned."
       items={[
         { label: 'Held back', value: yesNo(report.held_back) },
         { label: 'Held for', value: formatDurationMs(report.held_ms) },

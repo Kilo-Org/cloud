@@ -20,7 +20,7 @@ import {
   MAX_HELD_OUTPUT_BYTES,
   OUTPUT_KEEP_ALIVE_INTERVAL_MS,
   resolveEnkryptOutputScan,
-  RESPONSE_TOO_LARGE_MESSAGE,
+  responseTooLargeMessage,
   type EnkryptOutputScan,
 } from './output-guardrail';
 
@@ -34,11 +34,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => (
   ),
   recordEnkryptUsage: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => ({
-  ...jest.requireActual<Record<string, unknown>>(
-    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect'
-  ),
-  ENKRYPT_GUARDRAIL_TIMEOUT_MS: 100,
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/limits', () => ({
+  getRuntimeEnkryptLimits: jest.fn(async () => ({
+    calls_per_minute: 1_000,
+    timeout_ms: 100,
+    max_scan_characters: 100_000,
+  })),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-enkrypt-key',
@@ -48,6 +49,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter', 
     fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
     flush: async () => {},
   }),
+  enkryptCallRateLimiter: { tryAcquire: jest.fn(() => true) },
 }));
 
 const mockedAfter = jest.mocked(after);
@@ -396,9 +398,9 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('RESPONSE_TOO_LARGE_MESSAGE', () => {
+describe('responseTooLargeMessage', () => {
   it('says that a response is withheld above 100,000 characters', () => {
-    expect(RESPONSE_TOO_LARGE_MESSAGE).toBe(
+    expect(responseTooLargeMessage(ENKRYPT_MAX_SCAN_CHARACTERS)).toBe(
       "Your organization's Enkrypt AI guardrail cannot scan more than 100,000 characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry."
     );
   });
@@ -888,7 +890,7 @@ describe('guardEnkryptOutput', () => {
       expect(client.status).toBe(400);
       expect(await client.json()).toMatchObject({
         error: {
-          message: RESPONSE_TOO_LARGE_MESSAGE,
+          message: responseTooLargeMessage(ENKRYPT_MAX_SCAN_CHARACTERS),
           code: 'guardrail_blocked',
         },
       });

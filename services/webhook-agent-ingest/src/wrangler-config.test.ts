@@ -1,15 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { unstable_readConfig } from 'wrangler';
+import { experimental_readRawConfig, unstable_readConfig } from 'wrangler';
 
 // Resolves the effective config Wrangler deploys, inheritance applied, rather than the raw file.
-// Scope: the secret source, the pre-flip compare flag, and every binding a secret read can reach.
+// Scope: the environments that fix the secret source, and every binding a secret read can reach.
 const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href);
 
 const STORE = '342a86d9e3a94da698e82d0c6e2a36f0';
 
 describe('webhook-agent-ingest wrangler.jsonc secrets', () => {
-  it('reads production secrets from STS with comparison off and keeps every binding', () => {
+  it('runs production as `production`, with STS and every binding but no source setting', () => {
     const production = unstable_readConfig({ config });
 
     expect(production.name).toBe('cloudflare-webhook-agent-ingest');
@@ -20,8 +20,6 @@ describe('webhook-agent-ingest wrangler.jsonc secrets', () => {
       WEBHOOK_AGENT_URL: 'https://hooks.kilosessions.ai',
       KILOCLAW_API_URL: 'https://claw.kilosessions.ai',
       SHARED_RESOURCE_TOKENS_ENABLED: 'true',
-      SECRETS_SOURCE: 'sts',
-      SECRETS_COMPARE_ENABLED: 'false',
     });
     expect(production.services).toEqual([
       { binding: 'CLOUD_AGENT', service: 'cloud-agent-next' },
@@ -44,7 +42,7 @@ describe('webhook-agent-ingest wrangler.jsonc secrets', () => {
     ]);
   });
 
-  it('leaves dev without the compare flag, the source setting or the STS binding', () => {
+  it('runs env.dev as `development`, without the STS binding', () => {
     const dev = unstable_readConfig({ config, env: 'dev' });
 
     expect(dev.name).toBe('cloudflare-webhook-agent-ingest-dev');
@@ -68,5 +66,15 @@ describe('webhook-agent-ingest wrangler.jsonc secrets', () => {
       },
       { binding: 'NEXTAUTH_SECRET', store_id: STORE, secret_name: 'NEXTAUTH_SECRET_DEV' },
     ]);
+  });
+
+  it('declares no environment beyond production and env.dev', () => {
+    // src/secrets.ts reads only for `production` (top level) and `development` (`env.dev`).
+    const { rawConfig } = experimental_readRawConfig({ config });
+    expect(Object.keys(rawConfig.env ?? {})).toEqual(['dev']);
+    // Wrangler's own reason when `env` is declared but has no section of that name.
+    expect(() => unstable_readConfig({ config, env: 'staging' })).toThrow(
+      'No environment found in configuration with name "staging".'
+    );
   });
 });

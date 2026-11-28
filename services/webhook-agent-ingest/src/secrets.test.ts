@@ -22,6 +22,9 @@ const BUNDLE_VALUES = {
   NEXTAUTH_SECRET: 'bundle-nextauth-fixture-0123456789abcdef',
 };
 
+/** Environments this Worker does not deploy: each reads neither source. */
+const UNSUPPORTED_ENVIRONMENTS = ['staging', 'Production', '', undefined];
+
 type BundleResult = Awaited<ReturnType<BundleBinding['getBundle']>>;
 
 function okBundle(secrets: Record<string, string>, missing: string[] = []): BundleResult {
@@ -40,11 +43,14 @@ function okBundle(secrets: Record<string, string>, missing: string[] = []): Bund
 }
 
 /** A fresh STS binding per call: the reader keeps one bundle per binding for the isolate. */
-function sourceEnv(source: string | undefined, bundle: BundleResult = okBundle(BUNDLE_VALUES)) {
+function sourceEnv(
+  environment: string | undefined,
+  bundle: BundleResult = okBundle(BUNDLE_VALUES)
+) {
   const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
   const storeGet = vi.fn(async () => STORE_VALUE);
   const env = {
-    ...(source === undefined ? {} : { SECRETS_SOURCE: source }),
+    ...(environment === undefined ? {} : { ENVIRONMENT: environment }),
     INTERNAL_API_SECRET: { get: storeGet },
     CALLBACK_TOKEN_SECRET: { get: storeGet },
     NEXTAUTH_SECRET: { get: storeGet },
@@ -59,47 +65,47 @@ afterEach(() => {
 });
 
 describe('secretsSource', () => {
-  it('defaults to secrets-store', () => {
-    expect(secretsSource({})).toBe('secrets-store');
+  it('reads STS in production', () => {
+    expect(secretsSource({ ENVIRONMENT: 'production' })).toBe('sts');
   });
 
-  it.each(['secrets-store', 'sts'] as const)('accepts %s', source => {
-    expect(secretsSource({ SECRETS_SOURCE: source })).toBe(source);
+  it('reads the Worker bindings in development', () => {
+    expect(secretsSource({ ENVIRONMENT: 'development' })).toBe('secrets-store');
   });
 
-  it.each(['legacy', 'STS', ''])('returns undefined for %j', source => {
-    expect(secretsSource({ SECRETS_SOURCE: source })).toBeUndefined();
+  it.each(UNSUPPORTED_ENVIRONMENTS)('returns undefined for ENVIRONMENT %j', environment => {
+    expect(secretsSource({ ENVIRONMENT: environment })).toBeUndefined();
   });
 });
 
 describe('readSecret', () => {
-  it.each([undefined, 'secrets-store'])(
-    'reads the Secrets Store binding and no bundle (SECRETS_SOURCE %j)',
-    async source => {
-      const { env, getBundle, storeGet } = sourceEnv(source);
+  it('reads the Secrets Store binding and no bundle in development', async () => {
+    const { env, getBundle, storeGet } = sourceEnv('development');
 
-      expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(STORE_VALUE);
-      expect(await readSecret(env, 'CALLBACK_TOKEN_SECRET')).toBe(STORE_VALUE);
-      expect(await readSecret(env, 'NEXTAUTH_SECRET')).toBe(STORE_VALUE);
-      expect(storeGet).toHaveBeenCalledTimes(3);
-      expect(getBundle).not.toHaveBeenCalled();
-    }
-  );
+    expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(STORE_VALUE);
+    expect(await readSecret(env, 'CALLBACK_TOKEN_SECRET')).toBe(STORE_VALUE);
+    expect(await readSecret(env, 'NEXTAUTH_SECRET')).toBe(STORE_VALUE);
+    expect(storeGet).toHaveBeenCalledTimes(3);
+    expect(getBundle).not.toHaveBeenCalled();
+  });
 
-  it('keeps a plain string binding and a rejected get() as before', async () => {
-    expect(await readSecret({ NEXTAUTH_SECRET: 'plain-fixture' }, 'NEXTAUTH_SECRET')).toBe(
-      'plain-fixture'
-    );
+  it('keeps a plain string binding and a rejected get() in development', async () => {
+    expect(
+      await readSecret(
+        { ENVIRONMENT: 'development', NEXTAUTH_SECRET: 'plain-fixture' },
+        'NEXTAUTH_SECRET'
+      )
+    ).toBe('plain-fixture');
     const failure = new Error('store read failed');
-    const { env, getBundle, storeGet } = sourceEnv(undefined);
+    const { env, getBundle, storeGet } = sourceEnv('development');
     storeGet.mockRejectedValueOnce(failure);
 
     await expect(readSecret(env, 'INTERNAL_API_SECRET')).rejects.toBe(failure);
     expect(getBundle).not.toHaveBeenCalled();
   });
 
-  it('reads every name from one bundle under sts and never reads the Secrets Store', async () => {
-    const { env, getBundle, storeGet } = sourceEnv('sts');
+  it('reads every name from one bundle in production and never reads the Secrets Store', async () => {
+    const { env, getBundle, storeGet } = sourceEnv('production');
 
     expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(BUNDLE_VALUES.INTERNAL_API_SECRET);
     expect(await readSecret(env, 'CALLBACK_TOKEN_SECRET')).toBe(
@@ -112,23 +118,31 @@ describe('readSecret', () => {
   });
 
   it('returns an empty delivered value as is, for the caller to handle', async () => {
-    const { env } = sourceEnv('sts', okBundle({ NEXTAUTH_SECRET: '' }));
+    const { env } = sourceEnv('production', okBundle({ NEXTAUTH_SECRET: '' }));
 
     expect(await readSecret(env, 'NEXTAUTH_SECRET')).toBe('');
   });
 
   it.each<[string, string | undefined, BundleResult | 'no-binding', string]>([
-    ['the policy grants no name', 'sts', okBundle({}), 'not_granted'],
-    ['the manager holds no value', 'sts', okBundle({}, ['NEXTAUTH_SECRET']), 'missing'],
-    ['STS refuses the caller', 'sts', { status: 'denied', reason: 'unknown_workload' }, 'denied'],
-    ['the STS binding is absent', 'sts', 'no-binding', 'binding_missing'],
-    ['SECRETS_SOURCE is malformed', 'STS', okBundle(BUNDLE_VALUES), 'invalid_source'],
+    ['the policy grants no name', 'production', okBundle({}), 'not_granted'],
+    ['the manager holds no value', 'production', okBundle({}, ['NEXTAUTH_SECRET']), 'missing'],
+    [
+      'STS refuses the caller',
+      'production',
+      { status: 'denied', reason: 'unknown_workload' },
+      'denied',
+    ],
+    ['the STS binding is absent', 'production', 'no-binding', 'binding_missing'],
+    ['ENVIRONMENT is staging', 'staging', okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+    ['ENVIRONMENT is mis-cased', 'Production', okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+    ['ENVIRONMENT is empty', '', okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+    ['ENVIRONMENT is absent', undefined, okBundle(BUNDLE_VALUES), 'unsupported_environment'],
   ])(
     'throws a fixed error when %s, logs fixed fields only, and never falls back',
-    async (_case, source, bundle, reason) => {
+    async (_case, environment, bundle, reason) => {
       const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
       const { env, getBundle, storeGet } = sourceEnv(
-        source,
+        environment,
         bundle === 'no-binding' ? okBundle({}) : bundle
       );
       const target = bundle === 'no-binding' ? { ...env, STS: undefined } : env;
@@ -149,7 +163,7 @@ describe('readSecret', () => {
       // The client's own error text names the secret and the cause; none of it is logged.
       expect(JSON.stringify(log.mock.calls)).not.toContain('granted to this workload');
       expect(storeGet).not.toHaveBeenCalled();
-      if (source !== 'sts') expect(getBundle).not.toHaveBeenCalled();
+      if (environment !== 'production') expect(getBundle).not.toHaveBeenCalled();
     }
   );
 });
@@ -165,14 +179,14 @@ describe('STS success log', () => {
   it('logs one fixed event on the first successful read, not on a refused read before it', async () => {
     const info = await freshLog();
     const secrets = await import('./secrets');
-    const refused = sourceEnv('sts', { status: 'denied', reason: 'unknown_workload' });
+    const refused = sourceEnv('production', { status: 'denied', reason: 'unknown_workload' });
 
     await expect(secrets.readSecret(refused.env, 'INTERNAL_API_SECRET')).rejects.toBeInstanceOf(
       secrets.SecretSourceUnavailableError
     );
     expect(info).not.toHaveBeenCalled();
 
-    const { env } = sourceEnv('sts');
+    const { env } = sourceEnv('production');
 
     expect(await secrets.readSecret(env, 'INTERNAL_API_SECRET')).toBe(
       BUNDLE_VALUES.INTERNAL_API_SECRET
@@ -186,7 +200,7 @@ describe('STS success log', () => {
   it('does not repeat the event for later successful reads', async () => {
     const info = await freshLog();
     const { readSecret } = await import('./secrets');
-    const { env } = sourceEnv('sts');
+    const { env } = sourceEnv('production');
 
     expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(BUNDLE_VALUES.INTERNAL_API_SECRET);
     expect(await readSecret(env, 'CALLBACK_TOKEN_SECRET')).toBe(
@@ -196,16 +210,12 @@ describe('STS success log', () => {
     expect(info).toHaveBeenCalledOnce();
   });
 
-  it('logs nothing for a raw bundle read or a Secrets Store read', async () => {
+  it('logs nothing for a development read', async () => {
     const info = await freshLog();
-    const { readStsSecret, readSecret } = await import('./secrets');
-    const { env: stsEnv } = sourceEnv('sts');
-    const { env: storeEnv } = sourceEnv(undefined);
+    const { readSecret } = await import('./secrets');
+    const { env: stsEnv } = sourceEnv('production');
+    const { env: storeEnv } = sourceEnv('development');
 
-    expect(await readStsSecret(stsEnv, 'INTERNAL_API_SECRET')).toEqual({
-      ok: true,
-      value: BUNDLE_VALUES.INTERNAL_API_SECRET,
-    });
     expect(await readSecret(storeEnv, 'INTERNAL_API_SECRET')).toBe(STORE_VALUE);
     expect(info).not.toHaveBeenCalled();
 
@@ -216,7 +226,7 @@ describe('STS success log', () => {
   it('logs for a selected credential read and not for a keyless request', async () => {
     const info = await freshLog();
     const { expectedSecret } = await import('./secrets');
-    const { env } = sourceEnv('sts');
+    const { env } = sourceEnv('production');
 
     expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', null)).toEqual({
       status: 'keyless',
@@ -235,12 +245,12 @@ describe('STS success log', () => {
   it('logs nothing for an empty delivered value', async () => {
     const info = await freshLog();
     const { readSecret } = await import('./secrets');
-    const empty = sourceEnv('sts', okBundle({ INTERNAL_API_SECRET: '' }));
+    const empty = sourceEnv('production', okBundle({ INTERNAL_API_SECRET: '' }));
 
     expect(await readSecret(empty.env, 'INTERNAL_API_SECRET')).toBe('');
     expect(info).not.toHaveBeenCalled();
 
-    const { env } = sourceEnv('sts');
+    const { env } = sourceEnv('production');
 
     expect(await readSecret(env, 'INTERNAL_API_SECRET')).toBe(BUNDLE_VALUES.INTERNAL_API_SECRET);
     expect(info).toHaveBeenCalledOnce();
@@ -248,8 +258,8 @@ describe('STS success log', () => {
 });
 
 describe('expectedSecret', () => {
-  it('reads the Secrets Store for a keyless request under secrets-store, as before', async () => {
-    const { env, getBundle, storeGet } = sourceEnv(undefined);
+  it('reads the Secrets Store for a keyless request in development', async () => {
+    const { env, getBundle, storeGet } = sourceEnv('development');
 
     expect(await expectedSecret(env, 'INTERNAL_API_SECRET', null)).toEqual({
       status: 'read',
@@ -261,9 +271,9 @@ describe('expectedSecret', () => {
   });
 
   it.each([null, undefined, ''])(
-    'reads nothing for a keyless request under sts (%j)',
+    'reads nothing for a keyless request in production (%j)',
     async presented => {
-      const { env, getBundle, storeGet } = sourceEnv('sts');
+      const { env, getBundle, storeGet } = sourceEnv('production');
 
       expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', presented)).toEqual({
         status: 'keyless',
@@ -274,8 +284,8 @@ describe('expectedSecret', () => {
     }
   );
 
-  it('returns the bundle value for a request that presents a credential under sts', async () => {
-    const { env, storeGet } = sourceEnv('sts');
+  it('returns the bundle value for a request that presents a credential in production', async () => {
+    const { env, storeGet } = sourceEnv('production');
 
     expect(await expectedSecret(env, 'CALLBACK_TOKEN_SECRET', 'presented')).toEqual({
       status: 'read',
@@ -285,17 +295,26 @@ describe('expectedSecret', () => {
     expect(storeGet).not.toHaveBeenCalled();
   });
 
-  it.each<[string | undefined, BundleResult, string]>([
-    ['sts', okBundle({}), 'not_granted'],
-    ['STS', okBundle(BUNDLE_VALUES), 'invalid_source'],
-  ])('refuses with a fixed reason (SECRETS_SOURCE %j)', async (source, bundle, reason) => {
-    const { env, storeGet } = sourceEnv(source, bundle);
+  it.each<[string | undefined, BundleResult | 'no-binding', string]>([
+    ['production', okBundle({}), 'not_granted'],
+    ['production', 'no-binding', 'binding_missing'],
+    ['staging', okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+    ['Production', okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+    ['', okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+    [undefined, okBundle(BUNDLE_VALUES), 'unsupported_environment'],
+  ])('refuses with a fixed reason (ENVIRONMENT %j)', async (environment, bundle, reason) => {
+    const { env, getBundle, storeGet } = sourceEnv(
+      environment,
+      bundle === 'no-binding' ? okBundle({}) : bundle
+    );
+    const target = bundle === 'no-binding' ? { ...env, STS: undefined } : env;
 
-    expect(await expectedSecret(env, 'INTERNAL_API_SECRET', 'presented')).toEqual({
+    expect(await expectedSecret(target, 'INTERNAL_API_SECRET', 'presented')).toEqual({
       status: 'refused',
       reason,
     });
     expect(storeGet).not.toHaveBeenCalled();
+    if (environment !== 'production') expect(getBundle).not.toHaveBeenCalled();
   });
 });
 

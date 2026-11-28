@@ -17,7 +17,6 @@ import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
 import { expectedSecret, secretUnavailableResponse } from '../secrets';
-import { secretsComparison, type CheckedSecret } from '../secrets-compare';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -44,7 +43,7 @@ export function validateInternalApiKey(
 /**
  * Hono middleware for authenticating internal API requests.
  * Validates X-Internal-API-Key header against INTERNAL_API_SECRET from the source that
- * `SECRETS_SOURCE` selects (src/secrets.ts).
+ * `ENVIRONMENT` fixes (src/secrets.ts).
  * Does NOT set user context - routes extract userId/orgId from URL path.
  */
 export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, next) => {
@@ -70,26 +69,20 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
     return c.json(resError('Internal server error'), 500);
   }
 
-  // A keyless request under `sts` read no secret; validation refuses it as missing before any
-  // comparison.
-  const checked: CheckedSecret = {
-    route: 'internal-api',
-    source: expected.source,
-    selected: expected.status === 'read' ? expected.secret : '',
-  };
-  const result = validateInternalApiKey(apiKeyHeader, checked.selected);
+  // A keyless request in production read no secret; validation refuses it as missing.
+  const result = validateInternalApiKey(
+    apiKeyHeader,
+    expected.status === 'read' ? expected.secret : ''
+  );
 
   if (!result.success) {
     logger.warn('Internal API authentication failed', {
       error: result.error,
-      route: checked.route,
+      route: 'internal-api',
       secret: 'INTERNAL_API_SECRET',
-      source: checked.source,
+      source: expected.source,
       reason: apiKeyHeader ? 'invalid' : 'missing',
     });
-    // A refused key starts at most one background check of this name per isolate when enabled
-    // (src/secrets-compare.ts); a keyless request starts none. Neither changes this answer.
-    if (apiKeyHeader) secretsComparison.refused(c.env, () => c.executionCtx, checked);
     return c.json(resError('Unauthorized'), 401);
   }
 
@@ -100,9 +93,6 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
     'legacy_shared_secret',
     callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
   );
-  // Background source comparison, off unless enabled (src/secrets-compare.ts). It never changes
-  // this answer.
-  secretsComparison.admitted(c.env, () => c.executionCtx, checked);
 
   await next();
 });

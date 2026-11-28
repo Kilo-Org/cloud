@@ -10,6 +10,8 @@ import {
   resolveWebInternalCredential,
   type WebInternalAuthEnv,
 } from '@kilocode/worker-utils/web-internal-credential';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 export const GRADER_USAGE_MODEL = 'auto-routing/grader';
 
@@ -93,14 +95,15 @@ export async function buildGraderUsage(
 
 export async function writeGraderUsage(
   env: Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'> & WebInternalAuthEnv,
-  usage: UsageRecordRequest
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
   // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
   // `web:usage.benchmark-grader.record` STS token.
   const credential = await resolveWebInternalCredential(
     env,
     STS_WEB_USAGE_RECORD_BENCHMARK_GRADER,
-    () => env.INTERNAL_API_SECRET_PROD.get()
+    () => readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx)
   );
   if (credential.kind === 'unavailable') return { kind: 'unavailable', reason: 'missing_config' };
   const url = new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href;

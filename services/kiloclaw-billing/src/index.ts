@@ -481,7 +481,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
     );
   },
 
-  async queue(batch, env) {
+  async queue(batch, env, ctx) {
     for (const message of batch.messages) {
       const parsed = BillingQueueMessageSchema.safeParse(message.body);
       if (!parsed.success) {
@@ -521,7 +521,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
         async () => {
           try {
             if (parsed.data.kind === 'trial_inactivity_stop_candidate') {
-              await processTrialInactivityStopCandidate(env, parsed.data, message.attempts);
+              await processTrialInactivityStopCandidate(env, parsed.data, message.attempts, ctx);
               log('info', 'Completed trial inactivity stop candidate', {
                 event: 'run_completed',
                 outcome: 'completed',
@@ -533,7 +533,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
               parsed.data.kind === 'credit_renewal_discovery' ||
               parsed.data.kind === 'credit_renewal_discovery_continuation'
             ) {
-              await processCreditRenewalDiscovery(env, parsed.data, message.attempts);
+              await processCreditRenewalDiscovery(env, parsed.data, message.attempts, ctx);
               log('info', 'Completed credit-renewal discovery message', {
                 event: 'run_completed',
                 outcome: 'completed',
@@ -545,7 +545,8 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
               const result = await processCommitRetirementGuardPage(
                 env,
                 parsed.data,
-                message.attempts
+                message.attempts,
+                ctx
               );
               if (!result.continuationEnqueued) {
                 const next = nextSweep('commit_retirement_guard');
@@ -567,7 +568,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
               parsed.data.kind === 'trial_expiry_page' ||
               parsed.data.kind === 'trial_expiry_continuation'
             ) {
-              const result = await processTrialExpiryPage(env, parsed.data, message.attempts);
+              const result = await processTrialExpiryPage(env, parsed.data, message.attempts, ctx);
               if (!result.continuationEnqueued) {
                 const next = nextSweep('trial_expiry');
                 if (next) {
@@ -590,7 +591,8 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
               const result = await processOrganizationTrialExpiryPage(
                 env,
                 parsed.data,
-                message.attempts
+                message.attempts,
+                ctx
               );
               if (!result.continuationEnqueued) {
                 const next = nextSweep('organization_trial_expiry');
@@ -609,7 +611,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 summary: result.summary,
               });
             } else if (parsed.data.kind === 'credit_renewal_item') {
-              await processCreditRenewalItem(env, parsed.data, message.attempts);
+              await processCreditRenewalItem(env, parsed.data, message.attempts, ctx);
               log('info', 'Completed credit-renewal item message', {
                 event: 'run_completed',
                 outcome: 'completed',
@@ -625,7 +627,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 renewalBoundary: parsed.data.renewalBoundary,
               });
             } else if (parsed.data.kind === 'standalone_instance_destruction') {
-              await runSweep(env, parsed.data, message.attempts);
+              await runSweep(env, parsed.data, message.attempts, ctx);
               log('info', 'Completed standalone instance destruction run', {
                 event: 'run_completed',
                 outcome: 'completed',
@@ -685,7 +687,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 outcome: 'started',
               });
             } else {
-              await runSweep(env, parsed.data, message.attempts);
+              await runSweep(env, parsed.data, message.attempts, ctx);
 
               if (parsed.data.kind === 'lifecycle') {
                 const next = nextSweep(parsed.data.sweep);

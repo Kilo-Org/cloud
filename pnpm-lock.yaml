@@ -2490,6 +2490,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -2576,6 +2579,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../../packages/usage-contracts
@@ -2619,6 +2625,9 @@ importers:
       '@kilocode/auto-routing-contracts':
         specifier: workspace:*
         version: link:../../packages/auto-routing-contracts
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../../packages/usage-contracts
@@ -3231,6 +3240,9 @@ importers:
       '@kilocode/organization-entitlement':
         specifier: workspace:*
         version: link:../../packages/organization-entitlement
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3606,6 +3618,9 @@ importers:
       '@kilocode/scim-contracts':
         specifier: workspace:*
         version: link:../../packages/scim-contracts
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

@@ -1,7 +1,12 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { experimental_readRawConfig } from 'wrangler';
+import { readAiAttributionSecret } from '../../../ai-attribution/src/secrets';
+import { readAutoRoutingBenchmarkSecret } from '../../../auto-routing-benchmark/src/secrets';
+import { readAutoRoutingSecret } from '../../../auto-routing/src/secrets';
 import { readCodeReviewInfraSecret } from '../../../code-review-infra/src/secrets';
+import { readKiloclawBillingSecret } from '../../../kiloclaw-billing/src/secrets';
+import { readScimSyncSecret } from '../../../scim-sync/src/secrets';
 import { readSessionSyncSecret } from '../../../session-sync/src/secrets';
 import { readUserDataExportSecret } from '../../../user-data-export/src/secrets';
 import { PolicySchema, type Policy } from '../../src/policy/schema';
@@ -10,6 +15,16 @@ import { parseWorkerConfig } from './worker-configs';
 
 /** No policy secret may carry an environment suffix (src/policy/schema.ts): the folder picks it. */
 const ENVIRONMENT_SUFFIX = /_(PROD|PRODUCTION|STAGING|DEV|DEVELOPMENT)$/;
+
+/**
+ * Store items whose name is neither the binding's own nor its `_PROD` alias. Listed one row at a
+ * time, keyed by `workload|policy entry`, and the same value `policy-reader-names.test.ts` pins as
+ * its `STORE_SUFFIX_EXCEPTIONS` row: an item named after another app is a deliberate reuse, and a
+ * rename must fail here rather than pass as a prefix match.
+ */
+const STORE_NAME_ALIASES: Readonly<Record<string, string>> = {
+  'kilo-ai-attribution|ADMIN_SECRET': 'AI_ATTRIBUTION_ADMIN_SECRET_PROD',
+};
 
 /** One row of the copier table the PR body publishes. */
 type CopierRow = {
@@ -55,6 +70,25 @@ const PUBLISHED_PATHS: Record<string, string> = {
   'kilo-code-review-worker|CALLBACK_TOKEN_SECRET': '/shared/CALLBACK_TOKEN_SECRET',
   'kilo-code-review-worker|BACKEND_AUTH_TOKEN':
     '/workloads/kilo-code-review-worker/BACKEND_AUTH_TOKEN',
+  'kilo-ai-attribution|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'kilo-ai-attribution|ADMIN_SECRET': '/workloads/kilo-ai-attribution/ADMIN_SECRET',
+  'auto-routing|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'auto-routing|OPENROUTER_API_KEY': '/shared/OPENROUTER_API_KEY',
+  'auto-routing|O11Y_CF_AE_API_TOKEN': '/shared/O11Y_CF_AE_API_TOKEN',
+  'auto-routing|NEXTAUTH_SECRET': '/shared/NEXTAUTH_SECRET',
+  'auto-routing|AUTO_ROUTING_DECISION_SECRET':
+    '/workloads/auto-routing/AUTO_ROUTING_DECISION_SECRET',
+  'auto-routing-benchmark|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'auto-routing-benchmark|BOT_TOKEN_MINT_SECRET': '/shared/BOT_TOKEN_MINT_SECRET',
+  'auto-routing-benchmark|OPENROUTER_API_KEY': '/shared/OPENROUTER_API_KEY',
+  'cloudflare-scim-sync|WORKOS_API_KEY': '/workloads/cloudflare-scim-sync/WORKOS_API_KEY',
+  'cloudflare-scim-sync|WORKOS_CLIENT_ID': '/workloads/cloudflare-scim-sync/WORKOS_CLIENT_ID',
+  'cloudflare-scim-sync|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'kiloclaw-billing|INTERNAL_API_SECRET': '/shared/INTERNAL_API_SECRET',
+  'kiloclaw-billing|SNOWFLAKE_PRIVATE_KEY_PEM':
+    '/workloads/kiloclaw-billing/SNOWFLAKE_PRIVATE_KEY_PEM',
+  'kiloclaw-billing|SNOWFLAKE_PUBLIC_KEY_FINGERPRINT':
+    '/workloads/kiloclaw-billing/SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
 };
 
 /**
@@ -104,8 +138,12 @@ async function proveWorker<N extends string>(worker: {
 
     const entry = storeEntries.find(candidate => candidate.binding === binding);
     // Manifest ↔ store name: a production block binds the live item, never a dev or staging copy.
-    // The item's name is the binding's own name or its `_PROD` alias; the table records it verbatim.
-    if (entry !== undefined) {
+    // The item's name is the binding's own name or its `_PROD` alias, or the one alias this table
+    // names for it; the table records it verbatim.
+    const alias = STORE_NAME_ALIASES[`${worker.workload}|${name}`];
+    if (entry !== undefined && alias !== undefined) {
+      expect(entry.secret_name, `${worker.workload}: ${name}`).toBe(alias);
+    } else if (entry !== undefined) {
       expect([binding, `${binding}_PROD`], `${worker.workload}: ${name}`).toContain(
         entry.secret_name
       );
@@ -163,6 +201,46 @@ describe('the secrets copier table for the Workers that read STS', () => {
         names: ['INTERNAL_API_SECRET', 'CALLBACK_TOKEN_SECRET', 'BACKEND_AUTH_TOKEN'],
         read: readCodeReviewInfraSecret,
       })),
+      ...(await proveWorker({
+        workload: 'kilo-ai-attribution',
+        configPath: 'services/ai-attribution/wrangler.jsonc',
+        names: ['NEXTAUTH_SECRET', 'ADMIN_SECRET'],
+        read: readAiAttributionSecret,
+      })),
+      ...(await proveWorker({
+        workload: 'auto-routing',
+        configPath: 'services/auto-routing/wrangler.jsonc',
+        names: [
+          'INTERNAL_API_SECRET',
+          'OPENROUTER_API_KEY',
+          'O11Y_CF_AE_API_TOKEN',
+          'NEXTAUTH_SECRET',
+          'AUTO_ROUTING_DECISION_SECRET',
+        ],
+        read: readAutoRoutingSecret,
+      })),
+      ...(await proveWorker({
+        workload: 'auto-routing-benchmark',
+        configPath: 'services/auto-routing-benchmark/wrangler.jsonc',
+        names: ['INTERNAL_API_SECRET', 'BOT_TOKEN_MINT_SECRET', 'OPENROUTER_API_KEY'],
+        read: readAutoRoutingBenchmarkSecret,
+      })),
+      ...(await proveWorker({
+        workload: 'cloudflare-scim-sync',
+        configPath: 'services/scim-sync/wrangler.jsonc',
+        names: ['WORKOS_API_KEY', 'WORKOS_CLIENT_ID', 'INTERNAL_API_SECRET'],
+        read: readScimSyncSecret,
+      })),
+      ...(await proveWorker({
+        workload: 'kiloclaw-billing',
+        configPath: 'services/kiloclaw-billing/wrangler.jsonc',
+        names: [
+          'INTERNAL_API_SECRET',
+          'SNOWFLAKE_PRIVATE_KEY_PEM',
+          'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
+        ],
+        read: readKiloclawBillingSecret,
+      })),
     ];
 
     // No two rows name the same Worker binding, and every row is a policy entry the workload's
@@ -171,7 +249,7 @@ describe('the secrets copier table for the Workers that read STS', () => {
     expect(rows.map(row => `${row.workload}|${row.oldBinding}`)).toEqual([
       ...new Set(rows.map(row => `${row.workload}|${row.oldBinding}`)),
     ]);
-    expect(rows).toHaveLength(3 + 4 + 3);
+    expect(rows).toHaveLength(3 + 4 + 3 + 2 + 5 + 3 + 3 + 3);
     for (const row of rows) {
       expect(policies.get(row.workload)?.secrets, row.workload).toContain(row.policyEntry);
     }
@@ -191,6 +269,9 @@ describe('the secrets copier table for the Workers that read STS', () => {
       'INTERNAL_API_SECRET',
       'CALLBACK_TOKEN_SECRET',
       'BACKEND_AUTH_TOKEN',
+      'INTERNAL_API_SECRET',
+      'SNOWFLAKE_PRIVATE_KEY_PEM',
+      'SNOWFLAKE_PUBLIC_KEY_FINGERPRINT',
     ]);
   });
 });

@@ -21,6 +21,12 @@ export const SHARED_SECRET_NAMES: readonly string[] = [
   'INTERNAL_API_SECRET',
   'NEXTAUTH_SECRET',
   'CALLBACK_TOKEN_SECRET',
+  // Held by several Workloads (auto-routing and o11y, auto-routing and its benchmark Worker).
+  'O11Y_CF_AE_API_TOKEN',
+  'OPENROUTER_API_KEY',
+  // Single holder, but the value is already shared outside STS: apps/web's bot-token mint
+  // authenticates with it too, so it cannot live in one Workload's folder.
+  'BOT_TOKEN_MINT_SECRET',
 ];
 
 export function policyFileNames(): string[] {

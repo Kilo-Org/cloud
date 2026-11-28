@@ -20,7 +20,9 @@
   // The frequent tick recovers expired leases; completion dispatches immediately.
   "triggers": { "crons": ["0 5 * * *", "* * * * *"] },
   "dev": { "port": 8814, "local_protocol": "http", "ip": "0.0.0.0" },
-  "observability": { "enabled": true },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
+  "observability": { "enabled": true, "traces": { "enabled": false } },
   "vars": {
     "BENCHMARK_SCHEDULER_CONFIG": "{}",
     // Base URL for reaching apps/web's /api/internal/* routes. Other workers
@@ -39,7 +41,23 @@
     // Where a container posts a case outcome after losing its caller (for
     // example during a version rollout). Local dev overrides it via .dev.vars.
     "BENCH_RESULT_URL": "https://auto-routing-benchmark.kiloapps.io/container/case-result",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store binding below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    "SECRETS_SOURCE": "secrets-store",
   },
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // auto-routing-benchmark.yaml grants INTERNAL_API_SECRET, BOT_TOKEN_MINT_SECRET and
+  // OPENROUTER_API_KEY. Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "auto-routing-benchmark" },
+    },
+  ],
   "containers": [
     {
       "name": "auto-routing-benchmark-runner",

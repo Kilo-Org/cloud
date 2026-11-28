@@ -33,6 +33,8 @@ import {
 } from './subscriptions';
 import { isGradedSweepResult, summarizeSweep } from './scoreboard/sweep';
 import type { OfflineSweep, OfflineSweepSummary } from './scoreboard/schema';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 export const MIN_ACCURACY_GRID = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9] as const;
 export const ACCURACY_NOISE_BAND_GRID = [0, 0.02, 0.05, 0.08, 0.1] as const;
@@ -274,7 +276,8 @@ export function optimizeThresholdPolicy(params: {
  * last computed values instead of inventing numbers or stalling the tick.
  */
 export async function fetchProductionAutoMetrics(
-  env: Env & WebInternalAuthEnv
+  env: Env & WebInternalAuthEnv,
+  ctx?: SecretsExecutionContext
 ): Promise<ProductionAutoMetrics | null> {
   try {
     // The route reads a bearer either way: the internal secret unless `WEB_INTERNAL_AUTH=sts`,
@@ -284,7 +287,7 @@ export async function fetchProductionAutoMetrics(
       STS_WEB_AUTO_ROUTING_PRODUCTION_PROFILE_READ,
       {
         header: 'authorization',
-        secret: () => env.INTERNAL_API_SECRET_PROD.get(),
+        secret: () => readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx),
         format: secret => `Bearer ${secret}`,
       }
     );

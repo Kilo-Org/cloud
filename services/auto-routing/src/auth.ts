@@ -1,8 +1,9 @@
 import { backendAuthMiddleware } from '@kilocode/worker-utils';
 import type { HonoEnv } from './hono-env';
+import { readAutoRoutingSecret, requestContext } from './secrets';
 
 export const authMiddleware = backendAuthMiddleware<HonoEnv>(
-  c => c.env.INTERNAL_API_SECRET_PROD.get(),
+  c => readAutoRoutingSecret(c.env, 'INTERNAL_API_SECRET', requestContext(c)),
   {
     receiver: 'auto-routing',
     // The guard covers the admin pages and the decision route.

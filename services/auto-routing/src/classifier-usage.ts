@@ -1,4 +1,5 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   UsageRecordRequestSchema,
   toUsageRecordWireBody,
@@ -17,6 +18,7 @@ import {
 } from '@kilocode/worker-utils/web-internal-credential';
 import { ZodError } from 'zod';
 import type { DecisionScope } from './decision-cache';
+import { readAutoRoutingSecret } from './secrets';
 
 export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
 
@@ -124,7 +126,8 @@ export async function buildClassifierUsage(
 export async function writeClassifierUsage(
   env: Pick<ClassifierUsageEnv, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'> &
     WebInternalAuthEnv,
-  usage: UsageRecordRequest
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
   try {
     // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
@@ -132,7 +135,7 @@ export async function writeClassifierUsage(
     const credential = await resolveWebInternalCredential(
       env,
       STS_WEB_USAGE_RECORD_CLASSIFIER,
-      () => env.INTERNAL_API_SECRET_PROD.get()
+      () => readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx)
     );
     if (credential.kind === 'unavailable') return { kind: 'unavailable', reason: 'missing_config' };
     const url = new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href;

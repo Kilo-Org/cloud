@@ -24,6 +24,7 @@
   "dependencies": {
     "@cloudflare/containers": "0.1.1",
     "@kilocode/auto-routing-contracts": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",

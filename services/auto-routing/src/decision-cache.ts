@@ -102,7 +102,7 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
   }
 
   private async attemptUsage(key: string, entry: UsageRetryEntry): Promise<void> {
-    const outcome = await writeClassifierUsage(this.env, entry.usage);
+    const outcome = await writeClassifierUsage(this.env, entry.usage, this.ctx);
     if (outcome.kind !== 'unavailable') {
       await this.ctx.storage.delete(key);
       return;

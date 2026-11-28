@@ -351,7 +351,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).toHaveBeenCalledWith({
       kind: 'lifecycle',
       runId,
@@ -379,7 +379,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(processCommitRetirementGuardPage).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).not.toHaveBeenCalled();
   });
 
@@ -399,7 +399,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
@@ -463,7 +463,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).toHaveBeenCalledTimes(1);
     expect(lifecycleSend).toHaveBeenCalledWith({
       kind: 'lifecycle',
@@ -525,7 +525,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(processTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
@@ -574,7 +574,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).toHaveBeenCalledTimes(1);
     expect(lifecycleSend).toHaveBeenCalledWith({
       kind: 'lifecycle',
@@ -644,7 +644,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1);
+    expect(processOrganizationTrialExpiryPage).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();
@@ -666,7 +666,7 @@ describe('kiloclaw billing worker handler', () => {
 
     await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
 
-    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1);
+    expect(runSweep).toHaveBeenCalledWith(env, message.body, 1, {});
     expect(lifecycleSend).toHaveBeenCalledWith({
       kind: 'lifecycle',
       runId,
@@ -753,7 +753,8 @@ describe('kiloclaw billing worker handler', () => {
         runId: '22222222-2222-4222-8222-222222222222',
         sweep: 'trial_inactivity_stop',
       },
-      1
+      1,
+      {}
     );
     expect(processTrialInactivityStopCandidate).not.toHaveBeenCalled();
     expect(lifecycleSend).not.toHaveBeenCalled();
@@ -793,7 +794,8 @@ describe('kiloclaw billing worker handler', () => {
         userId: 'user-1',
         instanceId: '55555555-5555-4555-8555-555555555555',
       },
-      1
+      1,
+      {}
     );
     expect(runSweep).not.toHaveBeenCalled();
     expect(lifecycleSend).not.toHaveBeenCalled();
@@ -834,7 +836,8 @@ describe('kiloclaw billing worker handler', () => {
         pageBudget: 25,
         wallClockBudgetMs: 1000,
       },
-      1
+      1,
+      {}
     );
     expect(runSweep).not.toHaveBeenCalled();
     expect(lifecycleSend).not.toHaveBeenCalled();
@@ -868,7 +871,8 @@ describe('kiloclaw billing worker handler', () => {
         subscriptionId: '88888888-8888-4888-8888-888888888888',
         renewalBoundary: '2026-06-01T00:00:00.000Z',
       },
-      1
+      1,
+      {}
     );
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(message.retry).not.toHaveBeenCalled();

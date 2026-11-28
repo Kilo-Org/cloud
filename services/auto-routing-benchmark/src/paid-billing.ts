@@ -13,6 +13,7 @@ import {
   type CustomRouterPoolPinsRequest,
   type CustomRouterPoolPinsResponse,
 } from '@kilocode/auto-routing-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   claimPaidBillingOutbox,
   failPaidBillingOutbox,
@@ -35,6 +36,7 @@ import {
   webInternalCredential,
   type WebInternalAuthEnv,
 } from '@kilocode/worker-utils/web-internal-credential';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 const DELIVERY_TIMEOUT_MS = 10_000;
 
@@ -47,13 +49,14 @@ export type PaidBillingEnv = WebInternalAuthEnv & {
 async function deliverPaidPoolPins(
   env: PaidBillingEnv,
   body: CustomRouterPoolPinsRequest,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<{ ok: true; response: CustomRouterPoolPinsResponse } | { ok: false; error: string }> {
   // The internal secret unless `WEB_INTERNAL_AUTH=sts`, then a `web:auto-routing.pool-pins.write`
   // STS token. Without one the intent stays pending for a later drain.
   const credential = await webInternalCredential(env, STS_WEB_AUTO_ROUTING_POOL_PINS_WRITE, {
     header: 'x-internal-api-key',
-    secret: () => env.INTERNAL_API_SECRET_PROD.get(),
+    secret: () => readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx),
   });
   if (credential.kind === 'unavailable') {
     return { ok: false, error: `pool pins credential ${credential.reason}` };
@@ -162,7 +165,8 @@ export const PAID_PIN_NOT_APPLIED_REASON =
 export async function publishPaidPoolPins(
   env: PaidBillingEnv,
   request: PaidBenchmarkRequestRow,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  ctx?: SecretsExecutionContext
 ): Promise<PaidPinsPublication> {
   // The intent and the completion are written in one batch, so a request that is not completed
   // is a transient read. Stay pending: the same deterministic intent delivers once it is.
@@ -304,7 +308,7 @@ export async function publishPaidPoolPins(
   });
   if (!body.success)
     return { outcome: 'abandoned', reason: 'pins_payload_invalid', applied: 0, pinOnly };
-  const delivery = await deliverPaidPoolPins(env, body.data, fetchImpl);
+  const delivery = await deliverPaidPoolPins(env, body.data, fetchImpl, ctx);
   if (!delivery.ok) return { outcome: 'pending', reason: delivery.error, applied: 0, pinOnly };
   const applied = delivery.response.applied.length;
   // A pool edited after the click pins nothing: the confirmation named a pool state that no
@@ -405,7 +409,14 @@ async function closeAbandonedOutboxIntent(
  */
 export async function drainPaidBillingOutbox(
   env: PaidBillingEnv,
-  options: { limit?: number; requestId?: string; fetchImpl?: typeof fetch; now?: number } = {}
+  options: {
+    limit?: number;
+    requestId?: string;
+    fetchImpl?: typeof fetch;
+    now?: number;
+    /** The invocation that owns this drain, so a bundle revalidation can outlive it. */
+    ctx?: SecretsExecutionContext;
+  } = {}
 ): Promise<PaidBillingDrain> {
   const db = env.BENCH_DB;
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -432,7 +443,7 @@ export async function drainPaidBillingOutbox(
       summary.abandoned += 1;
       continue;
     }
-    const publication = await publishPaidPoolPins(env, request, fetchImpl);
+    const publication = await publishPaidPoolPins(env, request, fetchImpl, options.ctx);
     if (publication.outcome === 'nothing') {
       await markPaidBillingOutboxDelivered(db, { ids: [row.id], now: options.now });
       summary.delivered += 1;

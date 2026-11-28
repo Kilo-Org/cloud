@@ -8,6 +8,10 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import {
+  STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ,
+  webInternalSenderCredential,
+} from '@kilocode/web-shared/lib/web-internal-sts';
+import {
   claudeBillingEffectiveConnection,
   getGrantedClaudeBillingConnection,
   type ClaudeBillingOwner,
@@ -85,8 +89,21 @@ export async function getAuthoritativeClaudeBillingState(
     const granted = await getGrantedClaudeBillingConnection(owner, db);
     return claudeBillingPayerState(granted ? claudeBillingEffectiveConnection(granted) : null);
   }
-  const internalApiSecret = await readInternalApiSecret();
-  if (!internalApiSecret) throw new Error('Claude payer-state authentication is not configured');
+  // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:claude-billing.payer-state.read` STS token. This read runs before the LLM call, so it
+  // takes only a token the process already holds and never waits for a mint: without one it
+  // fails retryably while the mint it started serves the retry.
+  const credential = await webInternalSenderCredential(STS_WEB_CLAUDE_BILLING_PAYER_STATE_READ, {
+    legacySecret: readInternalApiSecret,
+    tokenWait: 'held',
+  });
+  if (credential.kind === 'unavailable') {
+    throw new Error(
+      credential.reason === 'token_not_held' || credential.reason === 'token_unavailable'
+        ? 'Claude payer-state token is unavailable; retry'
+        : 'Claude payer-state authentication is not configured'
+    );
+  }
   const payerStateUrl = parseInternalServiceEndpoint(
     APP_URL,
     '/api/internal/claude-billing/payer-state'
@@ -96,7 +113,7 @@ export async function getAuthoritativeClaudeBillingState(
     payerStateUrl.toString(),
     async () => ({
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-internal-api-key': internalApiSecret },
+      headers: { 'content-type': 'application/json', [credential.header]: credential.value },
       body: JSON.stringify(owner),
       cache: 'no-store',
     }),

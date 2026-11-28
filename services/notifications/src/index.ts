@@ -12,6 +12,13 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  internalAuthAnalyticsSink,
+  observeInternalAuth,
+  type InternalAuthAnalyticsBinding,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { useWorkersLogger } from 'workers-tagged-logger';
 
 import {
@@ -102,11 +109,15 @@ app.post('/v1/badges/mark-read', async c => {
   return c.json(response);
 });
 
-async function hasValidInternalSecret(c: {
-  req: { header(name: string): string | undefined };
-  env: Env;
-  executionCtx: SecretsExecutionContext;
-}): Promise<boolean> {
+async function hasValidInternalSecret(
+  c: {
+    req: { header(name: string): string | undefined };
+    /** The counter dataset is optional: a deployment without it writes no data points. */
+    env: Env & { INTERNAL_AUTH_COUNTER?: InternalAuthAnalyticsBinding };
+    executionCtx: SecretsExecutionContext;
+  },
+  route: string
+): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
   // A deployment that binds no internal secret (the closed staging environment)
   // has no caller to authorize: refuse it as unauthorized, not as a failed read.
@@ -114,16 +125,25 @@ async function hasValidInternalSecret(c: {
     return false;
   }
   const expected = await readNotificationsSecret(c.env, 'INTERNAL_API_SECRET', c.executionCtx);
-  if (!provided || !expected) return false;
-
-  return timingSafeEqual(provided, expected);
+  if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  // No Logpush here, so each counter line also becomes one Analytics Engine data point that o11y
+  // reads back into Axiom (design section 9.4, item 9).
+  const counter = c.env.INTERNAL_AUTH_COUNTER;
+  observeInternalAuth(
+    'notifications',
+    route,
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null),
+    internalAuthAnalyticsSink(counter)
+  );
+  return true;
 }
 
 // Internal service-to-service dispatch (low-balance + spend-alert +
 // security-finding). Intentionally outside `/v1/*` so user-JWT auth
 // middleware does not apply.
 app.post('/internal/v1/dispatch', async c => {
-  if (!(await hasValidInternalSecret(c))) {
+  if (!(await hasValidInternalSecret(c, 'dispatch'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -172,7 +192,7 @@ app.post('/internal/v1/dispatch', async c => {
 // internal-secret auth as the dispatch route; the DO owns the rate limit, so a
 // refresh inside the delivery window is deferred rather than dropped.
 app.post('/internal/v1/glanceable-refresh', async c => {
-  if (!(await hasValidInternalSecret(c))) {
+  if (!(await hasValidInternalSecret(c, 'glanceable_refresh'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

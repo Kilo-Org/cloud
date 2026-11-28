@@ -122,7 +122,10 @@ function versionChangeSection(body: Body): string {
 }
 
 export async function POST(req: NextRequest) {
-  const unauthorized = await authorizeInternalApiRequest(req);
+  const unauthorized = await authorizeInternalApiRequest(
+    req,
+    'kiloclaw_scheduled_action_side_effects'
+  );
   if (unauthorized) return unauthorized;
 
   const rawBody: unknown = await req.json().catch(() => null);

@@ -32,6 +32,11 @@ export const OPEN_ATTEMPT_STALE_MS = 1_000;
  * A held token is served while renewal fails until this many seconds before its `exp`, never
  * later: the request that presents it needs time to reach the callee. A 300 s token renews at
  * 240 s and keeps serving until 270 s.
+ *
+ * A read that finds a usable held token answers within microtasks: no timer, no I/O, even when it
+ * starts a renewal. `stsServiceTokenIfHeld` in `packages/web-shared/src/lib/sts-service-tokens.ts`
+ * relies on that to tell a held token from a mint with a zero-delay timer; keep that path free of
+ * awaits on timers or I/O (its test runs this client).
  */
 export const HELD_TOKEN_MARGIN_SECONDS = 30;
 /**

@@ -89,6 +89,8 @@ export type StaffRefusal =
   | { kind: 'not_staff' }
   | { kind: 'network'; denial: AdminNetworkRefusal & { clientAddress: string | null } }
   | { kind: 'reauth' }
+  /** A UTS browser session: no staff authority until design 5.12 is built for it. */
+  | { kind: 'uts_session' }
   | { kind: 'step_up'; cause: StepUpRequiredError; message: string };
 
 export type StaffAdmissionResult =
@@ -123,6 +125,8 @@ export async function admitStaff(request: StaffAdmissionRequest): Promise<StaffA
   });
   if (denial) return refused({ kind: 'network', denial });
 
+  // A UTS browser session is refused by name, never treated as a bearer or a NextAuth session.
+  if (request.credential === 'uts_session') return refused({ kind: 'uts_session' });
   if (request.credential !== 'session') {
     return refused({
       kind: 'step_up',
@@ -245,6 +249,12 @@ export function staffRefusalTrpcError(refusal: StaffRefusal): TRPCError {
         code: 'FORBIDDEN',
         message: 'Reauthentication required',
         cause: new StaffRefusalCause('reauth'),
+      });
+    case 'uts_session':
+      return new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Admin access requires a staff sign-in session',
+        cause: new StaffRefusalCause('uts_session'),
       });
     case 'step_up':
       return new TRPCError({ code: 'FORBIDDEN', message: refusal.message, cause: refusal.cause });

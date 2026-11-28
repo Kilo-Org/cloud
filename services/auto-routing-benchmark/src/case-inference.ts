@@ -36,6 +36,8 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import { observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
+import { createUsageId } from '@kilocode/worker-utils/usage-id';
 import type { Context, Hono } from 'hono';
 import * as z from 'zod';
 import type { HonoEnv } from './hono-env';
@@ -951,7 +953,7 @@ export async function createCaseInferenceDeps(
     });
     if (veto) return refused('permanently_failed');
     const assignmentId = crypto.randomUUID();
-    const usageId = crypto.randomUUID();
+    const usageId = createUsageId();
     const selected = await env.BENCH_DB.batch(
       selectPaidModelRequestPayerStatements(env.BENCH_DB, {
         key,
@@ -1304,6 +1306,7 @@ export async function handleCaseAdmit(
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   if (!(await authorizedInternalBearer(authorization, secret)))
     return jsonResponse({ error: { code: 'unauthorized', message: 'Not authorized.' } }, 401);
+  observeInternalAuth('auto-routing-benchmark', 'case_admit', 'legacy_shared_secret');
   const parsed = BenchmarkCaseAdmitRequestSchema.safeParse(body);
   if (!parsed.success)
     return jsonResponse({ error: { code: 'invalid_admit', message: 'Invalid admission.' } }, 400);

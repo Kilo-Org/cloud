@@ -45,11 +45,12 @@ import {
   type ScenarioDeadline,
 } from './scenarios-shared-runtime.js';
 import { requireWorktreeSessionIdentity } from './public-surface-support.js';
-import type {
-  CallbackPayload,
-  CallbackSink,
-  ScenarioEnvironment,
-  SessionSandboxObservation,
+import {
+  sinkCallbackTarget,
+  type CallbackPayload,
+  type CallbackSink,
+  type ScenarioEnvironment,
+  type SessionSandboxObservation,
 } from './scenario-capabilities.js';
 
 const CALLBACK_COMPLETION_TIMEOUT_MS = 300_000;
@@ -128,7 +129,7 @@ async function registerCallbackTarget(
   label: string
 ): Promise<void> {
   const registered = await deadline.within(`${label} callback target`, signal =>
-    updateSessionCallbackTarget(config, cloudAgentSessionId, { url: sink.callbackUrl }, signal)
+    updateSessionCallbackTarget(config, cloudAgentSessionId, sinkCallbackTarget(sink), signal)
   );
   if (!registered.success) {
     throw new Error(`${label}: updateSession did not accept the callback target`);

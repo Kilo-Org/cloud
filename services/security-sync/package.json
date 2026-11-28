@@ -15,11 +15,14 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@kilocode/service-token-client": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "jsonc-parser": "3.3.1",

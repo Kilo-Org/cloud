@@ -21,7 +21,12 @@ permissions:
 jobs:
   changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # 10 not 5: the Blacksmith checkout's mirror refresh took ~400 s (3 x 120 s
+    # fetch attempts plus waits) in a slowdown, and that post step had no room in
+    # a 5 minute budget, so it cancelled this required gate and every check that
+    # needs it — which cancels the CI run that admits a production deploy.
+    # The actions/checkout below drops the mirror refresh.
+    timeout-minutes: 10
     # dorny/paths-filter lists the pull request's changed files through the API.
     permissions:
       contents: read
@@ -79,10 +84,18 @@ jobs:
       lint_groups_non_trpc: ${{ steps.affected.outputs.lint_groups_non_trpc }}
       cloud_agent_next_parts: ${{ steps.affected.outputs.cloud_agent_next_parts }}
     steps:
-      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+      # Full history so the detection resolves the PR's base sha or
+      # `github.event.before`, and no blobs up front: the diff is tree-only,
+      # while the objects `scripts/affected-workspaces.mjs` reads come from the
+      # public repository on demand.
+      # actions/checkout has no Blacksmith mirror to refresh.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          persist-credentials: false
           fetch-depth: 0
+          filter: blob:none
+          # Nothing here pushes, and the repository is public: the lazy blob
+          # fetches below need no token.
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -471,12 +484,15 @@ jobs:
               - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
+              - 'services/notifications/src/secrets.ts'
+              - 'services/sts/policy/notifications.yaml'
               - 'services/auto-routing/.dev.vars.example'
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
               - '.github/workflows/extension-store-release.yml'
               - '.github/workflows/kilo-mcp-release.yml'
+              - '.github/workflows/notifications-runtime-copy.yml'
               - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
@@ -504,12 +520,15 @@ jobs:
               - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
+              - 'services/notifications/src/secrets.ts'
+              - 'services/sts/policy/notifications.yaml'
               - 'services/auto-routing/.dev.vars.example'
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
               - '.github/workflows/extension-store-release.yml'
               - '.github/workflows/kilo-mcp-release.yml'
+              - '.github/workflows/notifications-runtime-copy.yml'
               - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
@@ -716,6 +735,8 @@ jobs:
           scripts/sts-deploy-token.test.mjs
           scripts/inherit-secret-bindings.test.mjs
           scripts/r2-temp-credentials.test.mjs
+          scripts/sts-bundle-action.test.mjs
+          scripts/cloud-agent-e2e-workflow.test.mjs
 
       # The same split for the release workflow: a PR that changes it alone
       # trips no product filter, and its test runs in no other job, so its
@@ -738,10 +759,17 @@ jobs:
   plugin-contract:
     needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # 10 not 5: the Blacksmith checkout's mirror refresh took ~400 s (3 x 120 s
+    # fetch attempts plus waits) in a slowdown, and that post step had no room in
+    # a 5 minute budget, which cancelled this required check.
+    # The actions/checkout below drops the mirror refresh.
+    timeout-minutes: 10
     steps:
-      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+      # The checks read product files at this commit only.
+      # actions/checkout has no Blacksmith mirror to refresh.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          # Nothing here pushes, and the repository is public.
           persist-credentials: false
 
       - name: Setup Node

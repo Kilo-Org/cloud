@@ -52,8 +52,8 @@ export function assertMinimumCount(url: string, count: number, minimum: number) 
  * A stored row is used however old it is. The table exists so that metadata survives an upstream
  * outage, so an out-of-date row must not trigger a live fetch: only a missing or unparseable row
  * does. A row that stops being refreshed because the cron job or its deployment is broken is
- * reported by the stale alert in the refresh job, and that failure should be fixed rather than
- * worked around here.
+ * logged as a warning by the refresh job and flagged on the Gateway admin page, and that failure
+ * should be fixed rather than worked around here.
  */
 export async function readStoredMetadata<T>(
   source: MetadataSource<T>,

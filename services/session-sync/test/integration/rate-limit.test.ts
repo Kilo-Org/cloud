@@ -17,7 +17,7 @@ it.each([undefined, 'synthetic-invalid-credential'])(
     // Miniflare resets counters at minute boundaries, even during a short request loop.
     const limit = vi.fn<RateLimit['limit']>().mockResolvedValue({ success: false });
     const getSecret = vi
-      .fn<() => Promise<string | null>>()
+      .fn<() => Promise<string>>()
       .mockRejectedValue(new Error('Credential verification must not start'));
     const response = await app.request(
       'https://session-sync.test/v1/auth/exchange',

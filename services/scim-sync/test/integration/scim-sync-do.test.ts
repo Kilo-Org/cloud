@@ -577,6 +577,72 @@ describe('response classes', () => {
     }
   });
 
+  describe('WEB_INTERNAL_AUTH=sts', () => {
+    // No config sets `sts`, so the generated `Env` types the flag as `legacy` alone.
+    type StsEnv = Omit<Env, 'WEB_INTERNAL_AUTH'> & {
+      WEB_INTERNAL_AUTH?: string;
+      STS?: { mintTokens(request: unknown): Promise<unknown> };
+    };
+    const minted: unknown[] = [];
+    const fakeSts = {
+      async mintTokens(request: unknown) {
+        minted.push(request);
+        return {
+          status: 'ok',
+          tokens: [
+            {
+              status: 'issued',
+              audience: 'web',
+              scope: 'web:scim.sync',
+              token: 'sts-scim-token',
+              jti: 'jti-scim',
+              expiresAt: Math.floor(Date.now() / 1000) + 300,
+            },
+          ],
+        };
+      },
+    };
+
+    it('sends a web:scim.sync STS token and never the internal secret', async () => {
+      const target = stub('sts-credential');
+      const io = harness({ pages: [[membershipEvent('evt_1', 'dsync.group.user_added')]] });
+      const configured = env as StsEnv;
+      configured.WEB_INTERNAL_AUTH = 'sts';
+      configured.STS = fakeSts;
+      try {
+        const result = await runInDurableObject(target, instance => instance.poll());
+
+        expect(result.eventsApplied).toBe(1);
+        expect(io.calls.length).toBeGreaterThan(0);
+        expect(io.calls.every(c => c.authorization === 'Bearer sts-scim-token')).toBe(true);
+        expect(io.calls.every(c => c.apiKey === null)).toBe(true);
+        // Several calls of one event share the one held token.
+        expect(minted).toEqual([{ tokens: [{ audience: 'web', scope: 'web:scim.sync' }] }]);
+      } finally {
+        configured.WEB_INTERNAL_AUTH = 'legacy';
+        delete configured.STS;
+      }
+    });
+
+    it('holds the cursor without calling the app when the STS binding is missing', async () => {
+      const target = stub('sts-no-binding');
+      const io = harness({ pages: [[directoryEvent('evt_1')]] });
+      const configured = env as StsEnv;
+      configured.WEB_INTERNAL_AUTH = 'sts';
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const result = await runInDurableObject(target, instance => instance.poll());
+
+        expect(io.calls).toEqual([]);
+        expect(result.heldFailure).toMatchObject({ lastClass: 'unavailable', lastStatus: null });
+        expect(result.eventsParked).toBe(0);
+        expect(result.eventsApplied).toBe(0);
+      } finally {
+        configured.WEB_INTERNAL_AUTH = 'legacy';
+      }
+    });
+  });
+
   it('never parks a network failure', async () => {
     const target = stub('network-error');
     harness({

@@ -8,14 +8,14 @@ import {
 
 describe('security agent config', () => {
   it('defaults every model role to Kilo Balanced', () => {
-    expect(DEFAULT_SECURITY_AGENT_TRIAGE_MODEL).toBe('kilo-auto/balanced');
-    expect(DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL).toBe('kilo-auto/balanced');
-    expect(DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL).toBe('kilo-auto/balanced');
+    expect(DEFAULT_SECURITY_AGENT_TRIAGE_MODEL).toBe('kilo-auto/efficient');
+    expect(DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL).toBe('kilo-auto/efficient');
+    expect(DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL).toBe('kilo-auto/efficient');
     expect(parseSecurityAgentConfig({})).toMatchObject({
-      model_slug: 'kilo-auto/balanced',
-      triage_model_slug: 'kilo-auto/balanced',
-      analysis_model_slug: 'kilo-auto/balanced',
-      remediation_model_slug: 'kilo-auto/balanced',
+      model_slug: 'kilo-auto/efficient',
+      triage_model_slug: 'kilo-auto/efficient',
+      analysis_model_slug: 'kilo-auto/efficient',
+      remediation_model_slug: 'kilo-auto/efficient',
     });
   });
 

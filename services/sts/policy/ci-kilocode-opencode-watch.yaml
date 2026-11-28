@@ -1,5 +1,5 @@
-# kilocode watch-opencode-releases (kilocode CI design 6). Only the Slack webhook: the sync call's
-# service token (audience opencode-watch-sync) waits until that audience is registered.
+# kilocode watch-opencode-releases (kilocode CI design 6). Only the Slack webhook. The sync call's
+# service token (community-contributions-dashboard:opencode.sync) is registered but not yet granted.
 # legacySubject: Kilo-Org/kilocode still issues the default subject (npm/cli#9969); see
 # GITHUB_LEGACY_SUBJECT_REPOSITORY in src/policy/schema.ts for why and how to upgrade.
 workload: ci-kilocode-opencode-watch

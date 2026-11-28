@@ -14,6 +14,8 @@ export function remoteArtifactStore(options: {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
+  /** Set for R2 temporary credentials (scripts/ci/r2-temp-credentials.sh); absent for a key pair. */
+  sessionToken?: string;
   request?: typeof fetch;
 }): ArtifactObjectStore {
   z.string()
@@ -25,6 +27,7 @@ export function remoteArtifactStore(options: {
   const signer = new AwsClient({
     accessKeyId: options.accessKeyId,
     secretAccessKey: options.secretAccessKey,
+    ...(options.sessionToken ? { sessionToken: options.sessionToken } : {}),
     service: 's3',
     region: 'auto',
   });

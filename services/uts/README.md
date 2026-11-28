@@ -1524,12 +1524,12 @@ GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSE
   legacy value other services use, means the same here (it logs `source` `worker`), so the
   standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
 
-Both environments read `worker` until their flips (below). Staging and production refuse to start
-without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
-or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set under
-either source, so a rollback is the var alone. The `worker` source is removed in the same change
-that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret;
-the rotation job always reads it from the bundle ("Login rotation").
+Staging reads `sts` and production reads `worker` until its flip (below). Staging and production
+refuse to start without the var (`src/env.ts`), and `test/repo` fails a deployed block that does
+not name a source or does not bind its own environment's STS as caller `uts`. The Worker secrets
+stay set under either source, so a rollback is the var alone. The `worker` source is removed in
+the same change that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has
+no Worker secret; the rotation job always reads it from the bundle ("Login rotation").
 
 Under `sts` the client holds the whole bundle in every request isolate that reads it. Once the
 policy grants `UTS_HYPERDRIVE_SWITCH_TOKEN`, that token, which can edit every Hyperdrive config in
@@ -1566,7 +1566,7 @@ The secrets client caches a denial per isolate: once STS refuses the `uts` workl
 keeps refusing until it is replaced. After fixing a denial (`uts.secrets.unavailable` with
 `reason` `denied`), redeploy UTS, or roll the var back to `worker`.
 
-**Flip, per environment** (staging first, production only after the staging flip held), with the
+**Flip, per environment** (staging first, then production after the staging flip held), with the
 environment's `uts` policy live in STS:
 
 1. **Parity.** Every name in the environment's `/workloads/uts` holds the Worker secret's value,
@@ -1597,7 +1597,7 @@ environment's `uts` policy live in STS:
 | `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
 | `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations; staging sets all five, production sets none, so production offers none of these providers (Sign-in providers, "Configuration") |
 | `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
-| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); staging `sts`, production `worker` until its flip |
 | `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ## Identity store

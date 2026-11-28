@@ -48,7 +48,7 @@
     "LOGIN_ROTATION": "off",
     // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
     // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
-    // Each environment stays on `worker` until its flip; the flip and its rollback are this one var
+    // Production stays on `worker` until its flip; the flip and its rollback are this one var
     // (README, "Runtime secrets"). The Worker secrets stay set either way.
     "SECRETS_SOURCE": "worker",
     // Email sign-in and the notice email stay off until UTS_MAILGUN_DOMAIN, UTS_MAIL_FROM and
@@ -127,9 +127,9 @@
         "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
         "LOGIN_ROTATION": "off",
-        // Staging flips to `sts` in its own change once its STS policy is live and its values match
-        // (README, "Runtime secrets").
-        "SECRETS_SOURCE": "worker",
+        // Staging reads its runtime secrets from its STS bundle /workloads/uts; the Worker secrets
+        // stay set for rollback.
+        "SECRETS_SOURCE": "sts",
         // GitHub, Google, GitLab, Discord and LinkedIn sign-in. Each client id is the switch: its
         // SIGNIN_<PROVIDER>_CLIENT_SECRET is set first, in the staging /workloads/uts bundle and the
         // Worker secret (README, "Configuration"). Production offers none of them yet.

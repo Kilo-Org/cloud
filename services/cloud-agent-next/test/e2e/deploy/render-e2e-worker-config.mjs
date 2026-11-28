@@ -265,10 +265,10 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   }
 
   // The STS broker authorizes on `props.caller`, which must equal the Worker's own name, and this
-  // render renames the Worker. The E2E Worker therefore loses the binding, and `SECRETS_SOURCE` is
-  // pinned below so a production flip to `sts` cannot reach it through the inherited vars. A
-  // rendered config is not covered by services/sts/test/repo/worker-configs.ts, so the render does
-  // this itself.
+  // render renames the Worker. The E2E Worker therefore loses the binding, so it reads no bundle
+  // and mints no service token, and `SECRETS_SOURCE` is pinned below so a production flip to `sts`
+  // cannot reach it through the inherited vars. A rendered config is not covered by
+  // services/sts/test/repo/worker-configs.ts, so the render does this itself.
   config.services = (config.services ?? []).filter(binding => binding.binding !== 'STS');
   if (config.services.length === 0) delete config.services;
 
@@ -373,6 +373,8 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     vars.E2E_ACCESS_AUD = verifiedAccess.aud;
     vars.E2E_ACCESS_TEAM_DOMAIN = verifiedAccess.teamDomain;
   }
+  // Q9 admission observation is production-only; the e2e Worker never inherits it.
+  delete vars.KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED;
   config.vars = vars;
 
   config.secrets_store_secrets = [structuredClone(E2E_SIGNING_SECRET)];

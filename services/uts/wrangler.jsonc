@@ -48,14 +48,12 @@
     "LOGIN_ROTATION": "off",
     // Where the runtime secrets come from (src/secrets.ts): `worker` (the Worker secrets) or `sts`
     // (the UTS STS bundle over the `STS` binding below, never falling back to the Worker secrets).
-    // Each environment stays on `worker` until its flip, which is its own change (README, "Runtime
-    // secrets"); the Worker secrets stay set either way. The rollback is this one var too, except
-    // here while the sign-in client ids below are set: production keeps their client secrets only
-    // in the bundle, so they go first.
-    "SECRETS_SOURCE": "worker",
+    // Production reads its runtime secrets from its STS bundle /workloads/uts; the Worker secrets
+    // stay set for rollback, which is this one var (README, "Runtime secrets").
+    "SECRETS_SOURCE": "sts",
     // GitHub, Google, GitLab and LinkedIn sign-in. Production holds their
     // SIGNIN_<PROVIDER>_CLIENT_SECRET values only in its /workloads/uts bundle, never as Worker
-    // secrets, so test/repo refuses these client ids until SECRETS_SOURCE above reads `sts`: this
+    // secrets, so test/repo refuses these client ids unless SECRETS_SOURCE above reads `sts`: this
     // change merges only after the flip, and a rollback removes them before the source goes back
     // (README, "Production sign-in providers"). Production sets no Discord client id: that
     // registration and its secret are not ready.
@@ -139,9 +137,9 @@
         "WEBAUTHN_RP_ID": "uts-staging.kiloapps.io",
         "WEBAUTHN_ORIGINS": "https://uts-staging.kiloapps.io",
         "LOGIN_ROTATION": "off",
-        // Staging flips to `sts` in its own change once its STS policy is live and its values match
-        // (README, "Runtime secrets").
-        "SECRETS_SOURCE": "worker",
+        // Staging reads its runtime secrets from its STS bundle /workloads/uts; the Worker secrets
+        // stay set for rollback.
+        "SECRETS_SOURCE": "sts",
         // GitHub, Google, GitLab, Discord and LinkedIn sign-in. Each client id is the switch: its
         // SIGNIN_<PROVIDER>_CLIENT_SECRET is set first, in the staging /workloads/uts bundle and the
         // Worker secret (README, "Configuration"). Production offers GitHub, Google, GitLab and

@@ -44,7 +44,7 @@ function okBundle(secrets: Record<string, string>): BundleResult {
 
 /** A fresh STS binding per call: the reader keeps one bundle per binding for the isolate. */
 function service(
-  source: string | undefined,
+  environment: string,
   bundle: BundleResult = okBundle({ NEXTAUTH_SECRET: BUNDLE_SECRET })
 ) {
   const getBundle = vi.fn<BundleBinding['getBundle']>(async () => bundle);
@@ -52,8 +52,7 @@ function service(
   const minting = new TokenMintingService({
     HYPERDRIVE: { connectionString: 'postgres://test' },
     NEXTAUTH_SECRET: { get: storeGet },
-    ENVIRONMENT: 'production',
-    ...(source === undefined ? {} : { SECRETS_SOURCE: source }),
+    ENVIRONMENT: environment,
     STS: { getBundle },
   });
   return { minting, getBundle, storeGet };
@@ -75,22 +74,19 @@ afterEach(() => {
 });
 
 describe('webhook token minting secrets source', () => {
-  it.each([undefined, 'secrets-store'])(
-    'signs with the Secrets Store value and reads no bundle (%j)',
-    async source => {
-      const { minting, getBundle, storeGet } = service(source);
+  it('signs with the Secrets Store value and reads no bundle in development', async () => {
+    const { minting, getBundle, storeGet } = service('development');
 
-      const { token } = await minting.mintToken({ userId: 'user-1', triggerId: 'trigger-1' });
+    const { token } = await minting.mintToken({ userId: 'user-1', triggerId: 'trigger-1' });
 
-      expect(await verifiedUser(token, STORE_SECRET)).toEqual({ userId: 'user-1' });
-      expect(await verifiedUser(token, BUNDLE_SECRET)).toBeNull();
-      expect(storeGet).toHaveBeenCalledOnce();
-      expect(getBundle).not.toHaveBeenCalled();
-    }
-  );
+    expect(await verifiedUser(token, STORE_SECRET)).toEqual({ userId: 'user-1' });
+    expect(await verifiedUser(token, BUNDLE_SECRET)).toBeNull();
+    expect(storeGet).toHaveBeenCalledOnce();
+    expect(getBundle).not.toHaveBeenCalled();
+  });
 
-  it('signs with the bundle value under sts and never reads the Secrets Store', async () => {
-    const { minting, getBundle, storeGet } = service('sts');
+  it('signs with the bundle value in production and never reads the Secrets Store', async () => {
+    const { minting, getBundle, storeGet } = service('production');
 
     const { token } = await minting.mintToken({ userId: 'user-1', triggerId: 'trigger-1' });
 
@@ -101,15 +97,16 @@ describe('webhook token minting secrets source', () => {
   });
 
   it.each<[string, BundleResult]>([
-    ['sts', okBundle({})],
-    ['STS', okBundle({ NEXTAUTH_SECRET: BUNDLE_SECRET })],
-  ])('fails with the fixed error and no fallback (SECRETS_SOURCE %j)', async (source, bundle) => {
+    ['production', okBundle({})],
+    ['staging', okBundle({ NEXTAUTH_SECRET: BUNDLE_SECRET })],
+  ])('fails with the fixed error and no fallback (ENVIRONMENT %j)', async (environment, bundle) => {
     vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-    const { minting, storeGet } = service(source, bundle);
+    const { minting, getBundle, storeGet } = service(environment, bundle);
 
     await expect(
       minting.mintToken({ userId: 'user-1', triggerId: 'trigger-1' })
     ).rejects.toBeInstanceOf(SecretSourceUnavailableError);
     expect(storeGet).not.toHaveBeenCalled();
+    if (environment !== 'production') expect(getBundle).not.toHaveBeenCalled();
   });
 });

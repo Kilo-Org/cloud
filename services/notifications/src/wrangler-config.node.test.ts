@@ -79,6 +79,7 @@ describe('notifications wrangler.jsonc', () => {
       APNS_TEAM_ID: 'X96D76J65Z',
       APNS_KEY_ID: 'KRYMZL626P',
       SECRETS_SOURCE: 'secrets-store',
+      SECRETS_COMPARE_ENABLED: 'true',
     });
     expect(boundKinds(production)).toEqual([
       'analytics_engine_datasets',

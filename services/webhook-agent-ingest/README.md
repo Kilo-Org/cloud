@@ -231,12 +231,10 @@ Captured requests go through the following status lifecycle:
 
 | Variable | Description |
 |---|---|
-| `ENVIRONMENT` | `production` or `development` |
+| `ENVIRONMENT` | `production` or `development`; also fixes where the three secrets below are read, see [Secrets source](#secrets-source) |
 | `KILOCODE_BACKEND_BASE_URL` | Backend API URL |
-| `SECRETS_SOURCE` | Where the three secrets below are read; see [Secrets source](#secrets-source) |
-| `SECRETS_COMPARE_ENABLED` | `true` runs the pre-flip STS copy check; see [Secrets source](#secrets-source) |
 
-## Secrets (via Secrets Store)
+## Secrets
 
 | Secret | Description |
 |---|---|
@@ -246,14 +244,14 @@ Captured requests go through the following status lifecycle:
 
 ### Secrets source
 
-`SECRETS_SOURCE` selects where every read of the three secrets goes (`src/secrets.ts`):
+`ENVIRONMENT` fixes where every read of the three secrets goes (`src/secrets.ts`); there is no source setting:
 
-- `secrets-store` (default, also when unset): the Secrets Store bindings, as before. `env.dev` sets no value, so it keeps this source.
-- `sts`: the production STS bundle over the `STS` binding (`props.caller` `cloudflare-webhook-agent-ingest`). It never falls back to the Secrets Store. A request without a credential reads no bundle and gets the usual `401`. A failed read answers `/api/*` and `/api/callbacks/execution` with a generic `503` (`Retry-After: 30`, error `Internal key unavailable`) before the body is read. In the queue consumer it fails the delivery with the fixed text `Webhook credentials are temporarily unavailable`, which the consumer retries like any other failure. Each failure logs a fixed event with a fixed reason only.
+- `production`: the production STS bundle over the `STS` binding (`props.caller` `cloudflare-webhook-agent-ingest`). It never falls back to the Secrets Store; the production Secrets Store bindings stay configured but are never read. A request without a credential reads no bundle and gets the usual `401`. A failed read answers `/api/*` and `/api/callbacks/execution` with a generic `503` (`Retry-After: 30`, error `Internal key unavailable`) before the body is read. In the queue consumer it fails the delivery with the fixed text `Webhook credentials are temporarily unavailable`, which the consumer retries like any other failure. Each failure logs a fixed event with a fixed reason only.
+- `development` (`env.dev`, local only): its own Secrets Store bindings, or the plain strings from `.dev.vars` under `wrangler dev`.
 
-Any other value refuses every read in the same way. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants the three names, each resolved from `/shared` (a name not yet copied there reads as missing).
+Any other value, an absent one included, refuses every read in the same way with the reason `unsupported_environment`. The Worker declares no other environment. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants the three names, each resolved from `/shared` (a name not yet copied there reads as missing).
 
-`SECRETS_COMPARE_ENABLED` (only the exact value `true`) turns on the pre-flip check in `src/secrets-compare.ts`. It runs once per isolate, after the first request that passes the legacy authentication — an `X-Internal-API-Key` check on `/api/*` or an `X-Callback-Token` check on `/api/callbacks/execution` — so it never runs before an authorized request and never on one that is refused. It compares the STS copy of each of the three names with the bytes the Secrets Store serves and logs one `webhook_secrets_compare` event holding only the three names and their booleans. It never changes a response, and a comparison that has not settled within 25 s reports every name `false`. It requires production and `SECRETS_SOURCE` `secrets-store`: with `sts` selected it never runs, and `env.dev` sets neither value. To stop every comparison, set the flag to `false` or unset it.
+Every `401` from `/api/*` or `/api/callbacks/execution` logs its warning with fixed fields only: `route` (`internal-api` or `execution-callback`), `secret`, the serving `source` (`sts` or `secrets-store`) and `reason` (`missing` or `invalid`).
 
 ## Authentication
 
@@ -266,7 +264,7 @@ The `/inbound/*` routes accept webhooks from external services without authentic
 The `/api/*` routes use internal API key authentication for backend-to-backend calls:
 
 - Requests must include `X-Internal-API-Key: <secret>` header
-- The secret is validated against `INTERNAL_API_SECRET` from the source that `SECRETS_SOURCE` selects
+- The secret is validated against `INTERNAL_API_SECRET` from the source that `ENVIRONMENT` fixes
 - This is designed for calls from the Kilo backend, not direct user access
 - The backend is trusted to call the correct endpoints for the appropriate users/orgs
 

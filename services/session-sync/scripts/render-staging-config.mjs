@@ -82,6 +82,11 @@ try {
       !source.durable_objects.bindings[4].environment,
     'Review the staging renderer when the entrypoint or Durable Object bindings change'
   );
+  // Staging reads its own Secrets Store items below and binds no `STS`, so the source is pinned
+  // here: inheriting a production flip to `sts` would refuse every staging read.
+  const vars = { ...source.vars, ENVIRONMENT: 'staging', SECRETS_SOURCE: 'secrets-store' };
+  // Q9 admission observation is production-only; staging never inherits it.
+  delete vars.KILO_TOKEN_ADMISSION_OBSERVATION_ENABLED;
   // Select only service code/runtime settings. Never inherit local credentials,
   // resource bindings, routes, environments, or a future production service binding.
   const config = {
@@ -95,9 +100,7 @@ try {
     observability: source.observability,
     workers_dev: true,
     preview_urls: false,
-    // Staging reads its own Secrets Store items below and binds no `STS`, so the source is pinned
-    // here: inheriting a production flip to `sts` would refuse every staging read.
-    vars: { ...source.vars, ENVIRONMENT: 'staging', SECRETS_SOURCE: 'secrets-store' },
+    vars,
     ratelimits: source.ratelimits.map((binding, index) => ({
       ...binding,
       namespace_id: String(1028 + index),

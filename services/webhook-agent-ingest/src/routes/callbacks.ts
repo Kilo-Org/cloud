@@ -7,7 +7,6 @@ import { INTERNAL_CALLER_HEADER } from '@kilocode/worker-utils/internal-auth-obs
 import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
 import { expectedSecret, secretUnavailableResponse } from '../secrets';
-import { compareSecretsOnce } from '../secrets-compare';
 
 const callbacks = new Hono<HonoContext>();
 
@@ -46,7 +45,7 @@ callbacks.post('/execution', async c => {
     return c.json(resError('Internal server error'), 500);
   }
 
-  // A tokenless request under `sts` read no secret and is refused here without a check.
+  // A tokenless request in production read no secret and is refused here without a check.
   const validCallbackToken =
     expected.status === 'read' &&
     (await verifyCallbackToken({
@@ -60,12 +59,14 @@ callbacks.post('/execution', async c => {
       },
     }));
   if (!validCallbackToken) {
-    logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
+    logger.warn('Callback authentication failed', {
+      route: 'execution-callback',
+      secret: 'CALLBACK_TOKEN_SECRET',
+      source: expected.source,
+      reason: callbackToken ? 'invalid' : 'missing',
+    });
     return c.json(resError('Unauthorized'), 401);
   }
-  // Pre-flip STS copy check, off unless enabled (src/secrets-compare.ts). It runs in the
-  // background and never changes this answer.
-  compareSecretsOnce(c.env, () => c.executionCtx);
 
   let payload: z.infer<typeof ExecutionCallbackPayloadSchema>;
   try {

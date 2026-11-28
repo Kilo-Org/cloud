@@ -416,7 +416,10 @@ describe('Hono Routes', () => {
       });
 
       const path = `/api/triggers/user/${encodeUserIdForPath(userId)}/${triggerId}/invoke`;
+      // The test Worker sets no ENVIRONMENT; only `development` reads this binding.
+      const originalEnvironment = env.ENVIRONMENT;
       const originalSecret = env.INTERNAL_API_SECRET;
+      Object.defineProperty(env, 'ENVIRONMENT', { configurable: true, value: 'development' });
       Object.defineProperty(env, 'INTERNAL_API_SECRET', {
         configurable: true,
         value: { get: async () => 'test-internal-secret' },
@@ -433,6 +436,10 @@ describe('Hono Routes', () => {
         const body = await response.json();
         expect(body).toMatchObject({ success: true, data: { requestId: expect.any(String) } });
       } finally {
+        Object.defineProperty(env, 'ENVIRONMENT', {
+          configurable: true,
+          value: originalEnvironment,
+        });
         Object.defineProperty(env, 'INTERNAL_API_SECRET', {
           configurable: true,
           value: originalSecret,

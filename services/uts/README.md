@@ -1629,12 +1629,13 @@ environment's `uts` policy live in STS:
 ### Production sign-in providers (runbook)
 
 Production offers GitHub, Google, GitLab and LinkedIn sign-in through the four client id vars in
-the top level of `wrangler.jsonc`. Their client secrets exist only in production's `/workloads/uts` folder,
-never as Worker secrets, so the providers work only under `SECRETS_SOURCE` `sts`. `test/repo`
-refuses a production block that sets any `SIGNIN_<PROVIDER>_CLIENT_ID` under another source. The
-client id change never changes `SECRETS_SOURCE`: until the flip of step 2 is on the base branch,
-that change fails `test/repo` in CI, so it cannot merge before the flip, and a rollback must remove
-the client ids before the source goes back. Enable, in this order:
+the top level of `wrangler.jsonc`. Their client secrets exist only in production's
+`/workloads/uts` folder, never as Worker secrets, so the providers work only under
+`SECRETS_SOURCE` `sts`. `test/repo` refuses a production block that sets any
+`SIGNIN_<PROVIDER>_CLIENT_ID` under another source. The client id change never changes
+`SECRETS_SOURCE`: until the flip of step 2 is on the base branch, that change fails `test/repo` in
+CI, so it cannot merge before the flip, and a rollback must remove the client ids before the
+source goes back. Enable, in this order:
 
 1. **Prerequisites merged and deployed:** the `uts` STS policy (`services/sts/policy/uts.yaml`,
    which grants `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`,

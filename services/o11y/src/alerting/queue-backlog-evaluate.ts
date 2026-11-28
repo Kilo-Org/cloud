@@ -7,17 +7,15 @@ import {
 } from './queue-backlog-state';
 import { queryQueueBacklog } from './queue-backlog-query';
 import { sendAlertNotification, type AlertPayload } from './notify';
+import type { O11ySecretsEnv } from '../secrets';
 
-type QueueBacklogEnv = {
+type QueueBacklogEnv = O11ySecretsEnv & {
   O11Y_ALERT_STATE: KVNamespace;
   O11Y_CF_ACCOUNT_ID: string;
-  O11Y_CF_CONTAINERS_API_TOKEN: SecretsStoreSecret;
-  O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
-  O11Y_SLACK_WEBHOOK_TICKET: SecretsStoreSecret;
 };
 
 type QueryFn = (
-  env: Pick<QueueBacklogEnv, 'O11Y_CF_ACCOUNT_ID' | 'O11Y_CF_CONTAINERS_API_TOKEN'>
+  env: Pick<QueueBacklogEnv, 'O11Y_CF_ACCOUNT_ID' | 'STS'>
 ) => Promise<QueueBacklogMetrics>;
 
 type NotifyFn = (alert: AlertPayload, env: QueueBacklogEnv) => Promise<void>;

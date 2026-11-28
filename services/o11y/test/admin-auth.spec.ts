@@ -43,8 +43,8 @@ function stubFetch() {
 }
 
 /**
- * An env whose legacy secret can come from either source; `reads` records every Secrets Store
- * read and `bundleCalls` every STS bundle call, so a test can prove the secret was not read.
+ * An env bound to both secret sources; `reads` records every Secrets Store read and `bundleCalls`
+ * every STS bundle call, so a test can prove which one the legacy check used.
  * `sinkWrites` records every API-metrics write to Analytics Engine and the pipeline.
  */
 function makeEnv(vars: Record<string, string | undefined>) {
@@ -160,22 +160,21 @@ describe('the admin route contract', () => {
 });
 
 describe.each([undefined, 'legacy-only'])('mode %s (the default)', mode => {
-  it.each(['secrets-store', 'sts'])(
-    'accepts the shared secret from %s and makes no key-set fetch',
-    async source => {
-      const fetches = stubFetch();
-      const { env } = makeEnv({ ADMIN_CREDENTIAL_ACCEPT: mode, SECRETS_SOURCE: source });
-      const response = await call(app(), 'apiMetricsWrite', env, {
-        'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
-      });
-      expect(response.status).toBe(204);
-      expect(fetches).toEqual([]);
-    }
-  );
+  it('accepts the shared secret from the bundle and makes no key-set fetch', async () => {
+    const fetches = stubFetch();
+    const { env, reads, bundleCalls } = makeEnv({ ADMIN_CREDENTIAL_ACCEPT: mode });
+    const response = await call(app(), 'apiMetricsWrite', env, {
+      'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
+    });
+    expect(response.status).toBe(204);
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(1);
+    expect(fetches).toEqual([]);
+  });
 
   it('ignores an STS bearer: the legacy check decides, with no key-set fetch', async () => {
     const fetches = stubFetch();
-    const { env, reads } = makeEnv({
+    const { env, reads, bundleCalls } = makeEnv({
       ADMIN_CREDENTIAL_ACCEPT: mode,
       STS_ENVIRONMENT: 'production',
     });
@@ -184,7 +183,8 @@ describe.each([undefined, 'legacy-only'])('mode %s (the default)', mode => {
     });
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ success: false, error: 'Unauthorized' });
-    expect(reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(1);
     expect(fetches).toEqual([]);
   });
 
@@ -374,7 +374,7 @@ describe.each(['legacy-and-sts', 'sts-only'])('mode %s', mode => {
 describe('the shared secret header without a bearer', () => {
   it('runs the legacy check in legacy-and-sts', async () => {
     const fetches = stubFetch();
-    const { env, reads } = makeEnv({
+    const { env, reads, bundleCalls } = makeEnv({
       ADMIN_CREDENTIAL_ACCEPT: 'legacy-and-sts',
       STS_ENVIRONMENT: 'production',
     });
@@ -382,7 +382,8 @@ describe('the shared secret header without a bearer', () => {
       'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
     });
     expect(response.status).toBe(200);
-    expect(reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(reads).toEqual([]);
+    expect(bundleCalls()).toBe(1);
     expect(fetches).toEqual([]);
   });
 
@@ -604,7 +605,8 @@ describe('API_METRICS_CREDENTIAL_ACCEPT, the api-metrics write alone', () => {
         'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
       });
       expect(alerting.status).toBe(200);
-      expect(reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+      expect(reads).toEqual([]);
+      expect(bundleCalls()).toBe(1);
     }
   );
 
@@ -728,7 +730,7 @@ describe('API_METRICS_CREDENTIAL_ACCEPT, the api-metrics write alone', () => {
 
     it('keeps the alerting routes on the shared secret, ignoring an STS bearer', async () => {
       const fetches = stubFetch();
-      const { env, reads } = makeEnv(vars);
+      const { env, reads, bundleCalls } = makeEnv(vars);
       const hono = app();
       const read = await call(hono, 'alertingRead', env, { 'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET });
       const write = await call(hono, 'alertingWrite', env, { 'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET });
@@ -737,11 +739,8 @@ describe('API_METRICS_CREDENTIAL_ACCEPT, the api-metrics write alone', () => {
       });
       expect([read.status, write.status, bearer.status]).toEqual([200, 200, 401]);
       expect(await bearer.json()).toEqual({ success: false, error: 'Unauthorized' });
-      expect(reads).toEqual([
-        'O11Y_KILO_GATEWAY_CLIENT_SECRET',
-        'O11Y_KILO_GATEWAY_CLIENT_SECRET',
-        'O11Y_KILO_GATEWAY_CLIENT_SECRET',
-      ]);
+      expect(reads).toEqual([]);
+      expect(bundleCalls()).toBe(1);
       expect(fetches).toEqual([]);
     });
 
@@ -786,9 +785,12 @@ describe('API_METRICS_CREDENTIAL_ACCEPT, the api-metrics write alone', () => {
       Authorization: `Bearer ${await token()}`,
     });
     expect([legacy.status, sts.status, alerting.status]).toEqual([204, 204, 401]);
-    expect(legacyEnv.reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(legacyEnv.reads).toEqual([]);
+    expect(legacyEnv.bundleCalls()).toBe(1);
     expect(stsEnv.reads).toEqual([]);
-    expect(alertingEnv.reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(stsEnv.bundleCalls()).toBe(0);
+    expect(alertingEnv.reads).toEqual([]);
+    expect(alertingEnv.bundleCalls()).toBe(1);
     expect(fetches).toEqual([JWKS_URL]);
   });
 
@@ -809,8 +811,10 @@ describe('API_METRICS_CREDENTIAL_ACCEPT, the api-metrics write alone', () => {
       'X-O11Y-ADMIN-TOKEN': LEGACY_SECRET,
     });
     expect([metrics.status, alerting.status]).toEqual([204, 401]);
-    expect(metricsEnv.reads).toEqual(['O11Y_KILO_GATEWAY_CLIENT_SECRET']);
+    expect(metricsEnv.reads).toEqual([]);
+    expect(metricsEnv.bundleCalls()).toBe(1);
     expect(alertingEnv.reads).toEqual([]);
+    expect(alertingEnv.bundleCalls()).toBe(0);
   });
 });
 

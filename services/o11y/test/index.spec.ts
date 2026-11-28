@@ -1,6 +1,7 @@
 import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
 import Worker from '../src/index';
+import { stsBundle } from './sts-bundle-fixture';
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
@@ -41,9 +42,12 @@ function makeAlertConfigDOMock(): Env['ALERT_CONFIG_DO'] {
 
 function makeTestEnv(overrides?: Partial<Env>): Env {
   return {
-    O11Y_KILO_GATEWAY_CLIENT_SECRET: {
-      get: async () => TEST_CLIENT_SECRET,
-    } as SecretsStoreSecret,
+    STS: stsBundle({
+      O11Y_KILO_GATEWAY_CLIENT_SECRET: TEST_CLIENT_SECRET,
+      O11Y_CF_AE_API_TOKEN: 'test-ae-token',
+      O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/test-page',
+      O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/test-ticket',
+    }),
     O11Y_API_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
     O11Y_SESSION_METRICS: makeWriteDataPointSpy() as unknown as AnalyticsEngineDataset,
     API_METRICS_STREAM: makePipelineSpy() as unknown as Env['API_METRICS_STREAM'],
@@ -52,13 +56,6 @@ function makeTestEnv(overrides?: Partial<Env>): Env {
     ALERT_CONFIG_DO: makeAlertConfigDOMock(),
     O11Y_CF_ACCOUNT_ID: 'test-account-id' as never,
     O11Y_API_BASE_URL: 'https://api.kilo.ai',
-    O11Y_CF_AE_API_TOKEN: { get: async () => 'test-ae-token' } as SecretsStoreSecret,
-    O11Y_SLACK_WEBHOOK_PAGE: {
-      get: async () => 'https://hooks.slack.com/test-page',
-    } as SecretsStoreSecret,
-    O11Y_SLACK_WEBHOOK_TICKET: {
-      get: async () => 'https://hooks.slack.com/test-ticket',
-    } as SecretsStoreSecret,
     ...overrides,
   };
 }

@@ -4,7 +4,11 @@
   "name": "session-ingest-test",
   "main": "test/test-worker.ts",
   "compatibility_date": "2026-01-27",
-  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "service_binding_extra_handlers",
+    "unhandled_rejection_after_microtask_checkpoint",
+  ],
 
   "rules": [
     {

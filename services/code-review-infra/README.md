@@ -45,6 +45,41 @@ callback target handed to Cloud Agent Next keeps the derived token:
 Cloud Agent Next delivers that callback with its own credential. The test config
 (`wrangler.test.jsonc`) binds no STS and stays on `legacy`.
 
+### Review route credentials (`BACKEND_CREDENTIAL_ACCEPT`)
+
+Web calls the review routes with one credential in `Authorization: Bearer`, chosen by its own
+`CODE_REVIEW_WORKER_SENDER_AUTH`. `BACKEND_CREDENTIAL_ACCEPT` (`src/backend-auth.ts`) selects what
+the routes accept:
+
+- absent, empty or `legacy-only`: the `BACKEND_AUTH_TOKEN` bearer, exactly as before, with no
+  verifier and no key-set fetch;
+- `legacy-and-sts`: the bearer is compared with `BACKEND_AUTH_TOKEN` exactly first; any other value,
+  a malformed token included, must be an STS service token, and that refusal is final;
+- `sts-only`: only an STS service token; the shared secret is never read;
+- `disabled`: every review route answers 401. Any other value answers 500.
+
+The STS token must carry audience `code-review`, the scope of its route and the `web` workload,
+from the issuer of `STS_ENVIRONMENT` (`production`, or `development` for `wrangler dev`; there is
+no staging deployment):
+
+| Route | Scope |
+|---|---|
+| `POST /review` | `code-review:review.dispatch` |
+| `GET /reviews/:reviewId/status` | `code-review:review.status-read` |
+| `POST /reviews/:reviewId/cancel` | `code-review:review.cancel` |
+| `POST /reviews/:reviewId/retry-fresh` | `code-review:review.retry-fresh` |
+
+`/health` and unmatched paths keep the `BACKEND_AUTH_TOKEN` check in every mode. In an STS mode,
+`GET /.well-known/oauth-protected-resource` serves the RFC 9728 document that every STS challenge
+names. Admissions are counted in `kilo_internal_auth` lines (`@kilocode/worker-utils`, aggregated
+per minute; the first admission of a bucket is written at once) by route, `auth`
+(`legacy_shared_secret` or `sts`) and `caller`, which for `sts` is the verified workload; a refusal
+logs `code_review_backend_sts_refused` with the route, status and rule. Neither carries a credential.
+
+Production leaves `BACKEND_CREDENTIAL_ACCEPT` unset until the scopes are registered and granted to
+`web`. The flip order is `legacy-and-sts` here, then `sts` on web, then `sts-only` here; rollback is
+`legacy-only`.
+
 ## Development
 
 ```bash

@@ -2823,12 +2823,21 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
       '@kilocode/service-token-client':
         specifier: workspace:*
         version: link:../../packages/service-token-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3774,6 +3783,12 @@ importers:
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../../packages/verify
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

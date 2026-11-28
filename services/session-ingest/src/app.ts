@@ -22,6 +22,12 @@ import {
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
 import { withDORetry } from '@kilocode/worker-utils';
+import {
+  INVALIDATE_ROUTE_LABEL,
+  RESOURCE_METADATA_PATH,
+  createInvalidateAuth,
+  protectedResourceMetadata,
+} from './session-access-invalidate-auth';
 
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
@@ -33,6 +39,7 @@ async function hasValidInternalSecret(
     req: { header(name: string): string | undefined };
     env: Env;
   },
+  route: string,
   ctx?: SecretsExecutionContext
 ): Promise<boolean> {
   const provided = c.req.header('X-Internal-Secret');
@@ -40,41 +47,58 @@ async function hasValidInternalSecret(
   if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
   observeInternalAuth(
     'session-ingest',
-    'cloud_agent_internal',
+    route,
     'legacy_shared_secret',
     callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
   );
   return true;
 }
 
-const requireValidInternalSecret = createMiddleware<{
+type AppEnv = {
   Bindings: Env;
   Variables: { user_id: string; deletionAudience?: boolean };
-}>(async (c, next) => {
-  let isValid: boolean;
-  try {
-    isValid = await hasValidInternalSecret(c, requestContext(c));
-  } catch (error) {
-    console.error('Auth infrastructure failure', {
-      operation: 'internal-api-secret-get',
-      errorClass: error instanceof Error ? error.name : typeof error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-    return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
-  }
-  if (!isValid) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
-  }
-  return next();
-});
+};
 
-export const app = new Hono<{
-  Bindings: Env;
-  Variables: {
-    user_id: string;
-    deletionAudience?: boolean;
-  };
-}>();
+/** The `X-Internal-Secret` check, counted under `route`. */
+function internalSecretMiddleware(route: string) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    let isValid: boolean;
+    try {
+      isValid = await hasValidInternalSecret(c, route, requestContext(c));
+    } catch (error) {
+      console.error('Auth infrastructure failure', {
+        operation: 'internal-api-secret-get',
+        errorClass: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+    }
+    if (!isValid) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    return next();
+  });
+}
+
+const requireValidInternalSecret = internalSecretMiddleware('cloud_agent_internal');
+
+/**
+ * The invalidation route's guard: the shared secret, or under
+ * `SESSION_ACCESS_INVALIDATE_CREDENTIAL_ACCEPT` web's STS token
+ * (`session-access-invalidate-auth.ts`). The other internal routes keep the shared secret.
+ */
+const requireSessionAccessInvalidate = createInvalidateAuth<AppEnv>(
+  internalSecretMiddleware(INVALIDATE_ROUTE_LABEL)
+);
+
+export const app = new Hono<AppEnv>();
+
+// The RFC 9728 document the invalidation route's STS challenge names, served only while an STS
+// mode is configured; otherwise the ordinary 404.
+app.get(
+  RESOURCE_METADATA_PATH,
+  async (c, next) => protectedResourceMetadata(c.env) ?? (await next())
+);
 
 // Protect all /api routes with Kilo user API JWT auth.
 app.use('/api/*', kiloJwtAuthMiddleware);
@@ -150,7 +174,7 @@ app.get('/session/:shareToken/metadata', async c => {
   );
 });
 
-app.post('/internal/session-access/invalidate', requireValidInternalSecret, async c => {
+app.post('/internal/session-access/invalidate', requireSessionAccessInvalidate, async c => {
   const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);

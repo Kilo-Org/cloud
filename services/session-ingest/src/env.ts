@@ -14,4 +14,12 @@ export type Env = Omit<
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_MAX_BYTES: string;
   SESSION_SHARE_TOKEN_MIN_IAT: string;
+  /**
+   * Which credentials `POST /internal/session-access/invalidate` accepts
+   * (`session-access-invalidate-auth.ts`): unset or `legacy-only` (`X-Internal-Secret`),
+   * `legacy-and-sts`, `sts-only` or `disabled`.
+   */
+  SESSION_ACCESS_INVALIDATE_CREDENTIAL_ACCEPT?: string;
+  /** The STS environment whose tokens that route accepts; read only in an STS mode. */
+  STS_ENVIRONMENT?: string;
 };

@@ -8,6 +8,8 @@ import { api } from './routes/api';
 import { callbacks } from './routes/callbacks';
 import { handleWebhookDeliveryBatch } from './queue-consumer';
 import type { WebhookDeliveryMessage } from './util/queue';
+import { internalReceiver } from './util/auth';
+import type { InternalReceiverEnv } from '@kilocode/worker-utils/internal-service-receiver';
 
 export { TriggerDO };
 
@@ -32,6 +34,11 @@ app.get('/health', c => {
       timestamp: new Date().toISOString(),
     })
   );
+});
+
+app.get('/.well-known/oauth-protected-resource', c => {
+  const env: Env & InternalReceiverEnv = c.env;
+  return internalReceiver.protectedResourceMetadata(env) ?? c.json(resError('Not found'), 404);
 });
 
 app.route('/inbound', inbound);

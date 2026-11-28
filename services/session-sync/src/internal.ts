@@ -6,7 +6,13 @@ import {
   callerLabel,
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
-import { Hono } from 'hono';
+import { STS_SESSION_SYNC_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  createInternalServiceReceiver,
+  type InternalReceiverEnv,
+  type InternalRouteContract,
+} from '@kilocode/worker-utils/internal-service-receiver';
+import { Hono, type Context } from 'hono';
 import { userIDSchema } from './protocol';
 
 import { getTenantStub } from './dos/SessionSyncTenantDO';
@@ -16,7 +22,22 @@ import { readSessionSyncSecret } from './secrets';
 
 export const internal = new Hono<{ Bindings: Env }>();
 
-internal.post('/users/:userID/erase', async c => {
+/** `POST /internal/users/:userID/erase`, sent only by the web app's account deletion. */
+const USER_ERASE_ROUTE: InternalRouteContract = {
+  label: 'user_erase',
+  scope: STS_SESSION_SYNC_INTERNAL_CALL.scope,
+  workloads: ['web'],
+  legacyHeader: 'X-Internal-Secret',
+};
+
+export const internalReceiver = createInternalServiceReceiver({
+  receiver: 'session-sync',
+  audience: STS_SESSION_SYNC_INTERNAL_CALL.audience,
+  routes: [USER_ERASE_ROUTE],
+});
+
+/** The legacy check, unchanged: the shared secret in `X-Internal-Secret`. */
+async function legacyRefusal(c: Context<{ Bindings: Env }>): Promise<Response | null> {
   const provided = c.req.header('X-Internal-Secret');
   if (!provided) return c.json({ error: 'Unauthorized' }, 401);
   try {
@@ -30,7 +51,7 @@ internal.post('/users/:userID/erase', async c => {
     }
     observeInternalAuth(
       'session-sync',
-      'user_erase',
+      USER_ERASE_ROUTE.label,
       'legacy_shared_secret',
       callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
     );
@@ -40,6 +61,20 @@ internal.post('/users/:userID/erase', async c => {
     });
     return c.json({ error: 'Service temporarily unavailable' }, 503);
   }
+  return null;
+}
+
+internal.post('/users/:userID/erase', async c => {
+  // `INTERNAL_CREDENTIAL_ACCEPT` selects the shared secret, an STS token or either.
+  const receiverEnv: Env & InternalReceiverEnv = c.env;
+  const refusal = await internalReceiver.admit(
+    c.req.raw,
+    receiverEnv,
+    USER_ERASE_ROUTE,
+    () => legacyRefusal(c),
+    { waitUntil: promise => c.executionCtx.waitUntil(promise) }
+  );
+  if (refusal !== null) return refusal;
   const userID = userIDSchema.safeParse(c.req.param('userID'));
   if (!userID.success) return c.json({ error: 'Invalid user ID' }, 400);
   const result = await withDORetry(

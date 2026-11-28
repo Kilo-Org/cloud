@@ -11,6 +11,12 @@ import {
   callerLabel,
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
+import { STS_MODEL_EVAL_INGEST_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  createInternalServiceReceiver,
+  type InternalReceiverEnv,
+  type InternalRouteContract,
+} from '@kilocode/worker-utils/internal-service-receiver';
 import * as z from 'zod';
 import { readModelEvalIngestSecret } from './secrets';
 import { createPromotionStore, syncPromotionsFromBench } from './sync.js';
@@ -24,6 +30,45 @@ async function runSync(env: CloudflareEnv, promotionName?: string) {
 
 function scheduledEnvironment(env: CloudflareEnv): string | undefined {
   return 'ENVIRONMENT' in env && typeof env.ENVIRONMENT === 'string' ? env.ENVIRONMENT : undefined;
+}
+
+/** `POST /internal/sync`, sent only by the web app. */
+const SYNC_ROUTE: InternalRouteContract = {
+  label: 'sync',
+  scope: STS_MODEL_EVAL_INGEST_INTERNAL_CALL.scope,
+  workloads: ['web'],
+  legacyHeader: 'x-internal-api-key',
+};
+
+const receiver = createInternalServiceReceiver({
+  receiver: 'model-eval-ingest',
+  audience: STS_MODEL_EVAL_INGEST_INTERNAL_CALL.audience,
+  routes: [SYNC_ROUTE],
+});
+
+/** The legacy check, unchanged: the shared secret in `x-internal-api-key`. */
+async function legacyRefusal(
+  request: Request,
+  env: CloudflareEnv,
+  ctx: ExecutionContext | undefined
+): Promise<Response | null> {
+  // Read the secret only for a request that presents a key: the Worker is reachable on its
+  // workers.dev host, so a keyless request costs no bundle load under `sts`.
+  const authHeader = request.headers.get('x-internal-api-key');
+  if (!authHeader) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const internalSecret = await readModelEvalIngestSecret(env, 'INTERNAL_API_SECRET', ctx);
+  if (!internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  observeInternalAuth(
+    'model-eval-ingest',
+    SYNC_ROUTE.label,
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
+  return null;
 }
 
 async function handleFetch(
@@ -41,26 +86,25 @@ async function handleFetch(
     });
   }
 
+  const receiverEnv: CloudflareEnv & InternalReceiverEnv = env;
+  if (request.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+    const metadata = receiver.protectedResourceMetadata(receiverEnv);
+    if (metadata !== null) return metadata;
+  }
+
   if (request.method !== 'POST' || url.pathname !== '/internal/sync') {
     return Response.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Read the secret only for a request that presents a key: the Worker is reachable on its
-  // workers.dev host, so a keyless request costs no bundle load under `sts`.
-  const authHeader = request.headers.get('x-internal-api-key');
-  if (!authHeader) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const internalSecret = await readModelEvalIngestSecret(env, 'INTERNAL_API_SECRET', ctx);
-  if (!internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  observeInternalAuth(
-    'model-eval-ingest',
-    'sync',
-    'legacy_shared_secret',
-    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  // `INTERNAL_CREDENTIAL_ACCEPT` selects the shared secret, an STS token or either.
+  const refusal = await receiver.admit(
+    request,
+    receiverEnv,
+    SYNC_ROUTE,
+    () => legacyRefusal(request, env, ctx),
+    { waitUntil: promise => ctx?.waitUntil(promise) }
   );
+  if (refusal !== null) return refusal;
 
   const rawBody = await request.text();
   let requestBody: unknown;

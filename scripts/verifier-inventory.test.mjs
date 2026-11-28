@@ -367,6 +367,12 @@ const EXCEPTIONS = {
     reason: sharedWorker,
     signals: { 'helper-call': 1 },
   },
+  'packages/worker-utils/src/internal-service-receiver.ts': {
+    reason:
+      'The shared internal-route STS receiver (design section 6.5, decision D59), gated by INTERNAL_CREDENTIAL_ACCEPT; its adopting Workers (session-sync, notifications, model-eval-ingest, security-auto-analysis, security-sync, webhook-agent-ingest) are the surfaces',
+    signals: { 'verify-library': 1 },
+    pins: ['export function createInternalServiceReceiver(', 'INTERNAL_CREDENTIAL_ACCEPT_MODES'],
+  },
   'packages/worker-utils/src/kilo-token-auth.ts': {
     reason: sharedWorker,
     signals: { 'helper-call': 4 },

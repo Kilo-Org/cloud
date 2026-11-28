@@ -2444,9 +2444,15 @@ importers:
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../session-ingest-contracts
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../sts-contracts
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts
+      '@kilocode/verify':
+        specifier: workspace:*
+        version: link:../verify
       aws4fetch:
         specifier: 'catalog:'
         version: 1.0.20
@@ -2466,9 +2472,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@kilocode/sts-contracts':
-        specifier: workspace:*
-        version: link:../sts-contracts
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3459,6 +3462,9 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3469,6 +3475,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 4.20260605.1
       '@types/node':
         specifier: '>=24 <25'
         version: 24.12.4
@@ -3505,6 +3514,9 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3673,6 +3685,9 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3826,6 +3841,9 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -4132,6 +4150,9 @@ importers:
       '@kilocode/secrets-client':
         specifier: workspace:*
         version: link:../../packages/secrets-client
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

@@ -114,3 +114,7 @@ Production/dev deployments need:
 - Web/Vercel `INTERNAL_API_SECRET` with the same value.
 - Web/Vercel `MODEL_EVAL_INGEST_URL` pointing at the deployed Worker URL.
 - Cloudflare Service Binding `BENCH_DASHBOARD` targeting the kilo-bench dashboard WorkerEntrypoint.
+
+### Secret source comparison
+
+Production serves `INTERNAL_API_SECRET` from the Secrets Store binding (`SECRETS_SOURCE=secrets-store`). With `SECRETS_COMPARE_ENABLED=true` and `ENVIRONMENT=production`, the first accepted `/internal/sync` key in an isolate compares the value it matched with the other source's copy under the request's `waitUntil` (`src/secrets-compare.ts`); a refused key starts no comparison. It logs `model_eval_ingest_secrets_compare` with fixed fields only (`route`, `secret`, `source`, and `match`, `mismatch` or `unproven`) and never changes a response. `env.dev` sets neither variable and has no STS binding. The scheduled sync reads no secret, so it never starts a comparison.

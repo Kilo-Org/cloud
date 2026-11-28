@@ -64,13 +64,37 @@ export async function readModelEvalIngestSecret(
     if (binding === undefined) {
       throw new Error('SECRETS_SOURCE is "sts" but the STS service binding is missing');
     }
-    let client = stsClients.get(binding);
-    if (client === undefined) {
-      client = createWorkerSecrets(binding);
-      stsClients.set(binding, client);
-    }
-    return client.get(name, ctx);
+    return readBundleSecret(binding, name, ctx);
   }
+  return readLegacySecret(env, name);
+}
+
+/**
+ * Reads one secret from the STS bundle over `binding`, whatever `SECRETS_SOURCE` selects, through
+ * the isolate's one client for that binding. The `sts` source and the source comparison
+ * (src/secrets-compare.ts) both read through it.
+ */
+export async function readBundleSecret(
+  binding: BundleBinding,
+  name: ModelEvalIngestSecretName,
+  ctx?: SecretsExecutionContext
+): Promise<string> {
+  let client = stsClients.get(binding);
+  if (client === undefined) {
+    client = createWorkerSecrets(binding);
+    stsClients.set(binding, client);
+  }
+  return client.get(name, ctx);
+}
+
+/**
+ * Reads one secret from the binding the deployment holds today, whatever `SECRETS_SOURCE`
+ * selects.
+ */
+export async function readLegacySecret(
+  env: Partial<Record<BindingName, LegacySecretValue>>,
+  name: ModelEvalIngestSecretName
+): Promise<string> {
   const bindingName = BINDINGS[name];
   const value = env[bindingName];
   if (value === undefined) {

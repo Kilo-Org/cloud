@@ -46,7 +46,7 @@ async function classifierUsage() {
       classifierModel: 'test/classifier',
       contentHash: 'hash',
       kind: 'sync',
-      requestStart: 'request-start',
+      requestStart: '1767225600123:10',
       requestedModel: 'kilo-auto/efficient',
     },
     0.000013,

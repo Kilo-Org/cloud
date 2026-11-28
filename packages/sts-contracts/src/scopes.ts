@@ -482,11 +482,11 @@ export const STS_CLOUD_AGENT_NEXT_SESSION_CLEANUP = {
  * - (3) With neither a valid action token nor a user Bearer, it is never honoured.
  * - (4) Each honoured bypass logs the workload and the user subject; each refusal logs a reason;
  *   neither logs token data.
- * - (5) The proof applies only where a bypass exists today, both under
+ * - (5) The token is honoured only where a bypass exists today, both under
  *   `services/cloud-agent-next/src`: `middleware/balance.ts` and the authority preflight in
  *   `router/handlers/session-creation-preflight.ts`. The two public Kilo prompt mutations in
- *   `kilo-facade/user-kilo-facade.ts` keep refusing `x-skip-balance-check` with a 400 for every
- *   caller, a valid bypass token included.
+ *   `kilo-facade/user-kilo-facade.ts` always refuse `x-skip-balance-check` with a 400 (M246), for
+ *   every caller, a valid bypass token included; they are not token-check points.
  * Webhook Agent Ingest sends the bypass over a service binding, outside STS.
  */
 export const STS_CLOUD_AGENT_NEXT_BALANCE_BYPASS = {

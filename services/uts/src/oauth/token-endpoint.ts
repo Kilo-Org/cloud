@@ -1,11 +1,14 @@
 import {
   UTS_GRANT_TYPES,
+  UTS_ID_TOKEN_TYPE_URN,
   UTS_MAX_TOKENS_PER_CALL,
+  UTS_REFRESH_TOKEN_TYPE_URN,
   UTS_TOKEN_PATH,
   type UtsAccessTokenClaims,
 } from '@kilocode/uts-contracts';
 import { z } from 'zod';
 import { type AttestationService, attestCodeExchange } from '../attest/gate';
+import { type CiExchangeService, handleCiTokenExchange } from '../ci/exchange';
 import type { UtsConfig } from '../env';
 import { type ExchangeService, handleTokenExchange } from '../exchange/endpoint';
 import type { DeviceContext, ExchangeCodeInput, GrantsAccess, Minted } from '../grants/store';
@@ -36,7 +39,10 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 /**
  * POST /token (design 5.3 and 5.4). Grants: `authorization_code` (DPoP-bound for a first-party
  * client), `refresh_token` (DPoP-bound first-party grant, or third-party rotation with reuse
- * detection) and the RFC 8628 device grant through its hook. `client_credentials` is not offered.
+ * detection), the RFC 8628 device grant through its hook, and the RFC 8693 token exchange, told
+ * apart by `subject_token_type`: a GitHub OIDC token goes to the CI exchange (src/ci/exchange.ts),
+ * a refresh token to the home-widget exchange (src/home-widget/exchange.ts), and anything else to
+ * the broker exchange (src/exchange/endpoint.ts). `client_credentials` is not offered.
  *
  * Each call verifies at most one DPoP proof, before the grant read, runs one SQL statement, which
  * also records the proof's `jti` under the proof's key, and signs one token per scope (up to 8)
@@ -48,6 +54,9 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
  * token, revokes the family. A code exchange of a client that needs device attestation
  * (`kilo-mobile`) first runs the attestation step (src/attest/gate.ts): two more statements and,
  * for Android, one Play Integrity call, once per code; a retry of an attested exchange runs one.
+ * Only the device grant and that attestation step read the runtime secrets (src/secrets.ts), so a
+ * refresh never waits for STS; a device grant or attestation whose secret STS cannot deliver
+ * answers a retryable 503.
  *
  * A refused exchange or third-party refresh whose statement revoked a grant (a second use of a
  * code, a reused rotated token) publishes the statement's feed entries before it answers; a failed
@@ -57,6 +66,11 @@ import { firstPartyProof, refuseThirdPartyProof, replayedDpopProof } from './pro
 /** The RFC 8628 device grant, which the device sign-in slice provides. */
 export type DeviceCodeGrant = (request: Request, params: Params) => Promise<Response>;
 
+/** The device grant as the runtime secrets allow it: served, or not served and why. */
+export type DeviceGrantState =
+  | { status: 'served'; grant: DeviceCodeGrant }
+  | { status: 'off' | 'misconfigured' | 'unavailable' };
+
 /** The token endpoint of `kilo-web`, which the BFF slice provides. */
 export type WebClientGrant = (
   request: Request,
@@ -64,13 +78,17 @@ export type WebClientGrant = (
   params: Params
 ) => Promise<Response | null>;
 
+/** The home-widget exchange, which src/home-widget/exchange.ts provides. */
+export type HomeWidgetGrant = (request: Request, params: Params) => Promise<Response>;
+
 export type TokenDeps = {
   config: UtsConfig;
   grants: GrantsAccess;
   sign: SignerAccess;
   scopes: ScopeRegistry;
   publish: FeedPublish;
-  deviceCodeGrant: DeviceCodeGrant | null;
+  /** The device grant, read from the runtime secrets on first use in the request. */
+  deviceCodeGrant: () => Promise<DeviceGrantState>;
   /**
    * `kilo-web`, which authenticates with a client assertion (`handleWebClientToken`,
    * src/bff/token.ts): its answer, or null for a request without an assertion.
@@ -82,11 +100,22 @@ export type TokenDeps = {
    */
   exchange: ExchangeService | null;
   /**
-   * Device attestation of a client that needs it (src/attest/gate.ts): `verified` runs the
-   * attestation step before the exchange statement; `unattested_development` skips it, in
-   * development without attestation config only; `refused` refuses the client.
+   * The home-widget exchange (a `subject_token_type` of refresh token); null where
+   * `HOME_WIDGET_GRANT_ENABLED` is not `true`, and the exchange is then not offered.
    */
-  attestation: AttestationService;
+  homeWidgetGrant: HomeWidgetGrant | null;
+  /**
+   * The CI token exchange (src/ci/exchange.ts): a token exchange whose subject is a GitHub OIDC
+   * token. Off unless the environment configures trust policies.
+   */
+  ci: CiExchangeService;
+  /**
+   * Device attestation of a client that needs it (src/attest/gate.ts), read on first use in the
+   * request: `verified` runs the attestation step before the exchange statement;
+   * `unattested_development` skips it, in development without attestation config only; `refused`
+   * refuses the client; `unavailable` answers a retryable 503.
+   */
+  attestation: () => Promise<AttestationService>;
 };
 
 /** The token endpoint on the issuer origin: the `htu` of every token request's DPoP proof. */
@@ -281,14 +310,16 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
     const proof = await firstPartyProof(request, tokenEndpointUrl(deps.config));
     if (proof instanceof Response) return proof;
     if (identity.client.attestation === 'required') {
-      if (deps.attestation.kind === 'refused') {
+      const attestation = await deps.attestation();
+      if (attestation.kind === 'refused') {
         return oauthError('unauthorized_client', 400, 'device attestation is not configured here');
       }
-      if (deps.attestation.kind === 'unattested_development') {
+      if (attestation.kind === 'unavailable') return temporarilyUnavailable();
+      if (attestation.kind === 'unattested_development') {
         // Development without attestation config: the exchange statement's backstop still needs
         // the code marked, and the statement refuses that outside development (migration 0017).
         const environment = deps.config.environment;
-        await deps.attestation.store(store => store.exempt({ environment, codeHash }));
+        await attestation.store(store => store.exempt({ environment, codeHash }));
       } else {
         const gate = await attestCodeExchange(
           params,
@@ -300,7 +331,7 @@ async function exchangeCode(request: Request, params: Params, deps: TokenDeps): 
             codeChallenge,
             dpopJkt: proof.jkt,
           },
-          deps.attestation.gate
+          attestation.gate
         );
         if (gate instanceof Response) return gate;
       }
@@ -414,15 +445,31 @@ export async function handleToken(request: Request, deps: TokenDeps): Promise<Re
         return await exchangeCode(request, form.params, deps);
       case UTS_GRANT_TYPES.refreshToken:
         return await refresh(request, form.params, deps);
-      case UTS_GRANT_TYPES.deviceCode:
-        if (deps.deviceCodeGrant !== null) return await deps.deviceCodeGrant(request, form.params);
+      case UTS_GRANT_TYPES.deviceCode: {
+        const device = await deps.deviceCodeGrant();
+        if (device.status === 'served') return await device.grant(request, form.params);
+        if (device.status === 'unavailable') return temporarilyUnavailable();
         return oauthError('unsupported_grant_type', 400);
-      case UTS_GRANT_TYPES.tokenExchange:
+      }
+      case UTS_GRANT_TYPES.tokenExchange: {
+        // A GitHub OIDC token is the CI exchange's subject, the mobile app's refresh token the
+        // home-widget exchange's, and a UTS access token the broker's.
+        const subjectType = form.params.one('subject_token_type');
+        if (subjectType.status === 'present' && subjectType.value === UTS_ID_TOKEN_TYPE_URN) {
+          return await handleCiTokenExchange(form.params, deps);
+        }
+        if (subjectType.status === 'present' && subjectType.value === UTS_REFRESH_TOKEN_TYPE_URN) {
+          if (deps.homeWidgetGrant === null) {
+            return oauthError('invalid_request', 400, 'a refresh token is not exchanged here');
+          }
+          return await deps.homeWidgetGrant(request, form.params);
+        }
         if (deps.exchange === null) return oauthError('unsupported_grant_type', 400);
         return await handleTokenExchange(request, form.params, {
           ...deps,
           exchange: deps.exchange,
         });
+      }
       default:
         return oauthError('unsupported_grant_type', 400);
     }

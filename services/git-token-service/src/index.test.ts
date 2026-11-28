@@ -200,6 +200,7 @@ describe('Bitbucket repository-list HTTP authorization', () => {
       audience: 'git-token-service:bitbucket-repositories',
       extra: { organizationId: '123e4567-e89b-12d3-a456-426614174030' },
     });
+    const executionCtx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
     const response = await gitTokenServiceWorker.fetch(
       new Request('https://git-token-service.test/internal/bitbucket/repositories', {
         method: 'POST',
@@ -209,15 +210,21 @@ describe('Bitbucket repository-list HTTP authorization', () => {
         },
         body: JSON.stringify({ orgId: '123e4567-e89b-12d3-a456-426614174099' }),
       }),
-      env
+      env,
+      executionCtx
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: 'available', repositories: [] });
-    expect(serviceMocks.listBitbucketRepositories).toHaveBeenCalledWith(expect.anything(), {
-      userId: 'member-1',
-      orgId: '123e4567-e89b-12d3-a456-426614174030',
-    });
+    expect(serviceMocks.listBitbucketRepositories).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        userId: 'member-1',
+        orgId: '123e4567-e89b-12d3-a456-426614174030',
+      },
+      undefined,
+      executionCtx
+    );
   });
 
   it('requires an organization claim before repository lookup', async () => {
@@ -738,7 +745,9 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
         workspaceUuid: oauthSubject.workspaceUuid,
         repositoryUuid: oauthSubject.repositoryUuid,
         repositoryUrl: issueParams.repositoryUrl,
-      }
+      },
+      undefined,
+      expect.anything()
     );
   });
 
@@ -1071,7 +1080,12 @@ describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
       success: true,
       token: 'ATCT-runtime-token',
     });
-    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(expect.anything(), params);
+    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(
+      expect.anything(),
+      params,
+      undefined,
+      expect.anything()
+    );
   });
 });
 

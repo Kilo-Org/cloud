@@ -12,6 +12,7 @@ import {
   type ControlPlaneScmForwardAdmissionResult,
 } from '../shared/control-plane-protocol.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { isSafeSandboxId } from '../shared/control-plane-credential.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { configuredVercelForwardUrl } from './targets.js';
@@ -68,6 +69,8 @@ export function admitVercelScmForwardAtLocator(
 
 type VercelIdentityDependencies = {
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   contract: VercelSandboxIdentityContract | null;
   fetchCredential?: typeof fetchByocVercelCredential;
   keys?: typeof vercelJwksCache;
@@ -98,7 +101,8 @@ export async function verifyVercelForwardIdentity(
   if (!deps.contract) return deny('provider_identity_mismatch', 503);
   const credential = await (deps.fetchCredential ?? fetchByocVercelCredential)(
     deps.env,
-    context.byoc
+    context.byoc,
+    deps.ctx
   );
   const expected = expectedVercelIdentity({
     credential,
@@ -124,6 +128,8 @@ export async function admitVercelScmForward(
   input: ControlPlaneScmForwardAdmission,
   deps: {
     env: Env;
+    /** The invocation's context, for a secret read's bundle revalidation. */
+    ctx?: SecretsExecutionContext;
     contract: VercelSandboxIdentityContract | null;
     serial: <T>(operation: () => Promise<T>) => Promise<T>;
     readContext: () => Promise<VercelAdmissionContext>;

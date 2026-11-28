@@ -3,9 +3,11 @@ import { z } from 'zod';
 import type { HonoContext } from '../index';
 import { logger } from '../util/logger';
 import { resError, resSuccess, verifyCallbackToken } from '@kilocode/worker-utils';
+import { INTERNAL_CALLER_HEADER } from '@kilocode/worker-utils/internal-auth-observation';
 import { CloudAgentCallbackFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
 import { withDORetry } from '../util/do-retry';
 import { expectedSecret, secretUnavailableResponse } from '../secrets';
+import { secretsComparison, type CheckedSecret } from '../secrets-compare';
 
 const callbacks = new Hono<HonoContext>();
 
@@ -52,11 +54,31 @@ callbacks.post('/execution', async c => {
       secret: expected.secret,
       scope: 'webhook-execution-callback',
       resourceParts: [namespace, triggerId, requestId],
+      observation: {
+        receiver: 'webhook-agent-ingest',
+        caller: c.req.header(INTERNAL_CALLER_HEADER) ?? null,
+      },
     }));
+  const checked: CheckedSecret = {
+    route: 'execution-callback',
+    source: expected.source,
+    selected: expected.status === 'read' ? expected.secret : '',
+  };
   if (!validCallbackToken) {
-    logger.warn('Callback authentication failed', { requestId, namespace, triggerId });
+    logger.warn('Callback authentication failed', {
+      route: checked.route,
+      secret: 'CALLBACK_TOKEN_SECRET',
+      source: checked.source,
+      reason: callbackToken ? 'invalid' : 'missing',
+    });
+    // A refused token starts at most one background check of this name per isolate when enabled
+    // (src/secrets-compare.ts); a tokenless request starts none. Neither changes this answer.
+    if (callbackToken) secretsComparison.refused(c.env, () => c.executionCtx, checked);
     return c.json(resError('Unauthorized'), 401);
   }
+  // Background source comparison, off unless enabled (src/secrets-compare.ts). It never changes
+  // this answer.
+  secretsComparison.admitted(c.env, () => c.executionCtx, checked);
 
   let payload: z.infer<typeof ExecutionCallbackPayloadSchema>;
   try {

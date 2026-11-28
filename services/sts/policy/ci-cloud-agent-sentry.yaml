@@ -1,0 +1,17 @@
+# Kilo-Org/cloud's Cloud Agent source map upload after a production deploy: the
+# `upload` job of the reusable cloud-agent-sentry-sourcemaps.yml, called by deploy-workers.yml in
+# GitHub environment production. workflow_run with the other events in production: D53/M112
+# (D53_M112_CI_BUNDLE_CARVE_OUT in src/policy/schema.ts).
+workload: ci-cloud-agent-sentry
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: production
+  refs: [refs/heads/main]
+  jobWorkflowRefs:
+    [Kilo-Org/cloud/.github/workflows/cloud-agent-sentry-sourcemaps.yml@refs/heads/main]
+  events: [workflow_run, schedule, workflow_dispatch]
+secrets: [SENTRY_AUTH_TOKEN]

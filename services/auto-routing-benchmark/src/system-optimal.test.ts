@@ -504,4 +504,56 @@ describe('fetchProductionAutoMetrics', () => {
     expect(timeout).toHaveBeenCalledWith(10_000);
     timeout.mockRestore();
   });
+
+  it('sends the internal secret as a bearer while WEB_INTERNAL_AUTH is unset', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(fetchProductionAutoMetrics(env)).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://app.test/api/internal/auto-routing-benchmark/production-profile',
+      expect.objectContaining({ headers: { authorization: 'Bearer secret' } })
+    );
+  });
+
+  it('sends a web:auto-routing.production-profile.read STS token under sts, never the secret', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const secret = vi.fn(async () => 'secret');
+    const minted: unknown[] = [];
+
+    await expect(
+      fetchProductionAutoMetrics({
+        ...env,
+        INTERNAL_API_SECRET_PROD: { get: secret } as unknown as SecretsStoreSecret,
+        WEB_INTERNAL_AUTH: 'sts',
+        STS: {
+          async mintTokens(request) {
+            minted.push(request);
+            return {
+              status: 'ok',
+              tokens: request.tokens.map(({ audience, scope }) => ({
+                status: 'issued',
+                audience,
+                scope,
+                token: 'sts-profile-token',
+                jti: 'jti-profile',
+                expiresAt: Math.floor(Date.now() / 1000) + 300,
+              })),
+            };
+          },
+        },
+      })
+    ).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      'https://app.test/api/internal/auto-routing-benchmark/production-profile',
+      expect.objectContaining({ headers: { authorization: 'Bearer sts-profile-token' } })
+    );
+    expect(secret).not.toHaveBeenCalled();
+    expect(minted).toEqual([
+      { tokens: [{ audience: 'web', scope: 'web:auto-routing.production-profile.read' }] },
+    ]);
+  });
 });

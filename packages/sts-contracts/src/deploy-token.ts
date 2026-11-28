@@ -54,12 +54,15 @@ export type DeployTokenDeniedReason = (typeof DEPLOY_TOKEN_DENIED_REASONS)[numbe
  * Retryable after `retryAfterSeconds`: the workload holds its policy's number of unexpired deploy
  * tokens (`too_many_active`), or made its policy's number of mint requests in the last hour
  * (`rate_limited`), or STS holds its environment's share of the account's tokens
- * (`account_limit`).
+ * (`account_limit`). A grant with `maxPerRun` counts the first two in GitHub run attempts instead
+ * of tokens, and refuses a run attempt that made `maxPerRun` mint requests in the last hour
+ * (`run_limit`).
  */
 export const DEPLOY_TOKEN_LIMITED_REASONS = [
   'too_many_active',
   'rate_limited',
   'account_limit',
+  'run_limit',
 ] as const;
 export type DeployTokenLimitedReason = (typeof DEPLOY_TOKEN_LIMITED_REASONS)[number];
 

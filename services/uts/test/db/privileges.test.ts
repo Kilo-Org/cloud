@@ -388,11 +388,11 @@ describe.each(['uts_app_a', 'uts_app_b'] as const)('app login %s', login => {
     ['widen a consent', `UPDATE uts.third_party_consents SET scopes = scopes`],
     [
       'call the gated PAT write step',
-      `SELECT * FROM uts.write_gated_pat('a', NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', NULL, 1)`,
+      `SELECT * FROM uts.write_gated_pat('a', NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', NULL, 1)`,
     ],
     [
       'call the gated bot key write step',
-      `SELECT * FROM uts.write_gated_bot_key('a', NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', 1)`,
+      `SELECT * FROM uts.write_gated_bot_key('a', NULL, NULL, NULL, 'n', '\\x00', 'abcd', 'gateway:models.read', 1)`,
     ],
     ['compute tier B checks', `SELECT uts.tier_b_checks('a', NULL, NULL)`],
   ])('cannot %s', async (_name, statement) => {
@@ -702,8 +702,10 @@ describe('functions', () => {
       { routine: 'end_long_transactions', grantee: 'uts_app' },
       { routine: 'end_web_session', grantee: 'uts_app' },
       { routine: 'exchange_authorization_code', grantee: 'uts_app' },
+      { routine: 'exchange_ci_token', grantee: 'uts_app' },
       { routine: 'exchange_delegated_token', grantee: 'uts_app' },
       { routine: 'exchange_device_code', grantee: 'uts_app' },
+      { routine: 'exchange_home_widget_grant', grantee: 'uts_app' },
       { routine: 'exchange_web_code', grantee: 'uts_app' },
       { routine: 'exempt_code_attestation', grantee: 'uts_app' },
       { routine: 'extend_third_party_client', grantee: 'uts_app' },
@@ -733,6 +735,7 @@ describe('functions', () => {
       { routine: 'maintain_sign_in_rows', grantee: 'uts_app' },
       { routine: 'maintain_subject_operation_rows', grantee: 'uts_app' },
       { routine: 'maintain_third_party_client_rows', grantee: 'uts_app' },
+      { routine: 'mint_bot_token', grantee: 'uts_app' },
       { routine: 'mint_web_session_token', grantee: 'uts_app' },
       { routine: 'open_browser_tier_a_gate_pass', grantee: 'uts_app' },
       { routine: 'open_tier_a_gate_pass', grantee: 'uts_app' },

@@ -1,9 +1,15 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { TRPCContext } from '../types.js';
 import { projectTrpcErrorData } from '../trpc-error.js';
 import { validateScopedWorkerPreparation } from '../cloud-agent-authority.js';
 import { assertCloudAgentManagementRequest } from '../cloud-agent-child-management.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
 
 export const t = initTRPC.context<TRPCContext>().create({
   errorFormatter({ shape, error }) {
@@ -96,19 +102,23 @@ export const cloudAgentAuthorityProcedure = t.procedure.use(
 export const internalApiProtectedProcedure = t.procedure.use(
   async ({ ctx, next, path, getRawInput }) => {
     const internalApiKey = ctx.request.headers.get('x-internal-api-key');
-    if (!ctx.env.INTERNAL_API_SECRET) {
+    const expected = await readCloudAgentNextSecret(
+      ctx.env,
+      'INTERNAL_API_SECRET',
+      ctx.executionCtx
+    ).catch(() => undefined);
+    if (!expected) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Internal API secret not configured',
       });
     }
-    if (!internalApiKey || !timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET)) {
+    if (!internalApiKey || !timingSafeEqual(internalApiKey, expected)) {
       throw new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'Invalid or missing internal API key',
       });
     }
-
     if (!ctx.userId || !ctx.authToken) {
       throw new TRPCError({
         code: 'UNAUTHORIZED',
@@ -129,6 +139,14 @@ export const internalApiProtectedProcedure = t.procedure.use(
       }
     }
 
+    // Every credential passed. The procedure name is a registered literal; `caller` is the
+    // unauthenticated header label.
+    observeInternalAuth(
+      'cloud-agent-next',
+      path,
+      'legacy_shared_secret',
+      callerLabel(ctx.request.headers.get(INTERNAL_CALLER_HEADER) ?? null)
+    );
     return next({ ctx });
   }
 );

@@ -34,10 +34,16 @@ export const getSandboxSelectionOptions = protectedProcedure
       );
     }
     const owner = { userId: ctx.userId, orgId: input.kilocodeOrganizationId };
-    const readiness = await resolveVercelSelectionReadiness(ctx.env, owner);
+    const readiness = await resolveVercelSelectionReadiness(
+      ctx.env,
+      owner,
+      undefined,
+      ctx.executionCtx
+    );
     const capabilities = await getSandboxSelectionCapabilities(ctx.env, owner, {
       ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
       ...readiness,
+      ...(ctx.executionCtx === undefined ? {} : { ctx: ctx.executionCtx }),
     });
     if (!capabilities.enabled || !input.repositoryType) return capabilities;
 
@@ -45,6 +51,7 @@ export const getSandboxSelectionOptions = protectedProcedure
     const saved = await resolveSavedSandboxAllocation({
       db: getPgDb(ctx.env),
       env: ctx.env,
+      ...(ctx.executionCtx === undefined ? {} : { ctx: ctx.executionCtx }),
       owner,
       repositoryType,
       readiness,

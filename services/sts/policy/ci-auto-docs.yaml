@@ -1,0 +1,14 @@
+# Kilo-Org/cloud's docs intake: the `call-valtown` job of auto-docs.yml in GitHub
+# environment production, without a deployment record.
+workload: ci-auto-docs
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: production
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/auto-docs.yml@refs/heads/main]
+  events: [push, workflow_dispatch]
+secrets: [DOC_WEBHOOK_URL, DOC_WEBHOOK_SECRET]

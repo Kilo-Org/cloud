@@ -66,6 +66,8 @@ import {
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import { requestContext } from './secrets';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   listPaidBenchmarkAdminRequests,
   pausePaidBenchmarkAdminRequest,
@@ -296,10 +298,11 @@ function configSaveChangedRoutingPolicy(
 async function syncRegistryAfterConfigSave(
   env: Env,
   router: AutoRouter,
-  policyChanged: boolean
+  policyChanged: boolean,
+  ctx?: SecretsExecutionContext
 ): Promise<BenchmarkConfigSaveWarning[]> {
   try {
-    await syncPlatformRegistry(env, fetch, router);
+    await syncPlatformRegistry(env, fetch, router, ctx);
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -370,7 +373,8 @@ const CONFIG_SAVE_DRAIN_DEADLINE_MS = 5_000;
 async function drainPlatformAfterConfigSave(
   env: Env,
   router: AutoRouter,
-  keepAlive: (promise: Promise<unknown>) => void
+  keepAlive: (promise: Promise<unknown>) => void,
+  ctx?: SecretsExecutionContext
 ): Promise<BenchmarkConfigSaveDrain> {
   const timedOut = Promise.withResolvers<'timeout'>();
   const timer = setTimeout(() => timedOut.resolve('timeout'), CONFIG_SAVE_DRAIN_DEADLINE_MS);
@@ -383,6 +387,7 @@ async function drainPlatformAfterConfigSave(
   const drain = drainQueues(env, 'platform', drainErrors, router, {
     skipPlatformSync: true,
     skipped,
+    ctx,
   });
   try {
     const started = await Promise.race([drain, timedOut.promise]);
@@ -505,14 +510,22 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         updatedBy
       );
       const policyChanged = configSaveChangedRoutingPolicy(previousConfig, saved, router);
-      const warnings = await syncRegistryAfterConfigSave(c.env, router, policyChanged);
+      const warnings = await syncRegistryAfterConfigSave(
+        c.env,
+        router,
+        policyChanged,
+        requestContext(c)
+      );
       // Only a save whose registry sync and publish both landed has new pending
       // rows to start; a failed sync has no rows and a failed publish is already
       // reported, so the cron owns that case.
       const drain =
         warnings.length === 0
-          ? await drainPlatformAfterConfigSave(c.env, router, promise =>
-              c.executionCtx.waitUntil(promise)
+          ? await drainPlatformAfterConfigSave(
+              c.env,
+              router,
+              promise => c.executionCtx.waitUntil(promise),
+              requestContext(c)
             )
           : undefined;
       return c.json({
@@ -648,7 +661,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       // platform queue; an unavailable catalog must not block owner work.
       if (kind === 'decider') {
         const drainErrors: unknown[] = [];
-        const started = await drainQueues(c.env, queue, drainErrors, router);
+        const started = await drainQueues(c.env, queue, drainErrors, router, {
+          ctx: requestContext(c),
+        });
         // Drains never throw, so a wedged queue would otherwise return 200 and
         // the panel would report "nothing pending" for work that is stuck.
         // Nothing started at all is a failed request; a queue that failed while
@@ -675,7 +690,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        return c.json({ ...(await startRun(c.env, kind, { force, router })), startedRuns: [] });
+        return c.json({
+          ...(await startRun(c.env, kind, { force, router, ctx: requestContext(c) })),
+          startedRuns: [],
+        });
       } catch (error) {
         if (error instanceof RunOperatorHoldError) {
           return c.json({ error: 'operator_hold_active' }, 409);
@@ -825,7 +843,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         c.env,
         benchmarkIdentity.benchmarkUserId,
         benchmarkIdentity.benchmarkOrgId,
-        UNSPLIT_CLI_TOKEN
+        UNSPLIT_CLI_TOKEN,
+        fetch,
+        requestContext(c)
       );
       const result = await debugRunCli(c.env, {
         ...c.req.valid('json'),
@@ -859,7 +879,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         const owner = { ownerType: body.ownerType, ownerId: body.ownerId };
         const catalog = await fetchExecutableBenchmarkModelCatalog(
           c.env,
-          resolveBenchmarkIdentity(config)
+          resolveBenchmarkIdentity(config),
+          fetch,
+          undefined,
+          requestContext(c)
         );
         const previous = await loadSubscriptionSnapshot(c.env.BENCH_DB, config.router, owner);
         const snapshot = resolveSubscriptionSnapshot(body.entries, previous, catalog, false, true);
@@ -881,6 +904,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           catalog,
           admit: false,
           retryUnresolved: true,
+          ctx: requestContext(c),
         });
         return c.json({
           statuses: mapSubscriptionStatuses(saved, result.statuses),
@@ -908,6 +932,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       if (!config) return c.json({ error: 'Benchmark config is not configured.' }, 400);
       const snapshot = await syncSubscriptionSnapshot(c.env, config, body, body.entries ?? [], {
         restorePrevious: body.restorePrevious,
+        ctx: requestContext(c),
       });
       const pairs = snapshotPairs(snapshot);
       const result =
@@ -1211,7 +1236,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }),
     async c => {
       const { requestId } = c.req.valid('json');
-      const status = await pausePaidBenchmarkAdminRequest(c.env, requestId);
+      const status = await pausePaidBenchmarkAdminRequest(c.env, requestId, {
+        ctx: requestContext(c),
+      });
       return c.json(PaidBenchmarkAdminPauseResponseSchema.parse({ status }));
     }
   );

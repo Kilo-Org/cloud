@@ -91,6 +91,7 @@ function resolve(
     capability?: 'review' | 'remediation';
     environmentAllocation?: string;
     readiness?: { vercelUnavailableReason?: string };
+    ctx?: { waitUntil(promise: Promise<unknown>): void };
   } = {}
 ) {
   return resolveSavedSandboxAllocation({
@@ -101,6 +102,7 @@ function resolve(
     ...(args.capability ? { capability: args.capability } : {}),
     ...(args.environmentAllocation ? { environmentAllocation: args.environmentAllocation } : {}),
     ...(args.readiness ? { readiness: args.readiness } : {}),
+    ...(args.ctx ? { ctx: args.ctx } : {}),
   });
 }
 
@@ -324,8 +326,18 @@ describe('resolveSavedSandboxAllocation', () => {
     );
     expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(
       { ...env, BYOC_VERCEL_IDS: owner.orgId },
-      owner.orgId
+      owner.orgId,
+      undefined
     );
+  });
+
+  it('hands its invocation context to the BYOC enrollment lookup', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
+    const ctx = { waitUntil: vi.fn() };
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
+
+    await expect(resolve({ env: byocEnv, ctx })).resolves.toBe('vercel-small');
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(byocEnv, owner.orgId, ctx);
   });
 
   it('resolves a saved Vercel choice from BYOC enrollment without the selection allowlist', async () => {

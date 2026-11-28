@@ -9,7 +9,6 @@ import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
   CloudAgentNextError,
-  deriveCallbackToken,
   type CloudAgentNextFetchClient,
   type CloudAgentPrepareSessionInput,
   type CloudAgentSessionHealthOutput,
@@ -26,6 +25,8 @@ import type {
 } from './types';
 import { InternalStatusResponseSchema } from './types';
 import { doNameForAttempt } from './do-name';
+import { readCodeReviewInfraSecret } from './secrets';
+import { derivedCallbackHeaders, statusCallbackCredential } from './status-callback-auth';
 import {
   buildGitHubCloudReviewSkillCue,
   GITHUB_CLOUD_REVIEW_SKILL,
@@ -94,6 +95,11 @@ function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: str
   return url.toString();
 }
 
+/**
+ * The callback target Cloud Agent Next delivers terminal status to. It carries the derived callback
+ * token: Cloud Agent Next presents that token itself, so `CODE_REVIEW_STATUS_CALLBACK_AUTH` does not
+ * change it.
+ */
 async function callbackTargetForAttempt(
   apiUrl: string,
   reviewId: string,
@@ -102,13 +108,7 @@ async function callbackTargetForAttempt(
 ): Promise<{ url: string; headers: { 'X-Callback-Token': string } }> {
   return {
     url: callbackUrlForAttempt(apiUrl, reviewId, attemptId),
-    headers: {
-      'X-Callback-Token': await deriveCallbackToken({
-        secret: callbackTokenSecret,
-        scope: 'code-review-status-callback',
-        resourceParts: [reviewId, attemptId ?? ''],
-      }),
-    },
+    headers: await derivedCallbackHeaders(callbackTokenSecret, reviewId, attemptId),
   };
 }
 
@@ -841,12 +841,12 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       terminalReason?: CloudAgentTerminalReason;
     }
   ): Promise<UpdateStatusResult> {
-    // Use path-based endpoint (same as callback endpoint for consistency)
-    const callbackTarget = await callbackTargetForAttempt(
-      this.env.API_URL,
+    // This Worker's own write: its credential follows CODE_REVIEW_STATUS_CALLBACK_AUTH.
+    const credential = await statusCallbackCredential(
+      this.env,
+      this.ctx,
       this.state.reviewId,
-      this.state.attemptId,
-      this.env.CALLBACK_TOKEN_SECRET
+      this.state.attemptId
     );
 
     // Payload without reviewId (it's in the URL path)
@@ -858,14 +858,18 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       terminalReason: options?.terminalReason,
     };
 
-    const response = await fetch(callbackTarget.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...callbackTarget.headers,
-      },
-      body: JSON.stringify(payload),
-    });
+    const response = await fetch(
+      callbackUrlForAttempt(this.env.API_URL, this.state.reviewId, this.state.attemptId),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...credential.headers,
+        },
+        body: JSON.stringify(payload),
+        ...(credential.redirect === undefined ? {} : { redirect: credential.redirect }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1369,7 +1373,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // Build common headers for prepareSession (internalApiProtectedProcedure)
       const internalHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
-        'x-internal-api-key': this.env.INTERNAL_API_SECRET,
+        'x-internal-api-key': await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        ),
       };
       if (this.state.skipBalanceCheck) {
         internalHeaders['x-skip-balance-check'] = 'true';
@@ -1380,7 +1388,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.API_URL,
         this.state.reviewId,
         this.state.attemptId,
-        this.env.CALLBACK_TOKEN_SECRET
+        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
       );
 
       const sessionInput = this.state.sessionInput;
@@ -1461,7 +1469,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
-        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
+        userHeaders['x-internal-api-key'] = await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        );
       }
 
       console.log('[CodeReviewOrchestrator] Calling initiateFromKilocodeSessionV2', {
@@ -1582,7 +1594,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
-        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
+        userHeaders['x-internal-api-key'] = await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        );
       }
 
       let health: CloudAgentSessionHealthOutput;
@@ -1620,7 +1636,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // Build internal headers (internalApiProtectedProcedure — API key + Bearer token)
       const internalHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
-        'x-internal-api-key': this.env.INTERNAL_API_SECRET,
+        'x-internal-api-key': await readCodeReviewInfraSecret(
+          this.env,
+          'INTERNAL_API_SECRET',
+          this.ctx
+        ),
       };
       if (this.state.skipBalanceCheck) {
         internalHeaders['x-skip-balance-check'] = 'true';
@@ -1633,7 +1653,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.API_URL,
         this.state.reviewId,
         this.state.attemptId,
-        this.env.CALLBACK_TOKEN_SECRET
+        await readCodeReviewInfraSecret(this.env, 'CALLBACK_TOKEN_SECRET', this.ctx)
       );
 
       await client.updateSession(internalHeaders, {

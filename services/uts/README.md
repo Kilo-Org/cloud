@@ -311,6 +311,7 @@ audit row. It mints only scopes the registry allows `kilo-cli`.
 | `GET /authorize` | Code with PKCE `S256`; `resource` is `urn:kilo:service:<audience>`; a first-party client binds the code to `dpop_jkt`; `state` and `iss` (RFC 9207) go back; a bad client or redirect URI is shown, never redirected; sign-in and consent come from the `AuthorizationHandoff` hook | `uts.issue_authorization_code` |
 | `POST /token` `authorization_code` | First party: DPoP proof, device session and `kilo_rt_` grant (desktop 30 days idle, 180 days total; mobile 60 and 365). Third party: grant family and its first rotating token. A first-party retry of the same request while the code's 60-second lifetime lasts gets the same grant and the same refresh token (below); any other second use of a code, a third-party one included, revokes the grant | `uts.exchange_authorization_code` |
 | `POST /token` `refresh_token` | First party: DPoP proof matched to the grant key; last use moves at most once per hour. Third party: rotation with no grace; any later use of a replaced token revokes the family and writes a feed entry, until the family's 90-day end | `uts.refresh_first_party`, `uts.refresh_third_party` |
+| `POST /token` token exchange, refresh-token subject | The home-widget exchange (below): `kilo-mobile` exchanges its grant, with a DPoP proof of its key, for a widget grant that holds only `kilo-api:home-widget.use` | `uts.exchange_home_widget_grant` |
 | `POST /revoke` | RFC 7009; revokes the grant or family, writes the feed entry; a token issued to another client answers 200 like an unknown token and writes a denied row (at most one per grant per minute); an access token is `unsupported_token_type` | `uts.revoke_refresh_token` |
 | `POST /introspect` | RFC 7662 for refresh credentials, to their own client (first party with a DPoP proof); `active: false` for anything else | `uts.introspect_refresh_token` (no audit row) |
 
@@ -326,9 +327,9 @@ key adds no row. A first-party refresh grant names its grant id (`kilo_rt_<grant
 secret>`), so the endpoint knows the grant and its signer before the statement. One call mints one
 access token per scope, up to 8, each with one audience; one `signMany` call to the signer the
 grant id picks signs all of them, and `issued_tokens` lists them. The claims are exactly
-`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`
-(`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with `Retry-After`; a
-failure no retry fixes gives 500.
+`iss exp aud sub client_id iat jti scope org act req sid auth_time amr env`, plus `bot_user` on a
+bot token only (`UtsAccessTokenClaimsSchema`). A dependency that does not answer gives 503 with
+`Retry-After`; a failure no retry fixes gives 500.
 
 The tokens are signed after the statement commits. When signing fails (or the response is lost),
 a first-party client sends the same code exchange again with a new DPoP proof. While the code's
@@ -371,7 +372,9 @@ Attest and Android Play Integrity (`src/attest/`, migration 0017). The client is
 where the environment's attestation config is complete (`src/attest/config.ts`); anything less
 refuses it at `/authorize` with `unauthorized_client` and logs `uts.attestation.misconfigured`
 with the names (never the values) of what is missing. Development with no attestation value at
-all serves it without attestation, for the local tests.
+all serves it without attestation, for the local tests. With a var set and no usable STS bundle
+(Deploys, "Runtime secrets") the client is still sent to sign in and its code exchange answers 503
+with `Retry-After` until the key can be read.
 
 | Name | Kind | Value |
 |---|---|---|
@@ -379,7 +382,7 @@ all serves it without attestation, for the local tests.
 | `ATTEST_APPLE_BUNDLE_ID` | var | the iOS bundle id; with the team id it is the App ID whose SHA-256 is the RP ID hash |
 | `ATTEST_PLAY_INTEGRITY_PACKAGE_NAME` | var | the Android package name |
 | `ATTEST_PLAY_INTEGRITY_CERT_DIGESTS` | var | comma-separated SHA-256 digests of the accepted app signing certificates (Play Console hex, with or without colons, or base64url) |
-| `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` | secret | the JSON key of a Google service account allowed to call `decodeIntegrityToken` in the Cloud project linked to the app |
+| `ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` | runtime secret | the JSON key of a Google service account allowed to call `decodeIntegrityToken` in the Cloud project linked to the app |
 | `ATTEST_DEV_ENDPOINTS` | development only | a stand-in App Attest root and Play Integrity origin on loopback; set anywhere else it refuses the client |
 
 The Apple App Attestation Root CA is pinned in code (`APPLE_APP_ATTEST_ROOT`, checked by its
@@ -446,6 +449,66 @@ mint Worker with one value missing: it checks an admitted key attestation, asser
 Integrity verdict, refused replays, repeated counters, missing attestations, wrong packages,
 unrecognized apps and other signers, one decode per code across a retry, the refusal by default,
 and that no credential value reaches an audit row.
+
+## Home-widget grant
+
+The mobile home-screen widget reads `GET /api/mobile/widgets` and registers its push token at
+`POST /api/mobile/widgets/push-token` on the web app while the app is not running (design 9.3).
+Today a 30-day HS256 credential under the shared web secret serves it; under UTS the widget holds
+its own refresh grant, narrowed to one scope, and refreshes 10-minute access tokens like any
+first-party client (`src/home-widget/exchange.ts`, migration 0024, contract in
+`@kilocode/uts-contracts` `home-widget.ts`).
+
+**Why an exchange of the app's grant, not a new grant type.** Design 5.3 and 5.5 already give
+first-party clients one credential shape: a DPoP-bound refresh grant with an allowed scope list
+and 10-minute access tokens. The widget needs exactly that, with less: one scope, the same device,
+and no longer life than the app's sign-in. So the app exchanges its own grant at `/token` with RFC
+8693 (`subject_token_type` refresh token), and the result is an ordinary `uts.refresh_grants` row
+that the widget refreshes with `refresh_token`. No new client, grant type, signer path or verifier
+rule exists. Sharing the app's grant with the widget extension was rejected: that grant holds
+every mobile scope, and the extension's keychain item is readable by a second process.
+
+| Property | Rule |
+|---|---|
+| Client | `kilo-mobile` only; another first-party client gets `unauthorized_client`, a third-party one too |
+| Proof | A DPoP proof of the app grant's key; the widget grant takes the same key, which the app keeps in the keychain access group it shares with the widget extension (Android: the app's own keystore). The app's refresh token stays in the app's private keychain item, so the extension holds only the widget grant |
+| Scope | Exactly `kilo-api:home-widget.use` (audience `kilo-api`, 10 minutes, session-bound), which the app grant must list |
+| Organization | `org` optional: an org-bound app grant names its own organization or none; a personal app grant may name any organization with an active membership whose SSO requirement the session's sign-in meets (design 5.8). The organization becomes every widget token's `org` claim; without one the widget is personal. Each widget refresh rechecks it |
+| Lifetime | The widget grant expires at the app grant's idle expiry at the time of the exchange, so it never outlives the app's sign-in. The app exchanges again when it opens (after its own refresh, which moves its idle expiry) and `refresh_token_expires_in` is under 7 days, or when the widget's organization changes. It does not exchange again while its last exchange already answered under 7 days: then the app grant itself ends within 7 days (its one-year maximum), every new widget grant would end with it, and a repeat buys nothing until a new sign-in replaces the app grant |
+| One per app grant | A new exchange revokes the previous widget grant (`replaced`, with its feed entry); at most 10 exchanges per app grant per hour, then 429 `slow_down` with `Retry-After` |
+| Revocation | `/revoke` with the widget's refresh token ends only the widget. Anything that ends the app grant (sign-out, device revoke, reuse detection, member removal, subject operations) ends the widget in the same statement (`uts.end_grant`), each grant with its own feed entry, and writes the widget's own `grant.revoked` audit row (system actor, the app grant's reason, under the environment the widget grant recorded at its exchange); the device session ends with its last grant. A device revoke that names the app grant also names its widget grants and answers every entry its statement wrote, and a `/revoke` retry of a revoked app grant republishes its widget's entry, so each call publishes the widget's entry before it succeeds. A member removal revokes an org widget of a personal app grant with the member's other org-bound grants |
+| Not allowed | A widget grant mints no ticket (`uts.issue_ticket` answers `invalid_grant`), cannot be exchanged again, and records no device sign-in or new-device notice |
+| Switch | Offered only where `HOME_WIDGET_GRANT_ENABLED` is exactly `true`; otherwise the exchange answers `invalid_request`. `test/repo` keeps it off in production |
+
+**Wire contract.** `POST /token`, form-encoded, `DPoP` header: `grant_type`
+`urn:ietf:params:oauth:grant-type:token-exchange`, `client_id` `kilo-mobile`, `subject_token` the
+app's `kilo_rt_` token, `subject_token_type` `urn:ietf:params:oauth:token-type:refresh_token`,
+`scope` `kilo-api:home-widget.use`, optional `requested_token_type` (access token only),
+`resource` (`kilo-api` only) and `org`. A 200 is `HomeWidgetGrantResponseSchema`: the widget's
+first access token with `issued_token_type`, and its `refresh_token` and
+`refresh_token_expires_in`. Errors: 400 `invalid_request` (malformed form, actor or `audience`
+parameters, switch off), 401 `invalid_client`, 400 `unauthorized_client`, 400 `invalid_scope`,
+400 `invalid_target`, 400 `invalid_dpop_proof` (missing, invalid or replayed proof), 400
+`invalid_grant` (app grant unknown, revoked, expired, another key, a widget grant, or the
+organization refused), 429 `slow_down`, 503 `temporarily_unavailable` with `Retry-After` (retry
+the exchange with a new proof), 500 `server_error`. A lost answer after the statement committed
+costs nothing but the next exchange, which replaces the grant the lost answer carried.
+
+**Verifying.** The widget routes verify with `@kilocode/verify` as audience `kilo-api`, route
+`{ issuer: 'uts', scope: 'kilo-api:home-widget.use', requiresSession: true }`; the principal is
+`sub` and `org` (absent: personal). The verifier's feed check (`revoked_sids`, `revoked_before`,
+`blocked_accounts`) replaces the legacy route's per-request database rechecks; UTS rechecks the
+account, device session, membership and SSO requirement at each widget refresh.
+
+**Cost.** An exchange is one SQL statement (the app grant by its token hash with its row lock, the
+proof row, a range probe of the hourly count, the membership row when a personal grant names an
+organization, at most one replaced grant, one grant insert, one or two audit rows), at most one
+feed publish (two feed-object calls, only when a grant was replaced) and one signer call. It runs
+when the app opens and its widget grant is under 7 days from expiry, so about once per 53 days
+per device. A widget refresh is the ordinary refresh: one statement and one signer call per
+widget run with an expired token, at most one per 10 minutes per device, inside the "mint or
+refresh a user token" budget (design 3). The cascade in `uts.end_grant` adds one probe of
+`refresh_grants_live_widget_key` per first-party grant revoke.
 
 ## Third-party clients, consent and the broker exchange
 
@@ -527,6 +590,176 @@ The local run is `scripts/clients-e2e.ts`. Start the mint Worker with
 and set `track_functions = 'all'` on the local server, so the run can count the exchange
 statements. The run serves the metadata document and the fake STS key set itself.
 
+## CI token exchange
+
+A GitHub Actions job trades its GitHub OIDC token for one UTS access token at `POST /token`
+(`src/ci/`; design 5.3, 5.5 and 6.2; RFC 8693). It replaces a long-lived Kilo API key in
+repository secrets. The wire contract is `ci.ts` in `@kilocode/uts-contracts`.
+
+- **Switch.** The trust policies are the Worker var `CI_TOKEN_POLICIES`, a JSON array per
+  environment in `wrangler.jsonc`. Absent or `[]`: the exchange answers `unsupported_grant_type`
+  and the metadata does not list the token exchange for it. A value that breaks a load rule keeps
+  it off and logs `uts.ci_token.misconfigured` with the rules it breaks. Production sets none, and
+  `test/repo/worker-configs.test.ts` keeps it that way and checks every configured list.
+- **Policy.** One entry per repository id, GitHub environment and workflow file:
+
+  ```json
+  {
+    "name": "ci-kilocode-smoke-test",
+    "repository": "Kilo-Org/kilocode",
+    "repositoryId": "946087422",
+    "repositoryOwnerId": "201822503",
+    "environment": "smoke-test",
+    "refs": ["refs/heads/main"],
+    "jobWorkflowRefs": ["Kilo-Org/kilocode/.github/workflows/smoke-test.yml@refs/heads/main"],
+    "events": ["workflow_dispatch"],
+    "legacySubject": true,
+    "subject": "<UTS account id of the dedicated CI account>",
+    "scopes": ["kilo-gateway:inference"],
+    "lifetimeSeconds": 3600
+  }
+  ```
+
+  The load rules (`src/ci/policy.ts`) follow the STS GitHub rules (design 6.3): `ci-<job>` names;
+  workflow entries of the policy's own repository, each on a listed ref; events from `push`,
+  `schedule`, `workflow_dispatch` and `workflow_run` only, `workflow_run` alone and never in
+  production; production accepts only `refs/heads/main`; `legacySubject` only for
+  Kilo-Org/kilocode (decision Q62a). Every scope must be registered, PAT-eligible and need no
+  organization claim, so a CI token never holds more than a PAT of the same account could.
+- **Subject.** Each policy names one UTS account, a dedicated CI account for that job, not an org
+  bot key. The token then has the claim profile of any user token, so a verifier needs no new
+  subject kind. The token carries `sub`, `client_id` (the policy name), `scope`, `aud`, `env`,
+  `jti` and the policy's lifetime (at most 1 hour), and no `sid`, `org`, `act` or refresh token.
+- **Stopping CI tokens.** Removing a policy stops new CI tokens only: tokens already issued live
+  until their expiry, up to 1 hour. The emergency stop is an access block of the CI account
+  (subject operation `revoke`, reason `access_block`): its statement refuses every later exchange
+  and puts a `subject` entry (with `revoked_before`) and a `blocked_account` entry on the
+  revocation feed for 70 minutes, past the longest CI token issued before it. A verifier refuses
+  such a token once its feed copy holds the entries, not at once (design 3, 5.6, 7): the first
+  request 10 seconds after its last fetch refreshes the copy in the background, a request waits
+  for a refresh once the signed head is over 30 seconds old (about 41 seconds in the worst case),
+  and, for a policy lifetime over 10 minutes, the verifier answers 503 rather than accept it once
+  the head is over 60 seconds old (10 minutes for a shorter lifetime).
+  `test/runtime/ci-token.test.ts` proves both with `@kilocode/verify`; `test/db/ci-token.test.ts`
+  proves the block's feed entries.
+- **Checks.** The OIDC token is `RS256` under GitHub's key set, issuer
+  `https://token.actions.githubusercontent.com`, exactly the environment's UTS issuer URL as its
+  one audience, `exp` with 60 seconds of skew and no future `iat`. The repository and owner ids,
+  GitHub environment and workflow entry select the policy; its immutable subject (or the default
+  subject on a `legacySubject` policy), ref, event and the entry's pin to the token's own ref must
+  match. Refusals: `invalid_request`, `invalid_scope`, `invalid_target`, `invalid_grant`, and 503
+  `temporarily_unavailable` with `Retry-After` when GitHub's key set or the identity store fails.
+- **GitHub key set** (`github-keys.ts`). One plain-data copy per isolate, used for at most 5
+  minutes; an unknown `kid` refreshes it at most once per 5 minutes; a failed fetch is not
+  retried for 10 seconds. The URL is pinned, redirects are not followed, the fetch gives up after
+  5 seconds and reads at most 64 KB.
+- **Audit and cost.** A token that matches no policy costs no statement. Otherwise one statement,
+  `uts.exchange_ci_token` (migration 0023), checks that the account is active and writes
+  `ai.kilo.uts.ci_token.issued` (with the token id, policy and run) or
+  `ai.kilo.uts.ci_token.denied`, then one `signMany` call signs the token in the signer its `jti`
+  picks. A token that names a policy's workflow but breaks a binding, or asks for a scope the
+  policy lacks, writes a denied row at most once per policy and reason per minute in each isolate.
+
+A job uses it like this (production issuer shown; staging uses `https://uts-staging.kiloapps.io`
+for both the audience and the URL):
+
+```yaml
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    environment: smoke-test # the policy's `environment`
+    permissions:
+      contents: read
+      id-token: write # lets the job request its OIDC token
+    steps:
+      - name: Get a Kilo CI token
+        run: |
+          set -euo pipefail
+          oidc=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https%3A%2F%2Futs.kiloapps.io" | jq -r .value)
+          echo "::add-mask::$oidc"
+          token=$(curl -sS --fail-with-body https://uts.kiloapps.io/token \
+            --data-urlencode grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+            --data-urlencode subject_token_type=urn:ietf:params:oauth:token-type:id_token \
+            --data-urlencode "subject_token=$oidc" \
+            --data-urlencode scope=kilo-gateway:inference \
+            --data-urlencode resource=urn:kilo:service:kilo-gateway | jq -r .access_token)
+          echo "::add-mask::$token"
+          echo "KILO_API_KEY=$token" >> "$GITHUB_ENV"
+```
+
+The token lives for the policy's lifetime and cannot be refreshed; a longer job runs the step again
+for a fresh OIDC token and a new CI token.
+
+## Bot-token mint
+
+A workload that runs as an internal bot account (`bot-internal-<slug>`), such as the bouncer watch
+or the auto-routing benchmark, gets one short-lived UTS access token for that account at
+`POST /internal/bot-tokens` (`src/bot-token/`; design 5.3 and 6.5). It replaces the web app's
+`/api/internal/bot-token` and its shared `BOT_TOKEN_MINT_SECRET`. The wire contract is
+`bot-token.ts` in `@kilocode/uts-contracts`.
+
+- **Switch and allow-list.** The policies are the Worker var `BOT_TOKEN_POLICIES`, a JSON array
+  per environment in `wrangler.jsonc`. Absent or `[]`: the route answers `404 not_found`. A value
+  that breaks a load rule keeps it off and logs `uts.bot_token.misconfigured` with the rules it
+  breaks. The workloads the policies name are the route's whole caller allow-list. Production sets
+  none, and `test/repo/worker-configs.test.ts` keeps it that way and checks every configured list.
+- **Policy.** One entry per workload and bot account:
+
+  ```json
+  {
+    "workload": "bouncer-watch",
+    "account": "bot-internal-bouncer-watch",
+    "org": "<organization id the bot acts in>",
+    "scopes": ["kilo-gateway:inference", "kilo-api:organizations.read"],
+    "lifetimeSeconds": 3600
+  }
+  ```
+
+  Load rules (`src/bot-token/policy.ts`): every scope is registered, minted from a grant, needs no
+  session (a bot token has no `sid`), no step-up, is not privileged, changes no credential, belongs
+  to no staff list and is not a `uts` scope; at most 8 scopes and 1 hour.
+- **Caller.** `Authorization: Bearer <STS token>` for audience `uts` and the one STS scope
+  `uts:bot-token.mint`, checked by `@kilocode/verify` against the environment's STS key set
+  (`botTokenCallers` in `src/sts-callers.ts`). A valid token from a workload with no policy gets a
+  bare `403 insufficient_scope`. The development entry takes the stand-in bearer
+  `uts-dev-sts:<workload>:uts:bot-token.mint`.
+- **Request.** JSON `{ "account": "bot-internal-…", "audience": "kilo-gateway",
+  "scope": "kilo-gateway:inference" }`: one audience and one scope of it per call. A workload that
+  calls two services mints one token per audience.
+- **Answer.** `200 { access_token, token_type: "Bearer", expires_in, audience, scope }`, no refresh
+  token. The token carries `sub` (the bot account), `client_id` and `req` (the workload), `org`
+  (the policy's organization), `scope`, `aud`, `env`, `jti` and `bot_user: true`; no `sid`,
+  `auth_time`, `amr` or `act`. It lives the policy's lifetime for a PAT-eligible scope (a PAT
+  holds such a scope for up to a year) and at most the scope's registered maximum (10 minutes or
+  less) for any other.
+- **Refusals.** `400 invalid_request` (body), `400 invalid_target` (audience is not the scope's),
+  `400 invalid_scope` (the policy does not grant it), `401 invalid_token`, `403 insufficient_scope`,
+  `403 access_denied` with `error_description` `unknown_account`, `account_inactive` or
+  `membership_denied`, `404 not_found` (off), `503 temporarily_unavailable` with `Retry-After`
+  (STS key set, identity store or signer), `500 server_error`. Retry only on 503.
+- **Stopping bot tokens.** Block the bot account (subject operation `revoke`, reason
+  `access_block`): the statement then refuses every mint, and the block puts `subject` and
+  `blocked_account` entries on the revocation feed for 70 minutes, past the longest bot token. A
+  verifier refuses an issued token once its feed copy holds them (about 41 seconds in the worst
+  case), and answers 503 rather than accept a token whose lifetime is over 10 minutes once the head
+  is over 60 seconds old. Removing the policy stops new tokens only.
+  `test/runtime/bot-token.test.ts` proves the refusal with `@kilocode/verify`;
+  `test/db/bot-token.test.ts` proves the block's entries.
+- **Audit and cost.** Refusals before the statement (caller, body, account, scope) write a
+  `uts.bot_token.refused` or `uts.internal.workload_refused` log line and cost no statement.
+  Otherwise one statement, `uts.mint_bot_token` (migration 0026), reads the account and its
+  membership (two primary-key probes) and writes `ai.kilo.uts.bot_token.issued` (with the token
+  id, organization, role, scope and lifetime) or `ai.kilo.uts.bot_token.denied`
+  (`account_inactive`, or `membership_denied` for anything but an active `owner` or `member`), with
+  the calling workload as actor; then one `signMany` call signs the token in the signer its `jti`
+  picks. The bot account and its membership must be in the identity store (import through
+  `/internal/accounts/import` and the membership sync); no SSO rule applies, since a bot never
+  signs in.
+- **STS side.** `uts:bot-token.mint` must be registered under audience `uts` in the STS scope
+  registry and granted to each minting workload's STS policy; STS and its policy files are owned
+  outside this service.
+
 ## Account API, PATs and org bot keys
 
 Every account route takes a UTS access token for the `uts` audience with the route's scope and a
@@ -534,10 +767,18 @@ Every account route takes a UTS access token for the `uts` audience with the rou
 holds, read through an isolate copy of the key list (one Durable Object call per isolate per 10
 seconds, or per 2 seconds while tokens name a kid the copy lacks, so a flood of forged tokens costs
 no call each), `typ` `at+jwt`, the issuer, 60 seconds of skew and
-the claim profile, and a client that the scope registry allows for the scope (today `kilo-cli`
-only). A PAT names no session, so it is refused there. Each action is one statement that reads the
-grant the `sid` names and its device session, so a revoked grant, an ended session or a blocked
-account fails at once, with no feed lookup.
+the claim profile, and a client that the scope registry allows for the scope (`kilo-cli` or
+`kilo-web` only). A PAT names no session, so it is refused there. Each action is one statement that
+reads the grant or browser session the `sid` names, so a revoked grant, an ended session or a
+blocked account fails at once, with no feed lookup.
+
+**The profile API key and released clients (decision D54).** The released CLI, extension and mobile
+app send one profile API key to the gateway for inference, and to the kilo-api (reads and writes)
+and Session Ingest. A UTS PAT holds one audience and one scope, so the PAT the profile page creates
+serves gateway inference only (a product choice; other PAT-eligible scopes exist). Released clients
+keep their legacy profile key for kilo-api and Session Ingest calls until the phase 5 client
+releases; no compatibility credential exists. The criterion 4 measure counts legacy profile-key
+issuance as a released-app path, labelled separately from UTS-issued credentials.
 
 `/authorize` and `/token` apply the scope registry (`src/scopes/policy.ts`; the endpoints take it
 as a dependency: `utsScopeEntry` in every deployed Worker, plus the `fixture:*` scopes in the
@@ -588,6 +829,17 @@ organization a request names against the subject itself.
 | `POST /account/orgs/<org>/bot-keys/<id>/keep` | `uts:bot-keys.manage` | Keeps a flagged key before its 7-day cutoff; tier B gate, since keeping restores long-lived access | `uts.keep_bot_key` |
 | `GET /probe/pat` | `uts:probe.read` on the PAT | Answers whose PAT it is: the offline format check, a client address, 20 lookups per second per client (an IPv4 address or an IPv6 /64) per isolate, then the lookup with no cache, so a revoked PAT fails on its next use | `uts.lookup_pat` (PAT config) |
 
+- The CLI and the web BFF `kilo-web` hold `uts:pats.manage` and `uts:bot-keys.manage` (design
+  5.5). A `kilo-web` token names its browser session in `sid`: `uts.account_session` (migration
+  0025) finds a live browser session of the token's subject that holds a BFF handle, or a CLI
+  grant and its device session, and refuses a session of any other account. The token's `sub` and
+  `sid` come from the same session row at the mint, so the BFF manages the credentials of its
+  signed-in user only. A create's tier B gate, and a keep's, runs on that session, and the consumed
+  pass names it. A session the legacy bridge created holds no UTS sign-in cookie, so its sign-in
+  time (the web app's claim) never counts as a recent sign-in; only a passkey step-up of that
+  session could pass. `uts.open_tier_a_gate_pass` answers `invalid_session` for a browser session,
+  which uses `uts.open_browser_tier_a_gate_pass`. In the account audit rows `grantId` is the
+  token's `sid`, and the create and keep rows and their refusals name the client (`clientId`).
 - A create writes the credential, its gate pass (consumed by that one row), the owner's in-app
   notice and the audit row in one statement. The push and email notice goes through the
   `CredentialNotices` port after the statement; slice 3.8 (security notices) implements the port,
@@ -603,7 +855,8 @@ organization a request names against the subject itself.
   6-character CRC-32 checksum (`src/pat/format.ts`, the format `@kilocode/verify` parses). The
   identity store keeps the SHA-256 and the last four characters; audit rows name a credential by
   its id and `uts.credential_reference` of the hash, never by its value, its hash or its name.
-- A refused gate writes at most one `ai.kilo.uts.gate.refused` row per grant per minute.
+- A refused gate writes at most one `ai.kilo.uts.gate.refused` row per grant, or per browser
+  session, per minute.
 - `uts.remove_org_member` applies a membership-removed event: it revokes the member's org-bound
   PATs and grants, flags the bot keys the member created (they stop 7 days later unless an admin
   keeps them) and gives each owner and admin one notice; a stale event changes nothing.
@@ -635,7 +888,8 @@ organization a request names against the subject itself.
   any role or in listed roles; no delegated token carries a privileged, step-up, staff or
   credential-changing scope; a scope limited to listed roles is neither third-party-safe nor
   PAT-eligible). It lists the account API scopes (`uts:pats.manage`, `uts:bot-keys.manage`,
-  session-bound), `uts:probe.read`, `uts:security.read` (the web app's security view,
+  session-bound, for the CLI and the web BFF), `uts:probe.read` (PATs, and the CLI),
+  `uts:security.read` (the web app's security view,
   session-bound), `uts:browser-session.read` (the web app's bootstrap at its code exchange,
   session-bound, no account change), `kilo-api:profile.read` (CLI and PATs), the CLI's Kilo API
   route scopes
@@ -656,7 +910,13 @@ organization a request names against the subject itself.
   Its code names the browser session it was approved in and has no DPoP key; the code exchange
   returns that session and an opaque handle (migration 0013), and the BFF then calls
   `POST /account/browser-sessions/{read,token,end,end-all}` and `/account/devices/revoke`
-  (`@kilocode/uts-contracts` `browser-sessions.ts`). The legacy bridge (RFC 8693, subject token
+  (`@kilocode/uts-contracts` `browser-sessions.ts`). `token` takes an optional `org` (design 5.8):
+  `uts.mint_web_session_token` (migration 0025) reads the subject's membership and the
+  organization's SSO policy in the minting statement and binds the token only for an active member
+  in a role the scope allows whose handle sign-in meets the SSO rule, else 403 `access_denied`; a
+  scope that needs the `org` claim needs `org`. A member removal refuses the next mint; a token
+  minted before it is not revoked and ends at its expiry, 10 minutes at most. The legacy bridge
+  (RFC 8693, subject token
   `typ` `kilo-legacy-session+jwt`) is a high-risk switch: its subject token vouches for a legacy
   session of any app user. It runs only where `LEGACY_BRIDGE_ENABLED` is `true`, and verifies the
   token only under its own one or two Ed25519 keys in `KILO_WEB_BRIDGE_JWKS` (kid prefix
@@ -847,7 +1107,9 @@ Open items before deploy:
 ### Configuration
 
 A method is offered only when every value it needs is set; with some set and others missing it is
-not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only).
+not offered and its routes answer 500 (`uts.signin.misconfigured` log line, names only). The secrets
+come from the source `SECRETS_SOURCE` names (Deploys, "Runtime secrets"); with a method's vars set
+and no usable STS bundle it is not offered and its routes answer 503 with `Retry-After`.
 
 | Method | Vars | Secrets |
 |---|---|---|
@@ -866,11 +1128,11 @@ sender must sit on the sending domain (SPF and DKIM alignment), and Mailgun is c
 host. `UTS_MAIL_ALLOWED_RECIPIENTS` is a comma-separated list of exact addresses
 (`tester@example.com`) and whole domains (`@example.com`, no subdomains); staging and development
 must set it, and production must not (either mistake makes the mail settings misconfigured). The
-three vars are the switch: the secrets alone turn nothing on, so set `SIGNIN_EMAIL_HASH_KEY`,
-`UTS_MAILGUN_SENDING_KEY` and `UTS_TURNSTILE_SECRET_KEY` with `wrangler secret put` first, then
-deploy the vars in `wrangler.jsonc`; vars without both secrets make the routes answer 500. The
-Turnstile widget lists the issuer host (`uts-staging.kiloapps.io`, `uts.kiloapps.io`) as its
-hostname.
+three vars are the switch: the secrets alone turn nothing on, so put `SIGNIN_EMAIL_HASH_KEY`,
+`UTS_MAILGUN_SENDING_KEY` and `UTS_TURNSTILE_SECRET_KEY` in the selected source first (Deploys,
+"Runtime secrets"), then deploy the vars in `wrangler.jsonc`; vars without both secrets make the
+routes answer 500. The Turnstile widget lists the issuer host (`uts-staging.kiloapps.io`,
+`uts.kiloapps.io`) as its hostname.
 
 `SIGNIN_DEV_ENDPOINTS` (development only, loopback URLs only) points providers at local
 stand-ins. Each registration lists the callback of its environment's issuer:
@@ -1131,7 +1393,9 @@ feed object answers, terminal deletion, the user-created event and the audit row
   restarts, no head without a good backfill, refused names), the publisher and the `FeedReads`
   caller check, the PAT and bot key format against fixed vectors, every account route against a
   recording account store with tokens from the real signers, the probe route, the PAT lookup and
-  its entrypoint over real service bindings; unit tests cover feed entries, list serialization and
+  its entrypoint over real service bindings, and the runtime secrets of both sources (a stand-in
+  STS binding: delivered, missing, refused, unavailable and stale bundles, and the routes that must
+  not wait for it); unit tests cover feed entries, list serialization and
   the feed ledger.
 - `pnpm test:repo`: the repository config check and the scope registry check (`test/repo`), with
   no database.
@@ -1242,6 +1506,85 @@ The deployed entry checks STS tokens with `@kilocode/verify` against the environ
 each environment admits on the broker exchange and the `/internal/` routes; production lists none.
 An unreadable STS key set answers 503, never an admission.
 
+### Runtime secrets
+
+The 15 runtime secrets (`UTS_SECRET_NAMES` in `src/secrets.ts`: `DEVICE_USER_CODE_KEY`,
+`SIGNIN_EMAIL_HASH_KEY`, `SIGNIN_<PROVIDER>_CLIENT_SECRET` for Google, OpenAI, Anaconda, GitHub,
+GitLab, Discord and LinkedIn, `SIGNIN_APPLE_PRIVATE_KEY`, `SIGNIN_ANTHROPIC_ASSERTION_PRIVATE_KEY`,
+`SIGNIN_WORKOS_API_KEY`, `UTS_MAILGUN_SENDING_KEY`, `UTS_TURNSTILE_SECRET_KEY` and
+`ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY`) come from one source per environment, the var
+`SECRETS_SOURCE`:
+
+- `sts`: the UTS STS bundle, `/workloads/uts` of the environment, over the `STS` binding
+  (`SecretsBroker`, caller `uts`, policy `services/sts/policy/uts.yaml`). It never falls back to
+  the Worker secrets. `@kilocode/secrets-client` keeps one bundle per isolate, revalidates it in
+  the background after 4 minutes, waits for STS only on a cold isolate or past the 5-minute cache
+  life, and serves the held copy for up to 24 hours while STS fails.
+- `worker`: the Worker secrets of the same names, read once per isolate. `secrets-store`, the
+  legacy value other services use, means the same here (it logs `source` `worker`), so the
+  standard rollback value works for UTS too. Any other value refuses to start (`src/env.ts`).
+
+Both environments read `worker` until their flips (below). Staging and production refuse to start
+without the var (`src/env.ts`), and `test/repo` fails a deployed block that does not name a source
+or does not bind its own environment's STS as caller `uts`. The Worker secrets stay set under
+either source, so a rollback is the var alone. The `worker` source is removed in the same change
+that deletes the Worker secrets, never before. `UTS_HYPERDRIVE_SWITCH_TOKEN` has no Worker secret;
+the rotation job always reads it from the bundle ("Login rotation").
+
+Under `sts` the client holds the whole bundle in every request isolate that reads it. Once the
+policy grants `UTS_HYPERDRIVE_SWITCH_TOKEN`, that token, which can edit every Hyperdrive config in
+the account, sits in the memory of those isolates too, not only in the rotation object's. So the
+`uts` policy grants it only in the change that turns the rotation job on.
+
+Only the routes that use a secret read them, once per request: the sign-in pages and their calls,
+the provider, SSO and email routes, `/authorize`, the device pages, the issuer metadata, a
+`device_code` or `kilo-mobile` code exchange at `/token`, and, only where a mail var is set, a
+created credential's notice email (after the answer) and the minute cron's notice step. A refresh,
+`/revoke`, `/introspect`, `/tickets`, the browser-session API, the account API and the PAT routes
+never wait for STS. What a read finds:
+
+| Bundle state | Methods with their vars set | Methods without vars |
+|---|---|---|
+| Delivered, name present | `on` | `off` |
+| Delivered, name missing (policy grants it, the manager holds no value, or the value is empty) | `misconfigured`: not offered, routes answer 500 | `off` |
+| STS refuses the `uts` workload, or `STS` is not bound (`uts.secrets.unavailable` with `reason` `denied` or `not_bound`) | as a delivered bundle without the name: `misconfigured` | `off` |
+| No usable bundle: none yet on a cold isolate, or the held copy is 24 hours old (`uts.secrets.unavailable`, `reason` `unavailable`) | `unavailable`: not offered, routes answer 503 with `Retry-After` | `off` |
+
+With no usable bundle, the device grant answers 503 (`temporarily_unavailable` on
+`/device_authorization` and at `/token`) and the issuer metadata leaves it out with
+`Cache-Control: no-store`; `kilo-mobile` is still sent to sign in, and its code exchange answers 503
+until the bundle is back; the cron's notice step only runs retention, so pending notices wait.
+
+Each isolate logs one `uts.secrets.read` line when it first reads, and again for each new bundle
+version: `source` (`worker` or `sts`), `absent` (names the source holds no value for), `empty`
+(names it holds an empty value for, a manager placeholder; the readers treat both as unset), and
+for `sts` the bundle's `stale` and `fetched_at`. Names only, never a value. Zero legacy reads over
+a window is a logs query for `event = "uts.secrets.read"` with `source = "worker"` that finds
+nothing.
+
+The secrets client caches a denial per isolate: once STS refuses the `uts` workload, an isolate
+keeps refusing until it is replaced. After fixing a denial (`uts.secrets.unavailable` with
+`reason` `denied`), redeploy UTS, or roll the var back to `worker`.
+
+**Flip, per environment** (staging first, production only after the staging flip held), with the
+environment's `uts` policy live in STS:
+
+1. **Parity.** Every name in the environment's `/workloads/uts` holds the Worker secret's value,
+   compared by fingerprint, never printed, and the environment's read lines list no name under
+   `empty` that is set as a Worker secret. `DEVICE_USER_CODE_KEY` and `SIGNIN_EMAIL_HASH_KEY` key
+   hashes that the identity store holds (pending user codes, email codes and links), so a
+   different value breaks those flows.
+2. **Deploy** `SECRETS_SOURCE` `sts` for that environment, in a quiet window for production.
+3. **Watch** for one hour: `uts.secrets.read` lines only with `source` `sts` and an `absent` and
+   `empty` list that matches the environment's unset methods; no `uts.secrets.unavailable`; no new
+   `uts.signin.misconfigured`; the issuer metadata still lists `device_authorization_endpoint`
+   where the device grant was served; the sign-in proofs of that environment pass; and STS audit
+   rows for the `uts` deliveries.
+4. **Rollback** is a deploy with `SECRETS_SOURCE` `worker` (or the standard `secrets-store`, read as
+   `worker`), after re-running the parity check of step 1 the other way: a value changed in the
+   bundle while on `sts` (a rotated provider secret) must reach the Worker secret first, or the
+   rollback serves the old one.
+
 ### Provisioning per environment
 
 | Setting | Kind | Value |
@@ -1251,9 +1594,11 @@ An unreadable STS key set answers 503, never an admission.
 | `IDENTITY_STORE_REPLICA` | Hyperdrive binding | The read-replica config (logins `uts_reader_a`, `uts_reader_b`) for the account views |
 | `WEBAUTHN_RP_ID` | var | The relying-party id: the app host whose passkeys users hold in production (`app.kilo.ai`); the issuer host in staging (`uts-staging.kiloapps.io`), which keeps its own passkeys |
 | `WEBAUTHN_ORIGINS` | var | The issuer origin; in production the app host must list it in `/.well-known/webauthn` (WebAuthn related origins, design 5.14) before its passkeys work here |
-| `DEVICE_USER_CODE_KEY` | Worker secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Set with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` from a generated value, never a copied one |
+| `DEVICE_USER_CODE_KEY` | runtime secret | 32 random bytes in base64url, the HMAC key of RFC 8628 user codes; unset or malformed, the device grant is not served and every other route works (a malformed value logs `uts.signin.misconfigured` with the name on each device page request). Generate it once, put it in the environment's `/workloads/uts` folder, and set the Worker secret to the same value with `wrangler secret put DEVICE_USER_CODE_KEY --env <env>` reading standard input |
 | `SIGNIN_GITHUB_CLIENT_ID`, `SIGNIN_GOOGLE_CLIENT_ID`, `SIGNIN_GITLAB_CLIENT_ID`, `SIGNIN_DISCORD_CLIENT_ID`, `SIGNIN_LINKEDIN_CLIENT_ID` | var | The OAuth client ids of the GitHub, Google, GitLab, Discord and LinkedIn sign-in registrations; staging sets all five, production sets none, so production offers none of these providers (Sign-in providers, "Configuration") |
-| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | Worker secret | The client secrets of those registrations, set only where the matching client id is set. Copy each from the environment's `/workloads/uts` folder in the secrets manager with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
+| `SIGNIN_GITHUB_CLIENT_SECRET`, `SIGNIN_GOOGLE_CLIENT_SECRET`, `SIGNIN_GITLAB_CLIENT_SECRET`, `SIGNIN_DISCORD_CLIENT_SECRET`, `SIGNIN_LINKEDIN_CLIENT_SECRET` | runtime secret | The client secrets of those registrations, set only where the matching client id is set: in the environment's `/workloads/uts` folder in the secrets manager, and copied from there to the Worker secret with `wrangler secret put <name> --env <env>` reading standard input, before the deploy that adds the client id |
+| `SECRETS_SOURCE` | var | `sts` or `worker` (`secrets-store` is read as `worker`; Deploys, "Runtime secrets"); both environments `worker` until their flips |
+| `STS` | service binding | `sts` (`sts-staging` in staging), entrypoint `SecretsBroker`, props `{ "caller": "uts" }` |
 
 ## Identity store
 
@@ -1442,10 +1787,9 @@ rotated that login.
 4. **The origins.** Pin the environment's direct host, port and database for each pool in
    `ORIGIN_PINS`.
 
-**Open item:** STS has no `uts` workload policy yet (phase 2 adds it), so `wrangler.jsonc` binds no
-`STS` for now and the job, which is off, would report `misconfigured` (`missing STS`). With that
-policy, add the binding to the top level and to `env.staging`: `{ "binding": "STS", "service":
-"sts" (`"sts-staging"` in staging), "entrypoint": "SecretsBroker", "props": { "caller": "uts" } }`.
+The job reads the switch token through the `STS` binding that `wrangler.jsonc` sets in both
+environments (Deploys, "Runtime secrets"); until `services/sts/policy/uts.yaml` lists the token,
+STS refuses the read and a run reports it.
 
 `pnpm exec tsx scripts/rotation-e2e.ts` runs the full a -> b -> a rotation locally: the mint Worker
 under `wrangler dev`, a stand-in manager and Cloudflare API on loopback (`UTS_E2E_PORT`, default

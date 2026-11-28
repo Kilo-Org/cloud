@@ -1,6 +1,11 @@
 import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { HonoContext } from '../hono-context.js';
 import type { ValidatedSessionAccess } from '../types.js';
 import { logger } from '../logger.js';
@@ -15,6 +20,8 @@ import {
   type BalanceOnlyResult,
 } from '../balance-validation.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
+import { requestContext } from '../request-context.js';
 import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 import {
@@ -45,10 +52,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasValidInternalApiKey(c: Context<HonoContext>): boolean {
+async function hasValidInternalApiKey(c: Context<HonoContext>): Promise<boolean> {
   const provided = c.req.header(INTERNAL_API_KEY_HEADER);
-  const expected = c.env.INTERNAL_API_SECRET;
-  return Boolean(provided && expected && timingSafeEqual(provided, expected));
+  const expected = await readCloudAgentNextSecret(
+    c.env,
+    'INTERNAL_API_SECRET',
+    requestContext(c)
+  ).catch(() => undefined);
+  if (!provided || !expected || !timingSafeEqual(provided, expected)) return false;
+  // Design section 9.4, item 9: the bypass is a shared-secret acceptance on a procedure that the
+  // internal tRPC guard does not cover.
+  observeInternalAuth(
+    'cloud-agent-next',
+    'balance_bypass',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  return true;
 }
 
 /**
@@ -103,7 +123,7 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     const skipBalanceCheck = c.req.header(SKIP_BALANCE_CHECK_HEADER) === 'true';
 
     if (skipBalanceCheck) {
-      if (!hasValidInternalApiKey(c)) {
+      if (!(await hasValidInternalApiKey(c))) {
         logger
           .withFields({ procedure: procedureLabel })
           .warn('Rejected client-supplied balance bypass header');
@@ -134,7 +154,7 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
       const key = `${tokenScope}:${orgId ?? ''}`;
       const cached = validationCache.get(key);
       if (cached) return cached;
-      const pending = validateBalanceOnly(token, orgId, c.env);
+      const pending = validateBalanceOnly(token, orgId, c.env, requestContext(c));
       validationCache.set(key, pending);
       return pending;
     };

@@ -22,14 +22,24 @@ import type { HandleWindows } from '../bff/limits';
 import { handleBrowserSessionRequest } from '../bff/routes';
 import { webSessionAccess } from '../bff/store';
 import { handleWebClientToken } from '../bff/token';
+import type { CiExchangeService } from '../ci/exchange';
+import { githubKeys, newGithubKeyState } from '../ci/github-keys';
+import { ciPolicies } from '../ci/policy';
+import { ciTokenAccess } from '../ci/store';
 import type { Env, UtsConfig } from '../env';
 import type { ExchangeService } from '../exchange/endpoint';
 import { isolateSignerKeys, newKeyCopyState, shardSignerKeys } from '../exchange/keys';
 import { newExchangeWindows } from '../exchange/limits';
 import { grantsAccess, identityStoreBinding } from '../grants/binding';
 import type { GrantsAccess } from '../grants/store';
+import {
+  type HomeWidgetService,
+  handleHomeWidgetExchange,
+  homeWidgetService,
+} from '../home-widget/exchange';
 import type { MintOptions } from '../http';
 import { type FeedPublish, feedPublisher } from '../revocation/publish';
+import type { UtsSecrets } from '../secrets';
 import type { ScopeRegistry } from '../scopes/policy';
 import type { SignInDeps } from '../signin/deps';
 import { type DeviceDeps, handleDeviceAuthorization } from '../signin/device/authorization';
@@ -59,7 +69,7 @@ import {
 import { consentStep, handleAppsPage } from '../third-party/consent';
 import { type ThirdPartyAccess, thirdPartyAccess } from '../third-party/store';
 import { type SignerAccess, signerAccess } from '../token/mint';
-import { classifyFailure } from './errors';
+import { classifyFailure, temporarilyUnavailable } from './errors';
 import { type AuthorizationHandoff, handleAuthorize } from './authorize';
 import { handleIntrospect } from './introspect';
 import { handleRevoke } from './revoke';
@@ -68,13 +78,26 @@ import { type DeviceCodeGrant, handleToken } from './token-endpoint';
 /**
  * The RFC 8628 device grant: its token-endpoint hook and its pages where the user-code secret is
  * set (`served`). Where the secret is unset (`off`) or malformed (`misconfigured`) the grant is not
- * served and every other route works as before.
+ * served and every other route works as before; where STS gave no usable bundle (`unavailable`)
+ * its routes answer a retryable 503.
  */
 export type DeviceService =
   | { status: 'served'; grant: DeviceCodeGrant; pages: DeviceDeps }
-  | { status: 'off' | 'misconfigured' };
+  | { status: 'off' | 'misconfigured' | 'unavailable' };
 
 type ServedDevice = Extract<DeviceService, { status: 'served' }>;
+
+/**
+ * What reads the runtime secrets (src/secrets.ts): the sign-in methods and the pages that list
+ * them, the device grant and the attestation of `kilo-mobile`.
+ */
+export type SecretDeps = {
+  handoff: AuthorizationHandoff;
+  device: DeviceService;
+  signIn: SignInDeps;
+  /** Device attestation of `kilo-mobile` (src/attest/gate.ts). */
+  attestation: AttestationService;
+};
 
 /**
  * What an OAuth or sign-in request needs; the runtime tests pass their own stores, `scopes` and
@@ -88,9 +111,6 @@ export type OAuthDeps = {
   scopes: ScopeRegistry;
   /** Writes a committed statement's feed entries to the feed objects (src/revocation/publish.ts). */
   publish: FeedPublish;
-  handoff: AuthorizationHandoff;
-  device: DeviceService;
-  signIn: SignInDeps;
   tickets: TicketDeps;
   /** The web BFF `kilo-web`: its token grants and the browser-session API (src/bff/). */
   web: WebClientDeps;
@@ -100,8 +120,15 @@ export type OAuthDeps = {
   thirdParty: ThirdPartyAccess;
   /** The RFC 8693 broker exchange; null until an STS token verifier is wired. */
   exchange: ExchangeService | null;
-  /** Device attestation of `kilo-mobile` (src/attest/gate.ts). */
-  attestation: AttestationService;
+  /** The home-widget exchange's switch (src/home-widget/exchange.ts). */
+  homeWidget: HomeWidgetService;
+  /** The CI token exchange (src/ci/); off unless `CI_TOKEN_POLICIES` lists trust policies. */
+  ci: CiExchangeService;
+  /**
+   * The secret-reading deps, built on first use in the request, so the refresh, revocation,
+   * introspection, ticket and browser-session routes never wait for STS.
+   */
+  secretDeps: () => Promise<SecretDeps>;
 };
 
 /** The OAuth endpoints are served only where the identity store is bound. */
@@ -125,6 +152,29 @@ const metadataFailures: ThirdPartyClientsDeps['failures'] = new Map();
 const metadataFetches: ThirdPartyClientsDeps['inFlight'] = new Map();
 const exchangeKeys = newKeyCopyState();
 const exchangeWindows = newExchangeWindows();
+/** Per isolate: GitHub's OIDC key set and the CI exchange's denied-row times (src/ci/). */
+const githubKeyState = newGithubKeyState();
+const ciDeniedAudits = new Map<string, number>();
+
+/** The CI exchange of this environment's `CI_TOKEN_POLICIES`, over the isolate's state. */
+function ciExchange(
+  env: Env,
+  config: UtsConfig,
+  scopes: ScopeRegistry,
+  connectionString: string,
+  ctx: ExecutionContext
+): CiExchangeService {
+  const policies = ciPolicies(env, config.environment, scopes);
+  if (policies.status !== 'on') return policies;
+  return {
+    status: 'on',
+    policies: policies.policies,
+    keys: githubKeys(githubKeyState, (input, init) => fetch(input, init), Date.now),
+    store: ciTokenAccess(connectionString, ctx),
+    deniedAudits: ciDeniedAudits,
+    now: Date.now,
+  };
+}
 
 /**
  * `options.signer` null uses the grant's signer object; only the development entry passes another
@@ -134,37 +184,67 @@ const exchangeWindows = newExchangeWindows();
  * passes null, so the email sign-in is offered only where the mail settings are on
  * (src/signin/email/delivery.ts). `options.stsCallers` verifies the broker exchange's STS tokens:
  * `@kilocode/verify` in the deployed entry; null only in a development run without a stand-in STS,
- * where the exchange is not offered.
+ * where the exchange is not offered. `secrets` is the request's one secrets read (`requestSecrets`).
  */
 export function oauthService(
   env: Env,
   ctx: ExecutionContext,
   config: UtsConfig,
-  options: MintOptions
+  options: MintOptions,
+  secrets: () => Promise<UtsSecrets>
 ): OAuthService {
   const binding = identityStoreBinding(env);
   if (binding.kind === 'unprovisioned') return binding;
   const { scopes } = options;
-  const settings = signInConfigFor(env, config);
-  const signIn: SignInDeps = {
-    config,
-    signIn: signInAccess(binding.connectionString, ctx),
-    methods: {
-      config,
-      settings,
-      store: providerSignInAccess(binding.connectionString, ctx),
-      email: emailSignIn(settings, config.endpoints.issuer, options.recordingMailer, platformFetch),
-    },
-  };
   const signer = options.signer ?? signerAccess(env, config);
-  const secret = userCodeSecret(env);
   const thirdParty = thirdPartyAccess(binding.connectionString, ctx);
-  const signInPages = signInHandoff(
-    signIn,
-    consentStep({ config, thirdParty, scopes }, signIn.methods)
-  );
+  const signInStore = signInAccess(binding.connectionString, ctx);
+  const methodStore = providerSignInAccess(binding.connectionString, ctx);
   const handoff = options.authorizationHandoff;
   const publish = feedPublisher(env, config, ctx);
+  const buildSecretDeps = async (): Promise<SecretDeps> => {
+    const read = await secrets();
+    const settings = signInConfigFor(env, read, config);
+    const signIn: SignInDeps = {
+      config,
+      signIn: signInStore,
+      methods: {
+        config,
+        settings,
+        store: methodStore,
+        email: emailSignIn(
+          settings,
+          config.endpoints.issuer,
+          options.recordingMailer,
+          platformFetch
+        ),
+      },
+    };
+    const secret = userCodeSecret(read);
+    const signInPages = signInHandoff(
+      signIn,
+      consentStep({ config, thirdParty, scopes }, signIn.methods)
+    );
+    return {
+      signIn,
+      handoff: handoff === null ? signInPages : handoff(signInPages),
+      device:
+        secret.status === 'on'
+          ? {
+              status: 'served',
+              grant: deviceCodeGrant({ config, sign: signer, scopes }, signInStore),
+              pages: { ...signIn, userCodeSecret: secret.secret },
+            }
+          : { status: secret.status },
+      attestation: attestationService(
+        env,
+        read,
+        config,
+        attestationAccess(binding.connectionString, ctx)
+      ),
+    };
+  };
+  let secretDeps: Promise<SecretDeps> | null = null;
   return {
     kind: 'ready',
     deps: {
@@ -173,16 +253,6 @@ export function oauthService(
       sign: signer,
       scopes,
       publish,
-      handoff: handoff === null ? signInPages : handoff(signInPages),
-      device:
-        secret.status === 'on'
-          ? {
-              status: 'served',
-              grant: deviceCodeGrant({ config, sign: signer, scopes }, signIn.signIn),
-              pages: { ...signIn, userCodeSecret: secret.secret },
-            }
-          : { status: secret.status },
-      signIn,
       tickets: { config, tickets: ticketAccess(binding.connectionString, ctx) },
       web: {
         config,
@@ -218,11 +288,12 @@ export function oauthService(
               windows: exchangeWindows,
               now: Date.now,
             },
-      attestation: attestationService(
-        env,
-        config,
-        attestationAccess(binding.connectionString, ctx)
-      ),
+      homeWidget: homeWidgetService(env),
+      ci: ciExchange(env, config, scopes, binding.connectionString, ctx),
+      secretDeps: () => {
+        secretDeps ??= buildSecretDeps();
+        return secretDeps;
+      },
     },
   };
 }
@@ -250,12 +321,28 @@ async function handleSignedInPage(request: Request, deps: SignInDeps): Promise<R
 }
 
 /**
- * The device grant for a device page, or null (the page is not served). A malformed secret is
- * logged once per request that reaches a device page, by name only.
+ * The device grant for a device page, `unavailable` (the route answers 503), or null (the page is
+ * not served). A malformed secret is logged once per request that reaches a device page, by name
+ * only.
  */
-function servedDevice(device: DeviceService): ServedDevice | null {
+function servedDevice(device: DeviceService): ServedDevice | 'unavailable' | null {
   if (device.status === 'misconfigured') logMisconfigured('device', ['DEVICE_USER_CODE_KEY']);
+  if (device.status === 'unavailable') return 'unavailable';
   return device.status === 'served' ? device : null;
+}
+
+/**
+ * The sign-in pages, their JSON calls, the provider, SSO and email routes, the authorization
+ * endpoint and the device pages: the routes that read the runtime secrets before they answer.
+ */
+function readsSecrets(pathname: string): boolean {
+  return (
+    pathname.startsWith('/signin/') ||
+    pathname === UTS_AUTHORIZE_PATH ||
+    pathname === UTS_DEVICE_AUTHORIZATION_PATH ||
+    pathname === UTS_DEVICE_VERIFICATION_PATH ||
+    pathname === UTS_DEVICE_DECISION_PATH
+  );
 }
 
 /** The response for an endpoint, or null when `pathname` names none that is served. */
@@ -264,59 +351,73 @@ export async function handleOAuthRequest(
   pathname: string,
   deps: OAuthDeps
 ): Promise<Response | null> {
-  const methods = deps.signIn.methods;
-  const signInMethod =
-    (await handleProviderRequest(request, pathname, methods)) ??
-    (await handleSsoRequest(request, pathname, methods)) ??
-    (await handleEmailRequest(request, pathname, methods));
-  if (signInMethod !== null) return signInMethod;
   switch (pathname) {
-    case UTS_SIGNED_IN_PATH:
-      return await handleSignedInPage(request, deps.signIn);
-    case UTS_AUTHORIZE_PATH:
-      return await handleAuthorize(request, deps);
     case UTS_TOKEN_PATH:
       return await handleToken(request, {
         ...deps,
-        deviceCodeGrant: deps.device.status === 'served' ? deps.device.grant : null,
+        deviceCodeGrant: async () => (await deps.secretDeps()).device,
+        attestation: async () => (await deps.secretDeps()).attestation,
         webClient: (tokenRequest, grantType, params) =>
           handleWebClientToken(tokenRequest, grantType, params, deps.web),
+        homeWidgetGrant:
+          deps.homeWidget.status === 'on'
+            ? (tokenRequest, params) => handleHomeWidgetExchange(tokenRequest, params, deps)
+            : null,
       });
     case UTS_REVOKE_PATH:
       return await handleRevoke(request, deps);
     case UTS_INTROSPECT_PATH:
       return await handleIntrospect(request, deps);
+    case UTS_SIGNIN_SCRIPT_PATH:
+      return signInScript();
+    case UTS_TICKETS_PATH:
+      return await handleTicketIssue(request, deps.tickets);
+  }
+  if (!readsSecrets(pathname)) {
+    return await handleBrowserSessionRequest(request, pathname, deps.web);
+  }
+  const secret = await deps.secretDeps();
+  const { signIn } = secret;
+  const signInMethod =
+    (await handleProviderRequest(request, pathname, signIn.methods)) ??
+    (await handleSsoRequest(request, pathname, signIn.methods)) ??
+    (await handleEmailRequest(request, pathname, signIn.methods));
+  if (signInMethod !== null) return signInMethod;
+  switch (pathname) {
+    case UTS_SIGNED_IN_PATH:
+      return await handleSignedInPage(request, signIn);
+    case UTS_AUTHORIZE_PATH:
+      return await handleAuthorize(request, { ...deps, ...secret });
     case UTS_PASSKEY_OPTIONS_PATH:
-      return await handlePasskeyOptions(request, deps.signIn);
+      return await handlePasskeyOptions(request, signIn);
     case UTS_PASSKEY_VERIFY_PATH:
-      return await handlePasskeyVerify(request, deps.signIn);
+      return await handlePasskeyVerify(request, signIn);
     case UTS_PASSKEYS_PAGE_PATH:
-      return await handlePasskeysPage(request, deps.signIn);
+      return await handlePasskeysPage(request, signIn);
     case UTS_APPS_PAGE_PATH:
       return await handleAppsPage(request, {
         config: deps.config,
         thirdParty: deps.thirdParty,
         scopes: deps.scopes,
-        methods,
+        methods: signIn.methods,
         publish: deps.publish,
       });
-    case UTS_SIGNIN_SCRIPT_PATH:
-      return signInScript();
-    case UTS_TICKETS_PATH:
-      return await handleTicketIssue(request, deps.tickets);
     case UTS_DEVICE_AUTHORIZATION_PATH: {
-      const device = servedDevice(deps.device);
+      const device = servedDevice(secret.device);
+      if (device === 'unavailable') return temporarilyUnavailable();
       return device === null ? null : await handleDeviceAuthorization(request, device.pages);
     }
     case UTS_DEVICE_VERIFICATION_PATH: {
-      const device = servedDevice(deps.device);
+      const device = servedDevice(secret.device);
+      if (device === 'unavailable') return unavailablePage(true);
       return device === null ? null : await handleDevicePage(request, device.pages);
     }
     case UTS_DEVICE_DECISION_PATH: {
-      const device = servedDevice(deps.device);
+      const device = servedDevice(secret.device);
+      if (device === 'unavailable') return unavailablePage(true);
       return device === null ? null : await handleDeviceDecision(request, device.pages);
     }
     default:
-      return await handleBrowserSessionRequest(request, pathname, deps.web);
+      return null;
   }
 }

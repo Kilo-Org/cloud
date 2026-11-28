@@ -1,13 +1,13 @@
 import jwt from 'jsonwebtoken';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
-import { resolveSecret } from './auth.js';
+import { readCloudAgentNextSecret, type CloudAgentNextSecretsEnv } from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   resolveRuntimeCredentialProxyRoute,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
 import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from './shared/runtime-credential-proxy-handle.js';
-import type { Env } from './types.js';
 
 const sessionClaimsSchema = z
   .object({
@@ -135,12 +135,13 @@ export function sameRuntimeProxyControlBinding(
 }
 
 export async function issueRuntimeCredentialProxyHandle(
-  env: Pick<Env, 'NEXTAUTH_SECRET'>,
+  env: CloudAgentNextSecretsEnv,
   input: RuntimeProxyGrant,
-  issuedAt = Date.now()
+  issuedAt = Date.now(),
+  ctx?: SecretsExecutionContext
 ): Promise<string> {
   const grant = runtimeProxyGrantSchema.parse(input);
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) throw new Error('Authentication unavailable');
   const iat = Math.floor(issuedAt / 1000);
   const exp = Math.floor(grant.leaseExpiresAt / 1000);
@@ -163,11 +164,12 @@ export async function issueRuntimeCredentialProxyHandle(
 }
 
 export async function verifyRuntimeCredentialProxyHandle(
-  env: Pick<Env, 'NEXTAUTH_SECRET'>,
-  value: string
+  env: CloudAgentNextSecretsEnv,
+  value: string,
+  ctx?: SecretsExecutionContext
 ): Promise<RuntimeProxyHandleClaims | null> {
   return verifyRuntimeCredentialProxyHandleWithSecret(
-    await resolveSecret(env.NEXTAUTH_SECRET),
+    await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null),
     value
   );
 }
@@ -193,10 +195,11 @@ export function verifyRuntimeCredentialProxyHandleWithSecret(
  * not a signed handle.
  */
 export async function verifyRuntimeCredentialProxyHandleExpiresAt(
-  env: Pick<Env, 'NEXTAUTH_SECRET'>,
-  value: string
+  env: CloudAgentNextSecretsEnv,
+  value: string,
+  ctx?: SecretsExecutionContext
 ): Promise<number | null> {
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret || value.length > 4096) return null;
   try {
     const verified = jwt.verify(value, secret, { algorithms: ['HS256'], ignoreExpiration: true });

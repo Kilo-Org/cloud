@@ -1,11 +1,18 @@
 import { Buffer } from 'node:buffer';
 import { timingSafeEqual } from 'node:crypto';
 import { withDORetry } from '@kilocode/worker-utils';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { Hono } from 'hono';
 import { userIDSchema } from './protocol';
 
 import { getTenantStub } from './dos/SessionSyncTenantDO';
 import type { Env } from './env';
+import { requestContext } from './request-context';
+import { readSessionSyncSecret } from './secrets';
 
 export const internal = new Hono<{ Bindings: Env }>();
 
@@ -13,8 +20,7 @@ internal.post('/users/:userID/erase', async c => {
   const provided = c.req.header('X-Internal-Secret');
   if (!provided) return c.json({ error: 'Unauthorized' }, 401);
   try {
-    const binding = c.env.INTERNAL_API_SECRET_PROD;
-    const expected = typeof binding === 'string' ? binding : await binding.get();
+    const expected = await readSessionSyncSecret(c.env, 'INTERNAL_API_SECRET', requestContext(c));
     if (
       !expected ||
       Buffer.byteLength(provided) !== Buffer.byteLength(expected) ||
@@ -22,6 +28,12 @@ internal.post('/users/:userID/erase', async c => {
     ) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+    observeInternalAuth(
+      'session-sync',
+      'user_erase',
+      'legacy_shared_secret',
+      callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+    );
   } catch (error) {
     console.error('session-sync internal auth unavailable', {
       error: error instanceof Error ? error.name : typeof error,

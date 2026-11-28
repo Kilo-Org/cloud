@@ -21,7 +21,7 @@ import { env, evictDurableObject, runInDurableObject, SELF } from 'cloudflare:te
 import { describe, expect, it } from 'vitest';
 
 import { FAKE_LLM_STATE_STORAGE_KEY, scenarioRegistry } from '../e2e/fake-llm-core.js';
-import { createWorkerEmit } from '../e2e/fake-llm-worker.js';
+import fakeLlmWorker, { createWorkerEmit } from '../e2e/fake-llm-worker.js';
 
 type FakeLlmTestEnv = {
   FAKE_LLM: DurableObjectNamespace;
@@ -271,6 +271,29 @@ describe('deployed fake llm worker', () => {
     const res = await SELF.fetch(`${ORIGIN}/health`);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: 'ok', service: 'fake-llm' });
+  });
+
+  // check-access-closed.sh fails at once on this marker: a 401 that carries it
+  // came from the Worker, so the request was not stopped by Access.
+  it('marks its own model-route refusal so it cannot pass for an Access refusal', async () => {
+    const res = await SELF.fetch(`${ORIGIN}/`);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('X-Cloud-Agent-E2E-Refusal')).toBe('fake-llm');
+  });
+
+  // The deployed fake runs with ENVIRONMENT unset and its Access audience set.
+  it('refuses a request without a valid Access assertion when deployed', async () => {
+    const deployedEnv = {
+      ...env,
+      ENVIRONMENT: 'production',
+      E2E_ACCESS_AUD: 'a'.repeat(64),
+      E2E_ACCESS_TEAM_DOMAIN: 'probe.cloudflareaccess.com',
+    } as unknown as Parameters<typeof fakeLlmWorker.fetch>[1];
+    for (const path of ['/health', '/test/requests', '/api/openrouter/models']) {
+      const res = await fakeLlmWorker.fetch(new Request(`${ORIGIN}${path}`), deployedEnv);
+      expect(res.status, path).toBe(403);
+      expect(res.headers.get('X-Cloud-Agent-E2E-Refusal'), path).toBe('access');
+    }
   });
 
   it('guards /test/* with the DO counters behind the admin bearer', async () => {

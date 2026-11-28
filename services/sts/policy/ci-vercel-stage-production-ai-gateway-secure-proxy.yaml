@@ -1,0 +1,18 @@
+# Kilo-Org/cloud's Vercel stage job for project `ai-gateway-secure-proxy` in production: the `stage`
+# job of the reusable stage-vercel-deployment.yml with vercel_project ai-gateway-secure-proxy,
+# called by deploy-ai-gateway-secure-proxy.yml. It runs in the GitHub environment
+# production-vercel-ai-gateway-secure-proxy, which no other job names, so this bundle holds only
+# this project's token. workflow_run with the other events in production: D53/M112
+# (D53_M112_CI_BUNDLE_CARVE_OUT in src/policy/schema.ts).
+workload: ci-vercel-stage-production-ai-gateway-secure-proxy
+environments: [production]
+identity:
+  kind: github-oidc
+  repository: Kilo-Org/cloud
+  repositoryId: '1145038391'
+  repositoryOwnerId: '201822503'
+  environment: production-vercel-ai-gateway-secure-proxy
+  refs: [refs/heads/main]
+  jobWorkflowRefs: [Kilo-Org/cloud/.github/workflows/stage-vercel-deployment.yml@refs/heads/main]
+  events: [workflow_run, schedule, workflow_dispatch]
+secrets: [VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY]

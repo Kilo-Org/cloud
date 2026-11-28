@@ -1,4 +1,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { and, eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -15,7 +20,14 @@ const responseHeaders = { 'Cache-Control': 'no-store' };
 async function isAuthorized(request: NextRequest): Promise<boolean> {
   const presented = request.headers.get('x-internal-api-key');
   const expected = presented ? await readInternalApiSecret() : '';
-  return Boolean(expected && presented && timingSafeEqual(presented, expected));
+  if (!expected || !presented || !timingSafeEqual(presented, expected)) return false;
+  observeInternalAuth(
+    'web',
+    'byoc_vercel_credentials_user',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
+  return true;
 }
 
 export async function GET(

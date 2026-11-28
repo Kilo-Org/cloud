@@ -9,6 +9,7 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { isMultiRepositoryEnvironment } from '../environment-build/reference.js';
 import {
   getSandboxSelectionCapabilities,
@@ -104,6 +105,8 @@ function enforcesRequestedEgress(
 export async function resolveSavedSandboxAllocation(args: {
   db: WorkerDb;
   env: Env;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   owner: SelectionOwner;
   repositoryType: SessionRepositoryType;
   target?: RepositoryAllocationTarget;
@@ -119,6 +122,7 @@ export async function resolveSavedSandboxAllocation(args: {
     ...(args.readiness?.vercelUnavailableReason
       ? { vercelUnavailableReason: args.readiness.vercelUnavailableReason }
       : {}),
+    ...(args.ctx === undefined ? {} : { ctx: args.ctx }),
   };
   const candidates = await getSandboxAllocationCandidates(db, profileOwner(owner), target);
   const ownerDefaults = selectableAllocations([
@@ -134,7 +138,7 @@ export async function resolveSavedSandboxAllocation(args: {
   let readiness = args.readiness;
   for (const allocation of allocations) {
     if (getSandboxAllocationProvider(allocation) === 'vercel' && readiness === undefined) {
-      readiness = await resolveVercelSelectionReadiness(env, owner, capability);
+      readiness = await resolveVercelSelectionReadiness(env, owner, capability, args.ctx);
       capabilities = await getSandboxSelectionCapabilities(env, owner, {
         ...selectionOptions,
         ...(readiness.vercelUnavailableReason
@@ -174,7 +178,13 @@ export function allocationCapabilityFor(
  */
 export async function withSavedSandboxAllocation(
   input: SessionCreateRequest,
-  args: { db: WorkerDb; env: Env; userId: string; billingOrigin?: string }
+  args: {
+    db: WorkerDb;
+    env: Env;
+    userId: string;
+    billingOrigin?: string;
+    ctx?: SecretsExecutionContext;
+  }
 ): Promise<SessionCreateRequest> {
   if (
     input.runtime?.sandboxAllocation !== undefined ||
@@ -189,6 +199,7 @@ export async function withSavedSandboxAllocation(
   const saved = await resolveSavedSandboxAllocation({
     db: args.db,
     env: args.env,
+    ...(args.ctx === undefined ? {} : { ctx: args.ctx }),
     owner: { userId: args.userId, orgId: input.options?.kilocodeOrganizationId },
     repositoryType: input.repository.type,
     ...(target ? { target } : {}),

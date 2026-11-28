@@ -453,10 +453,12 @@ Token and secret grants (secrets of the Worker-binding workloads are in their fi
 | `web` | `uts-feed`: `uts-feed:revocation.read` | | development only (`environmentGrants`) |
 | `web` | `uts`: `uts:subjects.revoke`, `uts:browser-sessions.end`, `uts:api-credentials.revoke` | | development only (`environmentGrants`) |
 | `web` | | `UTS_KILO_WEB_CLIENT_KEY`, `UTS_KILO_WEB_CLIENT_KEY_NEXT` (present only during a rotation) | development only (`environmentGrants`) |
+| `web` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `web` | `bouncer`: `bouncer:decide`, `bouncer:usage.write`, `bouncer:signup.decide` | | production only (`environmentGrants`) |
 | `kilo-mcp` | `uts`: `uts:token-exchange` (registered, reserved) | none | only those its own policy lists, once its Worker config binds STS (below); until then STS refuses it |
 | `ai-gateway` | `usage-ingest`: `usage-ingest:usage.publish`; `o11y`: `o11y:api-metrics.write`; `ai-gateway-secure-proxy`: `ai-gateway-secure-proxy:request.forward` | none | development, staging, production |
 | `ai-gateway` | `uts-feed`: `uts-feed:revocation.read` | none | development only (`environmentGrants`) |
+| `ai-gateway` | | `INTERNAL_API_SECRET` | staging and production only (`environmentGrants`) |
 | `ai-gateway` | `bouncer`: `bouncer:decide`, `bouncer:usage.write` | none | production only (`environmentGrants`) |
 
 Staging and production get the `web` UTS grants with phase 4's activation go. The `bouncer` grants
@@ -490,6 +492,12 @@ Any preview build of `kilocode-ai-gateway`, from any branch, can obtain every sc
 holds on development STS, the same as `web`'s development grants. If fork or outside pull-request
 previews are ever enabled on that project, these grants need a review first.
 
+`web` and `ai-gateway` read `INTERNAL_API_SECRET` from their bundle only when the deployment's
+`SECRETS_SOURCE` is `sts` (`packages/web-shared/src/lib/sts-secret-reader.ts`), from
+`/workloads/web` or `/workloads/ai-gateway` if the name is there, else from `/shared`. The grant is
+in staging and production only: previews read development STS and keep `env`, so no preview build
+can read the key; a preview flip adds a `development` key.
+
 Workloads with a policy, all over `worker-binding`:
 
 | Workload | Environments | Worker config |
@@ -499,20 +507,36 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `uts` | staging, production | `services/uts/wrangler.jsonc`; reads stay on the Worker secrets until `SECRETS_SOURCE` is `sts`; no development, because the `uts-local` config binds no STS |
+| `kilo-ai-attribution` | production | `services/ai-attribution/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `auto-routing` | production | `services/auto-routing/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `auto-routing-benchmark` | production | `services/auto-routing-benchmark/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-scim-sync` | production | `services/scim-sync/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `kiloclaw-billing` | production | `services/kiloclaw-billing/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
 | `cloudflare-gmail-push` | production | `services/gmail-push/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `kiloclaw-inbound-email` | production | `services/kiloclaw-inbound-email/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `event-service` | production | `services/event-service/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `model-eval-ingest` | production | `services/model-eval-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `container-usage-meter` | production | `services/container-usage-meter/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloudflare-webhook-agent-ingest` | production | `services/webhook-agent-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `security-auto-analysis` | production | `services/security-auto-analysis/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `session-ingest` | production | `services/session-ingest/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `kilo-chat` | production | `services/kilo-chat/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `git-token-service` | production | `services/git-token-service/wrangler.jsonc`; reads stay on the Secrets Store and legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
+| `kilo-code-review-worker` | production | `services/code-review-infra/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
+| `session-sync` | production | `services/session-sync/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `user-data-export` | production | `services/user-data-export/wrangler.jsonc`; reads stay on the legacy Worker secrets until `SECRETS_SOURCE` is `sts` |
+| `kilo-ops` | production | `services/kilo-ops/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `cloud-agent-next` | production | `services/cloud-agent-next/wrangler.jsonc`; reads stay on the Worker secret and Secrets Store bindings until `SECRETS_SOURCE` is `sts` |
 
 A Worker's workload is its top-level config `name`, because STS authorizes on `props.caller` and the
 config check requires that to be the top-level name; its own secrets live in `/workloads/<name>`.
 
-GitHub Actions workloads (`github-oidc`, production only, `refs/heads/main`, each workflow file
-pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2` on `refs/heads/v2`; see
-[GitHub Actions callers](#github-actions-callers)). All are in `Kilo-Org/kilocode` (repository id
-`946087422`, owner id `201822503`) and grant no token, lease or deploy token; their bundles are
-`/ci/<workload>`:
+GitHub Actions workloads of `Kilo-Org/kilocode` (`github-oidc`, production only,
+`refs/heads/main`, each workflow file pinned to `@refs/heads/main`, except `ci-kilocode-app-key-v2`
+on `refs/heads/v2`; see [GitHub Actions callers](#github-actions-callers)). All are in
+`Kilo-Org/kilocode` (repository id `946087422`, owner id `201822503`) and grant no token, lease or
+deploy token; their bundles are `/ci/<workload>`:
 
 | Workload | GitHub environment | Workflow files | Events |
 |---|---|---|---|
@@ -549,13 +573,59 @@ Three kilocode-side rules hold these policies to what they name:
   workflow file apart, so another job of `publish.yml` declaring the environment receives the
   bundle too.
 
+GitHub Actions secret bundles of `Kilo-Org/cloud` (repository id `1145038391`, owner id
+`201822503`, immutable subjects, `refs/heads/main` only, one workflow file per policy). They grant
+no token, lease or deploy token; their bundles are `/ci/<workload>`, read with
+`.github/actions/sts-bundle` (its README lists the job rules and their exceptions):
+
+| Workload | STS environment | GitHub environment | Workflow file | Events | Secrets |
+|---|---|---|---|---|---|
+| `ci-vercel-stage-production-app` | production | `production-vercel-app` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP` |
+| `ci-vercel-stage-production-ai-gateway` | production | `production-vercel-ai-gateway` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY` |
+| `ci-vercel-stage-production-ai-gateway-secure-proxy` | production | `production-vercel-ai-gateway-secure-proxy` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY_SECURE_PROXY` |
+| `ci-vercel-stage-staging-app` | production | `staging-vercel-app` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_APP` |
+| `ci-vercel-stage-staging-ai-gateway` | production | `staging-vercel-ai-gateway` | `stage-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN_AI_GATEWAY` |
+| `ci-vercel-promote` | production | `production` | `promote-vercel-deployment.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `VERCEL_TOKEN`, `AXIOM_ANNOTATION_TOKEN` |
+| `ci-cloud-agent-sentry` | production | `production` | `cloud-agent-sentry-sourcemaps.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `SENTRY_AUTH_TOKEN` |
+| `ci-cloud-agent-sentry-staging` | production | `staging` | `cloud-agent-sentry-sourcemaps.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | `SENTRY_AUTH_TOKEN` |
+| `ci-kilo-app-release` | production | `release` | `kilo-app-release.yml` | `push`, `schedule`, `workflow_dispatch` | `EXPO_TOKEN` |
+| `ci-auto-docs` | production | `production` | `auto-docs.yml` | `push`, `workflow_dispatch` | `DOC_WEBHOOK_URL`, `DOC_WEBHOOK_SECRET` |
+| `ci-kiloclaw-dev-push` | staging | none | `push-dev-kiloclaw.yml` | `workflow_dispatch` | `FLY_DEV_API_TOKEN` |
+
+The stage job runs in one GitHub environment per Vercel environment and project, and each of those
+environments has its own policy holding that project's token alone: every caller of the file
+presents the same `job_workflow_ref`, so the `environment` claim is what keeps one project's stage
+job from opening another project's token. The promote policy holds the one team token
+(`VERCEL_TOKEN`), which a project token cannot replace: promotion with the project tokens failed
+and was reverted (#5513). The Vercel project tokens can deploy production, so the staging stage
+policies read them from the production manager too. The first eight are reusable workflows: a
+deploy workflow's own file belongs to its trigger-only policy (see "Trigger-only policies" below),
+so the reader jobs live in files of their own, and `scripts/sts-bundle-callers.test.mjs` pins every
+caller. Their callers run on `workflow_run`, `schedule` and `workflow_dispatch`, which those
+policies accept under the D53/M112 carve-out (manager ruling M112, extending D53):
+`D53_M112_CI_BUNDLE_CARVE_OUT` in `src/policy/schema.ts` lists exactly
+`stage-vercel-deployment.yml`, `promote-vercel-deployment.yml` and
+`cloud-agent-sentry-sourcemaps.yml`, and admits a policy only when it is a `Kilo-Org/cloud` policy
+on `refs/heads/main`, binds a GitHub environment, names exactly one of those files, accepts no
+event beyond those three, holds at least one secret, and grants no token, dynamic grant or
+environment grant. These jobs already received the same values as GitHub secrets on the same
+triggers; the environments `production`, `staging` and `release` admit deployments from `main`
+only (read back 2026-11-27), and the five `*-vercel-*` environments must be created with the same
+`main`-only branch policy before the first run.
+
+Exceptions that stay outside STS on purpose (criterion 2): `sts-deployment-watch.yml` and
+`sts-deployment-watch-health.yml` (the watcher of STS's own deployments, with its own Cloudflare
+read token), and `notify-main-failure.yml` and `notify-production-deploy-failure.yml` (manager
+ruling M112b). All four post with the `DEPLOY_NOTIFY_SLACK_WEBHOOK_URL` GitHub secret, because
+each alert must still reach Slack when STS is down.
+
 A Worker whose config lives in another repository is listed in `EXTERNAL_WORKLOADS` in
 `test/repo/worker-configs.ts`. The config check below cannot read that config, so that repository's
 review covers its STS binding; this repository refuses any config that deploys under the name.
 
 `test/repo/worker-configs.test.ts` reads every `wrangler*.json`, `wrangler*.jsonc` and
 `wrangler*.toml` the checkout tracks, or holds untracked and not ignored, test fixtures included
-(`cloud-agent-e2e-deploy.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
+(`cloud-agent-e2e.yml` deploys `services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc`).
 Ignored configs stay out: `wrangler.runtime-generated.json` and
 `.wrangler/wrangler.e2e-test.jsonc` are rendered at deploy time from a tracked `wrangler.jsonc` this
 check already reads. Each file is parsed with Wrangler's own parser, every env block and every
@@ -804,7 +874,9 @@ Rules the loader enforces:
   `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
   lists `workflow_run` lists no other event, binds an `environment`, and does not grant
   `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
-  pull request started the upstream run, and STS cannot see that run.
+  pull request started the upstream run, and STS cannot see that run. Three carve-outs: trigger-only
+  policies (Q71, below), the deploy-only policies of `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b,
+  below), and the secret bundles of `D53_M112_CI_BUNDLE_CARVE_OUT` (above).
 - A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`,
   unless it equals an entry of `GITHUB_PRODUCTION_REF_EXCEPTIONS` in every field (today only
   `ci-kilocode-app-key-v2`); a policy with token grants binds an `environment`.
@@ -894,9 +966,11 @@ verifier, so its job's token opens nothing there even with the STS audience.
 `environment` (production also only `refs/heads/main`); no secret, audience, scope, other dynamic
 grant or environment grant; and no other policy, in any environment, naming one of its workflow
 files (on top of the rule that two policies may not share a repository, environment and workflow
-file). Q71 carve-out (Igor, 2026-11-27): only such a policy may list `workflow_run` together with
-`schedule` and `workflow_dispatch` and grant production; the workflow's `workflow_run` trigger
-stays limited to `branches: [main]`. The name `migration-proxy` is registered for the proxy's own
+file). Q71 carve-out (Igor, 2026-11-27): such a policy may list `workflow_run` together with
+`schedule` and `workflow_dispatch` and grant production, as may the deploy-only policies of
+`Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b) and the D53/M112 secret bundles above; the workflow's
+`workflow_run` trigger stays limited to `branches: [main]`. The name
+`migration-proxy` is registered for the proxy's own
 Worker: the change that adds the Worker turns it into its `worker-binding` policy (staging and
 production, `MIGRATION_PROXY_DB_PASSWORD` and `MIGRATION_PROXY_GITHUB_APP_KEY` in
 `/workloads/migration-proxy`), since the repository check refuses a worker-binding policy no
@@ -1474,11 +1548,14 @@ loader refuses the grant on any identity but a `github-oidc` one with an `enviro
 accepts a ref other than `refs/heads/main` (in every environment while the account is shared; a
 production policy also accepts only `refs/heads/main`, as every GitHub policy does), a second
 `cloudflare-deploy` entry, a `ttlSeconds` above 3600 or below 300, a `maxActive` above 3, a
-`maxPerHour` above 12 or below `maxActive`, a group listed twice, a `zone` group without zones or
+`maxPerHour` above 12 or below `maxActive`, a `maxPerRun` above 64, a `maxActive` times
+`maxPerRun` above 100 (the environment's token share), more than 64 `intendedScripts`, a group
+listed twice, a `zone` group without zones or
 zones without a `zone` group, a group whose name matches `API Token` or `member`, and any group or
 zone outside the pins in `CLOUDFLARE_DEPLOY_PINS` (`src/constants.ts`). Those pins hold three
 lists, filled in at setup step 3 and empty until then: `allowedGroups`, the only groups a grant may
-list, each with its scope (the three deploy groups); `allowedZones`, per STS environment, the only
+list, each with its scope (the three deploy groups, and for Kilo-Org/cloud's own deploys Queues,
+D1, R2 Storage and Vectorize Write and Workers AI Read on the account); `allowedZones`, per STS environment, the only
 zones a grant of that environment may list (`kiloapps.io` serves staging and production alike, so
 it is in both lists and this check cannot separate them; it keeps every other zone out); and
 `forbiddenGroupIds`, the token, member, role and account-settings groups, which a deploy token
@@ -1493,6 +1570,80 @@ https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tok
 for members). So the pins and the runtime check of the returned token are what keep token
 provisioning, and any group beyond the deploy groups, out of a minted token; setup check 6
 confirms the minting token's fixed policy bounds it too.
+
+**Per-run limits (`maxPerRun`).** A grant that sets `maxPerRun` counts `maxActive` and
+`maxPerHour` in GitHub run attempts (run id and attempt) instead of tokens, and allows each run
+attempt `maxPerRun` mint requests per hour, whatever their outcome (`run_limit` beyond). It is for
+a workflow whose parallel jobs each deploy with their own token: Kilo-Org/cloud's
+`deploy-workers.yml` ran 449 Worker deploy jobs in 39 runs on 2026-11-26, up to 31 at once in one
+run and about 5 runs in its busiest hour, which a per-token `maxActive` of 3 and `maxPerHour` of
+12 cannot carry, and GitHub drops a job output that holds a masked value, so jobs cannot share one
+token. Each job still gets, and revokes, its own token, and each token is audited and
+window-checked. The caller's own run attempt never counts against `maxActive` or `maxPerHour`.
+Decided by Igor 2026-11-27 (W5): this reads the design's §3 limits per run for these policies.
+
+**Kilo-Org/cloud's own deploys** (repository id `1145038391`, owner id `201822503`, each workflow
+pinned to `@refs/heads/main`; the repository variable `DEPLOY_TOKEN_SOURCE` set to `sts` runs each
+deploy job's `-sts` twin, which reads no stored Cloudflare or R2 secret; unset or `secret` keeps
+the stored-secret jobs as the rollback):
+
+| Workload | STS environment | GitHub environment | Workflow file | Events | Permission groups | Limits |
+|---|---|---|---|---|---|---|
+| `ci-deploy-cloud` | production | `production` | `deploy-workers.yml` | `workflow_run`, `schedule`, `workflow_dispatch` | Workers Scripts, Containers, Routes (`kiloapps.io`, `kiloapps.ai`), Queues, D1, R2 Storage Write | 1 h, 2 runs, 12 runs/h, 40 per run |
+| `ci-deploy-cloud-staging` | staging | `staging` | `deploy-workers.yml` | same | Workers Scripts, Queues Write | 1 h, 2 runs, 12 runs/h, 16 per run |
+| `ci-deploy-cloud-runtime` | production | `cloud-agent-runtime-publication` | `cloud-agent-runtime-publish.yml` | `workflow_run`, `workflow_dispatch` | Containers, R2 Storage Write | 1 h, 1 active, 12/h |
+| `ci-deploy-cloud-mcp-catalog` | production | `production` | `kilo-mcp-catalog.yml` | `push` | Vectorize Write, Workers AI Read | 15 min, 1 active, 12/h |
+
+- **`workflow_run` (Q71 carve-out, Q71b, decided by Igor 2026-11-27).** Q71 keeps `workflow_run`
+  out of production and alone in its list, because STS cannot see the upstream run.
+  `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT`
+  (`src/policy/schema.ts`) lets the deploy-only policies of `deploy-workers.yml` and
+  `cloud-agent-runtime-publish.yml` list it with `schedule` and `workflow_dispatch` and grant
+  production: their jobs receive the stored `CLOUDFLARE_API_TOKEN` on the same trigger today, run
+  main's workflow code, and deploy a commit that `check-deployment-changes.yml` (or the publisher's
+  admission) picked from main, so a 1-hour token is no stronger than the stored token (Q65). It
+  holds only for a Kilo-Org/cloud policy, by ids, bound to a GitHub environment, naming only those
+  files and holding nothing but its `cloudflare-deploy` grant.
+- **Secrets Store bindings.** A minted token holds no Secrets Store permission (Edit would write
+  every secret of the shared store). Each Worker deploy job runs
+  `scripts/ci/inherit-secret-bindings.mjs` first: with the token it reads the Worker's latest
+  uploaded version and fails unless every committed `secrets_store_secrets` binding is there
+  unchanged, then rewrites them as `{ type: inherit }` `unsafe.bindings`, which Cloudflare copies
+  from that version. A new or changed Secrets Store binding, or a new Worker with one, therefore
+  deploys with `DEPLOY_TOKEN_SOURCE` `secret`.
+- **R2.** The Cloud Agent runtime jobs take temporary S3 credentials for the runtime bucket from
+  the token (`scripts/ci/r2-temp-credentials.sh`, `POST /accounts/<account>/r2/temp-access-credentials`,
+  prefix `runtime-artifacts/v1/`, 1 hour), derived from the R2 API token whose access key id is
+  the repository variable `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID`. R2 Storage Write reaches
+  every bucket for the token's hour, as a Worker binding deployed with Workers Scripts Write already
+  does (Q65).
+- **Before `DEPLOY_TOKEN_SOURCE` becomes `sts`:** the repository variable
+  `CLOUD_AGENT_RUNTIME_R2_PARENT_ACCESS_KEY_ID` is set, and the `cloud-agent-runtime-publication`
+  GitHub environment admits `main` only. Done 2026-11-27: the five new group ids match Cloudflare's
+  list; the `kiloapps.ai` zone, `1417bcc629d528e478b1da6615ea3799`, is pinned for production and in
+  `ci-deploy-cloud`; and a Super Administrator added Queues Write to `sts-minting-staging` and the
+  new groups and the zone to `sts-minting-production` (17:40-17:42Z). Setup step 2 lists only the
+  bouncer groups, so a recreated minting token needs these again. A STS deploy rides the sts path
+  too: if a broken STS cannot mint, set the variable to `secret`.
+- **Rollout and its limits.** The first production run on `sts` must deploy a Worker with a
+  Custom Domain on `kilosessions.ai` (for example `git-token-service`) and one on
+  `kilousercontent.com` (`nteract-pages-outputs`): their zones are in no grant, and Cloudflare
+  documents Workers Scripts Write as enough for a Custom Domain, which only such a run proves. A
+  direct dispatch of `deploy-workers.yml` from a ref other than `main` (the policies admit `main`
+  alone), and a redeploy of a commit from before this change (it lacks `scripts/ci/`), need
+  `DEPLOY_TOKEN_SOURCE` `secret`.
+- **cloud-agent-next's two tokens.** Its runtime preparation can wait up to 45 minutes for the
+  runtime handoff, so it gets a token of its own (revoked right after it) and read-only R2
+  credentials, and the job mints its deploy token after the wait. Only the runtime publisher's
+  credentials can write.
+- **The catalog index, for Igor.** The Vectorize upsert moved out of `catalog-merge` into
+  `catalog-index` (or `catalog-index-sts`), which runs after `catalog-merge` passed, so a failed
+  upsert fails `catalog-index`, not the required `catalog-merge` check. `catalog-index-sts` binds
+  the GitHub environment `production`, so each main push that changes the catalog records a
+  deployment there.
+- **Recorded for Igor, not taken:** separate grants for the Workers that need R2 Storage or D1
+  Write. The matrix deploys every Worker under one workload, so `ci-deploy-cloud` holds both for
+  every job.
 
 **Calling it.** The job asks with no body and revokes in an `always()` step:
 
@@ -1513,7 +1664,7 @@ curl -sS -X POST https://sts.kiloapps.io/v1/ci/cloudflare-deploy-token/revoke \
 |---|---|---|
 | `ok` | 200 | `token` (`cfat_...`), `tokenId`, `expiresAt`, `ttlSeconds`, `permissionSet` |
 | `denied` | 401 or 403 | `identity_rejected` (401: another workflow, event, ref or GitHub environment, a fork's event, or a token without a run id), `unknown_workload`, `environment_mismatch`, `grant_not_allowed`, `not_configured` (STS's setup step 3 has not pinned the forbidden and allowed groups; no retry helps) |
-| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included), `rate_limited` (`maxPerHour` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, possibly left by a creation whose outcome is unknown (not one Cloudflare refused or that was never sent), or found by the sweep and not yet deleted; two environments then hold at most 200 of the account's 500, 5 minutes) |
+| `limited` | 429, `Retry-After` | `too_many_active` (the policy's `maxActive` unexpired tokens, one being made or one whose deletion failed included; run attempts holding one under `maxPerRun`), `rate_limited` (`maxPerHour` mint requests in the last hour; run attempts under `maxPerRun`), `run_limit` (this run attempt made `maxPerRun` mint requests in the last hour) or `account_limit` (this environment holds 100 tokens that may exist at Cloudflare: being made, unexpired, owed a deletion, possibly left by a creation whose outcome is unknown (not one Cloudflare refused or that was never sent), or found by the sweep and not yet deleted; two environments then hold at most 200 of the account's 500, 5 minutes) |
 | `invalid_request` | 400 (413 above 1 KB) | A body other than empty or `{}` |
 | `unavailable` | 503, `Retry-After` | No minting credential, Cloudflare refused or failed (a 429's `Retry-After` is passed on), the object did not answer in 35 seconds, or the environment has no `CF_DEPLOY_ACCOUNT_ID` |
 

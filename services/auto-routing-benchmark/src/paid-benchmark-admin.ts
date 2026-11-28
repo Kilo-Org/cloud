@@ -5,6 +5,7 @@ import {
   type PaidBenchmarkAdminPayer,
   type PaidBenchmarkAdminRequest,
 } from '@kilocode/auto-routing-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { drainPaidBillingOutbox, type PaidBillingEnv } from './paid-billing';
 import {
   pausePaidBenchmarkRequestStatements,
@@ -539,7 +540,7 @@ export type AdminPauseOutcome = 'paused' | 'already_paused' | 'not_active' | 'no
 export async function pausePaidBenchmarkAdminRequest(
   env: PaidBillingEnv,
   requestId: string,
-  options: { fetchImpl?: typeof fetch } = {}
+  options: { fetchImpl?: typeof fetch; ctx?: SecretsExecutionContext } = {}
 ): Promise<AdminPauseOutcome> {
   const db = env.BENCH_DB;
   const before = await readPaidBenchmarkRequest(db, requestId);
@@ -549,7 +550,11 @@ export async function pausePaidBenchmarkAdminRequest(
   const [closed] = await db.batch(
     pausePaidBenchmarkRequestStatements(db, { requestId, reason: 'owner' })
   );
-  await drainPaidBillingOutbox(env, { requestId, fetchImpl: options.fetchImpl });
+  await drainPaidBillingOutbox(env, {
+    requestId,
+    fetchImpl: options.fetchImpl,
+    ctx: options.ctx,
+  });
   if ((closed.meta.changes ?? 0) > 0) return 'paused';
   const after = await readPaidBenchmarkRequest(db, requestId);
   return after?.status === 'paused' ? 'already_paused' : 'not_active';

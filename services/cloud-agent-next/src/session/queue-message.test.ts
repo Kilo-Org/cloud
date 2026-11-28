@@ -17,10 +17,6 @@ const fetchSessionMetadata = vi.hoisted(() => vi.fn());
 
 vi.mock('./metadata.js', () => ({ fetchSessionMetadata }));
 
-vi.mock('../auth.js', () => ({
-  resolveSecret: vi.fn(async () => 'secret'),
-}));
-
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
   createRuntimeAuthorization: vi.fn(async () => ({
     authorization: { id: 'authorization-1' },
@@ -59,6 +55,7 @@ const metadata = {
 
 function makeEnv(stub: unknown): Env {
   return {
+    NEXTAUTH_SECRET: 'secret',
     SANDBOX_SESSION: {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => stub),

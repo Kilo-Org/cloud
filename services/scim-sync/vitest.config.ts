@@ -6,7 +6,7 @@ export default defineConfig({
     name: 'unit',
     globals: true,
     environment: 'node',
-    include: ['test/unit/**/*.test.ts'],
+    include: ['test/unit/**/*.test.ts', 'src/**/*.test.ts'],
     exclude: ['test/integration/**/*.test.ts'],
   },
 });

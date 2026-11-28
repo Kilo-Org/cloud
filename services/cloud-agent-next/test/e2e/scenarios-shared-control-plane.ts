@@ -69,11 +69,12 @@ import { prepareSession } from './scenarios-shared-faults.js';
 import { assertScenarioPreconditions } from './public-surface-support.js';
 import { CONTROL_PLANE_WRAPPER_BASENAME } from './sandbox-control.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
-import type {
-  CallbackSink,
-  PreviewFixtureHandle,
-  SandboxFaultAllocation,
-  ScenarioEnvironment,
+import {
+  sinkCallbackTarget,
+  type CallbackSink,
+  type PreviewFixtureHandle,
+  type SandboxFaultAllocation,
+  type ScenarioEnvironment,
 } from './scenario-capabilities.js';
 
 const CONTROL_PLANE_TIMEOUT_MS = 15 * 60_000;
@@ -503,7 +504,7 @@ async function runControlPlaneCallbacks(
     const registered = await updateSessionCallbackTarget(
       boot.scenarioConfig,
       boot.session.cloudAgentSessionId,
-      { url: sink.callbackUrl }
+      sinkCallbackTarget(sink)
     );
     if (!registered.success) {
       throw new Error('updateSession did not accept the control-plane callback target');

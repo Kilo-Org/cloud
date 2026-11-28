@@ -8,10 +8,16 @@
 
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import type { HonoContext } from '../index';
 import { logger } from './logger';
 import { resError } from '@kilocode/worker-utils';
 import { expectedSecret, secretUnavailableResponse } from '../secrets';
+import { secretsComparison, type CheckedSecret } from '../secrets-compare';
 
 /** Header name for internal API key */
 export const INTERNAL_API_KEY_HEADER = 'X-Internal-API-Key';
@@ -66,17 +72,37 @@ export const internalApiMiddleware = createMiddleware<HonoContext>(async (c, nex
 
   // A keyless request under `sts` read no secret; validation refuses it as missing before any
   // comparison.
-  const result = validateInternalApiKey(
-    apiKeyHeader,
-    expected.status === 'read' ? expected.secret : ''
-  );
+  const checked: CheckedSecret = {
+    route: 'internal-api',
+    source: expected.source,
+    selected: expected.status === 'read' ? expected.secret : '',
+  };
+  const result = validateInternalApiKey(apiKeyHeader, checked.selected);
 
   if (!result.success) {
-    logger.warn('Internal API authentication failed', { error: result.error });
+    logger.warn('Internal API authentication failed', {
+      error: result.error,
+      route: checked.route,
+      secret: 'INTERNAL_API_SECRET',
+      source: checked.source,
+      reason: apiKeyHeader ? 'invalid' : 'missing',
+    });
+    // A refused key starts at most one background check of this name per isolate when enabled
+    // (src/secrets-compare.ts); a keyless request starts none. Neither changes this answer.
+    if (apiKeyHeader) secretsComparison.refused(c.env, () => c.executionCtx, checked);
     return c.json(resError('Unauthorized'), 401);
   }
 
   logger.info('Internal API request authenticated');
+  observeInternalAuth(
+    'webhook-agent-ingest',
+    'api',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
+  // Background source comparison, off unless enabled (src/secrets-compare.ts). It never changes
+  // this answer.
+  secretsComparison.admitted(c.env, () => c.executionCtx, checked);
 
   await next();
 });

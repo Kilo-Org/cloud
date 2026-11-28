@@ -16,6 +16,7 @@
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
     "./kilo-token-admission-observation": "./src/kilo-token-admission-observation.ts",
+    "./internal-auth-observation": "./src/internal-auth-observation.ts",
     "./kilo-token-pepper": "./src/kilo-token-pepper.ts",
     "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
     "./cloud-agent-attachments": "./src/cloud-agent-attachments.ts",
@@ -45,6 +46,7 @@
     "./git-url": "./src/git-url.ts",
     "./gitlab-url": "./src/gitlab-url.ts",
     "./callback-token": "./src/callback-token.ts",
+    "./sts-sender": "./src/sts-sender.ts",
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
     "./cloud-agent-session-sync": "./src/cloud-agent-session-sync.ts",
@@ -85,7 +87,8 @@
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
-    "./environment-setup-authority": "./src/environment-setup-authority.ts"
+    "./environment-setup-authority": "./src/environment-setup-authority.ts",
+    "./web-internal-credential": "./src/web-internal-credential.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -98,6 +101,7 @@
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
     "aws4fetch": "catalog:",
@@ -109,6 +113,7 @@
     "@cfworker/json-schema": "catalog:"
   },
   "devDependencies": {
+    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

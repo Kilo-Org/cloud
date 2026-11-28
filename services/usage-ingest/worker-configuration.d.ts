@@ -18,6 +18,7 @@ interface __BaseEnv_CloudflareEnv {
 	WEB_STS_CANARY_URL: "https://staging-app.kilo.ai/api/internal/sts-canary" | "https://app.kilo.ai/api/internal/sts-canary";
 	USAGE_WRITER_AUTH?: "sts";
 	STS: Service /* entrypoint SecretsBroker from sts-staging */ | Service /* entrypoint SecretsBroker from sts */;
+	INTERNAL_AUTH_COUNTER?: AnalyticsEngineDataset;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -41,6 +42,7 @@ declare namespace Cloudflare {
 		WEB_STS_CANARY_URL: "https://staging-app.kilo.ai/api/internal/sts-canary";
 		USAGE_WRITER_AUTH: "sts";
 		STS: Service /* entrypoint SecretsBroker from sts-staging */;
+		INTERNAL_AUTH_COUNTER?: AnalyticsEngineDataset;
 	}
 	interface Env extends __BaseEnv_CloudflareEnv {}
 }

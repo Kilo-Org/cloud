@@ -21,9 +21,10 @@ import { readKeySetShard, readThroughIsolateShard } from '../signer-keys';
  * `UtsAccessTokenClaimsSchema`, the route's one scope, and a client that the scope registry allows
  * for that scope. `/authorize` and `/token` do not apply the registry yet, so this check is what
  * keeps a token of another client off the account API. Every account route acts on a session, so
- * its scope is registered with `requiresSession`, and the token must name its grant (`sid`); a PAT
- * names none and is refused. Revocation needs no feed here: every account statement reads the
- * grant and its session, so a revoked grant fails there.
+ * its scope is registered with `requiresSession`, and the token must name its session (`sid`): a
+ * CLI grant, or the browser session of a `kilo-web` token; a PAT names none and is refused.
+ * Revocation needs no feed here: every account statement reads that session for the token's
+ * subject, so an ended session, or one of another account, fails there.
  */
 
 const SKEW_SECONDS = 60;
@@ -39,7 +40,9 @@ export type KeyLookup =
 export type AccessTokenKeys = (kid: string) => Promise<KeyLookup>;
 
 export type AccountCaller = {
+  /** The token's `sub`: the only account the call can act for. */
   accountId: string;
+  /** The token's `sid`: a CLI grant id, or a browser session id for `kilo-web`. */
   grantId: string;
   /** The organization the token is bound to, when it is. */
   orgId: string | null;

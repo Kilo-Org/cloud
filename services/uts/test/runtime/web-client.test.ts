@@ -670,6 +670,84 @@ describe('browser-session API', () => {
     expect(sessions.calls).toHaveLength(1);
   });
 
+  it('mints an organization-bound token only as the statement allows, and refuses a bad org', async () => {
+    const org = '6b1d2c3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e';
+    const scope = 'git-token-service:bitbucket.repositories.read';
+    const resource = 'http://localhost:8802';
+    const sessions = fakeSessions({
+      mint: async () => ({
+        outcome: 'issued',
+        sessionId: SESSION_ID,
+        subjectId: SUBJECT,
+        orgId: org,
+        orgRole: 'member',
+        authTime: new Date(),
+        amr: ['oauth'],
+        tokenIds: [crypto.randomUUID()],
+        scopes: [scope],
+      }),
+    });
+    const ok = await call(
+      formRequest(path('token'), await fields('token', { scope, resource, org })),
+      webDeps(sessions)
+    );
+    const body = BrowserSessionTokenSchema.parse(await ok.json());
+    expect(decodeJwt(body.access_token)).toMatchObject({
+      sub: SUBJECT,
+      sid: SESSION_ID,
+      org,
+      scope,
+    });
+    expect(sessions.calls.map(entry => entry.input)).toMatchObject([{ scope, orgId: org }]);
+
+    // A scope that needs no organization passes `org` on, and no `org` passes null.
+    const plain = fakeSessions({ mint: async () => ({ outcome: 'org_denied' }) });
+    const extras: Record<string, string>[] = [{ org }, {}];
+    for (const extra of extras) {
+      await call(
+        formRequest(
+          path('token'),
+          await fields('token', { scope: 'uts:pats.manage', resource: ISSUER, ...extra })
+        ),
+        webDeps(plain)
+      );
+    }
+    expect(plain.calls.map(entry => entry.input)).toMatchObject([
+      { scope: 'uts:pats.manage', orgId: org },
+      { scope: 'uts:pats.manage', orgId: null },
+    ]);
+
+    for (const value of ['not-an-org', `${org}0`, [org, org]]) {
+      const refused = await call(
+        formRequest(path('token'), {
+          ...(await fields('token', { scope, resource })),
+          org: value,
+        }),
+        webDeps(sessions)
+      );
+      expect(await errorOf(refused)).toBe('invalid_request');
+    }
+    expect(sessions.calls).toHaveLength(1);
+  });
+
+  it('answers 403 access_denied when the statement finds no membership that allows the scope', async () => {
+    const sessions = fakeSessions({ mint: async () => ({ outcome: 'org_denied' }) });
+    const response = await call(
+      formRequest(
+        path('token'),
+        await fields('token', {
+          scope: 'git-token-service:bitbucket.repositories.read',
+          resource: 'http://localhost:8802',
+          org: crypto.randomUUID(),
+        })
+      ),
+      webDeps(sessions)
+    );
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe('access_denied');
+    expect(sessions.calls).toHaveLength(1);
+  });
+
   it('answers a step-up scope without a recent passkey with the RFC 9470 challenge', async () => {
     const sessions = fakeSessions({ mint: async () => ({ outcome: 'step_up_required' }) });
     const response = await call(
@@ -881,7 +959,8 @@ describe('authorization-server metadata for kilo-web', () => {
         kind: 'ready',
         deps: oauthDeps(fakeGrants().access, { web: webDeps(fakeSessions(), web) }),
       },
-      webClientReady
+      webClientReady,
+      false
     );
 
   it('lists private_key_jwt only while the key set is valid, and the exchange only with the bridge on', () => {

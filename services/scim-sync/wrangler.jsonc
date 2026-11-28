@@ -24,8 +24,11 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": true,
+    "traces": { "enabled": false },
   },
   "logpush": true,
   // Watchdog only. The Durable Object reschedules its own alarm after every
@@ -45,6 +48,12 @@
     // applied over REST so the app keeps the advisory locks, the depth check,
     // the soft-delete side effects and the removal tombstone in one place.
     "BACKEND_API_URL": "https://app.kilo.ai",
+    // `WEB_INTERNAL_AUTH` (decision D59) is unset, so the `/api/internal/scim/*`
+    // calls send `INTERNAL_API_SECRET` as `x-internal-api-key`. `"sts"` sends a
+    // `web:scim.sync` STS service token over the `STS` binding instead; set it
+    // only once the Worker has that binding, STS grants the scope and the
+    // routes accept STS. Removing it is the rollback.
+
     // Seconds between polls. Read on every alarm, so a change takes effect on
     // the first tick after deploy. Clamped in code to 10..3600: a sub-second
     // interval would keep the Durable Object from hibernating and bill
@@ -58,7 +67,24 @@
     // events. It can only be an event ID: `after` and `range_start` are
     // mutually exclusive in the Events API.
     "WORKOS_EVENT_CURSOR": "",
+    // Where every runtime secret read goes: `secrets-store` (the Secrets Store bindings below) or
+    // `sts` (the bundle over the `STS` binding). An absent value means `secrets-store`; any other
+    // value refuses every read. The `sts` source never falls back to the Secrets Store.
+    // `env.staging` deploys no STS binding, so it keeps the default.
+    "SECRETS_SOURCE": "secrets-store",
   },
+  // STS serves the runtime secret bundle over the account-internal binding. `props.caller` is
+  // what STS authorizes on and must equal this Worker's top-level name; services/sts/policy/
+  // cloudflare-scim-sync.yaml grants WORKOS_API_KEY, WORKOS_CLIENT_ID and INTERNAL_API_SECRET.
+  // Nothing reads it while SECRETS_SOURCE is `secrets-store`.
+  "services": [
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloudflare-scim-sync" },
+    },
+  ],
   // One key pair per WorkOS environment. The Events API is scoped to whichever
   // WorkOS environment issued the key, so these names are what decide which
   // directory stream a deployment consumes — not `ENVIRONMENT`.
@@ -117,11 +143,17 @@
     "staging": {
       "name": "cloudflare-scim-sync-staging",
       "workers_dev": false,
+      // A config that binds STS names its schedule in every block
+      // (services/sts/test/repo/worker-configs.ts); staging keeps the same watchdog cron as
+      // production.
+      "triggers": { "crons": ["*/5 * * * *"] },
       "vars": {
         "ENVIRONMENT": "staging",
         "BACKEND_API_URL": "https://staging-app.kilo.ai",
         "SCIM_POLL_INTERVAL_SECONDS": "60",
         "WORKOS_EVENT_CURSOR": "",
+        // Staging binds no STS and its app accepts only the secret.
+        "WEB_INTERNAL_AUTH": "legacy",
       },
       "secrets_store_secrets": [
         {

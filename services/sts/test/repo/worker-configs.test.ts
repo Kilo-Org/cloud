@@ -84,7 +84,7 @@ describe('repository Worker configs', () => {
     expect(paths).toContain('services/sts/wrangler.jsonc');
     expect(paths).toContain('services/o11y/wrangler.jsonc');
     expect(paths).toContain('services/sts/wrangler.test.jsonc');
-    // cloud-agent-e2e-deploy.yml deploys this one to the account.
+    // cloud-agent-e2e.yml deploys this one to the account.
     expect(paths).toContain('services/cloud-agent-next/test/e2e/wrangler.fake-llm.jsonc');
     expect(paths.filter(path => path.includes('node_modules/'))).toEqual([]);
   });
@@ -546,6 +546,36 @@ describe('worker config rules', () => {
     const configs = [stsFixture(), relay, relayTest];
     expect(workerConfigProblems(configs, shippedPolicies())).toEqual([]);
     expect(internalWorkerProblems(configs)).toEqual([]);
+  });
+
+  it('accepts the UTS mint Worker binding STS as uts in staging and production, and only there', () => {
+    const utsBinding = (service: string) => ({
+      binding: 'STS',
+      service,
+      entrypoint: 'SecretsBroker',
+      props: { caller: 'uts' },
+    });
+    const audit = (queue: string) => ({ producers: [{ binding: 'AUDIT_QUEUE', queue }] });
+    const uts = (env: Record<string, unknown> = {}) =>
+      parseWorkerConfig('services/uts/wrangler.jsonc', {
+        name: 'uts',
+        ...NO_TRACES,
+        queues: audit('kilo-audit-uts'),
+        services: [utsBinding('sts')],
+        env: {
+          staging: {
+            name: 'uts-staging',
+            queues: audit('kilo-audit-uts-staging'),
+            services: [utsBinding('sts-staging')],
+          },
+          ...env,
+        },
+      });
+    expect(workerConfigProblems([uts()], shippedPolicies())).toEqual([]);
+    const withLocal = uts({ local: { services: [utsBinding('sts-local')] } });
+    expect(workerConfigProblems([withLocal], shippedPolicies())).toContain(
+      'services/uts/wrangler.jsonc (env.local): policy uts does not list development, which sts-local serves'
+    );
   });
 
   it('refuses a producer on an audit queue outside its own producer and environment', () => {

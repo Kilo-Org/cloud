@@ -14,6 +14,7 @@ import type { UtsManagerAuthDO } from './dos/UtsManagerAuthDO';
 import type { UtsSignerDO } from './dos/UtsSignerDO';
 import type { UtsFeedDO } from './feed/UtsFeedDO';
 import type { SignInEnv } from './signin/providers/config';
+import type { SecretsEnv, SecretsSource } from './secrets';
 
 const HostSchema = z
   .string()
@@ -28,6 +29,9 @@ const OriginSchema = z.string().refine(value => {
   }
 }, 'an origin');
 
+/** The values `SECRETS_SOURCE` takes; `test/repo` checks each deployed block against this list. */
+export const SECRETS_SOURCE_VALUES = ['worker', 'secrets-store', 'sts'] as const;
+
 /**
  * Production and staging keep every UTS Durable Object in the `eu` jurisdiction (design 5.7).
  * workerd enforces no residency, so `wrangler dev` and the test pool run unscoped.
@@ -35,6 +39,12 @@ const OriginSchema = z.string().refine(value => {
  * `PAT_LOOKUP_CONNECTIONS` is the connection limit of the environment's PAT lookup Hyperdrive
  * config, as a decimal string; the per-isolate PAT lookup cap derives from it
  * (`patLookupsInFlight`). Staging and production must set it; development may leave it out.
+ *
+ * `SECRETS_SOURCE` picks where the runtime secrets come from (src/secrets.ts): `worker` (the legacy
+ * Worker secrets) or `sts` (the UTS STS bundle). `secrets-store`, the legacy value other services
+ * roll back to, is read as `worker`, so one rollback value fits every service; any other value
+ * refuses to start. Staging and production must name one, so a flip or a rollback is one var in one
+ * environment; development without it reads `worker`.
  */
 const EnvVarsSchema = z
   .object({
@@ -58,6 +68,10 @@ const EnvVarsSchema = z
       .regex(/^[1-9][0-9]{0,7}$/, 'a period from 1 second')
       .transform(seconds => Number(seconds) * 1000)
       .optional(),
+    SECRETS_SOURCE: z
+      .enum(SECRETS_SOURCE_VALUES)
+      .transform(source => (source === 'sts' ? 'sts' : 'worker'))
+      .optional(),
   })
   .refine(
     vars => (vars.UTS_ENVIRONMENT === 'development') === (vars.DO_JURISDICTION === 'none'),
@@ -66,6 +80,10 @@ const EnvVarsSchema = z
   .refine(
     vars => vars.UTS_ENVIRONMENT === 'development' || vars.PAT_LOOKUP_CONNECTIONS !== undefined,
     'production and staging set PAT_LOOKUP_CONNECTIONS, the PAT lookup config connection limit'
+  )
+  .refine(
+    vars => vars.UTS_ENVIRONMENT === 'development' || vars.SECRETS_SOURCE !== undefined,
+    'production and staging set SECRETS_SOURCE to worker, secrets-store or sts'
   )
   .refine(
     vars =>
@@ -105,6 +123,8 @@ export type UtsConfig = {
   environment: UtsEnvironment;
   endpoints: UtsEndpoints;
   jurisdiction: 'eu' | 'none';
+  /** Where the runtime secrets come from (src/secrets.ts). */
+  secretsSource: SecretsSource;
   relyingParty: RelyingParty;
   /** Development only: the stand-in manager's origin (src/manager/config.ts). */
   managerBaseUrl: string | null;
@@ -143,10 +163,16 @@ export type Env = {
   /** `on` runs the login rotation job from the cron; absent or `off` keeps it off. */
   LOGIN_ROTATION?: string;
   /**
-   * The STS secrets broker, to be bound as caller `uts` once STS has a `uts` policy. It delivers the
-   * rotation job's Hyperdrive switch token (src/rotation/secrets.ts).
+   * The STS secrets broker, bound as caller `uts`. It delivers the UTS bundle: the runtime secrets
+   * under `SECRETS_SOURCE=sts` (src/secrets.ts) and the rotation job's Hyperdrive switch token
+   * (src/rotation/secrets.ts).
    */
   STS?: BundleBinding;
+  /**
+   * `worker`, `secrets-store` (read as `worker`) or `sts`; required in staging and production
+   * (`EnvVarsSchema`).
+   */
+  SECRETS_SOURCE?: string;
   /** Development only: JSON with the switch token a local run uses instead of STS. */
   UTS_LOCAL_SECRETS?: string;
   /** Development only: origin of a stand-in Cloudflare API for the local end-to-end run. */
@@ -175,11 +201,6 @@ export type Env = {
   /** Development only: origin of a stand-in secrets manager for the local end-to-end run. */
   MANAGER_BASE_URL?: string;
   /**
-   * The HMAC key of RFC 8628 user codes, 32 bytes in base64url, a Worker secret. The device grant
-   * is served only where it is set (src/signin/device/user-code.ts).
-   */
-  DEVICE_USER_CODE_KEY?: string;
-  /**
    * The public keys of the web BFF `kilo-web` (`KiloWebClientJwksSchema`): one or two Ed25519
    * JWKs as JSON. `kilo-web` is served only where it is set (src/bff/client-auth.ts).
    */
@@ -192,8 +213,24 @@ export type Env = {
   KILO_WEB_BRIDGE_JWKS?: string;
   /** `true` turns on the `kilo-web` legacy bridge (src/bff/token.ts); anything else keeps it off. */
   LEGACY_BRIDGE_ENABLED?: string;
+  /**
+   * `true` offers the home-widget exchange at the token endpoint (src/home-widget/exchange.ts);
+   * absent keeps it off, and any other value keeps it off and is logged.
+   */
+  HOME_WIDGET_GRANT_ENABLED?: string;
+  /**
+   * The CI token exchange's trust policies (src/ci/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the exchange off; a value that breaks a rule keeps it off and is logged.
+   */
+  CI_TOKEN_POLICIES?: string;
+  /**
+   * The bot-token mint's policies (src/bot-token/policy.ts): a JSON array per environment. Absent
+   * or empty keeps the mint off; a value that breaks a rule keeps it off and is logged.
+   */
+  BOT_TOKEN_POLICIES?: string;
 } & SignInEnv &
-  AttestEnv;
+  AttestEnv &
+  SecretsEnv;
 
 /**
  * The feed Worker's deployed name in each environment. It is the only caller the `SignerKeys`
@@ -212,6 +249,7 @@ export function readConfig(env: Env): UtsConfig {
     environment: vars.UTS_ENVIRONMENT,
     endpoints: UTS_ENDPOINTS[vars.UTS_ENVIRONMENT],
     jurisdiction: vars.DO_JURISDICTION,
+    secretsSource: vars.SECRETS_SOURCE ?? 'worker',
     relyingParty: { rpId: vars.WEBAUTHN_RP_ID, origins: vars.WEBAUTHN_ORIGINS },
     managerBaseUrl: vars.MANAGER_BASE_URL ?? null,
     loginRotation:

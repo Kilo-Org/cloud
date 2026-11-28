@@ -19,7 +19,14 @@ import { IssuedTokenSchema } from './oauth';
 
 /** `POST <issuer>/account/browser-sessions/read`: the live session a handle names. */
 export const UTS_BROWSER_SESSION_READ_PATH = '/account/browser-sessions/read';
-/** `POST <issuer>/account/browser-sessions/token`: one access token from the session. */
+/**
+ * `POST <issuer>/account/browser-sessions/token`: one access token for one `scope` and its exact
+ * `resource` origin, from the session. An optional `org` (one organization id) binds the token to
+ * that organization (design 5.8); a scope that needs the `org` claim requires it. UTS mints it only
+ * while the session's subject is an active member there, in a role the scope allows, whose sign-in
+ * meets the organization's SSO rule, all read in the minting statement; otherwise 403
+ * `access_denied`. The token's `sub` is always the session's subject.
+ */
 export const UTS_BROWSER_SESSION_TOKEN_PATH = '/account/browser-sessions/token';
 /** `POST <issuer>/account/browser-sessions/end`: ends this browser session only. */
 export const UTS_BROWSER_SESSION_END_PATH = '/account/browser-sessions/end';

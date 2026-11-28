@@ -51,7 +51,8 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
-import { resolveSecret } from '../../auth.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
+import { sessionIngestExportCredential } from '../../session-ingest-caller-auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
 import { getSandboxProviderBinding } from '../../persistence/session-metadata.js';
@@ -1363,12 +1364,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // pattern after eviction and `getMetadata()` can never return null silently.
     const validated = CurrentSessionMetadataSchema.safeParse(storedMetadata);
     if (!validated.success) return createFailure('BAD_REQUEST', 'Invalid session metadata');
+    // A missing key stays optional: the registration builder fails closed only when a route
+    // actually carries encrypted secrets.
+    const agentEnvVarsPrivateKey = await readCloudAgentNextSecret(
+      this.env,
+      'AGENT_ENV_VARS_PRIVATE_KEY',
+      this.ctx
+    ).catch(() => undefined);
     let registration: ControlPlaneSessionRegistration;
     try {
       registration = buildControlPlaneSessionRegistration(
         validated.data,
         sandboxSelection,
-        this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        agentEnvVarsPrivateKey,
         {
           containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
@@ -1426,12 +1434,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
       return { success: true };
     }
+    // A missing key stays optional: the registration builder fails closed only when a route
+    // actually carries encrypted secrets.
+    const agentEnvVarsPrivateKey = await readCloudAgentNextSecret(
+      this.env,
+      'AGENT_ENV_VARS_PRIVATE_KEY',
+      this.ctx
+    ).catch(() => undefined);
     let registration: ControlPlaneSessionRegistration;
     try {
       registration = buildControlPlaneSessionRegistration(
         metadata,
         sandboxSelection,
-        this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        agentEnvVarsPrivateKey,
         {
           containmentEnabled: true,
           workerUrl: this.env.WORKER_URL,
@@ -1539,6 +1554,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
+      ctx: this.ctx,
       storage: this.ctx.storage,
       metadata,
       authorization: authorization.success ? authorization.data : null,
@@ -1575,6 +1591,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     try {
       local = await resolvePersistedRuntimeProxyCredential({
         env: this.env,
+        ctx: this.ctx,
         storage: this.ctx.storage,
         handle,
         metadata: () => this.getMetadata(),
@@ -1717,7 +1734,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   async getRuntimeToken(destination?: RuntimeTokenDestination): Promise<string | null> {
     const target = RuntimeTokenDestinationSchema.optional().parse(destination);
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+      () => null
+    );
     if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
     return this.getStoredRuntimeToken(secret, target);
   }
@@ -1927,7 +1946,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         failure: createFailure('BAD_REQUEST', 'Runtime authorization already installed'),
       };
     }
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+      () => null
+    );
     if (!secret) {
       return { type: 'failure', failure: createFailure('INTERNAL', 'Authentication unavailable') };
     }
@@ -3151,7 +3172,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     let hydration = this.historyHydrations.get(kiloSessionId);
     if (hydration === undefined) {
       hydration = (async () => {
-        const internalSecret = await resolveSecret(this.env.INTERNAL_API_SECRET_PROD);
+        // SESSION_INGEST_CALLER_AUTH; an unknown value throws here, before any export call.
+        const ingestCredential = await sessionIngestExportCredential(this.env, this.ctx);
         if (this.registration !== registration) return;
         await hydrateSessionHistory({
           db: this.db,
@@ -3163,7 +3185,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kiloSessionId,
           rootKiloSessionId: registration.spec.kiloSessionId,
           userId: metadata.identity.userId,
-          internalSecret: internalSecret ?? '',
+          ingestCredential,
           isCurrent: () => this.registration === registration,
           broadcast: event => this.broadcast(event),
         });
@@ -3342,7 +3364,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (metadata === null || metadata.identity.userId !== input.ownerId) {
         return { status: 'denied' as const };
       }
-      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      const secret = await readCloudAgentNextSecret(this.env, 'NEXTAUTH_SECRET', this.ctx).catch(
+        () => null
+      );
       if (!secret) return { status: 'denied' as const };
       let fresh: RuntimeAuthorization;
       try {

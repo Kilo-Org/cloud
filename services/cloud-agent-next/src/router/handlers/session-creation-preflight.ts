@@ -61,6 +61,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
 import { logger } from '../../logger.js';
 import { NETWORK_SECRET_LIMITS } from '@kilocode/worker-utils/network-secrets';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 
 const WEB_ORIGIN = 'cloud-agent-web';
 
@@ -572,7 +573,7 @@ export type SessionCreationPolicyOptions = {
 
 type SessionCreationContext = Pick<
   TRPCContext,
-  'env' | 'userId' | 'authToken' | 'cloudAgentAuthority'
+  'env' | 'userId' | 'authToken' | 'cloudAgentAuthority' | 'executionCtx'
 > &
   Partial<Pick<TRPCContext, 'request'>>;
 type EndpointValidator = (request: SessionCreateRequest) => void | Promise<void>;
@@ -696,17 +697,24 @@ export async function preflightSessionCreation(
       createdOnPlatform: parentCreatedOnPlatform,
     };
     const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
+    const expectedInternalApiSecret = await readCloudAgentNextSecret(
+      ctx.env,
+      'INTERNAL_API_SECRET',
+      ctx.executionCtx
+    ).catch(() => undefined);
     const skipBalance =
       ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
-      typeof ctx.env.INTERNAL_API_SECRET === 'string' &&
+      typeof expectedInternalApiSecret === 'string' &&
+      expectedInternalApiSecret.length > 0 &&
       internalApiKey !== undefined &&
       internalApiKey !== null &&
-      timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET);
+      timingSafeEqual(internalApiKey, expectedInternalApiSecret);
     if (!skipBalance) {
       const balance = await validateBalanceOnly(
         token,
         authority.organizationId ?? undefined,
-        ctx.env
+        ctx.env,
+        ctx.executionCtx
       );
       if (!balance.success)
         throw new TRPCError({
@@ -816,6 +824,7 @@ export async function preflightSessionCreation(
   if (resolvedRequest.initialTurn?.type === 'prompt' && !isPolicyBearingAuthToken(ctx.authToken)) {
     await assertKiloModelAvailable({
       env: ctx.env,
+      ctx: ctx.executionCtx,
       submittedModel: resolvedRequest.agent.model,
       originalToken: ctx.authToken,
       originalOrganizationId: resolvedRequest.options?.kilocodeOrganizationId,

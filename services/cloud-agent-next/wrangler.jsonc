@@ -19,6 +19,8 @@
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },
+  // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+  // (services/sts/test/repo/worker-configs.ts).
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,
@@ -76,6 +78,8 @@
     // deployment of its own.
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai,https://staging-app.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    // SESSION_INGEST_CALLER_AUTH is unset (legacy, X-Internal-Secret): set `binding` only once
+    // Session Ingest authorizes the SESSION_INGEST binding's props.caller. src/session-ingest-caller-auth.ts.
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
     "TOOL_CGROUP_SERVER_CPU_WEIGHT": "75",
@@ -87,6 +91,11 @@
     "VERCEL_SANDBOX_RUNTIME": "node24",
     "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS": "300000",
     "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
+    // Where every runtime secret read goes: `secrets-store` (the Worker secret and Secrets Store
+    // binding below) or `sts` (the bundle over the `STS` binding). An absent value means
+    // `secrets-store`; any other value refuses every read. The `sts` source never falls back to
+    // the legacy binding.
+    "SECRETS_SOURCE": "secrets-store",
   },
   "placement": { "mode": "smart" },
   "ai": { "binding": "AI" },
@@ -120,6 +129,7 @@
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
       "entrypoint": "SessionIngestRPC",
+      "props": { "caller": "cloud-agent-next" },
     },
     {
       "binding": "GIT_TOKEN_SERVICE",
@@ -135,6 +145,17 @@
       "binding": "CONTAINER_USAGE_METER",
       "service": "container-usage-meter",
       "entrypoint": "ContainerUsageMeter",
+    },
+    // STS serves the runtime secret bundle and mints this Worker's outbound service tokens over
+    // the account-internal binding. `props.caller` is what STS authorizes on and must equal this
+    // Worker's top-level name; services/sts/policy/cloud-agent-next.yaml grants the names, the
+    // audiences and the scopes. Nothing reads the bundle while SECRETS_SOURCE is `secrets-store`,
+    // and nothing mints while every outbound switch (ENVIRONMENT.md) is unset.
+    {
+      "binding": "STS",
+      "service": "sts",
+      "entrypoint": "SecretsBroker",
+      "props": { "caller": "cloud-agent-next" },
     },
   ],
   "secrets_store_secrets": [
@@ -375,6 +396,9 @@
       "routes": [],
       "workers_dev": false,
       "preview_urls": false,
+      // Traces stay off: a trace records outbound URLs, and a Worker that binds STS records none
+      // (services/sts/test/repo/worker-configs.ts).
+      "observability": { "traces": { "enabled": false } },
       "triggers": {
         "crons": [],
       },
@@ -416,6 +440,7 @@
           "binding": "SESSION_INGEST",
           "service": "session-ingest",
           "entrypoint": "SessionIngestRPC",
+          "props": { "caller": "cloud-agent-next-dev" },
         },
         {
           "binding": "GIT_TOKEN_SERVICE",
@@ -437,7 +462,10 @@
         {
           "binding": "INTERNAL_API_SECRET_PROD",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "INTERNAL_API_SECRET_PROD",
+          // A config that binds STS may not read a production-named store secret from a
+          // non-production block (services/sts/test/repo/worker-configs.ts), and this block
+          // points every base URL at localhost. The store already holds the development copy.
+          "secret_name": "INTERNAL_API_SECRET_DEV",
         },
       ],
       "r2_buckets": [

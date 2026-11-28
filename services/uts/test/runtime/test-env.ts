@@ -9,6 +9,7 @@ import type { SignInMethods } from '../../src/signin/flows';
 import { readSignInConfig } from '../../src/signin/providers/config';
 import type { SubjectRevocation } from '../../src/subjects/entrypoint';
 import type { TicketRedeemer } from '../../src/tickets/redeemer';
+import { signInInput } from '../secrets-support';
 
 /**
  * The bindings `wrangler.test.jsonc` adds for the tests: the mint Worker's SignerKeys entrypoint
@@ -42,7 +43,7 @@ export const config: UtsConfig = readConfig(env);
 /** No provider, SSO or email sign-in: the deps of tests that reach none of them. */
 export const noSignInMethods: SignInMethods = {
   config,
-  settings: readSignInConfig({}, config),
+  settings: readSignInConfig(signInInput({}), config),
   store: async () => {
     throw new Error('unexpected sign-in method store call');
   },

@@ -26,10 +26,10 @@
   ],
 
   // The three secrets are plain vars here rather than Secrets Store bindings,
-  // so the suite never depends on what a developer has seeded locally.
-  // `resolveSecret` takes either. Note a generated `services/scim-sync/.dev.vars`
-  // overrides these, so assertions must compare against the binding rather
-  // than a hardcoded literal.
+  // so the suite never depends on what a developer has seeded locally. The
+  // reader accepts either. Note a generated `services/scim-sync/.dev.vars`
+  // overrides these, so assertions must compare against the configured secret
+  // rather than a hardcoded literal.
   //
   // `BACKEND_API_URL` and the WorkOS hostname are both stubbed at the `fetch`
   // boundary rather than served, so these origins are never dialed.
@@ -41,5 +41,7 @@
     "WORKOS_API_KEY": "sk_test",
     "WORKOS_CLIENT_ID": "client_test",
     "INTERNAL_API_SECRET": "internal-test-secret",
+    // The secret path; the STS test sets `sts` and a fake `STS` binding on `env`.
+    "WEB_INTERNAL_AUTH": "legacy",
   },
 }

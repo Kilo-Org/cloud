@@ -234,6 +234,7 @@ Captured requests go through the following status lifecycle:
 | `ENVIRONMENT` | `production` or `development` |
 | `KILOCODE_BACKEND_BASE_URL` | Backend API URL |
 | `SECRETS_SOURCE` | Where the three secrets below are read; see [Secrets source](#secrets-source) |
+| `SECRETS_COMPARE_ENABLED` | `true` runs the background source comparison; see [Secrets source](#secrets-source) |
 
 ## Secrets (via Secrets Store)
 
@@ -250,7 +251,11 @@ Captured requests go through the following status lifecycle:
 - `secrets-store` (default, also when unset): the Secrets Store bindings, as before. `env.dev` sets no value, so it keeps this source.
 - `sts`: the production STS bundle over the `STS` binding (`props.caller` `cloudflare-webhook-agent-ingest`). It never falls back to the Secrets Store. A request without a credential reads no bundle and gets the usual `401`. A failed read answers `/api/*` and `/api/callbacks/execution` with a generic `503` (`Retry-After: 30`, error `Internal key unavailable`) before the body is read. In the queue consumer it fails the delivery with the fixed text `Webhook credentials are temporarily unavailable`, which the consumer retries like any other failure. Each failure logs a fixed event with a fixed reason only.
 
-Any other value refuses every read in the same way. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants no name yet.
+Any other value refuses every read in the same way. Only the production block binds STS; `services/sts/policy/cloudflare-webhook-agent-ingest.yaml` grants the three names, each resolved from `/shared` (a name not yet copied there reads as missing).
+
+Every `401` from `/api/*` or `/api/callbacks/execution` logs its warning with fixed fields only: `route` (`internal-api` or `execution-callback`), `secret`, the serving `source` and `reason` (`missing` or `invalid`).
+
+`SECRETS_COMPARE_ENABLED` (only the exact value `true`, and only in production) turns on the background check in `src/secrets-compare.ts`, under either source. It compares the bytes the serving source gave with the other source and never changes a response or serves the other source's value. For the route's own name it uses the value the request was checked against. After the first request in an isolate that passes an `X-Internal-API-Key` check on `/api/*` or an `X-Callback-Token` check on `/api/callbacks/execution`, it compares all three names once and logs one `webhook_secrets_compare` event: the three names and their booleans as before, plus `route`, `source` and `mismatched` (the names whose two values were both read and differ). After the first refused credential per route in an isolate, it compares that route's name only and logs one `webhook_secrets_compare_refused` event with `route`, `secret`, `source` and `result` (`match`, `mismatch` or `unproven`). A request without a credential never starts one. A comparison that has not settled within 25 s proves nothing. `env.dev` sets neither value. To stop every comparison, set the flag to `false` or unset it; nothing is then read for it.
 
 ## Authentication
 

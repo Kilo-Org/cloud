@@ -23,6 +23,7 @@ export const wiringSuites = [
   'scripts/inherit-secret-bindings.test.mjs',
   'scripts/r2-temp-credentials.test.mjs',
   'scripts/sts-bundle-action.test.mjs',
+  'scripts/sts-bundle-callers.test.mjs',
   'scripts/cloud-agent-e2e-workflow.test.mjs',
 ];
 

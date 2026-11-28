@@ -3,6 +3,7 @@ name: Auto-docs intake
 # Trigger when PRs are merged to main, or manually with a PR number for testing.
 # IMPORTANT: This workflow does NOT check out PR code and does NOT execute any
 # code from the PR branch. It only reads PR metadata and forwards it to a webhook.
+# It checks out only this repository's sts-bundle action, from the run's commit.
 on:
   push:
     branches: [main]
@@ -31,8 +32,24 @@ jobs:
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # The ci-auto-docs STS policy names this environment; its branch policy
+    # keeps it to main. Nothing is deployed, so no deployment is recorded.
+    environment:
+      name: production
+      deployment: false
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
 
     steps:
+      # Only for the local sts-bundle action; nothing else is read from the tree.
+      - name: Checkout the STS action
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/sts-bundle
+
       - name: Determine PR number and check branch prefix or title
         id: pr
         env:
@@ -76,12 +93,22 @@ jobs:
           echo "should_send=true" >> "$GITHUB_OUTPUT"
           echo "Found PR #$PR_NUMBER with branch: $HEAD_BRANCH, title: $PR_TITLE"
 
+      - name: Read the docs webhook from STS
+        id: sts
+        if: steps.pr.outputs.should_send == 'true'
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ci-auto-docs
+          secrets: |
+            DOC_WEBHOOK_URL
+            DOC_WEBHOOK_SECRET
+
       - name: Build and send webhook payload
         if: steps.pr.outputs.should_send == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          DOC_WEBHOOK_URL: ${{ secrets.DOC_WEBHOOK_URL }}
-          DOC_WEBHOOK_SECRET: ${{ secrets.DOC_WEBHOOK_SECRET }}
+          DOC_WEBHOOK_URL: ${{ steps.sts.outputs.DOC_WEBHOOK_URL }}
+          DOC_WEBHOOK_SECRET: ${{ steps.sts.outputs.DOC_WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
           trap 'rm -f pr.json /tmp/gh_err.txt' EXIT

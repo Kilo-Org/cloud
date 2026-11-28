@@ -4,11 +4,19 @@ on:
   workflow_call:
     inputs:
       target_environment:
-        description: 'GitHub and Vercel environment to deploy to'
+        description: 'Vercel environment to deploy to: production or staging'
         required: true
         type: string
-      vercel_project_id_var:
-        description: 'Name of the GitHub variable containing the Vercel project ID to deploy'
+      vercel_project:
+        description: 'Vercel project to deploy: app, ai-gateway or ai-gateway-secure-proxy (production only)'
+        required: true
+        type: string
+      vercel_cli_artifact:
+        description: 'Artifact of this run that holds the packed Vercel CLI (install-vercel-cli.yml)'
+        required: true
+        type: string
+      vercel_cli_sha256:
+        description: 'SHA-256 of vercel-cli.tgz in that artifact, from the same install job'
         required: true
         type: string
       source_sha:
@@ -20,82 +28,99 @@ on:
       deployment_url:
         description: 'Staged Vercel deployment URL'
         value: ${{ jobs.stage.outputs.deployment_url }}
-    secrets:
-      VERCEL_PROJECT_TOKEN:
-        description: 'Vercel token scoped to the project being deployed'
-        required: true
 
 permissions:
   contents: read
 
 jobs:
+  # Reads the project token from STS and stages the deployment with the CLI the
+  # caller's install-vercel-cli.yml job installed. The token's consumer is the
+  # Vercel CLI itself, so its runtime code runs with the token; the job installs
+  # nothing and runs no package manager. One policy per Vercel environment and
+  # project, ci-vercel-stage-<environment>-<project>, each bound to the GitHub
+  # environment <environment>-vercel-<project> and holding only that project's
+  # token, so this job's OIDC token opens no other project's token. D53/M112.
   stage:
-    # Guard: this reusable workflow stages a Vercel deployment using repo
-    # secrets. It is only ever called by guarded caller jobs, but the guard is
+    # Guard: this reusable workflow stages a Vercel deployment with a production
+    # credential. It is only ever called by guarded caller jobs, but the guard is
     # also applied here so the workflow cannot run outside the canonical repo
     # even if a caller skips its own guard.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
-    environment: ${{ inputs.target_environment }}
+    # The STS policy names this environment; its branch policy keeps it to main.
+    environment: ${{ format('{0}-vercel-{1}', inputs.target_environment, inputs.vercel_project) }}
+    permissions:
+      contents: read
+      id-token: write
 
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
 
     env:
       TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
-      VERCEL_VERSION: '59.5.0'
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ vars[inputs.vercel_project_id_var] }}
 
     steps:
+      # The sts-bundle action comes from the run's own commit, not from the
+      # commit being deployed, and is read before anything else reaches the runner.
+      - name: Checkout the STS action
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          path: sts-action
+          persist-credentials: false
+          sparse-checkout: .github/actions/sts-bundle
+
+      # The bundle key and project variable of the project this job stages; a
+      # project without a policy in this environment stops here.
+      - name: Resolve the Vercel project
+        id: project
+        env:
+          VERCEL_PROJECT: ${{ inputs.vercel_project }}
+        run: |
+          case "$TARGET_ENVIRONMENT/$VERCEL_PROJECT" in
+            production/app | staging/app) suffix=APP ;;
+            production/ai-gateway | staging/ai-gateway) suffix=AI_GATEWAY ;;
+            production/ai-gateway-secure-proxy) suffix=AI_GATEWAY_SECURE_PROXY ;;
+            *)
+              echo "::error::No Vercel stage policy for $VERCEL_PROJECT in $TARGET_ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+          echo "token_key=VERCEL_TOKEN_$suffix" >> "$GITHUB_OUTPUT"
+          echo "project_id_var=VERCEL_PROJECT_ID_$suffix" >> "$GITHUB_OUTPUT"
+
+      - name: Read the Vercel project token from STS
+        id: sts
+        uses: ./sts-action/.github/actions/sts-bundle
+        with:
+          workload: ${{ format('ci-vercel-stage-{0}-{1}', inputs.target_environment, inputs.vercel_project) }}
+          secrets: ${{ steps.project.outputs.token_key }}
+
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
           ref: ${{ inputs.source_sha || github.sha }}
 
-      # The installed tree is ~265 MB (~77 MB compressed), so the cache only pays
-      # off when the prefix holds a runnable copy of the pinned version. A miss, or
-      # a cache failure, costs the registry install and never blocks a deploy. An
-      # entry that fails the check below is not replaced under an unchanged key, so
-      # it costs that install in every job until the key changes.
-      - name: Restore Vercel CLI
-        id: vercel-cli-cache
-        continue-on-error: true
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          path: ${{ runner.temp }}/vercel-cli
-          # vercel@59.5.0 installs one @vercel/vc-native-<os>-<arch> optional
-          # dependency, so an entry from another architecture cannot be reused.
-          key: ${{ runner.os }}-${{ runner.arch }}-vercel-cli-${{ env.VERCEL_VERSION }}
+          name: ${{ inputs.vercel_cli_artifact }}
+          path: ${{ runner.temp }}
 
-      - name: Install Vercel CLI
+      # The CLI stays off PATH, so no later step resolves another command from
+      # it. The side checkout leaves the tree the CLI uploads.
+      - name: Unpack Vercel CLI
         env:
-          VERCEL_CLI_PREFIX: ${{ runner.temp }}/vercel-cli
-          CACHE_HIT: ${{ steps.vercel-cli-cache.outputs.cache-hit }}
+          VERCEL_CLI_SHA256: ${{ inputs.vercel_cli_sha256 }}
         run: |
-          echo "$VERCEL_CLI_PREFIX/bin" >> "$GITHUB_PATH"
-
-          manifest="$VERCEL_CLI_PREFIX/lib/node_modules/vercel/package.json"
-          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
-
-          # A miss, a different version, or a tree the CLI cannot start from takes
-          # the registry path.
-          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$VERCEL_VERSION" ] \
-            && "$VERCEL_CLI_PREFIX/bin/vercel" --version >/dev/null 2>&1; then
-            echo "Restored vercel@$installed from the cache"
-          else
-            echo "Installing vercel@$VERCEL_VERSION"
-            rm -rf "$VERCEL_CLI_PREFIX"
-            npm install --global --prefix "$VERCEL_CLI_PREFIX" "vercel@$VERCEL_VERSION" --no-audit --no-fund
-            installed=$(node -p "require('$manifest').version")
-            if [ "$installed" != "$VERCEL_VERSION" ]; then
-              echo "::error::Resolved vercel@$installed but the pinned version is $VERCEL_VERSION"
-              exit 1
-            fi
-          fi
-          "$VERCEL_CLI_PREFIX/bin/vercel" --version
+          rm -rf sts-action
+          echo "$VERCEL_CLI_SHA256  $RUNNER_TEMP/vercel-cli.tgz" | sha256sum --check --strict --quiet ||
+            { echo "::error::The Vercel CLI artifact does not match the digest of its install job"; exit 1; }
+          mkdir "$RUNNER_TEMP/vercel-cli"
+          tar -xzf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli"
+          "$RUNNER_TEMP/vercel-cli/bin/vercel" --version
 
       # Each Vercel project builds its Root Directory from this repository root,
       # so the CLI uploads the whole tree. That tree passed Vercel's 15,000-file
@@ -103,11 +128,14 @@ jobs:
       # for deployments that include thousands of files.
       - name: Stage Vercel deployment
         id: deploy
+        env:
+          VERCEL_PROJECT_ID: ${{ vars[steps.project.outputs.project_id_var] }}
+          VERCEL_PROJECT_TOKEN: ${{ steps.sts.outputs[steps.project.outputs.token_key] }}
         run: |
           if [ "$TARGET_ENVIRONMENT" = "production" ]; then
-            deployment_output=$(vercel deploy --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$("$RUNNER_TEMP/vercel-cli/bin/vercel" deploy --prod --skip-domain --archive=tgz --token="$VERCEL_PROJECT_TOKEN")
           else
-            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --archive=tgz --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
+            deployment_output=$("$RUNNER_TEMP/vercel-cli/bin/vercel" deploy --target="$TARGET_ENVIRONMENT" --archive=tgz --token="$VERCEL_PROJECT_TOKEN")
           fi
 
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)

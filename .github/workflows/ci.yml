@@ -408,6 +408,8 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'services/sts/policy/**'
+              - 'services/sts/test/worker/cloud-workflow-files.ts'
               - 'services/*/wrangler.json'
               - 'services/*/wrangler.jsonc'
               - 'services/*/wrangler.toml'
@@ -434,6 +436,8 @@ jobs:
               - 'scripts/**'
               - 'services/cloud-agent-next/scripts/**'
               - 'services/usage-ingest/scripts/provision-queues.mjs'
+              - 'services/sts/policy/**'
+              - 'services/sts/test/worker/cloud-workflow-files.ts'
               - 'services/*/wrangler.json'
               - 'services/*/wrangler.jsonc'
               - 'services/*/wrangler.toml'
@@ -736,6 +740,7 @@ jobs:
           scripts/inherit-secret-bindings.test.mjs
           scripts/r2-temp-credentials.test.mjs
           scripts/sts-bundle-action.test.mjs
+          scripts/sts-bundle-callers.test.mjs
           scripts/cloud-agent-e2e-workflow.test.mjs
 
       # The same split for the release workflow: a PR that changes it alone

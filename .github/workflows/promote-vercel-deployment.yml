@@ -17,81 +17,89 @@ on:
         required: false
         type: string
         default: 'kilocode-app'
-    secrets:
-      VERCEL_TOKEN:
-        description: 'Vercel token used to promote the deployment'
+      vercel_cli_artifact:
+        description: 'Artifact of this run that holds the packed Vercel CLI (install-vercel-cli.yml)'
         required: true
-      AXIOM_ANNOTATION_TOKEN:
-        description: 'Optional Axiom token used to annotate the deployment'
-        required: false
+        type: string
+      vercel_cli_sha256:
+        description: 'SHA-256 of vercel-cli.tgz in that artifact, from the same install job'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
+  # Reads the Vercel and Axiom tokens from STS, then promotes and annotates with
+  # the CLI the caller's install-vercel-cli.yml job installed. The Vercel token's
+  # consumer is the CLI itself, so its runtime code runs with the tokens; the job
+  # installs nothing and runs no package manager. Policy: ci-vercel-promote,
+  # D53/M112.
   promote:
     # Guard: this reusable workflow promotes a Vercel deployment to production
-    # using repo secrets. This is defense-in-depth: callers must guard their own
-    # jobs, because a job-level `if:` turns an unguarded call on a fork into a
-    # silently skipped promotion rather than an obvious failure.
+    # with a production credential. This is defense-in-depth: callers must guard
+    # their own jobs, because a job-level `if:` turns an unguarded call on a fork
+    # into a silently skipped promotion rather than an obvious failure.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
+    # The STS policy names this environment; its branch policy keeps it to main.
     environment: production
-
-    env:
-      VERCEL_VERSION: '59.5.0'
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      # The installed tree is ~265 MB (~77 MB compressed), so the cache only pays
-      # off when the prefix holds a runnable copy of the pinned version. A miss, or
-      # a cache failure, costs the registry install and never blocks a deploy. An
-      # entry that fails the check below is not replaced under an unchanged key, so
-      # it costs that install in every job until the key changes.
-      - name: Restore Vercel CLI
-        id: vercel-cli-cache
-        continue-on-error: true
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      # Only for the local sts-bundle action; nothing else is read from the tree.
+      - name: Checkout the STS action
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: ${{ runner.temp }}/vercel-cli
-          # vercel@59.5.0 installs one @vercel/vc-native-<os>-<arch> optional
-          # dependency, so an entry from another architecture cannot be reused.
-          key: ${{ runner.os }}-${{ runner.arch }}-vercel-cli-${{ env.VERCEL_VERSION }}
+          persist-credentials: false
+          sparse-checkout: .github/actions/sts-bundle
 
-      - name: Install Vercel CLI
+      # Both reads come before the CLI reaches the runner: every step ahead of a
+      # read is trusted.
+      - name: Read the Vercel token from STS
+        id: sts
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ci-vercel-promote
+          secrets: VERCEL_TOKEN
+
+      # Annotation is best-effort, so a failed read only skips it.
+      - name: Read the Axiom annotation token from STS
+        id: sts-axiom
+        if: inputs.axiom_annotation_dataset != ''
+        continue-on-error: true
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ci-vercel-promote
+          secrets: AXIOM_ANNOTATION_TOKEN
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ${{ inputs.vercel_cli_artifact }}
+          path: ${{ runner.temp }}
+
+      # The CLI stays off PATH, so no later step resolves another command from it.
+      - name: Unpack Vercel CLI
         env:
-          VERCEL_CLI_PREFIX: ${{ runner.temp }}/vercel-cli
-          CACHE_HIT: ${{ steps.vercel-cli-cache.outputs.cache-hit }}
+          VERCEL_CLI_SHA256: ${{ inputs.vercel_cli_sha256 }}
         run: |
-          echo "$VERCEL_CLI_PREFIX/bin" >> "$GITHUB_PATH"
-
-          manifest="$VERCEL_CLI_PREFIX/lib/node_modules/vercel/package.json"
-          installed=$(node -p "require('$manifest').version" 2>/dev/null || true)
-
-          # A miss, a different version, or a tree the CLI cannot start from takes
-          # the registry path.
-          if [ "$CACHE_HIT" = "true" ] && [ "$installed" = "$VERCEL_VERSION" ] \
-            && "$VERCEL_CLI_PREFIX/bin/vercel" --version >/dev/null 2>&1; then
-            echo "Restored vercel@$installed from the cache"
-          else
-            echo "Installing vercel@$VERCEL_VERSION"
-            rm -rf "$VERCEL_CLI_PREFIX"
-            npm install --global --prefix "$VERCEL_CLI_PREFIX" "vercel@$VERCEL_VERSION" --no-audit --no-fund
-            installed=$(node -p "require('$manifest').version")
-            if [ "$installed" != "$VERCEL_VERSION" ]; then
-              echo "::error::Resolved vercel@$installed but the pinned version is $VERCEL_VERSION"
-              exit 1
-            fi
-          fi
-          "$VERCEL_CLI_PREFIX/bin/vercel" --version
+          echo "$VERCEL_CLI_SHA256  $RUNNER_TEMP/vercel-cli.tgz" | sha256sum --check --strict --quiet ||
+            { echo "::error::The Vercel CLI artifact does not match the digest of its install job"; exit 1; }
+          mkdir "$RUNNER_TEMP/vercel-cli"
+          tar -xzf "$RUNNER_TEMP/vercel-cli.tgz" -C "$RUNNER_TEMP/vercel-cli"
+          "$RUNNER_TEMP/vercel-cli/bin/vercel" --version
 
       - name: Promote Vercel deployment
         # The stage workflow checks the form of this URL before it publishes it
         # as an output; this step passes it to the CLI as one argument.
         env:
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: vercel promote "$DEPLOYMENT_URL" --scope=kilocode --token="$VERCEL_TOKEN"
+          VERCEL_TOKEN: ${{ steps.sts.outputs.VERCEL_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/vercel-cli/bin/vercel" promote "$DEPLOYMENT_URL" --scope=kilocode --token="$VERCEL_TOKEN"
 
       - name: Annotate production deployment in Axiom
         if: inputs.axiom_annotation_dataset != ''
@@ -99,15 +107,15 @@ jobs:
         # a successful promotion because Axiom/Vercel is flaky or slow to update.
         continue-on-error: true
         env:
-          AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+          AXIOM_ANNOTATION_TOKEN: ${{ steps.sts-axiom.outputs.AXIOM_ANNOTATION_TOKEN }}
           AXIOM_DATASET: ${{ inputs.axiom_annotation_dataset }}
           AXIOM_ORG_ID: kilo-code-nvjh
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
           EXPECTED_PROJECT: ${{ inputs.axiom_expected_project }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TOKEN: ${{ steps.sts.outputs.VERCEL_TOKEN }}
         run: |
           if [ -z "$AXIOM_ANNOTATION_TOKEN" ]; then
-            echo "::warning::Skipping deployment annotation because AXIOM_ANNOTATION_TOKEN is not configured"
+            echo "::warning::Skipping deployment annotation because AXIOM_ANNOTATION_TOKEN could not be read from STS"
             exit 0
           fi
 
@@ -116,7 +124,7 @@ jobs:
           deployment=""
           for attempt in 1 2 3 4 5; do
             inspection_error=$(mktemp)
-            if ! inspection=$(vercel inspect "$DEPLOYMENT_URL" --json --scope=kilocode --token="$VERCEL_TOKEN" 2>"$inspection_error"); then
+            if ! inspection=$("$RUNNER_TEMP/vercel-cli/bin/vercel" inspect "$DEPLOYMENT_URL" --json --scope=kilocode --token="$VERCEL_TOKEN" 2>"$inspection_error"); then
               echo "::warning::vercel inspect failed (attempt $attempt): $(<"$inspection_error")"
               rm "$inspection_error"
               if [ "$attempt" != "5" ]; then
@@ -135,7 +143,7 @@ jobs:
               continue
             fi
 
-            deployment=$(vercel api "/v13/deployments/$deployment_id" --raw --scope=kilocode --token="$VERCEL_TOKEN" 2>&1)
+            deployment=$("$RUNNER_TEMP/vercel-cli/bin/vercel" api "/v13/deployments/$deployment_id" --raw --scope=kilocode --token="$VERCEL_TOKEN" 2>&1)
             ready_state=$(jq -r '.readyState // empty' <<<"$deployment" 2>/dev/null)
             if [ "$ready_state" = "READY" ]; then
               break

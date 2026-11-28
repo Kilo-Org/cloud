@@ -85,13 +85,13 @@ function validateEasCli(workflow, mobilePackage, easConfig, lockfile) {
   for (const line of lines) {
     assert.match(
       line,
-      /\bpnpm exec eas (?:env:|build|submit)\b/,
+      /\.\/node_modules\/\.bin\/eas (?:env:|build|submit)\b/,
       `the workflow must run the installed CLI: ${line.trim()}`
     );
     // A step may nest one call inside another, as the build does inside
     // env:exec, so every call on the line has to name the installed binary.
     assert.doesNotMatch(
-      line.replace(/\bpnpm exec eas (?=env:|build|submit)/g, ''),
+      line.replace(/\.\/node_modules\/\.bin\/eas (?=env:|build|submit)/g, ''),
       /\b(?:pnpx\s+)?eas(?:-cli)?\b/,
       `every EAS CLI call must run the installed binary: ${line.trim()}`
     );
@@ -445,8 +445,8 @@ function validate(workflow) {
   // would ignore a failed gate, so the condition carries both.
   assert.deepEqual(
     [...(buildJob.needs ?? [])].sort(),
-    ['check-changes', 'preflight', 'reuse', 'validate'],
-    'the build must need both suite gates, the change check and the preflight'
+    ['app-workspace', 'check-changes', 'preflight', 'reuse', 'validate'],
+    'the build must need both suite gates, the change check, the preflight and the installed closure'
   );
   assert.match(
     buildJob.if,
@@ -634,27 +634,45 @@ test('the release workflow gates the build on the upload cap and lands the chang
   validate(readWorkflow());
 });
 
-// The preflight reads the EAS CLI and the evaluated Expo config only. `eas-cli`
+// The release jobs read the EAS CLI and the evaluated Expo config only. `eas-cli`
 // is the app's development dependency, and `app.config.ts` with
 // scripts/assert-expo-config.mjs resolves app-local modules, so the app closure
-// carries every input of the job. The job runs on the default runner, and a
-// measured run of it puts the install saving above a tenth of its wall time.
-const preflightInstall =
+// carries every input of the jobs. One job installs it without id-token; the
+// two jobs that read EXPO_TOKEN from STS install nothing and run no package
+// manager (.github/actions/sts-bundle/README.md).
+const appInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
-test('the release preflight installs the app closure', () => {
-  const job = readWorkflow().jobs.preflight;
-  const installs = job.steps.filter(item => /^pnpm\b.*\binstall\b/.test(item.run ?? ''));
+test('the release installs the app closure once, outside the jobs that hold EXPO_TOKEN', () => {
+  const workflow = readWorkflow();
+  const installs = workflow.jobs['app-workspace'].steps.filter(item =>
+    /^pnpm\b.*\binstall\b/.test(item.run ?? '')
+  );
   assert.deepEqual(
     installs.map(item => item.run),
-    [preflightInstall],
+    [appInstall],
     'one install links the app closure and the root project'
   );
-  const assertion = job.steps.find(item => item.name === 'Assert production config contract');
-  assert.match(
-    assertion.run,
-    /pnpm assert:config/,
-    'the config assertion the closure must carry still runs'
+  assert.equal(workflow.jobs['app-workspace'].permissions?.['id-token'], undefined);
+  for (const name of ['preflight', 'build-and-submit']) {
+    const job = workflow.jobs[name];
+    assert.equal(job.permissions?.['id-token'], 'write', `${name} reads the STS bundle`);
+    assert.ok(job.needs.includes('app-workspace'), `${name} needs the installed closure`);
+    for (const item of job.steps) {
+      assert.doesNotMatch(item.uses ?? '', /pnpm\/action-setup|setup-bun/, `${name}: ${item.name}`);
+      assert.doesNotMatch(item.run ?? '', /\b(?:pnpm|npm|npx|yarn|bun)\b/, `${name}: ${item.name}`);
+      assert.equal(item.with?.cache, undefined, `${name}: ${item.name} restores no package cache`);
+    }
+  }
+  const mobilePackage = JSON.parse(readFileSync('apps/mobile/package.json', 'utf8'));
+  const assertion = workflow.jobs.preflight.steps.find(
+    item => item.name === 'Assert production config contract'
+  );
+  assert.ok(
+    assertion.run.includes(
+      `SENTRY_AUTH_TOKEN=preflight-placeholder ${mobilePackage.scripts['assert:config']}'`
+    ),
+    'the config assertion runs the app assert:config script'
   );
 });
 
@@ -1773,14 +1791,14 @@ const toolchainMutations = {
     const build = workflow.jobs['build-and-submit'].steps.find(item =>
       /\beas build\b/.test(item.run ?? '')
     );
-    build.run = build.run.replace('pnpm exec eas build', 'eas build');
+    build.run = build.run.replace('./node_modules/.bin/eas build', 'eas build');
   },
   'a workflow step bypasses the installed CLI': ({ workflow, mobilePackage }) => {
     const build = workflow.jobs['build-and-submit'].steps.find(item =>
       /\beas build\b/.test(item.run ?? '')
     );
     build.run = build.run.replace(
-      'pnpm exec eas build',
+      './node_modules/.bin/eas build',
       `pnpx eas-cli@${mobilePackage.devDependencies['eas-cli']} build`
     );
   },

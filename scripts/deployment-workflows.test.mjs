@@ -39,13 +39,29 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
     const steps = workers.jobs[job].steps;
     const deploy = steps.find(step => step.id === (selector ? 'deploy' : 'deploy-cloud-agent'));
     const retry = steps.find(step => step.name?.endsWith('(retry)'));
-    const maps = steps.find(step => step.name === 'Upload Cloud Agent Sentry source maps');
-    assert.equal(maps['continue-on-error'], true);
-    assert.equal(maps.if, selector ? `${selector} == 'services/cloud-agent-next'` : undefined);
-    assert.doesNotMatch(maps.if ?? '', /always\(|failure\(/);
-    assert.ok(steps.indexOf(maps) > steps.indexOf(retry));
-    assert.equal(maps.run, 'pnpm run sentry:sourcemaps');
-    assert.equal(maps.env.SENTRY_AUTH_TOKEN, '${{ secrets.SENTRY_AUTH_TOKEN }}');
+    const stage = steps.find(step => step.name === 'Stage Cloud Agent Sentry source maps');
+    const handover = steps.find(step => step.name === 'Hand over Cloud Agent Sentry source maps');
+    assert.equal(stage['continue-on-error'], true);
+    assert.equal(stage.if, selector ? `${selector} == 'services/cloud-agent-next'` : undefined);
+    assert.doesNotMatch(stage.if ?? '', /always\(|failure\(/);
+    assert.ok(steps.indexOf(stage) > steps.indexOf(retry));
+    assert.match(stage.run, /^pnpm run sentry:stage "\$RUNNER_TEMP\/cloud-agent-sentry"\n/);
+    // handoff.json binds the maps to the run attempt, written before the archive is packed.
+    const handoff = stage.run.indexOf('> "$RUNNER_TEMP/cloud-agent-sentry/handoff.json"');
+    assert.ok(handoff > 0, `${job} writes handoff.json`);
+    assert.match(
+      stage.run,
+      /jq -n --arg run_id "\$GITHUB_RUN_ID" --arg run_attempt "\$GITHUB_RUN_ATTEMPT"/
+    );
+    assert.ok(handoff < stage.run.indexOf('tar -czf'), `${job} writes handoff.json before packing`);
+    // The deploy job never holds the Sentry token: the upload job reads it from STS.
+    assert.deepEqual(stage.env, { SOURCE_SHA: '${{ inputs.source_sha || github.sha }}' });
+    assert.equal(handover['continue-on-error'], true);
+    assert.equal(handover.if, "steps.sentry-stage.outcome == 'success'");
+    assert.equal(handover.with.name, 'cloud-agent-sentry-${{ github.run_attempt }}');
+    assert.equal(handover.with.overwrite, undefined, 'a per-attempt name is never overwritten');
+    assert.equal(steps.indexOf(handover), steps.indexOf(stage) + 1);
+    assert.doesNotMatch(JSON.stringify(workers.jobs[job]), /SENTRY_AUTH_TOKEN/);
     assert.equal(retry.if, `steps.${deploy.id}.outcome == 'failure'`);
     assert.equal(retry['continue-on-error'], undefined);
     assert.equal(deploy['continue-on-error'], true);
@@ -59,6 +75,29 @@ test('Cloud Agent source-map uploads are best-effort without masking build or de
       );
     }
   }
+
+  const upload = workers.jobs['upload-cloud-agent-sentry'];
+  // Both DEPLOY_TOKEN_SOURCE paths stage maps; the upload runs after whichever twin deployed.
+  assert.deepEqual(upload.needs, [
+    'deploy-manual',
+    'deploy-changed',
+    'deploy-cloud-agent-after-session-ingest',
+    'deploy-manual-sts',
+    'deploy-changed-sts',
+    'deploy-cloud-agent-after-session-ingest-sts',
+  ]);
+  assert.equal(upload.uses, './.github/workflows/cloud-agent-sentry-sourcemaps.yml');
+  assert.deepEqual(upload.with, {
+    target_environment: '${{ inputs.target_environment }}',
+    source_sha: '${{ inputs.source_sha || github.sha }}',
+  });
+  assert.match(upload.if, /!cancelled\(\)/);
+  const sentry = workflow('cloud-agent-sentry-sourcemaps');
+  assert.equal(
+    sentry.jobs.upload['continue-on-error'],
+    true,
+    'a failed upload never fails a deploy'
+  );
 });
 
 test('both Worker deployment paths prepare usage queues before direct consumer deployment', () => {
@@ -633,8 +672,8 @@ test('successful main CI selects the tested deployment SHA', () => {
   );
   assert.equal(ci.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 
-  for (const job of ['db-gate', 'stage-app']) {
-    assert.equal(production.jobs[job].needs, 'check-changes');
+  for (const job of ['db-gate', 'stage-app', 'vercel-cli']) {
+    assert.ok([production.jobs[job].needs].flat().includes('check-changes'), job);
     assert.match(production.jobs[job].if, /should_deploy == 'true'/);
   }
   for (const job of ['db-gate', 'deploy-app', 'deploy-workers']) {
@@ -687,37 +726,32 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
 
 test('ai-gateway deploys with each scheduled release and its promotion waits for the gate', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
-  assert.equal(stageAiGateway.needs, 'check-changes');
+  assert.deepEqual(stageAiGateway.needs, ['check-changes', 'vercel-cli']);
+  assert.equal(stageAiGateway.with.vercel_cli_artifact, '${{ needs.vercel-cli.outputs.artifact }}');
+  assert.equal(stageAiGateway.with.vercel_cli_sha256, '${{ needs.vercel-cli.outputs.sha256 }}');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
   assert.equal(stageAiGateway.with.target_environment, 'production');
-  assert.equal(stageAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(stageAiGateway.with.vercel_project, 'ai-gateway');
   assert.equal(stageAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
-  assert.equal(
-    stageAiGateway.secrets.VERCEL_PROJECT_TOKEN,
-    '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
-  );
+  assert.equal(stageAiGateway.secrets, undefined);
 
   const promoteAiGateway = production.jobs['promote-ai-gateway'];
-  assert.deepEqual(promoteAiGateway.needs, ['stage-ai-gateway', 'db-gate']);
+  assert.deepEqual(promoteAiGateway.needs, ['stage-ai-gateway', 'db-gate', 'vercel-cli']);
   assert.deepEqual(promoteAiGateway.with, {
     deployment_url: '${{ needs.stage-ai-gateway.outputs.deployment_url }}',
     axiom_annotation_dataset: 'vercel',
     axiom_expected_project: 'kilocode-ai-gateway',
+    vercel_cli_artifact: '${{ needs.vercel-cli.outputs.artifact }}',
+    vercel_cli_sha256: '${{ needs.vercel-cli.outputs.sha256 }}',
   });
-  assert.equal(
-    promoteAiGateway.secrets.AXIOM_ANNOTATION_TOKEN,
-    '${{ secrets.AXIOM_ANNOTATION_TOKEN }}'
-  );
+  assert.equal(promoteAiGateway.secrets, undefined);
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
-  assert.equal(deployAiGateway.needs, 'check-changes');
+  assert.deepEqual(deployAiGateway.needs, ['check-changes', 'vercel-cli']);
   assert.equal(deployAiGateway.with.target_environment, 'staging');
-  assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(deployAiGateway.with.vercel_project, 'ai-gateway');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
-  assert.equal(
-    deployAiGateway.secrets.VERCEL_PROJECT_TOKEN,
-    '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
-  );
+  assert.equal(deployAiGateway.secrets, undefined);
 
   // Neither pipeline's Workers read anything the Vercel deploys produce, so both
   // start with the gate and the matrix lookup rather than with those deploys.
@@ -818,9 +852,15 @@ test('one database gate per deployment checks out, installs and migrates once', 
   // target on their own: a custom environment cannot hold the traffic switch
   // until the gate finishes, so they run beside it. The Worker deploy and the
   // release record below keep the gate, so a failed migration still stops them.
+  // They also need the run's Vercel CLI job, which needs only the lookup.
   for (const job of ['deploy-app', 'deploy-ai-gateway']) {
-    assert.equal(staging.jobs[job].needs, 'check-changes', `${job} must start beside db-gate`);
+    assert.deepEqual(
+      staging.jobs[job].needs,
+      ['check-changes', 'vercel-cli'],
+      `${job} must start beside db-gate`
+    );
   }
+  assert.equal(staging.jobs['vercel-cli'].needs, 'check-changes');
   // Production names the gate result explicitly so a skipped gate cannot let the
   // Worker deploy run ahead of the migrations; staging relies on the default
   // needs-success behaviour for the same gate.
@@ -1500,7 +1540,7 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   // The order is a job dependency, so no job holds a runner while it waits: no
   // step reads the run's jobs or sleeps.
   for (const [name, job] of Object.entries(workers.jobs)) {
-    for (const step of job.steps) {
+    for (const step of job.steps ?? []) {
       assert.doesNotMatch(step.name ?? '', /Wait for session-ingest/, name);
       assert.doesNotMatch(step.run ?? '', /actions\/runs\/.*\/jobs|sleep \d/, name);
     }
@@ -1762,23 +1802,22 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
     const step = namedStep(document, name);
     const directory = mkdtempSync(join(tmpdir(), 'vercel-step-'));
     try {
-      const bin = join(directory, 'bin');
+      // The jobs run the handed-over CLI by its path under RUNNER_TEMP, never from PATH.
+      const bin = join(directory, 'runner-temp', 'vercel-cli', 'bin');
       const runnerTemp = join(directory, 'runner-temp');
       const argvLog = join(directory, 'argv');
       const githubOutput = join(directory, 'github-output');
-      mkdirSync(bin);
-      mkdirSync(runnerTemp);
+      mkdirSync(bin, { recursive: true });
       writeFileSync(argvLog, '');
       writeFileSync(githubOutput, '');
       writeFileSync(join(bin, 'vercel'), VERCEL_STUB, { mode: 0o755 });
       const substitutions = {
         'runner.temp': runnerTemp,
-        'steps.vercel-cli-cache.outputs.cache-hit': 'false',
+        'vars[steps.project.outputs.project_id_var]': 'probe-project',
         ...values,
       };
       const env = {
         ...process.env,
-        PATH: `${bin}:${process.env.PATH}`,
         ARGV_LOG: argvLog,
         DEPLOY_OUTPUT: deployOutput ?? '',
         GITHUB_OUTPUT: githubOutput,
@@ -1827,7 +1866,7 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
       name: 'Promote Vercel deployment',
       values: {
         'inputs.deployment_url': probeUrl,
-        'secrets.VERCEL_TOKEN': 'probe-token',
+        'steps.sts.outputs.VERCEL_TOKEN': 'probe-token',
       },
     });
     assert.equal(promoted.status, 0, promoted.stderr);
@@ -1846,7 +1885,9 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
     assert.ok(promoted.argv.includes('--scope=kilocode'), 'the scope stays on the command');
 
     const stage = workflow('stage-vercel-deployment');
-    const stageValues = { 'secrets.VERCEL_PROJECT_TOKEN': 'probe-token' };
+    const stageValues = {
+      'steps.sts.outputs[steps.project.outputs.token_key]': 'probe-token',
+    };
 
     const staged = runStep({
       document: stage,
@@ -1887,14 +1928,21 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
 
 // The STS deploy-token twins (services/sts/README.md, "Cloudflare deploy tokens"): the repository
 // variable DEPLOY_TOKEN_SOURCE runs each deploy job (unset or `secret`) or its `-sts` twin (`sts`).
-test('only the Worker deploy calls may hold an OIDC token in a deploy workflow', () => {
+test('only the Vercel and Worker deploy calls may hold an OIDC token in a deploy workflow', () => {
+  // The Vercel stage and promote jobs read their bundle from STS (D53/M112), so each carries
+  // id-token as the ceiling of the called job it runs.
+  //
   // Each deploy-workers call carries id-token as the ceiling of its called jobs, of which only the
-  // `-sts` twins request it (see the STS twin tests below); their tokens name deploy-workers.yml.
-  // Detection calls the same workflow, and GitHub checks every job in it, so the ceiling is needed
-  // even though the matrix-only call skips those jobs.
-  for (const [name, deployment] of [
-    ['production', production],
-    ['staging', staging],
+  // `-sts` twins request it (see the STS twin tests below) and the Cloud Agent source map upload;
+  // their tokens name deploy-workers.yml. Detection calls the same workflow, and GitHub checks
+  // every job in it, so the ceiling is needed even though the matrix-only call skips those jobs.
+  for (const [name, deployment, bundles] of [
+    [
+      'production',
+      production,
+      ['stage-app', 'stage-ai-gateway', 'promote-app', 'promote-ai-gateway'],
+    ],
+    ['staging', staging, ['deploy-app', 'deploy-ai-gateway']],
   ]) {
     assert.equal(deployment.permissions['id-token'], undefined, `${name} workflow-level block`);
     const minting = Object.entries(deployment.jobs)
@@ -1903,11 +1951,18 @@ test('only the Worker deploy calls may hold an OIDC token in a deploy workflow',
     assert.deepEqual(
       minting.sort(),
       [
+        ...bundles.map(id => [id, 'write']),
         ['deploy-workers', 'write'],
         ['detect-workers', 'write'],
       ].sort(),
       `${name} jobs with id-token`
     );
+    for (const id of bundles) {
+      assert.deepEqual(deployment.jobs[id].permissions, {
+        contents: 'read',
+        'id-token': 'write',
+      });
+    }
     for (const id of ['deploy-workers', 'detect-workers']) {
       assert.deepEqual(deployment.jobs[id].permissions, {
         contents: 'read',
@@ -1998,7 +2053,9 @@ test('only the STS twins hold an OIDC token, and none reads the stored deploy se
     assert.equal(file.permissions['id-token'], undefined, 'no workflow-level id-token');
     for (const [id, job] of Object.entries(file.jobs)) {
       const sts = twins.some(([twinFile, twinId]) => twinFile === file && twinId === id);
-      assert.equal(job.permissions?.['id-token'], sts ? 'write' : undefined, `${id} id-token`);
+      // The Cloud Agent source-map upload mints too: it reads the Sentry token from STS.
+      const mints = sts || (file === workers && id === 'upload-cloud-agent-sentry');
+      assert.equal(job.permissions?.['id-token'], mints ? 'write' : undefined, `${id} id-token`);
       const text = JSON.stringify(job);
       if (sts) {
         assert.doesNotMatch(text, STORED_DEPLOY_SECRET, `${id} reads no stored deploy secret`);

@@ -10,17 +10,33 @@ permissions:
 jobs:
   push-dev:
     # Guard: this workflow_dispatch builds and pushes a container image to
-    # Fly and GHCR using repo secrets. Only the canonical repo may run it.
+    # Fly and GHCR. Only the canonical repo may run it, and the ci-kiloclaw-dev-push
+    # STS policy (staging, no GitHub environment) admits a dispatch on main only.
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Build & Push Dev Image
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
 
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           dissociate: true
+
+      # Right after the checkout: every step ahead of the read is trusted. The
+      # image build runs inside BuildKit, which sees neither the job's
+      # environment nor its OIDC request token.
+      - name: Read the Fly development registry token from STS
+        id: sts
+        uses: ./.github/actions/sts-bundle
+        with:
+          workload: ci-kiloclaw-dev-push
+          sts-url: https://sts-staging.kiloapps.io
+          secrets: FLY_DEV_API_TOKEN
 
       - name: Setup Docker Buildx
         uses: useblacksmith/setup-docker-builder@5241b2e9423e8b1fa37ed6050ecb62d0fb9a4e38 # v1.6.0
@@ -30,7 +46,7 @@ jobs:
         with:
           registry: registry.fly.io
           username: x
-          password: ${{ secrets.FLY_DEV_API_TOKEN }}
+          password: ${{ steps.sts.outputs.FLY_DEV_API_TOKEN }}
 
       - name: Login to GHCR
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0

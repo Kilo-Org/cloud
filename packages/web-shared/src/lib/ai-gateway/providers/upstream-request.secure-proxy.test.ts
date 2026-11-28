@@ -1,22 +1,27 @@
 import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-contracts';
+import { ServiceTokenError } from '@kilocode/service-token-client';
 import { STS_SECURE_PROXY_FORWARD } from '@kilocode/sts-contracts';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { stsServiceTokenIfHeld } from '@kilocode/web-shared/lib/sts-service-tokens';
+import { stsServiceToken } from '@kilocode/web-shared/lib/sts-service-tokens';
 import { buildDirectProvider } from './build-direct-provider';
+import { SECURE_PROXY_COLD_TOKEN_WAIT_MS } from './secure-proxy-sts';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
-  // Read at each send, so a test sets the switch through `mockSenderAuth`.
+  // Read at each send, so a test sets both through `mockConfig`.
   get SECURE_PROXY_SENDER_AUTH() {
-    return mockSenderAuth.value;
+    return mockConfig.auth;
+  },
+  get SECURE_PROXY_EXPECTED_ORIGIN() {
+    return mockConfig.expectedOrigin;
   },
 }));
 
 jest.mock('@kilocode/web-shared/lib/sts-service-tokens', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/sts-service-tokens'),
-  stsServiceTokenIfHeld: jest.fn(),
+  stsServiceToken: jest.fn(),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -29,13 +34,13 @@ jest.mock('next/server', () => ({
   after: jest.fn(),
 }));
 
-const mockSenderAuth: { value: string | undefined } = { value: undefined };
-const heldToken = jest.mocked(stsServiceTokenIfHeld);
-const PRODUCTION = {
-  VERCEL_ENV: 'production',
-  VERCEL_TARGET_ENV: 'production',
-  KILO_STS_WORKLOAD: 'ai-gateway',
-} as const;
+const mockConfig: { auth: string | undefined; expectedOrigin: string | undefined } = {
+  auth: undefined,
+  expectedOrigin: undefined,
+};
+const mintedToken = jest.mocked(stsServiceToken);
+const PROXY_ORIGIN = 'https://secure-proxy.example.com';
+const PRODUCTION = { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' } as const;
 
 const originalFetch = global.fetch;
 
@@ -130,8 +135,8 @@ async function sendThroughSecureProxy(
 describe('upstreamRequest through the secure proxy', () => {
   afterEach(() => {
     global.fetch = originalFetch;
-    mockSenderAuth.value = undefined;
-    heldToken.mockReset();
+    mockConfig.auth = undefined;
+    mintedToken.mockReset();
     delete process.env.VERCEL_ENV;
     delete process.env.VERCEL_TARGET_ENV;
     delete process.env.KILO_STS_WORKLOAD;
@@ -146,7 +151,7 @@ describe('upstreamRequest through the secure proxy', () => {
       'content-type': 'application/json',
       authorization: 'Bearer proxy-secret',
     });
-    expect(heldToken).not.toHaveBeenCalled();
+    expect(mintedToken).not.toHaveBeenCalled();
     expect(body).toEqual({
       ...sent,
       kilo_secure_proxy: {
@@ -195,18 +200,26 @@ describe('upstreamRequest through the secure proxy', () => {
 describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
   afterEach(() => {
     global.fetch = originalFetch;
-    mockSenderAuth.value = undefined;
-    heldToken.mockReset();
+    mockConfig.auth = undefined;
+    mockConfig.expectedOrigin = undefined;
+    mintedToken.mockReset();
     delete process.env.VERCEL_ENV;
     delete process.env.VERCEL_TARGET_ENV;
     delete process.env.KILO_STS_WORKLOAD;
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
-  it('sends only a held STS token to the exact proxy, never the stored secret', async () => {
-    mockSenderAuth.value = 'sts';
+  function useSts(auth: string = 'sts') {
+    mockConfig.auth = auth;
+    mockConfig.expectedOrigin = PROXY_ORIGIN;
     Object.assign(process.env, PRODUCTION);
-    heldToken.mockResolvedValue({ kind: 'token', token: 'sts-token' });
+    process.env.KILO_STS_WORKLOAD = 'ai-gateway';
+  }
+
+  it('sends only a held STS token to the exact proxy, never the stored secret', async () => {
+    useSts();
+    mintedToken.mockResolvedValue('sts-token');
 
     const { url, init, headers, body, sent } = await sendThroughSecureProxy(false);
 
@@ -219,55 +232,175 @@ describe('the secure proxy forward under SECURE_PROXY_SENDER_AUTH', () => {
     expect(JSON.stringify(init)).not.toContain('proxy-secret');
     expect(body.kilo_secure_proxy.url).toBe('https://llm.example.com/v1/chat/completions?trace=1');
     expect(sent).not.toHaveProperty('kilo_secure_proxy');
-    expect(heldToken).toHaveBeenCalledWith('production', STS_SECURE_PROXY_FORWARD);
+    expect(mintedToken).toHaveBeenCalledWith('production', STS_SECURE_PROXY_FORWARD);
   });
 
-  it('refuses the forward as retryable while no token is held, with no blocking mint', async () => {
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockSenderAuth.value = 'sts';
-    Object.assign(process.env, PRODUCTION);
-    heldToken.mockResolvedValue({ kind: 'not_held' });
-
-    const { result, fetchMock } = await sendUpstream(false);
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(result.type).toBe('error');
-    if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(503);
-    expect(result.notInvoked).toBe(true);
-    expect(await result.response.json()).toMatchObject({
-      error_type: 'temporarily_unavailable',
+  it('sends the request with the token when a cold instance’s mint answers in 100 ms', async () => {
+    useSts();
+    mintedToken.mockImplementation(() => {
+      const { promise, resolve } = Promise.withResolvers<string>();
+      setTimeout(() => resolve('sts-token'), 100);
+      return promise;
     });
-    // The sender asks for a held token only; the read that mints one runs on in the background.
-    expect(heldToken).toHaveBeenCalledTimes(1);
+    jest.useFakeTimers();
+
+    const pending = sendUpstream(false);
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(100);
+    const { result, fetchMock } = await pending;
+
+    expect(result.type).toBe('success');
+    const [, init] = fetchMock.mock.calls[0];
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer sts-token');
   });
 
-  it('sends nothing for a value outside the closed set', async () => {
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockSenderAuth.value = 'dual';
+  it('refuses a cold instance’s forward at exactly 2000 ms when the mint never answers, with no fetch', async () => {
+    useSts();
+    const never = Promise.withResolvers<string>();
+    mintedToken.mockReturnValue(never.promise);
+    jest.useFakeTimers();
 
-    const { result, fetchMock } = await sendUpstream(false);
+    const pending = sendUpstream(false);
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(SECURE_PROXY_COLD_TOKEN_WAIT_MS - 1);
+    expect(settled).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
 
+    const { result, fetchMock } = await pending;
     expect(fetchMock).not.toHaveBeenCalled();
     expect(result.type).toBe('error');
     if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(503);
     expect(result.notInvoked).toBe(true);
-    expect(heldToken).not.toHaveBeenCalled();
+    expect(result.response.status).toBe(503);
+    const body = (await result.response.json()) as { error?: string; error_type?: string };
+    expect(body.error_type).toBe('temporarily_unavailable');
+    expect(body.error).toMatch(/retry/i);
   });
 
-  it('sends nothing from a build that is not the ai-gateway workload', async () => {
+  const refusals: Array<{
+    name: string;
+    setup: () => void;
+    status: number;
+    code: string;
+    retryable: boolean;
+  }> = [
+    {
+      name: 'an unknown switch value',
+      setup: () => {
+        mockConfig.auth = 'dual';
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a build that is not the ai-gateway workload',
+      setup: () => {
+        useSts();
+        delete process.env.KILO_STS_WORKLOAD;
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'an unset expected proxy origin',
+      setup: () => {
+        useSts();
+        mockConfig.expectedOrigin = undefined;
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a proxy origin other than the expected one',
+      setup: () => {
+        useSts();
+        mockConfig.expectedOrigin = 'https://other-proxy.example.com';
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a deployment without an STS environment',
+      setup: () => {
+        useSts();
+        process.env.VERCEL_TARGET_ENV = 'staging';
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a token STS denied',
+      setup: () => {
+        useSts();
+        mintedToken.mockImplementation(() =>
+          Promise.reject(
+            new ServiceTokenError(
+              { reason: 'denied', deniedReason: 'scope_not_allowed' },
+              STS_SECURE_PROXY_FORWARD
+            )
+          )
+        );
+      },
+      status: 500,
+      code: 'secure_proxy_credential_misconfigured',
+      retryable: false,
+    },
+    {
+      name: 'a token STS could not mint in time',
+      setup: () => {
+        useSts();
+        mintedToken.mockImplementation(() =>
+          Promise.reject(
+            new ServiceTokenError(
+              { reason: 'unavailable', retryAfterSeconds: 30 },
+              STS_SECURE_PROXY_FORWARD
+            )
+          )
+        );
+      },
+      status: 503,
+      code: 'temporarily_unavailable',
+      retryable: true,
+    },
+  ];
+
+  it.each(refusals)(
+    'answers $name with $status and $code',
+    async ({ setup, status, code, retryable }) => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      setup();
+
+      const { result, fetchMock } = await sendUpstream(false);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.type).toBe('error');
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.notInvoked).toBe(true);
+      expect(result.response.status).toBe(status);
+      const body = (await result.response.json()) as { error?: string; error_type?: string };
+      expect(body.error_type).toBe(code);
+      if (retryable) expect(body.error).toMatch(/retry/i);
+      else expect(body.error).not.toMatch(/retry/i);
+    }
+  );
+
+  it('never mints for an origin mismatch or a misconfigured switch', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockSenderAuth.value = 'sts';
-    delete process.env.KILO_STS_WORKLOAD;
-    Object.assign(process.env, { VERCEL_ENV: 'production', VERCEL_TARGET_ENV: 'production' });
-
-    const { result, fetchMock } = await sendUpstream(false);
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(result.type).toBe('error');
-    if (result.type !== 'error') throw new Error('expected an error result');
-    expect(result.response.status).toBe(503);
-    expect(heldToken).not.toHaveBeenCalled();
+    useSts();
+    mockConfig.expectedOrigin = undefined;
+    await sendUpstream(false);
+    mockConfig.expectedOrigin = PROXY_ORIGIN;
+    mockConfig.auth = 'dual';
+    await sendUpstream(false);
+    expect(mintedToken).not.toHaveBeenCalled();
   });
 });

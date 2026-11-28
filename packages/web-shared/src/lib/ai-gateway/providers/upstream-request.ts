@@ -18,7 +18,10 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
-import { secureProxyCredential } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy-sender';
+import {
+  secureProxyCredential,
+  type SecureProxySenderFailure,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy-sender';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
 import {
@@ -311,24 +314,35 @@ function upstreamFetchFailureResponse(
 }
 
 /**
- * No credential was available for the secure-proxy forward, so the proxy was never dialled: no
- * request left the gateway and no provider was billed. 503 because the reason is almost always a
- * cold start: `stsServiceTokenIfHeld` started the mint on `waitUntil`, and the retry uses its
- * token. The sender logged the reason once (`secure-proxy-sender.ts`).
+ * No usable credential for the secure-proxy forward, so the proxy was never dialled: no request
+ * left the gateway and no provider was billed. Two of the sender's reasons clear themselves and a
+ * retry then succeeds: `credential_not_held` while the cold-instance mint finishes, and
+ * `token_unavailable` while STS is unreachable or in backoff. Those answer 503
+ * `temporarily_unavailable`. The rest are a configuration or a refused grant that a retry never
+ * fixes, so they answer 500 `secure_proxy_credential_misconfigured` and say nothing about retrying.
+ * The sender logged the reason once (`secure-proxy-sender.ts`).
  */
-function secureProxyCredentialResponse(vercelRequestId: string | null | undefined) {
+function secureProxyCredentialResponse(
+  reason: SecureProxySenderFailure,
+  vercelRequestId: string | null | undefined
+) {
+  const retryable = reason === 'credential_not_held' || reason === 'token_unavailable';
   const error = withRequestId(
-    'The gateway could not authenticate its secure proxy, so the request was not sent upstream. Retry the request.',
+    retryable
+      ? 'The gateway could not authenticate its secure proxy yet, so the request was not sent upstream. Retry the request.'
+      : 'The gateway is misconfigured for its secure proxy, so the request was not sent upstream.',
     vercelRequestId
   );
   return NextResponse.json(
     {
       error,
-      error_type: ProxyErrorType.temporarily_unavailable,
+      error_type: retryable
+        ? ProxyErrorType.temporarily_unavailable
+        : ProxyErrorType.secure_proxy_credential_misconfigured,
       message: error,
       ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
     },
-    { status: 503 }
+    { status: retryable ? 503 : 500 }
   );
 }
 
@@ -471,12 +485,15 @@ async function sendUpstreamFetch({
     let outgoing: { url: string; headers: Headers; body: string | FormData };
     let credentialMode: 'legacy' | 'sts' | null = null;
     if (provider.secureProxy) {
-      const credential = await secureProxyCredential({ legacySecret: () => provider.apiKey });
+      const credential = await secureProxyCredential({
+        legacySecret: () => provider.apiKey,
+        proxyUrl: provider.secureProxy.url,
+      });
       if (credential.kind === 'unavailable') {
         budgetSignal.removeEventListener('abort', onBudgetExceeded);
         return {
           type: 'error',
-          response: secureProxyCredentialResponse(vercelRequestId),
+          response: secureProxyCredentialResponse(credential.reason, vercelRequestId),
           // The credential is read before any connection is opened, so the provider was never
           // dialled and was not billed.
           notInvoked: true,
@@ -539,9 +556,10 @@ async function sendUpstreamFetch({
       method,
       headers: outgoing.headers,
       body: outgoing.body,
-      // An STS token never reaches a redirect target, so that hop refuses one outright; the legacy
-      // bearer keeps its behaviour. The URL policy answers a redirect itself.
-      redirect: enforceUrlPolicy ? 'manual' : credentialMode === 'sts' ? 'error' : 'follow',
+      // An STS token never reaches a redirect target: that hop refuses redirects outright, with
+      // the URL policy on or off. The legacy bearer keeps its behaviour (the policy answers a
+      // redirect itself when it is enforced).
+      redirect: credentialMode === 'sts' ? 'error' : enforceUrlPolicy ? 'manual' : 'follow',
       duplex: 'half',
       signal: combinedSignal,
       ...(dispatcher ? { dispatcher } : {}),

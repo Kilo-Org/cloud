@@ -518,6 +518,10 @@ export const O11Y_ALERTING_SENDER_AUTH = getEnvVariable('O11Y_ALERTING_SENDER_AU
 // absent, empty or `legacy` sends the custom LLM credential's proxy secret; `sts` an STS service
 // token for `ai-gateway-secure-proxy:request.forward`.
 export const SECURE_PROXY_SENDER_AUTH = getEnvVariable('SECURE_PROXY_SENDER_AUTH');
+// Under `sts`, the only proxy origin that may receive that token: the proxy's own
+// KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN. Unset or another origin refuses the forward before any
+// token read.
+export const SECURE_PROXY_EXPECTED_ORIGIN = getEnvVariable('SECURE_PROXY_EXPECTED_ORIGIN');
 
 // Pylon chat widget (support chat on Code Reviewer pages).
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign

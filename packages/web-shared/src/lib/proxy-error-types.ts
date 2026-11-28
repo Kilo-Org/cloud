@@ -35,6 +35,7 @@ export const proxyErrorTypeSchema = z.enum([
   'client_disconnect',
   'guardrail_blocked',
   'guardrail_unavailable',
+  'secure_proxy_credential_misconfigured',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

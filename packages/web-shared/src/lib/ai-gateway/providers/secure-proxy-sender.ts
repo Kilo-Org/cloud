@@ -1,6 +1,9 @@
 import type { StsEnvironment } from '@kilocode/sts-contracts';
 import { z } from 'zod';
-import { SECURE_PROXY_SENDER_AUTH } from '@kilocode/web-shared/lib/config.server';
+import {
+  SECURE_PROXY_EXPECTED_ORIGIN,
+  SECURE_PROXY_SENDER_AUTH,
+} from '@kilocode/web-shared/lib/config.server';
 import type { StsTokenFailure } from '@kilocode/web-shared/lib/sts-service-tokens';
 
 /**
@@ -18,7 +21,9 @@ import type { StsTokenFailure } from '@kilocode/web-shared/lib/sts-service-token
  *   The proxy verifies against its own deployment's STS issuer, so a token of another environment
  *   is refused there. STS grants the scope only to the `ai-gateway` workload, so a build without
  *   `KILO_STS_WORKLOAD=ai-gateway` (inlined by `apps/ai-gateway/next.config.mjs`) sends nothing
- *   rather than ask for a token it cannot hold.
+ *   rather than ask for a token it cannot hold. The destination is pinned: the forward is refused
+ *   before any token read unless the proxy URL's origin is exactly `SECURE_PROXY_EXPECTED_ORIGIN`,
+ *   so a misconfigured custom LLM credential cannot make the gateway hand its token elsewhere.
  * Any other value sends nothing.
  *
  * This module imports no STS transport, so a `legacy` deployment never loads the token client or
@@ -37,14 +42,44 @@ export function secureProxySenderAuth(value: unknown): SecureProxySenderMode | n
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * `SECURE_PROXY_EXPECTED_ORIGIN`: exactly an `https:` origin, no path, query, fragment or
+ * credentials. The same value as the proxy's own `KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN`.
+ */
+const ExpectedOriginSchema = z.string().refine(value => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.origin === value;
+  } catch {
+    return false;
+  }
+});
+
+/** The configured `https:` origin, or null when unset or invalid: no token is ever sent. */
+function expectedProxyOrigin(value: string | undefined): string | null {
+  const parsed = ExpectedOriginSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+/** `url`'s origin, or null when it is not a URL: then it can satisfy no expected origin. */
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
 export type SecureProxySenderFailure =
   /** `SECURE_PROXY_SENDER_AUTH` holds a value other than `sts` or `legacy`. */
   | 'auth_misconfigured'
   /** `sts` outside the `ai-gateway` build, which alone can hold the forward scope. */
   | 'not_ai_gateway'
+  /** The proxy URL's origin is not `SECURE_PROXY_EXPECTED_ORIGIN`, or that is unset. */
+  | 'proxy_origin_mismatch'
   /** This deployment has no STS environment (`stsEnvironmentOfDeployment` refused it). */
   | 'no_sts_environment'
-  /** No token is held; the read that minted one runs on in the background. */
+  /** No token arrived within the cold-instance wait; the read that minted one runs on. */
   | 'credential_not_held'
   /** STS refused a token; a policy, identity or registry change fixes it, waiting does not. */
   | 'token_denied'
@@ -60,7 +95,6 @@ export type SecureProxyCredential =
 export type SecureProxyRuntime = Readonly<Record<string, string | undefined>> & {
   VERCEL_ENV?: string;
   VERCEL_TARGET_ENV?: string;
-  KILO_STS_WORKLOAD?: string;
 };
 
 export type SecureProxyCredentialOptions = {
@@ -69,6 +103,8 @@ export type SecureProxyCredentialOptions = {
    * never touches it.
    */
   legacySecret: () => string;
+  /** The exact proxy destination (`provider.secureProxy.url`); pinned under `sts`. */
+  proxyUrl: string;
   /** The switch value; `SECURE_PROXY_SENDER_AUTH` by default. */
   auth?: string;
   /** The deployment's runtime variables; `process.env` by default. */
@@ -94,9 +130,11 @@ function unavailable(
 }
 
 /**
- * The `Authorization` value of one forward through the secure proxy. `sts` never waits for a mint:
- * a held token is a memory read, and with none held the caller refuses the forward so a retry can
- * use the token its background read is minting (`stsServiceTokenIfHeld`).
+ * The `Authorization` value of one forward through the secure proxy. `sts` reads a held token
+ * without waiting, and a cold instance waits at most the mint bound
+ * (`SECURE_PROXY_COLD_TOKEN_WAIT_MS` in `secure-proxy-sts.ts`): with no token by then the caller
+ * refuses the forward so the retry uses the token that read is minting. No mint runs unbounded on
+ * the request path.
  */
 export async function secureProxyCredential(
   options: SecureProxyCredentialOptions
@@ -106,15 +144,20 @@ export async function secureProxyCredential(
   if (mode === 'legacy') {
     return { kind: 'ready', mode, authorization: `Bearer ${options.legacySecret()}` };
   }
-  const runtime = options.runtime ?? process.env;
-  if (runtime.KILO_STS_WORKLOAD !== 'ai-gateway') return unavailable('not_ai_gateway');
+  const destination = expectedProxyOrigin(SECURE_PROXY_EXPECTED_ORIGIN);
+  if (destination === null || originOf(options.proxyUrl) !== destination) {
+    return unavailable('proxy_origin_mismatch');
+  }
+  // Literal `process.env` access, so Next inlines the value `apps/ai-gateway/next.config.mjs`
+  // sets at build time (`web-internal-sts.ts` does the same).
+  if (process.env.KILO_STS_WORKLOAD !== 'ai-gateway') return unavailable('not_ai_gateway');
   // Loaded only under `sts`, so a `legacy` deployment never evaluates the token client, the
   // secrets transport or the Vercel OIDC exchange.
   const { stsEnvironmentOfDeployment } =
     await import('@kilocode/web-shared/lib/sts-secret-transport');
   let environment: StsEnvironment;
   try {
-    environment = stsEnvironmentOfDeployment(runtime);
+    environment = stsEnvironmentOfDeployment(options.runtime ?? process.env);
   } catch {
     return unavailable('no_sts_environment');
   }

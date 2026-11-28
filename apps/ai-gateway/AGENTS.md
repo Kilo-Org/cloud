@@ -38,7 +38,10 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   the Secure Proxy sends an STS token under `SECURE_PROXY_SENDER_AUTH=sts` only
   from this build. STS grants the forward scope only to the `ai-gateway`
   workload, so a build without it sends nothing rather than ask for a token it
-  cannot hold.
+  cannot hold. Under `sts` the destination is pinned: the forward is refused
+  before any token read unless the proxy URL's origin is exactly
+  `SECURE_PROXY_EXPECTED_ORIGIN` (the same value as the proxy's
+  `KILO_AI_GATEWAY_SECURE_PROXY_ORIGIN`).
 - Requests only arrive here under `/api/v1`. The LLM proxy's path validation
   accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`

@@ -25,6 +25,7 @@
     "@kilocode/encryption": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "croner": "10.0.1",
     "drizzle-orm": "catalog:",

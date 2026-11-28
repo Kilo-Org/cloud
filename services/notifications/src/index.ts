@@ -19,6 +19,12 @@ import {
   observeInternalAuth,
   type InternalAuthAnalyticsBinding,
 } from '@kilocode/worker-utils/internal-auth-observation';
+import { STS_NOTIFICATIONS_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  createInternalServiceReceiver,
+  type InternalReceiverEnv,
+  type InternalRouteContract,
+} from '@kilocode/worker-utils/internal-service-receiver';
 import { useWorkersLogger } from 'workers-tagged-logger';
 
 import {
@@ -139,13 +145,64 @@ async function hasValidInternalSecret(
   return true;
 }
 
+/** The two routes the web app calls here: one scope, sent only by the `web` workload. */
+const WEB_ROUTES = {
+  dispatch: {
+    label: 'dispatch',
+    scope: STS_NOTIFICATIONS_INTERNAL_CALL.scope,
+    workloads: ['web'],
+    legacyHeader: 'X-Internal-Secret',
+  },
+  glanceableRefresh: {
+    label: 'glanceable_refresh',
+    scope: STS_NOTIFICATIONS_INTERNAL_CALL.scope,
+    workloads: ['web'],
+    legacyHeader: 'X-Internal-Secret',
+  },
+} as const satisfies Record<string, InternalRouteContract>;
+
+const internalReceiver = createInternalServiceReceiver({
+  receiver: 'notifications',
+  audience: STS_NOTIFICATIONS_INTERNAL_CALL.audience,
+  routes: Object.values(WEB_ROUTES),
+});
+
+/** `INTERNAL_CREDENTIAL_ACCEPT` selects the shared secret, an STS token or either. */
+function webInternalRefusal(
+  c: {
+    req: { raw: Request; header(name: string): string | undefined };
+    env: Env & { INTERNAL_AUTH_COUNTER?: InternalAuthAnalyticsBinding };
+    executionCtx: { waitUntil(promise: Promise<unknown>): void };
+  },
+  route: InternalRouteContract
+): Promise<Response | null> {
+  const receiverEnv: Env & InternalReceiverEnv = c.env;
+  return internalReceiver.admit(
+    c.req.raw,
+    receiverEnv,
+    route,
+    async () =>
+      (await hasValidInternalSecret(c, route.label))
+        ? null
+        : Response.json({ error: 'Unauthorized' }, { status: 401 }),
+    {
+      waitUntil: promise => c.executionCtx.waitUntil(promise),
+      sink: internalAuthAnalyticsSink(c.env.INTERNAL_AUTH_COUNTER),
+    }
+  );
+}
+
+app.get('/.well-known/oauth-protected-resource', c => {
+  const receiverEnv: Env & InternalReceiverEnv = c.env;
+  return internalReceiver.protectedResourceMetadata(receiverEnv) ?? c.notFound();
+});
+
 // Internal service-to-service dispatch (low-balance + spend-alert +
 // security-finding). Intentionally outside `/v1/*` so user-JWT auth
 // middleware does not apply.
 app.post('/internal/v1/dispatch', async c => {
-  if (!(await hasValidInternalSecret(c, 'dispatch'))) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
+  const refusal = await webInternalRefusal(c, WEB_ROUTES.dispatch);
+  if (refusal !== null) return refusal;
 
   const body: unknown = await c.req.json().catch(() => null);
   if (body === null) {
@@ -192,9 +249,8 @@ app.post('/internal/v1/dispatch', async c => {
 // internal-secret auth as the dispatch route; the DO owns the rate limit, so a
 // refresh inside the delivery window is deferred rather than dropped.
 app.post('/internal/v1/glanceable-refresh', async c => {
-  if (!(await hasValidInternalSecret(c, 'glanceable_refresh'))) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
+  const refusal = await webInternalRefusal(c, WEB_ROUTES.glanceableRefresh);
+  if (refusal !== null) return refusal;
 
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = glanceableScopeRefreshRequestSchema.safeParse(body);

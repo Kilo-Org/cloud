@@ -12,6 +12,12 @@ import {
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
 import { verifyCallbackToken } from '@kilocode/worker-utils';
+import { STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL } from '@kilocode/sts-contracts';
+import {
+  createInternalServiceReceiver,
+  type InternalReceiverEnv,
+  type InternalRouteContract,
+} from '@kilocode/worker-utils/internal-service-receiver';
 import {
   buildScheduledJobFailureEvent,
   buildScheduledJobSuccessEvent,
@@ -62,6 +68,49 @@ async function internalAuthRefusal(
   return null;
 }
 
+/** The web app's routes here: one scope, sent only by the `web` workload. */
+function webRoute(label: string): InternalRouteContract {
+  return {
+    label,
+    scope: STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL.scope,
+    workloads: ['web'],
+    legacyHeader: 'x-internal-api-key',
+  };
+}
+const WEB_ROUTES = {
+  manualAnalysisStart: webRoute('manual_analysis_start'),
+  remediationStart: webRoute('remediation_start'),
+  remediationCancel: webRoute('remediation_cancel'),
+  applyAutoRemediation: webRoute('apply_auto_remediation'),
+} as const;
+
+const receiver = createInternalServiceReceiver({
+  receiver: 'security-auto-analysis',
+  audience: STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL.audience,
+  routes: Object.values(WEB_ROUTES),
+});
+
+/**
+ * The web app's routes: `INTERNAL_CREDENTIAL_ACCEPT` selects the shared secret, an STS token or
+ * either (`@kilocode/worker-utils/internal-service-receiver`). `/internal/dispatch` and the two
+ * callback receivers keep their own checks.
+ */
+function webInternalRefusal(
+  request: Request,
+  env: CloudflareEnv,
+  ctx: ExecutionContext | undefined,
+  route: InternalRouteContract
+): Promise<Response | null> {
+  const receiverEnv: CloudflareEnv & InternalReceiverEnv = env;
+  return receiver.admit(
+    request,
+    receiverEnv,
+    route,
+    () => internalAuthRefusal(request, env, ctx, route.label),
+    { waitUntil: promise => ctx?.waitUntil(promise) }
+  );
+}
+
 async function handleFetch(
   request: Request,
   env: CloudflareEnv,
@@ -75,6 +124,12 @@ async function handleFetch(
       service: 'security-auto-analysis',
       timestamp: new Date().toISOString(),
     });
+  }
+
+  if (request.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+    const receiverEnv: CloudflareEnv & InternalReceiverEnv = env;
+    const metadata = receiver.protectedResourceMetadata(receiverEnv);
+    if (metadata !== null) return metadata;
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/dispatch') {
@@ -95,7 +150,7 @@ async function handleFetch(
         { status: 503 }
       );
     }
-    const refusal = await internalAuthRefusal(request, env, ctx, 'manual_analysis_start');
+    const refusal = await webInternalRefusal(request, env, ctx, WEB_ROUTES.manualAnalysisStart);
     if (refusal !== null) return refusal;
 
     let payload: unknown;
@@ -133,7 +188,7 @@ async function handleFetch(
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/start') {
-    const refusal = await internalAuthRefusal(request, env, ctx, 'remediation_start');
+    const refusal = await webInternalRefusal(request, env, ctx, WEB_ROUTES.remediationStart);
     if (refusal !== null) return refusal;
 
     let payload: unknown;
@@ -171,7 +226,7 @@ async function handleFetch(
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/remediation/cancel') {
-    const refusal = await internalAuthRefusal(request, env, ctx, 'remediation_cancel');
+    const refusal = await webInternalRefusal(request, env, ctx, WEB_ROUTES.remediationCancel);
     if (refusal !== null) return refusal;
 
     let payload: unknown;
@@ -193,7 +248,7 @@ async function handleFetch(
   }
 
   if (request.method === 'POST' && url.pathname === '/internal/apply-auto-remediation') {
-    const refusal = await internalAuthRefusal(request, env, ctx, 'apply_auto_remediation');
+    const refusal = await webInternalRefusal(request, env, ctx, WEB_ROUTES.applyAutoRemediation);
     if (refusal !== null) return refusal;
 
     let payload: unknown;

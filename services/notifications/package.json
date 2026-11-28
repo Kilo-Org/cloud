@@ -27,6 +27,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "expo-server-sdk": "6.1.0",

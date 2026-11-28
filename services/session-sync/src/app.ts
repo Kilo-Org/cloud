@@ -10,7 +10,8 @@ import { authorizeCloudAgentUpload } from './cloud-agent-upload';
 import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
-import { internal } from './internal';
+import { internal, internalReceiver } from './internal';
+import type { InternalReceiverEnv } from '@kilocode/worker-utils/internal-service-receiver';
 import { isOverloaded, overloaded, rpcError, ServiceOverloaded } from './overload';
 import {
   ERROR_STATUS,
@@ -186,6 +187,10 @@ app.use('/v1/*', (c: C, next: Next) =>
   c.req.header('Upgrade')?.toLowerCase() === 'websocket' ? next() : browserCors(c, next)
 );
 
+app.get('/.well-known/oauth-protected-resource', c => {
+  const env: Env & InternalReceiverEnv = c.env;
+  return internalReceiver.protectedResourceMetadata(env) ?? c.notFound();
+});
 app.route('/internal', internal);
 
 app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env, requestContext(c)));

@@ -4,6 +4,15 @@ import {
   callerLabel,
   observeInternalAuth,
 } from '@kilocode/worker-utils/internal-auth-observation';
+import {
+  STS_SECURITY_SYNC_DISMISS_FINDING,
+  STS_SECURITY_SYNC_MANUAL_SYNC,
+} from '@kilocode/sts-contracts';
+import {
+  createInternalServiceReceiver,
+  type InternalReceiverEnv,
+  type InternalRouteContract,
+} from '@kilocode/worker-utils/internal-service-receiver';
 import { z } from 'zod';
 import {
   createOrFindSecurityAgentCommandByOperationKey,
@@ -796,8 +805,65 @@ async function processSecuritySyncMessage(
   message.ack();
 }
 
+/** The web app's two routes here, each with its registered scope, sent only by `web`. */
+const WEB_ROUTES = {
+  manualSync: {
+    label: 'manual_sync',
+    scope: STS_SECURITY_SYNC_MANUAL_SYNC.scope,
+    workloads: ['web'],
+    legacyHeader: 'x-internal-api-key',
+  },
+  dismissFinding: {
+    label: 'dismiss_finding',
+    scope: STS_SECURITY_SYNC_DISMISS_FINDING.scope,
+    workloads: ['web'],
+    legacyHeader: 'x-internal-api-key',
+  },
+} as const satisfies Record<string, InternalRouteContract>;
+
+const receiver = createInternalServiceReceiver({
+  receiver: 'security-sync',
+  audience: STS_SECURITY_SYNC_MANUAL_SYNC.audience,
+  routes: Object.values(WEB_ROUTES),
+});
+
+/** The legacy check of both routes, unchanged: the shared secret in `x-internal-api-key`. */
+async function legacyRefusal(
+  request: Request,
+  env: CloudflareEnv,
+  route: InternalRouteContract
+): Promise<Response | null> {
+  const [internalSecret, authHeader] = await Promise.all([
+    env.INTERNAL_API_SECRET.get(),
+    Promise.resolve(request.headers.get('x-internal-api-key')),
+  ]);
+  if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
+    return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+  }
+  observeInternalAuth(
+    'security-sync',
+    route.label,
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
+  return null;
+}
+
+/** `INTERNAL_CREDENTIAL_ACCEPT` selects the shared secret, an STS token or either. */
+function webInternalRefusal(
+  request: Request,
+  env: CloudflareEnv,
+  ctx: ExecutionContext | undefined,
+  route: InternalRouteContract
+): Promise<Response | null> {
+  const receiverEnv: CloudflareEnv & InternalReceiverEnv = env;
+  return receiver.admit(request, receiverEnv, route, () => legacyRefusal(request, env, route), {
+    waitUntil: promise => ctx?.waitUntil(promise),
+  });
+}
+
 export default {
-  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
+  async fetch(request: Request, env: CloudflareEnv, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === 'GET' && url.pathname === '/health') {
@@ -808,6 +874,12 @@ export default {
       });
     }
 
+    if (request.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+      const receiverEnv: CloudflareEnv & InternalReceiverEnv = env;
+      const metadata = receiver.protectedResourceMetadata(receiverEnv);
+      if (metadata !== null) return metadata;
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/manual-sync') {
       if (env.MANUAL_SYNC_COMMAND_ROUTING_ENABLED === 'false') {
         return jsonResponse(
@@ -815,20 +887,8 @@ export default {
           503
         );
       }
-      const [internalSecret, authHeader] = await Promise.all([
-        env.INTERNAL_API_SECRET.get(),
-        Promise.resolve(request.headers.get('x-internal-api-key')),
-      ]);
-
-      if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-        return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-      }
-      observeInternalAuth(
-        'security-sync',
-        'manual_sync',
-        'legacy_shared_secret',
-        callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
-      );
+      const refusal = await webInternalRefusal(request, env, ctx, WEB_ROUTES.manualSync);
+      if (refusal !== null) return refusal;
 
       let payload: unknown;
       try {
@@ -857,20 +917,8 @@ export default {
           503
         );
       }
-      const [internalSecret, authHeader] = await Promise.all([
-        env.INTERNAL_API_SECRET.get(),
-        Promise.resolve(request.headers.get('x-internal-api-key')),
-      ]);
-
-      if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
-        return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-      }
-      observeInternalAuth(
-        'security-sync',
-        'dismiss_finding',
-        'legacy_shared_secret',
-        callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
-      );
+      const refusal = await webInternalRefusal(request, env, ctx, WEB_ROUTES.dismissFinding);
+      if (refusal !== null) return refusal;
 
       let payload: unknown;
       try {

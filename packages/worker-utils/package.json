@@ -87,7 +87,8 @@
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
     "./environment-setup-authority": "./src/environment-setup-authority.ts",
-    "./web-internal-credential": "./src/web-internal-credential.ts"
+    "./web-internal-credential": "./src/web-internal-credential.ts",
+    "./internal-service-receiver": "./src/internal-service-receiver.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -102,7 +103,9 @@
     "@kilocode/encryption": "workspace:*",
     "@kilocode/service-token-client": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
+    "@kilocode/sts-contracts": "workspace:*",
     "@kilocode/usage-contracts": "workspace:*",
+    "@kilocode/verify": "workspace:*",
     "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
@@ -112,7 +115,6 @@
     "@cfworker/json-schema": "catalog:"
   },
   "devDependencies": {
-    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

@@ -8,11 +8,15 @@ import {
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
-import { resolveServiceSenderAuth, serviceSenderHeaders } from '@/lib/service-sender-auth';
+import {
+  resolveServiceSenderAuth,
+  serviceSenderHeaders,
+} from '@kilocode/web-shared/lib/service-sender-auth';
 import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
   ServiceFetchTimeoutError,
   fetchWithinBudget,
+  withinBudget,
 } from '@/lib/bounded-service-fetch';
 import {
   toSharedTranscriptMessages,
@@ -684,21 +688,6 @@ export async function fetchSharedSession(shareToken: string): Promise<SharedSess
     messages: toSharedTranscriptMessages(snapshotRead.snapshot.messages),
     transcriptUnavailable: false,
   };
-}
-
-/**
- * `work` if it settles within `budgetMs`, else a `ServiceFetchTimeoutError`
- * naming the whole budget: a cold STS mint counts against the same upstream
- * budget as the fetch it precedes.
- */
-async function withinBudget<T>(work: Promise<T>, budgetMs: number): Promise<T> {
-  const expired = Promise.withResolvers<never>();
-  const timer = setTimeout(() => expired.reject(new ServiceFetchTimeoutError(budgetMs)), budgetMs);
-  try {
-    return await Promise.race([work, expired.promise]);
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 export async function invalidateOrganizationSessionAccess(

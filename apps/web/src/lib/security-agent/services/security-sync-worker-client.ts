@@ -1,9 +1,10 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { SECURITY_SYNC_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
-import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
+import type { ServiceTokenRequest } from '@kilocode/service-token-client';
 import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
 import {
+  SECURITY_SYNC_WORKER_SENDER,
   isDefinitiveSecurityWorkerRejection,
   postSecurityWorkerJson,
 } from './security-worker-request';
@@ -35,14 +36,15 @@ type SecurityWorkerResponse = {
  */
 export async function postSecurityWorkerCommand(params: {
   path: string;
+  /** The route's STS scope; sent only under `SECURITY_SYNC_SENDER_AUTH=sts`. */
+  scope: ServiceTokenRequest;
   /** Service name used in the client-facing messages. */
   service: 'sync' | 'dismissal';
   /** The Worker's known pre-enqueue disabled-routing error body (a 503). */
   disabledRoutingError: string;
   body: Record<string, unknown>;
 }): Promise<AcceptedSecurityWorkerCommand> {
-  const internalApiSecret = SECURITY_SYNC_WORKER_URL ? await readInternalApiSecret() : '';
-  if (!SECURITY_SYNC_WORKER_URL || !internalApiSecret) {
+  if (!SECURITY_SYNC_WORKER_URL) {
     // Mirrored by the mobile security mutation classifier: a stable
     // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
     // classifier treats as retryable transport. The sentence is the shared
@@ -56,10 +58,13 @@ export async function postSecurityWorkerCommand(params: {
   // Bounded, and `BAD_GATEWAY` on a stalled or non-JSON response (see
   // `postSecurityWorkerJson`): a gateway HTML body and a Worker that never
   // answers both leave the command's acceptance unknown.
+  // The credential (the internal API secret, or an STS token for the route's
+  // scope) is checked there, inside the same budget.
   const { response, body } = await postSecurityWorkerJson({
     url: `${SECURITY_SYNC_WORKER_URL}${params.path}`,
     service: params.service,
-    internalApiSecret,
+    worker: SECURITY_SYNC_WORKER_SENDER,
+    scope: params.scope,
     body: params.body,
   });
   const workerBody = body as SecurityWorkerResponse | undefined;

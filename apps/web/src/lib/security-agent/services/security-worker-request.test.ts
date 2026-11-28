@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL } from '@kilocode/sts-contracts';
 import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import {
   isDefinitiveSecurityWorkerRejection,
@@ -6,13 +7,22 @@ import {
   SECURITY_SERVICE_UNAVAILABLE_MESSAGE,
 } from './security-worker-request';
 
+jest.mock('@kilocode/web-shared/lib/internal-api-secret', () => ({
+  readInternalApiSecret: async () => 'test-internal-secret',
+}));
+
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const params = {
   url: 'https://security-auto-analysis.test/internal/manual-analysis-start',
   service: 'analysis' as const,
-  internalApiSecret: 'test-internal-secret',
+  worker: {
+    sender: { kind: 'legacy' as const },
+    variable: 'SECURITY_AUTO_ANALYSIS_SENDER_AUTH',
+    label: 'security auto-analysis worker client',
+  },
+  scope: STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL,
   body: { schemaVersion: 1 },
 };
 

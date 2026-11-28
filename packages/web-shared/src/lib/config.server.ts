@@ -477,6 +477,17 @@ export const WEBHOOK_AGENT_URL = resolveProductionDefaultedUrl(
 // Model eval ingest Worker
 export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || '';
 
+// The credential switch of each web -> Worker `/internal` edge (service-sender-auth.ts): absent,
+// empty or `legacy` sends the internal API secret; `sts` only an STS service token.
+export const SECURITY_SYNC_SENDER_AUTH = getEnvVariable('SECURITY_SYNC_SENDER_AUTH');
+export const SECURITY_AUTO_ANALYSIS_SENDER_AUTH = getEnvVariable(
+  'SECURITY_AUTO_ANALYSIS_SENDER_AUTH'
+);
+export const MODEL_EVAL_INGEST_SENDER_AUTH = getEnvVariable('MODEL_EVAL_INGEST_SENDER_AUTH');
+export const WEBHOOK_AGENT_INGEST_SENDER_AUTH = getEnvVariable('WEBHOOK_AGENT_INGEST_SENDER_AUTH');
+export const SESSION_SYNC_SENDER_AUTH = getEnvVariable('SESSION_SYNC_SENDER_AUTH');
+export const NOTIFICATIONS_SENDER_AUTH = getEnvVariable('NOTIFICATIONS_SENDER_AUTH');
+
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
 export const SESSION_INGEST_SENDER_AUTH = getEnvVariable('SESSION_INGEST_SENDER_AUTH');

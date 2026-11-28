@@ -84,18 +84,19 @@ pnpm --filter github-relay build   # dist/server.mjs, the one file the host runs
 ## Deploy
 
 The host is an e2-micro VM `github-relay` in project `kilocode`, zone `us-central1-a`, with the
-reserved regional address `136.119.16.41` (`migration-proxy-github-relay`, us-central1, Premium
+reserved regional address `<relay-ip>` (`migration-proxy-github-relay`, us-central1, Premium
 tier) as its own external address. Debian 12, no service account, Shielded VM, OS Login. Caddy
 terminates TLS on 443; the relay listens on `127.0.0.1:8080` under systemd with `DynamicUser`.
 The host holds no secret. Cost: about $10 a month (about $4 with the free e2-micro).
 
 Steps 1 and 2 are organisation and DNS settings; the rest are GCP commands from the repository
-root.
+root. `<relay-ip>` is the reserved address `migration-proxy-github-relay`; read it with
+`gcloud compute addresses describe migration-proxy-github-relay --region=us-central1 --project=kilocode --format='value(address)'`.
 
-1. **Allow list.** An organisation owner adds `136.119.16.41/32` to the Kilo-Org IP allow list
+1. **Allow list.** An organisation owner adds `<relay-ip>/32` to the Kilo-Org IP allow list
    (organisation settings, Authentication security, IP allow list), description
    `migration-proxy github relay (kilocode GCP)`, enabled. Nothing else on that page changes.
-2. **DNS.** A DNS-only (grey cloud) record `github-relay.kiloapps.io A 136.119.16.41` in the
+2. **DNS.** A DNS-only (grey cloud) record `github-relay.kiloapps.io A <relay-ip>` in the
    `kiloapps.io` Cloudflare zone. Workers cannot fetch an IP literal, so the relay needs a name;
    DNS-only, so Caddy holds the certificate and no Cloudflare proxy sits in front of it.
 3. **Firewall.** The VM's own tag `github-relay` gets HTTPS from anywhere (the Worker egress is
@@ -120,7 +121,7 @@ root.
    gcloud compute instances create github-relay --project=kilocode --zone=us-central1-a \
      --machine-type=e2-micro --image-family=debian-12 --image-project=debian-cloud \
      --boot-disk-size=10GB --boot-disk-type=pd-standard \
-     --address=136.119.16.41 --network-tier=PREMIUM --tags=github-relay \
+     --address=migration-proxy-github-relay --network-tier=PREMIUM --tags=github-relay \
      --no-service-account --no-scopes \
      --shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
      --metadata=enable-oslogin=TRUE \

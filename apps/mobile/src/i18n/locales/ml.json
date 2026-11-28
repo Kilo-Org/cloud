@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "ഉപയോഗത്തിന് മുമ്പ് സ്കാൻ ഓൺ",
         "scanBeforeUseOff": "ഉപയോഗത്തിന് മുമ്പ് സ്കാൻ ഓഫ്",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "പ്രവർത്തനരഹിതമാക്കി {{provider}}: {{models}}",
         "autoRoutingRemoved": "നീക്കം ചെയ്തു: {{models}}",
         "browserPolicyOff": "ബ്രൗസർ ഉപയോഗം തടസ്സപ്പെട്ടിരിക്കുന്നു",
         "browserPolicyAllow": "അനുവദിച്ച ഒറിജിനുകൾ മാത്രം",

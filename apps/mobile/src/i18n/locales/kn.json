@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "ಬಳಕೆಗೆ ಮೊದಲು ಸ್ಕ್ಯಾನ್ ಆನ್",
         "scanBeforeUseOff": "ಬಳಕೆಗೆ ಮೊದಲು ಸ್ಕ್ಯಾನ್ ಆಫ್",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ {{provider}}: {{models}}",
         "autoRoutingRemoved": "ತೆಗೆದುಹಾಕಲಾಗಿದೆ: {{models}}",
         "browserPolicyOff": "ಬ್ರೌಸರ್ ಬಳಕೆ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
         "browserPolicyAllow": "ಅನುಮತಿಸಿದ ಮೂಲಗಳು ಮಾತ್ರ",

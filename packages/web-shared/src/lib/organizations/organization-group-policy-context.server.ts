@@ -4,6 +4,7 @@ import {
   organization_group_memberships,
   organization_groups,
   organization_memberships,
+  organization_new_models_baselines,
   type Organization,
 } from '@kilocode/db/schema';
 import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
@@ -43,6 +44,11 @@ export type OrganizationGroupPolicyContext = {
   defaultPolicies: OrganizationGroupPolicies;
   groups: OrganizationGroupPolicyEntry[];
   policyRevision: number;
+  /**
+   * The snapshot the organization's `disable_new_models` policy was last reconciled against,
+   * read in the same transaction as its settings. Undefined without the policy or a baseline.
+   */
+  newModelsBaselineSnapshotId?: number;
 };
 
 /**
@@ -135,10 +141,21 @@ export async function getOrganizationGroupPolicyContext(params: {
     }));
   }
 
+  let newModelsBaselineSnapshotId: number | undefined;
+  if (organization.plan === 'enterprise' && organization.settings.disable_new_models) {
+    const [baseline] = await client
+      .select({ snapshotId: organization_new_models_baselines.snapshot_id })
+      .from(organization_new_models_baselines)
+      .where(eq(organization_new_models_baselines.organization_id, params.organizationId))
+      .limit(1);
+    newModelsBaselineSnapshotId = baseline?.snapshotId;
+  }
+
   return {
     organization,
     defaultPolicies,
     groups,
     policyRevision,
+    newModelsBaselineSnapshotId,
   };
 }

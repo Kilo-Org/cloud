@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Սկանավորում օգտագործելուց առաջ՝ միացված",
         "scanBeforeUseOff": "Սկանավորում օգտագործելուց առաջ՝ անջատված",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Անջատվեց {{provider}}՝ {{models}}",
         "autoRoutingRemoved": "Հեռացվեց՝ {{models}}",
         "browserPolicyOff": "Զննարկիչի օգտագործումը արգելափակված է",
         "browserPolicyAllow": "Միայն թույլատրված ծագումներ",

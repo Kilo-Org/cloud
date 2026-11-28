@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Ашиглахаас өмнө скан хийх нь идэвхтэй",
         "scanBeforeUseOff": "Ашиглахаас өмнө скан хийх нь идэвхгүй",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Идэвхгүй болгосон {{provider}}: {{models}}",
         "autoRoutingRemoved": "Хассан: {{models}}",
         "browserPolicyOff": "Хөтөч ашиглалт саатсан",
         "browserPolicyAllow": "Зөвхөн зөвшөөрөгдсөн эх сурвалж",

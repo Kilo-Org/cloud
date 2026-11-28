@@ -272,7 +272,16 @@ export async function validateOrganizationAutoTarget(
       };
     }
 
-    if (hasActiveModelRestrictions(restrictions)) {
+    // Auto tier routing leaves out the candidates the organization's model access denies, which
+    // covers what the `disable_new_models` policy disables. That policy fills the deny list on
+    // its own, so a deny list does not rule out auto tiers while it is on.
+    const newModelsPolicy =
+      organization.plan === 'enterprise' && organization.settings.disable_new_models === true;
+    if (
+      hasActiveModelRestrictions(
+        newModelsPolicy ? { ...restrictions, modelDenyList: [] } : restrictions
+      )
+    ) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' cannot use an auto tier while the organization has an active model policy. Choose a concrete allowed model instead.`,

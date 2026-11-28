@@ -307,6 +307,7 @@ describe('ModelAccessForm save', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -328,6 +329,7 @@ describe('ModelAccessForm save', () => {
       organizationId: 'org-1',
       provider_allow_list: ['anthropic'],
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -342,6 +344,7 @@ describe('ModelAccessForm save', () => {
       organizationId: 'org-1',
       provider_allow_list: ['anthropic'],
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -424,6 +427,7 @@ describe('ModelAccessForm without the catalog', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['anthropic/claude'],
+      model_deny_list_base: [],
     });
   });
 
@@ -437,6 +441,7 @@ describe('ModelAccessForm without the catalog', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -460,6 +465,7 @@ describe('ModelAccessForm without the catalog', () => {
       organizationId: 'org-1',
       provider_allow_list: ['anthropic'],
       model_deny_list: [],
+      model_deny_list_base: [],
     });
   });
 });
@@ -493,6 +499,24 @@ describe('ModelAccessForm with both rebases in one render', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['anthropic/claude', 'openai/gpt'],
+      model_deny_list_base: ['openai/gpt'],
+    });
+  });
+});
+
+describe('ModelAccessForm with a deny the server added after load', () => {
+  it('sends the list the draft started from, not the one a refetch brought', async () => {
+    const root = render(undefined, { catalog: WIDE_CATALOG });
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'anthropic/claude', false));
+
+    renderWithCatalog(undefined, { modelDenyList: ['openai/gpt'], catalog: WIDE_CATALOG });
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['anthropic/claude'],
+      model_deny_list_base: [],
     });
   });
 });
@@ -584,6 +608,7 @@ describe('ModelAccessForm with no provider rows', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -608,6 +633,7 @@ describe('ModelAccessForm with no provider rows', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -634,6 +660,7 @@ describe('ModelAccessForm with no provider rows', () => {
       organizationId: 'org-1',
       provider_allow_list: ['anthropic'],
       model_deny_list: [],
+      model_deny_list_base: [],
     });
   });
 
@@ -730,6 +757,7 @@ describe('ModelAccessForm with a catalog that names no provider', () => {
     expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
       organizationId: 'org-1',
       model_deny_list: ['openai/gpt'],
+      model_deny_list_base: [],
     });
   });
 
@@ -825,6 +853,7 @@ describe('ModelAccessForm with a catalog that names every provider', () => {
       organizationId: 'org-1',
       provider_allow_list: ['anthropic', 'openai'],
       model_deny_list: [],
+      model_deny_list_base: [],
     });
   });
 });
@@ -844,6 +873,48 @@ describe('ModelAccessForm durable draft', () => {
     expect(draftStore.save).not.toHaveBeenCalled();
   });
 
+  it('restores the stored deny list base, so a deny added since is kept on save', async () => {
+    // The draft started from an empty deny list. Provider sync denied
+    // `openai/gpt` while the app was closed, so the saved list now names it.
+    draftStore.kind = 'ready';
+    draftStore.value = {
+      providerAllowList: ['anthropic', 'google', 'openai'],
+      modelDenyList: ['anthropic/claude'],
+      denyListBase: [],
+    };
+    const root = render(undefined, { catalog: WIDE_CATALOG, modelDenyList: ['openai/gpt'] });
+
+    expect((list(root, 'ModelDenyList').props.draft as ModelAccessDraft).modelDenyList).toEqual([
+      'anthropic/claude',
+    ]);
+    await pressSave(root);
+
+    // The base is the persisted one, not the server list the draft meets now:
+    // the server merge then keeps the automatic deny instead of removing it.
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      organizationId: 'org-1',
+      model_deny_list: ['anthropic/claude'],
+      model_deny_list_base: [],
+    });
+  });
+
+  it('pairs a stored draft that has no base with the current saved deny list', async () => {
+    // A draft an earlier build wrote carries no base.
+    draftStore.kind = 'ready';
+    draftStore.value = {
+      providerAllowList: ['anthropic', 'google', 'openai'],
+      modelDenyList: ['anthropic/claude'],
+    };
+    const root = render(undefined, { catalog: WIDE_CATALOG, modelDenyList: ['openai/gpt'] });
+
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      model_deny_list: ['anthropic/claude'],
+      model_deny_list_base: ['openai/gpt'],
+    });
+  });
+
   it('keeps an edit made before the stored draft lands', () => {
     const root = render(['anthropic']);
     const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
@@ -855,6 +926,7 @@ describe('ModelAccessForm durable draft', () => {
     expect(draftStore.save.mock.calls[0]?.[0]).toEqual({
       providerAllowList: ['anthropic'],
       modelDenyList: ['openai/gpt'],
+      denyListBase: [],
     });
 
     // The load settles after the edit: the person's change wins.
@@ -911,6 +983,7 @@ describe('ModelAccessForm durable draft', () => {
     expect(draftStore.save.mock.calls[0]?.[0]).toEqual({
       providerAllowList: ['anthropic'],
       modelDenyList: ['openai/gpt'],
+      denyListBase: [],
     });
   });
 

@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "پشکنین پێش بەکارهێنان چالاک",
         "scanBeforeUseOff": "پشکنین پێش بەکارهێنان ناچالاک",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ناچالاک کرا {{provider}}: {{models}}",
         "autoRoutingRemoved": "لابرا: {{models}}",
         "browserPolicyOff": "بەکارهێنانی وێبگەڕ بلۆککرا",
         "browserPolicyAllow": "تەنها سەرچاوە ڕێگەپێدراوەکان",

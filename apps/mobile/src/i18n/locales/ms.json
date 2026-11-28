@@ -3516,6 +3516,7 @@
         "scanBeforeUseOn": "imbas sebelum guna aktif",
         "scanBeforeUseOff": "imbas sebelum guna tidak aktif",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Dinyahaktifkan {{provider}}: {{models}}",
         "autoRoutingRemoved": "dibuang: {{models}}",
         "browserPolicyOff": "penggunaan pelayar disekat",
         "browserPolicyAllow": "hanya asal yang dibenarkan",

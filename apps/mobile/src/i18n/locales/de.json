@@ -3569,6 +3569,7 @@
         "scanBeforeUseOn": "Scan vor Verwendung an",
         "scanBeforeUseOff": "Scan vor Verwendung aus",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Deaktiviert {{provider}}: {{models}}",
         "autoRoutingRemoved": "Entfernt: {{models}}",
         "browserPolicyOff": "Browsernutzung blockiert",
         "browserPolicyAllow": "Nur erlaubte Origins",

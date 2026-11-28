@@ -3713,6 +3713,7 @@
         "scanBeforeUseOn": "Preverjanje pred uporabo: omogočeno",
         "scanBeforeUseOff": "Preverjanje pred uporabo: onemogočeno",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Onemogočeno {{provider}}: {{models}}",
         "autoRoutingRemoved": "Odstranjeno: {{models}}",
         "browserPolicyOff": "Uporaba brskalnika blokirana",
         "browserPolicyAllow": "Samo dovoljeni izvori",

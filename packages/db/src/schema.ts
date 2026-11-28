@@ -4332,6 +4332,20 @@ export const organization_group_policy_settings = pgTable(
 export type OrganizationGroupPolicySettings =
   typeof organization_group_policy_settings.$inferSelect;
 
+// One row per organization with the `disable_new_models` policy: the `models_by_provider`
+// snapshot its deny list was last reconciled against. Provider sync keeps that snapshot until
+// every baseline has moved past it.
+export const organization_new_models_baselines = pgTable('organization_new_models_baselines', {
+  organization_id: uuid()
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: 'cascade' }),
+  snapshot_id: integer().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
 export const organization_named_policies = pgTable(
   'organization_named_policies',
   {

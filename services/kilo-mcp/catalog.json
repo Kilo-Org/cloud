@@ -31234,6 +31234,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "model_deny_list_base": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -31246,9 +31252,10 @@
       "updateallowlists",
       "organizationid",
       "provider_allow_list",
-      "model_deny_list"
+      "model_deny_list",
+      "model_deny_list_base"
     ],
-    "searchBlob": "organizations.settings.updateAllowLists Set which model providers are allowed and which models are blocked for an organization. Use to restrict model access for enterprise plans. organizations settings updateallowlists organizationid provider_allow_list model_deny_list organizationId provider_allow_list model_deny_list"
+    "searchBlob": "organizations.settings.updateAllowLists Set which model providers are allowed and which models are blocked for an organization. Use to restrict model access for enterprise plans. organizations settings updateallowlists organizationid provider_allow_list model_deny_list model_deny_list_base organizationId provider_allow_list model_deny_list model_deny_list_base"
   },
   "organizations.settings.updateDataCollection": {
     "path": "organizations.settings.updateDataCollection",

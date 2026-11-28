@@ -30,6 +30,7 @@ import {
   type ModelAccessDraft,
   modelAccessSave,
   providerRows,
+  type StoredModelAccessDraft,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
 import {
@@ -140,6 +141,7 @@ export function ModelAccessForm({
     draft: serverDraft,
     providerRowsProvisional: providerRowsIncomplete,
     providerListEdited: false,
+    denyListBase: serverDraft.modelDenyList,
   }));
   const synced = syncedFormState({ state: form, serverKey, serverDraft, providerRowsIncomplete });
   if (synced !== form) {
@@ -163,7 +165,7 @@ export function ModelAccessForm({
   // once and applies a restored draft once, only while the person has moved
   // nothing.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const formDraft = useFormDraft<ModelAccessDraft>({
+  const formDraft = useFormDraft<StoredModelAccessDraft>({
     userId,
     isIdentityLoading,
     entityKey: orgModelAccessFormDraftKey(organizationId),
@@ -184,6 +186,13 @@ export function ModelAccessForm({
   // that reload. Nothing is lost for the viewer, who reads the saved policy, and
   // the next editor mount restores the draft as before.
   const restoredDraft = restoredValue === null ? null : canonicalDraft(restoredValue);
+  // The base the stored draft started from; a draft an earlier build wrote has
+  // none, and the form's current base stands in.
+  const restoredDenyListBase =
+    restoredValue?.denyListBase === undefined
+      ? null
+      : canonicalDraft({ providerAllowList: [], modelDenyList: restoredValue.denyListBase })
+          .modelDenyList;
   useEffect(() => {
     if (!canEdit || restoredDraft === null || touchedRef.current || restoredRef.current) {
       return;
@@ -197,10 +206,11 @@ export function ModelAccessForm({
       ...previous,
       draft: restoredDraft,
       providerListEdited: providerListEditedBy(previous, restoredDraft),
+      denyListBase: restoredDenyListBase ?? previous.denyListBase,
     }));
     // The role is a dependency too: a draft that lands while the role is still
     // unknown restores once the role arrives and says this person may edit.
-  }, [canEdit, restoredDraft]);
+  }, [canEdit, restoredDraft, restoredDenyListBase]);
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
@@ -250,7 +260,7 @@ export function ModelAccessForm({
     }));
     // The whole draft, on every edit: a reload may follow any of them, and the
     // hook writes through while it still reports `loading`.
-    formDraft.save(next);
+    formDraft.save({ ...next, denyListBase: form.denyListBase });
   };
 
   const onSave = async () => {
@@ -270,6 +280,7 @@ export function ModelAccessForm({
           ? {}
           : { provider_allow_list: [...savePayload.providerAllowList] }),
         model_deny_list: [...savePayload.modelDenyList],
+        model_deny_list_base: [...form.denyListBase],
       });
       if (!attempt.owns()) {
         return;
@@ -278,6 +289,7 @@ export function ModelAccessForm({
         ...previous,
         syncedKey: serverKey,
         baseline: previous.draft,
+        denyListBase: previous.draft.modelDenyList,
       }));
       // The draft became the saved policy; nothing is left to restore.
       restoredRef.current = true;

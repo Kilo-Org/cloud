@@ -231,7 +231,8 @@ describe('createModelsByProviderIndexLoader', () => {
     snapshot = makeSnapshot()
   ) {
     return createModelsByProviderIndexLoader({
-      fetchSnapshot: async () => snapshot,
+      fetchSnapshot: async () => ({ id: 1, data: snapshot }),
+      fetchSnapshotById: async () => undefined,
       fetchOpenRouterModels: async () => models,
       fetchVercelModels: async () => vercelModels,
       ttlMs: 60_000,
@@ -257,8 +258,9 @@ describe('createModelsByProviderIndexLoader', () => {
       fetchSnapshot: async () => {
         calls += 1;
         if (calls === 1) throw new Error('database unavailable');
-        return snapshot;
+        return { id: 1, data: snapshot };
       },
+      fetchSnapshotById: async () => undefined,
       fetchOpenRouterModels: async () => storedModels,
       fetchVercelModels: async () => ({}),
       ttlMs: 60_000,
@@ -299,7 +301,8 @@ describe('createModelsByProviderIndexLoader', () => {
     let openRouterReads = 0;
     let vercelReads = 0;
     const { getProviderSlugsForModels } = createModelsByProviderIndexLoader({
-      fetchSnapshot: async () => makeSnapshot(),
+      fetchSnapshot: async () => ({ id: 1, data: makeSnapshot() }),
+      fetchSnapshotById: async () => undefined,
       fetchOpenRouterModels: async () => {
         openRouterReads += 1;
         return storedModels;
@@ -389,5 +392,208 @@ describe('createModelsByProviderIndexLoader', () => {
     await expect(getProviderSlugsForModel(modelId)).resolves.toEqual(
       new Set(['anthropic', 'google-vertex'])
     );
+  });
+});
+
+describe('isModelListedAtOrBefore', () => {
+  const NEWER_MODEL = 'acme/newer-model';
+
+  function snapshotWithModels(slugs: string[]): NormalizedOpenRouterResponse {
+    return {
+      providers: [
+        {
+          name: 'deepinfra',
+          displayName: 'deepinfra',
+          slug: 'deepinfra',
+          dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+          models: slugs.map(slug => snapshotModel(slug, 'standard')),
+        },
+      ],
+      total_providers: 1,
+      total_models: slugs.length,
+      generated_at: '2026-09-01T00:00:00.000Z',
+    };
+  }
+
+  function loaderWith(options: {
+    latest?: { id: number; slugs: string[] };
+    byId?: Record<number, string[]>;
+    nowMs?: () => number;
+  }) {
+    const byIdCalls: number[] = [];
+    const state = { latest: options.latest };
+    const loader = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () =>
+        state.latest && { id: state.latest.id, data: snapshotWithModels(state.latest.slugs) },
+      fetchSnapshotById: async id => {
+        byIdCalls.push(id);
+        const slugs = options.byId?.[id];
+        return slugs && { id, data: snapshotWithModels(slugs) };
+      },
+      fetchOpenRouterModels: async () => ({}),
+      fetchVercelModels: async () => ({}),
+      ttlMs: 1_000,
+      nowMs: options.nowMs ?? (() => 0),
+    });
+    return { ...loader, byIdCalls, state };
+  }
+
+  it('answers from the latest index when it is the baseline snapshot', async () => {
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith({
+      latest: { id: 5, slugs: [MODEL] },
+    });
+
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(true);
+    await expect(isModelListedAtOrBefore(5, FREE_MODEL)).resolves.toBe(true);
+    await expect(isModelListedAtOrBefore(5, NEWER_MODEL)).resolves.toBe(false);
+    expect(byIdCalls).toEqual([]);
+  });
+
+  it('answers from a latest index older than the baseline snapshot', async () => {
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith({
+      latest: { id: 5, slugs: [MODEL] },
+    });
+
+    await expect(isModelListedAtOrBefore(7, MODEL)).resolves.toBe(true);
+    await expect(isModelListedAtOrBefore(7, NEWER_MODEL)).resolves.toBe(false);
+    expect(byIdCalls).toEqual([]);
+  });
+
+  it('loads the baseline snapshot by id when the latest index is newer', async () => {
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith({
+      latest: { id: 6, slugs: [MODEL, NEWER_MODEL] },
+      byId: { 5: [MODEL] },
+    });
+
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(true);
+    await expect(isModelListedAtOrBefore(5, NEWER_MODEL)).resolves.toBe(false);
+    await expect(isModelListedAtOrBefore(6, NEWER_MODEL)).resolves.toBe(true);
+    expect(byIdCalls).toEqual([5]);
+  });
+
+  it('switches to the by-id index once the cached latest index is replaced', async () => {
+    let now = 0;
+    const { isModelListedAtOrBefore, byIdCalls, state } = loaderWith({
+      latest: { id: 5, slugs: [MODEL] },
+      byId: { 5: [MODEL] },
+      nowMs: () => now,
+    });
+    await expect(isModelListedAtOrBefore(5, NEWER_MODEL)).resolves.toBe(false);
+    expect(byIdCalls).toEqual([]);
+
+    state.latest = { id: 6, slugs: [MODEL, NEWER_MODEL] };
+    now = 2_000;
+
+    await expect(isModelListedAtOrBefore(5, NEWER_MODEL)).resolves.toBe(false);
+    expect(byIdCalls).toEqual([5]);
+  });
+
+  it('caches the index of a snapshot loaded by id', async () => {
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith({
+      latest: { id: 9, slugs: [MODEL, NEWER_MODEL] },
+      byId: { 5: [MODEL], 6: [MODEL, NEWER_MODEL] },
+    });
+
+    await isModelListedAtOrBefore(5, MODEL);
+    await isModelListedAtOrBefore(5, NEWER_MODEL);
+    await isModelListedAtOrBefore(6, NEWER_MODEL);
+    await isModelListedAtOrBefore(6, MODEL);
+    await isModelListedAtOrBefore(5, MODEL);
+
+    expect(byIdCalls).toEqual([5, 6]);
+  });
+
+  it('keeps at most four snapshot indexes by id', async () => {
+    const byId = Object.fromEntries([1, 2, 3, 4, 5].map(id => [id, [MODEL]]));
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith({
+      latest: { id: 9, slugs: [MODEL] },
+      byId,
+    });
+
+    for (const id of [1, 2, 3, 4, 5]) await isModelListedAtOrBefore(id, MODEL);
+    await isModelListedAtOrBefore(5, MODEL);
+    await isModelListedAtOrBefore(2, MODEL);
+    expect(byIdCalls).toEqual([1, 2, 3, 4, 5]);
+
+    await isModelListedAtOrBefore(1, MODEL);
+    expect(byIdCalls).toEqual([1, 2, 3, 4, 5, 1]);
+  });
+
+  it('answers false for a missing snapshot and does not cache the miss', async () => {
+    const options = {
+      latest: { id: 9, slugs: [MODEL] },
+      byId: {} as Record<number, string[]>,
+    };
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith(options);
+
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(false);
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(false);
+    expect(byIdCalls).toEqual([5, 5]);
+
+    options.byId[5] = [MODEL];
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(true);
+    expect(byIdCalls).toEqual([5, 5, 5]);
+  });
+
+  it('shares one read between concurrent lookups of an uncached snapshot', async () => {
+    const byIdCalls: number[] = [];
+    let releaseRead: () => void = () => undefined;
+    const readReleased = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    const { isModelListedAtOrBefore } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => ({ id: 9, data: snapshotWithModels([MODEL, NEWER_MODEL]) }),
+      fetchSnapshotById: async id => {
+        byIdCalls.push(id);
+        await readReleased;
+        return { id, data: snapshotWithModels([MODEL]) };
+      },
+      fetchOpenRouterModels: async () => ({}),
+      fetchVercelModels: async () => ({}),
+      ttlMs: 1_000,
+      nowMs: () => 0,
+    });
+
+    const lookups = Array.from({ length: 64 }, (_, index) =>
+      isModelListedAtOrBefore(5, index % 2 === 0 ? MODEL : NEWER_MODEL)
+    );
+    // The latest index loads first, so let the by-id read start before releasing it.
+    for (let attempt = 0; attempt < 20 && byIdCalls.length === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    releaseRead();
+    const results = await Promise.all(lookups);
+
+    expect(byIdCalls).toEqual([5]);
+    expect(results).toEqual(Array.from({ length: 64 }, (_, index) => index % 2 === 0));
+    await isModelListedAtOrBefore(5, MODEL);
+    expect(byIdCalls).toEqual([5]);
+  });
+
+  it('retries a snapshot read that failed instead of keeping the failure', async () => {
+    let calls = 0;
+    const { isModelListedAtOrBefore } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => ({ id: 9, data: snapshotWithModels([MODEL]) }),
+      fetchSnapshotById: async id => {
+        calls += 1;
+        if (calls === 1) throw new Error('replica unavailable');
+        return { id, data: snapshotWithModels([MODEL]) };
+      },
+      fetchOpenRouterModels: async () => ({}),
+      fetchVercelModels: async () => ({}),
+      ttlMs: 1_000,
+      nowMs: () => 0,
+    });
+
+    await expect(isModelListedAtOrBefore(5, MODEL)).rejects.toThrow('replica unavailable');
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(true);
+    expect(calls).toBe(2);
+  });
+
+  it('loads by id when the latest read failed, since the cached index has no snapshot id', async () => {
+    const { isModelListedAtOrBefore, byIdCalls } = loaderWith({ byId: { 5: [MODEL] } });
+
+    await expect(isModelListedAtOrBefore(5, MODEL)).resolves.toBe(true);
+    expect(byIdCalls).toEqual([5]);
   });
 });

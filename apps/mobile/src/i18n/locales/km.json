@@ -3516,6 +3516,7 @@
         "scanBeforeUseOn": "ស្កេនមុនប្រើបានបើក",
         "scanBeforeUseOff": "ស្កេនមុនប្រើបានបិទ",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "បានបិទ {{provider}}៖ {{models}}",
         "autoRoutingRemoved": "បានដកចេញ៖ {{models}}",
         "browserPolicyOff": "ការប្រើកម្មវិធីរុករកត្រូវបានទប់ស្កាត់",
         "browserPolicyAllow": "ប្រភពដែលបានអនុញ្ញាតតែប៉ុណ្ណោះ",

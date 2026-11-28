@@ -3713,6 +3713,7 @@
         "scanBeforeUseOn": "Сканаванне перад выкарыстаннем уключана",
         "scanBeforeUseOff": "Сканаванне перад выкарыстаннем адключана",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Адключаны {{provider}}: {{models}}",
         "autoRoutingRemoved": "Выдалены: {{models}}",
         "browserPolicyOff": "Выкарыстанне браўзера заблакавана",
         "browserPolicyAllow": "Толькі дазволеныя крыніцы",

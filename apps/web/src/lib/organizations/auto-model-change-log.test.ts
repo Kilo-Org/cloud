@@ -1,11 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import type { Organization } from '@kilocode/db/schema';
+import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { computeSnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
 import {
+  applyNewModelsPolicy,
   buildAutoChangeMessage,
   computeRelevantChangesForOrg,
   relevantChangesIsEmpty,
@@ -320,40 +322,31 @@ describe('computeRelevantChangesForOrg', () => {
 
 describe('buildAutoChangeMessage', () => {
   test('only additions: formats one segment per provider', () => {
-    const message = buildAutoChangeMessage(
-      {
-        addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']]]),
-        removedFromCatalog: [],
-        removedFromAllowedProviders: [],
-      },
-      { addedModelsDisabled: false }
-    );
+    const message = buildAutoChangeMessage({
+      addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']]]),
+      removedFromCatalog: [],
+      removedFromAllowedProviders: [],
+    });
 
     expect(message).toBe('Added models from provider z-ai: z-ai/glm-5.1, z-ai/glm-5.1-air');
   });
 
   test('only catalog removals: formats one catalog-removal segment', () => {
-    const message = buildAutoChangeMessage(
-      {
-        addedByReasonProvider: new Map(),
-        removedFromCatalog: ['z-ai/glm-4.0'],
-        removedFromAllowedProviders: [],
-      },
-      { addedModelsDisabled: false }
-    );
+    const message = buildAutoChangeMessage({
+      addedByReasonProvider: new Map(),
+      removedFromCatalog: ['z-ai/glm-4.0'],
+      removedFromAllowedProviders: [],
+    });
 
     expect(message).toBe('Removed models (no longer available): z-ai/glm-4.0');
   });
 
   test('only allowed-provider removals: formats one allowed-provider-removal segment', () => {
-    const message = buildAutoChangeMessage(
-      {
-        addedByReasonProvider: new Map(),
-        removedFromCatalog: [],
-        removedFromAllowedProviders: ['openai/gpt-4o'],
-      },
-      { addedModelsDisabled: false }
-    );
+    const message = buildAutoChangeMessage({
+      addedByReasonProvider: new Map(),
+      removedFromCatalog: [],
+      removedFromAllowedProviders: ['openai/gpt-4o'],
+    });
 
     expect(message).toBe(
       'Removed models (no longer offered by any allowed provider): openai/gpt-4o'
@@ -361,34 +354,31 @@ describe('buildAutoChangeMessage', () => {
   });
 
   test('mixed additions and both removal kinds: providers sorted alphabetically', () => {
-    const message = buildAutoChangeMessage(
-      {
-        addedByReasonProvider: new Map([
-          ['z-ai', ['z-ai/glm-5.1']],
-          ['anthropic', ['anthropic/claude-4.6-haiku']],
-        ]),
-        removedFromCatalog: ['z-ai/glm-4.0'],
-        removedFromAllowedProviders: ['openai/gpt-4o'],
-      },
-      { addedModelsDisabled: false }
-    );
+    const message = buildAutoChangeMessage({
+      addedByReasonProvider: new Map([
+        ['z-ai', ['z-ai/glm-5.1']],
+        ['anthropic', ['anthropic/claude-4.6-haiku']],
+      ]),
+      removedFromCatalog: ['z-ai/glm-4.0'],
+      removedFromAllowedProviders: ['openai/gpt-4o'],
+    });
 
     expect(message).toBe(
       'Added models from provider anthropic: anthropic/claude-4.6-haiku; Added models from provider z-ai: z-ai/glm-5.1; Removed models (no longer available): z-ai/glm-4.0; Removed models (no longer offered by any allowed provider): openai/gpt-4o'
     );
   });
 
-  test('addedModelsDisabled: additions read as disabled, sorted by provider', () => {
+  test('disabled additions get their own segments, sorted by provider', () => {
     const message = buildAutoChangeMessage(
       {
-        addedByReasonProvider: new Map([
-          ['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']],
-          ['anthropic', ['anthropic/claude-4.6-haiku']],
-        ]),
+        addedByReasonProvider: new Map(),
         removedFromCatalog: [],
         removedFromAllowedProviders: [],
       },
-      { addedModelsDisabled: true }
+      new Map([
+        ['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']],
+        ['anthropic', ['anthropic/claude-4.6-haiku']],
+      ])
     );
 
     expect(message).toBe(
@@ -396,45 +386,189 @@ describe('buildAutoChangeMessage', () => {
     );
   });
 
-  test('addedModelsDisabled: removals keep their wording', () => {
+  test('disabled segments follow added segments and precede removals', () => {
     const message = buildAutoChangeMessage(
       {
-        addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1']]]),
+        addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5']]]),
         removedFromCatalog: ['z-ai/glm-4.0'],
         removedFromAllowedProviders: ['openai/gpt-4o'],
       },
-      { addedModelsDisabled: true }
+      new Map([['anthropic', ['anthropic/claude-4.6-haiku']]])
     );
 
     expect(message).toBe(
-      'Disabled new models from provider z-ai: z-ai/glm-5.1; Removed models (no longer available): z-ai/glm-4.0; Removed models (no longer offered by any allowed provider): openai/gpt-4o'
+      'Added models from provider z-ai: z-ai/glm-5; Disabled new models from provider anthropic: anthropic/claude-4.6-haiku; Removed models (no longer available): z-ai/glm-4.0; Removed models (no longer offered by any allowed provider): openai/gpt-4o'
     );
   });
 
-  test('addedModelsDisabled: removal-only changes are unaffected', () => {
+  test('an empty disabled list adds no segment', () => {
     const message = buildAutoChangeMessage(
       {
         addedByReasonProvider: new Map(),
         removedFromCatalog: ['z-ai/glm-4.0'],
         removedFromAllowedProviders: [],
       },
-      { addedModelsDisabled: true }
+      new Map([['z-ai', []]])
     );
 
     expect(message).toBe('Removed models (no longer available): z-ai/glm-4.0');
   });
 
   test('empty input returns empty string', () => {
-    const message = buildAutoChangeMessage(
-      {
-        addedByReasonProvider: new Map(),
-        removedFromCatalog: [],
-        removedFromAllowedProviders: [],
-      },
-      { addedModelsDisabled: false }
-    );
+    const message = buildAutoChangeMessage({
+      addedByReasonProvider: new Map(),
+      removedFromCatalog: [],
+      removedFromAllowedProviders: [],
+    });
 
     expect(message).toBe('');
+  });
+});
+
+describe('applyNewModelsPolicy', () => {
+  function additions(byProvider: Record<string, string[]>) {
+    return {
+      addedByReasonProvider: new Map(Object.entries(byProvider)),
+      removedFromCatalog: ['z-ai/glm-4.0'],
+      removedFromAllowedProviders: ['openai/gpt-4o'],
+    };
+  }
+
+  test('disables every addition, denies them and keeps the removals', () => {
+    const settings: OrganizationSettings = { disable_new_models: true };
+    const outcome = applyNewModelsPolicy(settings, additions({ 'z-ai': ['z-ai/glm-5.1'] }));
+
+    expect(outcome.disabledByReasonProvider).toEqual(new Map([['z-ai', ['z-ai/glm-5.1']]]));
+    expect(outcome.modelDenyList).toEqual(['z-ai/glm-5.1']);
+    expect(outcome.changes.addedByReasonProvider.size).toBe(0);
+    expect(outcome.changes.removedFromCatalog).toEqual(['z-ai/glm-4.0']);
+    expect(outcome.changes.removedFromAllowedProviders).toEqual(['openai/gpt-4o']);
+  });
+
+  test('handles several providers and appends to the existing deny list', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      model_deny_list: ['openai/gpt-4o'],
+    };
+    const outcome = applyNewModelsPolicy(
+      settings,
+      additions({
+        'z-ai': ['z-ai/glm-5.1', 'z-ai/glm-5.2'],
+        anthropic: ['anthropic/claude-4.6'],
+      })
+    );
+
+    expect(outcome.disabledByReasonProvider).toEqual(
+      new Map([
+        ['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.2']],
+        ['anthropic', ['anthropic/claude-4.6']],
+      ])
+    );
+    expect(outcome.modelDenyList).toEqual([
+      'openai/gpt-4o',
+      'z-ai/glm-5.1',
+      'z-ai/glm-5.2',
+      'anthropic/claude-4.6',
+    ]);
+  });
+
+  test('does not re-append a model that is already denied', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      model_deny_list: ['z-ai/glm-5.1'],
+    };
+    const outcome = applyNewModelsPolicy(
+      settings,
+      additions({ 'z-ai': ['z-ai/glm-5.1', 'z-ai/glm-5.2'] })
+    );
+
+    expect(outcome.modelDenyList).toEqual(['z-ai/glm-5.1', 'z-ai/glm-5.2']);
+    expect(outcome.disabledByReasonProvider.get('z-ai')).toEqual(['z-ai/glm-5.1', 'z-ai/glm-5.2']);
+  });
+
+  test('returns a null deny list when every addition is already denied', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      model_deny_list: ['z-ai/glm-5.1'],
+    };
+    const outcome = applyNewModelsPolicy(settings, additions({ 'z-ai': ['z-ai/glm-5.1'] }));
+
+    expect(outcome.modelDenyList).toBeNull();
+  });
+
+  test('returns a null deny list and no disabled models when nothing was added', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      model_deny_list: ['openai/gpt-4o'],
+    };
+    const outcome = applyNewModelsPolicy(settings, additions({}));
+
+    expect(outcome.modelDenyList).toBeNull();
+    expect(outcome.disabledByReasonProvider.size).toBe(0);
+    expect(outcome.changes.removedFromCatalog).toEqual(['z-ai/glm-4.0']);
+  });
+
+  test('keeps the default model enabled', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      default_model: 'z-ai/glm-5.1',
+    };
+    const outcome = applyNewModelsPolicy(
+      settings,
+      additions({ 'z-ai': ['z-ai/glm-5.1', 'z-ai/glm-5.2'] })
+    );
+
+    expect(outcome.changes.addedByReasonProvider).toEqual(new Map([['z-ai', ['z-ai/glm-5.1']]]));
+    expect(outcome.disabledByReasonProvider).toEqual(new Map([['z-ai', ['z-ai/glm-5.2']]]));
+    expect(outcome.modelDenyList).toEqual(['z-ai/glm-5.2']);
+  });
+
+  test('keeps a default model with a variant suffix enabled', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      default_model: 'z-ai/glm-5.1:free',
+    };
+    const outcome = applyNewModelsPolicy(settings, additions({ 'z-ai': ['z-ai/glm-5.1'] }));
+
+    expect(outcome.changes.addedByReasonProvider).toEqual(new Map([['z-ai', ['z-ai/glm-5.1']]]));
+    expect(outcome.modelDenyList).toBeNull();
+  });
+
+  test('keeps Organization Auto route and fallback models enabled', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      org_auto_model: {
+        fallback_model: 'anthropic/claude-4.6',
+        routes: { balanced: 'z-ai/glm-5.1' },
+      } as OrganizationSettings['org_auto_model'],
+    };
+    const outcome = applyNewModelsPolicy(
+      settings,
+      additions({
+        'z-ai': ['z-ai/glm-5.1', 'z-ai/glm-5.2'],
+        anthropic: ['anthropic/claude-4.6'],
+      })
+    );
+
+    expect(outcome.changes.addedByReasonProvider).toEqual(
+      new Map([
+        ['z-ai', ['z-ai/glm-5.1']],
+        ['anthropic', ['anthropic/claude-4.6']],
+      ])
+    );
+    expect(outcome.disabledByReasonProvider).toEqual(new Map([['z-ai', ['z-ai/glm-5.2']]]));
+    expect(outcome.modelDenyList).toEqual(['z-ai/glm-5.2']);
+  });
+
+  test('does not disable anything when only configured models were added', () => {
+    const settings: OrganizationSettings = {
+      disable_new_models: true,
+      default_model: 'z-ai/glm-5.1',
+    };
+    const outcome = applyNewModelsPolicy(settings, additions({ 'z-ai': ['z-ai/glm-5.1'] }));
+
+    expect(outcome.disabledByReasonProvider.size).toBe(0);
+    expect(outcome.modelDenyList).toBeNull();
   });
 });
 

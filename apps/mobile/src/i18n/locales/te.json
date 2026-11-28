@@ -3579,6 +3579,7 @@
         "scanBeforeUseOn": "ఉపయోగానికి ముందు స్కాన్ ఆన్",
         "scanBeforeUseOff": "ఉపయోగానికి ముందు స్కాన్ ఆఫ్",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "నిలిపివేయబడినవి {{provider}}: {{models}}",
         "autoRoutingRemoved": "తొలగించబడినవి: {{models}}",
         "browserPolicyOff": "బ్రౌజర్ వినియోగం నిలిచిపోయింది",
         "browserPolicyAllow": "అనుమతించబడిన మూలాలు మాత్రమే",

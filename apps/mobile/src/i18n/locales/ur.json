@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "استعمال سے پہلے اسکین فعال",
         "scanBeforeUseOff": "استعمال سے پہلے اسکین غیر فعال",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "غیر فعال کیے گئے {{provider}}: {{models}}",
         "autoRoutingRemoved": "ہٹائے گئے: {{models}}",
         "browserPolicyOff": "براؤزر کا استعمال مسدود",
         "browserPolicyAllow": "صرف اجازت شدہ اوریجنز",

@@ -3505,6 +3505,7 @@
         "scanBeforeUseOn": "사용 전 검사 켬",
         "scanBeforeUseOff": "사용 전 검사 끔",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "비활성화됨 {{provider}}: {{models}}",
         "autoRoutingRemoved": "제거됨: {{models}}",
         "browserPolicyOff": "브라우저 사용 차단됨",
         "browserPolicyAllow": "허용된 출처만",

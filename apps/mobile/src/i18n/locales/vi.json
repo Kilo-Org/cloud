@@ -3569,6 +3569,7 @@
         "scanBeforeUseOn": "Quét trước khi dùng: bật",
         "scanBeforeUseOff": "Quét trước khi dùng: tắt",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Đã tắt {{provider}}: {{models}}",
         "autoRoutingRemoved": "Đã xóa: {{models}}",
         "browserPolicyOff": "Sử dụng trình duyệt bị chặn",
         "browserPolicyAllow": "Chỉ các origin được phép",

@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "ବ୍ୟବହାର ପୂର୍ବରୁ ସ୍କାନ୍ ଚାଲୁ",
         "scanBeforeUseOff": "ବ୍ୟବହାର ପୂର୍ବରୁ ସ୍କାନ୍ ବନ୍ଦ",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ବନ୍ଦ କରାଗଲା {{provider}}: {{models}}",
         "autoRoutingRemoved": "ଅପସାରିତ: {{models}}",
         "browserPolicyOff": "ବ୍ରାଉଜର ବ୍ୟବହାର ଅବରୁଦ୍ଧ",
         "browserPolicyAllow": "କେବଳ ଅନୁମତିପ୍ରାପ୍ତ ଅରିଜିନ୍",

@@ -3516,6 +3516,7 @@
         "scanBeforeUseOn": "สแกนก่อนใช้งาน เปิด",
         "scanBeforeUseOff": "สแกนก่อนใช้งาน ปิด",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ปิดใช้งาน {{provider}}: {{models}}",
         "autoRoutingRemoved": "นำออก: {{models}}",
         "browserPolicyOff": "การใช้งานเบราว์เซอร์ถูกบล็อก",
         "browserPolicyAllow": "เฉพาะต้นทางที่อนุญาต",

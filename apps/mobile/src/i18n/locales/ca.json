@@ -3645,6 +3645,7 @@
         "scanBeforeUseOn": "Escaneig abans d'usar activat",
         "scanBeforeUseOff": "Escaneig abans d'usar desactivat",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Desactivats {{provider}}: {{models}}",
         "autoRoutingRemoved": "Eliminats: {{models}}",
         "browserPolicyOff": "Ús del navegador bloquejat",
         "browserPolicyAllow": "Només orígens permesos",

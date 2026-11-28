@@ -3508,6 +3508,7 @@
         "scanBeforeUseOn": "使用前スキャン有効",
         "scanBeforeUseOff": "使用前スキャン無効",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "無効化 {{provider}}：{{models}}",
         "autoRoutingRemoved": "削除：{{models}}",
         "browserPolicyOff": "ブラウザ使用をブロック",
         "browserPolicyAllow": "許可されたオリジンのみ",

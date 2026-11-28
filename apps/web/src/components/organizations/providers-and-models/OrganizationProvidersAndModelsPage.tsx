@@ -221,14 +221,22 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     if (!canEdit) return;
     if (state.status !== 'ready') return;
 
+    const submitted = {
+      modelDenyList: state.draftModelDenyList,
+      providerAllowList: state.draftProviderAllowList,
+    };
     try {
-      await updateOrganizationSettings.mutateAsync({
+      const { settings } = await updateOrganizationSettings.mutateAsync({
         organizationId,
-        model_deny_list: state.draftModelDenyList,
-        provider_allow_list: state.draftProviderAllowList,
+        model_deny_list: submitted.modelDenyList,
+        model_deny_list_base: state.initialModelDenyList,
+        provider_allow_list: submitted.providerAllowList,
       });
 
-      actions.markSaved();
+      actions.markSaved({
+        modelDenyList: settings.model_deny_list ?? submitted.modelDenyList,
+        submitted,
+      });
       toast.success('Success! The providers and models have been updated for your organization.');
     } catch {
       toast.error('Failed to save settings. Please try again.');

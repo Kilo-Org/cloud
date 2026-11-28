@@ -3,7 +3,7 @@ import type {
   GatewayModelMap,
   GatewayModelWithEndpoints,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getSnapshotModelVariantId,
   normalizeModelId,
@@ -20,20 +20,25 @@ import {
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { modelTrains } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 export type ModelIdToProviderSlugsIndex = ReadonlyMap<string, ReadonlySet<string>>;
 
 type ProviderIndexCacheState = {
   expiresAtMs: number;
+  /** The `models_by_provider` row the index was built from; undefined after a failed read. */
+  snapshotId?: number;
   index: ModelIdToProviderSlugsIndex;
   dataCollectionRequiredModelIds: ReadonlySet<string>;
 };
 
-export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
+export type ModelsByProviderSnapshotRow = { id: number; data: NormalizedOpenRouterResponse };
+
+export type FetchModelsByProviderSnapshot = () => Promise<ModelsByProviderSnapshotRow | undefined>;
 
 export type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
+  fetchSnapshotById: (id: number) => Promise<ModelsByProviderSnapshotRow | undefined>;
   fetchOpenRouterModels: () => Promise<GatewayModelMap>;
   fetchVercelModels: () => Promise<GatewayModelMap>;
   ttlMs: number;
@@ -157,9 +162,10 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
           // A failed read retries on the next call so an empty data-collection
           // set does not stick for the TTL; callers fall back to best-effort checks.
           expiresAtMs: snapshot ? options.nowMs() + options.ttlMs : options.nowMs(),
-          index: snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map(),
+          snapshotId: snapshot?.id,
+          index: snapshot ? buildModelIdToProviderSlugsIndex(snapshot.data) : new Map(),
           dataCollectionRequiredModelIds: snapshot
-            ? buildDataCollectionRequiredModelIds(snapshot)
+            ? buildDataCollectionRequiredModelIds(snapshot.data)
             : new Set(),
         };
       } finally {
@@ -173,6 +179,55 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
 
   async function loadIndex(): Promise<ModelIdToProviderSlugsIndex> {
     return (await loadState()).index;
+  }
+
+  // A snapshot row never changes, so its index stays valid; only the few snapshots that
+  // `disable_new_models` baselines still point at are ever looked up here.
+  const indexesBySnapshotId = new Map<number, ModelIdToProviderSlugsIndex>();
+  // Auto routing decides its candidates concurrently, so concurrent lookups share one read.
+  const pendingIndexesBySnapshotId = new Map<
+    number,
+    Promise<ModelIdToProviderSlugsIndex | undefined>
+  >();
+  async function loadIndexForSnapshot(
+    snapshotId: number
+  ): Promise<ModelIdToProviderSlugsIndex | undefined> {
+    const cached = indexesBySnapshotId.get(snapshotId);
+    if (cached) return cached;
+    const pending = pendingIndexesBySnapshotId.get(snapshotId);
+    if (pending) return await pending;
+    const load = (async () => {
+      try {
+        const snapshot = await options.fetchSnapshotById(snapshotId);
+        if (!snapshot) return undefined;
+        const index = buildModelIdToProviderSlugsIndex(snapshot.data);
+        if (indexesBySnapshotId.size >= MAX_CACHED_BASELINE_INDEXES) {
+          const oldest = indexesBySnapshotId.keys().next().value;
+          if (oldest !== undefined) indexesBySnapshotId.delete(oldest);
+        }
+        indexesBySnapshotId.set(snapshotId, index);
+        return index;
+      } finally {
+        pendingIndexesBySnapshotId.delete(snapshotId);
+      }
+    })();
+    pendingIndexesBySnapshotId.set(snapshotId, load);
+    return await load;
+  }
+
+  /**
+   * Whether `modelId` was listed by snapshot `snapshotId` or an older one. A model only a newer
+   * snapshot lists has not been reconciled against that baseline yet. An index older than the
+   * baseline answers for it, since every model it lists predates the baseline. A missing snapshot
+   * answers false.
+   */
+  async function isModelListedAtOrBefore(snapshotId: number, modelId: string): Promise<boolean> {
+    const normalizedModelId = normalizeModelId(modelId);
+    const state = await loadState();
+    if (state.snapshotId !== undefined && state.snapshotId <= snapshotId) {
+      return state.index.has(normalizedModelId);
+    }
+    return (await loadIndexForSnapshot(snapshotId))?.has(normalizedModelId) ?? false;
   }
 
   async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
@@ -236,28 +291,53 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
 
   return {
     getIndex: loadIndex,
+    isModelListedAtOrBefore,
     getProviderSlugsForModel,
     getProviderSlugsForModels,
     getDataCollectionRequiredModelIds,
   };
 }
 
-export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
-  NormalizedOpenRouterResponse | undefined
+async function fetchLatestModelsByProviderSnapshotRowFromDb(): Promise<
+  ModelsByProviderSnapshotRow | undefined
 > {
   const result = await readDb
-    .select({ data: modelsByProvider.data })
+    .select({ id: modelsByProvider.id, data: modelsByProvider.data })
     .from(modelsByProvider)
     .orderBy(desc(modelsByProvider.id))
     .limit(1);
 
-  return result[0]?.data;
+  return result[0];
+}
+
+export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
+  NormalizedOpenRouterResponse | undefined
+> {
+  return (await fetchLatestModelsByProviderSnapshotRowFromDb())?.data;
+}
+
+async function fetchModelsByProviderSnapshotByIdFromDb(
+  id: number
+): Promise<ModelsByProviderSnapshotRow | undefined> {
+  const select = (client: typeof db) =>
+    client
+      .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+      .from(modelsByProvider)
+      .where(eq(modelsByProvider.id, id))
+      .limit(1);
+  // A baseline read from one replica can name a snapshot another replica has not replayed yet.
+  // That is rare, so the primary is asked before the request is refused.
+  const [row] = await select(readDb);
+  if (row) return row;
+  return (await select(db))[0];
 }
 
 const DEFAULT_TTL_MS = 30_000;
+const MAX_CACHED_BASELINE_INDEXES = 4;
 
 const defaultLoader = createModelsByProviderIndexLoader({
-  fetchSnapshot: fetchLatestModelsByProviderSnapshotFromDb,
+  fetchSnapshot: fetchLatestModelsByProviderSnapshotRowFromDb,
+  fetchSnapshotById: fetchModelsByProviderSnapshotByIdFromDb,
   fetchOpenRouterModels: getOpenRouterModelsMetadataFromDatabase,
   fetchVercelModels: getVercelModelsMetadataFromDatabase,
   ttlMs: DEFAULT_TTL_MS,
@@ -280,4 +360,11 @@ export async function getModelIdToProviderSlugsIndex(): Promise<ModelIdToProvide
 
 export async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
   return defaultLoader.getDataCollectionRequiredModelIds();
+}
+
+export async function isModelListedAtOrBefore(
+  snapshotId: number,
+  modelId: string
+): Promise<boolean> {
+  return defaultLoader.isModelListedAtOrBefore(snapshotId, modelId);
 }

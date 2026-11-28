@@ -18,8 +18,10 @@ import {
   auto_routing_custom_routers,
   organization_audit_logs,
   organization_group_memberships,
+  modelsByProvider,
   organization_groups,
   organization_memberships,
+  organization_new_models_baselines,
   organizations,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -342,6 +344,79 @@ describe('organizations settings trpc router', () => {
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
       expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
+    });
+
+    it('should keep a deny added since the client loaded when model_deny_list_base is given', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      // The client loaded ['gpt-4'] and denies claude-3; provider sync has meanwhile denied gpt-3.5-turbo.
+      await mutateOrganizationSettings(testOrganization.id, () => ({
+        model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
+      }));
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: testOrganization.id,
+        model_deny_list: ['gpt-4', 'claude-3'],
+        model_deny_list_base: ['gpt-4'],
+      });
+
+      expect(result.settings.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
+    });
+
+    it('should remove a model the client removed from model_deny_list_base and keep a concurrent deny', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await mutateOrganizationSettings(testOrganization.id, () => ({
+        model_deny_list: ['gpt-4', 'claude-3', 'gpt-3.5-turbo'],
+      }));
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: testOrganization.id,
+        model_deny_list: ['claude-3'],
+        model_deny_list_base: ['gpt-4', 'claude-3'],
+      });
+
+      expect(result.settings.model_deny_list).toEqual(['claude-3', 'gpt-3.5-turbo']);
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings?.model_deny_list).toEqual(['claude-3', 'gpt-3.5-turbo']);
+    });
+
+    it('should compare model_deny_list_base after normalizing model ids', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await mutateOrganizationSettings(testOrganization.id, () => ({
+        model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
+      }));
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: testOrganization.id,
+        model_deny_list: ['gpt-4:free'],
+        model_deny_list_base: ['gpt-4', 'claude-3:free'],
+      });
+
+      expect(result.settings.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo']);
+    });
+
+    it('should replace the whole model_deny_list when model_deny_list_base is absent', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await mutateOrganizationSettings(testOrganization.id, () => ({
+        model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
+      }));
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: testOrganization.id,
+        model_deny_list: ['claude-3'],
+      });
+
+      expect(result.settings.model_deny_list).toEqual(['claude-3']);
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings?.model_deny_list).toEqual(['claude-3']);
     });
 
     it('should store provider_allow_list in canonical provider slug form', async () => {
@@ -1718,6 +1793,177 @@ describe('organizations settings trpc router', () => {
           (await getOrganizationById(testOrganization.id))?.settings.disable_new_models
         ).toBeUndefined();
         expect(await auditMessages(testOrganization.id)).toEqual([]);
+      });
+
+      describe('baseline', () => {
+        const snapshotIds: number[] = [];
+
+        async function insertSnapshot() {
+          const [row] = await db
+            .insert(modelsByProvider)
+            .values({
+              data: { providers: [], total_providers: 0, total_models: 0, generated_at: '' },
+            })
+            .returning({ id: modelsByProvider.id });
+          snapshotIds.push(row.id);
+          return row.id;
+        }
+
+        async function baselineSnapshotId() {
+          const [row] = await db
+            .select({ snapshotId: organization_new_models_baselines.snapshot_id })
+            .from(organization_new_models_baselines)
+            .where(eq(organization_new_models_baselines.organization_id, testOrganization.id));
+          return row?.snapshotId ?? null;
+        }
+
+        async function cleanUp() {
+          await db
+            .delete(organization_new_models_baselines)
+            .where(eq(organization_new_models_baselines.organization_id, testOrganization.id));
+          for (const id of snapshotIds.splice(0)) {
+            await db.delete(modelsByProvider).where(eq(modelsByProvider.id, id));
+          }
+        }
+
+        beforeEach(cleanUp);
+        afterEach(cleanUp);
+
+        it('records the latest snapshot as the baseline when the policy is enabled', async () => {
+          await insertSnapshot();
+          const latestId = await insertSnapshot();
+          const caller = await createCallerForUser(owner.id);
+
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+
+          expect(await baselineSnapshotId()).toBe(latestId);
+        });
+
+        it('deletes the baseline when the policy is disabled', async () => {
+          await insertSnapshot();
+          const caller = await createCallerForUser(owner.id);
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+          expect(await baselineSnapshotId()).not.toBeNull();
+
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: false,
+          });
+
+          expect(await baselineSnapshotId()).toBeNull();
+        });
+
+        it('moves the baseline to the latest snapshot when the policy is enabled again', async () => {
+          const firstId = await insertSnapshot();
+          const caller = await createCallerForUser(owner.id);
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+          expect(await baselineSnapshotId()).toBe(firstId);
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: false,
+          });
+          const secondId = await insertSnapshot();
+
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+
+          expect(await baselineSnapshotId()).toBe(secondId);
+        });
+
+        it('does not move the baseline when the policy is already enabled', async () => {
+          const firstId = await insertSnapshot();
+          const caller = await createCallerForUser(owner.id);
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+          await insertSnapshot();
+
+          await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+
+          expect(await baselineSnapshotId()).toBe(firstId);
+        });
+
+        it('enables the policy while Organization Auto routes to auto tiers', async () => {
+          const snapshotId = await insertSnapshot();
+          await mutateOrganizationSettings(testOrganization.id, () => ({
+            default_model: 'kilo-auto/org',
+            org_auto_model: {
+              routes: { code: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          }));
+          const caller = await createCallerForUser(owner.id);
+
+          const result = await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+
+          expect(result.settings).toMatchObject({
+            disable_new_models: true,
+            default_model: 'kilo-auto/org',
+            org_auto_model: {
+              routes: { code: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          });
+          expect(await baselineSnapshotId()).toBe(snapshotId);
+        });
+
+        it('disables the policy while Organization Auto routes to an auto tier', async () => {
+          const snapshotId = await insertSnapshot();
+          await mutateOrganizationSettings(testOrganization.id, () => ({
+            disable_new_models: true,
+            default_model: 'kilo-auto/org',
+            org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+          }));
+          await db.insert(organization_new_models_baselines).values({
+            organization_id: testOrganization.id,
+            snapshot_id: snapshotId,
+          });
+          const caller = await createCallerForUser(owner.id);
+
+          const result = await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: false,
+          });
+
+          expect(result.settings.disable_new_models).toBe(false);
+          expect(result.settings.org_auto_model?.fallback_model).toBe('kilo-auto/balanced');
+          expect(await baselineSnapshotId()).toBeNull();
+        });
+
+        it('enables the policy while Organization Auto routes to concrete models', async () => {
+          const snapshotId = await insertSnapshot();
+          await mutateOrganizationSettings(testOrganization.id, () => ({
+            default_model: 'kilo-auto/org',
+            org_auto_model: { routes: {}, fallback_model: 'openai/gpt-4o' },
+          }));
+          const caller = await createCallerForUser(owner.id);
+
+          const result = await caller.organizations.settings.updateNewModelsPolicy({
+            organizationId: testOrganization.id,
+            disable_new_models: true,
+          });
+
+          expect(result.settings.disable_new_models).toBe(true);
+          expect(await baselineSnapshotId()).toBe(snapshotId);
+        });
       });
 
       it('rejects policy changes by members', async () => {

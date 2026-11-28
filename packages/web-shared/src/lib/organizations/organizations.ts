@@ -1273,7 +1273,9 @@ export async function mutateOrganizationSettings(
       .select()
       .from(organizations)
       .where(eq(organizations.id, organizationId))
-      .for('update');
+      // Settings are not a key, so inserts that reference the organization (which take
+      // FOR KEY SHARE) neither wait for nor deadlock with a settings mutation.
+      .for('no key update');
     if (!organization) {
       throw new Error(`Organization ${organizationId} not found`);
     }

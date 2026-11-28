@@ -36,9 +36,21 @@ export type ModelAccessDraft = {
   modelDenyList: readonly string[];
 };
 
+/**
+ * What the form's durable store holds: the draft plus the deny list it started
+ * from, which a save sends as `model_deny_list_base`. A refetch or a reload can
+ * move the server's list under a stored draft, and pairing the draft with the
+ * newer list would make the save remove every deny that arrived since. A draft
+ * an earlier build wrote has no base.
+ */
+export type StoredModelAccessDraft = ModelAccessDraft & {
+  denyListBase?: readonly string[];
+};
+
 const modelAccessDraftSchema = z.object({
   providerAllowList: z.array(z.string()),
   modelDenyList: z.array(z.string()),
+  denyListBase: z.array(z.string()).optional(),
 });
 
 /**
@@ -46,7 +58,7 @@ const modelAccessDraftSchema = z.object({
  * provider ids. It checks the shape only — which providers a catalog holds, and
  * whether a list leaves a route open, is the form's own question.
  */
-export function isModelAccessFormDraft(value: unknown): value is ModelAccessDraft {
+export function isModelAccessFormDraft(value: unknown): value is StoredModelAccessDraft {
   return modelAccessDraftSchema.safeParse(value).success;
 }
 

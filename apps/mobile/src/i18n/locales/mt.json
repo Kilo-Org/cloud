@@ -3781,6 +3781,7 @@
         "scanBeforeUseOn": "Skennja qabel l-użu attivat",
         "scanBeforeUseOff": "Skennja qabel l-użu diżattivat",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Diżattivati {{provider}}: {{models}}",
         "autoRoutingRemoved": "Mneħħija: {{models}}",
         "browserPolicyOff": "Użu tal-browser mblokkat",
         "browserPolicyAllow": "Oriġini permessi biss",

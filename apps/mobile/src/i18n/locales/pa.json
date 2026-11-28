@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "ਵਰਤੋਂ ਤੋਂ ਪਹਿਲਾਂ ਸਕੈਨ ਚਾਲੂ",
         "scanBeforeUseOff": "ਵਰਤੋਂ ਤੋਂ ਪਹਿਲਾਂ ਸਕੈਨ ਬੰਦ",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "ਬੰਦ ਕੀਤੇ ਗਏ {{provider}}: {{models}}",
         "autoRoutingRemoved": "ਹਟਾਏ ਗਏ: {{models}}",
         "browserPolicyOff": "ਬ੍ਰਾਊਜ਼ਰ ਵਰਤੋਂ ਰੁਕੀ ਹੋਈ",
         "browserPolicyAllow": "ਸਿਰਫ਼ ਮਨਜ਼ੂਰ ਓਰੀਜਨ",

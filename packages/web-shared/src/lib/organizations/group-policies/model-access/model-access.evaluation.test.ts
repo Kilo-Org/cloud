@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -253,6 +253,211 @@ describe('effective organization model access', () => {
           async () => new Set()
         )
       ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
+
+    describe('with the disable_new_models baseline', () => {
+      const BASELINE_SNAPSHOT_ID = 7;
+      const withBaseline = (
+        settings: OrganizationGroupPolicyContext['organization']['settings'] = {
+          disable_new_models: true,
+        },
+        overrides: Partial<OrganizationGroupPolicyContext> = {},
+        organizationOverrides: Partial<OrganizationGroupPolicyContext['organization']> = {}
+      ) =>
+        evaluateEffectiveModelAccessPolicy(
+          context({
+            organization: { ...organization, settings, ...organizationOverrides },
+            defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+            newModelsBaselineSnapshotId: BASELINE_SNAPSHOT_ID,
+            ...overrides,
+          })
+        );
+      function listedAtBaseline(...listed: string[]) {
+        return jest.fn(async (_snapshotId: number, modelId: string) => listed.includes(modelId));
+      }
+      const inCurrentSnapshot = async () => new Set(['acme']);
+
+      it('sets the baseline snapshot id only for an enterprise organization with the policy', () => {
+        expect(withBaseline().newModelsBaselineSnapshotId).toBe(BASELINE_SNAPSHOT_ID);
+        expect(
+          withBaseline({ disable_new_models: false }).newModelsBaselineSnapshotId
+        ).toBeUndefined();
+        expect(withBaseline({}).newModelsBaselineSnapshotId).toBeUndefined();
+        expect(
+          withBaseline({ disable_new_models: true }, {}, { plan: 'teams' })
+            .newModelsBaselineSnapshotId
+        ).toBeUndefined();
+      });
+
+      it('leaves the baseline snapshot id unset when the organization has no baseline', () => {
+        expect(
+          withBaseline({ disable_new_models: true }, { newModelsBaselineSnapshotId: undefined })
+            .newModelsBaselineSnapshotId
+        ).toBeUndefined();
+      });
+
+      it('denies a public custom LLM that the baseline snapshot does not list', async () => {
+        const isListedAtOrBefore = listedAtBaseline();
+
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline(),
+            'acme/public-model',
+            inCurrentSnapshot,
+            isListedAtOrBefore
+          )
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+        expect(isListedAtOrBefore).toHaveBeenCalledWith(BASELINE_SNAPSHOT_ID, 'acme/public-model');
+      });
+
+      it('allows a public custom LLM that the baseline snapshot lists', async () => {
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline(),
+            'acme/public-model',
+            inCurrentSnapshot,
+            listedAtBaseline('acme/public-model')
+          )
+        ).resolves.toEqual({ allowed: true });
+      });
+
+      it('denies a catalog model that the baseline snapshot does not list', async () => {
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline(),
+            'anthropic/claude',
+            currentSnapshotLookup,
+            listedAtBaseline()
+          )
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline(),
+            'anthropic/claude',
+            currentSnapshotLookup,
+            listedAtBaseline('anthropic/claude')
+          )
+        ).resolves.toEqual({ allowed: true });
+      });
+
+      it('applies to a selected grant that would admit the model', async () => {
+        const policy = withBaseline(
+          { disable_new_models: true },
+          {
+            defaultPolicies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['acme/public-model'],
+                  provider_allow_list: [],
+                },
+              },
+            ],
+          }
+        );
+
+        await expect(
+          getEffectiveModelDecision(
+            policy,
+            'acme/public-model',
+            inCurrentSnapshot,
+            listedAtBaseline()
+          )
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+        await expect(
+          getEffectiveModelDecision(
+            policy,
+            'acme/public-model',
+            inCurrentSnapshot,
+            listedAtBaseline('acme/public-model')
+          )
+        ).resolves.toEqual({ allowed: true });
+      });
+
+      it('applies to a selected provider grant', async () => {
+        const policy = withBaseline(
+          { disable_new_models: true },
+          {
+            defaultPolicies: [
+              {
+                type: 'model_access',
+                data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['openai'] },
+              },
+            ],
+          }
+        );
+
+        await expect(
+          getEffectiveModelDecision(
+            policy,
+            'openai/gpt-4o',
+            currentSnapshotLookup,
+            listedAtBaseline()
+          )
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+        await expect(
+          getEffectiveModelDecision(
+            policy,
+            'openai/gpt-4o',
+            currentSnapshotLookup,
+            listedAtBaseline('openai/gpt-4o')
+          )
+        ).resolves.toEqual({
+          allowed: true,
+          eligibleProviderRoutes: new Set(['openai']),
+        });
+      });
+
+      it('does not apply to a custom LLM granted to the organization', async () => {
+        const isListedAtOrBefore = listedAtBaseline();
+
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline(),
+            'acme/org-model',
+            async () => new Set(),
+            isListedAtOrBefore
+          )
+        ).resolves.toEqual({ allowed: true });
+        expect(isListedAtOrBefore).not.toHaveBeenCalled();
+      });
+
+      it('does not apply to an auto tier', async () => {
+        const isListedAtOrBefore = listedAtBaseline();
+
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline(),
+            'kilo-auto/balanced',
+            currentSnapshotLookup,
+            isListedAtOrBefore
+          )
+        ).resolves.toEqual({ allowed: true });
+        expect(isListedAtOrBefore).not.toHaveBeenCalled();
+      });
+
+      it('does not check the baseline without the policy or outside Enterprise', async () => {
+        const isListedAtOrBefore = listedAtBaseline();
+
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline({}),
+            'acme/public-model',
+            inCurrentSnapshot,
+            isListedAtOrBefore
+          )
+        ).resolves.toEqual({ allowed: true });
+        await expect(
+          getEffectiveModelDecision(
+            withBaseline({ disable_new_models: true }, {}, { plan: 'teams' }),
+            'acme/public-model',
+            inCurrentSnapshot,
+            isListedAtOrBefore
+          )
+        ).resolves.toEqual({ allowed: true });
+        expect(isListedAtOrBefore).not.toHaveBeenCalled();
+      });
     });
   });
 

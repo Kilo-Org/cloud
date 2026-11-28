@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Uchanganuzi kabla ya kutumia umewashwa",
         "scanBeforeUseOff": "Uchanganuzi kabla ya kutumia umezimwa",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Imezimwa {{provider}}: {{models}}",
         "autoRoutingRemoved": "Zimeondolewa: {{models}}",
         "browserPolicyOff": "Matumizi ya kivinjari yamezuiwa",
         "browserPolicyAllow": "Vyanzo vinavyoruhusiwa pekee",

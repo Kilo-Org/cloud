@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Skönnun fyrir notkun virk",
         "scanBeforeUseOff": "Skönnun fyrir notkun óvirk",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Óvirkt {{provider}}: {{models}}",
         "autoRoutingRemoved": "Fjarlægt: {{models}}",
         "browserPolicyOff": "Vafranotkun blokkuð",
         "browserPolicyAllow": "Aðeins leyfðir upprunar",

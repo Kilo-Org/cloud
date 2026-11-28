@@ -3577,6 +3577,7 @@
         "scanBeforeUseOn": "Ukuskena ngaphambi kokusetshenziswa kuvuliwe",
         "scanBeforeUseOff": "Ukuskena ngaphambi kokusetshenziswa kucishiwe",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Kucishiwe {{provider}}: {{models}}",
         "autoRoutingRemoved": "Kususiwe: {{models}}",
         "browserPolicyOff": "Ukusetshenziswa kwesiphequluli kuvinjwe",
         "browserPolicyAllow": "Imisuka evunyelwe kuphela",

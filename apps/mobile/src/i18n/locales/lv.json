@@ -3645,6 +3645,7 @@
         "scanBeforeUseOn": "Skenēšana pirms lietošanas ieslēgta",
         "scanBeforeUseOff": "Skenēšana pirms lietošanas izslēgta",
         "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingDisabled": "Atspējoti {{provider}}: {{models}}",
         "autoRoutingRemoved": "Noņemti: {{models}}",
         "browserPolicyOff": "Pārlūka lietošana bloķēta",
         "browserPolicyAllow": "Tikai atļautās izcelsmes",

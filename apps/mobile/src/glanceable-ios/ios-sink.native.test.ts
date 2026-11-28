@@ -111,6 +111,13 @@ vi.mock('expo-widgets', async () => {
   const { after } = await import('expo-widgets/src/Widgets');
   return { after, widgetsDirectory: 'file:///app-group/ExpoWidgets/' };
 });
+// The credential clear, and the terminal-frame re-write it gates, belongs to
+// the widget-credential suite. Here it stays pending: loading the refresh
+// module's trpc graph is not part of this adapter's contract, and no late write
+// may reach these records.
+vi.mock('@/lib/glanceable/home-widget-refresh', () => ({
+  clearHomeWidgetRefresh: () => new Promise<void>(() => undefined),
+}));
 vi.mock('expo-widgets/src/ExpoWidgets', () => ({
   default: {
     LiveActivityFactory: function LiveActivityFactory() {

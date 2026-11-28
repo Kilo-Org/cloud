@@ -68,6 +68,13 @@ import {
 // Native surfaces are unreachable under vitest: expo-widgets factories, the
 // swift-ui component tree, and react-native are stubbed so the sink is the real
 // logic under test.
+// The credential clear is the module that deletes the widget's stored timeline.
+// It stays pending by default, so no case that ends in a terminal frame also
+// schedules a late write into another case's recorded surfaces.
+const mockClearWidgetCredential = vi.hoisted(() => vi.fn(() => new Promise<void>(() => undefined)));
+vi.mock('@/lib/glanceable/home-widget-refresh', () => ({
+  clearHomeWidgetRefresh: mockClearWidgetCredential,
+}));
 vi.mock('@expo/ui/swift-ui', () => ({
   Text: () => null,
   VStack: () => null,
@@ -970,6 +977,30 @@ describe('iosSink widget publish', () => {
       expect(Object.values(visible?.props ?? {})).not.toContain(null);
     }
     expect(mockState.timeline).toHaveLength(1);
+  });
+
+  it('keeps the signed-out frame after the credential clear deletes the timeline', async () => {
+    let releaseClear: () => void = () => undefined;
+    mockClearWidgetCredential.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          releaseClear = resolve;
+        })
+    );
+    const signedOut = snapshotFor([], 0, 'signed_out');
+    iosSink.publish(signedOut);
+    expect(mockState.snapshots).toHaveLength(1);
+    // The clear's deletion lands after the frame above: it waits for the
+    // push-token unregister, so WidgetKit is left with no timeline and would
+    // fall back to the neutral placeholder.
+    mockState.timeline = [];
+    releaseClear();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockState.snapshots).toHaveLength(2);
+    expect(mockState.snapshots.at(-1)).toMatchObject({ home: { status: 'signed_out' } });
+    expect(mockState.timeline).toHaveLength(1);
+    expect(mockState.timeline[0]?.props).toMatchObject({ home: { status: 'signed_out' } });
   });
 
   it('publishes the four-state widget props', () => {

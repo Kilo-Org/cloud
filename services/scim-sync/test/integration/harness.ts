@@ -19,6 +19,8 @@ export type RecordedCall = {
   path: string;
   body: unknown;
   apiKey: string | null;
+  /** `authorization`: the STS service token under `WEB_INTERNAL_AUTH=sts`. */
+  authorization: string | null;
   /**
    * `x-vercel-protection-bypass`, or null when the call omitted it. Staging's
    * origin sits behind Vercel Deployment Protection and production's does
@@ -147,6 +149,7 @@ export function harness(options: {
       path: url.pathname,
       body,
       apiKey: headers.get('x-internal-api-key'),
+      authorization: headers.get('authorization'),
       protectionBypass: headers.get('x-vercel-protection-bypass'),
       redirect,
     };
@@ -182,6 +185,7 @@ export function harness(options: {
         path: `${followed.host}${followed.pathname}`,
         body,
         apiKey: headers.get('x-internal-api-key'),
+        authorization: headers.get('authorization'),
         protectionBypass: headers.get('x-vercel-protection-bypass'),
         redirect,
       });

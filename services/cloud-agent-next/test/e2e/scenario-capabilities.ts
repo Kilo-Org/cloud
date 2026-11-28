@@ -9,7 +9,7 @@
  * database access; `LifecycleArgs`/`LifecycleResult` are imported type-only.
  */
 
-import type { ApiVersion } from './client.js';
+import type { ApiVersion, CallbackTarget } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { SandboxFaultReapEvidence } from './sandbox-fault-evidence.js';
 import { cleanupRemoteSession } from './scenarios-shared.js';
@@ -107,12 +107,15 @@ export type CallbackPayload = {
 };
 
 /**
- * One open callback target. `open()` starts a sink, `callbackUrl` is registered
- * on the session, and `close()` releases it. The local Docker profile backs this
- * with a host HTTP server; the HTTP profiles back it with the e2e surface sink.
+ * One open callback target. `open()` starts a sink, `sinkCallbackTarget(sink)`
+ * is registered on the session, and `close()` releases it. The local Docker
+ * profile backs this with a host HTTP server; the HTTP profiles back it with the
+ * e2e surface sink.
  */
 export type CallbackSink = {
   callbackUrl: string;
+  /** Headers every delivery must carry, e.g. Access service-token headers. */
+  callbackHeaders?: Record<string, string>;
   records(signal?: AbortSignal): Promise<CallbackPayload[]>;
   waitFor(
     predicate: (payload: CallbackPayload) => boolean,
@@ -123,6 +126,14 @@ export type CallbackSink = {
 };
 
 export type CallbackObservation = { open(signal?: AbortSignal): Promise<CallbackSink> };
+
+/** The session `callbackTarget` that delivers to `sink`, with any headers it requires. */
+export function sinkCallbackTarget(sink: CallbackSink): CallbackTarget {
+  const headers = sink.callbackHeaders ?? {};
+  return Object.keys(headers).length === 0
+    ? { url: sink.callbackUrl }
+    : { url: sink.callbackUrl, headers };
+}
 
 /**
  * A long parked `gate`/`hang` stream. The local Node fake keeps it open for the

@@ -229,7 +229,7 @@ describe('account API authentication', () => {
   });
 
   it('refuses a client the scope registry does not allow for the route', async () => {
-    for (const clientId of ['https://client.example.com/app', 'kilo-web']) {
+    for (const clientId of ['https://client.example.com/app', 'kilo-mobile']) {
       const response = await call(
         request('/account/pats', { token: await accessToken({ client_id: clientId }) }),
         deps(unused.access)
@@ -238,6 +238,65 @@ describe('account API authentication', () => {
       expect(await response.json()).toMatchObject({ error: 'access_denied' });
     }
     expect(unused.calls).toEqual([]);
+  });
+
+  it('serves a kilo-web token as its subject and the browser session its sid names, on both routes', async () => {
+    const webSession = crypto.randomUUID();
+    const store = fakeAccount({
+      listPats: async () => ({ outcome: 'listed', pats: [] }),
+      listBotKeys: async () => ({ outcome: 'listed', botKeys: [] }),
+    });
+    const pats = await call(
+      request('/account/pats', {
+        token: await accessToken({ client_id: 'kilo-web', sid: webSession }),
+      }),
+      deps(store.access)
+    );
+    expect(pats.status).toBe(200);
+    const keys = await call(
+      request(`/account/orgs/${ORG}/bot-keys`, {
+        token: await accessToken({
+          client_id: 'kilo-web',
+          sid: webSession,
+          scope: UTS_BOT_KEYS_MANAGE_SCOPE,
+        }),
+      }),
+      deps(store.access)
+    );
+    expect(keys.status).toBe(200);
+    expect(store.calls).toEqual([
+      { method: 'listPats', input: { accountId: ACCOUNT, grantId: webSession, orgId: null } },
+      { method: 'listBotKeys', input: { accountId: ACCOUNT, grantId: webSession, orgId: ORG } },
+    ]);
+  });
+
+  it('acts for the kilo-web token subject only: another account’s PAT is not found and its session is not live', async () => {
+    const otherAccountPat = crypto.randomUUID();
+    const store = fakeAccount({
+      // As uts.revoke_pat answers for a PAT of another account (test/db/account.test.ts).
+      revokePat: async () => ({ outcome: 'not_found', feedEntries: [] }),
+      // As uts.account_session answers for a session of another account.
+      createPat: async () => ({ outcome: 'invalid_session' }),
+    });
+    const token = await accessToken({ client_id: 'kilo-web' });
+    const revoked = await call(
+      request(`/account/pats/${otherAccountPat}`, { method: 'DELETE', token }),
+      deps(store.access)
+    );
+    expect(revoked.status).toBe(404);
+    const created = await call(
+      request('/account/pats', {
+        method: 'POST',
+        token,
+        json: { name: 'ci', scope: 'uts:probe.read' },
+      }),
+      deps(store.access)
+    );
+    expect(created.status).toBe(401);
+    expect(store.calls.map(entry => entry.input)).toMatchObject([
+      { accountId: ACCOUNT, grantId: GRANT, patId: otherAccountPat },
+      { accountId: ACCOUNT, grantId: GRANT },
+    ]);
   });
 
   it('answers 403 with the needed scope for a token of another scope', async () => {

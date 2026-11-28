@@ -18,7 +18,7 @@ const {
     () => Promise<DbModule.KiloClawCommitSwitchQualification | null>
   >(async () => null),
   mockGetWorkerDb: vi.fn(),
-  mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
+  mockGetMissingSnowflakeConfig: vi.fn<() => Promise<string[]>>(async () => []),
   mockQueryKiloclawActiveUserIds: vi.fn(),
   mockReconcileCreditExpirations: vi.fn(async () => undefined),
 }));
@@ -7129,7 +7129,7 @@ describe('trial inactivity stop sweep', () => {
     vi.clearAllMocks();
     mockGetWorkerDb.mockReset();
     mockGetMissingSnowflakeConfig.mockReset();
-    mockGetMissingSnowflakeConfig.mockReturnValue([]);
+    mockGetMissingSnowflakeConfig.mockResolvedValue([]);
     mockQueryKiloclawActiveUserIds.mockReset();
     loggedValues = [];
     vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
@@ -7382,7 +7382,7 @@ describe('trial inactivity stop sweep', () => {
   it('logs and skips the run when Snowflake config is missing', async () => {
     const { db } = createMockDb([[]]);
     mockGetWorkerDb.mockReturnValue(db);
-    mockGetMissingSnowflakeConfig.mockReturnValue(['SNOWFLAKE_ACCOUNT_HOST']);
+    mockGetMissingSnowflakeConfig.mockResolvedValue(['SNOWFLAKE_ACCOUNT_HOST']);
 
     const summary = await runSweep(
       createEnv(vi.fn()),

@@ -51,7 +51,8 @@ async function runDailyPlatformSync(
   env: Env,
   router: AutoRouter,
   production: ProductionAutoMetrics | null,
-  errors: unknown[]
+  errors: unknown[],
+  ctx?: ExecutionContext
 ): Promise<void> {
   const step = async <T>(name: string, run: () => Promise<T>): Promise<StepResult<T>> => {
     try {
@@ -72,11 +73,13 @@ async function runDailyPlatformSync(
     }
   };
 
-  const sweep = await step('sweep', () => sweepStaleRuns(env));
-  const aliases = await step('subscriptions', () => dailyReconcileSubscriptions(env, router));
+  const sweep = await step('sweep', () => sweepStaleRuns(env, ctx));
+  const aliases = await step('subscriptions', () =>
+    dailyReconcileSubscriptions(env, router, { ctx })
+  );
   if (aliases.ok && aliases.value.platform.status === 'failed')
     errors.push(new Error(`${router} alias resolution: ${aliases.value.platform.error}`));
-  const registry = await step('registrySync', () => syncPlatformRegistry(env, fetch, router));
+  const registry = await step('registrySync', () => syncPlatformRegistry(env, fetch, router, ctx));
   const optimal = await step('systemOptimal', () =>
     reevaluateSystemOptimalSettings(env, router, production)
   );
@@ -94,7 +97,7 @@ async function runDailyPlatformSync(
       })
     );
   }
-  const drain = await step('drain', () => drainQueues(env, 'both', undefined, router));
+  const drain = await step('drain', () => drainQueues(env, 'both', undefined, router, { ctx }));
   const publish = await step('publish', () => publishPlatformRoutingTable(env, fetch, router));
 
   console.log(
@@ -159,15 +162,19 @@ app.onError(createErrorHandler());
 
 export default {
   fetch: app.fetch,
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    ctx?: ExecutionContext
+  ): Promise<void> {
     const errors: unknown[] = [];
     const production =
-      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env) : null;
+      controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env, ctx) : null;
     // Paid benchmarks: stage the next bounded slices, activate fully staged requests, settle
     // finished ones, and deliver the durable pin notifications. Never starts a request.
     try {
-      const reconciled = await reconcilePaidBenchmarkRequests(env);
-      const receipts = await reconcilePaidUsageReceipts(env);
+      const reconciled = await reconcilePaidBenchmarkRequests(env, { ctx });
+      const receipts = await reconcilePaidUsageReceipts(env, { ctx });
       if (
         receipts.recorded > 0 ||
         reconciled.completed.length > 0 ||
@@ -195,8 +202,8 @@ export default {
     for (const router of AUTO_ROUTERS) {
       try {
         if (controller.cron !== PLATFORM_SYNC_CRON) {
-          const result = await sweepStaleRunsAndDrain(env, router);
-          const aliases = await continueDailyReconcile(env, router).catch(error => {
+          const result = await sweepStaleRunsAndDrain(env, router, ctx);
+          const aliases = await continueDailyReconcile(env, router, { ctx }).catch(error => {
             console.warn(
               JSON.stringify({
                 event: 'benchmark_daily_alias_continued_failed',
@@ -220,7 +227,7 @@ export default {
             })
           );
         } else {
-          await runDailyPlatformSync(controller.cron, env, router, production, errors);
+          await runDailyPlatformSync(controller.cron, env, router, production, errors, ctx);
         }
       } catch (error) {
         errors.push(error);
@@ -236,13 +243,17 @@ export default {
     }
     if (errors.length > 0) throw new AggregateError(errors, 'Benchmark scheduled routers failed');
   },
-  async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
+  async queue(
+    batch: MessageBatch<BenchmarkJobMessage>,
+    env: Env,
+    ctx?: ExecutionContext
+  ): Promise<void> {
     for (const message of batch.messages) {
       try {
         if (batch.queue === DLQ_NAME) {
-          await processDeadLetter(env, message.body);
+          await processDeadLetter(env, message.body, ctx);
         } else {
-          await processJob(env, message.body);
+          await processJob(env, message.body, ctx);
         }
         message.ack();
       } catch (error) {

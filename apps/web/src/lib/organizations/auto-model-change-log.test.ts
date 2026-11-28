@@ -320,31 +320,40 @@ describe('computeRelevantChangesForOrg', () => {
 
 describe('buildAutoChangeMessage', () => {
   test('only additions: formats one segment per provider', () => {
-    const message = buildAutoChangeMessage({
-      addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']]]),
-      removedFromCatalog: [],
-      removedFromAllowedProviders: [],
-    });
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']]]),
+        removedFromCatalog: [],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: false }
+    );
 
     expect(message).toBe('Added models from provider z-ai: z-ai/glm-5.1, z-ai/glm-5.1-air');
   });
 
   test('only catalog removals: formats one catalog-removal segment', () => {
-    const message = buildAutoChangeMessage({
-      addedByReasonProvider: new Map(),
-      removedFromCatalog: ['z-ai/glm-4.0'],
-      removedFromAllowedProviders: [],
-    });
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map(),
+        removedFromCatalog: ['z-ai/glm-4.0'],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: false }
+    );
 
     expect(message).toBe('Removed models (no longer available): z-ai/glm-4.0');
   });
 
   test('only allowed-provider removals: formats one allowed-provider-removal segment', () => {
-    const message = buildAutoChangeMessage({
-      addedByReasonProvider: new Map(),
-      removedFromCatalog: [],
-      removedFromAllowedProviders: ['openai/gpt-4o'],
-    });
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map(),
+        removedFromCatalog: [],
+        removedFromAllowedProviders: ['openai/gpt-4o'],
+      },
+      { addedModelsDisabled: false }
+    );
 
     expect(message).toBe(
       'Removed models (no longer offered by any allowed provider): openai/gpt-4o'
@@ -352,26 +361,78 @@ describe('buildAutoChangeMessage', () => {
   });
 
   test('mixed additions and both removal kinds: providers sorted alphabetically', () => {
-    const message = buildAutoChangeMessage({
-      addedByReasonProvider: new Map([
-        ['z-ai', ['z-ai/glm-5.1']],
-        ['anthropic', ['anthropic/claude-4.6-haiku']],
-      ]),
-      removedFromCatalog: ['z-ai/glm-4.0'],
-      removedFromAllowedProviders: ['openai/gpt-4o'],
-    });
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map([
+          ['z-ai', ['z-ai/glm-5.1']],
+          ['anthropic', ['anthropic/claude-4.6-haiku']],
+        ]),
+        removedFromCatalog: ['z-ai/glm-4.0'],
+        removedFromAllowedProviders: ['openai/gpt-4o'],
+      },
+      { addedModelsDisabled: false }
+    );
 
     expect(message).toBe(
       'Added models from provider anthropic: anthropic/claude-4.6-haiku; Added models from provider z-ai: z-ai/glm-5.1; Removed models (no longer available): z-ai/glm-4.0; Removed models (no longer offered by any allowed provider): openai/gpt-4o'
     );
   });
 
+  test('addedModelsDisabled: additions read as disabled, sorted by provider', () => {
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map([
+          ['z-ai', ['z-ai/glm-5.1', 'z-ai/glm-5.1-air']],
+          ['anthropic', ['anthropic/claude-4.6-haiku']],
+        ]),
+        removedFromCatalog: [],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: true }
+    );
+
+    expect(message).toBe(
+      'Disabled new models from provider anthropic: anthropic/claude-4.6-haiku; Disabled new models from provider z-ai: z-ai/glm-5.1, z-ai/glm-5.1-air'
+    );
+  });
+
+  test('addedModelsDisabled: removals keep their wording', () => {
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map([['z-ai', ['z-ai/glm-5.1']]]),
+        removedFromCatalog: ['z-ai/glm-4.0'],
+        removedFromAllowedProviders: ['openai/gpt-4o'],
+      },
+      { addedModelsDisabled: true }
+    );
+
+    expect(message).toBe(
+      'Disabled new models from provider z-ai: z-ai/glm-5.1; Removed models (no longer available): z-ai/glm-4.0; Removed models (no longer offered by any allowed provider): openai/gpt-4o'
+    );
+  });
+
+  test('addedModelsDisabled: removal-only changes are unaffected', () => {
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map(),
+        removedFromCatalog: ['z-ai/glm-4.0'],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: true }
+    );
+
+    expect(message).toBe('Removed models (no longer available): z-ai/glm-4.0');
+  });
+
   test('empty input returns empty string', () => {
-    const message = buildAutoChangeMessage({
-      addedByReasonProvider: new Map(),
-      removedFromCatalog: [],
-      removedFromAllowedProviders: [],
-    });
+    const message = buildAutoChangeMessage(
+      {
+        addedByReasonProvider: new Map(),
+        removedFromCatalog: [],
+        removedFromAllowedProviders: [],
+      },
+      { addedModelsDisabled: false }
+    );
 
     expect(message).toBe('');
   });

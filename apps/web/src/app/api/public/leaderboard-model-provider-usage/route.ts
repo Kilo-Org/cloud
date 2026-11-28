@@ -7,6 +7,7 @@ import {
   resolveLeaderboardModel,
 } from '@/lib/leaderboard-model';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
+import { LEADERBOARD_WINDOW_USAGE_SQL } from '@/lib/leaderboard-usage-hourly-rollup';
 import { createPublicReport, publicReportOptions } from '@/lib/public-report';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
@@ -36,11 +37,9 @@ select
     , sum(mu.request_count)::float8 as "sum_request_count"
     , sum(mu.error_count)::float8 as "sum_error_count"
     , ${sql.raw(LEADERBOARD_SERVED_MODEL_SQL)} as "served_model"
-from leaderboard_usage_daily as mu
+from ${LEADERBOARD_WINDOW_USAGE_SQL} as mu
 where
-    mu.usage_date >= (now() at time zone 'UTC')::date - 7
-    and mu.usage_date < (now() at time zone 'UTC')::date
-    and (
+    (
         mu.provider != 'custom'
         or mu.requested_model = 'reflection/beam-free'
         or mu.requested_model = 'stealth/glyph-cluster'
@@ -165,10 +164,10 @@ export const GET = createPublicReport({
     const { rows } = await readDb.execute<ModelProviderUsageRow>(
       LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY
     );
-    // An empty window means the rollup has not been built yet; failing keeps
-    // the last good report in the in-process cache instead of caching nothing.
+    // An empty window means no day in it is complete yet; failing keeps the
+    // last good report in the in-process cache instead of caching nothing.
     if (rows.length === 0) {
-      throw new Error('leaderboard_usage_daily has no rows for the leaderboard window');
+      throw new Error('leaderboard_usage_hourly has no complete days in the leaderboard window');
     }
     return await aggregateUsage(rows);
   },

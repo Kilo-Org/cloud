@@ -7,6 +7,7 @@ import {
 } from './bitbucket-workspace-access-token-authorization-service.js';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
 import { ResponseTooLargeError, readBoundedJsonBody } from './lib/bounded-read.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const BITBUCKET_API_PREFIX = `${BITBUCKET_API_ORIGIN}/2.0`;
@@ -405,10 +406,15 @@ export class BitbucketCodeReviewService {
   private readonly fetchImplementation: typeof fetch;
   private readonly authorizationService: AuthorizationService;
 
-  constructor(env: CloudflareEnv, options: BitbucketCodeReviewServiceOptions = {}) {
+  constructor(
+    env: CloudflareEnv,
+    options: BitbucketCodeReviewServiceOptions = {},
+    ctx?: SecretsExecutionContext
+  ) {
     this.fetchImplementation = options.fetch ?? defaultFetch;
     this.authorizationService =
-      options.authorizationService ?? new BitbucketWorkspaceAccessTokenAuthorizationService(env);
+      options.authorizationService ??
+      new BitbucketWorkspaceAccessTokenAuthorizationService(env, {}, ctx);
   }
 
   async getPullRequest(input: BitbucketPullRequestRequest): Promise<BitbucketPullRequestResult> {

@@ -9,7 +9,7 @@
     "tail": "wrangler tail",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/code-review-infra/src",
-    "test": "vitest run --config vitest.workers.config.ts"
+    "test": "vitest run && vitest run --config vitest.workers.config.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
@@ -22,6 +22,8 @@
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"

@@ -26,6 +26,11 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
@@ -60,6 +65,12 @@ export async function POST(req: NextRequest) {
   if (!BOT_TOKEN_MINT_SECRET || !secret || !timingSafeEqual(secret, BOT_TOKEN_MINT_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'web',
+    'bot_token_mint',
+    'legacy_shared_secret',
+    callerLabel(req.headers.get(INTERNAL_CALLER_HEADER))
+  );
 
   let body: unknown;
   try {

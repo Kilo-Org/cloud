@@ -1166,6 +1166,7 @@ export async function POST(
         secret: CALLBACK_TOKEN_SECRET,
         scope: 'code-review-status-callback',
         resourceParts: [reviewId, callbackAttemptId],
+        observation: { receiver: 'web', caller: req.headers.get('x-kilo-caller') },
       }));
     if (!validCallbackToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -1,13 +1,19 @@
 # The auto-routing-benchmark Worker (services/auto-routing-benchmark/wrangler.jsonc). Production
 # only. Over its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts) it writes pool pins, reads
 # usage receipts and the production routing profile, and records its grader's own LLM usage at the
-# web app, one scope each.
+# web app, one scope each. It reads its runtime secrets over the same binding; SECRETS_SOURCE stays
+# `secrets-store` (the Secrets Store bindings) until secrets-cutover flips it. All three resolve
+# from /shared. The Node CLI scripts under src/ read OPENROUTER_API_KEY from `process.env` and bind
+# no STS.
 workload: auto-routing-benchmark
 environments:
   - production
 identity:
   kind: worker-binding
-secrets: []
+secrets:
+  - BOT_TOKEN_MINT_SECRET
+  - INTERNAL_API_SECRET
+  - OPENROUTER_API_KEY
 audiences:
   - web
 scopes:

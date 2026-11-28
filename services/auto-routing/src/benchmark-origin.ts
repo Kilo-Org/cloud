@@ -18,15 +18,18 @@ import {
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
+import { readAutoRoutingSecret } from './secrets';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 
 async function fetchBenchmark(
   env: BenchmarkEnv,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx);
   return env.BENCHMARK_SERVICE.fetch(`https://auto-routing-benchmark${path}`, {
     ...init,
     headers: {
@@ -39,9 +42,10 @@ async function fetchBenchmark(
 async function fetchBenchmarkJson(
   env: BenchmarkEnv,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  ctx?: SecretsExecutionContext
 ): Promise<unknown> {
-  const res = await fetchBenchmark(env, path, init);
+  const res = await fetchBenchmark(env, path, init, ctx);
   if (!res.ok) {
     const detail = (await res.text().catch(() => '')).slice(0, 200);
     throw new Error(`benchmark origin ${path} responded ${res.status} ${detail}`);
@@ -49,6 +53,9 @@ async function fetchBenchmarkJson(
   return res.json();
 }
 
+// The two cached origin reads below are loaded through `ttlCached` (routing-table.ts,
+// classifier-config.ts), whose loaders receive only the env. They therefore pass no invocation
+// context: each caller already authenticated through a ctx-bearing read in the same invocation.
 export async function fetchRoutingTableFromOrigin(
   env: BenchmarkEnv,
   router: AutoRouter = DEFAULT_AUTO_ROUTER
@@ -103,14 +110,20 @@ export function customRouterBenchmarkContext(
  */
 export async function fetchCustomRouterEpoch(
   env: BenchmarkEnv,
-  router: AutoRouter
+  router: AutoRouter,
+  ctx?: SecretsExecutionContext
 ): Promise<number | null> {
   try {
-    const body = await fetchBenchmarkJson(env, CUSTOM_ROUTER_EPOCH_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ router }),
-    });
+    const body = await fetchBenchmarkJson(
+      env,
+      CUSTOM_ROUTER_EPOCH_PATH,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ router }),
+      },
+      ctx
+    );
     const parsed = CustomRouterEpochResponseSchema.safeParse(body);
     return parsed.success ? parsed.data.epoch : null;
   } catch {
@@ -120,14 +133,20 @@ export async function fetchCustomRouterEpoch(
 
 export async function fetchCustomRouterTableVersion(
   env: BenchmarkEnv,
-  context: CustomRouterBenchmarkContext
+  context: CustomRouterBenchmarkContext,
+  ctx?: SecretsExecutionContext
 ): Promise<string | null> {
   try {
-    const body = await fetchBenchmarkJson(env, CUSTOM_ROUTER_TABLE_VERSION_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(context),
-    });
+    const body = await fetchBenchmarkJson(
+      env,
+      CUSTOM_ROUTER_TABLE_VERSION_PATH,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(context),
+      },
+      ctx
+    );
     const parsed = CustomRouterTableVersionResponseSchema.safeParse(body);
     return parsed.success ? parsed.data.readinessVersion : null;
   } catch {
@@ -145,13 +164,19 @@ export type CustomRouterTableLoad = {
 
 export async function fetchCustomRouterTable(
   env: BenchmarkEnv,
-  context: CustomRouterBenchmarkContext
+  context: CustomRouterBenchmarkContext,
+  ctx?: SecretsExecutionContext
 ): Promise<CustomRouterTableLoad> {
-  const res = await fetchBenchmark(env, CUSTOM_ROUTER_TABLE_PATH, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(context),
-  });
+  const res = await fetchBenchmark(
+    env,
+    CUSTOM_ROUTER_TABLE_PATH,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(context),
+    },
+    ctx
+  );
   if (!res.ok) {
     const detail = (await res.text().catch(() => '')).slice(0, 200);
     throw new Error(
@@ -175,13 +200,19 @@ export async function fetchCustomRouterTable(
 export async function forwardClientEval(
   env: BenchmarkEnv,
   path: string,
-  body: unknown
+  body: unknown,
+  ctx?: SecretsExecutionContext
 ): Promise<Response> {
-  const res = await fetchBenchmark(env, path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const res = await fetchBenchmark(
+    env,
+    path,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    ctx
+  );
   return new Response(res.body, {
     status: res.status,
     headers: { 'content-type': res.headers.get('content-type') ?? 'application/json' },

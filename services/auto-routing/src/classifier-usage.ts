@@ -1,4 +1,5 @@
 import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   UsageRecordRequestSchema,
   toUsageRecordWireBody,
@@ -10,8 +11,14 @@ import {
   recordLlmUsage,
   type LlmUsageWriteOutcome,
 } from '@kilocode/worker-utils/usage-writer-client';
+import {
+  STS_WEB_USAGE_RECORD_CLASSIFIER,
+  resolveWebInternalCredential,
+  type WebInternalAuthEnv,
+} from '@kilocode/worker-utils/web-internal-credential';
 import { ZodError } from 'zod';
 import type { DecisionScope } from './decision-cache';
+import { readAutoRoutingSecret } from './secrets';
 
 export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
 
@@ -117,14 +124,27 @@ export async function buildClassifierUsage(
 }
 
 export async function writeClassifierUsage(
-  env: Pick<ClassifierUsageEnv, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'>,
-  usage: UsageRecordRequest
+  env: Pick<ClassifierUsageEnv, 'INTERNAL_API_SECRET_PROD' | 'KILO_WEB_API_BASE_URL'> &
+    WebInternalAuthEnv,
+  usage: UsageRecordRequest,
+  ctx?: SecretsExecutionContext
 ): Promise<LlmUsageWriteOutcome> {
   try {
-    return await recordLlmUsage(usage, {
-      url: new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href,
-      secret: await env.INTERNAL_API_SECRET_PROD.get(),
-    });
+    // `WEB_INTERNAL_AUTH`: the internal secret unless set to `sts`, then a
+    // `web:usage.classifier.record` STS token. Without either the DO keeps the event and retries.
+    const credential = await resolveWebInternalCredential(
+      env,
+      STS_WEB_USAGE_RECORD_CLASSIFIER,
+      () => readAutoRoutingSecret(env, 'INTERNAL_API_SECRET', ctx)
+    );
+    if (credential.kind === 'unavailable') return { kind: 'unavailable', reason: 'missing_config' };
+    const url = new URL('/api/internal/usage/record', env.KILO_WEB_API_BASE_URL).href;
+    return await recordLlmUsage(
+      usage,
+      credential.kind === 'sts'
+        ? { url, serviceToken: credential.token }
+        : { url, secret: credential.secret }
+    );
   } catch {
     return { kind: 'unavailable', reason: 'missing_config' };
   }

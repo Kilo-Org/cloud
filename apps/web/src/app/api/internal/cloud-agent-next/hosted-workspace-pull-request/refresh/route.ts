@@ -39,7 +39,7 @@ type RefreshResult = { status: RefreshStatus; retryAt: string | null };
 const createCaller = createCallerFactory(rootRouter);
 
 export async function POST(request: Request) {
-  const unauthorized = await authorizeInternalApiRequest(request);
+  const unauthorized = await authorizeInternalApiRequest(request, 'hosted_workspace_refresh');
   if (unauthorized) return unauthorized;
 
   let body: unknown;

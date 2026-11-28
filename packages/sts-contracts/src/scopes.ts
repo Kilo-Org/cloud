@@ -330,6 +330,93 @@ export const STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE = {
 } as const;
 
 /**
+ * The web app calls Security Auto Analysis's web-called `/internal/*` routes. Only the `web`
+ * workload may send it.
+ */
+export const STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL = {
+  audience: 'security-auto-analysis',
+  scope: 'security-auto-analysis:internal.call',
+} as const;
+
+/**
+ * The web app calls Model Eval Ingest's web-called `/internal/*` routes. Only the `web` workload
+ * may send it.
+ */
+export const STS_MODEL_EVAL_INGEST_INTERNAL_CALL = {
+  audience: 'model-eval-ingest',
+  scope: 'model-eval-ingest:internal.call',
+} as const;
+
+/**
+ * The web app calls Webhook Agent Ingest's web-called `/internal/*` routes. Only the `web`
+ * workload may send it.
+ */
+export const STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL = {
+  audience: 'webhook-agent-ingest',
+  scope: 'webhook-agent-ingest:internal.call',
+} as const;
+
+/**
+ * The web app calls Session Sync's web-called `/internal/*` routes. Only the `web` workload may
+ * send it.
+ */
+export const STS_SESSION_SYNC_INTERNAL_CALL = {
+  audience: 'session-sync',
+  scope: 'session-sync:internal.call',
+} as const;
+
+/**
+ * The web app calls the Notifications Worker's web-called `/internal/*` routes. Only the `web`
+ * workload may send it.
+ */
+export const STS_NOTIFICATIONS_INTERNAL_CALL = {
+  audience: 'notifications',
+  scope: 'notifications:internal.call',
+} as const;
+
+/** The web app reads Auto Routing's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_ADMIN_READ = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:admin.read',
+} as const;
+
+/** The web app writes through Auto Routing's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_ADMIN_WRITE = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:admin.write',
+} as const;
+
+/** The AI Gateway asks Auto Routing for a routing decision. Only the `ai-gateway` workload may send it. */
+export const STS_AUTO_ROUTING_DECIDE = {
+  audience: 'auto-routing',
+  scope: 'auto-routing:decide',
+} as const;
+
+/**
+ * The web app, the AI Gateway and Auto Routing read the Auto Routing Benchmark's routing tables.
+ * Only the `web`, `ai-gateway` and `auto-routing` workloads may send it.
+ */
+export const STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:routing-tables.read',
+} as const;
+
+/** The web app reads the Auto Routing Benchmark's admin routes. Only the `web` workload may send it. */
+export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:admin.read',
+} as const;
+
+/**
+ * The web app writes through the Auto Routing Benchmark's admin routes. Only the `web` workload
+ * may send it.
+ */
+export const STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE = {
+  audience: 'auto-routing-benchmark',
+  scope: 'auto-routing-benchmark:admin.write',
+} as const;
+
+/**
  * A GitHub Actions job asks the web app to mint the one-hour catalog API token
  * (`POST /api/internal/mcp-catalog/token`): the MCP catalog dump and the kilo-app changelog jobs.
  */
@@ -363,8 +450,9 @@ export const STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC = {
  * (`STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC`).
  * The phase 2 C1 scopes are each one sender's call to the web app (the other `STS_WEB_*` pairs),
  * Cloud Agent's callbacks to Webhook Agent Ingest and Security Auto Analysis, the web app's calls
- * to the Code Review Worker (`STS_CODE_REVIEW_*`), and its session access invalidation at Session
- * Ingest. STS mints each one only where a policy grants it (default deny).
+ * to the Code Review Worker (`STS_CODE_REVIEW_*`), its session access invalidation at Session
+ * Ingest, and its calls to other Workers' web-called `/internal/*` routes (`STS_*_INTERNAL_CALL`).
+ * STS mints each one only where a policy grants it (default deny).
  */
 export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   web: {
@@ -425,12 +513,16 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
     ],
   },
   [STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK.audience]: {
-    scopes: [STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK.scope],
+    scopes: [
+      STS_WEBHOOK_AGENT_INGEST_EXECUTION_CALLBACK.scope,
+      STS_WEBHOOK_AGENT_INGEST_INTERNAL_CALL.scope,
+    ],
   },
   [STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.audience]: {
     scopes: [
       STS_SECURITY_AUTO_ANALYSIS_ANALYSIS_CALLBACK.scope,
       STS_SECURITY_AUTO_ANALYSIS_REMEDIATION_CALLBACK.scope,
+      STS_SECURITY_AUTO_ANALYSIS_INTERNAL_CALL.scope,
     ],
   },
   [STS_CODE_REVIEW_DISPATCH.audience]: {
@@ -443,6 +535,25 @@ export const STS_SCOPE_REGISTRY: StsScopeRegistry = {
   },
   [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.audience]: {
     scopes: [STS_SESSION_INGEST_SESSION_ACCESS_INVALIDATE.scope],
+  },
+  [STS_MODEL_EVAL_INGEST_INTERNAL_CALL.audience]: {
+    scopes: [STS_MODEL_EVAL_INGEST_INTERNAL_CALL.scope],
+  },
+  [STS_SESSION_SYNC_INTERNAL_CALL.audience]: { scopes: [STS_SESSION_SYNC_INTERNAL_CALL.scope] },
+  [STS_NOTIFICATIONS_INTERNAL_CALL.audience]: { scopes: [STS_NOTIFICATIONS_INTERNAL_CALL.scope] },
+  [STS_AUTO_ROUTING_DECIDE.audience]: {
+    scopes: [
+      STS_AUTO_ROUTING_ADMIN_READ.scope,
+      STS_AUTO_ROUTING_ADMIN_WRITE.scope,
+      STS_AUTO_ROUTING_DECIDE.scope,
+    ],
+  },
+  [STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.audience]: {
+    scopes: [
+      STS_AUTO_ROUTING_BENCHMARK_ROUTING_TABLES_READ.scope,
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_READ.scope,
+      STS_AUTO_ROUTING_BENCHMARK_ADMIN_WRITE.scope,
+    ],
   },
   'community-contributions-dashboard': {
     scopes: [STS_COMMUNITY_CONTRIBUTIONS_DASHBOARD_OPENCODE_SYNC.scope],

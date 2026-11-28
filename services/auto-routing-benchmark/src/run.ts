@@ -2,6 +2,7 @@ import {
   ClassifierRunError,
   classifyWithSystemOne,
 } from '@kilocode/auto-routing-contracts/classifier';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   CLASSIFIER_WINNER_KV_KEY,
   routingTableKvKey,
@@ -237,6 +238,7 @@ import { BenchmarkProbeFamilyError, runCancellableProbeCase } from './probe/exec
 import { agenticEligibilityView, pairsMissingProbeResults } from './probe/eligibility';
 import { pauseUnfundedPaidRequests } from './paid-benchmark';
 import { PaidBenchmarkPlanSchema } from './paid-benchmark-plan';
+import { readAutoRoutingBenchmarkSecret } from './secrets';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
 export type RunModelEntry = {
@@ -321,14 +323,15 @@ const QUEUE_SEND_BATCH_LIMIT = 100;
 async function enqueueRunMessages(
   env: Env,
   runId: string,
-  messages: { body: BenchmarkJobMessage }[]
+  messages: { body: BenchmarkJobMessage }[],
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   for (let i = 0; i < messages.length; i += QUEUE_SEND_BATCH_LIMIT) {
     try {
       await env.BENCH_QUEUE.sendBatch(messages.slice(i, i + QUEUE_SEND_BATCH_LIMIT));
     } catch (error) {
       const reason = `enqueue failed after ${i} of ${messages.length} messages: ${formatError(error).error}`;
-      await failRunAndDrain(env, runId, { failureClass: 'run_init_failed', reason }).catch(
+      await failRunAndDrain(env, runId, { failureClass: 'run_init_failed', reason }, ctx).catch(
         () => {}
       );
       throw error;
@@ -343,7 +346,8 @@ async function enqueueRunMessages(
 export async function failRunAndDrain(
   env: Env,
   runId: string,
-  failure: ProfileFailure
+  failure: ProfileFailure,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   await markRunFailed(env.BENCH_DB, runId, failure.reason);
   try {
@@ -357,7 +361,7 @@ export async function failRunAndDrain(
       })
     );
   }
-  for (const router of AUTO_ROUTERS) await drainQueues(env, 'both', undefined, router);
+  for (const router of AUTO_ROUTERS) await drainQueues(env, 'both', undefined, router, { ctx });
 }
 
 const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
@@ -372,7 +376,7 @@ const STALE_RUN_MAX_AGE_MS = 6 * 3600_000;
 // which matters because those measurements cost real money.
 // Registry rows claimed by a stale run that could not be salvaged are failed so
 // they do not stay stuck in `running`.
-export async function sweepStaleRuns(env: Env): Promise<string[]> {
+export async function sweepStaleRuns(env: Env, ctx?: SecretsExecutionContext): Promise<string[]> {
   const db = env.BENCH_DB;
   const olderThanIso = new Date(Date.now() - STALE_RUN_MAX_AGE_MS).toISOString();
   // Capture ids before the bulk status flip so profile claims can be settled.
@@ -381,7 +385,7 @@ export async function sweepStaleRuns(env: Env): Promise<string[]> {
   );
   for (const run of stale) {
     // Salvage before the bulk flip — markRunCompleted guards on status='running'.
-    await salvageTimedOutDeciderRun(env, run.id).catch(error => {
+    await salvageTimedOutDeciderRun(env, run.id, ctx).catch(error => {
       console.warn(
         JSON.stringify({
           event: 'benchmark_profile_salvage_error',
@@ -418,7 +422,11 @@ export async function sweepStaleRuns(env: Env): Promise<string[]> {
  * finalization path complete the run: finished entries go `ready` with their
  * summaries, unfinished ones go `failed` and a requeue re-admits them.
  */
-async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void> {
+async function salvageTimedOutDeciderRun(
+  env: Env,
+  runId: string,
+  ctx?: SecretsExecutionContext
+): Promise<void> {
   const state = await getRunState(env, runId);
   if (state.status !== 'running') return;
 
@@ -445,7 +453,7 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
       unfinishedLanes: unfinished.length,
     })
   );
-  await finalizeRunIfComplete(env, runId, 'decider', state);
+  await finalizeRunIfComplete(env, runId, 'decider', state, ctx);
 }
 
 /**
@@ -455,12 +463,13 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
  */
 export async function sweepStaleRunsAndDrain(
   env: Env,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  ctx?: SecretsExecutionContext
 ): Promise<{
   staleRunIds: string[];
   drained: StartedQueueRun[];
 }> {
-  const staleRunIds = await sweepStaleRuns(env);
+  const staleRunIds = await sweepStaleRuns(env, ctx);
   const recoveries = await listPendingOutputRecoveries(
     env.BENCH_DB,
     router,
@@ -479,8 +488,8 @@ export async function sweepStaleRunsAndDrain(
     } satisfies BenchmarkJobMessage);
   }
   // Each platform drain reconciles the catalog before claiming entries.
-  const drained = await drainQueues(env, 'both', undefined, router);
-  await dispatchScheduler(env);
+  const drained = await drainQueues(env, 'both', undefined, router, { ctx });
+  await dispatchScheduler(env, ctx);
   return { staleRunIds, drained };
 }
 
@@ -509,7 +518,12 @@ export async function drainQueues(
   // A caller that reconciled the platform queue itself, in this same request
   // (the config save), skips the drain's own reconcile. It would read the same
   // saved decider list and write the same rows again.
-  options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
+  options: {
+    skipPlatformSync?: boolean;
+    skipped?: DrainSkipReason[];
+    /** The invocation that owns this drain, handed to every secret read it reaches. */
+    ctx?: SecretsExecutionContext;
+  } = {}
 ): Promise<StartedQueueRun[]> {
   if (selector === 'user') {
     console.log(JSON.stringify({ event: 'benchmark_user_queue_retired', router }));
@@ -549,7 +563,8 @@ export const PLATFORM_SYNC_SCHEDULE = 'daily at 05:00 UTC';
 export async function syncPlatformRegistry(
   env: Env,
   fetchImpl: typeof fetch = fetch,
-  router: AutoRouter = 'efficient'
+  router: AutoRouter = 'efficient',
+  ctx?: SecretsExecutionContext
 ): Promise<{ desiredEntries: number }> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) return { desiredEntries: 0 };
@@ -558,7 +573,7 @@ export async function syncPlatformRegistry(
     config,
     PLATFORM_SUBSCRIPTION_OWNER,
     config.deciderModels.map(model => ({ model: model.id })),
-    { fetchImpl }
+    { fetchImpl, ctx }
   );
   const desired = snapshotPairs(snapshot);
   await syncPlatformRegistryRows(
@@ -1152,6 +1167,8 @@ export function resolveRunIdentity(config: BenchmarkIdentityOverrides): Benchmar
 
 export type StartRunOptions = {
   router?: AutoRouter;
+  /** The invocation that starts this run, handed to every secret read it reaches. */
+  ctx?: SecretsExecutionContext;
   /** Classifier only: re-measure models that already have current results. */
   force?: boolean;
   /** Which registry queue this run drains. Classifier runs are always 'platform'. */
@@ -1190,7 +1207,7 @@ export async function startRun(
 
   // Stale-run sweeper: fail dead 'running' runs first so a wedged run can't
   // block new ones and the admin panel shows the truth.
-  await sweepStaleRuns(env);
+  await sweepStaleRuns(env, options.ctx);
 
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
   if (!config) {
@@ -1383,29 +1400,35 @@ export async function startRun(
     // aggregate so config-only changes (model removed, threshold tweaked)
     // take effect without re-running any model. The state mirrors the rows
     // insertRun just wrote, so no re-read is needed.
-    await finalizeRunIfComplete(env, runId, kind, {
-      router,
-      status: 'running',
-      minAccuracy: policy.minAccuracy,
-      switchCostFactor: policy.switchCostFactor,
-      bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
-      benchmarkUserId: benchmarkIdentity.benchmarkUserId,
-      benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
-      models: runModelRows,
-      repetitions,
-      classifierMaxP95LatencyMs: kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
-      startedAt,
-      purpose,
-      engineIdentity,
-      measurementRevision: ACTIVE_MEASUREMENT_REVISION,
-    });
+    await finalizeRunIfComplete(
+      env,
+      runId,
+      kind,
+      {
+        router,
+        status: 'running',
+        minAccuracy: policy.minAccuracy,
+        switchCostFactor: policy.switchCostFactor,
+        bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+        benchmarkUserId: benchmarkIdentity.benchmarkUserId,
+        benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
+        models: runModelRows,
+        repetitions,
+        classifierMaxP95LatencyMs: kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
+        startedAt,
+        purpose,
+        engineIdentity,
+        measurementRevision: ACTIVE_MEASUREMENT_REVISION,
+      },
+      options.ctx
+    );
     return { runId, enqueuedModels: 0, skippedModels };
   }
 
   if (kind === 'classifier') {
     const chunks = chunkArray(CLASSIFIER_CASES, CLASSIFIER_CHUNK_SIZE);
     const messages = buildClassifierMessages(runId, enqueuedRunEntries, repetitions, chunks);
-    await enqueueRunMessages(env, runId, messages);
+    await enqueueRunMessages(env, runId, messages, options.ctx);
     return { runId, enqueuedModels: enqueuedRunEntries.length, skippedModels };
   }
 
@@ -1464,7 +1487,12 @@ export async function drainQueue(
   env: Env,
   queue: BenchmarkRunPurpose,
   router: AutoRouter = 'efficient',
-  options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
+  options: {
+    skipPlatformSync?: boolean;
+    skipped?: DrainSkipReason[];
+    /** The invocation that owns this drain, handed to every secret read it reaches. */
+    ctx?: SecretsExecutionContext;
+  } = {}
 ): Promise<{ runId: string; entryCount: number } | null> {
   // The user queue is retired: only an explicit funded paid request admits user work
   // (`startPaidRequestRun`). Nothing here may enroll a subscription, schedule or retry.
@@ -1529,7 +1557,7 @@ export async function drainQueue(
 
   // Reconcile saved snapshots, not the live alias targets.
   if (queue === 'platform' && !options.skipPlatformSync)
-    await syncPlatformRegistry(env, fetch, router);
+    await syncPlatformRegistry(env, fetch, router, options.ctx);
 
   const engineIdentity = computeEngineIdentity('decider', router);
   const repetitions = resolveEffectivePolicy(config).deciderRepetitions;
@@ -1542,7 +1570,13 @@ export async function drainQueue(
     options.skipped?.push('nothing_pending');
     return null;
   }
-  const catalog = await fetchExecutableBenchmarkModelCatalog(env, resolveRunIdentity(config));
+  const catalog = await fetchExecutableBenchmarkModelCatalog(
+    env,
+    resolveRunIdentity(config),
+    fetch,
+    undefined,
+    options.ctx
+  );
   const checked = pending.map(row => ({
     row,
     failure: benchmarkPairUnavailability(catalog, {
@@ -1578,7 +1612,12 @@ export async function drainQueue(
   }));
 
   try {
-    const result = await startRun(env, 'decider', { router, purpose: queue, entries });
+    const result = await startRun(env, 'decider', {
+      router,
+      purpose: queue,
+      entries,
+      ctx: options.ctx,
+    });
     console.log(
       JSON.stringify({
         event: 'benchmark_queue_drain_started',
@@ -1792,7 +1831,7 @@ async function dispatchClaims(env: Env, config: SchedulerConfig): Promise<number
  * that takes several passes to initialize never holds back other runs' dispatch. A
  * pass that completes a run's initialization claims again to start its chunks.
  */
-export async function dispatchScheduler(env: Env): Promise<void> {
+export async function dispatchScheduler(env: Env, ctx?: SecretsExecutionContext): Promise<void> {
   // The cutover comes first and fail-closed: a worker that cannot read the marker must not
   // schedule anything (it cannot tell legacy work from admitted work).
   let cutoverAt: string;
@@ -1845,13 +1884,19 @@ export async function dispatchScheduler(env: Env): Promise<void> {
         caseId,
       });
     }
-    await finalizeRunIfComplete(env, claim.run_id, 'decider', await getRunState(env, claim.run_id));
+    await finalizeRunIfComplete(
+      env,
+      claim.run_id,
+      'decider',
+      await getRunState(env, claim.run_id),
+      ctx
+    );
   }
   for (const runId of await listSettledSchedulerRuns(
     env.BENCH_DB,
     REGISTRY_QUEUES * MAX_RUNNING_RUNS_PER_QUEUE
   )) {
-    await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId));
+    await finalizeRunIfComplete(env, runId, 'decider', await getRunState(env, runId), ctx);
   }
   let claimed = await dispatchClaims(env, config);
   if (await initializeScheduledRuns(env)) claimed += await dispatchClaims(env, config);
@@ -2626,7 +2671,12 @@ async function failDeadLaneAndPaidLinks(
   ]);
 }
 
-async function processScheduledChunk(env: Env, id: string, token: string): Promise<void> {
+async function processScheduledChunk(
+  env: Env,
+  id: string,
+  token: string,
+  ctx?: SecretsExecutionContext
+): Promise<void> {
   const claim = await getChunk(env.BENCH_DB, id, token);
   if (!claim) return;
   if (!(await startChunk(env.BENCH_DB, id, token, Date.now()))) return;
@@ -2671,7 +2721,8 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         caseIds: z.array(z.string()).parse(JSON.parse(claim.case_ids)),
       },
       state,
-      claim
+      claim,
+      ctx
     );
     await finishChunk(env.BENCH_DB, id, token);
   } catch (error) {
@@ -2854,16 +2905,20 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
       })
     );
   }
-  await dispatchScheduler(env);
+  await dispatchScheduler(env, ctx);
   // Run accounting reads every case result of the run, so it only runs once the
   // run's scheduled work has settled. Dispatch's settled-run sweep and the
   // dead-letter path stay responsible for settling runs that never complete.
   if (state && !(await hasUnsettledChunks(env.BENCH_DB, claim.run_id))) {
-    await finalizeRunIfComplete(env, claim.run_id, 'decider', state);
+    await finalizeRunIfComplete(env, claim.run_id, 'decider', state, ctx);
   }
 }
 
-export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
+export async function processJob(
+  env: Env,
+  rawMessage: unknown,
+  ctx?: SecretsExecutionContext
+): Promise<void> {
   // Validate the message shape; malformed messages are logged and dropped
   // rather than retried forever.
   const parsed = BenchmarkJobMessageSchema.safeParse(rawMessage);
@@ -2884,11 +2939,11 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       return;
     }
     if (message.schedulerWake) {
-      await dispatchScheduler(env);
+      await dispatchScheduler(env, ctx);
       return;
     }
     if (message.claimId && message.claimToken) {
-      await processScheduledChunk(env, message.claimId, message.claimToken);
+      await processScheduledChunk(env, message.claimId, message.claimToken, ctx);
     } else {
       const legacyState = await getRunState(env, message.runId);
       if (legacyState.status === 'running') await initializeScheduledRun(env, message.runId);
@@ -2911,14 +2966,14 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
           );
         });
       }
-      await dispatchScheduler(env);
+      await dispatchScheduler(env, ctx);
     }
     return;
   }
   const state = await getRunState(env, message.runId);
   if (state.status !== 'running') {
     if (message.kind === 'classifier' && state.status === 'completed') {
-      await finalizeRunIfComplete(env, message.runId, message.kind, state);
+      await finalizeRunIfComplete(env, message.runId, message.kind, state, ctx);
       return;
     }
     return;
@@ -2996,7 +3051,7 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
     );
   }
 
-  await finalizeRunIfComplete(env, message.runId, message.kind, state);
+  await finalizeRunIfComplete(env, message.runId, message.kind, state, ctx);
 }
 
 /**
@@ -3006,7 +3061,11 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
  * (e.g. D1) throw so the DLQ consumer retries — a death recorded without a
  * completed finalization must be re-attempted, not acked away.
  */
-export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<void> {
+export async function processDeadLetter(
+  env: Env,
+  rawMessage: unknown,
+  ctx?: SecretsExecutionContext
+): Promise<void> {
   const parsed = BenchmarkJobMessageSchema.safeParse(rawMessage);
   if (!parsed.success) {
     console.warn(
@@ -3027,7 +3086,7 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
       const state = await getRunState(env, message.runId).catch(() => null);
       if (state?.status === 'running') await initializeScheduledRun(env, message.runId);
     }
-    await dispatchScheduler(env);
+    await dispatchScheduler(env, ctx);
     return;
   }
   const state = await getRunState(env, message.runId).catch(() => undefined);
@@ -3069,7 +3128,7 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
       chunk: message.chunk ?? 0,
     })
   );
-  await finalizeRunIfComplete(env, message.runId, message.kind, state);
+  await finalizeRunIfComplete(env, message.runId, message.kind, state, ctx);
 }
 
 type RunState = {
@@ -3144,9 +3203,10 @@ async function caseInferenceProxy(
      */
     catalogToken: string | null;
     kiloApiUrl: string;
-  }
+  },
+  ctx?: SecretsExecutionContext
 ): Promise<CaseInferenceProxy> {
-  const secret = await env.INTERNAL_API_SECRET_PROD.get();
+  const secret = await readAutoRoutingBenchmarkSecret(env, 'INTERNAL_API_SECRET', ctx);
   if (!secret) throw new Error('benchmark case inference secret is unavailable');
   const issued = await issueCaseInferenceCapability(secret, {
     engineIdentity: input.engineIdentity,
@@ -3401,7 +3461,8 @@ async function processDeciderJob(
   env: Env,
   message: BenchmarkJobMessage,
   state: RunState,
-  claim: SchedulerClaim
+  claim: SchedulerClaim,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   if (!message.caseIds?.length) throw new Error('Scheduler chunk has no cases');
   const caseIds = new Set(message.caseIds);
@@ -3496,7 +3557,14 @@ async function processDeciderJob(
           // org snapshot existed lack one; checked here so chunks whose cases are
           // all recorded still finish without a mint.
           if (!benchmarkOrgId) throw new Error(`run ${message.runId} has no benchmarkOrgId`);
-          return fetchBenchmarkUserToken(env, benchmarkUserId, benchmarkOrgId, audience);
+          return fetchBenchmarkUserToken(
+            env,
+            benchmarkUserId,
+            benchmarkOrgId,
+            audience,
+            fetch,
+            ctx
+          );
         })();
         minted.set(audience, token);
       }
@@ -3510,7 +3578,8 @@ async function processDeciderJob(
           env,
           { benchmarkUserId, benchmarkOrgId },
           fetch,
-          token
+          token,
+          ctx
         );
       });
       // A catalog read that fails after the paid case started is a transient lookup failure,
@@ -3660,18 +3729,22 @@ async function processDeciderJob(
         // just claimed and re-issued for a retry (its `startedAt` moves). Every provider
         // request carries it, so the gateway attributes the call to exactly one paid
         // generation; the platform bot token stays on the exact catalog reads only.
-        let inference = await caseInferenceProxy(env, {
-          engineIdentity: state.engineIdentity,
-          runId: message.runId,
-          model: message.model,
-          variant: storedVariant,
-          caseId: benchCase.id,
-          rep,
-          generation,
-          startedAt,
-          catalogToken: launch.catalogToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-        });
+        let inference = await caseInferenceProxy(
+          env,
+          {
+            engineIdentity: state.engineIdentity,
+            runId: message.runId,
+            model: message.model,
+            variant: storedVariant,
+            caseId: benchCase.id,
+            rep,
+            generation,
+            startedAt,
+            catalogToken: launch.catalogToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+          },
+          ctx
+        );
         // A probe goes straight to the gateway with the captured request template; every
         // other case keeps the CLI container, which owns the workspace and tool execution.
         // Both transports re-check the canonical live generation before they spend
@@ -3799,18 +3872,22 @@ async function processDeciderJob(
         }
         // The retry is a further paid call of the same generation: its capability must name
         // the new signed start or the gateway rejects it as expired.
-        inference = await caseInferenceProxy(env, {
-          engineIdentity: state.engineIdentity,
-          runId: message.runId,
-          model: message.model,
-          variant: storedVariant,
-          caseId: benchCase.id,
-          rep,
-          generation,
-          startedAt,
-          catalogToken: launch.catalogToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-        });
+        inference = await caseInferenceProxy(
+          env,
+          {
+            engineIdentity: state.engineIdentity,
+            runId: message.runId,
+            model: message.model,
+            variant: storedVariant,
+            caseId: benchCase.id,
+            rep,
+            generation,
+            startedAt,
+            catalogToken: launch.catalogToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+          },
+          ctx
+        );
         attemptStartedAt = startedAt;
         retried = true;
         priorCostUsd = first.costUsd;
@@ -4422,7 +4499,8 @@ async function finalizeRunIfComplete(
   runId: string,
   kind: BenchmarkKind,
   // Run snapshot already loaded by the caller (startRun / processJob / processDeadLetter).
-  state: RunState
+  state: RunState,
+  ctx?: SecretsExecutionContext
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
   const caseCount = expectedCaseCount(kind, state.router, state.measurementRevision);
@@ -4444,12 +4522,17 @@ async function finalizeRunIfComplete(
   // runs settle per entry below — one dead model never discards the rest.
   if (deadLanes.length > 0 && kind === 'classifier') {
     const [first, ...rest] = deadLanes;
-    await failRunAndDrain(env, runId, {
-      failureClass: 'unknown',
-      reason:
-        `lane dead-lettered: ${first.model} variant ${variantFromStorage(first.variant) ?? 'default'} rep ${first.rep}` +
-        (rest.length > 0 ? ` (+${rest.length} more)` : ''),
-    });
+    await failRunAndDrain(
+      env,
+      runId,
+      {
+        failureClass: 'unknown',
+        reason:
+          `lane dead-lettered: ${first.model} variant ${variantFromStorage(first.variant) ?? 'default'} rep ${first.rep}` +
+          (rest.length > 0 ? ` (+${rest.length} more)` : ''),
+      },
+      ctx
+    );
     return;
   }
 
@@ -4709,7 +4792,7 @@ async function finalizeRunIfComplete(
     });
     // Both queues: this queue may have been full, and a pair this run just
     // measured may have been the only pending work the other queue was waiting on.
-    await drainQueues(env, 'both', undefined, state.router);
+    await drainQueues(env, 'both', undefined, state.router, { ctx });
     return;
   }
 

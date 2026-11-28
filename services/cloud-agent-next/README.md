@@ -67,6 +67,21 @@ the methods its policy allows: credential endpoints answer none, and
 configuration, membership and lifecycle endpoints answer reads only. The
 project root answers reads only.
 
+### Session Ingest caller credential (`SESSION_INGEST_CALLER_AUTH`)
+
+The scoped session proxy and the child history export call Session Ingest over
+the `SESSION_INGEST` binding (`src/session-ingest-caller-auth.ts`). Unset, empty
+or `legacy` sends the internal API secret in `X-Internal-Secret`, as before.
+`binding` sends no credential: the binding declares `props.caller` (`cloud-agent-next`
+at the top level, `cloud-agent-next-dev` in `env.dev`) and the secret is never
+read. Any other value fails every call. Production leaves it unset.
+
+Set `binding` only once Session Ingest's `SessionIngestRPC` entrypoint authorizes
+the caller (design §6.4). That receiver must accept only the exact deployed caller
+name of its own environment (`cloud-agent-next` in production) and refuse every
+other name, including the development caller; that change is p4's. Rollback is
+`legacy`.
+
 ## API Documentation
 
 ### Overview

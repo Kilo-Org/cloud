@@ -1,4 +1,13 @@
-# Registration only: services/session-ingest/wrangler.jsonc. No environment, identity or grant.
+# The session-ingest Worker (services/session-ingest/wrangler.jsonc). It reads its runtime secrets
+# over the `STS` SecretsBroker binding; SECRETS_SOURCE stays `secrets-store` (the Secrets Store bindings)
+# until secrets-cutover flips it. NEXTAUTH_SECRET and INTERNAL_API_SECRET resolve from /shared;
+# SESSION_SHARE_JWT_SECRET resolves from /workloads/session-ingest. The staging block binds no STS.
 workload: session-ingest
-registered: true
-secrets: []
+environments:
+  - production
+identity:
+  kind: worker-binding
+secrets:
+  - NEXTAUTH_SECRET
+  - INTERNAL_API_SECRET
+  - SESSION_SHARE_JWT_SECRET

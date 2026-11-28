@@ -1,13 +1,19 @@
 # The cloudflare-scim-sync Worker (services/scim-sync/wrangler.jsonc). Production only:
-# `env.staging` (cloudflare-scim-sync-staging) binds no STS. It applies directory changes over the
-# web app's /api/internal/scim/* routes with a web:scim.sync token over its `STS` SecretsBroker
-# binding (WEB_INTERNAL_AUTH=sts).
+# `env.staging` (cloudflare-scim-sync-staging) binds no STS and reads the `_STAGING` store names.
+# It applies directory changes over the web app's /api/internal/scim/* routes with a web:scim.sync
+# token over its `STS` SecretsBroker binding (WEB_INTERNAL_AUTH=sts). It reads its runtime secrets
+# over the same binding; SECRETS_SOURCE stays `secrets-store` (the Secrets Store bindings) until
+# secrets-cutover flips it. WORKOS_API_KEY and WORKOS_CLIENT_ID resolve from
+# /workloads/cloudflare-scim-sync; INTERNAL_API_SECRET from /shared.
 workload: cloudflare-scim-sync
 environments:
   - production
 identity:
   kind: worker-binding
-secrets: []
+secrets:
+  - INTERNAL_API_SECRET
+  - WORKOS_API_KEY
+  - WORKOS_CLIENT_ID
 audiences:
   - web
 scopes:

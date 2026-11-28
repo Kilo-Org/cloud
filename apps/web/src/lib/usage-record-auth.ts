@@ -11,6 +11,7 @@ import {
 } from '@kilocode/verify';
 import { STS_URL } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL, resolveAppUrl } from '@kilocode/web-shared/lib/constants';
+import { callerLabel, observeInternalAuth } from '@kilocode/worker-utils/internal-auth-observation';
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 
 /**
@@ -47,6 +48,16 @@ const USAGE_RECORD_PATHS = [
   EXA_USAGE_WRITE_PATH,
 ] as const;
 type UsageRecordPath = (typeof USAGE_RECORD_PATHS)[number];
+
+/**
+ * The observation label of a record route (design section 9.4, item 9): the fixed route family,
+ * never the request's own path or a value from it.
+ */
+function usageRecordRoute(path: UsageRecordPath): string {
+  if (path === ENKRYPT_USAGE_WRITE_PATH) return 'enkrypt_usage_record';
+  if (path === EXA_USAGE_WRITE_PATH) return 'exa_usage_record';
+  return 'usage_record';
+}
 
 /** STS grants `STS_USAGE_RECORD` only to this workload; the routes repeat the check. */
 const USAGE_RECORD_WORKLOAD = 'usage-ingest';
@@ -205,6 +216,7 @@ async function authorizeServiceToken(
   if (request.headers.get('x-usage-write-source') !== QUEUE_SOURCE) {
     return insufficientScope(deployment, path, 'source');
   }
+  observeInternalAuth('web', usageRecordRoute(path), 'sts', callerLabel(result.caller.workload));
   return null;
 }
 
@@ -238,7 +250,7 @@ async function missingCredential(
   path: UsageRecordPath
 ): Promise<Response | null> {
   const deployment = await stsDeployment();
-  if (deployment === null) return authorizeInternalApiRequest(request);
+  if (deployment === null) return authorizeInternalApiRequest(request, usageRecordRoute(path));
   return unauthorized(deployment, path);
 }
 
@@ -265,7 +277,7 @@ export async function authorizeUsageRecordRequest(
   path: UsageRecordPath
 ): Promise<Response | null> {
   const mode = usageRecordAuthMode(process.env.USAGE_RECORD_AUTH);
-  if (mode === 'legacy') return authorizeInternalApiRequest(request);
+  if (mode === 'legacy') return authorizeInternalApiRequest(request, usageRecordRoute(path));
   if (mode === null) {
     log('usage_record_auth_misconfigured', { path });
     return Response.json({ error: 'Service unavailable' }, { status: 503, headers: NO_STORE });
@@ -284,7 +296,9 @@ export async function authorizeUsageRecordRequest(
   }
   if (bearer) return authorizeServiceToken(request, path);
   if (mode === 'sts') return refuseWithoutToken(path, secret);
-  return secret ? authorizeInternalApiRequest(request) : missingCredential(request, path);
+  return secret
+    ? authorizeInternalApiRequest(request, usageRecordRoute(path))
+    : missingCredential(request, path);
 }
 
 /**

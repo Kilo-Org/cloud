@@ -15,7 +15,7 @@ Treat this map as a starting point; refresh `listDatasets` when a name/kind diff
 |---|---|---|
 | `vercel` | APL | Web/function/request logs; Cloud Agent session creation and request IDs. |
 | `cloudflare-logpush` | APL | Worker/DO logs and execution metadata; Cloud Agent allocation and message lifecycle. |
-| `cloudflare-user-data-export` | APL | Cloudflare OTel spans: `trace_id`, `span_id`, `duration`, service/HTTP attributes. |
+| `cloudflare-user-data-export` | APL | Cloudflare OTel spans: `trace_id`, `span_id`, `duration`, service/HTTP attributes. The dataset stops receiving spans once `services/user-data-export` deploys with traces off (the STS secret-holder rule keeps `observability.traces.enabled: false`); logs stay in `cloudflare-logpush`. |
 | `supabase-production` | APL | Production database logs. |
 | `supabase-snowflake-exports` | APL | Exported Supabase platform/database logs: `event_message`, `metadata.*`. |
 | `kilocode-app` | MPL | Vercel app telemetry; discover the metric catalog first. |

@@ -1887,9 +1887,11 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
 
 // The STS deploy-token twins (services/sts/README.md, "Cloudflare deploy tokens"): the repository
 // variable DEPLOY_TOKEN_SOURCE runs each deploy job (unset or `secret`) or its `-sts` twin (`sts`).
-test('only the Worker deploy call may hold an OIDC token in a deploy workflow', () => {
-  // The deploy-workers call carries id-token as the ceiling of its called jobs, of which only the
+test('only the Worker deploy calls may hold an OIDC token in a deploy workflow', () => {
+  // Each deploy-workers call carries id-token as the ceiling of its called jobs, of which only the
   // `-sts` twins request it (see the STS twin tests below); their tokens name deploy-workers.yml.
+  // Detection calls the same workflow, and GitHub checks every job in it, so the ceiling is needed
+  // even though the matrix-only call skips those jobs.
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
@@ -1898,12 +1900,21 @@ test('only the Worker deploy call may hold an OIDC token in a deploy workflow', 
     const minting = Object.entries(deployment.jobs)
       .filter(([, job]) => job.permissions?.['id-token'] !== undefined)
       .map(([id, job]) => [id, job.permissions['id-token']]);
-    assert.deepEqual(minting, [['deploy-workers', 'write']], `${name} jobs with id-token`);
-    assert.deepEqual(deployment.jobs['deploy-workers'].permissions, {
-      contents: 'read',
-      actions: 'read',
-      'id-token': 'write',
-    });
+    assert.deepEqual(
+      minting.sort(),
+      [
+        ['deploy-workers', 'write'],
+        ['detect-workers', 'write'],
+      ].sort(),
+      `${name} jobs with id-token`
+    );
+    for (const id of ['deploy-workers', 'detect-workers']) {
+      assert.deepEqual(deployment.jobs[id].permissions, {
+        contents: 'read',
+        actions: 'read',
+        'id-token': 'write',
+      });
+    }
   }
 });
 

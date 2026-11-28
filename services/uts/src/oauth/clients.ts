@@ -1,3 +1,4 @@
+import type { UtsEnvironment, UtsFirstPartyClient } from '@kilocode/uts-contracts';
 import type { AttestationPolicy } from '../attest/config';
 import { matchesPrivateUseRedirect } from '../signin/native/redirect';
 import { oauthError } from './errors';
@@ -154,4 +155,13 @@ export function isRegisteredRedirect(client: FirstPartyClient, redirectUri: stri
   return client.redirect.kind === 'loopback'
     ? isLoopbackRedirect(client.redirect.path, redirectUri)
     : matchesPrivateUseRedirect(client.redirect.uri, redirectUri);
+}
+
+/** True when `redirectUri` is one of the exact URIs the web client registered for `environment`. */
+export function isRegisteredWebRedirect(
+  client: Extract<UtsFirstPartyClient, { kind: 'confidential_web' }>,
+  environment: UtsEnvironment,
+  redirectUri: string
+): boolean {
+  return client.redirectUris[environment].includes(redirectUri);
 }

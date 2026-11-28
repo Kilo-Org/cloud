@@ -1137,7 +1137,10 @@ describe('required inputs (migration 0020)', () => {
         )
       )
     ).toBe('22004');
-    expect(await store.readEmailLink(sha256(link))).not.toBeNull();
+    expect(await store.readEmailLink(sha256(link))).toMatchObject({
+      email,
+      returnTo: '/signin/done',
+    });
   });
 });
 

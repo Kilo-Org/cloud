@@ -79,6 +79,8 @@ describe('sign-in hand-off', () => {
     if (result.status !== 'interaction') throw new Error('expected the sign-in page');
     expect(result.response.status).toBe(200);
     expect(result.response.headers.get('Content-Security-Policy')).toContain("script-src 'self'");
+    // The URL names no authorization request, so the forms stay on the issuer.
+    expect(result.response.headers.get('Content-Security-Policy')).toContain("form-action 'self';");
     expect(result.response.headers.get('X-Frame-Options')).toBe('DENY');
     // `no-referrer` would make the browser send `Origin: null` with the pages' own form posts.
     expect(result.response.headers.get('Referrer-Policy')).toBe('same-origin');

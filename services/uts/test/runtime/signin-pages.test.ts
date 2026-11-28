@@ -25,8 +25,23 @@ const device: PendingDevice = {
 
 const RECORDING_EMAIL = { turnstileSiteKey: null };
 
-function choices(methods: { email: SignInChoices['email'] }): SignInChoices {
-  return { returnTo: '/signin/done', rpId: RP_ID, providers: [], email: methods.email, sso: false };
+function choices(
+  methods: { email: SignInChoices['email'] },
+  clientOrigin: string | null = null
+): SignInChoices {
+  return {
+    returnTo: '/signin/done',
+    clientOrigin,
+    rpId: RP_ID,
+    providers: [],
+    email: methods.email,
+    sso: false,
+  };
+}
+
+/** The sign-in page's whole policy, with `formAction` as its `form-action` sources. */
+function signInPolicy(formAction: string): string {
+  return `default-src 'none'; script-src 'self'; ${PASSKEY_CONNECT} img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
 }
 
 describe('sign-in page policy', () => {
@@ -85,6 +100,15 @@ describe('sign-in page policy', () => {
       );
       expect(await page.text()).not.toContain('cf-turnstile');
     }
+  });
+
+  it("names only the request's registered client origin beside 'self' in form-action, and changes no other directive", () => {
+    const withClient = signInPage(choices({ email: RECORDING_EMAIL }, 'https://app.kilo.ai'));
+    expect(withClient.headers.get('Content-Security-Policy')).toBe(
+      signInPolicy("'self' https://app.kilo.ai")
+    );
+    const withoutClient = signInPage(choices({ email: RECORDING_EMAIL }));
+    expect(withoutClient.headers.get('Content-Security-Policy')).toBe(signInPolicy("'self'"));
   });
 });
 

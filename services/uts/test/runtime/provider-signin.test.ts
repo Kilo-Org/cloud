@@ -81,6 +81,30 @@ function setCookies(response: Response): string[] {
   return (response.headers.get('Set-Cookie') ?? '').split(/,\s*(?=__Host-)/);
 }
 
+/** The registered callback of `kilo-web` in the test pool's development environment. */
+const WEB_CALLBACK = 'http://localhost:3000/api/auth/uts/callback';
+const FOREIGN_CALLBACK = 'https://evil.example/api/auth/uts/callback';
+const CLI_RETURN_TO = `/authorize?${new URLSearchParams({
+  client_id: 'kilo-cli',
+  redirect_uri: 'http://127.0.0.1:4100/callback',
+}).toString()}`;
+
+/** A `kilo-web` authorization request, as a sign-in's `returnTo`. */
+function webReturnTo(redirectUri = WEB_CALLBACK): string {
+  const query = new URLSearchParams({
+    client_id: 'kilo-web',
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    state: 's-1',
+  });
+  return `/authorize?${query.toString()}`;
+}
+
+/** The whole policy of a page without a passkey ceremony, with `formAction` as its sources. */
+function pagePolicy(formAction: string): string {
+  return `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; style-src 'self'; form-action ${formAction}; base-uri 'none'; frame-ancestors 'none'`;
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('provider routes', () => {
@@ -322,7 +346,11 @@ describe('email routes', () => {
 
   it('shows the address on the link page, warns in another browser, and consumes nothing', async () => {
     const { methods, calls } = methodsWith({
-      readEmailLink: async () => ({ email: 'person@example.com', binderHash: new Uint8Array(32) }),
+      readEmailLink: async () => ({
+        email: 'person@example.com',
+        binderHash: new Uint8Array(32),
+        returnTo: '/signin/done',
+      }),
     });
     const token = 'T'.repeat(43);
     const response = await handleEmailRequest(
@@ -337,6 +365,8 @@ describe('email routes', () => {
     // This request carries no binder cookie of the email, so the page warns and confirms.
     expect(html).toContain('another browser');
     expect(calls.map(call => call.method)).toEqual(['readEmailLink']);
+    // The link returns to no authorization request, so its form stays on the issuer.
+    expect(response?.headers.get('Content-Security-Policy')).toBe(pagePolicy("'self'"));
   });
 
   it('signs in with the right code and sets the session cookie', async () => {
@@ -384,12 +414,94 @@ describe('email routes', () => {
     );
     expect(foreign?.status).toBe(403);
   });
+
+  it.each([
+    [
+      'a kilo-web request with its registered callback',
+      webReturnTo(),
+      "'self' http://localhost:3000",
+    ],
+    ['a kilo-web request with another callback', webReturnTo(FOREIGN_CALLBACK), "'self'"],
+    ['a kilo-cli request', CLI_RETURN_TO, "'self'"],
+    ['no authorization request', '/signin/done', "'self'"],
+  ])('gives the code entry of %s the form-action %s', async (_name, returnTo, formAction) => {
+    const { methods, calls } = methodsWith({
+      startEmail: async () => ({
+        outcome: 'stored',
+        withCode: true,
+        expiresAt: new Date(Date.now() + 600_000),
+      }),
+    });
+    const response = await handleEmailRequest(
+      post(
+        '/signin/email/start',
+        new URLSearchParams({ email: 'a@example.com', return_to: returnTo }).toString()
+      ),
+      '/signin/email/start',
+      methods
+    );
+    expect(response?.status).toBe(200);
+    expect(await response?.text()).toContain('action="/signin/email/code"');
+    expect(response?.headers.get('Content-Security-Policy')).toBe(pagePolicy(formAction));
+    expect(calls[0].input).toMatchObject({ returnTo });
+  });
+
+  it.each([
+    [
+      'a kilo-web request with its registered callback',
+      webReturnTo(),
+      "'self' http://localhost:3000",
+    ],
+    ['a kilo-web request with another callback', webReturnTo(FOREIGN_CALLBACK), "'self'"],
+    ['no stored request', null, "'self'"],
+  ])(
+    'gives the code entry after a wrong code for %s the form-action %s',
+    async (_name, returnTo, formAction) => {
+      const { methods } = methodsWith({
+        verifyEmailCode: async () => ({ outcome: 'invalid_code', entriesLeft: 2, returnTo }),
+      });
+      const response = await handleEmailRequest(
+        post('/signin/email/code', 'email=a%40example.com&code=000000'),
+        '/signin/email/code',
+        methods
+      );
+      expect(response?.status).toBe(400);
+      expect(response?.headers.get('Content-Security-Policy')).toBe(pagePolicy(formAction));
+    }
+  );
+
+  it.each([
+    [
+      'a kilo-web request with its registered callback',
+      webReturnTo(),
+      "'self' http://localhost:3000",
+    ],
+    ['a kilo-web request with another callback', webReturnTo(FOREIGN_CALLBACK), "'self'"],
+    ['a kilo-cli request', CLI_RETURN_TO, "'self'"],
+  ])('gives the link page of %s the form-action %s', async (_name, returnTo, formAction) => {
+    const { methods } = methodsWith({
+      readEmailLink: async () => ({
+        email: 'person@example.com',
+        binderHash: new Uint8Array(32),
+        returnTo,
+      }),
+    });
+    const response = await handleEmailRequest(
+      new Request(`${ISSUER}/signin/email/link?token=${'T'.repeat(43)}`),
+      '/signin/email/link',
+      methods
+    );
+    expect(response?.status).toBe(200);
+    expect(await response?.text()).toContain('action="/signin/email/link"');
+    expect(response?.headers.get('Content-Security-Policy')).toBe(pagePolicy(formAction));
+  });
 });
 
 describe('sign-in page', () => {
   it('lists the configured methods, and its form-action stays on the issuer', async () => {
     const response = signInPage({
       returnTo: '/authorize?client_id=kilo-cli&state=a"b',
+      clientOrigin: null,
       rpId: 'app.kilo.ai',
       providers: [{ provider: 'google', name: 'Google' }],
       email: { turnstileSiteKey: null },

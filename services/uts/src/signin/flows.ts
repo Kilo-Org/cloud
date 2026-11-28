@@ -12,6 +12,7 @@ import { readBoundedText } from '../request-body';
 import { classifyFailure } from '../oauth/errors';
 import { base64url, isRandomCredential, randomCredential, sha256 } from '../token/credentials';
 import type { EmailSignIn } from './email/delivery';
+import { clientReturnOrigin } from './form-action';
 import { anonymousWriteRetryAfter } from './limits';
 import { requestNetwork } from './network';
 import { type SignInChoices, continuePage, messagePage, unavailablePage } from './pages';
@@ -48,6 +49,7 @@ export function signInChoices(methods: SignInMethods, returnTo: string): SignInC
   const { settings, config } = methods;
   return {
     returnTo,
+    clientOrigin: clientReturnOrigin(returnTo, config.environment),
     rpId: config.relyingParty.rpId,
     providers: UTS_OAUTH_PROVIDERS.filter(
       provider => settings.providers[provider].status === 'on'

@@ -51,7 +51,7 @@ import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlit
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
 import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
-import { readCloudAgentNextSecret, readCloudAgentNextStoreSecret } from '../../secrets.js';
+import { readCloudAgentNextSecret } from '../../secrets.js';
 import { sessionIngestExportCredential } from '../../session-ingest-caller-auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';

@@ -811,13 +811,13 @@ function githubProblems(policy: Policy, identity: GithubIdentity): string[] {
   if (hasDuplicates(identity.events)) problems.push('identity.events contains a duplicate');
   // Q71 carve-out (Igor, 2026-11-27): a trigger-only policy holds nothing a token could read; its
   // job only asks the migration proxy to apply what is on `main`, which the proxy checks itself
-  // (design Q64a). So it may list workflow_run with other events and grant production.
-  // D53/M112: the secret-bundle policies of D53_M112_CI_BUNDLE_CARVE_OUT may too.
+  // (design Q64a). So it alone may list workflow_run with other events and grant production.
   // Q71b (Igor, 2026-11-27): the deploy-only policies of Q71_CLOUDFLARE_DEPLOY_CARVE_OUT may too.
+  // D53/M112: the secret-bundle policies of D53_M112_CI_BUNDLE_CARVE_OUT may too.
   const carvedOut =
     holdsMigrationRun(policy) ||
-    usesCiBundleCarveOut(policy, identity) ||
-    usesCloudflareDeployCarveOut(policy, identity);
+    usesCloudflareDeployCarveOut(policy, identity) ||
+    usesCiBundleCarveOut(policy, identity);
   if (!carvedOut && identity.events.includes('workflow_run') && identity.events.length > 1) {
     problems.push('a github-oidc policy that accepts workflow_run accepts no other event');
   }

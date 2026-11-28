@@ -874,8 +874,9 @@ Rules the loader enforces:
   `pull_request_review`, `discussion`, `merge_group` and the rest) can be listed. A policy that
   lists `workflow_run` lists no other event, binds an `environment`, and does not grant
   `production`: GitHub gives a `workflow_run` job the default branch as its `ref` even when a fork's
-  pull request started the upstream run, and STS cannot see that run. Two carve-outs: trigger-only
-  policies (Q71, below) and the secret bundles of `D53_M112_CI_BUNDLE_CARVE_OUT` (above).
+  pull request started the upstream run, and STS cannot see that run. Three carve-outs: trigger-only
+  policies (Q71, below), the deploy-only policies of `Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b,
+  below), and the secret bundles of `D53_M112_CI_BUNDLE_CARVE_OUT` (above).
 - A policy that grants `production` binds an `environment` and accepts only `refs/heads/main`,
   unless it equals an entry of `GITHUB_PRODUCTION_REF_EXCEPTIONS` in every field (today only
   `ci-kilocode-app-key-v2`); a policy with token grants binds an `environment`.
@@ -966,8 +967,9 @@ verifier, so its job's token opens nothing there even with the STS audience.
 grant or environment grant; and no other policy, in any environment, naming one of its workflow
 files (on top of the rule that two policies may not share a repository, environment and workflow
 file). Q71 carve-out (Igor, 2026-11-27): such a policy may list `workflow_run` together with
-`schedule` and `workflow_dispatch` and grant production, as may only the D53/M112 secret bundles
-above; the workflow's `workflow_run` trigger stays limited to `branches: [main]`. The name
+`schedule` and `workflow_dispatch` and grant production, as may the deploy-only policies of
+`Q71_CLOUDFLARE_DEPLOY_CARVE_OUT` (Q71b) and the D53/M112 secret bundles above; the workflow's
+`workflow_run` trigger stays limited to `branches: [main]`. The name
 `migration-proxy` is registered for the proxy's own
 Worker: the change that adds the Worker turns it into its `worker-binding` policy (staging and
 production, `MIGRATION_PROXY_DB_PASSWORD` and `MIGRATION_PROXY_GITHUB_APP_KEY` in

@@ -11,6 +11,10 @@ export default defineConfig({
       wrangler: { configPath: './wrangler.jsonc' },
       remoteBindings: false,
       miniflare: {
+        // The pool runs the production wrangler vars, which turn the background source
+        // comparison on. Pin it off so a route test never starts a bundle read against the stub
+        // below; src/secrets-compare.test.ts turns it on with its own env and context.
+        bindings: { SECRETS_COMPARE_ENABLED: '' },
         serviceBindings: {
           EVENT_SERVICE_SELF: kCurrentWorker,
           // The wrangler config binds the deployed `sts`; tests resolve that name to the stub.
@@ -18,7 +22,7 @@ export default defineConfig({
         },
         // Worker unit tests resolve the STS binding to the stub below instead of the deployed
         // broker. The binding names the `SecretsBroker` entrypoint, so the stub exports it.
-        // Nothing reaches it while SECRETS_SOURCE is `secrets-store`.
+        // Nothing reaches it while SECRETS_SOURCE is `secrets-store` and the comparison is off.
         workers: [
           {
             name: 'sts-stub',

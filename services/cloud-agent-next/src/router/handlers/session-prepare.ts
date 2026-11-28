@@ -333,6 +333,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const operationKey = requestWithProfile.options?.operationKey;
       const registrationContext = {
         env: ctx.env,
+        executionCtx: ctx.executionCtx,
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,

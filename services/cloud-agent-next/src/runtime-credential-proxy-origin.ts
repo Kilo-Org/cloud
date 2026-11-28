@@ -3,7 +3,12 @@ import {
   CLOUD_AGENT_SESSION_SYNC_ORIGIN,
   RUNTIME_PROXY_ORIGIN_HEADER,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
-import { resolveSecret, type SecretBinding } from './auth.js';
+import {
+  readCloudAgentNextSecret,
+  secretsSource,
+  type CloudAgentNextSecretsEnv,
+} from './secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import { logger } from './logger.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 
@@ -29,7 +34,7 @@ export function parseRuntimeProxyOriginProof(value: unknown): string | undefined
   return typeof value === 'string' && PROOF_PATTERN.test(value) ? value : undefined;
 }
 
-type OriginEnv = { NEXTAUTH_SECRET?: SecretBinding };
+type OriginEnv = CloudAgentNextSecretsEnv;
 
 /**
  * The proof for one sandbox egress: a keyed MAC over its outbound id (the
@@ -38,14 +43,21 @@ type OriginEnv = { NEXTAUTH_SECRET?: SecretBinding };
  */
 export async function runtimeProxyOriginProof(
   env: OriginEnv,
-  outboundId: string
+  outboundId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<string | null> {
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const secret = await readCloudAgentNextSecret(env, 'NEXTAUTH_SECRET', ctx).catch(() => null);
   if (!secret) {
-    // Egress then sends no proof; make that visible before readers require it.
-    const reason = env.NEXTAUTH_SECRET ? 'secret_unavailable' : 'secret_not_configured';
+    // Egress then sends no proof; make that visible before readers require it. A source that is not
+    // deployed at all is a different alert from one that is deployed and failing: `secrets-store`
+    // holds the binding, `sts` holds the service binding.
+    const configured =
+      secretsSource(env) === 'sts' ? env.STS !== undefined : env.NEXTAUTH_SECRET !== undefined;
     logger
-      .withFields({ logTag: 'runtime_proxy_origin_proof_unavailable', reason })
+      .withFields({
+        logTag: 'runtime_proxy_origin_proof_unavailable',
+        reason: configured ? 'secret_unavailable' : 'secret_not_configured',
+      })
       .warn('Runtime proxy origin proof unavailable');
     return null;
   }
@@ -77,7 +89,8 @@ function isFacadeRequest(url: URL, facade: string | null): boolean {
 export async function withRuntimeProxyOrigin(
   request: Request,
   env: OriginEnv & { WORKER_URL?: string },
-  outboundId: string
+  outboundId: string,
+  ctx?: SecretsExecutionContext
 ): Promise<Request> {
   const facade = env.WORKER_URL ? runtimeCredentialProxyFacadeBaseUrl(env.WORKER_URL) : null;
   const url = new URL(request.url);
@@ -87,7 +100,7 @@ export async function withRuntimeProxyOrigin(
   if (!needsProof && !request.headers.has(RUNTIME_PROXY_ORIGIN_HEADER)) return request;
   const headers = new Headers(request.headers);
   headers.delete(RUNTIME_PROXY_ORIGIN_HEADER);
-  const proof = needsProof ? await runtimeProxyOriginProof(env, outboundId) : null;
+  const proof = needsProof ? await runtimeProxyOriginProof(env, outboundId, ctx) : null;
   if (proof !== null) headers.set(RUNTIME_PROXY_ORIGIN_HEADER, proof);
   return new Request(request, { headers });
 }

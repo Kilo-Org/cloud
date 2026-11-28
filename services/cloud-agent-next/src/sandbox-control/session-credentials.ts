@@ -9,6 +9,8 @@ import {
 import { z } from 'zod';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
+import { readCloudAgentNextSecret } from '../secrets.js';
+import type { SecretsExecutionContext } from '@kilocode/secrets-client';
 import {
   getSandboxProvider,
   requiresContainmentSandbox,
@@ -1638,6 +1640,8 @@ export function credentialSourceFromMetadata(
 
 export async function prepareSessionCredentials(input: {
   env: CredentialEnv;
+  /** The invocation's context, for a secret read's bundle revalidation. */
+  ctx?: SecretsExecutionContext;
   metadata: SessionMetadata;
   sandboxId: string;
   outboundContainerId?: string;
@@ -1655,7 +1659,13 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
-  const payload = buildSessionAttachPayload(metadata, undefined, env.AGENT_ENV_VARS_PRIVATE_KEY);
+  // A missing key stays optional, as before; the attach payload then carries no decrypted values.
+  const agentEnvVarsPrivateKey = await readCloudAgentNextSecret(
+    env,
+    'AGENT_ENV_VARS_PRIVATE_KEY',
+    input.ctx
+  ).catch(() => undefined);
+  const payload = buildSessionAttachPayload(metadata, undefined, agentEnvVarsPrivateKey);
   return prepareCredentialGrant({
     env,
     source: credentialSourceFromMetadata(metadata),

@@ -15,6 +15,7 @@ export const wiringSuites = [
   'scripts/deployment-workflows.test.mjs',
   'scripts/main-workflow-failure.test.mjs',
   'scripts/production-deploy-failure.test.mjs',
+  'scripts/copy-secrets-to-infisical.test.mjs',
   'scripts/meta-janitor-approve.test.mjs',
   'scripts/mobile-sbom-workflow.test.mjs',
   'scripts/sts-deployment-watch.test.mjs',

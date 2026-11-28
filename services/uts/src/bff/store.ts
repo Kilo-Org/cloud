@@ -53,10 +53,12 @@ export type ReadResult =
   | { outcome: 'active'; session: WebSession }
   | { outcome: 'invalid_session' | 'assertion_replay' };
 
-export type MintInput = HandleInput & { scope: string; stepUp: boolean };
+/** `orgId`: the organization the token binds to, or null for none. */
+export type MintInput = HandleInput & { scope: string; stepUp: boolean; orgId: string | null };
+/** `org_denied`: the subject cannot act in the named organization for this scope (design 5.8). */
 export type MintResult =
   | ({ outcome: 'issued'; sessionId: string } & Minted)
-  | { outcome: 'invalid_session' | 'step_up_required' | 'assertion_replay' };
+  | { outcome: 'invalid_session' | 'org_denied' | 'step_up_required' | 'assertion_replay' };
 
 /** A revoking call's outcome and the feed entries to publish (also on a repeat). */
 export type EndResult =
@@ -167,8 +169,10 @@ const MintRowSchema = z.discriminatedUnion('outcome', [
     signed_in_at: z.date(),
     sign_in_methods: z.array(z.string()).min(1),
     ...TokenColumns,
+    bound_org_id: z.uuid().nullable(),
+    org_role: z.enum(ORG_ROLES).nullable(),
   }),
-  failure(['invalid_session', 'step_up_required', 'assertion_replay']),
+  failure(['invalid_session', 'org_denied', 'step_up_required', 'assertion_replay']),
 ]);
 
 const EndRowSchema = z.discriminatedUnion('outcome', [
@@ -278,8 +282,8 @@ export function identityStoreWebSessions(store: IdentityStore): WebSessionStore 
 
     async mint(input) {
       const row = await one(
-        'SELECT * FROM uts.mint_web_session_token($1, $2, $3, $4, $5, $6, $7)',
-        [...handleValues(input), input.scope, input.stepUp],
+        'SELECT * FROM uts.mint_web_session_token($1, $2, $3, $4, $5, $6, $7, $8)',
+        [...handleValues(input), input.scope, input.stepUp, input.orgId],
         MintRowSchema
       );
       if (row.outcome !== 'issued') return { outcome: row.outcome };
@@ -287,8 +291,8 @@ export function identityStoreWebSessions(store: IdentityStore): WebSessionStore 
         outcome: 'issued',
         sessionId: row.web_session_id,
         subjectId: row.subject_id,
-        orgId: null,
-        orgRole: null,
+        orgId: row.bound_org_id,
+        orgRole: row.org_role,
         authTime: row.signed_in_at,
         amr: row.sign_in_methods,
         tokenIds: row.token_ids,

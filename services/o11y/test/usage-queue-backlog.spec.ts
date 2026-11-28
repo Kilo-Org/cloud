@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { evaluateAlerts } from '../src/alerting/evaluate';
 import { MONITORED_QUEUE_ID } from '../src/alerting/queue-backlog';
 import { DEAD_LETTER_QUEUE_NAME } from '../src/alerting/dead-letter-queue';
+import { stsBundle } from './sts-bundle-fixture';
 
 const NAME = 'usage-ingest-processing-eu';
 const ID = 'a'.repeat(32);
 const DLQ_ID = 'd'.repeat(32);
 const KEY = `o11y:queue_backlog:${ID}`;
-const secret = (value: string) => ({ get: async () => value }) as SecretsStoreSecret;
 
 function harness() {
   const store = new Map<string, string>();
@@ -93,9 +93,11 @@ function harness() {
       },
     },
     O11Y_CF_ACCOUNT_ID: 'test-account',
-    O11Y_CF_CONTAINERS_API_TOKEN: secret('synthetic-token'),
-    O11Y_SLACK_WEBHOOK_PAGE: secret('https://hooks.slack.com/page'),
-    O11Y_SLACK_WEBHOOK_TICKET: secret('https://hooks.slack.com/ticket'),
+    STS: stsBundle({
+      O11Y_CF_CONTAINERS_API_TOKEN: 'synthetic-token',
+      O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/page',
+      O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/ticket',
+    }),
   } as unknown as Env;
   return {
     store,

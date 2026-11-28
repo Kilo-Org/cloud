@@ -1,20 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { MONITORED_QUEUE_ID } from '../src/alerting/queue-backlog';
 import { queryQueueBacklog } from '../src/alerting/queue-backlog-query';
+import { stsBundle } from './sts-bundle-fixture';
 
 const ACCOUNT_ID = 'test-account-123';
 const API_TOKEN = 'test-token-abc';
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
-function makeSecret(value: string | null): SecretsStoreSecret {
-  return { get: async () => value } as unknown as SecretsStoreSecret;
-}
-
 function makeEnv(token: string | null = API_TOKEN) {
   return {
     O11Y_CF_ACCOUNT_ID: ACCOUNT_ID,
-    O11Y_CF_CONTAINERS_API_TOKEN: makeSecret(token),
+    STS: stsBundle({ O11Y_CF_CONTAINERS_API_TOKEN: token ?? '' }),
   };
 }
 

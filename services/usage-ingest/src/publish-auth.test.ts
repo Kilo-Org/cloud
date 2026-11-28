@@ -4,6 +4,7 @@ import worker from './index';
 import { enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaRecord } from './exa-usage.test-fixture';
 import { publishAuthMode } from './publish-auth';
+import { resetInternalAuthObservation } from '@kilocode/worker-utils/internal-auth-observation';
 import type { Env } from './publish-usage';
 import { RESOURCE_METADATA_PATH, USAGE_INGEST_RESOURCE_ORIGINS } from './sts';
 import { serviceClaims, signToken, testSigner, type TestSigner } from './sts-canary.test-fixture';
@@ -21,6 +22,7 @@ beforeAll(async () => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  resetInternalAuthObservation();
 });
 
 /** Serves the stand-in key set at the production issuer; `keySet: false` answers it with 500. */
@@ -38,6 +40,7 @@ function setup(overrides: Partial<Env> = {}) {
   const accepted = { metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } };
   const send = vi.fn<Env['USAGE_INGEST_QUEUE']['send']>().mockResolvedValue(accepted);
   const tagged = vi.fn<Env['USAGE_INGEST_ENKRYPT_QUEUE']['send']>().mockResolvedValue(accepted);
+  const writeDataPoint = vi.fn();
   const env: Env = {
     USAGE_INGEST_PUBLISH_SECRET: SECRET,
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics: vi.fn() },
@@ -45,11 +48,12 @@ function setup(overrides: Partial<Env> = {}) {
     USAGE_INGEST_ENKRYPT_QUEUE: { send: tagged, sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_ENKRYPT_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: 'true',
+    INTERNAL_AUTH_COUNTER: { writeDataPoint },
     STS_URL,
     STS_ENVIRONMENT: 'production',
     ...overrides,
   };
-  return { send, tagged, env };
+  return { send, tagged, env, writeDataPoint };
 }
 
 function publish(
@@ -166,6 +170,43 @@ describe('an unknown mode', () => {
 });
 
 describe('dual mode', () => {
+  it('reports each accepted request to the item-9 counter (design 9.4)', async () => {
+    stubKeySet();
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { env, writeDataPoint } = setup({ USAGE_INGEST_PUBLISH_AUTH: 'dual' });
+
+    expect((await worker.fetch(publish(`Bearer ${SECRET}`), env)).status).toBe(202);
+    expect((await worker.fetch(publish(await stsBearer()), env)).status).toBe(202);
+
+    const lines = log.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .filter(line => line.event === 'kilo_internal_auth');
+    expect(lines).toEqual([
+      expect.objectContaining({
+        receiver: 'usage-ingest',
+        route: 'usage_publish',
+        auth: 'legacy_shared_secret',
+        caller: 'unknown',
+        count: 1,
+      }),
+      expect.objectContaining({
+        receiver: 'usage-ingest',
+        route: 'usage_publish',
+        auth: 'sts',
+        caller: 'ai-gateway',
+        count: 1,
+      }),
+    ]);
+    // Both accepted requests also become one Analytics Engine data point each.
+    expect(writeDataPoint).toHaveBeenCalledTimes(2);
+    expect(writeDataPoint).toHaveBeenNthCalledWith(1, {
+      blobs: ['usage-ingest', 'usage_publish', 'legacy_shared_secret', 'unknown'],
+      doubles: [1],
+      indexes: [expect.any(String)],
+    });
+  });
+
   it('accepts the secret and a usage-ingest:usage.publish STS token, and labels each', async () => {
     stubKeySet();
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});

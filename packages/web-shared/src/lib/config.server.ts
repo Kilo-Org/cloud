@@ -121,6 +121,7 @@ export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
+export const CODE_REVIEW_WORKER_SENDER_AUTH = getEnvVariable('CODE_REVIEW_WORKER_SENDER_AUTH');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
 export const IMPACT_CAMPAIGN_ID = getEnvVariable('IMPACT_CAMPAIGN_ID') || '';
@@ -485,6 +486,7 @@ export const MODEL_EVAL_INGEST_URL = getEnvVariable('MODEL_EVAL_INGEST_URL') || 
 
 // Session ingest worker (public share proxy)
 export const SESSION_INGEST_WORKER_URL = getEnvVariable('SESSION_INGEST_WORKER_URL') || '';
+export const SESSION_INGEST_SENDER_AUTH = getEnvVariable('SESSION_INGEST_SENDER_AUTH');
 
 // Push-notifications worker (internal dispatch)
 export const NOTIFICATIONS_WORKER_URL = getEnvVariable('NOTIFICATIONS_WORKER_URL') || '';
@@ -519,6 +521,10 @@ export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';
 export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY_CLIENT_SECRET');
 export const O11Y_API_METRICS_SENDER_AUTH = getEnvVariable('O11Y_API_METRICS_SENDER_AUTH');
 export const O11Y_ALERTING_SENDER_AUTH = getEnvVariable('O11Y_ALERTING_SENDER_AUTH');
+// The credential the AI Gateway's US-region senders present to the web app's own /api/internal/*
+// routes (web-internal-sts.ts): absent, empty or `legacy` sends the internal secret; `sts` an STS
+// service token.
+export const WEB_INTERNAL_SENDER_AUTH = getEnvVariable('WEB_INTERNAL_SENDER_AUTH');
 
 // Pylon chat widget (support chat on Code Reviewer pages).
 // PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign

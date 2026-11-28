@@ -405,6 +405,9 @@ importers:
       '@kilocode/verify':
         specifier: workspace:*
         version: link:../../packages/verify
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../../packages/worker-utils
       next:
         specifier: 16.4.5
         version: 16.4.5(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.65.0)(@types/node@24.12.4)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -628,7 +631,7 @@ importers:
         version: 1.5.2(@types/react@19.3.0)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
       '@sentry/react-native':
         specifier: ~8.34.0
-        version: 8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1(bufferutil@4.2.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
+        version: 8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(patch_hash=0788a743245aad9c9a54369df351e79faacc757717d0d3d87f1954e2e61bec65)(@babel/runtime@7.29.7)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -2438,6 +2441,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../encryption
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../service-token-client
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../session-ingest-contracts
@@ -2463,6 +2469,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../sts-contracts
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -2704,6 +2713,9 @@ importers:
       hono:
         specifier: 4.13.16
         version: 4.13.16
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.17
       jsonc-parser:
         specifier: 3.3.1
         version: 3.3.1
@@ -2805,6 +2817,12 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../../packages/service-token-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3656,6 +3674,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 4.20260605.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3683,6 +3704,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/sts-contracts':
+        specifier: workspace:*
+        version: link:../../packages/sts-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3693,6 +3717,12 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 4.20260605.1
+      '@kilocode/service-token-client':
+        specifier: workspace:*
+        version: link:../../packages/service-token-client
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -3781,6 +3811,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3928,6 +3961,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/secrets-client':
+        specifier: workspace:*
+        version: link:../../packages/secrets-client
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -30582,7 +30618,7 @@ snapshots:
       '@sentry/conventions': 0.32.0
       '@sentry/core': 11.12.0
 
-  '@sentry/react-native@8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1(bufferutil@4.2.0)(utf-8-validate@6.0.6))(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
+  '@sentry/react-native@8.34.0(@babel/core@7.29.7)(@expo/config-types@58.0.3)(@expo/config@58.0.12(typescript@7.0.2))(@expo/env@2.6.0)(bufferutil@4.2.0)(dotenv@18.0.10)(expo-router@58.0.31)(expo@58.0.25)(metro-config@0.87.1)(metro-resolver@0.87.1)(open@11.0.0)(promise@8.3.0)(react-native@0.88.1(patch_hash=6b9e916f36eabdc061fad3018b88cbfe3cf65e519156c17d01ee0aad791427f8)(@types/react@19.3.0)(bufferutil@4.2.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(rollup@4.68.2)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 58.0.9(typescript@7.0.2)
       '@sentry/browser': 10.78.0

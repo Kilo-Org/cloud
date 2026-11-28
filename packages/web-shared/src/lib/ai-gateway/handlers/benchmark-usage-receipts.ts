@@ -9,6 +9,11 @@ import {
 import { inArray } from 'drizzle-orm';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-secret';
 
@@ -94,5 +99,11 @@ async function authorize(request: Request): Promise<Response | null> {
   if (!expected || !presented || !timingSafeEqual(presented, expected)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  observeInternalAuth(
+    'web',
+    'benchmark_usage_receipts',
+    'legacy_shared_secret',
+    callerLabel(request.headers.get(INTERNAL_CALLER_HEADER))
+  );
   return null;
 }

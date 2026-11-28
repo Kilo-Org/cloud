@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev --local --var SECRETS_SOURCE:secrets-store",
-    "start": "wrangler dev --local --var SECRETS_SOURCE:secrets-store",
+    "dev": "wrangler dev --env local --name o11y",
+    "start": "wrangler dev --env local --name o11y",
     "test": "vitest run",
     "test:watch": "vitest",
     "cf-typegen": "wrangler types",

@@ -1,5 +1,10 @@
 import { createMiddleware } from 'hono/factory';
 import { timingSafeEqual } from '@kilocode/encryption';
+import {
+  INTERNAL_CALLER_HEADER,
+  callerLabel,
+  observeInternalAuth,
+} from '@kilocode/worker-utils/internal-auth-observation';
 import { logger } from './logger';
 import type { HonoContext } from '../ai-attribution.worker';
 
@@ -32,6 +37,12 @@ export const adminAuthMiddleware = createMiddleware<HonoContext>(async (c, next)
   }
 
   logger.info('Admin request authenticated');
+  observeInternalAuth(
+    'ai-attribution',
+    'admin',
+    'legacy_shared_secret',
+    callerLabel(c.req.header(INTERNAL_CALLER_HEADER) ?? null)
+  );
 
   await next();
 });

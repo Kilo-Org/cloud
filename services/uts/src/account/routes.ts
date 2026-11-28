@@ -35,9 +35,11 @@ import type { AccountAccess, RevokeBotKeyResult } from './store';
 
 /**
  * The account API for PATs and org bot keys (design 5.3, 5.5, 5.8, 5.11). Every route takes a UTS
- * access token for the `uts` audience with the route's scope and a `sid`; each action is one
- * statement that checks the grant and its session (a revoked grant fails there at once), runs the
- * tier B gate for a create, and writes the audit row with the credential.
+ * access token for the `uts` audience with the route's scope and a `sid`, from the CLI or from the
+ * web BFF `kilo-web`; each action is one statement that checks the session `sid` names (a CLI
+ * grant and its device session, or the BFF's browser session) for the token's subject, so an ended
+ * session fails there at once, runs the tier B gate for a create on that session, and writes the
+ * audit row with the credential.
  *
  * | Route | Scope |
  * |---|---|

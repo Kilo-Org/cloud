@@ -167,7 +167,7 @@ describe('authorize', () => {
   it('retries a failed secret fetch and caches only the resolved value', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const get = vi
-      .fn<() => Promise<string | null>>()
+      .fn<() => Promise<string>>()
       .mockRejectedValueOnce(new Error('secret store unavailable'))
       .mockResolvedValue(GRANT_SECRET);
     const bindingEnv = env({ SESSION_SYNC_SECRET: { get } });

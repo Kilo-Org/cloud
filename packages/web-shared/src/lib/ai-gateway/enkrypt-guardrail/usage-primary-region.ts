@@ -6,12 +6,21 @@ import { readInternalApiSecret } from '@kilocode/web-shared/lib/internal-api-sec
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import {
+  REGION_HANDOFF_TOKEN_WAIT_MS,
+  STS_WEB_USAGE_RECORD_REGION_HANDOFF,
+  webInternalSenderCredential,
+  type WebInternalSenderCredential,
+} from '@kilocode/web-shared/lib/web-internal-sts';
+import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageWriteResponseSchema,
   type EnkryptUsageWriteInput,
 } from '@kilocode/usage-contracts';
 
-/** Must stay below the endpoint's `maxDuration`; matches `recordUsageInPrimaryRegion`. */
+/**
+ * The whole handoff, the credential included. Must stay below the endpoint's `maxDuration`;
+ * matches `recordUsageInPrimaryRegion`.
+ */
 const HANDOFF_TIMEOUT_MS = 90_000;
 
 /**
@@ -38,13 +47,24 @@ export async function recordEnkryptUsageInPrimaryRegion(
 }
 
 async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | null> {
-  let internalApiSecret: string;
+  // `WEB_INTERNAL_SENDER_AUTH`: the internal secret unless set to `sts`, then a
+  // `web:usage.region-handoff.record` STS token. Without one the caller writes locally. A cold
+  // mint waits at most `REGION_HANDOFF_TOKEN_WAIT_MS`, taken out of `HANDOFF_TIMEOUT_MS`.
+  const startedAt = Date.now();
+  let credential: WebInternalSenderCredential;
   try {
-    internalApiSecret = await readInternalApiSecret();
+    credential = await webInternalSenderCredential(STS_WEB_USAGE_RECORD_REGION_HANDOFF, {
+      legacySecret: readInternalApiSecret,
+      tokenWait: REGION_HANDOFF_TOKEN_WAIT_MS,
+    });
   } catch {
     return 'internal_api_secret_unavailable';
   }
-  if (!internalApiSecret) return 'missing_internal_api_secret';
+  if (credential.kind === 'unavailable') {
+    return credential.reason === 'secret_missing'
+      ? 'missing_internal_api_secret'
+      : `credential_${credential.reason}`;
+  }
   if (!APP_URL) return 'missing_app_url';
   if (!parseInternalServiceUrl(APP_URL)) return 'unsupported_app_url';
 
@@ -54,10 +74,10 @@ async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | nul
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': internalApiSecret,
+        [credential.header]: credential.value,
       },
       body: JSON.stringify(usageWrite),
-      signal: AbortSignal.timeout(HANDOFF_TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.max(1, HANDOFF_TIMEOUT_MS - (Date.now() - startedAt))),
       cache: 'no-store',
     });
   } catch (error) {

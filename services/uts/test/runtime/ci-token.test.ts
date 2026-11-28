@@ -526,6 +526,7 @@ describe('the CI token exchange', () => {
       authorizationServerMetadata(
         config,
         { kind: 'ready', deps: oauthDeps(unexpectedStore, { ci }) },
+        false,
         false
       ).grant_types_supported;
     expect(grantTypes(ciService())).toContain(UTS_GRANT_TYPES.tokenExchange);

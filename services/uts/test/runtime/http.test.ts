@@ -26,6 +26,7 @@ const productionEnv: Env = {
   DO_JURISDICTION: 'eu',
   WEBAUTHN_RP_ID: 'app.kilo.ai',
   WEBAUTHN_ORIGINS: 'https://uts.kiloapps.io',
+  SECRETS_SOURCE: 'worker',
   IDENTITY_STORE: undefined,
 };
 

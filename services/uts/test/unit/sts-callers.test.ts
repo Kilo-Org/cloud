@@ -34,6 +34,7 @@ function configFor(environment: UtsEnvironment): UtsConfig {
     environment,
     endpoints: UTS_ENDPOINTS[environment],
     jurisdiction: environment === 'development' ? 'none' : 'eu',
+    secretsSource: 'worker',
     relyingParty: { rpId: 'localhost', origins: ['http://localhost:8800'] },
     managerBaseUrl: null,
     loginRotation: { status: 'off' },

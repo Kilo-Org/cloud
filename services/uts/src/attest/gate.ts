@@ -7,13 +7,14 @@ import {
 } from '@kilocode/uts-contracts';
 import { Buffer } from 'node:buffer';
 import type { UtsConfig } from '../env';
+import type { UtsSecrets } from '../secrets';
 import { oauthError, temporarilyUnavailable } from '../oauth/errors';
 import type { Params } from '../oauth/params';
 import { verifyAssertion, verifyKeyAttestation } from './app-attest';
 import {
   ATTEST_VAR_NAMES,
   type AttestEnv,
-  type AttestVarName,
+  type AttestProblem,
   type AttestationSettings,
   attestationPolicy,
   readAttestationConfig,
@@ -49,19 +50,22 @@ export type AttestationGateDeps = {
 
 /**
  * `unattested_development` carries the store for the exempt statement, which the exchange
- * statement's backstop needs before it consumes the code (migration 0017).
+ * statement's backstop needs before it consumes the code (migration 0017). `unavailable`: the
+ * attestation key could not be read from STS; the code exchange answers a retryable 503.
  */
 export type AttestationService =
-  | { kind: 'refused'; problems: readonly AttestVarName[] }
+  | { kind: 'refused'; problems: readonly AttestProblem[] }
   | { kind: 'unattested_development'; store: AttestationAccess }
+  | { kind: 'unavailable' }
   | { kind: 'verified'; gate: AttestationGateDeps };
 
 /** Codes in verification, per isolate. */
 const inFlight = new Set<string>();
 
 type IsolatePolicy =
-  | { kind: 'refused'; problems: readonly AttestVarName[] }
+  | { kind: 'refused'; problems: readonly AttestProblem[] }
   | { kind: 'unattested_development' }
+  | { kind: 'unavailable' }
   | { kind: 'verified'; settings: AttestationSettings; decode: PlayDecode };
 
 /**
@@ -70,10 +74,16 @@ type IsolatePolicy =
  */
 let isolatePolicy: { key: string; policy: IsolatePolicy } | null = null;
 
-function policyOf(env: AttestEnv, environment: UtsEnvironment): IsolatePolicy {
-  const key = JSON.stringify([environment, ...ATTEST_VAR_NAMES.map(name => env[name] ?? null)]);
+function policyOf(env: AttestEnv, secrets: UtsSecrets, environment: UtsEnvironment): IsolatePolicy {
+  const key = JSON.stringify([
+    environment,
+    ...ATTEST_VAR_NAMES.map(name => env[name] ?? null),
+    secrets.status === 'read'
+      ? (secrets.values.ATTEST_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY ?? null)
+      : { unavailable: true },
+  ]);
   if (isolatePolicy?.key === key) return isolatePolicy.policy;
-  const policy = attestationPolicy(readAttestationConfig(env, environment), environment);
+  const policy = attestationPolicy(readAttestationConfig(env, secrets, environment), environment);
   let resolved: IsolatePolicy;
   if (policy.kind === 'verified') {
     const { play } = policy.settings;
@@ -98,11 +108,12 @@ function policyOf(env: AttestEnv, environment: UtsEnvironment): IsolatePolicy {
 /** The attestation service of an environment whose identity store is bound. */
 export function attestationService(
   env: AttestEnv,
+  secrets: UtsSecrets,
   config: UtsConfig,
   store: AttestationAccess
 ): AttestationService {
-  const policy = policyOf(env, config.environment);
-  if (policy.kind === 'refused') return policy;
+  const policy = policyOf(env, secrets, config.environment);
+  if (policy.kind === 'refused' || policy.kind === 'unavailable') return policy;
   if (policy.kind === 'unattested_development') return { kind: 'unattested_development', store };
   return {
     kind: 'verified',

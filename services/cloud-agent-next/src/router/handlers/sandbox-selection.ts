@@ -34,7 +34,12 @@ export const getSandboxSelectionOptions = protectedProcedure
       );
     }
     const owner = { userId: ctx.userId, orgId: input.kilocodeOrganizationId };
-    const readiness = await resolveVercelSelectionReadiness(ctx.env, owner);
+    const readiness = await resolveVercelSelectionReadiness(
+      ctx.env,
+      owner,
+      undefined,
+      ctx.executionCtx
+    );
     const capabilities = await getSandboxSelectionCapabilities(ctx.env, owner, {
       ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
       ...readiness,

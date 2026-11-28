@@ -507,6 +507,7 @@ Workloads with a policy, all over `worker-binding`:
 | `usage-ingest` | development, staging, production | `services/usage-ingest/wrangler.jsonc` |
 | `bouncer-watch` | production | `watch/wrangler.jsonc` in `Kilo-Org/bouncer`; its STS binding arrives with bouncer's step 2 |
 | `notifications` | production | `services/notifications/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
+| `uts` | staging, production | `services/uts/wrangler.jsonc`; reads stay on the Worker secrets until `SECRETS_SOURCE` is `sts`; no development, because the `uts-local` config binds no STS |
 | `kilo-ai-attribution` | production | `services/ai-attribution/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `auto-routing` | production | `services/auto-routing/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |
 | `auto-routing-benchmark` | production | `services/auto-routing-benchmark/wrangler.jsonc`; reads stay on the Secrets Store until `SECRETS_SOURCE` is `sts` |

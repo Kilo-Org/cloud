@@ -11,6 +11,9 @@ const mockPayload: ExecutionCallbackPayload = {
   status: 'completed',
 };
 
+/** These targets are no listed callback route, so every switch keeps their stored headers. */
+const SENDER = { env: {} };
+
 describe('classifyCallbackError', () => {
   it('fails a parent authority denial without retrying', () => {
     expect(
@@ -47,7 +50,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 500 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('retry');
       if (result.type === 'retry') {
@@ -59,7 +62,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 500 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 2);
+      const result = await deliverCallbackJob(target, mockPayload, 2, SENDER);
 
       expect(result.type).toBe('retry');
       if (result.type === 'retry') {
@@ -71,7 +74,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 500 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 3);
+      const result = await deliverCallbackJob(target, mockPayload, 3, SENDER);
 
       expect(result.type).toBe('retry');
       if (result.type === 'retry') {
@@ -83,7 +86,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 500 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 5);
+      const result = await deliverCallbackJob(target, mockPayload, 5, SENDER);
 
       expect(result.type).toBe('failed');
       if (result.type === 'failed') {
@@ -95,7 +98,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 429 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('retry');
     });
@@ -104,7 +107,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 400 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('failed');
     });
@@ -113,7 +116,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 404 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('failed');
     });
@@ -130,7 +133,7 @@ describe('deliverCallbackJob', () => {
         headers: { 'X-Internal-Secret': 'secret' },
       };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('failed');
       expect(redirectFetch).toHaveBeenCalledTimes(1);
@@ -156,7 +159,7 @@ describe('deliverCallbackJob', () => {
             new Response(null, { status: 307, headers: location ? { Location: location } : {} })
           );
 
-        await deliverCallbackJob(target, mockPayload, 1);
+        await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
         const fields = withFields.mock.calls.map(([logged]) => logged);
         expect(fields).toContainEqual(expect.objectContaining({ status: 307 }));
@@ -170,7 +173,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 502 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('retry');
     });
@@ -179,7 +182,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 503 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('retry');
     });
@@ -194,7 +197,7 @@ describe('deliverCallbackJob', () => {
         headers: { 'X-Internal-Secret': 'secret' },
       };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('success');
       expect(callbackFetch).toHaveBeenCalledWith(
@@ -210,7 +213,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('success');
     });
@@ -219,7 +222,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response('', { status: 201 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('success');
     });
@@ -228,7 +231,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('success');
     });
@@ -250,7 +253,7 @@ describe('deliverCallbackJob', () => {
         },
       };
 
-      await deliverCallbackJob(target, payload, 1);
+      await deliverCallbackJob(target, payload, 1, SENDER);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://example.com/callback',
@@ -270,7 +273,7 @@ describe('deliverCallbackJob', () => {
         messageId: 'msg_018f1e2d3c4bCallbackMsgId',
       };
 
-      await deliverCallbackJob(target, payload, 1);
+      await deliverCallbackJob(target, payload, 1, SENDER);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://example.com/callback',
@@ -288,7 +291,7 @@ describe('deliverCallbackJob', () => {
         headers: { Authorization: 'Bearer token123' },
       };
 
-      await deliverCallbackJob(target, mockPayload, 1);
+      await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(mockFetch).toHaveBeenCalledWith(
         'https://example.com/callback',
@@ -307,7 +310,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 1);
+      const result = await deliverCallbackJob(target, mockPayload, 1, SENDER);
 
       expect(result.type).toBe('retry');
     });
@@ -316,7 +319,7 @@ describe('deliverCallbackJob', () => {
       globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const target: CallbackTarget = { url: 'https://example.com/callback' };
 
-      const result = await deliverCallbackJob(target, mockPayload, 5);
+      const result = await deliverCallbackJob(target, mockPayload, 5, SENDER);
 
       expect(result.type).toBe('failed');
       if (result.type === 'failed') {

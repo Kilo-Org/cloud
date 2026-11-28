@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@kilocode/sts-contracts": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
@@ -27,6 +28,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/secrets-client": "workspace:*",
+    "@kilocode/service-token-client": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "expo-server-sdk": "6.1.0",

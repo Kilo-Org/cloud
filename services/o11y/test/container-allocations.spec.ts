@@ -5,6 +5,7 @@ import {
   queryContainerAllocations,
 } from '../src/alerting/container-allocations';
 import { buildSlackMessage, type AlertPayload } from '../src/alerting/notify';
+import { stsBundle } from './sts-bundle-fixture';
 
 const application = {
   id: 'production-id',
@@ -22,20 +23,21 @@ function instance(id: string, state: string) {
   return { id, status: { state } };
 }
 
-function makeEnv() {
+function makeEnv(token = 'test-token') {
   const store = new Map<string, string>();
   const get = vi.fn(async (key: string) => store.get(key) ?? null);
   const put = vi.fn(async (key: string, value: string, _options?: KVNamespacePutOptions) => {
     store.set(key, value);
   });
-  const secret = { get: async () => 'test-token' } as SecretsStoreSecret;
   return {
     env: {
       O11Y_CF_ACCOUNT_ID: 'test-account',
-      O11Y_CF_CONTAINERS_API_TOKEN: secret,
       O11Y_ALERT_STATE: { get, put } as unknown as KVNamespace,
-      O11Y_SLACK_WEBHOOK_PAGE: secret,
-      O11Y_SLACK_WEBHOOK_TICKET: secret,
+      STS: stsBundle({
+        O11Y_CF_CONTAINERS_API_TOKEN: token,
+        O11Y_SLACK_WEBHOOK_PAGE: 'https://hooks.slack.com/page',
+        O11Y_SLACK_WEBHOOK_TICKET: 'https://hooks.slack.com/ticket',
+      }),
     },
     store,
     get,
@@ -147,8 +149,7 @@ describe('queryContainerAllocations', () => {
   });
 
   it('fails before fetching when the API token is missing', async () => {
-    const { env } = makeEnv();
-    env.O11Y_CF_CONTAINERS_API_TOKEN = { get: async () => '' } as SecretsStoreSecret;
+    const { env } = makeEnv('');
     const fetchFn = vi.fn<typeof fetch>();
     await expect(queryContainerAllocations(env, fetchFn)).rejects.toThrow(
       'O11Y_CF_CONTAINERS_API_TOKEN secret is not configured'

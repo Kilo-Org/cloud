@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { recordAlertFired, shouldSuppress } from './dedup';
 import { sendAlertNotification, type AlertPayload } from './notify';
 import type { SecretsExecutionContext } from '@kilocode/secrets-client';
-import { readO11ySecret } from '../secrets';
+import { readO11ySecret, type O11ySecretsEnv } from '../secrets';
 
 export const NATIVE_CONTAINER_APP = 'cloud-agent-next-sandboxcontainers';
 export const CONTAINER_ALLOCATION_THRESHOLDS = { info: 500, ticket: 1000, page: 5000 } as const;
@@ -13,12 +13,9 @@ export type ContainerAllocations = {
   stopping: number;
 };
 
-type AllocationEnv = {
+type AllocationEnv = O11ySecretsEnv & {
   O11Y_CF_ACCOUNT_ID: string;
-  O11Y_CF_CONTAINERS_API_TOKEN: SecretsStoreSecret;
   O11Y_ALERT_STATE: KVNamespace;
-  O11Y_SLACK_WEBHOOK_PAGE: SecretsStoreSecret;
-  O11Y_SLACK_WEBHOOK_TICKET: SecretsStoreSecret;
 };
 
 const PaginationSchema = z.object({ next_page_token: z.string().optional() });
@@ -39,7 +36,7 @@ const InstancesSchema = z.object({
 });
 
 export async function queryContainerAllocations(
-  env: Pick<AllocationEnv, 'O11Y_CF_ACCOUNT_ID' | 'O11Y_CF_CONTAINERS_API_TOKEN'>,
+  env: Pick<AllocationEnv, 'O11Y_CF_ACCOUNT_ID' | 'STS'>,
   fetchFn: typeof fetch = fetch,
   ctx?: SecretsExecutionContext
 ): Promise<ContainerAllocations> {

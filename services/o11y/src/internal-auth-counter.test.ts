@@ -1,12 +1,28 @@
+import type { BundleResult } from '@kilocode/sts-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { summarizeInternalAuthCounter, type InternalAuthCounterEnv } from './internal-auth-counter';
 
-vi.mock('./secrets', () => ({ readO11ySecret: async () => 'test-token' }));
+/** Served by the fake broker, so a test can prove the request carries the token the reader read. */
+const TOKEN = 'test-ae-token';
 
-const env = {
+/** The real reader over a fake STS bundle: one binding per env, since it caches one per binding. */
+const env: InternalAuthCounterEnv = {
   O11Y_CF_ACCOUNT_ID: 'account',
-  O11Y_CF_AE_API_TOKEN: {},
-} as unknown as InternalAuthCounterEnv;
+  STS: {
+    async getBundle(): Promise<BundleResult> {
+      return {
+        status: 'ok',
+        workload: 'o11y',
+        environment: 'production',
+        etag: '"0123456789abcdef"',
+        stale: false,
+        fetchedAt: '2026-11-25T00:00:00.000Z',
+        secrets: { O11Y_CF_AE_API_TOKEN: { value: TOKEN, version: 1 } },
+        missing: [],
+      };
+    },
+  },
+};
 
 const WINDOW = 1795769220;
 /** Three minutes after the window: the cron's scheduled time for the run that reads it. */
@@ -90,6 +106,7 @@ describe('summarizeInternalAuthCounter', () => {
     await summarizeInternalAuthCounter(env, undefined, SCHEDULED_MS);
 
     const sql = String((fetchMock.mock.calls[0]?.[1] as { body?: string } | undefined)?.body);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({ Authorization: `Bearer ${TOKEN}` });
     expect(sql).toContain('FROM kilo_internal_auth');
     expect(sql).toContain('SUM(_sample_interval * double1) AS accepted');
     expect(sql).toContain('blob1 AS receiver');

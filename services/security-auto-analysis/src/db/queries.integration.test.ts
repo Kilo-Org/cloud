@@ -412,6 +412,143 @@ describe('security analysis durable database invariants', () => {
     ).resolves.toEqual({ status: 'launch-started' });
   });
 
+  describe('redelivery of a restart whose claim stored a random token', () => {
+    // A later release stores a random restart token; this release must still recognise that
+    // claim by its job id so a rollback keeps redelivery.
+    async function insertRandomClaim(
+      suffix: string,
+      queueStatus: 'pending' | 'running',
+      findingStatus: string | null
+    ) {
+      const findingId = await insertFinding(suffix, findingStatus);
+      const commandId = randomUUID();
+      const randomToken = randomUUID();
+      await client.db.insert(security_analysis_queue).values({
+        finding_id: findingId,
+        owned_by_user_id: testUserId,
+        queue_status: queueStatus,
+        severity_rank: 1,
+        queued_at: '2026-05-18T08:00:00.000Z',
+        claimed_at: '2026-05-18T08:00:00.000Z',
+        claimed_by_job_id: `manual-restart:${commandId}`,
+        claim_token: randomToken,
+      });
+      return { findingId, commandId, randomToken };
+    }
+
+    async function queueRow(findingId: string) {
+      const [row] = await client.db
+        .select({
+          status: security_analysis_queue.queue_status,
+          claimToken: security_analysis_queue.claim_token,
+          claimedByJobId: security_analysis_queue.claimed_by_job_id,
+        })
+        .from(security_analysis_queue)
+        .where(eq(security_analysis_queue.finding_id, findingId));
+      return row;
+    }
+
+    it('reclaims a still-pending row and keeps the stored token', async () => {
+      const { findingId, commandId, randomToken } = await insertRandomClaim(
+        'random-restart-pending',
+        'pending',
+        null
+      );
+      await expect(
+        prepareActiveAnalysisRestart(client.db as never, {
+          findingId,
+          owner: { type: 'user', id: testUserId },
+          commandId,
+        })
+      ).resolves.toEqual({ status: 'ready', claimToken: randomToken, oldCloudAgentSessionId: null });
+      expect(await queueRow(findingId)).toEqual({
+        status: 'pending',
+        claimToken: randomToken,
+        claimedByJobId: `manual-restart:${commandId}`,
+      });
+    });
+
+    it('answers launch-started for a running row without restarting it again', async () => {
+      const { findingId, commandId, randomToken } = await insertRandomClaim(
+        'random-restart-running',
+        'running',
+        'running'
+      );
+      await expect(
+        prepareActiveAnalysisRestart(client.db as never, {
+          findingId,
+          owner: { type: 'user', id: testUserId },
+          commandId,
+        })
+      ).resolves.toEqual({ status: 'launch-started' });
+      expect(await queueRow(findingId)).toEqual({
+        status: 'running',
+        claimToken: randomToken,
+        claimedByJobId: `manual-restart:${commandId}`,
+      });
+    });
+
+    it('still treats another command as a duplicate of a pending claim', async () => {
+      const { findingId, randomToken, commandId } = await insertRandomClaim(
+        'random-restart-other-command',
+        'pending',
+        null
+      );
+      await expect(
+        prepareActiveAnalysisRestart(client.db as never, {
+          findingId,
+          owner: { type: 'user', id: testUserId },
+          commandId: randomUUID(),
+        })
+      ).resolves.toEqual({ status: 'no-op' });
+      expect(await queueRow(findingId)).toEqual({
+        status: 'pending',
+        claimToken: randomToken,
+        claimedByJobId: `manual-restart:${commandId}`,
+      });
+    });
+
+    it('keeps writing the command-derived token for a fresh restart', async () => {
+      const { findingId } = await insertRandomClaim('random-restart-fresh', 'running', 'running');
+      const commandId = randomUUID();
+      await expect(
+        prepareActiveAnalysisRestart(client.db as never, {
+          findingId,
+          owner: { type: 'user', id: testUserId },
+          commandId,
+        })
+      ).resolves.toEqual({
+        status: 'ready',
+        claimToken: `manual-restart:${commandId}`,
+        oldCloudAgentSessionId: null,
+      });
+    });
+  });
+
+  it('reclaims a same-command pending row that holds the command-derived token', async () => {
+    const findingId = await insertFinding('active-restart-pending-redelivery', null);
+    const commandId = randomUUID();
+    const claimToken = `manual-restart:${commandId}`;
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: findingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'pending',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: claimToken,
+      claim_token: claimToken,
+    });
+
+    await expect(
+      prepareActiveAnalysisRestart(client.db as never, {
+        findingId,
+        owner: { type: 'user', id: testUserId },
+        commandId,
+      })
+    ).resolves.toEqual({ status: 'ready', claimToken, oldCloudAgentSessionId: null });
+  });
+
   it('requeues stale pending rows and terminalizes stale running rows in real SQL', async () => {
     const pendingFindingId = await insertFinding('stale-pending');
     const runningFindingId = await insertFinding('stale-running', 'running');

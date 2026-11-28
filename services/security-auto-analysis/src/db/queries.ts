@@ -434,7 +434,10 @@ export async function prepareActiveAnalysisRestart(
   db: WorkerDb,
   params: { findingId: string; owner: QueueOwner; commandId: string }
 ): Promise<ActiveAnalysisRestartPreparation> {
-  const claimToken = `manual-restart:${params.commandId}`;
+  // This release still writes the command-derived token. A redelivery recognises its own claim by
+  // that token or by its job id, and keeps whatever token the claim stored, so a later release may
+  // store a random token and still be rolled back to this one without losing redelivery.
+  const derivedClaimToken = `manual-restart:${params.commandId}`;
   const jobId = `manual-restart:${params.commandId}`;
 
   return db.transaction(async tx => {
@@ -443,6 +446,7 @@ export async function prepareActiveAnalysisRestart(
         id: security_analysis_queue.id,
         status: security_analysis_queue.queue_status,
         claimToken: security_analysis_queue.claim_token,
+        claimedByJobId: security_analysis_queue.claimed_by_job_id,
         ownedByOrganizationId: security_analysis_queue.owned_by_organization_id,
         ownedByUserId: security_analysis_queue.owned_by_user_id,
       })
@@ -478,7 +482,11 @@ export async function prepareActiveAnalysisRestart(
       finding.ownedByUserId === expectedUserId;
     if (!ownerMatches) return { status: 'no-op' };
 
-    if (queue.claimToken === claimToken) {
+    const storedToken = queue.claimToken;
+    const ownClaim =
+      storedToken !== null && (storedToken === derivedClaimToken || queue.claimedByJobId === jobId);
+    const claimToken = ownClaim ? storedToken : derivedClaimToken;
+    if (ownClaim) {
       if (queue.status === 'running' || finding.analysisStatus === 'running') {
         return { status: 'launch-started' };
       }
